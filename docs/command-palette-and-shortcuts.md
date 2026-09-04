@@ -9,8 +9,8 @@ neither fetches a row or invokes one. Until 2026-09-03 each host did all of that
 is why a nested or asynchronous command could not be added to one without being reproduced in the
 other.
 
-**A command may be a group.** `CommandContribution` is a discriminated union — an action, a group, and
-later a search, an input and a setting — and a static command may name a group registered by the same
+**A command may be a group.** `CommandContribution` is a discriminated union — an action, a group, a
+search, an input and a setting — and a static command may name a group registered by the same
 contributor as its `parentId`. Cross-contributor parenting is refused, and so are duplicate ids, a
 parent that is not a group, and a cycle: each becomes a dropped node and one diagnostic rather than a
 palette that will not draw (`registries/commands/graph.ts`).
@@ -31,12 +31,24 @@ command with no executor is passed to the registered palette presenter, which op
 command's frame (`registries/commands/presenter.ts`). A leaf named that way opens at its parent with
 the cursor on it.
 
-**A command may also be a search or an input.** A `search` command owns the field: the host debounces
-the typing (250 ms and two characters by default), asks its provider with an `AbortSignal`, and draws
-the instruction, loading, empty, error or result state that came back. An `input` command is never
-debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a failure
-keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a character;
-the end of the composition schedules once.
+**A command may also be a search, an input or a setting.** A `search` command owns the field: the host
+debounces the typing (250 ms and two characters by default), asks its provider with an `AbortSignal`,
+and draws the instruction, loading, empty, error or result state that came back. An `input` command is
+never debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a
+failure keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a
+character; the end of the composition schedules once.
+
+**A setting shows what is set before it changes it.** Entering a `setting` frame asks its owner what
+the value currently is, draws the two-to-thirty-two declared choices, and marks the one that is set.
+Picking a choice writes it, keeps the frame open, and marks whatever the owner says it *stored* — never
+what was asked for, so a failed write leaves the list telling the truth. A value naming none of the
+declared choices is refused rather than shown, a stored value the choices do not name leaves the list
+unmarked, and a failed read is one line that Enter reads again. Typing narrows the choices and asks
+nobody anything.
+
+Every Boolean setting is an explicit On and Off rather than a blind toggle, so the command shows the
+current value and means the same thing pressed twice. Free text, secrets, dependent fields and
+anything that saves several values at once stay Settings pages.
 
 **A stale answer cannot land.** Every request carries a generation taken when it was scheduled, and an
 answer is applied only if that generation is still current. The abort is the optimisation and the
@@ -62,15 +74,63 @@ and executor. An external change to the node, workspace, project or task closes 
 outstanding; a command that navigates closes through its own outcome first, so its error still has
 somewhere to be reported.
 
-Task rows, workspace rows and `paletteRows` contributions are compatibility providers over that
-session and keep the order the flat list had. They go as their owners become commands.
+**A setting has one accessor, and the page and the command both call it.** There is no reflection of
+Settings pages into commands: a page is an arbitrary component, and scraping one would couple the
+palette to rendering and create a second persistence path. An owner opts a value in by registering a
+setting command whose reader and writer are the ones its page already uses — Appearance's five choices
+and the six notification switches are core's own, in
+`client-core/host/registries/commands/coreCommands.ts` over
+`features/settings/appearancePrefs.ts` and `features/notifications/settings.ts`. The host that
+contributes those Settings pages is the host that registers their commands, so a client with no
+Appearance page has no Appearance command to disagree with it.
+
+**Core's own catalogue is a small tree.** `Go to` holds the task, workspace, project and node
+searches, `Panes` and `Terminal` hold the task-scoped operations that were loose at the root,
+`Settings` holds one row per registered settings page, and `Appearance` and `Notifications` hold the
+settings core owns. Going to a task or a workspace was a special kind of palette item until
+2026-09-03, composed into the root by hand and invoked through a switch on what a row was about; it is
+a `fleet`-scoped search now, so the root shows one named row instead of every task the fleet has, and
+switching node still happens before a remote task is activated.
+
+**Every row in the palette is a command.** There was a second way in until 2026-09-03: a
+`paletteRows` contribution, with `rows` and `invoke` where a command has `run`, fetched by each host
+when the palette opened. It solved ownership — no host switched on a plugin's row kind — and it cost
+everything else. A row source had no owner, no capability gate, no disposal and no shortcut, so each
+of those had to be arranged for it separately; it refreshed on open rather than on the query; it
+carried a task id rather than an execution context; it could express no child, no input, no setting
+and no cancellation; and only a compiled plugin could supply its callbacks, so a loaded plugin could
+never contribute a live row at all. Its last two contributors — the terminal's run targets, layout
+recipes and live sessions, and the workflow definitions — are `search` commands their plugins register
+through `ctx.commands`. The registry, `ctx.paletteRows`, the two published types and the session's
+row-provider seam went with them; `PLUGIN_API_MAJOR` moved to `10` for the two names
+([plugins.md](./plugins.md) § The plugin API). Ownership, capability gating and disposal come with a
+command registration, so disabling a plugin takes its group and everything under it out of the graph
+together.
+
+Five architectural rules in `tools/arch/boundaries.test.ts` hold the shape: there is one
+`createCommandSession` and both hosts build theirs from it; neither host's palette files compose,
+fetch, rank or invoke; no manifest frame target and no slot id is the palette; a search response
+carries no field naming an action, a route, a URL or a verb; and there is no palette-row registry
+beside the command one.
+
+Each plugin's catalogue is short on purpose. The editor contributes quick-open and find-in-files;
+github a changed-file finder, a pull-request finder, create-a-pull-request and its rail source; agents
+the Agent Center, a session search, the two harness terminals and two settings; docker an open action
+and one search over containers, images, volumes and networks; terminal a run-target search, a layout
+search and a session search; workflows a definition search; database and http their groups of saved
+rows and one submitted input each; linear and rollbar an issue search each; memory a search and the
+proposals view; notes a three-scope finder and a create-a-note input; changes, context and preview one
+open action each; and onboarding none. Each plugin's own document has the whole of its share under
+"From the command palette". What is *not* there is the point: stopping an agent, removing a container, deleting a
+note, merging a pull request and approving a workflow gate all need context and a confirmation that a
+low-context row cannot carry, so they stay in the surfaces that have both.
 
 ## Global commands
 
 | Shortcut | Action |
 | --- | --- |
 | `⌘K` | Open command palette |
-| `⌘P` | Open worktree file finder |
+| `⌘P` | Go to a file in the worktree (the palette, at the editor's search) |
 | `⌘L` | Open workspace switcher |
 | `⌘⇧N` | Create a local task |
 | `⌘⇧T` | Toggle terminal drawer |
@@ -84,22 +144,50 @@ contenteditable elements stop global commands unless a command explicitly opts i
 
 ## Palette data
 
-Palette rows can be static or task/Node-backed. Fleet rows carry a Node label and tolerate partial
+Every row the session draws is a `SessionRow`: an id that is stable across a refresh, a label, an
+optional hint, an optional badge, an optional breadcrumb, and one of three actions — enter this
+command's frame, run this, or nothing. That last one is a line that explains why the list is short,
+and it is never the selection. The renderers get that and no more: neither of them knows what a run
+target, a task or a Rollbar issue is, which is what stopped the two of them drifting apart.
+
+Rows can be static or task/Node-backed. Fleet rows carry a Node label and tolerate partial
 availability. A row action targets the Node that owns its resource; no aggregate action pretends to
 be cross-Node atomic.
 
-Run targets and workflow rows are contributed from the Node's task configuration. Pane and source
-commands are registered by their owning plugin. A loaded plugin's manifest `commands` descriptors are
+Run targets, layout recipes and workflow definitions come from the Node's task configuration, read
+once when their frame opens and filtered on the device after that. Pane and source commands are
+registered by their owning plugin. A loaded plugin's manifest `commands` descriptors are
 promoted into the same command registry: one command supplies both its optional palette row and any
-keybinding target. The legacy manifest `palette` array is a compatibility alias for a command with
-`palette: true`; it never produces a second row.
+keybinding target. The older manifest `palette` array is a compatibility alias for a command with
+`palette: true`; it is rewritten into one at registration and never produces a second row.
 
-A manifest may declare an action, a group, a search or an input (`docs/plugins.md § Command kinds`).
+A manifest may declare an action, a group, a search, an input or a setting
+(`docs/plugins.md § Command kinds`).
 A declarative search names a route in the plugin's own namespace and one static verb for the row that
 is picked; the host sends the query and the identifiers the declared scope owns, drops every field of
 the answer it does not name, caps the rendered set, and runs the manifest's verb. A response cannot
 name a route, a URL, a command or a verb, which is the whole of why a plugin's live rows are safe to
 draw in a host surface.
+
+The verb a search picks a row with may be `navigate`, which no other command may name. Rollbar and
+Linear both use it: their item detail belongs to the project rather than to a task, so picking a row
+changes the URL and the surface beside the rail list follows, exactly as clicking the same row in that
+list does. It is available there and nowhere else because it needs a selected row and a routed
+project, and a search at project scope is the one command site that has both. The address is still
+minted from the pattern the host registered, with the row's sanitized id as the item.
+
+`surfaceAction` is the other verb worth naming here, because a command is the only click site it is
+useful from: it delivers the command's own id into a region of one of that plugin's own panes, and the
+plugin handles it as it would its own button click. Database's `Run query` and HTTP's `New request`
+are the two: running the editor's SQL and starting a blank draft are both things that happen inside a
+pane, not routes on a node. A pane nobody has open has nothing listening, which is the honest outcome
+for "do this in the thing I am looking at".
+
+A declarative setting names two routes in the plugin's own namespace and a static list of choices.
+The host GETs the read route when the frame opens and PUTs the write route with the chosen value plus
+the identifiers the declared scope owns; both answer `{ value }`, and a value naming none of the
+declared choices is refused on the way out and on the way back. Secrets and free-form values are not
+this variant.
 
 A compiled plugin whose rows are already on the machine uses the load-once adapter
 (`registries/commands/localSearch.ts`): no debounce, no minimum query, one fetch when the frame opens
@@ -116,6 +204,70 @@ Core's own row actions register there too, which is what keeps the contract hone
 User-configured shortcuts outrank defaults. Among defaults, first-party bindings win, then loaded
 plugins in lockfile installation order with plugin id as the stable tiebreak. A losing binding is
 unbound and named as a conflict; no fallback chord is invented.
+
+## What the palette refuses
+
+Nine decisions, each with what would reopen it. They are here rather than in a design folder because
+every one of them is a thing the palette will keep being asked for.
+
+**A plugin-rendered palette frame.** Refused, permanently. The palette owns global focus, the
+reserved keys, navigation, loading, errors and result invocation. An iframe or a remote tree redrawing
+those semantics is one palette per plugin, no terminal half at all, and a wider loaded-plugin UI
+boundary bought for no domain capability. A plugin returns facts and declares a closed verb; the host
+draws them. A genuinely custom workflow is a pane or an overlay, not the palette. An arch rule holds
+it: no frame target and no slot id is the palette.
+
+**A second registry for every interactive kind.** Refused. `paletteRows` is the evidence and it is
+gone. A group, a search, an input and a setting are variants of a command because shortcuts,
+capability gates, ownership, discovery and outcomes are shared, and a parallel vocabulary means
+merging, filtering, owning and invoking twice. Reopens if a proposed kind stops having command
+semantics at all — a durable background job with no user invocation, say.
+
+**Returning executable commands from a loaded search response.** Refused. A route answer is untrusted
+wire input. Letting each result choose a verb, a URL or a route makes a changing server response more
+powerful than the manifest somebody reviewed. Results carry display facts and identity; the manifest's
+search command owns one static action. Reopens only with a separately designed, schema-bounded
+result-action contract, a trust disclosure, and a case one static action cannot express.
+
+**Result action panels.** Deferred, not refused. They are useful — promoting a Rollbar issue, acting
+on a container — and they multiply authorization, confirmation, keyboard and untrusted-wire decisions
+before the graph and search contracts have proved themselves. A result has one primary action.
+Reopens when a concrete secondary action has been asked for by someone using the thing.
+
+**Fleet search by default.** Refused. It multiplies external-provider requests, latency, rate-limit
+pressure, result collisions and partial errors. Scope is declared per command and defaults to the
+active node; core's task and workspace navigation uses `fleet` deliberately. Reopens if a control
+plane provides one indexed fleet query with its own authorization and ranking.
+
+**Calling a model as the reader types.** Refused for ordinary query typing, permanently. Generation is
+not search: it costs money, takes materially longer, and produces a side effect the reader meant to
+ask for once. Database's `Generate SQL` is an input command, submitted explicitly, with a duplicate
+guard and a pending state. A future suggestion system would need an explicit opt-in, a budget and a
+cancellation contract.
+
+**Reflecting Settings pages into commands.** Refused. A Settings page is an arbitrary component or a
+remote tree, not a field schema; scraping one would couple the palette to rendering and create a
+second persistence path. An owner opts a value in by registering a `setting` command whose reader and
+writer are the ones its page already calls. Reopens if Settings itself moves to a typed domain schema
+every renderer projects — the palette could then be another projection of that same schema.
+
+**Free-form secret settings.** Refused. The `setting` kind is a bounded choice with a visible current
+value. Connection keys, HTTP variable values and other secrets need secure input, a reveal policy,
+validation and richer recovery than picking from a list. Reopens through a dedicated secret-entry
+design, not by widening `setting` to arbitrary text.
+
+**Cross-owner command parenting.** Refused. A plugin inserting children into core's group or another
+plugin's creates hidden lifecycle and presentation coupling, and makes ownership unanswerable during a
+disable or a reload. Parents and children share one host-stamped owner, and the graph drops a child
+that names a parent it does not own. Root descendant search is what keeps a command discoverable
+without a cross-owner tree. Reopens with an explicit command extension point owned by the parent,
+carrying its own acceptance and ordering contract.
+
+**Replacing every picker with the palette.** Refused as a blanket rule. The editor and GitHub file
+finders became commands because each had a named shortcut and one selection outcome. The workspace
+topbar picker still uses the generic overlay helper (`host/palette/overlay.ts`), and that is not a
+migration anybody owes: the test is semantics, not component resemblance. Reopens per picker, when one
+becomes a globally discoverable, context-complete command.
 
 ## Pane shortcuts
 

@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createMemo, For, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
@@ -177,6 +177,12 @@ export type SlotProps = {
   children?: JSX.Element
   taskId?: string
   projectId?: string | null
+  /** What this owner will do if a contributor asks (docs/plugins.md § Asking the owner). Host-only:
+   *  neither the handlers nor their names are sent to the worker. */
+  actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
+  /** Whether a contributor is standing in for the owner's default right now, for an owner that has to
+   *  keep drawing something a contributor must not be given. */
+  occupied?: (occupied: boolean) => void
 }
 
 /**
@@ -196,10 +202,16 @@ export function Slot(props: SlotProps) {
     const point = extensionPointRegistry.get(props.point)
     if (!point || point.kind !== 'remote') return null
     const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
-    return { mode: point.mode ?? 'stack', outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)) }
+    return {
+      mode: point.mode ?? 'stack',
+      actions: point.actions ?? [],
+      outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)),
+    }
   })
   const outcome = () => resolved()?.outcome
   const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
+
+  createEffect(() => props.occupied?.(!drawDefault()))
 
   return (
     <>
@@ -216,8 +228,11 @@ export function Slot(props: SlotProps) {
                     pluginId: contribution.pluginId,
                     hash: contribution.hash ?? '',
                     entry: contribution.entry ?? '',
+                    ...(contribution.overlay ? { overlay: contribution.overlay } : {}),
                   }}
                   props={props.props ?? (() => ({}))}
+                  actions={() => props.actions ?? {}}
+                  declaredActions={() => resolved()?.actions ?? []}
                   scope={() => ({
                     ...(props.taskId ? { taskId: props.taskId } : {}),
                     ...(props.projectId ? { projectId: props.projectId } : {}),

@@ -12,24 +12,25 @@ vi.mock('../../infra/node/apiClient', () => ({
 }))
 
 const { pluginCommand, usablePluginCommands } = await import('./chromeCommands')
+const { projectSurfaceRegistry } = await import('../registries/panes/projectSurfaces')
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
 type SearchCommand = import('../registries/commands/commands').SearchCommand
 type InputCommand = import('../registries/commands/commands').InputCommand
+type SettingCommand = import('../registries/commands/commands').SettingCommand
 
 // A loaded plugin's interactive commands, which is where a manifest meets a route's answer.
 //
 // Two boundaries are worth the length. The host decides what a route is asked — the reader's text and
 // the identifiers the declared scope owns, and nothing a descriptor or a previous answer wrote. And the
 // answer decides nothing: it carries display facts and identity, and the verb that runs when a row is
-// picked is the static one the manifest declared (docs/future/command-palette/refused.md § Returning
-// executable commands from a loaded search response).
+// picked is the static one the manifest declared (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 const CONTEXT: CommandExecutionContext = {
   host: 'desktop', nodeId: 'node-b', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
   paneId: null, surfaceId: null,
 }
 
-const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () => true }
+const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () => true, usableSelectAction: () => true }
 
 const searchDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
   id: 'find', title: 'Find an issue', category: 'action', palette: true, kind: 'search',
@@ -42,6 +43,13 @@ const inputDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescr
   id: 'ask', title: 'Generate SQL', category: 'action', palette: true, kind: 'input',
   scope: 'task', route: '/v2/p/database/generate',
   onSuccess: { verb: 'runNodeAction', path: '/v2/p/database/open' },
+  ...over,
+} as PluginCommandDescriptor)
+
+const settingDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
+  id: 'theme', title: 'Board theme', category: 'action', palette: true, kind: 'setting',
+  scope: 'project', readRoute: '/v2/p/linear/theme', writeRoute: '/v2/p/linear/theme',
+  options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   ...over,
 } as PluginCommandDescriptor)
 
@@ -144,6 +152,36 @@ describe('a search command', () => {
     const command = pluginCommand('linear', searchDescriptor(), binding) as SearchCommand
     await expect(command.select({ id: 'i-1', title: 'One' }, CONTEXT)).rejects.toThrow('the node fell over')
   })
+
+  // `navigate` is the verb Rollbar and Linear pick a row with: their detail belongs to the project, so
+  // a pick changes the URL and the surface beside the list follows
+  // (docs/plugins.md § Command kinds).
+  describe('picking a row that navigates', () => {
+    const navigating = searchDescriptor({ onSelect: { verb: 'navigate', surface: 'rollbar-item' } })
+
+    it('mints the path from the registered pattern, the captured project and the sanitized row id', async () => {
+      const surface = projectSurfaceRegistry.register({
+        id: 'rollbar-item',
+        path: '/p/:projectId/x/rollbar/items/:item',
+        item: 'item',
+        order: 60,
+        component: (() => null) as never,
+      })
+      const navigate = vi.fn()
+      const command = pluginCommand('rollbar', navigating, binding) as SearchCommand
+      const outcome = await command.select({ id: 'conn-1:142', title: 'TypeError' }, { ...CONTEXT, navigate })
+      expect(navigate).toHaveBeenCalledWith('/p/p-1/x/rollbar/items/conn-1%3A142')
+      expect(outcome).toEqual({ effect: 'close' })
+      surface.dispose()
+    })
+
+    it('refuses rather than guessing when this host has nowhere to take the reader', async () => {
+      const command = pluginCommand('rollbar', navigating, binding) as SearchCommand
+      // No navigator on the context, which is a shortcut rather than a palette session, and no
+      // registered surface either. Both are the same answer: nothing happens and the frame says so.
+      await expect(command.select({ id: 'conn-1:142', title: 'TypeError' }, CONTEXT)).rejects.toThrow('project')
+    })
+  })
 })
 
 describe('an input command', () => {
@@ -199,7 +237,8 @@ describe('which descriptors this device will honour', () => {
   })
 
   it('refuses a verb this device cannot honour, on a search as on an action', () => {
-    const refusing = { ...binding, usableAction: (action: { verb: string }) => action.verb !== 'openPane' }
+    const refuse = (action: { verb: string }): boolean => action.verb !== 'openPane'
+    const refusing = { ...binding, usableAction: refuse, usableSelectAction: refuse }
     expect(usablePluginCommands('linear', [
       searchDescriptor({ id: 'fine' }),
       searchDescriptor({ id: 'undrawable', onSelect: { verb: 'openPane', pane: 'nope' } }),
@@ -208,9 +247,18 @@ describe('which descriptors this device will honour', () => {
 
   it('skips a kind this build has no frame for rather than treating it as an action', () => {
     expect(usable([
-      { id: 'later', title: 'Theme', category: 'action', palette: true, kind: 'setting' } as unknown as PluginCommandDescriptor,
+      { id: 'later', title: 'A sixth kind', category: 'action', palette: true, kind: 'toggle' } as unknown as PluginCommandDescriptor,
       searchDescriptor(),
     ])).toEqual(['find'])
+  })
+
+  it('refuses a setting whose routes are not its own, or that declares too few choices', () => {
+    expect(usable([
+      settingDescriptor({ id: 'own' }),
+      settingDescriptor({ id: 'reads-core', readRoute: '/v2/prefs' }),
+      settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v2/p/rollbar/theme' }),
+      settingDescriptor({ id: 'one-choice', options: [{ value: 'on', label: 'On' }] }),
+    ])).toEqual(['own'])
   })
 
   it('drops a child whose parent is missing, is not a group, or is its own descendant', () => {
@@ -231,5 +279,41 @@ describe('which descriptors this device will honour', () => {
       { id: 'issues', title: 'Issues', category: 'navigation', palette: true, kind: 'group', parentId: 'gone' } as PluginCommandDescriptor,
       searchDescriptor({ id: 'inside', parentId: 'issues' }),
     ])).toEqual([])
+  })
+})
+
+describe('a loaded setting', () => {
+  const command = (over: Record<string, unknown> = {}): SettingCommand =>
+    pluginCommand('linear', settingDescriptor(over), binding) as SettingCommand
+
+  it('reads the current value from the plugin’s own route, with the identifiers its scope owns', async () => {
+    readJson.mockResolvedValue({ value: 'dark' })
+    await expect(command().read(CONTEXT, signal())).resolves.toBe('dark')
+    // The project, because the descriptor said `project`. Never the task, which the session also
+    // captured and this scope does not own.
+    expect(readJson).toHaveBeenCalledWith('/v2/p/linear/theme?projectId=p-1', expect.objectContaining({ nodeId: 'node-b' }))
+  })
+
+  it('writes the chosen value and answers with the value the node says is now stored', async () => {
+    writeJson.mockResolvedValue({ value: 'light' })
+    await expect(command().write('dark', CONTEXT, signal())).resolves.toBe('light')
+    expect(writeJson).toHaveBeenCalledWith('/v2/p/linear/theme', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ value: 'dark', projectId: 'p-1' }),
+    }))
+  })
+
+  it('refuses to write a value the manifest never declared', async () => {
+    await expect(command().write('neon', CONTEXT, signal())).rejects.toThrow('not one of the choices')
+    expect(writeJson).not.toHaveBeenCalled()
+  })
+
+  it('refuses an answer this build cannot read, rather than showing an unmarked list', async () => {
+    readJson.mockResolvedValue({ theme: 'dark' })
+    await expect(command().read(CONTEXT, signal())).rejects.toThrow('cannot read')
+  })
+
+  it('carries the manifest’s choices through unchanged, because they are what a value is checked against', () => {
+    expect(command().options).toEqual([{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }])
   })
 })

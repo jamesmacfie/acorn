@@ -51,7 +51,7 @@ export type ChromeActionContext = {
  *
  * A result rather than a rejection, because most click sites discard the promise and an unhandled
  * rejection is a console error nobody asked for. The one caller that reads it is the palette, which
- * keeps its frame open with the message on it (docs/future/command-palette/architecture.md § Actions).
+ * keeps its frame open with the message on it (docs/command-palette-and-shortcuts.md).
  */
 export type ChromeActionResult = { ok: true } | { ok: false; message: string }
 

@@ -276,7 +276,12 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 // pane. Which region a message is for is the plugin's own question, and the plugin is the
                 // only side that can answer it.
                 const contribution = { id: surface.id, pluginId, hash, entry: region.entry }
-                regions[name] = () => createComponent(RemoteTree, { contribution, props: scope, scope })
+                // The document goes to this region as well as to a `frame` one. Both are the plugin's
+                // own bytes in the other half of a composed pane, and the grant is structural either
+                // way: what makes the `document` verb answerable is standing beside a host editor, not
+                // which of the two runtimes the bundle happens to be in
+                // (docs/editor.md § Communication between regions).
+                regions[name] = () => createComponent(RemoteTree, { contribution, props: scope, scope, document })
                 continue
               }
               regions[name] = () => createComponent(DocumentSurface, {

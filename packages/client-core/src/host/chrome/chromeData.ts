@@ -22,6 +22,7 @@ import {
 import {
   acceptCommandSearchItems,
   commandInputResultSchema,
+  commandSettingValueSchema,
   MAX_COMMAND_SEARCH_QUERY,
   type CommandInputResult,
   type CommandSearchItem,
@@ -48,9 +49,12 @@ import { ownsTaskOrigin } from './ownership'
 const PLUGIN_NAMESPACE = '/v2/p/'
 
 /** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
- * `/v2/p/id/../other` route cannot escape after URL parsing. */
+ * `/v2/p/id/../other` route cannot escape after URL parsing.
+ *
+ * `path` is typed but arrives as a roster row, so a missing one is a `false` rather than a throw: a
+ * descriptor from a newer node may not carry the field this build reads it out of. */
 export const ownsRoute = (pluginId: string, path: string): boolean => {
-  if (!path.startsWith('/')) return false
+  if (typeof path !== 'string' || !path.startsWith('/')) return false
   try {
     const url = new URL(path, 'https://acorn.invalid')
     return url.origin === 'https://acorn.invalid' && url.pathname.startsWith(`${PLUGIN_NAMESPACE}${pluginId}/`)
@@ -222,7 +226,7 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
   })
 }
 
-// ── Command search and input (docs/future/command-palette/architecture.md § Loaded-plugin descriptor) ──
+// ── Command search and input (docs/plugins.md § Command kinds) ──
 
 /** The identifiers a scoped command may send. Derived by the host from the session it captured, never
  *  read off the descriptor or off a previous answer. */
@@ -289,6 +293,56 @@ export async function submitCommandInput(
     throw new Error('the plugin answered with something this build cannot read')
   }
   return result.data
+}
+
+/**
+ * One setting command's current value, and the value a choice stored.
+ *
+ * Two calls against one shape, because a read and a write answer the same thing: the value that is now
+ * set. The caller checks it against the choices the manifest declared — this only guarantees that the
+ * node answered with a value at all, so a route replying `{}` or `{ value: 42 }` fails here rather than
+ * leaving a list with nothing marked and no reason why.
+ */
+export async function readCommandSetting(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  scope: CommandRouteScope,
+  signal: AbortSignal,
+): Promise<string> {
+  const body = await read<unknown>(pluginId, withQuery(path, scope), nodeId, signal)
+  return acceptSettingValue(pluginId, body)
+}
+
+export async function writeCommandSetting(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  value: string,
+  scope: CommandRouteScope,
+  signal: AbortSignal,
+): Promise<string> {
+  if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not write to ${path}`)
+  const body = await writeJson<unknown>(path, {
+    method: 'PUT',
+    nodeId,
+    signal,
+    headers: { 'content-type': 'application/json' },
+    // The value, plus the identifiers the declared scope owns. The scope is the host's, derived from
+    // the session it captured, so a manifest cannot make its own setting write against a task the
+    // reader was not looking at.
+    body: JSON.stringify({ value, ...scope }),
+  })
+  return acceptSettingValue(pluginId, body)
+}
+
+const acceptSettingValue = (pluginId: string, body: unknown): string => {
+  const parsed = commandSettingValueSchema.safeParse(body)
+  if (!parsed.success) {
+    drop(pluginId, 'setting value', body)
+    throw new Error('the plugin answered with something this build cannot read')
+  }
+  return parsed.data.value
 }
 
 const TONES = new Set(['neutral', 'accent', 'warn'])

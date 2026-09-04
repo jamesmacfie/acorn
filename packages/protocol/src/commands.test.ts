@@ -50,8 +50,7 @@ describe('a search result row', () => {
   it('strips anything that would let a response choose a verb', () => {
     // The refusal this module exists for. A row that ships an action, a route or a URL loses all
     // three here, before a host can read one
-    // (docs/future/command-palette/refused.md § Returning executable commands from a loaded search
-    // response).
+    // (docs/command-palette-and-shortcuts.md § What the palette refuses).
     const parsed = commandSearchItemSchema.parse(item({
       action: { verb: 'runNodeAction', path: '/somewhere/else' },
       route: '/v2/core/tasks',

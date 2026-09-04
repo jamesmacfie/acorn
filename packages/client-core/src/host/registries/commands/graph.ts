@@ -1,4 +1,4 @@
-import { fuzzyScore } from '../../../kit/lib/paletteModel'
+import { fuzzyScore } from '../../../kit/lib/fuzzy'
 import {
   commandAvailable,
   commandHint,
@@ -10,7 +10,7 @@ import {
 } from './commands'
 
 // The command graph: a flat registry read as a tree, once, for whoever is drawing
-// (docs/future/command-palette/architecture.md § Command graph).
+// (docs/command-palette-and-shortcuts.md).
 //
 // Pure and host-neutral. It takes a snapshot of contributions and answers with nodes; it renders
 // nothing, fetches nothing and holds no state, which is what lets the desktop and the terminal share

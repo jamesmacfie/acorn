@@ -1,14 +1,12 @@
 import { Show } from 'solid-js'
-import { useParams } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { activeTaskId } from '../../features/tasks/tasks'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
-import { createPaletteRowsProvider } from '../registries/palette/provider'
 import type { CommandExecutionContext } from '../registries/commands/commands'
-import type { SessionRowProvider } from '../registries/commands/session'
-import { createTaskRowsProvider, createWorkspaceRowsProvider } from './navigationRows'
+import { registerNavigationCommands } from './navigationCommands'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
@@ -19,18 +17,13 @@ import { PaletteSurface } from './PaletteSurface'
 // the registry's actions and the task and workspace lists, filtered them, kept a row-to-source map
 // and invoked the pick. All of that is `host/registries/commands/session.ts` now, and the terminal
 // runs on the same object (apps/tui/src/chrome/Palette.tsx). What is left here is what only this host
-// can answer: which identity a session captures, which compatibility rows this host can produce, and
-// the dialog it draws them in.
+// can answer: which identity a session captures, which nodes a fleet search may ask, and the dialog
+// it draws the rows in.
 
 export default function CommandPalette() {
   const params = useParams()
+  const navigate = useNavigate()
   const fleetWorkspaces = createFleetWorkspaces()
-
-  // Filled in below the view, and read only when a session opens. `createTaskRowsProvider` fans out
-  // over the fleet keyed on the palette being open, so it needs the session that does not exist yet;
-  // a thunk over a `let` is the smallest way to tie the knot, and it is only ever read after both
-  // halves exist.
-  let providers: readonly SessionRowProvider[] = []
 
   const context = (): CommandExecutionContext => ({
     host: 'desktop',
@@ -43,6 +36,10 @@ export default function CommandPalette() {
     taskId: activeTaskId() ?? null,
     paneId: null,
     surfaceId: null,
+    // The shell's own navigator, for the closed chrome verbs that address a URL rather than a task
+    // layout. Taken here because `useNavigate` needs a router context and the command registry has
+    // none (../registries/commands/commands.ts).
+    navigate,
   })
 
   const { session, view } = createCommandPaletteView({
@@ -50,14 +47,19 @@ export default function CommandPalette() {
     title: 'Command palette',
     toggleChord: 'meta+k',
     context,
-    providers: () => providers,
-    // Read only by a `fleet`-scoped search, which nothing declares yet. Supplied here because this is
-    // the host that has a fleet at all: the terminal draws one node and answers with the one it
-    // captured (apps/tui/src/chrome/paletteSession.ts).
-    fleet: () => nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })),
+    // Supplied here because this is the host that has a fleet at all: the terminal draws one node and
+    // answers with the one it captured (apps/tui/src/chrome/paletteSession.ts).
+    //
+    // Empty below two nodes, and that is the answer rather than a shortcut: one machine is not a
+    // fleet. An empty roster makes a `fleet` search ask once, against the node it captured, and leaves
+    // the node label off every row — which is what the task and workspace lists have always shown on a
+    // single-node install.
+    fleet: () => (nodes().length > 1 ? nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })) : []),
   })
 
-  providers = [createPaletteRowsProvider(), createWorkspaceRowsProvider(fleetWorkspaces), createTaskRowsProvider(session.open)]
+  // The four navigation searches, which need the session's own open flag: the task fan-out runs only
+  // while somebody is looking at the palette.
+  registerNavigationCommands({ open: session.open, fleetWorkspaces })
 
   const announce = () => {
     if (session.busy()) return 'Loading…'

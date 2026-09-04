@@ -181,6 +181,59 @@ An occurrence detail is capped for size: up to 10 trace chains, 200 frames total
 frame, 8 KiB per string, and 192 KiB per detail (`CAPS` in `plugins/rollbar/src/server/normalize.ts`).
 Tests assert against the same constants, so a cap cannot drift between the code and its coverage.
 
+## From the command palette
+
+Linear and Rollbar each contribute one project-scoped `search` command, declared in the plugin's own
+manifest and answered by that plugin's own node half.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+| Command | Route | Rows |
+| --- | --- | --- |
+| Linear: find an issue | `/v2/p/linear/palette/issues` | active issues in the Linear projects the routed project's workspace links |
+| Rollbar: find an item | `/v2/p/rollbar/palette/issues` | active items in the connections the routed project's workspace maps |
+
+Each route is given two things and nothing else: `projectId`, the project the palette session
+captured, and `q`, the typed text. Neither the manifest nor a previous answer writes either one.
+Scope is resolved by the same code the rail beside it uses, so a connection the routed project maps
+nothing of is never asked, and the command is not offered where there is no routed project.
+
+**Rollbar filters a list it already has.** The route reuses the rail's own `scopedConnections` and
+`listItems`, and `listItems` reads the mirrored `rollbar.items` resource, whose two-minute TTL the
+rail is already refreshing (see the provider mirrors in [the caching doc](./caching.md)). Typing
+therefore spends no extra provider budget. Partial connection success is preserved as it is on the
+rail: one connection failing does not erase the rows another answered with, and only a total wash is
+reported as an error.
+
+**Linear asks the provider instead**, and the reasoning is the more interesting half. Linear's
+`IssueFilter` supports the mapping filter the rail already sends, `project: { id: { in: … } }`, so a
+title clause and an identifier clause ride along with it (`projectIssueSearchFilter` in
+`plugins/linear/src/server/index.ts`). There is also no cached active mapped-project set to filter:
+`/rail-items` calls `providerFetch` directly, and Linear's reads are exempt from
+serve-then-revalidate. Filtering "the cache" would have meant fetching the first hundred active
+issues per keystroke and searching those — the same request count, more bytes, and unable to find the
+hundred-and-first. `searchableContent` was refused because it reads every description as well, which
+is a different question from "find the ticket I am thinking of", and it is the field most likely to
+vary by plan. `title` and `number` have been in `IssueFilter` since the beginning.
+
+Both normalize their rows through their existing rail identity, `<connection>:<identifier>`, so two
+connections whose teams or counters share a display identifier cannot collide. Each route returns at
+most 50 rows, which is the bound the host renders to anyway, and both read through the same
+per-connection scheduler and budget as every other read, so no rate-limit policy changed hands.
+
+Picking a row runs the `navigate` verb, which no other command may name. An item's detail belongs to
+the project rather than to a task, so a pick changes the URL and the surface beside the rail list
+follows, exactly as clicking the same row in that list does. It is available only here because it
+needs a selected row and a routed project, and a project-scoped search is the one command site with
+both. The address is minted from the pattern the host registered, with the row's sanitized id as the
+item: the response chooses nothing.
+
+A search answers with display facts and that id, and with nothing else. There is no credential in a
+row — Rollbar's and Linear's tokens are lent to the route by core and never travel outward — and no
+action, route or verb, because the verb that runs is the static one the manifest declared. Creating
+a task from a Rollbar item is not what picking one means. Promotion stays the deliberate act it is
+on the rail. Commenting and issue mutation stay in the issue surface.
+
 ## Model providers
 
 OpenAI and Anthropic connections are registered through the model-provider plugin. Adapters expose a

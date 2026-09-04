@@ -79,6 +79,41 @@ mid-session. The push still governs profiles with no such flag. `launchArgs` rea
 and the tmux and `-lc` paths as a quoted line (`launchCommandLine`). A command override, such as the
 dev-server pane, is a different binary and gets none.
 
+## From the command palette
+
+Four rows across the two plugins, all registered by their own client half.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+Notes contributes a finder and an input (`plugins/notes/src/client/commands.ts`). **Find a note** is
+one search over all three scopes, because a reader looking for the deploy runbook does not know
+whether they filed it against this task, this workspace, or globally, and the pane draws all three in
+one column anyway. The three lists load once when the frame opens and are filtered on the device after
+that (`packages/client-core/src/host/registries/commands/localSearch.ts`). Rows are keyed
+`<scope>:<slug>`, and that is load-bearing: a slug is unique inside a scope and nowhere else, so
+`task:deploy` and `global:deploy` are two reachable rows where a bare slug would hide one of them and
+send the other's pick to the wrong file. A scope whose list cannot be read becomes a row saying so,
+since a workspace list is device-gated on the Node and an agent-confined client is refused rather than
+broken. Workflow scratch seeds are filtered out here for the same reason the library hides them.
+Picking a row emits the retained open intent the pane already answers, so the note opens whether the
+pane is mounted or opens because of the pick. **Create a task note** takes a title and nothing else:
+the Node owns the kind and the slug, so a note started from the palette gets the default kind and the
+same `name-2` collision rule the pane's own button gets. Both rows are task-scoped, because opening a
+note is a pane intent addressed at a task even when the note is a global one.
+
+Memory contributes a search and one open action (`plugins/memory/src/client/commands.ts`). **Search
+memory** goes through the existing full-text path, so the ordering is that index's own rank and the
+device does not re-rank it, and a row reveals by the memory's name rather than its id, because the
+name is what the context section keys its rows by. **Review memory proposals** is the same reveal with
+no row named, which lands on the proposals drawn at the top of that section. Both are task-scoped even
+though the query is about the project: the query carries the captured project, but the surface a row
+opens in belongs to a task, and a row that cannot be opened is not worth offering.
+
+What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note
+list, where the scope and the current value are both on screen. Accepting or rejecting a proposal
+needs the proposal's body and its verification flags in front of the reader. Adding a memory needs a
+name, a type, a scope, and a body, which is four fields rather than one line.
+
 ## Lifecycle hooks
 
 Managed-agent completion can trigger memory review. The hook creates proposals or review attention;

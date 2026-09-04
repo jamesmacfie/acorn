@@ -92,9 +92,38 @@ which every schedule already has.
 ## Routes and UI
 
 Node routes are under `/v2/p/workflows/` and core task run-target routes under
-`/v2/core/tasks/:id/run/*`. The desktop contributes Settings inspection/problems, command-palette
-rows, task activity, gate controls, and attention items. Workflow notices use `/v2/events`; durable
+`/v2/core/tasks/:id/run/*`. The desktop contributes Settings inspection/problems, one command-palette
+search, task activity, gate controls, and attention items. Workflow notices use `/v2/events`; durable
 run history is paged from the plugin database.
+
+## From the command palette
+
+One row at the palette root, **Run a workflow**, registered by this plugin's client half
+(`plugins/workflows/src/client/commands.ts`). It is a `search` over the definitions this task's
+repository commits: a row carries the workflow's name and its step count, a parse or cycle error is a
+badged row at the top of the list rather than a row that is quietly missing, and picking a definition
+starts it. There is no group, because one row does not need one.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+The command is task-scoped and gated on the terminal plugin, because the runner is a node engine and
+these routes answer 503 on a node that does not run terminals. Definitions load once when the frame
+opens and are filtered on the device after that, through the same load-once adapter the terminal's
+searches use (`client-core/host/registries/commands/localSearch.ts`): no debounce and no minimum
+query, because a read of the repository is not something a keystroke moves. Starting is unchanged from
+the row source this replaced — the whole definition goes to the start route rather than its id, and a
+refusal keeps the frame open with the node's own message on it.
+
+Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
+status and its consequences in front of the person doing it, and a row in a list carries neither.
+
+**Finding an active or recent run is deferred, because there is nowhere to open one.** This plugin
+ships no pane and no run surface on either host. The only client that reads its `runs` route is the
+agents plugin's task sidebar (`plugins/agents/src/client/sessions/AgentTaskSidebar.tsx`), which draws a
+run's *steps* into its roster and keys selection on a managed-session id that a workflow step does not
+have; opening a step there spawns a terminal that resumes the step's provider session. A row that
+cannot name where it goes is worse than no row, so the search reopens when there is a run surface to
+point it at, and not before.
 
 ## Configuration trust
 

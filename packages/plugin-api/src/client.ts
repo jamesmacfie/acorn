@@ -32,6 +32,10 @@ export type { PaneIntent } from '@acorn/client-core/host/registries/commands/cli
 export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
+// A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.
+// The subscriber returns its disposal because a model root, rather than the plugin host's registration
+// pass, owns this listener's lifetime.
+export { onPluginFrame } from '@acorn/client-core/host/plugins/pluginChannel.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
@@ -59,7 +63,6 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/features/tabs/railMarkers.ts'
-export type { PaletteRowSource } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
 export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/host/registries/panes/refPanels.ts'
@@ -72,8 +75,24 @@ export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/host/regi
 export { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 export type { ProjectImporterProps } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/host/registries/sources/integrationFlows.ts'
-export { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-export type { CommandContribution } from '@acorn/client-core/host/registries/commands/commands.ts'
+export { COMMAND_CLOSED, registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+// `InputCommand`, `SearchCommand` and `SettingCommand` are the three interactive members, for a plugin
+// that builds one in a function rather than inline. The action and group members add nothing over
+// `ContributedCommand` and stay off this surface.
+export type {
+  CommandContribution,
+  CommandExecutionContext,
+  CommandOutcome,
+  ContributedCommand,
+  InputCommand,
+  SearchCommand,
+  SettingCommand,
+} from '@acorn/client-core/host/registries/commands/commands.ts'
+// The load-once search adapter (docs/command-palette-and-shortcuts.md § Palette data). A plugin whose
+// rows are already on this machine — run targets, notes, docker resources — spreads this into a
+// `search` command and gets no debounce, no minimum query, one fetch when the frame opens and local
+// fuzzy filtering after that. A plugin querying a node instead writes its own `query`.
+export { localSearch } from '@acorn/client-core/host/registries/commands/localSearch.ts'
 // See docs/dashboards.md § Provenance, and what a row may not claim for what `openInAppUrl`
 // answers and how a URL's destination gets resolved.
 export {
@@ -184,8 +203,7 @@ export { markAttentionSeen } from '@acorn/client-core/features/notifications/att
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
 export { toast } from '@acorn/client-core/features/notifications/toast.ts'
-export { fuzzyScore } from '@acorn/client-core/kit/lib/paletteModel.ts'
-export type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
+export { fuzzyScore } from '@acorn/client-core/kit/lib/fuzzy.ts'
 export { createOverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'
 
 // ── Design-system helpers ─────────────────────────────────────────────────────────────────────

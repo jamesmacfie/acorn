@@ -44,9 +44,8 @@ component: a tree names one, and the host mounts its own.
 | Webviews | Both | — / `frames` (`target: 'webview'`) | A pane showing external web content |
 | Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail |
 | Slots | Both | `ctx.slots` / `contributions.slots` | See the slot vocabulary below |
-| Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords |
+| Commands | Both | `ctx.commands` / `contributions.commands`, `contributions.palette` | The command palette and chords. One kind, five shapes: an action, a group, a search, an input, a setting ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). `contributions.palette` is the older array and is an alias for a command with `palette: true` — it is rewritten into one at registration and never produces a second row |
 | Keybindings | Both | `ctx.keybindings` / `contributions.keybindings` | The chord dispatcher |
-| Palette rows | Both | `ctx.paletteRows` / `contributions.palette` | The command palette's row sources |
 | Attention sources | Both | `ctx.attentionSources` / `contributions.attention` | The notification inbox. An item of `info` severity is a nudge the owner can retire by acknowledging it; `warn` and `danger` stay until the block is lifted ([notifications.md](./notifications.md) § Acknowledging an attention row) |
 | Node stats | Both | `ctx.nodeStats` / `contributions.nodeStats` | A node card on Fleet home |
 | Content links | Both | `ctx.contentLinks` / `contributions.contentLinks` | The in-app link router |
@@ -54,8 +53,8 @@ component: a tree names one, and the host mounts its own.
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
 | Context menus | Both | `ctx.contribute(contextMenuRegistry)` / `contributions.contextMenus` | Host-drawn context menus |
-| Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds: rows, annotations, remote trees, rectangles, hooks (docs/plugins.md § Cooperative extension points). The host mints `<pluginId>:<id>` from the plugin doing the registering, either way in. |
-| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. |
+| Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds: rows, annotations, remote trees, rectangles, hooks (docs/plugins.md § Cooperative extension points). The host mints `<pluginId>:<id>` from the plugin doing the registering, either way in. A `remote` point may also declare `actions`, the closed list of things a contributor's tree may ask it to do (docs/plugins.md § Asking the owner); the owner binds a handler of the same name per `Slot`, and a name missing from either list is refused. |
+| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |
 | Collections | Both | `ctx.collections` / `contributions.collections` | Dashboard panels |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the node, which runs whether or not a client is open (docs/schedules.md § Why the node, and only the node). The client registry exists for work that has no meaning without a window. |

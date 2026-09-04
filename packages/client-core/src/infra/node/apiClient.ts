@@ -232,6 +232,27 @@ export async function sendRaw(url: string, init: WriteInit = {}): Promise<RawApi
   return { ok: res.ok, status: res.status, body, ...(error ? { error } : {}) }
 }
 
+/** `sendRaw`'s shape for a call whose answer is bytes rather than JSON (../../host/frames/frameServices.ts).
+ *
+ * The success arm keeps the body out of the JSON parser entirely, which is the whole difference: `sendRaw`
+ * throws a non-JSON success body away on purpose, and an image is exactly that. The failure arm still
+ * reads the node's error envelope, because a refusal is JSON whatever the request asked for. */
+export type RawBytesResult =
+  | { ok: true; status: number; bytes: Uint8Array; type: string; filename: string | null }
+  | { ok: false; status: number; error?: ApiErrorBody['error'] }
+
+export async function sendRawBytes(url: string, init: WriteInit = {}): Promise<RawBytesResult> {
+  const res = await send(url, init)
+  if (!res.ok) return { ok: false, status: res.status, ...(errorBody(res) ? { error: errorBody(res) } : {}) }
+  return {
+    ok: true,
+    status: res.status,
+    bytes: res.body,
+    type: res.headers['content-type'] ?? 'application/octet-stream',
+    filename: filenameFromDisposition(res.headers['content-disposition']),
+  }
+}
+
 type ErrorFallback = string | ((res: ApiResponse) => string)
 
 export async function writeJson<T>(url: string, init: WriteInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {

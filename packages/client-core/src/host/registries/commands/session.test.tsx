@@ -10,12 +10,12 @@ import {
   type CommandOutcome,
   type InputCommand,
   type SearchCommand,
+  type SettingCommand,
 } from './commands'
 import {
   createCommandSession,
   type CommandFleetNode,
   type CommandSession,
-  type SessionRowProvider,
 } from './session'
 
 // The session's transitions, as one suite both hosts are held to.
@@ -24,7 +24,7 @@ import {
 // what Enter does to a group, what Escape gives back, what happens when the thing you opened over
 // moves. None of it mentions a dialog or a cell, which is the point — the desktop and the terminal
 // bind keys and draw rows, and if one of them needed a different answer to any of these it would be
-// two products (docs/future/command-palette/phase-1-command-graph-and-session.md § Tests).
+// two products (docs/command-palette-and-shortcuts.md).
 //
 // The DOM half is `../../palette/paletteView.test.tsx` and the terminal half is
 // `apps/tui/src/chrome/chrome.test.tsx`; both drive the same operations through their own keys.
@@ -51,16 +51,7 @@ const CONTEXT: CommandExecutionContext = {
   paneId: null, surfaceId: null,
 }
 
-const provider = (id: string, order: number, rows: readonly { id: string; label: string }[], errors?: readonly { source: string; message: string }[]): SessionRowProvider => ({
-  id,
-  order,
-  rows: () => ({
-    rows: rows.map((row) => ({ ...row, action: { effect: 'run', run: () => {} } as const })),
-    errors,
-  }),
-})
-
-/** Everything queued has run: the providers answered and an activation's promise settled. */
+/** Everything queued has run: a search answered and an activation's promise settled. */
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
@@ -77,7 +68,6 @@ async function withSession(
     opens: () => number
   }) => void | Promise<void>,
   options: {
-    providers?: readonly SessionRowProvider[]
     fleet?: readonly CommandFleetNode[]
     context?: CommandExecutionContext
   } = {},
@@ -89,7 +79,6 @@ async function withSession(
   const dispose = createRoot((disposeRoot) => {
     session = createCommandSession({
       context,
-      providers: () => options.providers ?? [],
       ...(options.fleet ? { fleet: () => options.fleet! } : {}),
       onOpen: () => { opens += 1 },
       onClose: () => { closes += 1 },
@@ -106,20 +95,18 @@ async function withSession(
 const ids = (session: CommandSession): string[] => session.rows().map((row) => row.id)
 
 describe('the empty root', () => {
-  it('keeps the flat list’s order: errors, contributed rows, commands, workspaces, tasks', async () => {
-    register(leaf('cmd.archive', { title: 'Archive task' }))
+  it('lists the top level in the order its owners declared, and nothing else', async () => {
+    // Every row here comes from the command registry, and that is the assertion. There was a second
+    // way into this list until 2026-09-03 — a row provider the host handed the session — and its
+    // rows sorted ahead of the commands by a number nobody could see
+    // (docs/command-palette-and-shortcuts.md).
+    register(leaf('cmd.archive', { title: 'Archive task', order: 20 }))
+    register(leaf('cmd.new', { title: 'New task', order: 10 }))
+    register(group('panes', { title: 'Panes', order: 30 }))
     await withSession(async (session) => {
       session.openRoot()
       await settle()
-      expect(ids(session)).toEqual([
-        'error:rows:0', 'run:dev', 'cmd.archive', 'workspace:w-2', 'task:t-2',
-      ])
-    }, {
-      providers: [
-        provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }], [{ source: 'repo', message: 'run.bad is missing command' }]),
-        provider('workspaces', 900, [{ id: 'workspace:w-2', label: 'Switch workspace: Core' }]),
-        provider('tasks', 950, [{ id: 'task:t-2', label: 'Go to task: fix login' }]),
-      ],
+      expect(ids(session)).toEqual(['cmd.new', 'cmd.archive', 'panes'])
     })
   })
 
@@ -147,28 +134,18 @@ describe('the typed root', () => {
     })
   })
 
-  it('interleaves commands with the compatibility rows by relevance, as one list', async () => {
-    register(leaf('cmd.archive', { title: 'Archive task' }))
+  it('ranks the whole tree as one list, not each owner’s block on its own', async () => {
+    register(leaf('cmd.archive', { title: 'Archive task', order: 90 }))
+    register(group('run', { title: 'Run', order: 10 }))
+    register(leaf('run.rearchive', { title: 'rearchive-old-logs', parentId: 'run' }))
     await withSession(async (session) => {
       session.openRoot()
       await settle()
       session.setQuery('archive')
-      // The contributed row sorts first when the query is empty and last when the query says so. A
-      // reader who types a command's name should not have to scroll past every run target.
-      // The row that came first is still in the list, just below: a query re-ranks the whole thing
-      // rather than sorting each source's block on its own.
-      expect(ids(session)).toEqual(['cmd.archive', 'run:rearchive'])
-    }, { providers: [provider('rows', 100, [{ id: 'run:rearchive', label: 'Run: rearchive-old-logs' }])] })
-  })
-
-  it('keeps an error line visible whatever is typed, because it explains a missing row', async () => {
-    await withSession(async (session) => {
-      session.openRoot()
-      await settle()
-      session.setQuery('zzzz')
-      expect(ids(session)).toEqual(['error:rows:0'])
-      expect(session.selectedRow()).toBeNull() // visible, never the selection
-    }, { providers: [provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }], [{ source: 'repo', message: 'bad' }])] })
+      // `Archive task` is a worse sibling — it was registered last — and a better match, so it comes
+      // first. Declared order is the tiebreak for an empty query and nothing more.
+      expect(ids(session)).toEqual(['cmd.archive', 'run.rearchive'])
+    })
   })
 })
 
@@ -251,13 +228,18 @@ describe('availability', () => {
 
 describe('the cursor', () => {
   it('keeps the row it was on by id when the list is rebuilt under it', async () => {
+    const [extra, setExtra] = createSignal(false)
     register(leaf('cmd.one', { title: 'One' }))
     register(leaf('cmd.two', { title: 'Two' }))
+    register(leaf('cmd.zero', { title: 'Zero', order: -1, when: () => extra() }))
     await withSession((session) => {
       session.openRoot()
       session.select('cmd.two')
       expect(session.selectedIndex()).toBe(1)
-      session.refresh()
+      // A row appearing above the cursor rebuilds the list and moves every index in it. The selection
+      // is kept by id, so it stays on the row the reader was looking at.
+      setExtra(true)
+      expect(session.selectedIndex()).toBe(2)
       expect(session.selectedRow()?.id).toBe('cmd.two')
     })
   })
@@ -274,18 +256,23 @@ describe('the cursor', () => {
     })
   })
 
-  it('steps over the rows that are not selectable and stops at both ends', async () => {
-    register(leaf('cmd.one', { title: 'One' }))
+  it('never lands on a row that is not selectable, and stops at both ends', async () => {
+    register(search('find', {
+      minQueryLength: 0, debounceMs: 0,
+      query: async () => { throw new Error('the node said no') },
+    }))
     await withSession(async (session) => {
-      session.openRoot()
+      session.openAt('find')
       await settle()
-      expect(ids(session)).toEqual(['error:rows:0', 'cmd.one'])
-      expect(session.selectedRow()?.id).toBe('cmd.one') // never the error line
+      // The one row is the error line: visible, because it explains why the list is empty, and never
+      // the selection.
+      expect(ids(session)).toEqual(['error:search:0'])
+      expect(session.selectedRow()).toBeNull()
       session.move(-1)
-      expect(session.selectedRow()?.id).toBe('cmd.one')
+      expect(session.selectedRow()).toBeNull()
       session.move(1)
-      expect(session.selectedRow()?.id).toBe('cmd.one')
-    }, { providers: [provider('rows', 100, [], [{ source: 'repo', message: 'bad' }])] })
+      expect(session.selectedRow()).toBeNull()
+    })
   })
 })
 
@@ -449,7 +436,7 @@ describe('opening at a command', () => {
   })
 })
 
-// ── Search and input (docs/future/command-palette/phase-2-search-and-input.md § Tests) ────────────
+// ── Search and input (docs/command-palette-and-shortcuts.md) ────────────
 //
 // Two rules run through all of it. A query is asked once the typing stops and only for the last thing
 // typed, and an answer is applied only if the frame still wants it — which is the generation, not the
@@ -819,16 +806,15 @@ describe('scope', () => {
     }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
   })
 
-  it('does not let a search opened at directly cost the root its provider rows', async () => {
-    // Opening straight at a search frame starts the providers' fetch and the frame's own in the same
-    // tick. They have separate generations for exactly this: Escape comes back to a root with rows.
+  it('comes back to a whole root when a search opened at directly is escaped', async () => {
+    register(leaf('cmd.archive', { title: 'Archive task' }))
     register(search('find', { minQueryLength: 0, debounceMs: 0, query: async () => [] }))
     await withSession(async (session) => {
       session.openAt('find')
       await settle()
       session.back()
-      expect(ids(session)).toEqual(['run:dev', 'find'])
-    }, { providers: [provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }])] })
+      expect(ids(session)).toEqual(['cmd.archive', 'find'])
+    })
   })
 
   it('namespaces a fleet row so two nodes answering with the same id are both reachable', async () => {
@@ -841,5 +827,284 @@ describe('scope', () => {
       await settle()
       expect(ids(session)).toEqual(['node-1:dup', 'node-2:dup'])
     }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+  })
+})
+
+
+const setting = (id: string, over: Partial<SettingCommand>): CommandContribution => ({
+  id, title: id, category: 'navigation', palette: true, kind: 'setting',
+  options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
+  read: async () => 'on',
+  write: async (value: string) => value,
+  ...over,
+} as CommandContribution)
+
+const badges = (session: CommandSession): (string | undefined)[] => session.rows().map((row) => row.badge)
+
+describe('a setting frame', () => {
+  it('asks the owner what the value is on entry, and marks that choice and no other', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'dark',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      // Nothing is drawn until the answer lands: a list with nothing marked reads as "none of these".
+      expect(labels(session)).toEqual(['Loading…'])
+      expect(session.busy()).toBe(true)
+      await settle()
+      expect(labels(session)).toEqual(['Light', 'Dark'])
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('writes the picked value, stays open, and marks what the owner says it stored', async () => {
+    const written: string[] = []
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      // A provider that normalises what it was given still leaves the list marking the right row.
+      write: async (value) => { written.push(value); return 'dark' },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.select('setting:dark')
+      session.activate()
+      await settle()
+      expect(written).toEqual(['dark'])
+      expect(session.open()).toBe(true)
+      expect(session.status()).toBe('Set to Dark.')
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('keeps the old value on a failed write, and says why', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      write: async () => { throw new Error('the node said no') },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.select('setting:dark')
+      session.activate()
+      await settle()
+      expect(session.status()).toBe('the node said no')
+      // Nothing optimistic: the marker still says what is actually set.
+      expect(badges(session)).toEqual(['current', undefined])
+    })
+  })
+
+  it('refuses a canonical value that names none of the declared choices', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      write: async () => 'neon',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.activate()
+      await settle()
+      expect(session.status()).toContain('not one of the choices')
+    })
+  })
+
+  it('draws the choices unmarked when the stored value names none of them', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'a-theme-whose-plugin-left',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      expect(labels(session)).toEqual(['Light', 'Dark'])
+      expect(badges(session)).toEqual([undefined, undefined])
+    })
+  })
+
+  it('shows a failed read as one unselectable line, and Enter reads again', async () => {
+    let attempts = 0
+    register(setting('theme', {
+      read: async () => {
+        attempts++
+        if (attempts === 1) throw new Error('the node is not answering')
+        return 'off'
+      },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      expect(labels(session)).toEqual(['the node is not answering'])
+      expect(session.selectedIndex()).toBe(-1)
+
+      session.activate()
+      await settle()
+      expect(labels(session)).toEqual(['On', 'Off'])
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('is idempotent: On written twice is On both times', async () => {
+    let stored = 'off'
+    register(setting('sound', { read: async () => stored, write: async (value) => (stored = value) }))
+    await withSession(async (session) => {
+      session.openAt('sound')
+      await settle()
+      session.select('setting:on')
+      session.activate()
+      await settle()
+      expect(badges(session)).toEqual(['current', undefined])
+      session.select('setting:on')
+      session.activate()
+      await settle()
+      expect(stored).toBe('on')
+      expect(badges(session)).toEqual(['current', undefined])
+    })
+  })
+
+  it('narrows the choices with the query rather than asking anybody again', async () => {
+    let reads = 0
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'nord', label: 'Nord' }],
+      read: async () => { reads++; return 'light' },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.setQuery('dar')
+      await settle()
+      expect(labels(session)).toEqual(['Dark'])
+      expect(reads).toBe(1)
+    })
+  })
+
+  it('leaves an answer that arrives after Escape nowhere to land', async () => {
+    let release: (value: string) => void = () => {}
+    register(group('appearance'))
+    register(setting('theme', {
+      parentId: 'appearance',
+      read: () => new Promise<string>((resolve) => { release = resolve }),
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      session.back()
+      release('on')
+      await settle()
+      // Back on the group's frame, with its own row and no setting state written into it.
+      expect(labels(session)).toEqual(['theme'])
+      expect(session.frame()?.setting).toBeUndefined()
+    })
+  })
+
+  it('is found from the root by its breadcrumb, and Escape comes back to it', async () => {
+    register(group('appearance', { title: 'Appearance' }))
+    register(setting('theme', { parentId: 'appearance', title: 'Theme', read: async () => 'on' }))
+    await withSession(async (session) => {
+      session.openRoot()
+      session.setQuery('appearance theme')
+      expect(labels(session)).toEqual(['Theme'])
+      expect(session.rows()[0]?.breadcrumb).toEqual(['Appearance'])
+
+      session.activate()
+      await settle()
+      expect(session.breadcrumb()).toEqual(['Appearance', 'Theme'])
+      expect(labels(session)).toEqual(['On', 'Off'])
+
+      session.back()
+      expect(session.query()).toBe('appearance theme')
+    })
+  })
+})
+
+describe('a contributor going away underneath', () => {
+  // Disabling a plugin disposes everything it registered, in reverse order, while whatever it
+  // contributed may be on screen (registries/extensionPoints/plugin.ts). A group and the searches
+  // under it are the first contribution kind that can hold each other, so the question is not only
+  // "does the row go" but "does anything of it survive"
+  // (docs/plugins.md § Command kinds).
+
+  const plugin = (): Disposable[] => {
+    const registrations = [
+      commandRegistry.register(group('docker', { title: 'Docker', ownerId: 'docker' })),
+      commandRegistry.register(leaf('docker.open', { parentId: 'docker', title: 'Open Docker', ownerId: 'docker' })),
+    ]
+    return registrations
+  }
+
+  it('takes the group, its descendants and their breadcrumbs with it', async () => {
+    const registrations = plugin()
+    await withSession((session) => {
+      session.openRoot()
+      session.setQuery('docker open')
+      expect(labels(session)).toEqual(['Open Docker'])
+      expect(session.rows()[0]?.breadcrumb).toEqual(['Docker'])
+
+      // Reverse order, which is what the plugin host does: the child goes before the parent.
+      for (const registration of registrations.reverse()) registration.dispose()
+
+      // Not an orphan promoted to the top level, and not a breadcrumb pointing at a group nobody
+      // registered any more. Nothing.
+      expect(labels(session)).toEqual([])
+      session.setQuery('')
+      expect(labels(session)).toEqual([])
+    })
+  })
+
+  it('leaves an open frame with nothing to act on rather than a stale row', async () => {
+    const registrations = plugin()
+    await withSession((session) => {
+      session.openAt('docker')
+      expect(labels(session)).toEqual(['Open Docker'])
+      for (const registration of registrations.reverse()) registration.dispose()
+      // The frame is still the one the reader is looking at — the session does not close under them —
+      // but there is nothing selectable in it, so Enter cannot reach a disposed executor.
+      expect(labels(session)).toEqual([])
+      expect(session.selectedRow()).toBeNull()
+      session.activate()
+    })
+  })
+
+  it('cannot invoke a search result once its command has gone', async () => {
+    vi.useFakeTimers()
+    try {
+      let picked = 0
+      const register2 = () => commandRegistry.register(search('docker.find', {
+        ownerId: 'docker',
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async () => [item('c1')],
+        select: () => { picked++ },
+      }))
+
+      // The control, so the assertion below is about disposal rather than about a row that was never
+      // selectable: with the command registered, picking the row reaches its `select`.
+      const live = register2()
+      await withSession(async (session) => {
+        session.openAt('docker.find')
+        await tick()
+        expect(labels(session)).toEqual(['c1'])
+        session.activateRow('c1')
+        await tick()
+        expect(picked).toBe(1)
+      })
+      live.dispose()
+
+      const registration = register2()
+      await withSession(async (session) => {
+        session.openAt('docker.find')
+        await tick()
+        registration.dispose()
+        // The row is still drawn from the frame's own state, and activating it finds no command to
+        // ask, so a disposed plugin's `select` is never called in a world it no longer lives in.
+        session.activateRow('c1')
+        await tick()
+        expect(picked).toBe(1)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -30,7 +30,28 @@ export const TREE_LIMITS = {
   textLength: 65_536,
   /** Trees one worker may serve at once. */
   slotsPerWorker: 512,
+  /** Serialized bytes of one host request's payload, and of the reply's body. Two orders of magnitude
+   *  under a batch, because these carry an identifier and an answer rather than a description of a
+   *  screen. Anything that wants to move a file moves it over the plugin's own route. */
+  hostRequestBytes: 65_536,
+  /** Host requests one mounted tree may have outstanding. A tree that has asked eight questions and
+   *  awaited none of them is not waiting on an answer. */
+  hostRequestsPerSlot: 8,
+  /** How long the owner's handler has before the tree is told the request failed. The owner is code in
+   *  this process, so this is a stuck promise rather than a network round trip. */
+  hostRequestMs: 10_000,
 } as const
+
+/** What a tree may ask the host for, as opposed to describe to it (docs/plugins.md § Asking the host).
+ *
+ *   owner.invoke   call one action the owning extension point declared and this `Slot` bound.
+ *   overlay.open   present the one overlay frame this contribution's own descriptor associated.
+ *
+ * Two operations, not a dispatcher. Each is a different question with a different grant behind it, and
+ * neither takes a plugin, point or slot id: the host addresses the request from the port and the slot
+ * it arrived on, so there is nothing here for plugin code to forge. */
+export const TREE_HOST_OPS = ['owner.invoke', 'overlay.open'] as const
+export type TreeHostOp = (typeof TREE_HOST_OPS)[number]
 
 const nodeId = z.string().min(1).max(64)
 const slotId = z.string().min(1).max(128)
@@ -81,6 +102,18 @@ export const sandboxMessage = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tree:batch'), slot: slotId, ops: z.array(mutation).max(TREE_LIMITS.batchOps), bytes: z.number().int().min(0).optional() }),
   z.object({ kind: z.literal('tree:failed'), slot: slotId, message: z.string().max(1_000) }),
   z.object({ kind: z.literal('tree:pong') }),
+  // The one message that expects an answer. `id` is the sandbox's own sequence and the host only ever
+  // quotes it back, exactly as the bridge's request ids work one rung up.
+  z.object({
+    kind: z.literal('tree:host-request'),
+    slot: slotId,
+    id: z.number().int().positive(),
+    op: z.enum(TREE_HOST_OPS),
+    name: z.string().min(1).max(64),
+    // `.optional()` because a request with nothing to say omits the key, and a bare `z.unknown()` is a
+    // required key whose type is unknown rather than an absent one.
+    payload: z.unknown().optional(),
+  }),
 ])
 export type TreeSandboxMessage = z.infer<typeof sandboxMessage>
 
@@ -91,6 +124,19 @@ export const hostMessage = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tree:unmount'), slot: slotId }),
   z.object({ kind: z.literal('tree:event'), slot: slotId, handler: z.number().int().positive(), event: z.enum(KIT_EVENTS), payload: z.unknown() }),
   z.object({ kind: z.literal('tree:ping') }),
+  // The answer to one `tree:host-request`. `ok` picks the arm rather than a second discriminator,
+  // because this union already discriminates on `kind`.
+  //
+  // The failure arm is a code and a sentence, never a host stack: what went wrong on this side of the
+  // port is not something a contributor gets to read.
+  z.object({
+    kind: z.literal('tree:host-reply'),
+    slot: slotId,
+    id: z.number().int().positive(),
+    ok: z.boolean(),
+    body: z.unknown().optional(),
+    error: z.object({ code: z.string().min(1).max(64), message: z.string().max(1_000) }).optional(),
+  }),
 ])
 export type TreeHostMessage = z.infer<typeof hostMessage>
 

@@ -36,6 +36,12 @@ describe('RollbarPane', () => {
       props: () => ({ item: 'connection:14395' }),
       onProps: () => {},
       onUnmount: () => {},
+      // This tree asks its host for nothing, so both throw: a fixture that silently answered
+      // would hide a component that started asking.
+      host: {
+        invoke: () => Promise.reject(new Error('this fixture answers no host requests')),
+        openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
+      },
     })
     await settle()
     await settle()

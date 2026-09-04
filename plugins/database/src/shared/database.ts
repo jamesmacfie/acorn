@@ -37,6 +37,13 @@ export type DbGenerateResult = { sql: string; providerId: string; modelId: strin
 // Shared so the modal's maxlength and the route's zod bound can't drift apart.
 export const GENERATE_MAX_PROMPT_CHARS = 4000
 
+// The one selection id that is not a saved query's. The palette's `Generate SQL` writes the scratch
+// document on the node and then opens the pane; the pane may already be open, in which case its editor
+// loaded the old text and nothing would tell it otherwise. So the success row carries this instead of a
+// row id, and the panel reads it as "re-read the scratch document" (server/routes/database.ts,
+// tree/DatabasePanel.tsx). A `#` prefix so it can never collide with the UUIDs saved queries carry.
+export const SCRATCH_SELECT_ID = '#scratch'
+
 // A named SQL snippet saved against a project (docs/data-layer.md § Database plugin: the Postgres
 // pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
@@ -57,6 +64,10 @@ export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconn
   taskRoute(taskId, `/${action}`)
 // Saved queries: project-scoped rows, addressed through the task (the project is resolved server-side).
 export const databaseQueriesRoute = (taskId: string) => taskRoute(taskId, '/queries')
+// The task's scratch document, as this plugin's own route rather than the host's document handle: the
+// panel reads it back after the palette's `Generate SQL` wrote it, which is a question about the stored
+// row and not about what is in the editor right now.
+export const databaseScratchRoute = (taskId: string) => taskRoute(taskId, '/scratch')
 export const databaseQueryRoute = (taskId: string, queryId: string) => taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
 // Which model connections this owner could generate with. A plugin route rather than a bridge call
 // because `/v2/core/integrations` has no bridge scope, and the frame needs ids and labels, not keys.

@@ -29,6 +29,11 @@ import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import '@acorn/client-core/features/tasks/task-view.css'
 import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
 
+// The two task-scoped groups this view owns in the command graph. Core's, like every command below,
+// so they may hold core's children and no plugin's (docs/command-palette-and-shortcuts.md).
+const PANES_GROUP = 'core.panes'
+const TERMINAL_GROUP = 'core.terminal'
+
 export default function TaskView(props: {
   task: Task
   terminalOpen: boolean
@@ -108,33 +113,36 @@ export default function TaskView(props: {
   }
 
   onMount(() => {
+    // The pane operations hang under one group rather than filling the root with five rows per pane
+    // (docs/command-palette-and-shortcuts.md). Their conditions are untouched: each
+    // still answers for itself, and the group only says where they are.
     const paneCommands = paneContributions().flatMap((pane) => [
       {
         id: `pane.show.${pane.id}`, title: `Show pane: ${pane.label}`, category: 'pane' as const,
-        hint: pane.description, palette: true,
+        hint: pane.description, palette: true, parentId: PANES_GROUP,
         when: () => paneAvailable(pane, props.task),
         run: () => dispatchLayout(props.task.id, { type: 'show', pane: pane.id }),
       },
       {
         id: `pane.close.${pane.id}`, title: `Close pane: ${pane.label}`, category: 'pane' as const,
-        palette: true,
+        palette: true, parentId: PANES_GROUP,
         when: () => paneAvailable(pane, props.task) && layoutForTask(props.task.id)?.panes.includes(pane.id) === true && (layoutForTask(props.task.id)?.panes.length ?? 0) > 1,
         run: () => dispatchLayout(props.task.id, { type: 'close', pane: pane.id }),
       },
       {
         id: `pane.pin.${pane.id}`,
         title: () => `${layoutForTask(props.task.id)?.pinned?.includes(pane.id) ? 'Unpin' : 'Pin'} pane: ${pane.label}`,
-        category: 'pane' as const, palette: true,
+        category: 'pane' as const, palette: true, parentId: PANES_GROUP,
         when: () => layoutForTask(props.task.id)?.panes.includes(pane.id) === true,
         run: () => dispatchLayout(props.task.id, { type: 'pin', pane: pane.id }),
       },
       {
-        id: `pane.move-left.${pane.id}`, title: `Move pane left: ${pane.label}`, category: 'pane' as const, palette: true,
+        id: `pane.move-left.${pane.id}`, title: `Move pane left: ${pane.label}`, category: 'pane' as const, palette: true, parentId: PANES_GROUP,
         when: () => (layoutForTask(props.task.id)?.panes.indexOf(pane.id) ?? -1) > 0,
         run: () => dispatchLayout(props.task.id, { type: 'move', pane: pane.id, direction: -1 }),
       },
       {
-        id: `pane.move-right.${pane.id}`, title: `Move pane right: ${pane.label}`, category: 'pane' as const, palette: true,
+        id: `pane.move-right.${pane.id}`, title: `Move pane right: ${pane.label}`, category: 'pane' as const, palette: true, parentId: PANES_GROUP,
         when: () => {
           const panes = layoutForTask(props.task.id)?.panes ?? []
           const index = panes.indexOf(pane.id)
@@ -144,12 +152,26 @@ export default function TaskView(props: {
       },
     ])
     const commands = registerCommands([
+      // Both groups are task-scoped, so a palette opened over a browse source does not offer them at
+      // all: there is no task for either to be about.
+      {
+        id: PANES_GROUP, kind: 'group', title: 'Panes', hint: 'show, close, pin and move the panes on this task',
+        category: 'pane', palette: true, scope: 'task', order: 200,
+      },
       ...paneCommands,
-      { id: 'task.terminal.toggle', title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: props.onToggleTerminal },
+      {
+        id: TERMINAL_GROUP, kind: 'group', title: 'Terminal', hint: 'the drawer and a shell in the worktree',
+        category: 'terminal', palette: true, scope: 'task', order: 300, requires: { plugin: 'terminal' },
+      },
+      { id: 'task.terminal.toggle', parentId: TERMINAL_GROUP, title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: props.onToggleTerminal },
       // A plain shell only. A terminal running a harness CLI is that harness's command and is
-      // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts).
-      { id: 'task.terminal.new-shell', title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
-      { id: 'task.archive', title: 'Archive task', hint: 'guarded teardown', category: 'task', palette: true, run: openClose },
+      // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts), which
+      // is a different owner and so cannot hang inside this group
+      // (docs/command-palette-and-shortcuts.md § What the palette refuses).
+      { id: 'task.terminal.new-shell', parentId: TERMINAL_GROUP, title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
+      // Top-level, and deliberately: one guarded action with a confirmation behind it is not a group,
+      // and burying it a keystroke deeper would not make it safer.
+      { id: 'task.archive', title: 'Archive task', hint: 'guarded teardown', category: 'task', palette: true, scope: 'task', run: openClose },
       ...paneContributions().map((pane) => ({
         id: `pane.restore.${pane.id}`, title: `Restore ${pane.label} pane row`, category: 'pane' as const,
         when: () => maximizedPane(props.task.id) === pane.id,

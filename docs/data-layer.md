@@ -153,6 +153,23 @@ behind the pane's editor. Saved queries outlive any one task worktree because th
 against a project's schema rather than a task's checkout. The scratch document is task-scoped because
 it holds whatever the reader is working on.
 
+Two of the pane's rows are also **palette commands**, under a Database group
+(`docs/command-palette-and-shortcuts.md`). Both are task-scoped, and the reason is the boundary above:
+saved queries are project-owned, but every route in this plugin reaches them through the task, because
+the task is what core resolves a project from. `/v2/p/database/palette/queries` answers that project's
+rows in the pane's own order, narrowed by what was typed and matching the name, the note and the SQL —
+the SQL because a table name lives nowhere else. Picking one loads it into the editor through the same
+path the pane's picker uses; running it is the reader's next keystroke and never the pick's own effect.
+
+`/v2/p/database/palette/generate` is the Generate SQL modal with every choice already made: the first
+connected model connection, that provider's own default model, and no worked examples. It validates
+the prompt against the modal's own bound, refuses a task-scoped agent token the way the modal's route
+does, loads the live schema, generates, **writes the scratch document, and only then answers**. That
+ordering is the contract rather than an implementation detail: the success action opens the pane, whose
+editor reads the scratch route on mount, so answering first would race the reader to their own result.
+Every failure returns before the write, which is what leaves the prompt in the palette field with the
+reason under it. Choosing a connection, a model or examples remains the modal's job.
+
 ## External-item read model
 
 `issues`, `issue_resources`, `task_links`, and provider `sync_state` rows are deliberately core-owned

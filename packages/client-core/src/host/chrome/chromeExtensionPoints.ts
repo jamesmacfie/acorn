@@ -83,6 +83,10 @@ export function pluginExtensionPoint(
     ...(descriptor.mode === 'stack' || descriptor.mode === 'replace' ? { mode: descriptor.mode as ArbitrationMode } : {}),
     // An older node's roster row carries no ceiling; four is the schema's own default.
     max: descriptor.max ?? 4,
+    // Names the owner declared, kept as declared. Whether a given `Slot` actually bound a handler for
+    // one is the owner's business at draw time, and the host checks both before it forwards a request
+    // (../tree/Slot.tsx).
+    ...(descriptor.actions?.length ? { actions: [...descriptor.actions] } : {}),
     when: () => binding.enabled(),
   }
 }
@@ -139,7 +143,11 @@ export function pluginExtension(
     // A remote entry runs the plugin's own bytes in a worker, so it is gated exactly as a frame is: no
     // accepted bundle on this device, nothing to mount.
     if (!binding.hash) throw new Error(`extension '${descriptor.id}' draws a tree, but no bundle is trusted on this device`)
-    return { ...base, carrier: 'remote', entry: descriptor.remote, hash: binding.hash }
+    // The companion overlay this descriptor associated, carried through so `RemoteTree` can bind that
+    // one name to the mounted slot. The node already refused an `overlay` naming a surface this manifest
+    // does not declare (node-core/server/plugins/manifest.ts), which is why there is nothing to re-check
+    // here: the host resolves it against this plugin's own registered overlays when the tree asks.
+    return { ...base, carrier: 'remote', entry: descriptor.remote, hash: binding.hash, ...(descriptor.overlay ? { overlay: descriptor.overlay } : {}) }
   }
   if (descriptor.frame !== undefined) {
     return { ...base, carrier: 'frame', frame: descriptor.frame }

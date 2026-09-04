@@ -7,9 +7,12 @@
 import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from '../collections.ts'
 import {
+  commandSettingOptionSchema,
   MAX_COMMAND_SEARCH_MIN_QUERY,
   MAX_COMMAND_SEARCH_DEBOUNCE_MS,
+  MAX_COMMAND_SETTING_OPTIONS,
   MIN_COMMAND_SEARCH_DEBOUNCE_MS,
+  MIN_COMMAND_SETTING_OPTIONS,
 } from '../commands.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from '../contextMenus.ts'
@@ -256,6 +259,18 @@ const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
+// The same set plus `navigate`, for the one click site that has what `navigate` wants.
+//
+// A search row is a selected row, and a project-scoped search ran because the session had a routed
+// project, so both halves of the address exist here where they do not on a plain command
+// (docs/plugins.md § Command kinds). `createTask` is still absent: a
+// search result is a thing to go and look at, and promoting one is a second verb on the row rather
+// than what picking it means (docs/integrations.md § From the command palette).
+const selectedRowAction = z.discriminatedUnion('verb', [
+  ...contextFreeAction.options,
+  z.object({ verb: z.literal('navigate'), surface: z.string().min(1).max(64) }),
+])
+
 // What an empty rail says, and where it can send someone. One action, no markup, bounded message: this
 // is the field that invites a source to grow an onboarding flow. See docs/plugins.md.
 const emptyStateDescriptor = z.object({
@@ -407,6 +422,14 @@ const extensionPointDescriptor = z.object({
   // an author checking their `matches` against something. Advisory: a contributor whose `matches` fall
   // outside it simply never wins.
   accepts: z.array(z.string().min(1).max(128)).max(32).optional(),
+  // `remote` only: what a contributor's tree may ask this point's owner to do. A closed vocabulary,
+  // declared by the owner, because a contributor's props are data and it therefore has no other way to
+  // reach back (docs/plugins.md § Cooperative extension points, "asking the owner").
+  //
+  // Names, not handlers. The owner binds a handler of the same name per `Slot` it draws, and the host
+  // refuses a request that is not in both lists. An empty declaration is the default and means a
+  // contributor may draw and nothing else, which is what every point shipped before this field meant.
+  actions: z.array(z.string().min(1).max(64).regex(/^[a-z][a-zA-Z0-9]*$/, 'an action name is lower camel case')).max(8).optional(),
   // ── The hook fields (docs/plugins.md § Hooks) ──
   // Required for `kind: 'hook'` and refused elsewhere.
   payload: hookPayloadShape.optional(),
@@ -450,6 +473,14 @@ const extensionDescriptor = z.object({
   // predicate is code and the arbitration has to be decidable by the host without running any.
   // Absent means "every key", which is the ordinary answer in a `stack` slot.
   matches: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
+  // `remote` only: one of this manifest's own `overlay` frames, which this tree may ask the host to
+  // present (docs/plugins.md § Companion overlays). A qualifier on the `remote` carrier rather than a
+  // carrier of its own, so it must stay out of the exactly-one-carrier count below; adding it there
+  // would reject every descriptor that uses it.
+  //
+  // Named here rather than passed at call time because it is the grant: a tree may open this one
+  // overlay of its own plugin's and no other, and both sides are visible in the manifest at trust time.
+  overlay: z.string().min(1).max(64).optional(),
   // `route` only: what this handler asks to do, and where it wants to sit in the chain.
   mode: z.enum(HOOK_MODES).optional(),
   priority: z.number().int().min(0).max(100_000).default(500),
@@ -482,6 +513,11 @@ const extensionDescriptor = z.object({
   if (descriptor.matches && descriptor.remote === undefined && descriptor.frame === undefined) {
     ctx.addIssue({ code: 'custom', path: ['matches'], message: 'matches is only valid on a remote or frame contribution' })
   }
+  // A companion overlay belongs to a tree. A rectangle already is a frame and can draw whatever it
+  // wants inside itself; the rest of the carriers have no mounted UI to open one from.
+  if (descriptor.overlay !== undefined && descriptor.remote === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['overlay'], message: 'overlay is only valid on a remote contribution' })
+  }
 })
 
 const paletteDescriptor = z.object({
@@ -495,7 +531,7 @@ const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'termina
 // What every kind of command declares. Ids are local: `chromeRegister.ts` qualifies both this one and
 // `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
 // plugin's group as its parent or claim another plugin's id
-// (docs/future/command-palette/architecture.md § Command graph).
+// (docs/command-palette-and-shortcuts.md).
 const commandCommon = {
   id: z.string().min(1).max(64),
   title: z.string().min(1).max(120),
@@ -540,10 +576,10 @@ const groupCommandDescriptor = z.object({
  *
  * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
  * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
- * choose what picking it does: `onSelect` is one static verb from the same closed set a command's
- * action comes from, declared here and reviewed with the rest of the manifest
- * (docs/future/command-palette/refused.md § Returning executable commands from a loaded search
- * response).
+ * choose what picking it does: `onSelect` is one static verb from a closed set, declared here and
+ * reviewed with the rest of the manifest (docs/command-palette-and-shortcuts.md § What the palette
+ * refuses). The set is a command's own plus `navigate`, because a picked row is a selected row and a
+ * project-scoped search already has its project.
  */
 const searchCommandDescriptor = z.object({
   ...commandCommon,
@@ -555,7 +591,7 @@ const searchCommandDescriptor = z.object({
   minQueryLength: z.number().int().min(0).max(MAX_COMMAND_SEARCH_MIN_QUERY).optional(),
   // Floored as well as capped: a declared 5 ms is a plugin spending a request on every keystroke.
   debounceMs: z.number().int().min(MIN_COMMAND_SEARCH_DEBOUNCE_MS).max(MAX_COMMAND_SEARCH_DEBOUNCE_MS).optional(),
-  onSelect: contextFreeAction,
+  onSelect: selectedRowAction,
 })
 
 /**
@@ -574,11 +610,37 @@ const inputCommandDescriptor = z.object({
   onSuccess: contextFreeAction,
 })
 
+/**
+ * A bounded choice with its current value shown.
+ *
+ * Two of this plugin's own routes and a static list of choices. The host GETs `readRoute` when the
+ * frame opens and PUTs `writeRoute` when a choice is picked, and both answer `{ value }`; the value
+ * that comes back has to name one of the choices declared here, which the host checks against its own
+ * copy rather than trusting the answer.
+ *
+ * Deliberately not free text. A secret, a URL or a number needs validation, a reveal policy and a
+ * recovery story that a list of labelled choices does not
+ * (docs/command-palette-and-shortcuts.md § What the palette refuses).
+ */
+const settingCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('setting'),
+  scope: loadedCommandScope,
+  // GET → { value }
+  readRoute: pluginRoute,
+  // PUT { value, taskId?, projectId?, workspaceId? } → { value }
+  writeRoute: pluginRoute,
+  // Two is the fewest that is a choice; a list long enough to need scrolling is a settings page
+  // (@acorn/protocol/commands.ts).
+  options: z.array(commandSettingOptionSchema).min(MIN_COMMAND_SETTING_OPTIONS).max(MAX_COMMAND_SETTING_OPTIONS),
+})
+
 const commandDescriptor = z.union([
   actionCommandDescriptor,
   groupCommandDescriptor,
   searchCommandDescriptor,
   inputCommandDescriptor,
+  settingCommandDescriptor,
 ])
 
 const keybindingDescriptor = z.object({
@@ -1048,6 +1110,9 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 // The verbs that need nothing from their click site. `createTask` depends on a selected rail row and
 // `navigate` on a routed project, and a command registry row has neither in scope.
 export type PluginCommandAction = z.infer<typeof contextFreeAction>
+// The same verbs plus `navigate`, which a search's `onSelect` may name because a picked row is a
+// selected row and its project came from the scope the search declared.
+export type PluginCommandSelectAction = z.infer<typeof selectedRowAction>
 export type PluginSourceEmptyState = z.infer<typeof emptyStateDescriptor>
 // `views` and `fieldRole` are wider than the parse. Both are filters: a newer node naming a view kind or
 // field role this build can't render must narrow what's offered, never fail to register.
@@ -1064,11 +1129,12 @@ export type PluginCommandCategory = z.infer<typeof commandCategory>
 // `kind` is optional on the action member and required nowhere else, which is the rule this file's
 // header states: the field was added to a shape that had already shipped, so a roster row from a node
 // running the previous parser carries no `kind` at all and means the action it always meant. The other
-// three members can only have come from a node that has this schema.
+// four members can only have come from a node that has this schema.
 export type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
 export type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
 export type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
 export type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
+export type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
 /** A newer node may send a kind this build has no frame for, so every reader switches on `kind` and
  *  skips what it does not know rather than coercing it into an action. */
 export type PluginCommandDescriptor =
@@ -1076,6 +1142,7 @@ export type PluginCommandDescriptor =
   | PluginGroupCommandDescriptor
   | PluginSearchCommandDescriptor
   | PluginInputCommandDescriptor
+  | PluginSettingCommandDescriptor
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 export type PluginAttentionDescriptor = z.infer<typeof attentionDescriptor>
 export type PluginNodeStatDescriptor = z.infer<typeof nodeStatDescriptor>

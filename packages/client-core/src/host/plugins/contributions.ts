@@ -1,5 +1,5 @@
 import type { InstalledPluginRow, NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
-import { isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
+import { hasFrameRegion, hasRemoteRegion, isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
 import { namespaceContributions } from './contributionIds'
 import { activeBundles, bundleAccepted, installedByNode } from './distribution'
 
@@ -83,6 +83,11 @@ export type DeclaredSurfaces = {
   // Full-screen pickers the host places. Not panes (docs/plugins.md § One shared eligibility and trust
   // check).
   overlays: ReadonlySet<string>
+  // Panes of either scope that draw at least one region with this plugin's own bytes: the
+  // `surfaceAction` allowlist. The verb delivers a command id across the bridge, so what it needs is a
+  // pane on the far end of one — an iframe region and a worker region qualify alike, and a pane whose
+  // regions are all host-drawn does not, because there would be nothing listening.
+  actionPanes: ReadonlySet<string>
 }
 
 /** The surface classification both passes work from. */
@@ -92,5 +97,10 @@ export function declaredSurfaces(contributions: PluginContributions): DeclaredSu
     panes: new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id)),
     projectPanes: new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id)),
     overlays: new Set(frames.filter(isOverlaySurface).map((frame) => frame.id)),
+    actionPanes: new Set(
+      frames
+        .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)))
+        .map((frame) => frame.id),
+    ),
   }
 }

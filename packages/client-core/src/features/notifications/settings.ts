@@ -8,8 +8,10 @@
 // older build both behave the way the design intends.
 //
 // The device's, like `theme`. A sound on this machine is not a fact about the node.
+import type { QueryClient } from '@tanstack/solid-query'
 import { readDevicePrefs } from '../../infra/persistence/devicePrefs'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
+import { saveJsonPref } from '../settings/savePref'
 
 export type NotificationSettings = {
   sound: boolean
@@ -50,3 +52,23 @@ export function parseNotificationSettings(json: string | undefined): Notificatio
 // is the whole truth and `savePref` writes it before it touches the cache.
 export const readNotificationSettings = (): NotificationSettings =>
   parseNotificationSettings(readDevicePrefs()[PrefKeys.notifications])
+
+/**
+ * One switch, written as a merge onto the whole record.
+ *
+ * A merge and not a replace, because the six booleans share one key: writing `{ sound: false }` on its
+ * own would turn the other five off, since every absent field reads as `true`. Settings → Notifications
+ * and the palette's setting commands both come through here so there is one merge rule and not two.
+ */
+export const saveNotificationSettings = (
+  qc: QueryClient,
+  current: NotificationSettings,
+  patch: Partial<NotificationSettings>,
+): Promise<boolean> => saveJsonPref(qc, PrefKeys.notifications, { ...current, ...patch })
+
+/** The same, one level down: the three event switches are a nested object, so they merge twice. */
+export const saveNotificationEvent = (
+  qc: QueryClient,
+  current: NotificationSettings,
+  patch: Partial<NotificationSettings['events']>,
+): Promise<boolean> => saveNotificationSettings(qc, current, { events: { ...current.events, ...patch } })

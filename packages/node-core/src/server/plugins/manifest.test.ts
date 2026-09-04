@@ -17,6 +17,10 @@ const permissionManifest = (permissions: Record<string, unknown>) =>
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
 
+/** Where each issue landed. The field, when two fields share one message. */
+const paths = (result: ReturnType<typeof manifest>) =>
+  result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'))
+
 // A pane says how it is drawn. `single` over a `frame` region is the plainest true answer and what
 // almost every case here wants: the host draws the box, the plugin's own bundle draws the inside.
 const PANE = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
@@ -103,6 +107,33 @@ describe('overlay surfaces', () => {
       .toContain(`overlay 'files' needs an action that opens it; a command with a keybinding is the usual one`)
     expect(messages(manifest({ frames: [PANE], commands: [opener({ verb: 'openOverlay', overlay: 'board' })] })))
       .toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
+  })
+
+  // The second opener, and the reason it had to be added to the same set: a plugin whose only opener is
+  // a companion overlay would otherwise fail the check above, which reads as a plugin bug rather than
+  // the missing platform rule it was.
+  it('accepts an overlay opened by a remote contribution that associated it', () => {
+    const result = webviewManifest({
+      frames: [overlay],
+      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('refuses a companion overlay this manifest does not declare', () => {
+    expect(messages(webviewManifest({
+      frames: [PANE],
+      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
+    }))).toContain(`extension names overlay 'files', which this manifest does not declare as an overlay surface`)
+  })
+
+  // A qualifier on the `remote` carrier, never a carrier of its own. A descriptor naming both would be
+  // rejected by the exactly-one-carrier rule, which is the trap this pins shut.
+  it('refuses a companion overlay on anything but a remote contribution', () => {
+    expect(messages(manifest({
+      frames: [overlay],
+      extensions: [{ id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v2/p/board/rows', overlay: 'files' }],
+    }))).toContain('overlay is only valid on a remote contribution')
   })
 
   it('keeps an overlay out of the pane sets', () => {
@@ -269,9 +300,10 @@ describe('pane layouts', () => {
 })
 
 describe('surface actions', () => {
-  // A command delivered into the frame region of a composed pane, because its chord is pressed in the
-  // host's editor where the frame has no keyboard. The rule worth pinning is the one every other verb has:
-  // it may only name a surface this same manifest declares, and only one that can receive it.
+  // A command delivered into a region the plugin draws: from the palette, or from a chord pressed in
+  // the host's editor beside it, where that frame has no keyboard of its own. The rule worth pinning is
+  // the one every other verb has: it may only name a surface this same manifest declares, and only one
+  // that can receive it.
   const composedPane = {
     target: 'pane',
     id: 'query',
@@ -288,20 +320,31 @@ describe('surface actions', () => {
     expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
   })
 
-  it('refuses a surface with no frame region to receive it', () => {
-    // A plain frame pane has no document to flush and no host chord to have resolved the command,
-    expect(messages(manifest({ frames: [PANE], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
-    // and a pane whose only region is host-drawn has no frame at all, so there is nothing on the
-    // other side.
+  // A document beside the region is NOT required, although the verb was born in a pane that has one.
+  // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
+  // about any pane the plugin draws — http's `list-detail` request panel as much as database's
+  // editor-over-panel (docs/http-client.md § From the command palette).
+  it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
+    expect(manifest({ frames: [PANE], commands: [execute('board')] }).success).toBe(true)
+    const trees = {
+      ...PANE,
+      layout: 'list-detail',
+      regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } },
+    }
+    expect(manifest({ frames: [trees], commands: [execute('board')] }).success).toBe(true)
+  })
+
+  it('refuses a pane with nothing of the plugin\'s own to receive it', () => {
+    // Every region host-drawn: the pane runs none of this plugin's code, so a command aimed at it would
+    // parse and then post into nothing.
     const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v2/p/board/doc' } } }
     expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane drawing a region of its own")
   })
 
   it('refuses another plugin\'s surface, which is to say any it did not declare', () => {
     expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] })))
-      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane with both a document region and a frame region")
+      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane drawing a region of its own")
   })
 })
 
@@ -857,6 +900,30 @@ describe('project-scoped surfaces and their routes', () => {
     }).success).toBe(false)
   })
 
+  // The one click site inside a command that can carry `navigate`: a search result. It has a picked
+  // row and, at project scope, the project the palette session captured, which is exactly the pair the
+  // verb was missing everywhere else (docs/plugins.md § Command kinds).
+  it('lets a search result navigate, and counts it as a mount site for the surface', () => {
+    const find = {
+      id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',
+      route: '/v2/p/board/search', onSelect: { verb: 'navigate', surface: 'board-card' },
+    }
+    // `nodeManifest`, because a search calls a node route and only a node half serves one.
+    expect(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE], commands: [find],
+    }).success).toBe(true)
+    // And on its own: a project-scoped surface reached only from the palette is addressed and
+    // mountable, so the "nowhere to mount" refusal must not fire on it.
+    expect(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], commands: [find],
+    }).success).toBe(true)
+    // The surface still has to be one this manifest declared as project-scoped.
+    expect(messages(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE],
+      commands: [{ ...find, onSelect: { verb: 'navigate', surface: 'nope' } }],
+    }))).toContain(`navigate names 'nope', which this manifest does not declare as a project-scoped pane`)
+  })
+
   it('refuses navigate and createTask from a slot badge, whose click carries no row and no project', () => {
     const slot = (onClick: unknown) => manifest({
       frames: [PROJECT_PANE],
@@ -907,9 +974,9 @@ describe('plugin commands and keybindings', () => {
     expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
   })
 
-  // The four kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
+  // The five kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
   // is that the addition is additive — the descriptor above, with no `kind` at all, is still the action
-  // it always was — and that the two new kinds are held to the same confinement every other route is.
+  // it always was — and that the new kinds are held to the same confinement every other route is.
   const group = { id: 'cards', title: 'Cards', category: 'navigation', kind: 'group' }
   const find = {
     id: 'find', title: 'Find a card', kind: 'search', route: '/v2/p/board/search',
@@ -918,6 +985,11 @@ describe('plugin commands and keybindings', () => {
   const ask = {
     id: 'ask', title: 'New card', kind: 'input', route: '/v2/p/board/new-card',
     onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  }
+  const theme = {
+    id: 'theme', title: 'Board theme', kind: 'setting',
+    readRoute: '/v2/p/board/theme', writeRoute: '/v2/p/board/theme',
+    options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   }
 
   it('reads a command with no kind as the action it has always meant', () => {
@@ -956,11 +1028,41 @@ describe('plugin commands and keybindings', () => {
       .toContain('route must be inside /v2/p/board/')
   })
 
-  it('refuses a search or an input from a package with no node half to answer it', () => {
+  it('refuses a search, an input or a setting from a package with no node half to answer it', () => {
     expect(messages(manifest({ commands: [find] })))
       .toContain('a search command calls a node route; declare `node` in the manifest')
     expect(messages(manifest({ commands: [ask] })))
       .toContain('an input command calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ commands: [theme] })))
+      .toContain('a setting command calls a node route; declare `node` in the manifest')
+  })
+
+  it('accepts a setting with two of its own routes and a bounded list of choices', () => {
+    const result = nodeManifest({ commands: [group, { ...theme, parentId: 'cards', scope: 'project' }] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.commands[1]).toMatchObject({
+      kind: 'setting', scope: 'project', readRoute: '/v2/p/board/theme',
+    })
+  })
+
+  it('confines both of a setting’s routes to the plugin’s own namespace', () => {
+    // The message is the shared one; what the path in the issue names is which of the two routes.
+    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
+      .toContain('contributions.commands.0.readRoute')
+    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v2/p/other/theme' }] })))
+      .toContain('contributions.commands.0.writeRoute')
+  })
+
+  it('refuses a setting that is not a choice: too few options, too many, or two spelled the same', () => {
+    expect(nodeManifest({ commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }] }] }).success).toBe(false)
+    expect(nodeManifest({
+      commands: [{ ...theme, options: Array.from({ length: 33 }, (_, at) => ({ value: `v${at}`, label: `V${at}` })) }],
+    }).success).toBe(false)
+    expect(messages(nodeManifest({
+      commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }, { value: 'light', label: 'Also light' }] }],
+    }))).toContain("setting 'theme' declares 'light' twice")
   })
 
   it('holds the parent graph together across the whole array', () => {

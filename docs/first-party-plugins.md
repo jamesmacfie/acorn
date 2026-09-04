@@ -141,7 +141,7 @@ Two things that are **not** on this list, deliberately:
   loaded plugins do not get — but that is a seam gap, not a privilege. See "The honest asterisk"
   below.
 - **Owning a SQLite file, agent tools, integration providers, panes, ref panels, sources, settings
-  pages, palette rows, slots, attention items, node stats, content links, and a host-owned
+  pages, slots, attention items, node stats, content links, and a host-owned
   webview.** All available to loaded plugins today, through the manifest, the frame bridge, or
   `ctx`. The webview is the newest and the one most likely to be assumed unavailable: a plugin
   declares a surface with a host allowlist and drives it with four verbs, while the
@@ -213,8 +213,9 @@ Its **project-scoped issue view** was the other loss, and that one is closed. Ev
 manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
 through a `SourceRouteContribution` had no manifest form, and every rail row click outside a task was
 refused with "open a task first". Panes now declare a `scope`, a manifest may declare `routes` under a
-host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` may `navigate` to a
-project-scoped surface — so the capability is carried by the tier rather than by a compiled exception.
+host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` — or a search command's,
+which has the same selected row and the project its scope was resolved against — may `navigate` to a
+project-scoped surface, so the capability is carried by the tier rather than by a compiled exception.
 The picker remains open.
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
@@ -242,9 +243,11 @@ by 24. Only the plugins that lose something are listed.
 
 What another plugin brings *into* these panes crosses too: github's diff-line marks and the badges
 beside a pull request's state draw in cells, and the changes pane's own diff point behaves the same
-way. What is still absent is the host UI slots — the editor's and github's palettes and the terminal
-drawer are registered and not drawn — and that is one row of [tui.md](./tui.md) § What a plugin loses
-here rather than a property of any plugin here.
+way. What is still absent is the host UI slots — the terminal drawer, and the two `overlay` entries
+github and agents use to mount router- and query-client-scoped command registrations — and that is one
+row of [tui.md](./tui.md) § What a plugin loses here rather than a property of any plugin here. The
+editor's ⌘P file palette used to be on that list; it is a command on the shared palette session now,
+so it draws here like everything else.
 
 Nothing is missing from **changes**, **context**, **memory**, **notes** or **onboarding**. The four
 plugins that ship only a tree bundle — **http**, **linear**, **rollbar**, **database** — reach the
