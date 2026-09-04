@@ -72,6 +72,12 @@ const mount = (item?: string): Harness => {
     props: () => ({ taskId: 'task-1' }),
     onProps: () => {},
     onUnmount: () => {},
+    // This tree asks its host for nothing, so both throw: a fixture that silently answered
+    // would hide a component that started asking.
+    host: {
+      invoke: () => Promise.reject(new Error('this fixture answers no host requests')),
+      openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
+    },
   })
   return { written, select: (next) => onSelect(next), dispose: () => root.dispose() }
 }

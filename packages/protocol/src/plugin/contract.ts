@@ -422,6 +422,14 @@ const extensionPointDescriptor = z.object({
   // an author checking their `matches` against something. Advisory: a contributor whose `matches` fall
   // outside it simply never wins.
   accepts: z.array(z.string().min(1).max(128)).max(32).optional(),
+  // `remote` only: what a contributor's tree may ask this point's owner to do. A closed vocabulary,
+  // declared by the owner, because a contributor's props are data and it therefore has no other way to
+  // reach back (docs/plugins.md § Cooperative extension points, "asking the owner").
+  //
+  // Names, not handlers. The owner binds a handler of the same name per `Slot` it draws, and the host
+  // refuses a request that is not in both lists. An empty declaration is the default and means a
+  // contributor may draw and nothing else, which is what every point shipped before this field meant.
+  actions: z.array(z.string().min(1).max(64).regex(/^[a-z][a-zA-Z0-9]*$/, 'an action name is lower camel case')).max(8).optional(),
   // ── The hook fields (docs/plugins.md § Hooks) ──
   // Required for `kind: 'hook'` and refused elsewhere.
   payload: hookPayloadShape.optional(),
@@ -465,6 +473,14 @@ const extensionDescriptor = z.object({
   // predicate is code and the arbitration has to be decidable by the host without running any.
   // Absent means "every key", which is the ordinary answer in a `stack` slot.
   matches: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
+  // `remote` only: one of this manifest's own `overlay` frames, which this tree may ask the host to
+  // present (docs/plugins.md § Companion overlays). A qualifier on the `remote` carrier rather than a
+  // carrier of its own, so it must stay out of the exactly-one-carrier count below; adding it there
+  // would reject every descriptor that uses it.
+  //
+  // Named here rather than passed at call time because it is the grant: a tree may open this one
+  // overlay of its own plugin's and no other, and both sides are visible in the manifest at trust time.
+  overlay: z.string().min(1).max(64).optional(),
   // `route` only: what this handler asks to do, and where it wants to sit in the chain.
   mode: z.enum(HOOK_MODES).optional(),
   priority: z.number().int().min(0).max(100_000).default(500),
@@ -496,6 +512,11 @@ const extensionDescriptor = z.object({
   }
   if (descriptor.matches && descriptor.remote === undefined && descriptor.frame === undefined) {
     ctx.addIssue({ code: 'custom', path: ['matches'], message: 'matches is only valid on a remote or frame contribution' })
+  }
+  // A companion overlay belongs to a tree. A rectangle already is a frame and can draw whatever it
+  // wants inside itself; the rest of the carriers have no mounted UI to open one from.
+  if (descriptor.overlay !== undefined && descriptor.remote === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['overlay'], message: 'overlay is only valid on a remote contribution' })
   }
 })
 

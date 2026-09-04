@@ -41,6 +41,10 @@ export type ExtensionPointContribution = {
   mode?: ArbitrationMode
   /** `stack` only: how many contributors fit before the host draws a disclosure. */
   max: number
+  /** `remote` only: what a contributor's tree may ask this owner to do (docs/plugins.md § Asking the
+   *  owner). Names only. The owner binds a handler of the same name on each `Slot` it draws, and the
+   *  host refuses a request missing from either list, so declaring one here grants nothing on its own. */
+  actions?: readonly string[]
   /** The platform question, the same field every host-filtered contribution takes
    *  (../hostCapabilities.ts). */
   requires?: HostCapabilityRequirement
@@ -74,6 +78,10 @@ export type ExtensionContribution = {
   entry?: string
   /** `remote`: the bundle this device accepted. The worker runs these bytes and no others. */
   hash?: string
+  /** `remote`: the one overlay of this plugin's own that this tree may ask the host to present
+   *  (docs/plugins.md § Companion overlays). One association, bound to the mounted slot, rather than a
+   *  list: a tree that could name any of its plugin's overlays would have a dispatcher, not a grant. */
+  overlay?: string
   /** `component`: the first-party half of the same kind. A compiled plugin's tree is already in this
    *  process, so the host mounts it where it would have mounted a worker's (docs/plugins.md §
    *  Cooperative extension points, "two render paths"). `Component<any>` for the reason

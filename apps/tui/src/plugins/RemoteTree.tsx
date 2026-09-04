@@ -10,6 +10,9 @@ import { recordSurfaceFailure } from '@acorn/client-core/host/plugins/surfaceFai
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { acquireTreeWorker } from '@acorn/client-core/host/tree/workerHost.ts'
+import {
+  answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions,
+} from '@acorn/client-core/host/tree/hostRequests.ts'
 import type { RemoteContribution } from '@acorn/client-core/host/tree/treeRegistry.ts'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { copyToTerminal } from '../kit/copy'
@@ -35,6 +38,11 @@ export type RemoteTreeProps = {
    *  because the two regions mount independently; its absence is the whole permission check for the
    *  `document` verb, exactly as it is on the desktop. */
   document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
+  /** What the owner of this slot will do if the tree asks, and what the owning point declared it may
+   *  ask for. The same pair the desktop takes, answered by the same shared check, because what a
+   *  contributor may ask its owner to do is not a question about which host is drawing. */
+  actions?: () => OwnerActions
+  declaredActions?: () => readonly string[]
 }
 
 let slotSeq = 0
@@ -140,6 +148,23 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     },
   })
 
+  // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
+  // the shared check; a companion overlay is a rectangle over the window, and this host has none, so it
+  // says so rather than pretending. A plugin catches `unsupported_host` and leaves its static preview
+  // up, which is why the owner's chip is what a reader sees here (docs/tui.md § Plugin surfaces).
+  const detachHostRequests = worker.onHostRequest(slot, async (request) => {
+    if (request.op === 'owner.invoke') {
+      return answerOwnerInvoke({
+        declared: componentProps.declaredActions?.() ?? [],
+        actions: componentProps.actions?.() ?? {},
+        name: request.name,
+        payload: request.payload,
+      })
+    }
+    if (request.op === 'overlay.open') return unsupportedOverlay()
+    return unknownHostOp(String(request.op))
+  })
+
   const transport = worker.transport(slot)
   // Mount is also update: the first call starts the tree, every later one carries new props.
   createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
@@ -167,6 +192,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   onCleanup(() => {
     unaction()
     unselect()
+    detachHostRequests()
     worker.unmount(slot)
     worker.release()
   })

@@ -11,7 +11,7 @@
 // host, which is why nothing here asks a second question.
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { TREE_LIMITS, batchBytes, sandboxMessage } from '@acorn/protocol/tree/messages.ts'
+import { TREE_LIMITS, batchBytes, sandboxMessage, type TreeHostOp } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import type { FrameBridge } from '../frames/broker'
 import type { TreeTransport } from './TreeHost'
@@ -34,6 +34,14 @@ const GRACE_MS = 30_000
 /** Ping cadence, and how long a worker has to answer before it is treated as gone. */
 const HEARTBEAT_MS = 10_000
 
+/** One thing a mounted tree asked the host for, already addressed: the slot is where it arrived, not
+ *  something the sandbox named (@acorn/protocol/tree/messages.ts § TREE_HOST_OPS). */
+export type TreeHostRequest = { op: TreeHostOp; name: string; payload: unknown }
+
+/** What the owner of a mounted tree answers with. A code and a sentence on failure, never a host error:
+ *  a contributor learns that its request was refused, not how this process is put together. */
+export type TreeHostResult = { ok: true; body: unknown } | { ok: false; error: { code: string; message: string } }
+
 export type TreeWorkerHandle = {
   /** Mount, or update: a second mount for the same slot is a props change, which is what keeps a tool
    *  card's redraw one message rather than a teardown. */
@@ -49,12 +57,27 @@ export type TreeWorkerHandle = {
    * tree it drew — the same re-check a frame does, one rung up.
    */
   bridgePort(): MessagePort | null
+  /**
+   * Answer this slot's host requests. Returns the detach.
+   *
+   * Per slot rather than per worker, which is the point of routing these over the tree channel at all:
+   * one worker draws every tree its bundle contributes, so only the slot says which mounted
+   * contribution asked (../frames/sdk.ts § TreeMount.host).
+   *
+   * A slot with no handler denies every request, so a tree whose host cannot answer is told so rather
+   * than left waiting.
+   */
+  onHostRequest(slot: string, handler: (request: TreeHostRequest) => Promise<TreeHostResult>): () => void
   release(): void
 }
 
 type Slot = {
   batch: ((ops: readonly TreeMutation[]) => void)[]
   failed: ((message: string) => void)[]
+  /** The owner's answer to `TreeMount.host`, set by the component that drew this slot. */
+  hostRequest: ((request: TreeHostRequest) => Promise<TreeHostResult>) | null
+  /** Requests this slot has outstanding, against TREE_LIMITS.hostRequestsPerSlot. */
+  inFlight: number
 }
 
 type Live = {
@@ -108,7 +131,7 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
     const existing = live.slots.get(id)
     if (existing) return existing
     if (live.slots.size >= TREE_LIMITS.slotsPerWorker) throw new Error(`${input.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`)
-    const slot: Slot = { batch: [], failed: [] }
+    const slot: Slot = { batch: [], failed: [], hostRequest: null, inFlight: 0 }
     live.slots.set(id, slot)
     return slot
   }
@@ -124,6 +147,13 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
       if (!live.dead) live.port.postMessage({ kind: 'tree:unmount', slot })
     },
     bridgePort: () => (live.dead ? null : live.bridgeSide),
+    onHostRequest: (slot, handler) => {
+      const target = slotFor(slot)
+      target.hostRequest = handler
+      return () => {
+        if (target.hostRequest === handler) target.hostRequest = null
+      }
+    },
     transport: (slot) => ({
       onBatch: (listener) => {
         const target = slotFor(slot)
@@ -188,6 +218,48 @@ function start(input: AcquireInput): Live {
         const slot = live.slots.get(message.slot)
         for (const listener of slot?.failed ?? []) listener(message.message)
         return input.onRefused(`could not draw '${message.slot}': ${message.message}`)
+      }
+      case 'tree:host-request': {
+        const slot = live.slots.get(message.slot)
+        const deny = (code: string, reason: string): void => {
+          if (!live.dead) live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ok: false, error: { code, message: reason } })
+        }
+        // A request for a tree nobody is showing any more. Unmount and a request in flight cross
+        // constantly, and it is not a fault, but the sandbox is waiting on a promise either way.
+        if (!slot) return deny('unmounted', 'this tree is not mounted')
+        // Measured before anything is done with it. `payload` is `unknown` on the wire, so this is the
+        // only place its size is a question at all.
+        const size = batchBytes(message.payload ?? null)
+        if (size > TREE_LIMITS.hostRequestBytes) {
+          return deny('too_large', `a host request is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
+        }
+        if (slot.inFlight >= TREE_LIMITS.hostRequestsPerSlot) {
+          return deny('too_many', `no more than ${TREE_LIMITS.hostRequestsPerSlot} host requests at once`)
+        }
+        const handler = slot.hostRequest
+        if (!handler) return deny('unsupported_host', 'this host does not answer tree requests')
+        slot.inFlight++
+        // A deadline on the owner rather than on the sandbox: the owner is code in this process, so a
+        // handler that never settles is a stuck promise, and the tree would wait on it forever.
+        let settled = false
+        const reply = (result: TreeHostResult): void => {
+          if (settled) return
+          settled = true
+          slot.inFlight--
+          // The slot going away mid-request is the ordinary case, not an error: the sandbox rejects its
+          // own copy on unmount, so there is nobody left to tell.
+          if (live.dead || !live.slots.has(message.slot)) return
+          live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ...result })
+        }
+        const timer = setTimeout(
+          () => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }),
+          TREE_LIMITS.hostRequestMs,
+        )
+        void handler({ op: message.op, name: message.name, payload: message.payload })
+          .then((result) => reply(result))
+          .catch((error: unknown) => reply({ ok: false, error: { code: 'internal', message: error instanceof Error ? error.message : String(error) } }))
+          .finally(() => clearTimeout(timer))
+        return
       }
       case 'tree:batch': {
         // The sandbox's own measurement, taken before it posted. Falls back to measuring here only for

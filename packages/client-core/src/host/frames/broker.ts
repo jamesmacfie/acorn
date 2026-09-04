@@ -20,7 +20,7 @@ import type {
   PluginBridgeSurfaceAction,
   PluginFrameContext,
 } from '@acorn/protocol/plugin/bridge.ts'
-import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_DOCUMENT_BYTES, MAX_OVERLAY_INPUT_BYTES, MAX_PLUGIN_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
@@ -57,11 +57,26 @@ export type FrameApiResult = {
   error?: { code: string; message: string; requestId: string; retryable: boolean }
 }
 
+/** `FrameApiResult` for a call that asked for bytes. The success arm never went near a JSON parser; the
+ *  failure arm did, because a refusal is JSON however the request was framed. */
+export type FrameBytesResult =
+  | { ok: true; status: number; bytes: Uint8Array; type: string; filename: string | null }
+  | { ok: false; status: number; error?: { code: string; message: string; requestId: string; retryable: boolean } }
+
 // The host effects a bridge is allowed to cause. Deliberately small and closed: adding a member here is a
 // deliberate widening of what third-party UI can do.
 export type FrameServices = {
   // Forward an already-allowed call. Pinned to the frame's node by the caller that builds this.
   fetch(method: ApiMethod, path: string, body: unknown, signal: AbortSignal): Promise<FrameApiResult>
+  // The same, for a call whose body is bytes in one direction or both. Separate rather than a mode on
+  // `fetch`, because the two differ in what they do to the response: this one must not put it through a
+  // JSON parser, which is exactly what the other one does.
+  fetchBytes(
+    method: 'GET' | 'POST',
+    path: string,
+    body: { bytes: Uint8Array; type: string; filename?: string } | undefined,
+    signal: AbortSignal,
+  ): Promise<FrameBytesResult>
   // Attach to one shell event channel; returns the detach.
   subscribe(channel: string, listener: (payload: unknown) => void): () => void
   stateGet(key: string): unknown
@@ -80,7 +95,9 @@ export type FrameServices = {
   frameHasFocus(): boolean
   // Importer lifecycle. `done` is the host's post-import refresh; `close` is plain dismissal.
   importerDone(): void
-  importerClose(): void
+  // `result` is an overlay's answer for whoever opened it. Absent for an importer, and absent for an
+  // overlay dismissed rather than answered, which the opener sees as `null` either way.
+  importerClose(result?: unknown): void
   webviewNavigate?(url: string): Promise<boolean>
   webviewCommand?(action: 'back' | 'forward' | 'reload'): Promise<boolean>
   keydown(chord: string): void
@@ -137,6 +154,17 @@ const requestShape = (data: unknown): { id: number; kind: string } | null => {
 }
 
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteLength
+
+/** Does this value fit the overlay conversation's ceiling, and is it something structured clone would
+ *  have carried anyway? A cycle or a BigInt fails both questions at once, which is why one `try` answers
+ *  them together. */
+export const withinOverlayBudget = (value: unknown): boolean => {
+  try {
+    return utf8Bytes(JSON.stringify(value ?? null) ?? 'null') <= MAX_OVERLAY_INPUT_BYTES
+  } catch {
+    return false
+  }
+}
 
 export function createFrameBridge(input: {
   port: MessagePort
@@ -223,6 +251,76 @@ export function createFrameBridge(input: {
           error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
         })
       }
+    } catch (error) {
+      if (inFlight.has(id)) post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+    } finally {
+      inFlight.delete(id)
+    }
+  }
+
+  // The same call as `handleApi`, for a route whose body is bytes (docs/plugins.md § Binary bridge
+  // calls). The two share one thing and it is the important one: `allowApi` decides before either looks
+  // at a body, so the byte path cannot be used to reach a path the JSON path would refuse.
+  const handleApiBytes = async (id: number, data: Record<string, unknown>): Promise<void> => {
+    const { method, path, bytes, type, filename } = data as {
+      method?: unknown; path?: unknown; bytes?: unknown; type?: unknown; filename?: unknown
+    }
+    if (typeof path !== 'string' || (method !== 'GET' && method !== 'POST')) {
+      post(failed(id, 'bad_request', 'a byte request needs GET or POST and a path'))
+      return
+    }
+    const decision = allowApi(binding, method, path)
+    if (!decision.allowed) {
+      // Same guarantee as the JSON path, and the same test pins it: a denied path must never produce a
+      // request. Checked here, before the body is read, so a 12 MiB POST at another plugin's namespace
+      // is refused without being looked at.
+      post(denied(id, decision.reason))
+      return
+    }
+    let body: { bytes: Uint8Array; type: string; filename?: string } | undefined
+    if (method === 'POST') {
+      if (!(bytes instanceof Uint8Array)) {
+        post(failed(id, 'bad_request', 'a byte POST needs a Uint8Array body'))
+        return
+      }
+      if (bytes.byteLength > MAX_PLUGIN_BYTES) {
+        post(failed(id, 'bad_request', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
+        return
+      }
+      // Advisory metadata, bounded here so a frame cannot use a header as a side channel. What the
+      // bytes actually are is decided by whatever receives them.
+      if (type !== undefined && (typeof type !== 'string' || type.length > 128)) {
+        post(failed(id, 'bad_request', 'a byte body’s type must be a short media type'))
+        return
+      }
+      if (filename !== undefined && (typeof filename !== 'string' || filename.length > 500)) {
+        post(failed(id, 'bad_request', 'a byte body’s filename must be a short name'))
+        return
+      }
+      body = {
+        bytes,
+        type: typeof type === 'string' && type ? type : 'application/octet-stream',
+        ...(typeof filename === 'string' && filename ? { filename } : {}),
+      }
+    }
+    const controller = new AbortController()
+    inFlight.set(id, controller)
+    try {
+      const result = await services.fetchBytes(method, path, body, controller.signal)
+      if (!inFlight.has(id)) return // cancelled while in flight; the frame stopped caring
+      if (!result.ok) {
+        post({
+          id,
+          ok: false,
+          error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
+        })
+        return
+      }
+      if (result.bytes.byteLength > MAX_PLUGIN_BYTES) {
+        post(failed(id, 'too_large', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
+        return
+      }
+      post({ id, ok: true, status: result.status, body: { bytes: result.bytes, type: result.type, filename: result.filename } })
     } catch (error) {
       if (inFlight.has(id)) post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     } finally {
@@ -356,7 +454,19 @@ export function createFrameBridge(input: {
           return void post(denied(id, `${op} is only valid from an importer surface`))
         }
         if (op === 'importer.done') services.importerDone()
-        else services.importerClose()
+        else {
+          // A result is an overlay answering the tree that opened it (docs/plugins.md § Companion
+          // overlays). An importer has nobody awaiting a value, so supplying one there is a frame
+          // built against the wrong surface and is refused rather than dropped.
+          const result = (data as { result?: unknown }).result
+          if (result !== undefined && binding.target !== 'overlay') {
+            return void post(denied(id, 'only an overlay closes with a result'))
+          }
+          if (result !== undefined && !withinOverlayBudget(result)) {
+            return void post(failed(id, 'bad_request', `an overlay result is capped at ${MAX_OVERLAY_INPUT_BYTES} bytes`))
+          }
+          services.importerClose(result)
+        }
         return void post({ id, ok: true, status: 200, body: null })
       }
       default:
@@ -463,6 +573,9 @@ export function createFrameBridge(input: {
     switch (shape.kind) {
       case 'api':
         void handleApi(shape.id, data)
+        return
+      case 'api.bytes':
+        void handleApiBytes(shape.id, data)
         return
       case 'subscribe':
         handleSubscribe(shape.id, data)

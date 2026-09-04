@@ -2642,6 +2642,16 @@
                   "maxLength": 128
                 }
               },
+              "actions": {
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[a-z][a-zA-Z0-9]*$"
+                }
+              },
               "payload": {
                 "type": "object",
                 "propertyNames": {
@@ -2765,6 +2775,11 @@
                   "minLength": 1,
                   "maxLength": 128
                 }
+              },
+              "overlay": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "mode": {
                 "type": "string",

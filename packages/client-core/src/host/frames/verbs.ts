@@ -29,6 +29,8 @@ import type { AcornBridge } from './sdk'
 // or bare `kind` where there is no op.
 type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
   ? `api:${M}`
+  : R extends { kind: 'api.bytes'; method: infer M extends string }
+    ? `api.bytes:${M}`
   : R extends { kind: infer K extends string; op: infer O extends string }
     ? `${K}:${O}`
     : R extends { kind: infer K extends string }
@@ -58,6 +60,10 @@ type AuthorSurface = {
   'api:PUT': AcornBridge['api']['put']
   'api:PATCH': AcornBridge['api']['patch']
   'api:DELETE': AcornBridge['api']['del']
+  // The byte path is its own wire kind, so it is its own pair of verbs here: a JSON call and a byte
+  // call are not the same request wearing a flag (docs/plugins.md § Binary bridge calls).
+  'api.bytes:GET': AcornBridge['api']['getBytes']
+  'api.bytes:POST': AcornBridge['api']['postBytes']
   subscribe: AcornBridge['events']['on']
   'state.get': AcornBridge['state']['get']
   'state.set': AcornBridge['state']['set']
@@ -85,6 +91,8 @@ type HostSurface = {
   'api:PUT': FrameServices['fetch']
   'api:PATCH': FrameServices['fetch']
   'api:DELETE': FrameServices['fetch']
+  'api.bytes:GET': FrameServices['fetchBytes']
+  'api.bytes:POST': FrameServices['fetchBytes']
   subscribe: FrameServices['subscribe']
   'state.get': FrameServices['stateGet']
   'state.set': FrameServices['stateSet']
