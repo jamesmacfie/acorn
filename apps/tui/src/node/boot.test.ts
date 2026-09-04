@@ -103,6 +103,12 @@ describe('acorn against a node it started', () => {
     expect(lockedBy(dataDir())).toBe(holder)
     await second.stop()
     expect(lockedBy(dataDir())).toBe(holder)
+
+    // …and the row it wrote is one the next launch can read. A fleet row is parsed back with a strict
+    // schema, so the attach path spreading the running node's `pid` into it made the whole file
+    // unreadable next time: an empty fleet, nothing for `connect` to connect, and a shell stuck on
+    // "the node is unreachable". A fresh store, because the one above has the rows in memory.
+    expect(custody(join(root, 'config')).fleet.get(opened.nodeId)?.endpoint).toBeDefined()
   }, 30_000)
 
   it('reports a token the node refuses as revoked, and stops retrying', async () => {
