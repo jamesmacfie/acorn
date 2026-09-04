@@ -59,7 +59,10 @@ const contributor = (pluginId: string, matches: string[]) =>
 const draw = (file: AgentAttachment): string => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <AttachmentSlot attachment={file} taskId="t1" onRemove={() => {}} />, host)
+  const dispose = render(
+    () => <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />,
+    host,
+  )
   const text = host.textContent ?? ''
   dispose()
   host.remove()
@@ -80,7 +83,21 @@ describe('the composer’s attachment slot', () => {
   it('hands a .png to the plugin that declared it, instead of the chip', () => {
     point()
     contributor('images', ['image/png', 'image/jpeg'])
-    expect(draw(attachment('screenshot.png', 'image/png'))).toBe('drawn by images')
+    expect(draw(attachment('screenshot.png', 'image/png'))).toContain('drawn by images')
+  })
+
+  // The ✕ lives inside the chip a contributor replaces, so without this the reader would be unable to
+  // take an attachment off the turn for as long as a plugin was drawing it.
+  it('keeps removal available outside the slot when a plugin replaced the chip', () => {
+    point()
+    contributor('images', ['image/png'])
+    expect(draw(attachment('screenshot.png', 'image/png'))).toBe('drawn by images✕')
+  })
+
+  // And does not draw a second one when nobody did: the chip already has its own.
+  it('leaves removal to the chip when nobody replaced it', () => {
+    point()
+    expect(draw(attachment('notes.txt', 'text/plain'))).not.toContain('✕✕')
   })
 
   it('leaves a type that plugin did not declare to the chip', () => {

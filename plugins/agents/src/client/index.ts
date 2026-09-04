@@ -45,8 +45,14 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.extensionPoints.register({
       id: 'tool-card', label: 'Agent tool call', kind: 'remote', mode: 'replace', max: 1,
     })
+    // `replace` is the one thing a contributor may ask this pane to do (docs/plugins.md § Asking the
+    // owner). An editor that draws an attachment has to be able to hand back an altered one, and props
+    // are data, so without a declared action it could draw the button and never do anything with it.
+    // The composer binds the handler per attachment and decides whether to accept
+    // (./composer/AgentComposer.tsx).
     ctx.extensionPoints.register({
       id: 'attachment', label: 'Agent turn attachment', kind: 'remote', mode: 'replace', max: 1,
+      actions: ['replace'],
     })
     ctx.extensionPoints.register({
       id: 'composer-actions', label: 'Agent composer', kind: 'remote', mode: 'stack', max: 4,

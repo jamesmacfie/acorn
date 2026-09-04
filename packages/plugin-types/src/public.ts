@@ -680,6 +680,9 @@ export type CapabilityCatalogue = {
   'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
   /** Ask the agent runtime to reconcile after a restart. */
   'agents.runtime': { reconcile(): Promise<void> }
+  /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
+   *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
+  'agents.draftAttachments': HostOwned<'plugins/agents/contract/draftAttachments.DraftAttachmentsCapability'>
   /** The host-declared slot whichever plugin owns agent sessions fills. */
   'agents.harnessRegistry': HostOwned<'node-core/server/plugin/harnesses.HarnessRegistry'>
   /** The host-declared hook fired when a task's worktree first exists. */
