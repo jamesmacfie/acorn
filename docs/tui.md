@@ -422,6 +422,15 @@ nothing to be already destroyed.
 natively rather than handing an element back. The `rectangle` extension kind — a sibling region an
 iframe fills — is absent entirely.
 
+**A companion overlay is the same absence, answered rather than ignored.** A remote tree may ask its
+host to present one of its plugin's overlay frames (`docs/plugins.md § Companion overlays`). There is
+no iframe here to put one in, and a cell-drawn canvas is not something this project is going to invent,
+so `src/plugins/RemoteTree.tsx` answers `overlay.open` with a typed `unsupported_host`. A plugin
+catches that code and leaves its static preview up, and the point owner's own fallback is what a reader
+sees. The other half of that seam, `owner.invoke`, is host-agnostic and goes through the shared check
+in `client-core/host/tree/hostRequests.ts` — what a contributor may ask its owner to do is not a
+question about which host is drawing, and a copy of that check here would be a copy that could
+diverge.
 ### Unknown nodes and failed trees
 
 Three behaviours, the same on both hosts. A node type this build cannot draw renders as a labelled
@@ -1391,11 +1400,17 @@ lives.
 | `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
 | `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](./future/client-plugins/04-replaceable-surfaces.md) |
 
-The last row costs five first-party registrations: github's pull-file palette, the editor's file
-palette and onboarding's first-run screen all take `overlay`; the terminal plugin takes `drawer`; and
-docker takes `task.footer`. The terminal's overlays are a fixed set the shell draws and its drawer is
-the rail, so giving a plugin those places is a contract for both hosts rather than a component for
-this one.
+The last row costs five first-party registrations, and two of them draw nothing: github's and agents'
+`overlay` entries are where a command that needs the router or a query client gets mounted, and
+onboarding's first-run screen is the one `overlay` that is really a screen. The terminal plugin takes
+`drawer` and docker takes `task.footer`. The terminal's overlays are a fixed set the shell draws and
+its drawer is the rail, so giving a plugin those places is a contract for both hosts rather than a
+component for this one.
+
+What that costs a reader here is small and named: github's changed-file and pull-request searches and
+agents' two settings are desktop-only, because the registrations that mint them are not mounted. The
+editor's ⌘P quick-open used to be in the same list and is not any more — it is a `search` command its
+plugin registers at boot, so it works here.
 
 **A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
 `Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region

@@ -19,6 +19,7 @@ import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from '.
 import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
 import { AttachmentSlot } from './AttachmentSlot'
+import { decideReplacement } from './replaceAttachment'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -68,6 +69,10 @@ export default function AgentComposer(props: {
   const [sending, setSending] = createSignal(false)
   const [uploading, setUploading] = createSignal(false)
   const [attachments, setAttachments] = createSignal<AgentAttachment[]>([])
+  // Which attachment is mid-swap, if any (`replaceDraftAttachment`). Submit is disabled for the
+  // duration: the editor overlay normally covers the composer, but a turn must not be able to enqueue
+  // an id that is being replaced, and correctness here cannot depend on what is on top.
+  const [replacing, setReplacing] = createSignal('')
   const [contexts, setContexts] = createSignal<AgentContextSnapshot[]>([])
   const [capturingContext, setCapturingContext] = createSignal('')
   const [contextPickerId, setContextPickerId] = createSignal('')
@@ -221,7 +226,9 @@ export default function AgentComposer(props: {
 
   async function send() {
     const text = draft().trim()
-    if (nothingToSend() || sending() || props.disabled || props.submitDisabled) return
+    // `replacing()` for the reason its declaration gives: a turn must not enqueue an attachment id that
+    // is halfway through being swapped for another.
+    if (nothingToSend() || sending() || replacing() || props.disabled || props.submitDisabled) return
     setSending(true)
     setError('')
     try {
@@ -321,6 +328,67 @@ export default function AgentComposer(props: {
   function removeAttachment(attachment: AgentAttachment) {
     setAttachments((current) => current.filter((item) => item.id !== attachment.id))
     void managedAgentApi.removeAttachment(attachment.id).catch(() => undefined)
+  }
+
+  /**
+   * A contributor asking this composer to put a different attachment in one slot
+   * (docs/plugins.md § Asking the owner; docs/managed-agents.md § Draft attachments).
+   *
+   * A compare-and-swap, because there is no transaction to be had. The draft is an array in this
+   * component and the replacement is a row on the node, so "atomic" here can only mean: either the id
+   * we were told to expect is still in that slot and it is replaced once, or nothing changes at all. A
+   * reader who removed the attachment, sent the turn, or switched sessions while an editor was open
+   * gets the second.
+   *
+   * The order at the end is load-bearing. The new id is written to the draft before the old one is
+   * cleaned up, so a crash in between leaves an extra unreferenced row for the garbage collector rather
+   * than a draft pointing at content that has been deleted.
+   */
+  async function replaceDraftAttachment(expected: AgentAttachment, payload: unknown): Promise<void> {
+    const { expectedAttachmentId, replacementAttachmentId } = (payload ?? {}) as {
+      expectedAttachmentId?: unknown
+      replacementAttachmentId?: unknown
+    }
+    if (typeof replacementAttachmentId !== 'string' || !replacementAttachmentId) {
+      throw new Error('A replacement needs an attachment id.')
+    }
+    if (replacing()) throw new Error('Another replacement is already in progress.')
+    if (!attachments().some((item) => item.id === expected.id)) {
+      throw new Error('That attachment is no longer in this draft.')
+    }
+    setReplacing(expected.id)
+    try {
+      const replacement = await managedAgentApi.attachment(replacementAttachmentId)
+      // The draft is re-read here rather than captured before the await: fetching the metadata gave the
+      // reader time to remove something. Every rule about whether the swap is allowed lives in the pure
+      // decision (./replaceAttachment.ts), where the cases that would lose an attachment are testable.
+      const decision = decideReplacement({
+        current: attachments(),
+        expectedId: expected.id,
+        claimedExpectedId: expectedAttachmentId,
+        replacement,
+        taskId: props.session.taskId,
+      })
+      if (decision.kind === 'noop') return
+      if (decision.kind === 'refuse') {
+        // The candidate the contributor created and this composer refused. Nobody references it, so
+        // the sweep would get it eventually; asking now keeps a rejected edit from leaving content
+        // behind. The decision never refuses when the candidate IS the source, so this cannot delete
+        // the reader's own attachment.
+        void managedAgentApi.removeAttachment(replacement.id).catch(() => undefined)
+        throw new Error(decision.reason)
+      }
+      setAttachments(decision.next)
+      // Written by hand rather than left to the effect above, which runs after this function returns.
+      // The point of the ordering is that the durable draft names the replacement before the source is
+      // deleted, and an effect one tick later is not that.
+      writeLocal(attachmentDraftKey(props.session.id), JSON.stringify(decision.next.map((item) => item.id)))
+      // Best effort, deliberately. The swap is already durable; a failure here leaves an unreferenced
+      // row that the store's own 24-hour sweep collects.
+      void managedAgentApi.removeAttachment(expected.id).catch(() => undefined)
+    } finally {
+      setReplacing('')
+    }
   }
 
   function removeContext(context: AgentContextSnapshot) {
@@ -448,7 +516,14 @@ export default function AgentComposer(props: {
               <AttachmentSlot
                 attachment={attachment}
                 taskId={props.session.taskId}
-                onRemove={() => removeAttachment(attachment)}
+                sessionId={props.session.id}
+                onRemove={() => {
+                  // Refused while this one is being swapped, for the same reason Submit is: the
+                  // compare-and-swap is holding this slot.
+                  if (replacing() === attachment.id) return
+                  removeAttachment(attachment)
+                }}
+                onReplace={(payload) => replaceDraftAttachment(attachment, payload)}
               />
             )}
           </For>
@@ -593,7 +668,7 @@ export default function AgentComposer(props: {
           size="sm"
           busy={sending()}
           title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
-          disabled={nothingToSend() || contextBudget().overLimit || props.disabled || props.submitDisabled}
+          disabled={nothingToSend() || !!replacing() || contextBudget().overLimit || props.disabled || props.submitDisabled}
           onPress={() => void send()}
         >
           Send

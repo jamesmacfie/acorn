@@ -23,7 +23,6 @@ import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { NODE_CORE_FACETS } from './permissions'
 import {
-  hasDocumentRegion,
   hasFrameRegion,
   hasRemoteRegion,
   isOverlaySurface,
@@ -103,14 +102,20 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   const taskPanes = new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id))
   const projectPanes = new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id))
   const overlays = new Set(frames.filter(isOverlaySurface).map((frame) => frame.id))
-  // Panes with both a host document region and a region of the plugin's own, which is the only place a
-  // surface action has to land. A pane whose regions are all host-drawn is excluded: it runs none of the
-  // plugin's code, so a command targeting it would parse and then post into nothing. A `remote` region
-  // counts as much as a `frame` one — the command crosses the same bridge either way, and only the thing
-  // on the far end of it differs.
-  const composedPanes = new Set(
+  // Panes with a region of the plugin's own, which is where a surface action lands. A pane whose regions
+  // are all host-drawn is excluded: it runs none of the plugin's code, so a command targeting it would
+  // parse and then post into nothing. A `remote` region counts as much as a `frame` one — the command
+  // crosses the same bridge either way, and only the thing on the far end of it differs.
+  //
+  // A document region is NOT required, although the verb was born in a pane that has one: ⌘Enter in the
+  // host's editor was the chord that could not otherwise reach a frame. The palette is the other way in
+  // (@acorn/protocol/plugin/contract.ts § surfaceAction), and from there "do this in the thing I am
+  // looking at" is a sentence about any pane this plugin draws — http's `list-detail` request panel as
+  // much as database's editor-over-panel. The test is the one the paragraph above states: is there
+  // something of the plugin's on the far end of the bridge to receive it.
+  const actionPanes = new Set(
     frames
-      .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)) && hasDocumentRegion(frame))
+      .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)))
       .map((frame) => frame.id),
   )
 
@@ -149,13 +154,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       if (overlays.has(value.overlay)) openedOverlays.add(value.overlay)
       else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `openOverlay names '${value.overlay}', which this manifest does not declare as an overlay surface` })
     }
-    // The frame region is what receives it, so the degenerate template is not a candidate, and neither is
-    // a plain frame pane, which has no document to flush and no host chord to have resolved this.
-    if (value.verb === 'surfaceAction' && !composedPanes.has(value.surface)) {
+    // The plugin's own region is what receives it, so a pane whose regions are all host-drawn is not a
+    // candidate: there would be nothing on the far end of the bridge.
+    if (value.verb === 'surfaceAction' && !actionPanes.has(value.surface)) {
       ctx.addIssue({
         code: 'custom',
         path: [...at, 'surface'],
-        message: `surfaceAction names '${value.surface}', which this manifest does not declare as a pane with both a document region and a frame region`,
+        message: `surfaceAction names '${value.surface}', which this manifest does not declare as a pane drawing a region of its own`,
       })
     }
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
@@ -297,9 +302,9 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // refinement can see.
   contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
-  // Four kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
-  // an input's route and its one static verb, a group's nothing at all
-  // (@acorn/protocol/plugin/contract.ts).
+  // Five kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
+  // an input's route and its one static verb, a setting's two routes and its choices, a group's nothing
+  // at all (@acorn/protocol/plugin/contract.ts).
   const commandKind = new Map<string, string>()
   commands.forEach((entry, i) => {
     const at = ['contributions', 'commands', i] as (string | number)[]
@@ -318,11 +323,25 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
         route(entry.route, [...at, 'route'])
         action(entry.onSuccess, [...at, 'onSuccess'])
         break
+      case 'setting': {
+        route(entry.readRoute, [...at, 'readRoute'])
+        route(entry.writeRoute, [...at, 'writeRoute'])
+        // Two choices spelled the same way is a list where picking either marks both and the host
+        // cannot tell which one a returned value meant.
+        const values = new Set<string>()
+        entry.options.forEach((option, at2) => {
+          if (values.has(option.value)) {
+            ctx.addIssue({ code: 'custom', path: [...at, 'options', at2, 'value'], message: `setting '${entry.id}' declares '${option.value}' twice` })
+          }
+          values.add(option.value)
+        })
+        break
+      }
     }
     // Verbatim the schedule and task-check rule above, and for the identical reason: only a node half
-    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke
-    // and an input on every Enter.
-    if ((entry.kind === 'search' || entry.kind === 'input') && !manifest.node) {
+    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke,
+    // an input on every Enter, and a setting the moment its frame opens.
+    if ((entry.kind === 'search' || entry.kind === 'input' || entry.kind === 'setting') && !manifest.node) {
       const article = entry.kind === 'input' ? 'an' : 'a'
       ctx.addIssue({ code: 'custom', path: at, message: `${article} ${entry.kind} command calls a node route; declare \`node\` in the manifest` })
     }
@@ -448,11 +467,11 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // declaration that installs and does nothing, and the way that gets in is a kind added below with one
   // of its two lists forgotten.
   const kindFields: Record<ExtensionPointKind, { required: readonly string[]; refused: readonly string[] }> = {
-    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
-    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
+    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
+    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
     remote: { required: ['mode'], refused: ['location', 'surface', 'panels', 'key', 'payload', 'allows'] },
-    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'payload', 'allows'] },
-    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts'] },
+    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'actions', 'payload', 'allows'] },
+    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions'] },
   }
   extensionPoints.forEach((entry, i) => {
     const at = ['contributions', 'extensionPoints', i] as (string | number)[]
@@ -515,6 +534,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       }
       placedInlineFrames.add(entry.frame)
     }
+    // The second thing that opens an overlay, beside the `openOverlay` action verb. It has to add to the
+    // same set the frame check below reads: a plugin whose only opener is a companion overlay would
+    // otherwise fail that check, which reads as a plugin bug rather than the missing rule it is.
+    if (entry.overlay !== undefined) {
+      if (overlays.has(entry.overlay)) openedOverlays.add(entry.overlay)
+      else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `extension names overlay '${entry.overlay}', which this manifest does not declare as an overlay surface` })
+    }
     // A plugin extending its own point is legal and pointless: it can put the rows there itself. It is not
     // refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.
   })
@@ -563,10 +589,17 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'item'], message: `route item '${entry.item}' must be a :param of its path other than projectId` })
     }
   })
-  // A source's `navigate` is the only thing that mounts a project-scoped surface, and a `routes` entry is
-  // the only address it has. Declaring one without either is a surface that parses and can never appear,
+  // A `navigate` is the only thing that mounts a project-scoped surface, and a `routes` entry is the
+  // only address it has. Declaring one without either is a surface that parses and can never appear,
   // which is the failure mode this file spends the rest of its length avoiding.
-  const navigatedSurfaces = new Set(sources.flatMap((entry) => entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : []))
+  //
+  // Two verbs count, because two click sites can carry one: a source row and a search result. Both
+  // hand over a selected row and a routed project, which is all `navigate` ever needed
+  // (@acorn/protocol/plugin/contract.ts § selectedRowAction).
+  const navigatedSurfaces = new Set([
+    ...sources.flatMap((entry) => entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : []),
+    ...commands.flatMap((entry) => entry.kind === 'search' && entry.onSelect.verb === 'navigate' ? [entry.onSelect.surface] : []),
+  ])
   frames.forEach((frame, i) => {
     if (frame.target === 'overlay' && !openedOverlays.has(frame.id)) {
       ctx.addIssue({

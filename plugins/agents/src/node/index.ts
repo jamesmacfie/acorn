@@ -10,6 +10,8 @@ import { createHarnessRegistry } from '../server/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
+import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
+import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
@@ -82,6 +84,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
+  let draftAttachmentsRoute: { dispose(): void } | null = null
   return {
     name: 'agents',
     required: true,
@@ -212,6 +215,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
       ctx.capabilities.provide(AGENTS_RUNTIME, { reconcile: () => runtime!.reconcile() })
+      // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
+      // attachment reaches this plugin through, since a sandbox cannot call another plugin's routes.
+      // Read and write only, and only for a draft: the composer still owns which attachment is in the
+      // turn, because the node cannot transact with an array in the client.
+      draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
     },
     // Releases what init acquired, in the order docs/managed-agents.md § Operations and failure
     // describes.
@@ -219,6 +227,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       await runtime?.stop()
       runtime = null
       managedRoute?.dispose()
+      draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
       harnessRoute?.dispose()
       for (const dispose of builtInProfileDisposables ?? []) dispose()

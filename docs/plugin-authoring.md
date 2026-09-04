@@ -101,7 +101,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'7'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"7"` unless you have checked your plugin against another major too, in which case `"6 || 7"` or `"5-7"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'10'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"10"` unless you have checked your plugin against another major too, in which case `"9 || 10"` or `"8-10"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -181,8 +181,8 @@ host cannot draw.
 | `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. Also where a pane declares its `claimsKeys`, and where a `coreSlot` surface names which core surface it offers to replace. |
 | `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels` records why each refused slot is refused. |
-| `palette` | 32 | The pre-`commands` spelling of a palette row, still parsed as an alias for a command with `palette: true`. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for. |
-| `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Takes the narrow verb set only. |
+| `palette` | 32 | The pre-`commands` spelling, still parsed as an alias for a command with `palette: true` and rewritten into one before anything else sees it. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for, and it has only the `action` shape. |
+| `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Five shapes, on an optional `kind`: an `action` (the default, and one narrow verb), a `group` that holds children, a `search` naming a GET route and one static `onSelect`, an `input` naming a POST route and one static `onSuccess`, and a `setting` naming a read route, a write route and 2-32 labelled choices. A descriptor with no `kind` means exactly what it always did. `docs/plugins.md § Command kinds` has the fields and the bounds of each. |
 | `keybindings` | 32 | A chord for a command from the same manifest. Canonical `meta+ctrl+alt+shift+key` order, must include `meta`, `ctrl` or `alt`, `when` is `global`/`task`/`surface`, and one binding per command. In the terminal client a terminal emulator keeps the command key for itself, so the host reads your `meta` as Ctrl: `meta+shift+p` is pressed there as Ctrl+Shift+P, and `meta+ctrl+alt+shift+d` as Ctrl+Option+Shift+D. You declare the chord once (`docs/tui.md` § What a plugin loses here). |
 | `attention` | 4 | An attention-inbox feed, fetched per node from your route. |
 | `nodeStats` | 4 | A node statistic, with a singular/plural label pair so a card reads "1 card stuck". |
@@ -275,7 +275,8 @@ The cross-field rules are worth knowing before you write a manifest that parses 
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
 project-scoped one; a project-scoped pane needs both a `routes` entry (its only address) and a source
 whose `onSelect` navigates to it (its only mount site); an `overlay` needs an action that opens it; a
-`surfaceAction` may name only a pane that has both a document region and a `frame` region; a webview needs a client bundle; an
+`surfaceAction` may name only a pane that draws a region of its own, as an iframe or as a worker
+tree; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
 it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
 must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
@@ -301,7 +302,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "4",
+  "apiVersion": "10",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -394,8 +395,9 @@ it. Closed is the point: every plugin composes the same few verbs, and adding on
 where removing one would not be.
 
 The full set. It is meant for a rail source's `onSelect` — the one click site that has a selected row,
-a routed project and the host's promotion callback in scope. (The legacy `palette` descriptor also
-accepts it, which predates the split and should not be relied on.)
+a routed project and the host's promotion callback in scope. A `search` command's `onSelect` gets the
+narrow set plus `navigate`, because it has both halves of a project-surface address too. (The legacy
+`palette` descriptor also accepts the full set, which predates the split and should not be relied on.)
 
 | Verb | Effect |
 | --- | --- |
@@ -406,7 +408,7 @@ accepts it, which predates the split and should not be relied on.)
 | `createTask` | Host-owned promotion: the row supplies the task seed, the host owns the modal, the ownership check and the ordering. |
 | `openUrl` | `https` only, in the real browser. |
 | `openOverlay` | Open a full-screen picker this manifest declares. |
-| `surfaceAction` | Deliver this command's own id to the `frame` region of a pane that also has a document region. The only verb whose effect lands inside a plugin. |
+| `surfaceAction` | Deliver this command's own id to a region of one of your own panes — an iframe or a worker tree. The only verb whose effect lands inside a plugin. |
 
 Commands, slot badges and a source's `emptyState` take a **six-verb subset**: `openPane`, `openTask`,
 `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction`. `createTask` and `navigate` are absent
@@ -625,6 +627,50 @@ your bundle draws, so it holds one bridge and one context; the props are per slo
 A pane tree is mounted with `{ taskId, projectId }`, a project pane and a reference panel with
 `{ item }`. `bridge.onSelect` and `bridge.onSurfaceAction` reach you exactly as they reach a frame.
 
+#### Asking the host for something
+
+Props are data, so a tree that fills somebody else's slot cannot change what it is drawing and cannot
+open a rectangle. Two methods on the mount cover both, and they are on the mount rather than the bridge
+for the reason above: one bridge per bundle could not say which of your four mounted previews asked.
+
+```tsx
+mountTree({
+  // `solidTree` puts `host` on your props beside `bridge`. Both are stable for the mount's life, so a
+  // handler that is mid-await when the owner sends new props is still holding the right one.
+  attachmentPreview: solidTree((props) => (
+    <Button onPress={async () => {
+      const result = await props.host.openOverlay('editor', { taskId: props.taskId, attachmentId: props.attachment.id })
+      if (!result) return                       // dismissed; nothing happened
+      await props.host.invoke('replace', { expectedAttachmentId: props.attachment.id, ...result })
+    }}>Edit {props.attachment.filename}</Button>
+  )),
+})
+```
+
+Writing the renderer by hand instead of through `solidTree`? It is the second argument, `mount.host`.
+
+`host.invoke(action, payload)` calls an action the owning point declared and the owner bound to that
+exact slot. You learn the names from the owner's published `actions` list; anything else is refused.
+The owner decides whether to do it, so handle a rejection.
+
+`host.openOverlay(overlayId, input)` presents the one overlay your extension descriptor associated:
+
+```json
+{ "id": "image-attachment", "point": "agents:attachment", "label": "Image markup",
+  "remote": "attachmentPreview", "matches": ["image/png", "image/jpeg"], "overlay": "editor" }
+```
+
+That overlay must be a `frame` in your own manifest with `"target": "overlay"`, and naming it here is
+what opens it — you do not also need a command. Inside it, `bridge.context.input` is what you passed,
+and `bridge.ui.close(result)` resolves the call. Every dismissal resolves it with `null` instead, so
+check for that before acting.
+
+Three things will refuse you, all deliberate. Call `openOverlay` from a press or key handler: the host
+honours it only while focus is inside your tree, and at most once a second. Keep payloads, inputs and
+results under 64 KiB and made of JSON — pass an id and fetch the bytes over your own route with
+`bridge.api.getBytes`. And catch `unsupported_host`: the terminal draws trees and has no iframe to put
+an overlay in, so leave your static preview up there rather than showing a control that cannot work.
+
 ### Reaching the bridge
 
 In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
@@ -661,7 +707,8 @@ The sequence (`packages/protocol/src/plugin/bridge.ts`):
 2. You take `event.ports[0]`, set `onmessage`, and call `port.start()`.
 3. The host sends `{ kind: 'ready', context }`. `context` is a **snapshot**, not reactive: `surface`,
    `target`, `nodeId`, and — depending on the surface — `taskId`, `projectId`, `refId`, `item`,
-   `theme`, `style`, `claimsKeys`.
+   `input`, `theme`, `style`, `claimsKeys`. `input` is overlay-only and is what the remote tree that
+   opened this overlay passed; it is the only thing the frame is told about who opened it.
 4. **You must post something back.** The host arms a 10-second deadline when it transfers the port and
    replaces the frame with a labelled "This plugin's UI failed to start" placeholder if nothing
    arrives, because a bundle that throws at module scope otherwise renders a blank rectangle and
@@ -692,9 +739,10 @@ messages by hand:
 | --- | --- |
 | `context` | The `ready` snapshot. |
 | `api` | `get`, `post`, `put`, `patch`, `del` — five, matching `PluginBridgeApiRequest.method` exactly. A method missing from the facade is a method no plugin can reach, however permissive the scope table underneath. |
+| `api.getBytes` / `api.postBytes` | The same call for a route whose body is bytes, on its own wire kind `api.bytes`. GET and POST, capped at 12 MiB each way, with an advisory `type` and `filename`. Reach for it instead of base64 whenever you are moving a file: the JSON verbs stringify everything, which costs a third more on the wire and a decode at each end. The path decision is identical, and another plugin's namespace is refused before the body is read. |
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
-| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. |
+| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |
@@ -782,7 +830,7 @@ it is checked against the contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "7",
+  "apiVersion": "10",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

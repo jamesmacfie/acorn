@@ -395,12 +395,99 @@ The same page carries one setting that is not a session default and does not tra
 draws its tool cards (section Client surfaces). It is there because that is where somebody looks for
 it, not because it shares a store with anything above it.
 
+## From the command palette
+
+Six rows, all registered by this plugin rather than by the shell.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+| Row | Kind | What it does |
+| --- | --- | --- |
+| Open Agent Center | action, no scope | Selects the `agents` rail source, which is this device's view of the node rather than a property of a task |
+| Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
+| New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |
+| New Codex terminal | action, needs an open task | The same for the `codex` profile |
+| Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
+| How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
+
+**The search is task-scoped although the route is not.** The route behind it takes a workspace as
+happily as a task, and Agent Center asks it that way. But a row from another task can only be opened
+by activating that task first, and that navigation belongs to a router a plugin has no handle on. A
+search whose rows cannot all be opened is worse than a narrower one, so the palette asks about the
+captured task and Agent Center stays the surface that spans them. The node ranks the rows and the
+device does not re-rank them, a request is capped at 50, and each row carries the task it came from,
+so a stale context cannot send a pick to the wrong pane. Selection goes through the same retained
+path Agent Center uses (`plugins/agents/src/client/sessions/managedSelection.ts`) rather than a
+second one of the palette's own.
+
+**The two harness terminals belong to this plugin, not to the shell.** The desktop carried them by
+name until 2026-08-31, which meant a third harness needed a shell edit. The profile ids are this
+plugin's (`plugins/agents/src/server/profiles/index.ts`), so the commands are too. The shell keeps
+the drawer toggle and the plain shell, because neither of those belongs to a harness.
+
+**Each setting shares one accessor with its Settings page, so the two cannot drift.** The first
+writes through `writeAgentSessionDefaults`
+(`plugins/agents/src/client/settings/sessionDefaultsClient.ts`), which owns the optimistic cache
+write and the refetch on failure; the second through `saveAgentToolFoldMode`
+(`plugins/agents/src/client/sessions/toolFoldPrefs.ts`), which also spells the three choices once for
+the page's picker and the command's options. Both accessors take a query client, and there is none at
+plugin init, so these two register from a component mounted in the `overlay` slot
+(`plugins/agents/src/client/AgentCommands.tsx`) instead of at boot. That makes them desktop-only: the
+terminal draws no overlay slot and has nowhere to store a device preference, and a choice that would
+quietly fail to persist is worse than an absent row.
+
+What is missing is deliberate. Stop, archive, unarchive, import and export, fork, compact, and
+handoff each need a selected session, and most need a confirmation, which is a result action panel
+rather than a row. Pricing and concurrency are forms: a number has no list of labelled choices to
+pick from.
+
 ## Context, files, and attachments
 
 Context is assembled by the Node from registered task sections and sent as an immutable snapshot.
 Attachments are validated, task-scoped, stored through the shared blob cache, and referenced by
 session records. Artifacts are authenticated no-store downloads; provider paths and worktree paths
 are revalidated against the owning task.
+
+### Draft attachments, and replacing one
+
+An attachment on an unsent turn is a draft: a row and a content-addressed blob that no turn references
+yet. The composer owns which ones are in the turn, as an array in client state with the ids in local
+storage; the node owns the content. Sending a turn is what turns a draft into evidence, and stored
+bytes are never edited in place — content addressing, deduplication, draft recovery and the record of
+what a turn contained all rest on that.
+
+Another plugin may draw an attachment instead of the composer's chip, and may hand back an altered one.
+Two seams make that possible without letting it reach past either owner.
+
+`agents.draftAttachments` is a node capability with exactly two methods
+(`plugins/agents/src/contract/draftAttachments.ts`). `read` returns one PNG or JPEG of a named task
+that no turn has claimed, as bytes — never a filesystem path — and answers `null` for every refusal,
+because saying which kind of no would answer questions about rows the caller may not see.
+`createReplacement` stores an altered copy through the ordinary upload path: same 10 MiB ceiling, same
+magic-byte validation, same safe-name normalization, same deduplication, so bytes identical to the
+source come back as the source and an edit that changed nothing is a no-op. It rechecks the source
+immediately before writing, because an editor stays open while a person draws and the turn can be sent
+in the meantime. A loaded plugin declares `requires.plugins: [{ id: "agents" }]` and the capability in
+`permissions.node.capabilities`, and resolves it at call time rather than at init.
+
+Neither method replaces the draft or deletes the source, deliberately. The node does not own the unsent
+client array and cannot transact with it, and deleting a source before the client has committed would
+lose the reader's only valid attachment. So `createReplacement` produces a candidate, and the composer
+commits it through the `agents:attachment` point's declared `replace` action
+(`docs/plugins.md § Asking the owner`).
+
+That commit is a compare-and-swap, which is the only meaning "atomic" can have across those two
+owners: the id the contributor says it edited has to still be in that slot, the replacement has to
+belong to the same task and be an image, and the draft's count and aggregate-size ceilings have to
+still hold. Exactly one array element changes, order is preserved, and Submit and that slot's remove
+are disabled while it runs. The new id is written to durable draft storage *before* the old one is
+cleaned up, so a crash in between leaves an extra unreferenced row for the 24-hour sweep rather than a
+draft pointing at deleted content. A rejected candidate is deleted on a best-effort basis and the
+original stays.
+
+Nothing downstream needed changing. The turn stores `{ type: 'attachment', attachmentId }` and both
+drivers resolve the id to a local path at dispatch, so replacing the id before enqueue is the whole of
+what makes the agent receive the altered image.
 
 ## Operations and failure
 

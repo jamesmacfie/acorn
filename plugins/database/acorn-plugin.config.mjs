@@ -110,17 +110,80 @@ export default {
         id: 'open',
         title: 'Database: open pane',
         category: 'pane',
+        // Not in the group below, and not renamed: it is invisible in the palette, so the only place
+        // this title is read is the shortcut editor, where it stands on its own next to a chord.
         palette: false,
         action: { verb: 'openPane', pane: 'database' },
       },
       {
+        // The group the three visible rows hang under. Grouping is what keeps four rows saying
+        // "Database" out of the palette root; the root search still finds a child by its own words,
+        // because the breadcrumb is one of the terms a node is indexed under
+        // (client-core/host/registries/commands/graph.ts).
+        //
+        // `db` rather than `database`, which is the pane's id: contribution ids are unique across the
+        // whole manifest, so a group cannot be named after the surface it is about.
+        id: 'db',
+        title: 'Database',
+        kind: 'group',
+        category: 'action',
+      },
+      {
         id: 'execute',
-        title: 'Database: run query',
+        // Was 'Database: run query'. The id and the chord are unchanged, which is what a reader's
+        // muscle memory and a stored override are keyed on; the prefix went because the group above now
+        // says it.
+        title: 'Run query',
+        parentId: 'db',
         category: 'action',
         // Reachable from the palette as well as from the chord, which is what naming the surface on the
         // action rather than deriving it from the keybinding buys.
         palette: true,
         action: { verb: 'surfaceAction', surface: 'database' },
+      },
+      {
+        // This project's saved queries, searched from the palette
+        // (docs/database.md § From the command palette).
+        //
+        // `scope: 'task'` although a saved query belongs to a project, and that is deliberate rather
+        // than a compromise: every saved-query route in this plugin is addressed through a task,
+        // because the task is what core resolves a project from. The host sends the task the palette
+        // session captured; the route turns it into exactly one project's rows.
+        //
+        // `openPane`, not `navigate`: a saved query has no detail surface of its own. Picking one loads
+        // its SQL into the pane's editor through the same path the pane's own picker uses, and running
+        // it stays the reader's next keystroke (../tree/DatabasePanel.tsx).
+        id: 'find-query',
+        title: 'Find a saved query',
+        parentId: 'db',
+        hint: 'saved queries in this repository',
+        keywords: ['sql', 'query', 'saved', 'database'],
+        category: 'navigation',
+        kind: 'search',
+        scope: 'task',
+        route: '/v2/p/database/palette/queries',
+        placeholder: 'Find a saved query…',
+        onSelect: { verb: 'openPane', pane: 'database' },
+      },
+      {
+        // Describe a query in words and get SQL in the editor, without opening the modal
+        // (docs/database.md § From the command palette).
+        //
+        // One text field, so the three choices the modal offers are all made for the reader: the first
+        // connected model provider, that provider's own default model, and no worked examples. Choosing
+        // any of them remains the modal's job. The route writes the scratch document before it answers,
+        // so by the time this pane opens the SQL is already the document it loads.
+        id: 'generate',
+        title: 'Generate SQL',
+        parentId: 'db',
+        hint: 'describe a query and get SQL in the editor',
+        keywords: ['ai', 'sql', 'generate', 'database'],
+        category: 'action',
+        kind: 'input',
+        scope: 'task',
+        route: '/v2/p/database/palette/generate',
+        placeholder: 'Describe the query — e.g. the 10 most recent orders with the customer’s email',
+        onSuccess: { verb: 'openPane', pane: 'database' },
       },
     ],
     keybindings: [

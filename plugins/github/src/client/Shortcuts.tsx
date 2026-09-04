@@ -1,18 +1,19 @@
-import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
+import { createMemo, onCleanup, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
-import { useChangedFiles } from './changedFiles'
-import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
-import type { PullFile } from '../shared/api'
-import { PaletteSurface, registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Inline, Text } from '@acorn/plugin-api/ui'
 import { createQuery } from '@tanstack/solid-query'
-import { githubCreateRoute } from './clientRoutes'
+import { projectsOptions, registerCommands } from '@acorn/plugin-api/client'
+import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { useChangedFiles } from './changedFiles'
+import { githubCommands } from './commands'
 
-// Global keyboard shortcuts and the file finder. Mounted once in App. PullList owns j/k (next/prev
-// PR); those keys are untouched here. Global shortcut dispatch lives in the command registry; the
-// open finder handles its own dialog-scoped navigation.
-// The finder is local; the shortcut reference lives in Settings → Shortcuts, so `?` opens that tab
-// (via onOpenShortcuts) rather than a local help overlay.
+// Where this plugin's router-scoped commands get mounted, and the chords that reach them. One instance,
+// in the shell's overlay slot, drawing nothing.
+//
+// It drew a file finder until 2026-09-03. That overlay is a `search` command on the shared palette
+// session now, and what a command does is `./commands.ts`; what is left here is the router, the
+// changed-file query and the keyboard. PullList still owns j/k (next/prev PR); those keys are untouched.
+// The `?` shortcut opens Settings → Shortcuts rather than a local help overlay, so the reference lives
+// in one place.
 
 export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()
@@ -20,36 +21,25 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
   const github = () => project()?.github
-  let lastRouteKey = ''
 
-  // Current PR's changed files (same source/order PullDetail uses). Only fetched when a PR is open.
+  // Current PR's changed files (same source and order PullDetail uses). Only fetched when a PR is open.
   const route = createMemo(() => {
     if (!github()?.owner || !github()?.name || !params.number) return null
-    return { owner: github()!.owner, repo: github()!.name, number: params.number, key: `${params.projectId}#${params.number}` }
+    return { owner: github()!.owner, repo: github()!.name, number: params.number }
   })
   const changedFiles = useChangedFiles(route)
-  const allFiles = changedFiles.files
-
-  const finder = createOverlayPalette({
-    count: () => results().length,
-    onPick: (index) => {
-      const sel = results()[index]
-      if (sel) selectFile(sel.path)
-    },
-  })
 
   onMount(() => {
-    const commands = registerCommands([
-      { id: 'help.shortcuts.open', title: 'Open keyboard shortcuts', category: 'navigation', run: props.onOpenShortcuts },
-      { id: 'github.files.find', title: 'Find file in this pull request', category: 'navigation', when: () => !!route(), run: finder.show },
-      { id: 'github.files.next', title: 'Next changed file', category: 'navigation', when: () => !!route(), run: () => changedFiles.cycleFile(1) },
-      { id: 'github.files.previous', title: 'Previous changed file', category: 'navigation', when: () => !!route(), run: () => changedFiles.cycleFile(-1) },
-      {
-        id: 'github.pull.create', title: 'Create pull request', category: 'navigation',
-        when: () => !!params.projectId && !!github(),
-        run: () => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? ''))),
-      },
-    ])
+    const commands = registerCommands(githubCommands({
+      route,
+      github,
+      projectId: () => params.projectId,
+      files: changedFiles.files,
+      selectFile: changedFiles.selectFile,
+      cycleFile: changedFiles.cycleFile,
+      navigate,
+      openShortcuts: props.onOpenShortcuts,
+    }))
     const bindings = registerKeybindings([
       { id: 'help.shortcuts.open', command: 'help.shortcuts.open', description: 'Open keyboard shortcuts', category: 'Global', defaultChord: 'shift+?', when: 'typing-exempt' },
       { id: 'github.files.find', command: 'github.files.find', description: 'Find file in this pull request', category: 'Pull requests', defaultChord: '/', when: 'typing-exempt', active: () => !!route() },
@@ -60,59 +50,5 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Finder results ranked with the palette's fuzzy scorer: every query char must appear in order in
-  // the path, and contiguous runs or word-start hits score higher, so substring-ish matches sort
-  // above looser subsequence ones. Ties keep the PR's file order (stable sort); an empty query lists
-  // all files in PR order.
-  const results = createMemo(() => {
-    const q = finder.query().trim()
-    const list = allFiles()
-    if (!q) return list
-    return list
-      .map((file) => ({ file, score: fuzzyScore(q, file.path) }))
-      .filter((x): x is { file: PullFile; score: number } => x.score !== null)
-      .sort((a, b) => b.score - a.score)
-      .map((x) => x.file)
-  })
-
-  function selectFile(path: string) {
-    changedFiles.selectFile(path)
-    finder.close()
-  }
-
-  // Finder state is per PR. Route changes keep `?file=` intact for DiffView's scroll target,
-  // but the transient finder UI should not carry across pages.
-  createEffect(() => {
-    const key = route()?.key ?? ''
-    if (key === lastRouteKey) return
-    lastRouteKey = key
-    finder.close()
-  })
-
-  // Split a path into directory + basename so the finder can emphasize the filename.
-  function splitPath(path: string) {
-    const i = path.lastIndexOf('/')
-    return i < 0 ? { dir: '', name: path } : { dir: path.slice(0, i + 1), name: path.slice(i + 1) }
-  }
-
-  return (
-    <PaletteSurface
-      palette={finder}
-      items={results()}
-      ariaLabel="Find file"
-      placeholder="Find file…"
-      emptyText={allFiles().length ? 'No matching files.' : 'No changed files.'}
-      onPick={(file) => selectFile(file.path)}
-      row={(file) => {
-        const parts = splitPath(file.path)
-        return (
-          <Inline gap="none">
-            {/* Directory first and dimmed, filename emphasised. */}
-            <Text emphasis="muted">{parts.dir}</Text>
-            <Text>{parts.name}</Text>
-          </Inline>
-        )
-      }}
-    />
-  )
+  return null
 }

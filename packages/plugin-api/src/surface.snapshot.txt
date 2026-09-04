@@ -1,16 +1,19 @@
-# plugin API major: 9
+# plugin API major: 10
 client: CHECK_TONE
+client: COMMAND_CLOSED
 client: ClientPlugin
 client: ClientScheduleContribution
 client: CommandContribution
+client: CommandExecutionContext
+client: CommandOutcome
 client: ContentLinkContribution
+client: ContributedCommand
 client: FAILED_STATUSES
 client: HostCapabilityRequirement
 client: HostRequirement
 client: InAppTarget
+client: InputCommand
 client: IntegrationFlowContribution
-client: PaletteItem
-client: PaletteRowSource
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution
@@ -37,6 +40,8 @@ client: RefPanelProps
 client: RefPanelTarget
 client: RemoteContribution
 client: SaveRequest
+client: SearchCommand
+client: SettingCommand
 client: ShellSlotContribution
 client: SourceContribution
 client: SourceRouteContribution
@@ -101,12 +106,14 @@ client: isTerminalMax
 client: latestOnly
 client: learnRefPrefixes
 client: linkifyRefs
+client: localSearch
 client: markAttentionSeen
 client: nodeReady
 client: nodes
 client: observeAttention
 client: onClosePaneWhen
 client: onClosePaneWithin
+client: onPluginFrame
 client: onScopeEvicted
 client: openInAppUrl
 client: openPane
@@ -411,6 +418,7 @@ ui/host: selectPaneTab
 ui/host: slotFills
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
+ui/sdk: PluginByteResponse
 ui/sdk: PluginFrameContext
 ui/sdk: RemoteNode
 ui/sdk: RemoteRoot

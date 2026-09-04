@@ -2,7 +2,7 @@ import type { PluginContributions } from '@acorn/protocol/api.ts'
 
 // Binding a loaded plugin's pane, source and slot ids to its own name.
 //
-// Contribution ids are un-namespaced by design: `pr`, `changes` and `palette.files` double as
+// Contribution ids are un-namespaced by design: `pr`, `changes` and `terminal.drawer` double as
 // persisted layout keys and chord targets, so they cannot carry an arbitrary prefix
 // (registries/plugin.ts). Plugin-versus-plugin collisions fail loudly, which is fine. The one that
 // does not is a collision with a *future core id*: core adds a pane called `notes`, an installed

@@ -109,16 +109,15 @@ Your plugin exports a `ClientPlugin`: a `name`, an `init`, and optionally `activ
 | --- | --- |
 | `panes` | A rectangle inside a task, with a glyph, an order, and an optional default chord |
 | `sources` | A rail entry, and the surface the shell renders when it is selected |
-| `commands` | A palette entry |
+| `commands` | A palette entry: an action, a group, a live search, a submitted text input, or a two-to-thirty-two-choice setting |
 | `keybindings` | A chord bound to a command |
 | `integrationFlows` | The connect flow for a provider you own. The id must equal your plugin name |
 | `projectImporters` | An importer the first-run onboarding hosts |
 | `settingsPages` | A page in Settings, with a group and an order |
 | `slots` | A component in a host-owned region of the shell, or inside a task's chrome. The slot id decides which, and which context your component receives |
-| `extensionPoints` | A place inside one of your own surfaces that other plugins may fill. The host mints the id from your plugin name |
+| `extensionPoints` | A place inside one of your own surfaces that other plugins may fill. The host mints the id from your plugin name. A `remote` point may also declare `actions`: the closed list of things a contributor may ask you to do, since its props are data and it has no other way to reach back ([plugins.md](./plugins.md) § Asking the owner) |
 | `extensions` | What you bring to somebody else's point, as a component the host mounts. This is how your tool's calls draw in an agent transcript: fill `agents:tool-card` |
 | `refPanels` | A reference panel for an external item. Not a pane, see [panes.md](./panes.md) |
-| `paletteRows` | Rows the palette can search, sourced from your own state |
 | `agentContexts` | Context an agent can pull from your plugin |
 | `schedules` | Periodic client work with an interval and an optional external refresh trigger |
 | `railMarkers` | Status markers the host draws on a rail control |

@@ -1,6 +1,7 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { dockerAgentContextContribution } from './agentContextContribution'
+import { dockerCommands } from './commands'
 import { dockerPrefsSlice } from './dockerPrefs'
 import { dockerTaskScheduleContribution } from './dockerStore'
 import { dockerPaneContribution } from './paneContribution'
@@ -40,6 +41,8 @@ export const dockerClientPlugin: ClientPlugin = {
     })
     // A local source: no providerId, so no integration row gates it and it's always in the rail.
     ctx.sources.register(dockerSourceContribution)
+    // Open the browse surface, and find one of the four things on the daemon (./commands.ts).
+    for (const contribution of dockerCommands) ctx.commands.register(contribution)
     ctx.slots.register(dockerFooterSlotContribution)
     ctx.railMarkers.register(dockerRailMarkerContribution)
     ctx.schedules.register(dockerTaskScheduleContribution)

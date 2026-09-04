@@ -5,6 +5,7 @@ import {
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
+import { SCRATCH_SELECT_ID } from '../shared/database'
 import {
   connectDb,
   deleteRow,
@@ -16,6 +17,7 @@ import {
   listRows,
   listSavedQueries,
   listTables,
+  readScratch,
   runQuery,
   updateCell,
 } from './databaseClient'
@@ -178,6 +180,15 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     return Object.fromEntries(columns().filter((c) => c.isPk).map((c) => [c.name, set.rows[index][set.columns.indexOf(c.name)]]))
   }
 
+  // What the palette picked, when it picked something. Two ids arrive on this channel and they are two
+  // different questions: a saved query's own id, which loads that query, and the scratch sentinel,
+  // which the `Generate SQL` command sends because it wrote the document on the node and this pane may
+  // already have loaded the old text (../shared/database.ts).
+  //
+  // A signal rather than acting on arrival, because a saved-query id can land before the list it names:
+  // the pane opens and the row and the list are two round trips racing each other.
+  const [requested, setRequested] = createSignal<string | undefined>()
+
   onMount(() => {
     // The host's half of a composed pane resolved a surface-scoped chord and sent it across. There is
     // one command today; the switch is here rather than an `if` because a second one is a manifest row
@@ -185,6 +196,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     onCleanup(props.bridge.onSurfaceAction((command) => {
       if (command === 'execute') void execute()
     }))
+    // The selection that opened this pane rides in `context`; every later one is a message
+    // (docs/plugins.md § The tree contract). Both land in the same signal.
+    setRequested(props.bridge.context.item)
+    onCleanup(props.bridge.onSelect((item) => setRequested(item)))
     void connect()
   })
   onCleanup(() => void disconnectDb(props.taskId).catch(() => {}))
@@ -196,6 +211,22 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     writeSql(q.sql)
     setLoadedName(q.name)
   }
+
+  createEffect(() => {
+    const id = requested()
+    if (!id) return
+    if (id === SCRATCH_SELECT_ID) {
+      setRequested(undefined)
+      // Read the row, not the editor: this runs because the node wrote SQL the editor has not seen.
+      // Loading a generated query is not running it, exactly as picking a saved one is not.
+      void readScratch(props.taskId).then((sql) => sql && writeSql(sql), fail)
+      return
+    }
+    const q = savedList().find((candidate) => candidate.id === id)
+    if (!q) return
+    setRequested(undefined)
+    loadSaved(q)
+  })
 
   return (
     <Stack gap="row">

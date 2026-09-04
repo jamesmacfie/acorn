@@ -6,7 +6,7 @@
 // against, and its names are Solid's; they are exported because the preset imports them by name, not
 // because you write them.
 import type { JSX } from 'solid-js'
-import type { AcornBridge, TreeRender } from 'acorn-plugin-sdk'
+import type { AcornBridge, TreeMount, TreeRender } from 'acorn-plugin-sdk'
 
 /**
  * What a kit node takes: anything, checked on arrival.
@@ -113,9 +113,13 @@ export declare const KIT_NODE_COMPONENTS: Record<string, (props: KitNodeProps) =
  *
  * The props acorn mounted with arrive as a store, so a redraw reconciles rather than tearing the tree
  * down: a card whose data gains a line re-renders that line.
+ *
+ * `bridge` and `host` arrive beside them. `host` is the two things a tree may ask acorn for — call an
+ * action the owning extension point declared, open the overlay your descriptor associated — and both
+ * are stable for the mount's life, so a redraw does not invalidate a handler mid-await.
  */
 export declare function solidTree<P extends Record<string, unknown>>(
-  component: (props: P & { bridge: AcornBridge }) => JSX.Element,
+  component: (props: P & { bridge: AcornBridge; host: TreeMount['host'] }) => JSX.Element,
 ): TreeRender
 
 // The universal-renderer surface. Solid's compiler emits calls to these; you do not.

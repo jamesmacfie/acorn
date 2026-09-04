@@ -9,6 +9,7 @@ import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/s
 import type { StoredConnection } from '@acorn/node-core/server/integrations/connections.ts'
 import type { ExternalItemStore } from '@acorn/node-core/server/integrations/itemStore.ts'
 import type { CapabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 import type * as Published from './public.ts'
 
 // The drift lock for the hand-written published declarations, copying the pattern
@@ -75,7 +76,11 @@ const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[
 const _tasks: Mutual<Hole<CoreServices['tasks'], (typeof HOLES.tasks)[number]>, Hole<Published.CoreServices['tasks'], (typeof HOLES.tasks)[number]>> = [true, true]
 const _projects: Mutual<Hole<CoreServices['projects'], (typeof HOLES.projects)[number]>, Hole<Published.CoreServices['projects'], (typeof HOLES.projects)[number]>> = [true, true]
 const _request: Mutual<PluginRequestContext, Published.PluginRequestContext<Real[0], Real[1]>> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request]
+// One capability whose shape is written out here rather than left opaque, because a plugin outside this
+// repository is the whole reason it exists (`agents.draftAttachments`). The row it hands back is
+// protocol's `AgentAttachment`, so this is what stops the published copy drifting from the real one.
+const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
+void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _draftAttachment]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.

@@ -1,7 +1,6 @@
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
-import { paletteRowRegistry, type PaletteRowSource } from '../palette/paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from '../rail/attention'
 import { collectionKey, collectionRegistry, type CollectionRegistration } from '../sources/collections'
 import { nodeStatRegistry, type NodeStatContribution } from '../rail/nodeStats'
@@ -69,7 +68,6 @@ export type ClientPluginContext = {
   // worker, and a compiled one is already in this process (registries/extensionPoints.ts).
   extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
-  paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
   // One number on a Fleet home node card (docs/frontend.md § Registries and plugins;
   // registries/nodeStats.ts).
@@ -153,7 +151,7 @@ export type ClientPluginHostResult = {
 const contributed = new Map<string, Disposable[]>()
 
 // A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
-// because `pr`, `changes` and `palette.files` are persisted layout keys and chord targets, so
+// because `pr`, `changes` and `terminal.drawer` are persisted layout keys and chord targets, so
 // prefixing them breaks stored state.
 const declaredProvider = (entry: object): string | undefined =>
   'providerId' in entry && typeof (entry as { providerId?: unknown }).providerId === 'string'
@@ -226,7 +224,6 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     extensionPoints: ownExtensionPoint,
     extensions: ownExtension,
     refPanels: own(refPanelRegistry),
-    paletteRows: own(paletteRowRegistry),
     agentContexts: own(agentContextRegistry),
     schedules: own(clientScheduleRegistry),
     railMarkers: own(railMarkerRegistry),

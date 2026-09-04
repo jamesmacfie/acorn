@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { sendRaw } from '../../infra/node/apiClient'
+import { sendRaw, sendRawBytes } from '../../infra/node/apiClient'
 import { toast } from '../../features/notifications/toast'
 import { clientEvents, openPane } from '../registries/commands/clientEvents'
 import { executeCommand } from '../registries/commands/commands'
@@ -37,10 +37,16 @@ export type PluginFrameProps = {
   // updates. Both feed the same two channels: whatever is set when the frame connects rides in
   // `context`, and every change after that is a `select` message rather than a remount.
   item?: string
+  // Overlay surfaces only: what the remote tree that opened this overlay handed over
+  // (docs/plugins.md § Companion overlays). Reaches the frame as `bridge.context.input` and nothing
+  // else; the frame is never told which slot or which plugin asked.
+  input?: unknown
   // Importer surfaces only. The host owns the modal chrome and the post-import refresh; the frame only
   // says when it is done.
   onImported?: () => void
-  onClose?: () => void
+  // The result an overlay closed with, when it closed with one. An importer and a dismissed overlay
+  // both pass nothing, and the surface that owns the chrome decides what that means.
+  onClose?: (result?: unknown) => void
   // A webview's visible pixels are host-owned. Its sandboxed client bundle remains mounted offscreen
   // solely as the typed controller that can issue the four allowed verbs.
   controllerOnly?: boolean
@@ -86,6 +92,31 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         nodeId: props.binding.nodeId,
         signal,
         ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      })
+      return result
+    },
+    // The byte path (docs/plugins.md § Binary bridge calls). Almost nothing new: the transport under
+    // `sendRawBytes` has carried a `Uint8Array` body all the way from the broker since it was written,
+    // and the only reason a frame could not reach it was that the line above hard-codes JSON in both
+    // directions. So this is a second door onto existing transport, not new transport.
+    fetchBytes: async (method, path, body, signal) => {
+      const result = await sendRawBytes(path, {
+        method,
+        // Pinned, exactly as above: the frame named a path and nothing else.
+        nodeId: props.binding.nodeId,
+        signal,
+        ...(body === undefined
+          ? {}
+          : {
+            headers: {
+              'content-type': body.type,
+              ...(body.filename ? { 'content-disposition': `attachment; filename="${body.filename.replace(/["\\]/g, '')}"` } : {}),
+            },
+            // The one cast in this file. `NodeFetchBody` narrows its view to an `ArrayBuffer`-backed one
+            // and a value that crossed a MessagePort is typed as backed by either; both work here,
+            // because everything downstream only ever reads the view.
+            body: { kind: 'bytes' as const, bytes: body.bytes as Uint8Array<ArrayBuffer> },
+          }),
       })
       return result
     },
@@ -150,7 +181,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     },
     frameHasFocus: () => host.frameHasFocus(),
     importerDone: () => props.onImported?.(),
-    importerClose: () => props.onClose?.(),
+    importerClose: (result) => props.onClose?.(result),
     // Present only for a composed pane, and its absence is the permission check the broker applies:
     // there is no scope to declare, because the grant is structural. The indirection through the
     // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the

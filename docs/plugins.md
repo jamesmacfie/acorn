@@ -169,6 +169,18 @@ theme name is not a thing CodeMirror has. What the entrypoint offers instead is 
 `captureViewState`/`applyViewState` with its `EditorViewState` type, which is the selection and
 scroll a pane used to hand back to a library as an opaque blob.
 
+It went to `10` on 2026-09-03, when the command palette stopped having two vocabularies.
+`PaletteRowSource` and `PaletteItem` came off `/client` with the registry behind them: a second way to
+put a row in the palette, with `rows` and `invoke` where a command has `run`, and with no owner, no
+capability gate, no disposal and no shortcut of its own — each of those had to be arranged for it
+separately. Only a compiled plugin could supply its callbacks, so a loaded plugin could never
+contribute a live row through it at all. Its last two contributors, the terminal's run targets and the
+workflow definitions, are `search` commands their plugins register through `ctx.commands`
+([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). `ctx.paletteRows` went with
+them. The manifest's `contributions.palette` alias did **not**: it names a command rather than a row,
+it has always been read as one, and its removal is a separate announcement rather than something this
+batch could carry quietly.
+
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major
 was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
@@ -865,7 +877,7 @@ usually a contribution id something else already owns — is skipped so the rest
 works, and reported in the attention inbox rather than only in the console.
 
 **A loaded plugin's ids sit inside its own namespace.** Contribution ids are un-namespaced by design:
-`pr`, `changes` and `palette.files` double as persisted layout keys and chord targets, so they cannot
+`pr`, `changes` and `terminal.drawer` double as persisted layout keys and chord targets, so they cannot
 carry an arbitrary prefix. Plugin-versus-plugin collisions fail loudly, which is fine. The one that
 did not was a collision with a *future core id*: core adds a pane called `notes`, an installed plugin
 already registered one, and core loses a first-come race against a package the owner installed.
@@ -893,6 +905,34 @@ makes that class of bug a compile error now: it derives the wire union, the auth
 (`sdk.ts`) and the host-facing surface (`PluginFrame.tsx`, through `FrameServices`) from one verb list,
 with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
 either surface, or gains a surface row the wire does not carry.
+
+### Binary bridge calls
+
+Those five verbs stringify and parse everything. For a route whose body is bytes — an image, a PDF, an
+archive — that costs a third more on the wire as base64, two copies in memory, and a decode at each
+end, for content the host was already carrying as bytes. So there are two more:
+
+```ts
+const { bytes, type, filename } = await bridge.api.getBytes('/v2/p/image-markup/files/a1')
+await bridge.api.postBytes('/v2/p/image-markup/files', { bytes, type: 'image/png', filename: 'a.png' })
+```
+
+A separate wire kind, `api.bytes`, rather than a flag on the JSON one, so a JSON call can never
+acquire byte semantics by getting a field wrong. What the two share is the one thing that matters:
+`allowApi` decides the path before either handler looks at a body. Your own `/v2/p/<id>/` namespace is
+reachable and another plugin's is refused, byte call or not, and a 12 MiB POST at somebody else's
+namespace is denied without being read. The desktop end-to-end suite pins that by spying at the broker.
+
+GET and POST only, capped at 12 MiB either way: above the agents store's 10 MiB attachment limit, low
+enough to be an explicit memory bound. No streaming — the desktop broker fully buffers a node response
+already, so a chunked API here would be a shape with no transport under it.
+
+`type` and `filename` are advisory in both directions. Whatever receives the bytes decides what they
+really are; the agents attachment store, for one, re-sniffs magic bytes and re-normalizes the name.
+
+Almost none of this was new transport. `infra/node/apiClient.ts` has carried a `Uint8Array` body from
+the broker since it was written; the only reason a frame could not reach it was that `frameServices`
+hard-coded JSON in both directions.
 
 Two browser affordances a frame does NOT have, both worth knowing before writing one. `window.confirm`
 and `alert` are suppressed: the iframe is sandboxed `allow-scripts allow-same-origin` and deliberately
@@ -1171,11 +1211,15 @@ for the same reason: its click carries no selected row and no routed project, so
 either would parse and then only ever fail. Only a source's `onSelect` gets the full set, because a
 rail row is the one click site with a row, a project, and the promotion callback in scope.
 `surfaceAction` is the one verb whose effect lands *inside* a plugin rather than on the shell: it
-delivers the command's own id to the frame region of one of that plugin's `document-over-frame` panes
-(§ Document surfaces above), and it may only name a pane the same manifest declares with such a
-layout — a plain frame pane has no document to flush and no host chord to have resolved it. It is
-useful only on a command, because what it delivers *is* the command id, and a footer badge has no
-command in scope. An `agentContexts`
+delivers the command's own id to a region of one of that plugin's own panes, and it may only name a
+pane the same manifest declares that draws such a region — an iframe or a worker tree qualifies alike,
+and a pane whose regions are all host-drawn does not, because there would be nothing on the far end of
+the bridge to receive it. A document beside the region is not required. The verb was born in a
+`document-over-frame` pane, where `⌘Enter` is pressed in the host's editor and the frame has no
+keyboard (§ Document surfaces above), but the palette is the other way in, and from there "do this in
+the thing I am looking at" is a sentence about any pane the plugin draws — http's `list-detail`
+request panel as much as database's editor-over-panel. It is useful only on a
+command, because what it delivers *is* the command id, and a footer badge has no command in scope. An `agentContexts`
 entry names two routes — `options`
 (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
 answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
@@ -1453,6 +1497,19 @@ a tool card per call, a section per tray — so every message names its slot. A 
 a slot already mounted is a props update, which keeps a tool card's redraw one message rather than a
 teardown.
 
+**One message expects an answer**: `tree:host-request(slot, id, op, name, payload)`, replied to with
+`tree:host-reply(slot, id, ok, body | error)`. Two operations and no more — `owner.invoke` calls an
+action the point's owner declared, `overlay.open` presents this contribution's companion overlay — and
+neither is a dispatcher; [Asking the owner](#asking-the-owner) has what each one grants. `id` is the
+sandbox's own sequence and the host only quotes it back, exactly as the bridge's request ids work one
+rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
+owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
+
+The whole reason it rides here rather than the bridge is the slot. One worker holds one bridge, so a
+request that crossed the bridge could not say which of a bundle's mounted trees sent it; a request that
+crosses this channel is addressed by the port and the slot the host already trusts, and plugin code
+supplies no identifier at all.
+
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
 
@@ -1490,7 +1547,7 @@ allowlist, the list deciding which pane ids a sandboxed frame may ask the host t
 check maintained in two copies, connected by nothing, fails silently in whichever direction an author
 updates only one of them, and `tsc` stays quiet because each copy is locally consistent on its own.
 `packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
-own job, rendering a sandboxed iframe versus registering a command palette row.
+own job, rendering a sandboxed iframe versus registering a command.
 
 `eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
 same place: the bundle that **won fleet resolution**, not the first one a roster happened to list. In a
@@ -1635,6 +1692,11 @@ ctx.events.send({ channel: `plugin:${ID}:sample`, cpu: 0.34, memory: 0.81 })
 // its frame
 bridge.events.on(`plugin:${ID}:sample`, (sample) => paint(sample))
 ```
+
+A compiled client half hears the same channel through `onPluginFrame(pluginId, channel, listener)`
+from `@acorn/plugin-api/client`. The returned disposable belongs to the model or component root that
+subscribed; GitHub's pull model uses it to replace a stale detail response after the node announces
+`plugin:github:pr-synced`.
 
 What a plugin puts on the frame beside `channel` is the payload, delivered to its frames unchanged.
 Core reads the channel and nothing else, which is the same promise the WS envelope makes everywhere
@@ -1978,6 +2040,114 @@ into a background task's layout, where the reader is not. It is the same rule a 
 The scope is not data. What the owner wants the contributor to *know* goes in the slot's props, where
 the owner writes the names; the scope is the host's answer to "where am I", it reaches the bridge and
 nowhere else, and the contributor never reads it directly.
+
+#### Asking the owner
+
+Props are data, and that leaves a gap: a contributor drawing a replacement for one of the owner's own
+items has no way to ask the owner to change that item. A callback prop cannot cross the worker
+boundary, and pretending it could would split what a compiled and a loaded contribution mean.
+
+So an owner declares a closed vocabulary of actions on the point, and binds a handler per `Slot` it
+draws:
+
+```json
+{ "id": "attachment", "kind": "remote", "label": "Attachment", "mode": "replace",
+  "actions": ["replace"] }
+```
+
+```tsx
+<Slot
+  point="agents:attachment"
+  key={attachment.mediaType}
+  props={() => ({ attachment, taskId, sessionId })}
+  actions={{ replace: (payload) => replaceDraftAttachment(attachment.id, payload) }}
+>
+  <AttachmentChip file={attachment} />
+</Slot>
+```
+
+A contributor names one:
+
+```ts
+await mount.host.invoke('replace', { expectedAttachmentId, replacementAttachmentId })
+```
+
+`solidTree` puts `host` on the component's props beside `bridge`, so a Solid tree reaches it as
+`props.host` without touching the mount. Both are the same object across a props update, which is what
+keeps a handler valid while it is awaiting.
+
+Two lists have to contain the name before the host forwards anything: the point's `actions`, which is
+the owner plugin's published contract, and this particular `Slot`'s handler map, which is the
+instance's consent. A name in one and not the other is refused. Neither the handlers nor their names
+are sent to the worker; a contributor learns which actions exist from the published declaration, names
+one, and the host looks it up.
+
+It is a request and not a setter. The owner still decides — the agent composer checks that the id it
+was told to expect is still in the slot before it swaps anything — which is why a contributor never
+receives a handle to the owner's state.
+
+The bounds: payload and result each under 64 KiB, eight outstanding per slot, ten seconds for the
+owner to answer. An action is scoped by the host-held slot id, so plugin code supplies no plugin,
+point, owner or target id and there is nothing to forge.
+
+**Binding on the mount, not the bridge.** One worker serves every tree its bundle draws and holds one
+bridge, so a composer showing four image attachments has four trees and one port. A request sent over
+the bridge could not say which of the four sent it and the host would have to guess from focus. These
+ride the tree channel, where the slot is part of the address the host already trusts.
+
+#### Companion overlays
+
+A tree that needs a rectangle — a canvas, an editor, anything with pixels — declares one overlay of its
+own plugin's on the extension descriptor:
+
+```json
+{ "id": "image-attachment", "point": "agents:attachment", "label": "Image markup",
+  "remote": "attachmentPreview", "matches": ["image/png", "image/jpeg"], "overlay": "editor" }
+```
+
+```ts
+const result = await mount.host.openOverlay('editor', { taskId, attachmentId })
+```
+
+`overlay` is a qualifier on the `remote` carrier, never a carrier of its own: a descriptor still names
+exactly one of `items`, `remote`, `frame` or `route`. It must name an `overlay` frame the same manifest
+declares, and it counts as a valid opener for that frame, so a plugin whose only opener is a companion
+overlay passes the "an overlay needs an action that opens it" rule.
+
+One name, not a list. A tree that could name any of its plugin's overlays would have a dispatcher; one
+name is a grant a person can read in the manifest at trust time.
+
+Name it as your manifest spells it. The device rewrites a frame id that sits outside your plugin's
+namespace to `<pluginId>.<id>`, and rewrites the descriptor's `overlay` reference with it
+(client-core/host/plugins/contributionIds.ts), but the string your tree passes is yours. The host
+qualifies it the same way before comparing, so `editor` and `my-plugin.editor` both reach the same
+frame and neither is refused for naming your own overlay.
+
+The host accepts it only from a person, and at most once a second. Either the shell's focus is inside
+that exact tree, or somebody pressed something in it within the last second. Two answers rather than
+one because focus alone is not enough: WebKit does not move focus to a button when it is clicked, which
+is the behaviour behind macOS's "Keyboard navigation" setting and the platform the desktop shell runs
+on, so a focus-only gate meant a click on a kit `Button` could never open an overlay at all. A
+background timer produces neither, which is the property being kept. The throttle is the same second
+gate `ui.openUrl` has one rung down.
+
+**The result lifecycle.** The overlay store holds an invocation rather than a pair of ids: an id that
+keys the iframe, the opener's input, and the waiter. `openOverlay` resolves with whatever the overlay
+passed to `bridge.ui.close(result)`, and with `null` for every dismissal — Escape, the backdrop, the
+close button, another overlay opening over it, the source tree unmounting, navigating away. An opener
+never has to tell "cancelled" from "went away", and nobody is ever left waiting.
+
+Reopening the same overlay builds a fresh iframe keyed by the new invocation id. An editor must never
+inherit the previous canvas or the previous input, or the reader has no way to tell which image they
+are drawing on.
+
+Input and result are each capped at 64 KiB and are data. An overlay that needs a file gets its id in
+the input and fetches the bytes over its own plugin's route.
+
+**A host without overlays** answers `unsupported_host`. The terminal is the case: it mounts remote
+trees and has no iframe to put a rectangle in, and this project is not going to invent a cell-drawn
+canvas. A contributor catches that code and leaves its static preview up, so the owner's own fallback
+is what a reader sees there.
 
 ### Rectangles
 
@@ -2426,14 +2596,20 @@ command from the same manifest, uses the canonical `meta+ctrl+alt+shift+key` spe
 
 `when` is `global`, `task`, or `surface`; loaded plugins cannot request `typing-exempt`. Command and
 binding ids must remain stable across versions because the qualified binding id is the key in the
-user's persisted override map. The old `contributions.palette` descriptor remains an alias for a
-command with `palette: true` for plugin API v1 and is scheduled for removal in plugin API v2.
+user's persisted override map.
+
+The older `contributions.palette` array remains an alias for a command with `palette: true`, and it
+never produces a second row. It survived the `10` bump on purpose: a removal is a major on its own
+announcement, and folding it into a batch bought for something else would take it off manifests
+written against a number that never said it was going. Nothing in the host branches on it — the
+registration pass rewrites each entry into a command descriptor before anything else sees it — so it
+costs one `flatMap` and no second code path.
 
 ### Command kinds
 
 A command descriptor carries an optional `kind`. Omitted, or `action`, it is one closed verb the host
 runs, which is what every command was before 2026-09-03 and what every already-installed manifest
-still parses as. The other three are additive:
+still parses as. The other four are additive:
 
 - **`group`** holds children and has no action of its own. Any command may name a `parentId`, which
   must be a group in the same manifest; cross-plugin parenting is refused, and a missing parent, a
@@ -2444,10 +2620,21 @@ still parses as. The other three are additive:
   (`taskId`, `projectId` or `workspaceId`), and renders
   `{ items: [{ id, title, subtitle?, icon?, badge?, ref?, taskId?, projectId?, workspaceId? }] }`.
   `placeholder`, `minQueryLength` (0–20) and `debounceMs` (150–1,000) are optional; the host caps the
-  rendered set at 50 rows.
+  rendered set at 50 rows. `onSelect` takes a command's verbs plus `navigate`, which no other command
+  may name: picking a row supplies the selected row, and a project-scoped search already ran against a
+  routed project, so both halves of a project-surface address exist here. The path is minted from the
+  pattern the host registered, with the row's own id as the item — a response still chooses nothing.
 - **`input`** names a POST `route` and one static `onSuccess` verb. The host sends
   `{ input, taskId? }` when the reader presses Enter and expects `{ ok: true, item?, message? }`; a
   failure is the ordinary error envelope, keeps the reader's text on screen, and runs no action.
+- **`setting`** names a GET `readRoute`, a PUT `writeRoute` and 2–32 static
+  `{ value, label, keywords? }` choices. The host GETs the read route when the frame opens and PUTs
+  the write route with `{ value, taskId?, projectId?, workspaceId? }` when a choice is picked; both
+  answer `{ value }`. The value has to name one of the declared choices — the host checks its own copy
+  on the way out and on the way back, so a route that starts answering with something new cannot add a
+  choice nobody reviewed. Two choices spelled the same way is an install-time error. A Boolean is two
+  choices, `On` and `Off`, not a toggle. Secrets and free-form values are not this variant: they need
+  secure input, a reveal policy and recovery that a list of labelled choices does not have.
 
 `scope` is `none`, `task`, `project`, `workspace` or `node` (the default). A command whose scope names
 an identity the palette session does not have is not offered. `fleet` is not a scope a manifest may
@@ -2456,8 +2643,8 @@ somebody else's network.
 
 A route's answer never chooses behaviour. Every field but the ones listed above is dropped before the
 row is rendered, malformed rows are dropped individually, and the verb that runs when a row is picked
-or a submission succeeds is the static one the manifest declared. A search or an input needs a `node`
-entrypoint, because only a node half serves `/v2/p/<id>/`.
+or a submission succeeds is the static one the manifest declared. A search, an input or a setting
+needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
 
 ```json
 {
@@ -2472,12 +2659,34 @@ entrypoint, because only a node half serves `/v2/p/<id>/`.
         "scope": "project",
         "route": "/v2/p/linear/issues/search",
         "placeholder": "Search issues…",
-        "onSelect": { "verb": "runNodeAction", "path": "/v2/p/linear/issues/open" }
+        "onSelect": { "verb": "navigate", "surface": "linear-issue" }
+      },
+      {
+        "id": "grouping",
+        "title": "Linear: group issues by",
+        "kind": "setting",
+        "parentId": "issues",
+        "scope": "project",
+        "readRoute": "/v2/p/linear/issues/grouping",
+        "writeRoute": "/v2/p/linear/issues/grouping",
+        "options": [
+          { "value": "status", "label": "Status" },
+          { "value": "assignee", "label": "Assignee" }
+        ]
       }
     ]
   }
 }
 ```
+
+A compiled plugin declares the same five kinds as typed objects through `ctx.commands.register`,
+which stamps the owner so a plugin cannot claim another contributor's group as a parent. Its `search`
+gets a live callback rather than a route, so it may query whatever its client already has: a plugin
+whose rows are on the device spreads `localSearch` from `@acorn/plugin-api/client` and gets one fetch
+when the frame opens, no debounce and no minimum query; a plugin asking its node writes `query`
+itself and keeps the defaults, because every keystroke is then a request. A `setting` shares the
+reader and writer its Settings page already uses. The first-party catalogue is in
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md).
 
 The webview manifest shape is:
 
@@ -2611,7 +2820,7 @@ persisted layout keys and two versions registering at once would collide on them
 
 Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution
 points for panes, sources, settings pages, slots, extension points, extensions, provider reference
-panels, palette rows, agent contexts, schedules, persisted-state slices, Node statistics, attention
+panels, agent contexts, schedules, persisted-state slices, Node statistics, attention
 sources, brand marks, and content links. `slots` is one point for both shapes: the
 slot id decides whether the component receives the shell context or only a task id (`docs/frontend.md §
 Registries and plugins`). `schedules` is the same word the node half uses for the same idea, taking a

@@ -13,4 +13,7 @@ export type RemoteContribution = {
   hash: string
   /** Which key of the object the bundle passed to `mountTree`. */
   entry: string
+  /** The one overlay of this plugin's own that this tree may ask the host to present, when its
+   *  descriptor associated one (docs/plugins.md § Companion overlays). */
+  overlay?: string
 }

@@ -32,6 +32,34 @@ for a plugin with a graph or a cost estimate to put beside the numbers. `docker:
 `annotation` point keyed by container id, drawn under the rows of the Source list. For more
 information, see the cooperative extension points in [the plugins doc](./plugins.md).
 
+## From the command palette
+
+Two rows, registered by the plugin in `plugins/docker/src/client/commands.ts`.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+**Open Docker** selects the rail source. **Find a Docker resource** is one search over all four
+lists — containers, images, volumes, and networks — with a badge on each row saying which list it came
+from, because a reader looking for `postgres` does not know whether they are about to find a container
+or an image. The containers come from the store this plugin already keeps in step with the daemon; the
+other three are read when the frame opens, and the filtering after that is local
+(`packages/client-core/src/host/registries/commands/localSearch.ts`), so nothing is debounced and an
+empty query is the whole list. A row id is `<scope>:<id>`, because a volume is keyed by its name and
+everything else by an id, and a bare id could collide across the four namespaces.
+
+A pick names the rail source, never the task pane, and that is the correction the design took during
+implementation rather than the shape it started in. The pane draws one task's containers and appears
+only on a task that has some (`plugins/docker/src/client/paneContribution.ts`), so an image, a volume,
+and a network have nowhere in it to be revealed, and a container has no pane either on a task the
+matcher linked nothing to. Selection therefore sets the source and leaves the browse surface a reveal
+to land on (`plugins/docker/src/client/dockerViewStore.ts`). The surface consumes it whether it was already
+mounted or opens because of the pick, and taking it clears it, so a later remount does not jump
+somewhere the reader has since navigated away from.
+
+Lifecycle actions are not attached to results. Start, stop, and restart wait for result actions to be
+designed. Remove, prune, and Compose down stay pane operations behind their confirmation, where what
+is about to be destroyed is on screen.
+
 ## Matching
 
 Matching configuration is declarative: project names, labels, and name patterns are stored in the

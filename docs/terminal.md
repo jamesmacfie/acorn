@@ -252,3 +252,56 @@ takes a height and a maximized flag from the plugin, which owns the resize grip 
 That geometry was the plugin's own stylesheet until phase 9 of the layout programme. Where the rails
 are and how tall the top bar is are the shell's facts, and a plugin that writes them down is one
 shell change away from being wrong.
+
+## From the command palette
+
+Three searches under a **Run** group, registered by this plugin's client half
+(`plugins/terminal/src/client/commands.ts`).
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+| Row | What it finds | What picking one does |
+| --- | --- | --- |
+| Run a target | the run targets in the task's repository configuration, matched on the target's id and on the command line it runs | starts the target and opens the drawer, or stops it when it is already running |
+| Apply a layout | the layout recipes the same configuration names | replaces the task's pane layout, starts the recipe's target, and points the browser pane at a target's resolved URL when the recipe names one |
+| Focus a terminal | the sessions alive in this task, an exited one badged | shows the drawer, makes that tab the task's active one, and asks it for the keyboard |
+
+The group is this plugin's own, `terminal.run`, rather than core's `Terminal` group, which is the
+drawer toggle and a plain shell and belongs to the shell (`apps/desktop/src/client/TaskView.tsx`): a
+plugin may not hang a command under another owner's group. All three rows are task-scoped and gated on
+the terminal plugin, so a palette opened over a browse source, or over a node that runs no terminals,
+does not offer them. A parse error in the repository configuration is a badged row at the top of the
+list rather than a row that is quietly missing, and Enter on it restates the message and stays.
+
+**One read when the frame opens, filtered on the device after that.** The rows are one read of the
+task's configuration plus one signal this window already holds, so there is nothing for a debounce to
+wait for. The shared adapter is `client-core/host/registries/commands/localSearch.ts`: no debounce, no
+minimum query — an empty query is the whole list — and one fetch that the target frame and the layout
+frame both read, because they come out of the same answer. Focusing a terminal fetches nothing at all;
+the session roster is a signal the window already keeps in step with the node. The rows are held for as
+long as that palette session is open, so an edit to the configuration shows up the next time the
+palette is opened, which is what the row source these replaced did too.
+
+**Nothing about launching changed.** Picking a target decides run or stop against this session's own
+fetch rather than the label the row was drawn with, so a target started from the drawer since the frame
+opened is stopped rather than started a second time. Starting opens the drawer, stopping does not, both
+refresh the session roster, and a node that refuses either reports its own reason with the frame still
+open. Those are the calls and the error copy the row source had.
+
+**The terminal's own preferences are still a page.** What the terminal button opens into, the terminal
+text size, and whether a new agent session is sent the task's startup context are not setting commands.
+On the desktop the palette reaches them through the **Settings → Terminal** row core generates from the
+settings registry, and that row opens the page rather than editing a value in the frame. Each of the
+three has one reader and one writer in `plugins/terminal/src/client/terminalPrefs.ts`, and the page and
+the drawer both call them, so the value has a single persistence path and a setting command registered
+later cannot become a second one.
+
+**Creating a terminal was already a command before this group existed.** The shell owns
+`task.terminal.new-shell` under its own Terminal group, and the agents plugin owns the two harness
+profiles, `task.terminal.new-claude` and `task.terminal.new-codex`
+(`plugins/agents/src/client/terminalProfileCommands.ts`), because the profile ids are that plugin's.
+Registering either of them here would have put two rows carrying the same words in the palette root, so
+this group holds neither.
+
+Killing a session and bulk session management stay in the drawer, where the tab strip says what is
+running and the close control sits beside it. A palette row has neither of those in front of it.

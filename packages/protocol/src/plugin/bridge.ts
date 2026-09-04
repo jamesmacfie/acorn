@@ -56,6 +56,13 @@ export type PluginFrameContext = {
   // later selection into an already-mounted frame arrives as a `select` message, because `context` is
   // a snapshot by contract.
   item?: string
+  // Overlay surfaces only, and only when a remote tree opened this one as its companion
+  // (docs/plugins.md § Companion overlays): what the opener handed over. A snapshot like the rest of
+  // this record, and the only thing the frame is told about who opened it.
+  //
+  // Data, and small: bounded to MAX_OVERLAY_INPUT_BYTES below. An overlay that needs a file gets its id
+  // here and fetches the bytes through its own plugin's route, exactly as it would from a pane.
+  input?: unknown
   theme: string
   style: string
   // Host-validated upper bound for the chords this frame may keep. The SDK starts with this set and
@@ -74,6 +81,46 @@ export type PluginBridgeApiRequest = {
   path: string
   body?: unknown
 }
+
+/**
+ * The same call, for a route whose body is bytes in one direction or both (docs/plugins.md § Binary
+ * bridge calls).
+ *
+ * A separate kind rather than a flag on the request above, so a JSON call can never acquire byte
+ * semantics by getting a field wrong: the broker branches on the kind before it looks at anything else,
+ * and the two handlers share only the permission check.
+ *
+ * `path` is checked by exactly the same `allowApi` decision, at exactly the same point — before the body
+ * is touched at all. A plugin's own namespace is reachable and another plugin's is not, whichever kind
+ * of call asks.
+ *
+ * No streaming. The desktop broker fully buffers a node response already, so a chunked API here would be
+ * a shape with no transport under it. `MAX_PLUGIN_BYTES` is the memory bound instead.
+ */
+export type PluginBridgeApiBytesRequest = {
+  id: number
+  kind: 'api.bytes'
+  method: 'GET' | 'POST'
+  path: string
+  // POST only. Transferred where the runtime allows it, so a 10 MiB image crosses the port once.
+  bytes?: Uint8Array
+  // Advisory, both directions. The receiving store re-sniffs magic bytes and re-normalizes the name;
+  // nothing downstream trusts what a sandbox said its bytes were.
+  type?: string
+  filename?: string
+}
+
+/** The ceiling on a binary bridge call in either direction.
+ *
+ * Above the agents store's 10 MiB attachment limit and well below anything that would be a memory
+ * problem: an explicit bound with room for one allowed attachment plus its envelope. The store's own
+ * limit stays authoritative for what may be stored; this only bounds what may cross a port. */
+export const MAX_PLUGIN_BYTES = 12 * 1024 * 1024
+
+/** What a successful `api.bytes` call resolves to. Rides the ordinary reply envelope's `body`, because
+ * a `Uint8Array` is structured-clone-safe and a parallel reply type would be a second envelope to keep
+ * in step for no gain. The request kind is what carries the security property, not the reply's shape. */
+export type PluginBridgeApiBytesBody = { bytes: Uint8Array; type: string; filename: string | null }
 
 // Server-push. The channel must appear in the manifest's `events` list and be one the shell actually
 // has; subscribing does not create a channel.
@@ -100,7 +147,10 @@ export type PluginBridgeUiRequest =
   // Importer lifecycle, valid only from a frame whose surface is an importer. `done` closes the modal
   // and triggers the host's post-import refresh; `close` is plain dismissal.
   | { id: number; kind: 'ui'; op: 'importer.done' }
-  | { id: number; kind: 'ui'; op: 'importer.close' }
+  // `result` is an overlay closing with an answer for whoever opened it (docs/plugins.md § Companion
+  // overlays). Refused from an importer, which has `done` for "I finished" and nobody awaiting a value,
+  // and bounded to MAX_OVERLAY_INPUT_BYTES in the same way the input is.
+  | { id: number; kind: 'ui'; op: 'importer.close'; result?: unknown }
 
 // The document a composed pane shares with its frame (docs/editor.md § Communication
 // between regions). Valid only from a frame whose pane declares a `document-over-frame` layout;
@@ -122,6 +172,11 @@ export type PluginBridgeDocumentRequest =
  * to agree on it, and refused whole rather than truncated. Half a document in an editor that will
  * happily save it back is data loss wearing the shape of a rendering limit. */
 export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
+
+/** The ceiling on an overlay invocation's input and on the result it closes with. Both directions, one
+ * number, because they are the two halves of one conversation and neither is a payload: an input names
+ * what to open and a result names what came back. Anything with bytes in it belongs on a route. */
+export const MAX_OVERLAY_INPUT_BYTES = 64 * 1024
 
 // A webview controller can address only the surface whose binding owns its port. There is no surface,
 // plugin or node identifier in the request for plugin code to forge.
@@ -146,6 +201,7 @@ export type PluginBridgeConnected = { kind: 'connected' }
 
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
+  | PluginBridgeApiBytesRequest
   | PluginBridgeSubscribeRequest
   | PluginBridgeStateRequest
   | PluginBridgeUiRequest

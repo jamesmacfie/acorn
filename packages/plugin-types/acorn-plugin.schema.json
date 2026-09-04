@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 9)",
+  "title": "acorn plugin manifest (plugin API major 10)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -1557,6 +1557,24 @@
                           "verb",
                           "surface"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "navigate"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
                       }
                     ]
                   }
@@ -1759,6 +1777,127 @@
                   "kind",
                   "route",
                   "onSuccess"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
+                    ]
+                  },
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "setting"
+                  },
+                  "scope": {
+                    "default": "node",
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "task",
+                      "project",
+                      "workspace",
+                      "node"
+                    ]
+                  },
+                  "readRoute": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "writeRoute": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "options": {
+                    "minItems": 2,
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "keywords": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          }
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "label"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "kind",
+                  "readRoute",
+                  "writeRoute",
+                  "options"
                 ]
               }
             ]
@@ -2503,6 +2642,16 @@
                   "maxLength": 128
                 }
               },
+              "actions": {
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[a-z][a-zA-Z0-9]*$"
+                }
+              },
               "payload": {
                 "type": "object",
                 "propertyNames": {
@@ -2626,6 +2775,11 @@
                   "minLength": 1,
                   "maxLength": 128
                 }
+              },
+              "overlay": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "mode": {
                 "type": "string",

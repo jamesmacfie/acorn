@@ -17,7 +17,7 @@ import {
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { containerTone } from './dockerViewStore'
+import { consumeDockerReveal, containerTone, dockerReveal } from './dockerViewStore'
 
 type SectionId = 'containers' | 'images' | 'volumes' | 'networks'
 const SECTIONS: { id: SectionId; label: string }[] = [
@@ -67,6 +67,18 @@ export default function DockerBrowse() {
   onMount(() => {
     wireDockerRefresh()
     void refreshDocker()
+  })
+
+  // A resource the palette named (./commands.ts). An effect rather than a read at mount, because the
+  // surface may already be on screen when the pick happens: `dockerReveal` is tracked, and taking it
+  // clears it so a later remount does not jump somewhere the reader has since left.
+  createEffect(() => {
+    if (!dockerReveal()) return
+    const reveal = consumeDockerReveal()
+    if (!reveal) return
+    setSection(reveal.scope)
+    setSelected(reveal.id)
+    setFilter('')
   })
 
   // Object lists load on section entry and refresh on their docker:changed scope.

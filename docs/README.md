@@ -94,9 +94,6 @@ Five docs, and they do not overlap. Start at the map.
 - [future/](./future/README.md) — designs, analyses, and sequenced plans for work that has not shipped,
   plus the refusals that keep it from being re-argued. Its README indexes every programme and single
   file. Behaviour that ships moves out of here into an owning doc above.
-- [future/command-palette/](./future/command-palette/README.md) — the proposed command graph and
-  shared palette session: nested commands, plugin-backed search, submitted input, opt-in settings,
-  the full core/plugin catalogue, seven phases, and the decisions it refuses.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 

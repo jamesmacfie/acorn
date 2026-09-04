@@ -7,7 +7,7 @@ import { pullRefMatchesTask } from '../shared/pullRef'
 import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
 import { prFiltersSlice } from './pullList/filterStore'
 import { prPaneContribution } from './pullDetail/paneContribution'
-import { pullFilePaletteSlotContribution } from './slotContribution'
+import { githubShortcutsSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
@@ -127,7 +127,7 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.extensionPoints.register({
       id: 'summary-badges', label: 'Pull request summary', kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX,
     })
-    ctx.slots.register(pullFilePaletteSlotContribution)
+    ctx.slots.register(githubShortcutsSlotContribution)
     ctx.persistedStateSlices.register(prFiltersSlice)
   },
 }

@@ -2,7 +2,7 @@ import { onMount } from 'solid-js'
 import Picker from './Picker'
 import Icon from '../content/Icon'
 import { iconNames, loadIconNodes } from '../../tokens/iconNodes'
-import { fuzzyScore } from '../../lib/paletteModel'
+import { fuzzyScore } from '../../lib/fuzzy'
 
 const MAX_RESULTS = 200
 
