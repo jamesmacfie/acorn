@@ -906,6 +906,34 @@ makes that class of bug a compile error now: it derives the wire union, the auth
 with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
 either surface, or gains a surface row the wire does not carry.
 
+### Binary bridge calls
+
+Those five verbs stringify and parse everything. For a route whose body is bytes — an image, a PDF, an
+archive — that costs a third more on the wire as base64, two copies in memory, and a decode at each
+end, for content the host was already carrying as bytes. So there are two more:
+
+```ts
+const { bytes, type, filename } = await bridge.api.getBytes('/v2/p/image-markup/files/a1')
+await bridge.api.postBytes('/v2/p/image-markup/files', { bytes, type: 'image/png', filename: 'a.png' })
+```
+
+A separate wire kind, `api.bytes`, rather than a flag on the JSON one, so a JSON call can never
+acquire byte semantics by getting a field wrong. What the two share is the one thing that matters:
+`allowApi` decides the path before either handler looks at a body. Your own `/v2/p/<id>/` namespace is
+reachable and another plugin's is refused, byte call or not, and a 12 MiB POST at somebody else's
+namespace is denied without being read. The desktop end-to-end suite pins that by spying at the broker.
+
+GET and POST only, capped at 12 MiB either way: above the agents store's 10 MiB attachment limit, low
+enough to be an explicit memory bound. No streaming — the desktop broker fully buffers a node response
+already, so a chunked API here would be a shape with no transport under it.
+
+`type` and `filename` are advisory in both directions. Whatever receives the bytes decides what they
+really are; the agents attachment store, for one, re-sniffs magic bytes and re-normalizes the name.
+
+Almost none of this was new transport. `infra/node/apiClient.ts` has carried a `Uint8Array` body from
+the broker since it was written; the only reason a frame could not reach it was that `frameServices`
+hard-coded JSON in both directions.
+
 Two browser affordances a frame does NOT have, both worth knowing before writing one. `window.confirm`
 and `alert` are suppressed: the iframe is sandboxed `allow-scripts allow-same-origin` and deliberately
 not `allow-modals`, so `confirm()` returns false and a guarded action silently does nothing. And
@@ -1469,6 +1497,19 @@ a tool card per call, a section per tray — so every message names its slot. A 
 a slot already mounted is a props update, which keeps a tool card's redraw one message rather than a
 teardown.
 
+**One message expects an answer**: `tree:host-request(slot, id, op, name, payload)`, replied to with
+`tree:host-reply(slot, id, ok, body | error)`. Two operations and no more — `owner.invoke` calls an
+action the point's owner declared, `overlay.open` presents this contribution's companion overlay — and
+neither is a dispatcher; [Asking the owner](#asking-the-owner) has what each one grants. `id` is the
+sandbox's own sequence and the host only quotes it back, exactly as the bridge's request ids work one
+rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
+owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
+
+The whole reason it rides here rather than the bridge is the slot. One worker holds one bridge, so a
+request that crossed the bridge could not say which of a bundle's mounted trees sent it; a request that
+crosses this channel is addressed by the port and the slot the host already trusts, and plugin code
+supplies no identifier at all.
+
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
 
@@ -1999,6 +2040,101 @@ into a background task's layout, where the reader is not. It is the same rule a 
 The scope is not data. What the owner wants the contributor to *know* goes in the slot's props, where
 the owner writes the names; the scope is the host's answer to "where am I", it reaches the bridge and
 nowhere else, and the contributor never reads it directly.
+
+#### Asking the owner
+
+Props are data, and that leaves a gap: a contributor drawing a replacement for one of the owner's own
+items has no way to ask the owner to change that item. A callback prop cannot cross the worker
+boundary, and pretending it could would split what a compiled and a loaded contribution mean.
+
+So an owner declares a closed vocabulary of actions on the point, and binds a handler per `Slot` it
+draws:
+
+```json
+{ "id": "attachment", "kind": "remote", "label": "Attachment", "mode": "replace",
+  "actions": ["replace"] }
+```
+
+```tsx
+<Slot
+  point="agents:attachment"
+  key={attachment.mediaType}
+  props={() => ({ attachment, taskId, sessionId })}
+  actions={{ replace: (payload) => replaceDraftAttachment(attachment.id, payload) }}
+>
+  <AttachmentChip file={attachment} />
+</Slot>
+```
+
+A contributor names one:
+
+```ts
+await mount.host.invoke('replace', { expectedAttachmentId, replacementAttachmentId })
+```
+
+Two lists have to contain the name before the host forwards anything: the point's `actions`, which is
+the owner plugin's published contract, and this particular `Slot`'s handler map, which is the
+instance's consent. A name in one and not the other is refused. Neither the handlers nor their names
+are sent to the worker; a contributor learns which actions exist from the published declaration, names
+one, and the host looks it up.
+
+It is a request and not a setter. The owner still decides — the agent composer checks that the id it
+was told to expect is still in the slot before it swaps anything — which is why a contributor never
+receives a handle to the owner's state.
+
+The bounds: payload and result each under 64 KiB, eight outstanding per slot, ten seconds for the
+owner to answer. An action is scoped by the host-held slot id, so plugin code supplies no plugin,
+point, owner or target id and there is nothing to forge.
+
+**Binding on the mount, not the bridge.** One worker serves every tree its bundle draws and holds one
+bridge, so a composer showing four image attachments has four trees and one port. A request sent over
+the bridge could not say which of the four sent it and the host would have to guess from focus. These
+ride the tree channel, where the slot is part of the address the host already trusts.
+
+#### Companion overlays
+
+A tree that needs a rectangle — a canvas, an editor, anything with pixels — declares one overlay of its
+own plugin's on the extension descriptor:
+
+```json
+{ "id": "image-attachment", "point": "agents:attachment", "label": "Image markup",
+  "remote": "attachmentPreview", "matches": ["image/png", "image/jpeg"], "overlay": "editor" }
+```
+
+```ts
+const result = await mount.host.openOverlay('editor', { taskId, attachmentId })
+```
+
+`overlay` is a qualifier on the `remote` carrier, never a carrier of its own: a descriptor still names
+exactly one of `items`, `remote`, `frame` or `route`. It must name an `overlay` frame the same manifest
+declares, and it counts as a valid opener for that frame, so a plugin whose only opener is a companion
+overlay passes the "an overlay needs an action that opens it" rule.
+
+One name, not a list. A tree that could name any of its plugin's overlays would have a dispatcher; one
+name is a grant a person can read in the manifest at trust time.
+
+The host accepts it only while focus is inside that exact tree, and at most once a second. A modal is a
+person's act, and the focus check is what a click or a key press leaves behind, so a background timer
+cannot put an editor in front of the reader. It is the same pair of gates `ui.openUrl` has one rung
+down.
+
+**The result lifecycle.** The overlay store holds an invocation rather than a pair of ids: an id that
+keys the iframe, the opener's input, and the waiter. `openOverlay` resolves with whatever the overlay
+passed to `bridge.ui.close(result)`, and with `null` for every dismissal — Escape, the backdrop, the
+close button, another overlay opening over it, the source tree unmounting, navigating away. An opener
+never has to tell "cancelled" from "went away", and nobody is ever left waiting.
+
+Reopening the same overlay builds a fresh iframe keyed by the new invocation id. An editor must never
+inherit the previous canvas or the previous input, or the reader has no way to tell which image they
+are drawing on.
+
+Input and result are each capped at 64 KiB and are data. An overlay that needs a file gets its id in
+the input and fetches the bytes over its own plugin's route.
+
+**A host without overlays** answers `unsupported_host`. The terminal is the case: it mounts remote
+trees and has no iframe to put a rectangle in, and this project is not going to invent a cell-drawn
+canvas. A contributor catches that code and leaves its static preview up, so the owner's own fallback
+is what a reader sees there.
 
 ### Rectangles
 

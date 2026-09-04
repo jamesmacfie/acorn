@@ -665,6 +665,24 @@ fails is dropped whole and recorded; a node name this build does not know draws 
 placeholder. What a worker that misbehaves can do to the surface around it is nothing — it is
 terminated and its trees show placeholders.
 
+**Two messages cross the tree channel in the other direction**, and both are bounded requests rather
+than an RPC door (`docs/plugins.md § Asking the owner`). `owner.invoke` calls one action the owning
+extension point declared *and* the owner's `Slot` bound a handler for; `overlay.open` presents the one
+overlay this contribution's own manifest descriptor named. Everything about their addressing is the
+host's: a request is scoped by the slot it arrived on, so plugin code supplies no plugin, point, owner,
+overlay or slot id and there is nothing to forge. Payload and reply are each capped at 64 KiB, eight
+may be outstanding per slot, an owner has ten seconds to answer, and the failure arm is a code and a
+sentence with no host stack in it. `overlay.open` additionally needs focus inside that exact tree and
+is throttled to one a second, so a modal stays a person's act rather than something a timer can do.
+
+**Binary bridge calls change no permission.** `api.bytes` is a second wire kind beside `api`, added so
+a plugin moving a file does not have to base64 it through a JSON envelope. It runs the identical
+`allowApi` decision at the identical point — before the body is touched at all — so your own
+`/v2/p/<id>/` namespace is reachable and another plugin's is refused whichever kind asks. The desktop
+end-to-end suite pins that by spying at the broker: a denied path must produce no request, not merely
+a discarded response. Both directions are capped at 12 MiB, and `type` and `filename` are advisory,
+because a sandbox saying what its bytes are decides nothing downstream.
+
 **Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
 reasonable:
 

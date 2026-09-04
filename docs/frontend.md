@@ -238,6 +238,15 @@ fetch client, but it does not provide a renderer shell. Shared repository-picker
 reads are generic shell query wrappers backed by the owning source's `repository` contribution;
 provider routes and response types do not live in client-core.
 
+A response body is a `Uint8Array` the whole way from the broker, so binary is a read on the same
+transport rather than a second one. `readBytes` and `sendRawBytes` are what a caller uses when the
+answer is a file: under `app://` a route builder's URL resolves against the protocol handler rather
+than a node, so a download cannot be an `href` or a `src` and comes back as bytes the caller turns
+into a blob URL. `sendRawBytes` is also what carries a plugin frame's `api.getBytes` and `postBytes`
+(`docs/plugins.md § Binary bridge calls`); the frame path needed a second `frameServices` method, not
+new transport, because the only thing standing between a frame and these bytes was that the JSON door
+hard-coded `content-type: application/json` and `JSON.stringify`.
+
 TanStack Query is the server-data cache. There is one QueryClient/persister scope per Node. Query
 keys do not need an ad hoc Node prefix because the cache itself is partitioned. Fleet queries fan out
 per Node and must not write aggregate shapes into ordinary per-Node keys.
