@@ -102,6 +102,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       ...(props.binding.projectId ? { projectId: props.binding.projectId } : {}),
       ...(props.refId ? { refId: props.refId } : {}),
       ...(item ? { item } : {}),
+      ...(props.input === undefined ? {} : { input: props.input }),
       ...currentAxes(),
       claimsKeys: [...props.binding.claimsKeys],
     }

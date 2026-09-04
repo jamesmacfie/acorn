@@ -109,6 +109,33 @@ describe('overlay surfaces', () => {
       .toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
   })
 
+  // The second opener, and the reason it had to be added to the same set: a plugin whose only opener is
+  // a companion overlay would otherwise fail the check above, which reads as a plugin bug rather than
+  // the missing platform rule it was.
+  it('accepts an overlay opened by a remote contribution that associated it', () => {
+    const result = webviewManifest({
+      frames: [overlay],
+      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('refuses a companion overlay this manifest does not declare', () => {
+    expect(messages(webviewManifest({
+      frames: [PANE],
+      extensions: [{ id: 'preview', point: 'agents:attachment', label: 'Image markup', remote: 'attachmentPreview', overlay: 'files' }],
+    }))).toContain(`extension names overlay 'files', which this manifest does not declare as an overlay surface`)
+  })
+
+  // A qualifier on the `remote` carrier, never a carrier of its own. A descriptor naming both would be
+  // rejected by the exactly-one-carrier rule, which is the trap this pins shut.
+  it('refuses a companion overlay on anything but a remote contribution', () => {
+    expect(messages(manifest({
+      frames: [overlay],
+      extensions: [{ id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v2/p/board/rows', overlay: 'files' }],
+    }))).toContain('overlay is only valid on a remote contribution')
+  })
+
   it('keeps an overlay out of the pane sets', () => {
     // `openPane` puts a rectangle in a task's layout; an overlay has no layout to be put in.
     expect(messages(manifest({

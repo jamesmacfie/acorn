@@ -1,4 +1,4 @@
-import { For, Show, createMemo, type JSX } from 'solid-js'
+import { For, Show, createEffect, createMemo, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
@@ -40,6 +40,22 @@ export type SlotProps = {
   /** What the contributor's tree is mounted with. The owner's own data, in the owner's words; the host
    *  does not add to it. */
   props?: () => unknown
+  /**
+   * What this owner will do if a contributor asks (docs/plugins.md § Asking the owner).
+   *
+   * The counterpart to `props`, and the reason it exists: props are data, so a contributor drawing a
+   * replacement for one of the owner's own items has had no way to ask the owner to change that item.
+   * A callback prop cannot cross the worker boundary, and pretending it could would split what a
+   * compiled and a loaded contribution mean.
+   *
+   * Host-only. Neither the handlers nor their names are sent to the worker: a contributor learns which
+   * actions exist from the point's published `actions` declaration, names one, and the host looks it up
+   * here. A name missing from either list is refused.
+   *
+   * Bound per `Slot` rather than per point, because the handler closes over which item this instance
+   * drew, which is the whole thing a point-level registration could not know.
+   */
+  actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
   /** Drawn when nobody matches, and when two match a `replace` point and nobody has picked. The owner's
    *  own answer to "what if nothing is here", which is why it is children rather than a prop: it is
    *  ordinary tree. */
@@ -63,6 +79,19 @@ export type SlotProps = {
    */
   taskId?: string
   projectId?: string | null
+  /**
+   * Whether a contributor is standing in for the owner's default right now.
+   *
+   * Only `replace` points ever report `true`, since a `stack` point draws the owner's own answer
+   * alongside every contributor and there is nothing to stand in for.
+   *
+   * Here because an owner sometimes has to keep drawing something a contributor must not be given, and
+   * cannot know when to. The agent composer's attachment is the case: the remove affordance lives
+   * inside the chip a contributor replaces, so an owner that did nothing would lose the ability to
+   * remove the attachment for as long as a plugin drew it, and an owner that always drew a second one
+   * would put two crosses next to every attachment when no plugin is installed.
+   */
+  occupied?: (occupied: boolean) => void
 }
 
 export function Slot(props: SlotProps) {
@@ -74,13 +103,22 @@ export function Slot(props: SlotProps) {
     // Silent, like every other unmatched contribution; the developer view is where an author finds out.
     if (!point || point.kind !== 'remote') return null
     const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
-    return { mode: point.mode ?? 'stack', outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)) }
+    return {
+      mode: point.mode ?? 'stack',
+      // The owner's own declaration, read off the registry rather than off this call site: a `Slot` that
+      // binds a handler the point never declared has bound nothing, which is what keeps the published
+      // contract and the running one the same list.
+      actions: point.actions ?? [],
+      outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)),
+    }
   })
   const outcome = () => resolved()?.outcome
   // `stack` is the owner's default PLUS everyone who matched; `replace` is one contributor instead of
   // it (docs/plugins.md § Arbitration). The difference is only visible here, which is why it lives
   // here and not in the arbitration rule: `resolveSlot` answers who draws, not what else is on screen.
   const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
+
+  createEffect(() => props.occupied?.(!drawDefault()))
 
   return (
     <>
@@ -97,8 +135,11 @@ export function Slot(props: SlotProps) {
                     pluginId: contribution.pluginId,
                     hash: contribution.hash ?? '',
                     entry: contribution.entry ?? '',
+                    ...(contribution.overlay ? { overlay: contribution.overlay } : {}),
                   }}
                   props={props.props ?? (() => ({}))}
+                  actions={() => props.actions ?? {}}
+                  declaredActions={() => resolved()?.actions ?? []}
                   scope={() => ({
                     ...(props.taskId ? { taskId: props.taskId } : {}),
                     ...(props.projectId ? { projectId: props.projectId } : {}),

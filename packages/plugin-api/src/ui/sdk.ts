@@ -8,6 +8,9 @@ export { connect, AcornBridgeError, mountFrame, openLinkOnClick } from '@acorn/c
 // `AcornBridge` is the whole bridge. `AcornBridgeApi` was its `.api` sub-shape, and nothing ever named
 // the sub-shape on its own.
 export type { AcornBridge } from '@acorn/client-core/host/frames/sdk.ts'
+// What `api.getBytes` resolves to. Named because an author annotating the variable they decoded an
+// image out of has nowhere else to reach for it.
+export type { PluginByteResponse } from '@acorn/client-core/host/frames/sdk.ts'
 // The context the host hands a frame on connect. Kept rather than pruned: the four things that name it
 // today are all host-side, and a frame that wants to type the context it was given has nowhere else to go.
 export type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'

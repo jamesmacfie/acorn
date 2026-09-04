@@ -467,11 +467,11 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // declaration that installs and does nothing, and the way that gets in is a kind added below with one
   // of its two lists forgotten.
   const kindFields: Record<ExtensionPointKind, { required: readonly string[]; refused: readonly string[] }> = {
-    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
-    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
+    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
+    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
     remote: { required: ['mode'], refused: ['location', 'surface', 'panels', 'key', 'payload', 'allows'] },
-    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'payload', 'allows'] },
-    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts'] },
+    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'actions', 'payload', 'allows'] },
+    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions'] },
   }
   extensionPoints.forEach((entry, i) => {
     const at = ['contributions', 'extensionPoints', i] as (string | number)[]
@@ -533,6 +533,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
         ctx.addIssue({ code: 'custom', path: [...at, 'frame'], message: `extension names frame '${entry.frame}', which this manifest does not declare with target 'inline'` })
       }
       placedInlineFrames.add(entry.frame)
+    }
+    // The second thing that opens an overlay, beside the `openOverlay` action verb. It has to add to the
+    // same set the frame check below reads: a plugin whose only opener is a companion overlay would
+    // otherwise fail that check, which reads as a plugin bug rather than the missing rule it is.
+    if (entry.overlay !== undefined) {
+      if (overlays.has(entry.overlay)) openedOverlays.add(entry.overlay)
+      else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `extension names overlay '${entry.overlay}', which this manifest does not declare as an overlay surface` })
     }
     // A plugin extending its own point is legal and pointless: it can put the rows there itself. It is not
     // refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import {
+  MAX_PLUGIN_BYTES,
   PLUGIN_BRIDGE_VERSION,
   type PluginBridgeApiRequest,
   type PluginBridgeDocumentRequest,
@@ -65,6 +66,9 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
+  'api.bytes': `the same call for a route whose body is bytes: bridge.api.getBytes / postBytes, GET and POST only, `
+    + `capped at ${MAX_PLUGIN_BYTES} bytes each way. Same permission decision as \`api\`, made before the body is `
+    + `looked at. Reach for it instead of base64 whenever you are moving a file`,
   subscribe:
     'subscribe to a channel the manifest declared in `permissions.events`: one of the shell\'s own, or your own '
     + '`plugin:<id>:<verb>`, which your node half broadcasts on with `ctx.events.send`. That second one is how a frame '
@@ -85,7 +89,8 @@ const UI_OPS = {
   openPane: 'open a pane by id',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
-  'importer.close': 'importers and overlays: plain dismissal',
+  'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '
+    + 'JSON result under 64 KiB, which resolves that tree\'s openOverlay call',
 } satisfies Record<PluginBridgeUiRequest['op'], string>
 
 const DOCUMENT_OPS = { read: 1, write: 1, flush: 1 } satisfies Record<PluginBridgeDocumentRequest['op'], 1>

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectConfigRoute, projectRunTargetsRoute, projectsRoute, tasksRoute } from '@acorn/protocol/api.ts'
 import type { PluginBridgeMessage } from '@acorn/protocol/plugin/bridge.ts'
-import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_DOCUMENT_BYTES, MAX_OVERLAY_INPUT_BYTES, MAX_PLUGIN_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
@@ -29,6 +29,7 @@ const CONTEXT = { surface: 'board', target: 'pane' as const, nodeId: 'node-a', t
 
 const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   fetch: vi.fn(async () => ({ ok: true, status: 200, body: { fetched: true } })),
+  fetchBytes: vi.fn(async () => ({ ok: true as const, status: 200, bytes: new Uint8Array([1, 2, 3]), type: 'image/png', filename: 'a.png' })),
   subscribe: vi.fn(() => vi.fn()),
   stateGet: vi.fn(() => undefined),
   stateSet: vi.fn(async () => {}),
@@ -513,5 +514,132 @@ describe('malformed and hostile traffic', () => {
     h.send({ id: 26, kind: 'ui', op: 'copy', text: 'x' })
     await new Promise((r) => setTimeout(r, 10))
     expect(h.svc.copy).not.toHaveBeenCalled()
+  })
+})
+
+// ── The binary path (docs/plugins.md § Binary bridge calls) ───────────────────────────────────────
+//
+// A separate wire kind, so the only thing it shares with the JSON path is the permission decision. That
+// sharing is the point: an image route and a JSON route are the same route table question, and a byte
+// call must not be a way around an answer the other call would have got.
+
+describe('byte requests', () => {
+  it('hands back bytes without putting them through a JSON parser', async () => {
+    const h = withBridge()
+    h.send({ id: 30, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    await h.settled(2)
+    expect(replyTo(h, 30)).toEqual({
+      id: 30,
+      ok: true,
+      status: 200,
+      body: { bytes: new Uint8Array([1, 2, 3]), type: 'image/png', filename: 'a.png' },
+    })
+  })
+
+  it('carries a byte body and its advisory metadata to the host', async () => {
+    const h = withBridge()
+    h.send({ id: 31, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files', bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' })
+    await h.settled(2)
+    expect(h.svc.fetchBytes).toHaveBeenCalledWith(
+      'POST',
+      '/v2/p/board/files',
+      { bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' },
+      expect.anything(),
+    )
+  })
+
+  // The one that matters. `image-markup` needs attachment content, and the temptation is to let it call
+  // the agents routes directly. It cannot, and the check happens before the body is looked at, so a
+  // 12 MiB POST at somebody else's namespace is refused without being read.
+  it('refuses another plugin’s namespace without ever calling the transport', async () => {
+    const h = withBridge()
+    h.send({ id: 32, kind: 'api.bytes', method: 'GET', path: '/v2/p/agents/attachments/a1/content' })
+    await h.settled(2)
+    expect(replyTo(h, 32)).toMatchObject({ id: 32, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses a core path the plugin has no scope for, the same as the JSON path would', async () => {
+    const h = withBridge()
+    h.send({ id: 33, kind: 'api.bytes', method: 'POST', path: '/v2/projects', bytes: new Uint8Array([1]), type: 'application/json' })
+    await h.settled(2)
+    expect(replyTo(h, 33)).toMatchObject({ ok: false })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses a body over the ceiling before sending it anywhere', async () => {
+    const h = withBridge()
+    h.send({ id: 34, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files', bytes: new Uint8Array(MAX_PLUGIN_BYTES + 1), type: 'image/png' })
+    await h.settled(2)
+    expect(replyTo(h, 34)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses a POST with no bytes rather than sending an empty one', async () => {
+    const h = withBridge()
+    h.send({ id: 35, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files' })
+    await h.settled(2)
+    expect(replyTo(h, 35)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses a method the byte path does not carry', async () => {
+    const h = withBridge()
+    h.send({ id: 36, kind: 'api.bytes', method: 'DELETE', path: '/v2/p/board/files/a' })
+    await h.settled(2)
+    expect(replyTo(h, 36)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('passes a node refusal through as the ordinary error envelope', async () => {
+    const h = withBridge({}, services({
+      fetchBytes: async () => ({ ok: false as const, status: 404, error: { code: 'not_found', message: 'gone', requestId: 'r1', retryable: false } }),
+    }))
+    h.send({ id: 37, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    await h.settled(2)
+    expect(replyTo(h, 37)).toMatchObject({ ok: false, error: { code: 'not_found', message: 'gone' } })
+  })
+
+  it('carries zero bytes, which is a real answer and not an error', async () => {
+    const h = withBridge({}, services({
+      fetchBytes: async () => ({ ok: true as const, status: 200, bytes: new Uint8Array(), type: 'application/octet-stream', filename: null }),
+    }))
+    h.send({ id: 38, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    await h.settled(2)
+    expect(replyTo(h, 38)).toMatchObject({ ok: true, body: { bytes: new Uint8Array(), filename: null } })
+  })
+})
+
+// An overlay a remote tree opened answers the tree that opened it. Everything else that can call
+// `close()` still gets the old no-result behaviour.
+describe('closing with a result', () => {
+  it('lets an overlay pass one', async () => {
+    const h = withBridge({ target: 'overlay' })
+    h.send({ id: 40, kind: 'ui', op: 'importer.close', result: { replacementAttachmentId: 'a2' } })
+    await h.settled(2)
+    expect(h.svc.importerClose).toHaveBeenCalledWith({ replacementAttachmentId: 'a2' })
+  })
+
+  it('refuses one from an importer, which has nobody awaiting a value', async () => {
+    const h = withBridge({ target: 'importer' })
+    h.send({ id: 41, kind: 'ui', op: 'importer.close', result: 'something' })
+    await h.settled(2)
+    expect(replyTo(h, 41)).toMatchObject({ ok: false })
+    expect(h.svc.importerClose).not.toHaveBeenCalled()
+  })
+
+  it('refuses a result over the ceiling, so a result cannot become a payload', async () => {
+    const h = withBridge({ target: 'overlay' })
+    h.send({ id: 42, kind: 'ui', op: 'importer.close', result: { blob: 'x'.repeat(MAX_OVERLAY_INPUT_BYTES + 1) } })
+    await h.settled(2)
+    expect(replyTo(h, 42)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(h.svc.importerClose).not.toHaveBeenCalled()
+  })
+
+  it('still closes with nothing, which every dismissal reads as null', async () => {
+    const h = withBridge({ target: 'overlay' })
+    h.send({ id: 43, kind: 'ui', op: 'importer.close' })
+    await h.settled(2)
+    expect(h.svc.importerClose).toHaveBeenCalledWith(undefined)
   })
 })

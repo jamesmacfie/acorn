@@ -57,7 +57,30 @@ export type AcornBridgeApi = {
   put<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   patch<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   del<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
+  /**
+   * Read a route of your own plugin's whose answer is bytes: an image, a PDF, an archive
+   * (docs/plugins.md § Binary bridge calls).
+   *
+   * The five methods above put every request and every response through `JSON.stringify` and
+   * `JSON.parse`. Base64 over that would add a third to the wire, two copies in memory, and a decode on
+   * each side, for a file the host was already carrying as bytes.
+   *
+   * The same permission decision as `get`, made at the same point: your own `/v2/p/<your id>/` namespace
+   * and nothing else. Capped at 12 MiB either way.
+   */
+  getBytes(path: string, options?: { signal?: AbortSignal }): Promise<PluginByteResponse>
+  /** Send bytes to a route of your own plugin's. `type` and `filename` are advisory: whatever receives
+   * them decides what they really are, and a store that keeps files re-sniffs and re-normalizes both. */
+  postBytes<T>(
+    path: string,
+    body: { bytes: Uint8Array; type: string; filename?: string },
+    options?: { signal?: AbortSignal },
+  ): Promise<T>
 }
+
+/** What `getBytes` resolves to. `filename` is whatever the route's `Content-Disposition` named, or null
+ * when it named nothing; a caller that needs a name owns the fallback. */
+export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: string | null }
 
 // Named for what it is rather than for the app: `Acorn` on @acorn/plugin-api/ui is the shell component,
 // and two things called Acorn in one plugin's imports is a trap.
@@ -91,9 +114,17 @@ export type AcornBridge = {
     openUrl(url: string): Promise<void>
     /** Importer surfaces only: finish, letting the host close the modal and refresh. */
     done(): Promise<void>
-    /** Dismiss the surface: an importer modal without having imported anything, or an overlay once its
-     * picker has picked. Refused from any other surface, because a pane doesn't get to close itself. */
-    close(): Promise<void>
+    /**
+     * Dismiss the surface: an importer modal without having imported anything, or an overlay once its
+     * picker has picked. Refused from any other surface, because a pane doesn't get to close itself.
+     *
+     * An overlay a remote tree opened as its companion may pass a JSON `result`, which resolves that
+     * tree's `openOverlay` call (docs/plugins.md § Companion overlays). Closing without one resolves it
+     * with `null`, and so does every dismissal the host owns, so an opener never has to tell
+     * "cancelled" from "went away". Capped at 64 KiB: a result names an outcome, and anything with bytes
+     * in it goes over the plugin's own route first.
+     */
+    close(result?: unknown): Promise<void>
   }
   /**
   /**
@@ -329,6 +360,16 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         put: (path, body, options) => call('PUT', path, body, options),
         patch: (path, body, options) => call('PATCH', path, body, options),
         del: (path, options) => call('DELETE', path, undefined, options),
+        getBytes: (path, options) => request<PluginByteResponse>({ kind: 'api.bytes', method: 'GET', path }, options?.signal),
+        postBytes: <T,>(path: string, body: { bytes: Uint8Array; type: string; filename?: string }, options?: { signal?: AbortSignal }) =>
+          request<T>({
+            kind: 'api.bytes',
+            method: 'POST',
+            path,
+            bytes: body.bytes,
+            type: body.type,
+            ...(body.filename === undefined ? {} : { filename: body.filename }),
+          }, options?.signal),
       },
       events: {
         on: onEvent,
@@ -343,7 +384,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         openPane: async (paneId) => void (await request({ kind: 'ui', op: 'openPane', paneId })),
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
-        close: async () => void (await request({ kind: 'ui', op: 'importer.close' })),
+        close: async (result) => void (await request({ kind: 'ui', op: 'importer.close', ...(result === undefined ? {} : { result }) })),
       },
       document: {
         read: async () => (await request<{ text?: string }>({ kind: 'document', op: 'read' }))?.text ?? '',
@@ -501,6 +542,43 @@ export type TreeMount = {
   onProps(listener: (props: unknown) => void): void
   /** Your teardown, run when the host unmounts this slot. */
   onUnmount(dispose: () => void): void
+  /**
+   * The two things a tree may ask the host for, as opposed to describe to it.
+   *
+   * On the mount rather than on the bridge, and that is the whole design. One worker serves every tree
+   * its bundle draws and holds one bridge, so a composer showing four image attachments has four trees
+   * and one port: a request sent over the bridge could not say which of the four sent it, and the host
+   * would have to guess from focus. These two ride the tree channel instead, where the slot is part of
+   * the address the host already trusts.
+   *
+   * Both reject with an `AcornBridgeError` carrying a code. Neither takes a plugin, point or slot id;
+   * there is nothing here to forge.
+   */
+  readonly host: {
+    /**
+     * Call one action the owning extension point declared and this slot's owner bound
+     * (docs/plugins.md § Asking the owner).
+     *
+     * The owner's answer to a request, not a setter: a tree asks the composer to replace an attachment
+     * and the composer decides whether to. Payload and result are JSON under 64 KiB, and eight may be
+     * outstanding at once.
+     */
+    invoke<TResult = unknown>(action: string, payload?: unknown): Promise<TResult>
+    /**
+     * Present the one overlay this contribution's own manifest descriptor associated, and wait for it
+     * (docs/plugins.md § Companion overlays).
+     *
+     * Resolves with whatever the overlay passed to `bridge.ui.close(result)`, or `null` for every
+     * dismissal: Escape, the backdrop, the close button, this tree unmounting, another overlay opening.
+     * `overlayId` must be the name the descriptor declared; anything else is denied rather than opened.
+     *
+     * A person's act. The host accepts it only while focus is inside this tree, and at most once a
+     * second, so a bundle cannot put a modal in front of a reader from a timer. A host with no overlay
+     * frames at all, which is what a terminal is, rejects with `unsupported_host`; draw your static
+     * fallback and carry on.
+     */
+    openOverlay<TResult = unknown>(overlayId: string, input?: unknown): Promise<TResult | null>
+  }
 }
 
 export type TreeRender = (bridge: AcornBridge, mount: TreeMount) => void
@@ -544,20 +622,44 @@ type MountedSlot = {
   props: unknown
   onProps: ((props: unknown) => void)[]
   dispose: (() => void)[]
+  /** Host requests this slot is waiting on, by request id (`TreeMount.host`). */
+  pending: Map<number, Pending>
 }
 
 function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Record<string, TreeRender>): void {
   const slots = new Map<string, MountedSlot>()
+  // One sequence for the whole channel, and a pending map per slot. The host quotes the id back beside
+  // the slot it arrived on, so two trees can have a request in flight under the same number and neither
+  // can settle the other's.
+  let requestSeq = 0
 
   const drop = (id: string): void => {
     const slot = slots.get(id)
     if (!slot) return
     slots.delete(id)
+    // Rejected rather than left hanging. The host rejects its own copy on unmount too, but a bundle
+    // whose worker outlives one slot would otherwise hold a promise nobody will ever settle.
+    for (const waiter of slot.pending.values()) {
+      waiter.reject(new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' }))
+    }
+    slot.pending.clear()
     for (const dispose of slot.dispose) {
       try { dispose() } catch (error) { console.error('[acorn] tree teardown threw:', error) }
     }
     slot.root.dispose()
   }
+
+  const ask = <T>(slotId: string, op: 'owner.invoke' | 'overlay.open', name: string, payload: unknown): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const slot = slots.get(slotId)
+      if (!slot) {
+        reject(new AcornBridgeError({ code: 'unmounted', message: 'this tree is not mounted', retryable: false, requestId: '' }))
+        return
+      }
+      const id = ++requestSeq
+      slot.pending.set(id, { resolve: resolve as (value: unknown) => void, reject })
+      port.postMessage({ kind: 'tree:host-request', slot: slotId, id, op, name, ...(payload === undefined ? {} : { payload }) })
+    })
 
   const mount = (id: string, entry: string, props: unknown): void => {
     const existing = slots.get(id)
@@ -593,6 +695,7 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
       props,
       onProps: [],
       dispose: [],
+      pending: new Map(),
     }
     slots.set(id, slot)
     try {
@@ -602,6 +705,10 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
         props: () => slot.props,
         onProps: (listener) => slot.onProps.push(listener),
         onUnmount: (dispose) => slot.dispose.push(dispose),
+        host: {
+          invoke: <TResult,>(action: string, payload?: unknown) => ask<TResult>(id, 'owner.invoke', action, payload),
+          openOverlay: <TResult,>(overlayId: string, input?: unknown) => ask<TResult | null>(id, 'overlay.open', overlayId, input),
+        },
       })
     } catch (error: unknown) {
       drop(id)
@@ -624,6 +731,25 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
         // has forgotten is a stale click on a torn-down node, which is nothing.
         const slot = typeof message.slot === 'string' ? slots.get(message.slot) : undefined
         if (slot && typeof message.handler === 'number') slot.root.dispatch(message.handler, message.payload)
+        return
+      }
+      case 'tree:host-reply': {
+        const slot = typeof message.slot === 'string' ? slots.get(message.slot) : undefined
+        const reply = message as unknown as { id?: number; ok?: boolean; body?: unknown; error?: { code: string; message: string } }
+        if (!slot || typeof reply.id !== 'number') return
+        const waiter = slot.pending.get(reply.id)
+        // An id this slot has forgotten is a reply to a request it already gave up on, which is nothing.
+        if (!waiter) return
+        slot.pending.delete(reply.id)
+        if (reply.ok) waiter.resolve(reply.body)
+        else {
+          waiter.reject(new AcornBridgeError({
+            code: reply.error?.code ?? 'internal',
+            message: reply.error?.message ?? 'the host refused this request',
+            retryable: false,
+            requestId: '',
+          }))
+        }
         return
       }
       case 'tree:ping':

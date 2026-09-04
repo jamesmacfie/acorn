@@ -2,7 +2,10 @@ import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
+import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
+import { answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
 import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
+import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { recordSurfaceFailure } from '../plugins/surfaceFailures'
@@ -10,7 +13,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './treeRegistry'
-import { acquireTreeWorker } from './workerHost'
+import { acquireTreeWorker, type TreeHostResult } from './workerHost'
 
 // One tree from one plugin, drawn where the owner asked for it.
 //
@@ -32,6 +35,18 @@ export type RemoteTreeProps = {
   /** What this tree is for. Reactive: a second mount for the same slot is a props update, which is how
    *  a tool card redraws on every transcript snapshot without its worker restarting. */
   props: () => unknown
+  /**
+   * What the owner of this slot will do if the tree asks (docs/plugins.md § Asking the owner).
+   *
+   * Host-only. These never reach the worker in any form: a function cannot cross the boundary, and the
+   * name is not sent either, so a tree learns which actions exist only from the point's own published
+   * declaration. The tree names one and the host looks it up here.
+   */
+  actions?: () => OwnerActions
+  /** The action names the owning extension point declared, as the host read them off the owner's
+   *  manifest. Both lists have to contain a name before the host will forward it: the point says what
+   *  may ever be asked, and `actions` says what this particular `Slot` is prepared to answer. */
+  declaredActions?: () => readonly string[]
   /**
    * The task or project this tree is inside, for a tree that is a pane rather than a slot.
    *
@@ -145,6 +160,62 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     },
   })
 
+  // ── What this tree may ask the host for (../frames/sdk.ts § TreeMount.host) ───────────────────────
+  //
+  // Two operations, each with its own grant, and both answered here rather than on the bridge. The
+  // bridge belongs to the bundle; this belongs to one mounted contribution, which is the only scope in
+  // which "which attachment was pressed" has an answer at all.
+  const fail = (code: string, message: string): TreeHostResult => ({ ok: false, error: { code, message } })
+
+  let lastOverlayAt = 0
+  let openOverlayId = ''
+
+  const openOverlay = async (name: string, input: unknown): Promise<TreeHostResult> => {
+    // The one overlay this contribution's own manifest descriptor associated, and no other. A list would
+    // make this a dispatcher; one name makes it a grant that is readable at trust time.
+    if (!contribution.overlay || name !== contribution.overlay) {
+      return fail('unknown_overlay', `'${name}' is not the overlay this contribution declares`)
+    }
+    // A host with no overlay frames answers so rather than hanging. The terminal is the case: it mounts
+    // remote trees and has no iframe to put one in, so a plugin catches this and leaves its static
+    // preview up (apps/tui/src/plugins/RemoteTree.tsx).
+    const owner = eligiblePlugins().find((entry) => entry.pluginId === contribution.pluginId)
+    const declared = (owner?.installed.contributions.frames ?? []).some((frame) => frame.id === name && frame.target === 'overlay')
+    if (!declared) return unsupportedOverlay()
+    // A modal is a person's act. Focus inside this tree is what a click or a key press leaves behind,
+    // so a background timer cannot put an editor in front of the reader, and the throttle backs the
+    // focus check up the way it does for `openUrl` one rung down (../frames/broker.ts).
+    if (!(container !== undefined && container.contains(document.activeElement))) {
+      return fail('needs_focus', 'openOverlay works from a click or key handler: the tree must be focused')
+    }
+    const now = Date.now()
+    if (now - lastOverlayAt < 1_000) return fail('throttled', 'openOverlay is limited to one overlay per second')
+    lastOverlayAt = now
+    if (batchBytes(input ?? null) > TREE_LIMITS.hostRequestBytes) return fail('too_large', `an overlay input is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
+    const opened = openPluginOverlayInvocation({
+      pluginId: contribution.pluginId,
+      surface: name,
+      ...(input === undefined ? {} : { input }),
+    })
+    openOverlayId = opened.id
+    const result = await opened.result
+    if (openOverlayId === opened.id) openOverlayId = ''
+    return { ok: true, body: result ?? null }
+  }
+
+  const detachHostRequests = worker.onHostRequest(slot, async (request) => {
+    if (request.op === 'owner.invoke') {
+      return answerOwnerInvoke({
+        declared: componentProps.declaredActions?.() ?? [],
+        actions: componentProps.actions?.() ?? {},
+        name: request.name,
+        payload: request.payload,
+      })
+    }
+    if (request.op === 'overlay.open') return openOverlay(request.name, request.payload)
+    return unknownHostOp(String(request.op))
+  })
+
   const transport = worker.transport(slot)
   // Mount is also update: the first call starts the tree, every later one carries new props. Solid's
   // effect gives the "later one" for free, because `props()` is the caller's accessor.
@@ -180,6 +251,11 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   onCleanup(() => {
     unaction()
     unselect()
+    detachHostRequests()
+    // An overlay outliving the tree that asked for it is a modal nobody can answer: the reader would be
+    // drawing on an attachment whose composer has gone. The invocation settles with `null` on the way
+    // out, and the sandbox's own copy of the promise rejects when the host unmounts the slot.
+    if (openOverlayId) closePluginOverlayFrom(openOverlayId)
     worker.unmount(slot)
     worker.release()
   })

@@ -38,6 +38,7 @@ vi.mock('./workerHost', () => ({
       unmount: () => {},
       release: () => {},
       bridgePort: () => port,
+      onHostRequest: () => () => {},
     }
   },
 }))

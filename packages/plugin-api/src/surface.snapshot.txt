@@ -418,6 +418,7 @@ ui/host: selectPaneTab
 ui/host: slotFills
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
+ui/sdk: PluginByteResponse
 ui/sdk: PluginFrameContext
 ui/sdk: RemoteNode
 ui/sdk: RemoteRoot
