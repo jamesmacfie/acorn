@@ -18,6 +18,18 @@ const TEXT_EXTENSIONS = new Set([
   'sh', 'bash', 'zsh', 'fish', 'sql', 'graphql', 'gql', 'diff', 'patch', 'log',
 ])
 
+/** The two image families the editor seam accepts, sniffed rather than believed
+ *  (../../contract/draftAttachments.ts).
+ *
+ *  Deliberately narrower than what `upload` takes. GIF and WebP may be animated, so a plugin that
+ *  decoded one to a canvas and re-encoded it would silently flatten it to a single frame, and a PDF is
+ *  not an image at all. Refusing them here is cheaper than explaining the data loss afterwards. */
+export const imageEditKind = (bytes: Uint8Array): 'image/png' | 'image/jpeg' | null => {
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png'
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg'
+  return null
+}
+
 const rowToAttachment = (row: typeof schema.agentAttachments.$inferSelect): AgentAttachment => ({
   id: row.id,
   taskId: row.taskId,
@@ -175,13 +187,47 @@ export class AgentAttachmentStore {
     return { ...rowToAttachment(row), localPath: join(this.root, row.storageKey) }
   }
 
-  async removeUnreferenced(id: string): Promise<boolean> {
+  /**
+   * One live attachment of this task that no turn has claimed yet, with its bytes.
+   *
+   * Both halves of the key, always: an attachment id alone would let a caller holding one task's id
+   * read any attachment on this node. `null` covers every refusal — wrong task, missing, deleted,
+   * already sent — because telling the caller which would answer questions about rows it may not see.
+   *
+   * The local path never leaves this class. A caller gets a copy of the bytes, which is what makes this
+   * safe to hand to a sandboxed plugin's node half.
+   */
+  async readDraft(taskId: string, id: string): Promise<{ attachment: AgentAttachment; bytes: Uint8Array } | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.agentAttachments)
+      .where(and(
+        eq(schema.agentAttachments.id, id),
+        eq(schema.agentAttachments.taskId, taskId),
+        isNull(schema.agentAttachments.deletedAt),
+      ))
+      .limit(1)
+    if (!row || await this.#referenced(id)) return null
+    // A row whose object is gone is a draft that cannot be edited, which reads the same as absent to
+    // every caller. The garbage collector is what reconciles the two.
+    const bytes = await readFile(join(this.root, row.storageKey)).catch(() => null)
+    if (!bytes) return null
+    return { attachment: rowToAttachment(row), bytes: new Uint8Array(bytes) }
+  }
+
+  /** Is this attachment claimed by a turn? Referenced content is the evidence of what was sent, so it is
+   *  never readable as a draft, never replaced, and never deleted. */
+  async #referenced(id: string): Promise<boolean> {
     const [reference] = await this.db
       .select({ attachmentId: schema.agentAttachmentRefs.attachmentId })
       .from(schema.agentAttachmentRefs)
       .where(eq(schema.agentAttachmentRefs.attachmentId, id))
       .limit(1)
-    if (reference) return false
+    return reference !== undefined
+  }
+
+  async removeUnreferenced(id: string): Promise<boolean> {
+    if (await this.#referenced(id)) return false
     await this.db.update(schema.agentAttachments).set({ deletedAt: Date.now() }).where(eq(schema.agentAttachments.id, id))
     return true
   }
