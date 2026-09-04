@@ -9,7 +9,7 @@ import { measureField, measureRun } from './measure'
 // both reach it: `yoga-layout` is a module that says `await loadYoga()` at the top level and exports
 // the result, `yoga-layout/load` is the same call left for the caller. So the choice only decides
 // where the await happens, and `../main.tsx` already awaits at the top level, which makes this the
-// one that costs nothing (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 2).
+// one that costs nothing.
 // The one thing it forbids is `require()` from CommonJS, and nothing in this package requires
 // anything.
 //

@@ -558,7 +558,7 @@ export const onFocusMove = (listener: (node: Renderable | null) => void): (() =>
  *
  * A field asks this store whether it has the keys and writes the answer into its own props, where
  * paint reads it, so these two are no-ops on our nodes and the mirror is one-way: nothing here holds
- * focus state for the store to disagree with (../tree/compat.ts, ../kit/asking.tsx § ownInput).
+ * focus state for the store to disagree with (../tree/compat.ts, ../kit/asking.tsx § fieldRef).
  */
 const paintCaret = (previous: Renderable | null, node: Renderable | null): void => {
   if (node) node.focus()

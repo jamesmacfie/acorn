@@ -17,13 +17,12 @@ import { paint } from './paint'
 // frame only happens because an operation on the tree asked for one, and every one of those
 // operations is a change Yoga has to be asked about. Yoga is asked in turn — it only re-measures the
 // nodes it marked dirty — so the check would be ours to keep and Yoga's to make anyway. A 1,708-node
-// pane lays out in 0.19 ms warm, against a 5 ms budget
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 2).
+// pane lays out in 0.19 ms warm, against a 5 ms budget.
 //
 // **The sink is injectable and that is not only for tests.** Paint writes to one function that takes
 // a string, so the test harness reads frames without a terminal and the real boot hands it
 // `process.stdout.write`. Which is also the promise `../kit/render.tsx` already makes to every kit
-// test (docs/future/terminal-rewrite/architecture.md § 7).
+// test (docs/tui.md § Tests).
 //
 // The terminal's own setup — the alternate screen, raw mode, the protocol requests — is not here. It
 // belongs with the parser that reads their replies, and this module writes nothing but cells.

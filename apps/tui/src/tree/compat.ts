@@ -148,7 +148,7 @@ const accessors = {
   // them unconditionally — and deliberately so now that there is a caret to draw. A field asks the
   // store whether it has the keys and writes the answer into its own props, where paint reads it, so
   // the mirror stays one-way: nothing here holds focus state for the store to disagree with
-  // (`../kit/asking.tsx § ownInput`, `../paint/paint.ts § drawField`).
+  // (`../kit/asking.tsx § fieldRef`, `../paint/paint.ts § drawField`).
   focus: { value() {} },
   blur: { value() {} },
   getChildren: {

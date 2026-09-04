@@ -3,14 +3,13 @@ import type { Node } from '../tree/node'
 
 // One layout pass, and the clamp that reads it back.
 //
-// This function is where the old render guard went — deleted in phase 4, and in the git history as
-// `apps/tui/src/renderGuard.ts`. That file patched two methods on somebody else's
+// This function is where the old render guard went — deleted with the old painter, and in the git
+// history as `apps/tui/src/renderGuard.ts`. That file patched two methods on somebody else's
 // prototype because a node that joins the tree after a frame's layout pass has no computed size, and
 // the fault is Yoga's rather than OpenTUI's: `getComputedWidth` and `getComputedHeight` on an
 // unmeasured node both return `NaN`, and so does `getComputedLayout()` for the same two fields
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 2). It survives the move to
-// wasm unchanged. What changes is that there is one place a rectangle is read, so there is one place
-// to answer it.
+// (docs/tui.md § Rendering). It survives the move to wasm unchanged. What changes is that there is
+// one place a rectangle is read, so there is one place to answer it.
 //
 // Three things the clamp has to know, each measured rather than assumed.
 //
@@ -24,9 +23,9 @@ import type { Node } from '../tree/node'
 //                        the real size.
 //   a left may be        and stays negative. An overflowing child under `alignItems: center`
 //   negative             reported left -15 at width 40 inside a 10-cell parent. Clamping that to 0
-//                        would move the run; paint's job is to clip it. So the invariant in
-//                        architecture.md § 2 holds for the size half only: four finite integers, of
-//                        which the width and the height are non-negative.
+//                        would move the run; paint's job is to clip it. So the invariant is four
+//                        finite integers, of which only the width and the height are non-negative
+//                        (docs/tui.md § Rendering).
 //
 // Yoga rounds sizes to whole cells by itself at the default point scale factor of 1 — 101 split three
 // ways comes back 34, 33, 34 with edges that meet — so the rounding below is a belt, not the braces.
@@ -75,12 +74,10 @@ export function clampRect(
  *  then clips them to the viewport for nothing, because it clips every child to its parent's content
  *  box already.
  *
- *  Here rather than in paint, which is a departure from what
- *  docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Scope asks for, and it buys the same
- *  answer to three questions instead of one. A rectangle is where a node is on the screen, so a
- *  translated rectangle is what a reveal compares, what a wheel hit test walks, and what the region
- *  store reads through `x` and `y`. Translating in paint alone would leave those three reading a
- *  position nothing was drawn at. */
+ *  Here rather than in paint, and it buys the same answer to three questions instead of one. A
+ *  rectangle is where a node is on the screen, so a translated rectangle is what a reveal compares,
+ *  what a wheel hit test walks, and what the region store reads through `x` and `y`. Translating in
+ *  paint alone would leave those three reading a position nothing was drawn at. */
 export function readBack(node: Node, originX = 0, originY = 0, resized: Node[] = []): Node[] {
   let x = originX
   let y = originY

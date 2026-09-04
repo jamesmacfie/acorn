@@ -12,8 +12,7 @@ import type { Node } from './tree/node'
 // **A soft break carries no character**, so a row's `to` is the next row's `from` and one offset can
 // sit at the end of one row and the start of the next. That is the whole reason `assoc` exists in the
 // model: without it End on a wrapped row and Home on the row below are the same number, and End
-// followed by Home does not come back. CodeMirror carries the same field for the same problem
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4).
+// followed by Home does not come back. CodeMirror carries the same field for the same problem.
 //
 // **The cache is here rather than in `./layout/measure.ts`, and the reason is a byte count.** That
 // module imports `MeasureMode` from `yoga-layout`, which is a runtime value, so a static import of it
@@ -123,18 +122,16 @@ const cache = new WeakMap<Node, Wrapped>()
  * `./kit/asking.tsx` asks which row the caret is on so that Up and Down can move between them. A
  * second wrap anywhere would draw a caret on a row the reader is not looking at.
  *
- * Which is also what
- * docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md means by holding the rows beside the
- * model: a wrap of a 400-line note is 163 microseconds, affordable per keystroke and wasteful per
- * frame, so a frame that moved nothing wraps nothing and a keystroke that only moved the caret is a
- * cache hit.
+ * Which is also why the rows are held beside the model rather than rebuilt per frame: a wrap of a
+ * 400-line note is 163 microseconds, affordable per keystroke and wasteful per frame, so a frame that
+ * moved nothing wraps nothing and a keystroke that only moved the caret is a cache hit.
  *
  * There is no invalidator beside this, unlike `./layout/measure.ts § invalidateRun`, and the
  * difference is where the text comes from: a run's characters are its `#text` children, which the
  * reconciler patches, so something has to tell the cache. A field's are one prop this function reads
  * on the way in, so a value that changed is a key that does not match. What the component still owes
  * is `markDirty` on the Yoga node, because Yoga will not call a measure function it does not think is
- * stale (./kit/asking.tsx § ownField).
+ * stale (./kit/asking.tsx § fieldRef).
  */
 export function measuredField(node: Node, limit: number): Wrapped {
   const text = typeof node.props.value === 'string' ? node.props.value : ''

@@ -6,14 +6,14 @@ import type { Node as YogaNode } from 'yoga-layout'
 // `Renderable` has a lifecycle, so it can be destroyed a tick after it detaches and refuse to come
 // back — which blanked every `Suspense` boundary that suspended twice. It has behaviour, so a `text`
 // can refuse a bare child and a `span` can drop a colour prop in silence. And it reads its own size
-// from Yoga, so an unmeasured node hands `NaN` to something strict from inside the render loop
-// (docs/future/terminal-rewrite/review.md § 2a to § 2c). A plain object cannot do any of the three:
-// it has whatever fields the layout pass wrote, it holds whatever children it was given, and there
-// is nothing to be "already destroyed".
+// from Yoga, so an unmeasured node hands `NaN` to something strict from inside the render loop. A
+// plain object cannot do any of the three: it has whatever fields the layout pass wrote, it holds
+// whatever children it was given, and there is nothing to be "already destroyed"
+// (docs/tui.md § Rendering).
 //
 // Deliberately absent, so nobody adds them back by habit: focus is the region store's one value
 // (`../keys/regions.ts`), visibility is `props.visible` which layout turns into `DISPLAY_NONE`, and
-// a scroll offset and an edit state arrive in phase 3 as props the widget components own.
+// a scroll offset and an edit state are props the widget components own.
 
 /** The kinds a tag can be. Fixed: this host has no component catalogue to extend, which is why
  *  `extend` in `./renderer.ts` registers nothing. */
@@ -57,9 +57,8 @@ export const KINDS: Readonly<Record<string, Kind>> = {
  * height as "does not shrink", which is what keeps a field its full width in an overflowing row, and
  * a height set behind the prop's back would have left it shrinking.
  *
- * It cannot be a JSX attribute: `InputRenderableOptions` omits `height` outright, and while the
- * switch exists tsc types every intrinsic in this package against OpenTUI's prop shapes whichever
- * painter the build picked (docs/future/terminal-rewrite/phase-2-the-painter.md).
+ * Applied in `./renderer.ts § createElement`, before a single JSX prop lands, so a call site that
+ * wants a taller field can still say so.
  */
 export const INTRINSIC: Partial<Readonly<Record<Kind, Readonly<Record<string, unknown>>>>> = {
   input: { height: 1 },

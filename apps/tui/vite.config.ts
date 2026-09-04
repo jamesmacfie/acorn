@@ -21,7 +21,7 @@ import solid from 'vite-plugin-solid'
 // included — to the module named in `moduleName`, and that name is this path. Named by its own path
 // rather than by a bare specifier with an alias behind it, because an alias is a second place to
 // look and there is nothing left to switch between: plain objects, Yoga through wasm, a cell buffer
-// (src/tree/renderer.ts, docs/future/terminal-rewrite/architecture.md).
+// (src/tree/renderer.ts, docs/tui.md § The host switch).
 const RECONCILER = resolve(import.meta.dirname, 'src/tree/renderer.ts')
 
 const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
@@ -89,11 +89,11 @@ export default defineConfig({
       // answers in hex when the kit answers in the terminal's own sixteen slots.
       //
       // They were left externalised while the packages were installed, so the imports resolved and
-      // the surface simply did not draw. Phase 4 dropped the packages, and an unresolved bare import
+      // the surface simply did not draw. Dropping the packages changed that: an unresolved bare import
       // in a lazily loaded chunk is a crash the moment a reader opens that surface rather than a
       // surface that quietly cannot draw. So the specifiers are answered here, by stubs that throw
       // with the host's name on them (src/kit/codemirrorGrammars.ts, src/kit/xterm.ts,
-      // src/kit/shiki.ts, docs/future/terminal-rewrite/phase-4-cut-over.md).
+      // src/kit/shiki.ts, docs/tui.md § The host switch).
       //
       // Patterns rather than one line each, because the grammar and theme sets are open: a language
       // added to `client-core/src/features/editor/language.ts` or a theme added to

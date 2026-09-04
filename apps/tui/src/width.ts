@@ -3,12 +3,11 @@
 //
 // `String.length` is what the kit truncates by today, and it is wrong three ways: two code units for
 // one astral character, one cell for a wide one, and a cell for a combining mark that takes none. The
-// fixture never reaches any of the three, which is why nobody has seen it
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 3).
+// fixture never reaches any of the three, which is why nobody has seen it.
 //
 // So: `Intl.Segmenter` for the cluster boundaries and a hand table of the East Asian Width `W` and
-// `F` ranges for how wide each cluster's base is. Spike 3 weighed that against `string-width` and
-// this is the one it picked. `string-width` asks `emoji-regex` first, which matches a bare
+// `F` ranges for how wide each cluster's base is. We weighed that against `string-width` and picked
+// this one. `string-width` asks `emoji-regex` first, which matches a bare
 // text-presentation emoji, so it calls `▶`, `☑`, `⚠`, `⌨`, `☺`, `👁` and `🏷` two cells each —
 // against the standard, against xterm, and against seven names the rail and the footer draw every
 // frame. It also only arrived in the tree as a dependency of the old painter and left with it, so
@@ -22,7 +21,7 @@
 // with no flag.
 
 /** A string with nothing in it a terminal has to think about. One cell per character, and the answer
- *  agrees with the segmenter on every one of spike 3's 125 samples. */
+ *  agrees with the segmenter on all 125 samples it was measured against. */
 const PLAIN = /^[\x20-\x7e]*$/
 
 /** A cluster that starts with a mark or a format character has no base of its own, so it costs
@@ -156,8 +155,7 @@ export type Cluster = { text: string; from: number; width: number }
  *
  * The ASCII branch matters more here than it does in `stringWidth`, because the wrap in `./wrap.ts`
  * runs this walk over every line it touches. With the branch a wrap of a 400-line note is 163
- * microseconds; without it, 1,946
- * (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4).
+ * microseconds; without it, 1,946.
  */
 export function clusters(value: string): Cluster[] {
   const out: Cluster[] = []

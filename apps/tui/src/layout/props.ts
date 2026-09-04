@@ -85,7 +85,7 @@ const OVERFLOWS: Record<string, Overflow> = {
  * all keep their full size and the last of them is clipped, at 1 they give the overflow up between
  * them. A `TableRow`'s caret marker was clipped outside its panel, and both halves of a `Sections`
  * strip took the whole row each, because a viewport's content box is 100% wide and hands its half
- * that as a floor to grow from (../kit/scrolling.tsx § ownViewport).
+ * that as a floor to grow from (../kit/scrolling.tsx § viewportBox).
  *
  * A blanket 1 also passes every test in this package. The derived rule is here anyway, because it is
  * the answer the kit was written against rather than the answer that happens to be green: the two

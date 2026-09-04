@@ -124,9 +124,9 @@ describe('the store is the only owner of focus', () => {
     // is reachable", and it belongs in the region store or nowhere.
     //
     // `tree/compat.ts` is the sixth and it is a node being built rather than a sixth opinion: the
-    // accessor there gives a `scrollbox`, an `input` and a `textarea` the defaults OpenTUI's own
-    // renderables had, and phase 4 deletes the file
-    // (docs/future/terminal-rewrite/phase-2-the-painter.md).
+    // accessor there gives a `scrollbox`, an `input` and a `textarea` the defaults the old
+    // renderables had, which is what makes a viewport the stop of last resort in a document with no
+    // controls in it.
     expect(said(/focusable = /g)).toEqual({
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,
@@ -141,10 +141,10 @@ describe('the store is the only owner of focus', () => {
 // The new painter's own invariant: it is ours, all of it.
 //
 // The four folders are the tree Solid mutates, the Yoga pass over it, the cell buffer and the input
-// parser, and the whole point of the programme is that none of them is a wrapper around somebody
-// else's renderer. The keymap engine is still a dependency of this package, so an import of it here
-// would resolve and nothing else would notice — which is what this rule is for now that the painter
-// packages are gone (docs/future/terminal-rewrite/phase-4-cut-over.md).
+// parser, and the point of all four is that none of them is a wrapper around somebody else's
+// renderer. The keymap engine is still a dependency of this package, so an import of it here would
+// resolve and nothing else would notice — which is what this rule is for now that the painter
+// packages are gone (docs/tui.md § The adapter).
 describe('the new painter is ours', () => {
   it('reaches for nothing from @opentui anywhere under tree, layout, paint or input', () => {
     const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) => filesIn(join(ROOT, folder))

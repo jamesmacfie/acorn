@@ -3,22 +3,20 @@ import { fromVisual, toVisual, type Row } from '../wrap'
 
 // What a field holds and what one key does to it: a string, an offset, and a table.
 //
-// This is the model `./asking.tsx`'s `Input` and `Textarea` own under our painter, in place of
-// OpenTUI's `EditBuffer`. It is a plain string rather than a rope and it is not `@codemirror/state`:
-// spike 4 wrote it both ways against the same 40 assertions and the library saved 26 lines for 47,922
-// bytes in the eager graph, of a package phase 4 is trying to delete
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4). A keystroke on a 400-line
-// note costs 99 microseconds either way.
+// This is the model `./asking.tsx`'s `Input` and `Textarea` own. It is a plain string rather than a
+// rope and it is not `@codemirror/state`: we wrote it both ways against the same 40 assertions and
+// the library saved 26 lines for 47,922 bytes in the eager graph. A keystroke on a 400-line note
+// costs 99 microseconds either way.
 //
-// **Selection and undo are deliberately absent.** Shift with an arrow really does select under
-// OpenTUI today, and nothing under `apps/tui/src` reads a selection, sets one, or asks for undo:
+// **Selection and undo are deliberately absent.** Shift with an arrow selected under the old
+// renderer, and nothing under `apps/tui/src` reads a selection, sets one, or asks for undo:
 // `CopyButton` is the copy path and there is no way to get a selection out again. A selection you can
 // make and cannot use is not worth the anchor it costs every operation here.
 //
-// **One table for both fields, which the phase file expected to be two.** OpenTUI's `Input` is its
-// `Textarea` with `height: 1` and one binding changed — Return submits instead of inserting a newline
-// — so the whole of the difference is the `newline` flag below. Two tables would have been the same
-// twenty lines written twice, and they would have drifted the first time somebody added a chord.
+// **One table for both fields, where two were expected.** An `Input` is a `Textarea` with
+// `height: 1` and one binding changed — Return submits instead of inserting a newline — so the whole
+// of the difference is the `newline` flag below. Two tables would have been the same twenty lines
+// written twice, and they would have drifted the first time somebody added a chord.
 //
 // **Home and End go to the visual line's ends, not the document's**, which is a deliberate departure
 // from `defaultTextareaKeyBindings`, where they are `buffer-home` and `buffer-end` and the line
@@ -234,8 +232,7 @@ function typedBy(key: Press): string {
  *
  * `rows` are the visual rows of the current text at the current width, which the component holds
  * beside the model and rebuilds when either changes rather than per keystroke: a wrap of a 400-line
- * note is 163 microseconds, which is affordable per key and wasteful per frame
- * (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4).
+ * note is 163 microseconds, which is affordable per key and wasteful per frame.
  *
  * `newline` is the whole of the difference between the two fields. An `Input` says no, and Return
  * then falls through to its component, which submits (./asking.tsx § Input).

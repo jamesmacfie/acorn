@@ -262,9 +262,9 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     }
     // Whether paint draws the emulator's own caret, which is exactly whether the rectangle is
     // entered. Written from an effect rather than spelled as a JSX attribute, the way every other
-    // widget's props are while the switch exists: tsc types every intrinsic in this package against
-    // OpenTUI's prop shapes whichever painter the build picked
-    // (./scrolling.tsx § ownViewport, ../paint/paint.ts § drawPty).
+    // widget's props are: `../tree/jsx.ts § PtyProps` does not carry it, because it is what this
+    // component knows about the screen rather than something a call site passes in
+    // (./scrolling.tsx § viewportBox, ../paint/paint.ts § drawPty).
     createEffect(() => {
       node.props.focused = entered()
       requestFrame()

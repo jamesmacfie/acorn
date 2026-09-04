@@ -35,7 +35,7 @@ function drawn(root: Node, cols: number, rows: number): string[] {
 }
 
 /** A screen with its writes collected instead of sent, which is the whole of what a test terminal is
- *  (docs/future/terminal-rewrite/architecture.md § 7). */
+ *  (docs/tui.md § Tests). */
 function screenOf(cols: number, rows: number): { screen: Screen; writes: string[] } {
   const writes: string[] = []
   const screen = openScreen({ cols, rows, write: (text) => writes.push(text) })
@@ -139,8 +139,8 @@ describe('a run of text', () => {
   it('keeps a span its own colour inside a sentence', () => {
     // The `span` fault, from the other side: a colour handed to one was dropped in silence, so the
     // run inherited its parent's — and a parent given none drew opaque white, which on a light
-    // terminal was every line of every diff (docs/future/terminal-rewrite/review.md § 2c). A span is
-    // a stretch inside one `text` rather than a box of its own, so the line still wraps as one thing.
+    // terminal was every line of every diff. A span is a stretch inside one `text` rather than a box
+    // of its own, so the line still wraps as one thing.
     const buffer = createBuffer(21, 1)
     const span = el('span', { style: { fg: 6, bold: true } }, [createTextNode('signIn')])
     const text = el('text', { fg: 8 }, [createTextNode('hash but '), span, createTextNode(' still')])
@@ -196,10 +196,9 @@ describe('a wide glyph', () => {
 
 describe('a field', () => {
   it('is a cell tall and does not shrink, without either being spelled', () => {
-    // `InputRenderable`'s constructor hands `height: 1` to the textarea it extends, so a field is a
-    // cell tall whatever is in it — and the height decides a second thing, because a numeric one is
-    // what `../layout/props.ts § flexShrinkFor` reads as "does not shrink". Neither can be a JSX
-    // attribute: `InputRenderableOptions` omits `height` outright (../tree/node.ts § INTRINSIC).
+    // An `input` arrives with `height: 1`, so a field is a cell tall whatever is in it — and the
+    // height decides a second thing, because a numeric one is what `../layout/props.ts § flexShrinkFor`
+    // reads as "does not shrink". Neither is spelled at the call site (../tree/node.ts § INTRINSIC).
     const field = el('input', { value: 'a much longer value than fits' })
     expect(drawn(boxOf(8, 3, {}, [field]), 8, 3)).toEqual(['a much l', '        ', '        '])
     expect(field.rect.h).toBe(1)

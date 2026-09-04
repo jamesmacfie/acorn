@@ -6,9 +6,9 @@ import { byChar, byGroup, create, edit, paste, setValue, type Field, type Press 
 // file runs on the Node the repo pins with no flag — which is the point of the model being a string
 // and two numbers rather than somebody's edit buffer.
 //
-// Spike 4 wrote the model twice, once over `@codemirror/state` and once over a string, against one
-// file of 40 assertions; this is that file's shape kept, against the version that shipped
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4).
+// While the model was being chosen it was written twice, once over `@codemirror/state` and once over
+// a string, against one file of 40 assertions; this is that file's shape kept, against the version
+// that shipped (./field.ts).
 
 /** A key as the dispatcher hands one over: a name, and the character it types where it types one. */
 const key = (name: string, modifiers: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}): Press =>
@@ -41,7 +41,7 @@ describe('the wrap', () => {
   })
 
   it('counts a wide character as two cells rather than one', () => {
-    // The fault spike 3 exists to prevent, arriving through wrapping rather than through truncation:
+    // The fault the width table exists to prevent, arriving through wrapping rather than truncation:
     // by `String.length` this row would hold twice the characters and overrun the terminal
     // (../width.ts).
     const text = '日本語のテキスト'

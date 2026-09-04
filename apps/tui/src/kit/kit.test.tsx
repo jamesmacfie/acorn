@@ -817,23 +817,21 @@ const CASES: Case[] = [
 /**
  * What the new painter cannot draw yet, case by case, and what each is waiting for.
  *
- * Two entries are left and neither is a widget, because phase 3 built all five of them. Both are the
- * same measured Yoga-build difference, recorded with everything that was tried, and neither is above
- * the layout pass (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it
- * found).
+ * Two entries are left and neither is a widget, because all five widgets are built. Both are the
+ * same measured Yoga-build difference, recorded below with everything that was tried, and neither is
+ * above the layout pass.
  *
  * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
  */
 const HELD: Readonly<Record<string, string>> = {
-  // Not phase 3's, and not the painter's either: the two Yoga builds disagree about what a
+  // Not a widget's fault, and not the painter's either: the two Yoga builds disagree about what a
   // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
   // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
   // contributes the child's content, so the same tree comes out one row tall. No `Config` knob in
   // yoga-layout 3.2.1 reproduces it — web defaults, every errata and the web-flex-basis feature were
   // each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the app does:
-  // every viewport it draws is inside a `Panel` or a grown column, where the two agree
-  // (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
+  // every viewport it draws is inside a `Panel` or a grown column, where the two agree.
   'TabPanel: the rows under the tab strip, and nothing for a panel that is not current':
     'a viewport in a parent with no height of its own',
   'is a parent stop: Down enters the panel it is showing, Escape comes back':
@@ -1490,13 +1488,11 @@ describe('every control is a stop', () => {
   }, 30_000)
 
   it.skipIf(owed('types into the field that has the keys, wherever the renderer is drawing its caret'))('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
-    // Spike 1's answer as a regression test, and the sentence the whole phase rests on: an OpenTUI
-    // edit buffer's `handleKeyPress` reads the key and its own suspend trait and nothing else, so the
-    // dispatcher can hand it a key without the renderer having focused it. If that stopped being
-    // true, typing would quietly start depending on the caret mirror agreeing with the store, which
-    // is the two owners this phase removed
-    // (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 1,
-    // ../keys/install.ts § typeInto).
+    // The sentence the typing hand-off rests on, as a regression test: a field's `handleKeyPress`
+    // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
+    // hand it a key without anything else having focused it. If that stopped being true, typing would
+    // quietly start depending on the caret mirror agreeing with the store
+    // (docs/tui.md § The five key groups, ../keys/install.ts § typeInto).
     const typed: string[] = []
     const screen = await renderCells(
       () => (

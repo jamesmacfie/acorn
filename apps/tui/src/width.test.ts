@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GLYPHS } from './kit/glyphs'
 import { clusterWidth, graphemes, sliceToWidth, stringWidth } from './width'
 
-// The corpus is spike 3's, held as the column it chose. Every row here was measured against what
-// OpenTUI actually drew, `string-width`, and `@xterm/headless`
-// (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 3), so a change to the table
-// in `./width.ts` that moves one of these is a change that has to be argued against those three
-// answers rather than against a preference.
+// The corpus is the one that chose the measure in `./width.ts`, held as the column it chose. Every
+// row here was measured against what the old renderer actually drew, `string-width`, and
+// `@xterm/headless`, so a change to the table that moves one of these is a change that has to be
+// argued against those three answers rather than against a preference.
 //
 // No OpenTUI anywhere in this file, so it runs on the Node the repo pins with no flag.
 

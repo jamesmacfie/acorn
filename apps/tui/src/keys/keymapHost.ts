@@ -18,14 +18,6 @@ import type { Renderer } from '../renderer'
 import { keyEvent, type KeyEvent } from '../keyEvent'
 import { focusedRenderable, onFocusMove } from './regions'
 
-/** The host the engine is built from, which is the adapter below and nothing else.
- *
- *  Its own exported function so `./install.ts` reads the same as it did while this file held two of
- *  these, and so the cast lives in one place rather than at the call site. */
-export function tuiKeymapHost(renderer: Renderer): KeymapHost<Renderable, KeyEvent> {
-  return ownKeymapHost(renderer)
-}
-
 // ── The thirteen questions, over our own tree ─────────────────────────────────────────────────
 //
 // The engine is host-agnostic and the adapter is the whole of what it knows about a host, so this is
@@ -57,7 +49,7 @@ const OWN_METADATA: HostMetadata = {
   },
 }
 
-function ownKeymapHost(renderer: Renderer): KeymapHost<Renderable, KeyEvent> {
+export function tuiKeymapHost(renderer: Renderer): KeymapHost<Renderable, KeyEvent> {
   const listen = (event: 'keypress' | 'keyrelease') => (listener: (key: KeyEvent) => void): (() => void) => {
     // Prepended for the reason the OpenTUI adapter prepends: dispatch has to have had its say before
     // anything else on the stream reads the key, which is how a binding claims one (§ typeInto).
