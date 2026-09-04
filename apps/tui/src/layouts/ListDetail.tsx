@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { Panel } from '../panel'
 import { ScrollViewport } from '../kit/scrolling'
@@ -37,7 +37,7 @@ const LIST_COLUMN = 1
 const DETAIL_COLUMN = 2
 
 export function ListDetail(props: LayoutProps) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [width, setWidth] = createSignal(NARROW_AT)
   // Which half the keys are in while narrow. Above 80 cells both are drawn and the switch refuses, so
   // the intent bubbles instead of moving something nobody can see.
@@ -58,7 +58,7 @@ export function ListDetail(props: LayoutProps) {
     <box
       flexDirection="row"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         setWidth(element.width)
         split.attach(element)

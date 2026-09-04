@@ -1,5 +1,6 @@
 import { onCleanup } from 'solid-js'
-import type { KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { keymap, keysFor } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { OVERLAY_OWN, TRAP } from './tiers'
 

@@ -33,10 +33,8 @@ export type Buffer = { cols: number; rows: number; cells: Cell[]; cursor: Cursor
 
 /** The four attributes a role can ask for, as bits.
  *
- *  The values are OpenTUI's, deliberately: `../kit/roles.ts` computes this mask out of
- *  `TextAttributes` today and the goldens hold the numbers it produced, so keeping the bit positions
- *  means the mask needs no translating while both painters run and no golden changes when the kit
- *  stops importing it. The gaps at 4 and 16 are its `ITALIC` and `BLINK`, which no role asks for. */
+ *  The values are the ones every terminal library uses, so a mask read off a frame is the number a
+ *  reader expects. The gaps at 4 and 16 are italic and blink, which no role asks for. */
 export const ATTRS = { bold: 1, dim: 2, underline: 8, inverse: 32 } as const
 
 /** A rectangle that a write may land in, as half-open bounds in absolute screen cells.
@@ -173,8 +171,7 @@ export const sameCell = (one: Cell, two: Cell): boolean =>
 /** The buffer as lines of characters, one string per row.
  *
  *  A continuation marker contributes nothing, so a line is a string of graphemes rather than of
- *  columns — the same shape `../harness.tsx` § frame hands a test, and the shape the phase 0 goldens
- *  hold. */
+ *  columns — the same shape `../harness.tsx` § frame hands a test. */
 export function bufferLines(buffer: Buffer): string[] {
   const lines: string[] = []
   for (let y = 0; y < buffer.rows; y += 1) {

@@ -1,5 +1,5 @@
-/** @jsxImportSource @opentui/solid */
-import type { Renderable, ScrollBoxRenderable } from '@opentui/core'
+/** @jsxImportSource @acorn/tui/jsx */
+import type { Renderable } from '../tree/compat'
 import { createEffect, createSignal, onCleanup, type JSX } from 'solid-js'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
@@ -28,15 +28,17 @@ import type { Node } from '../tree/node'
 /**
  * What this app asks of a viewport.
  *
- * `ownViewport` below installs all four on the node, so the key tables and `./showing.tsx` reach a
- * viewport through this shape rather than through whatever drew it. `scrollTop` and
- * `scrollChildIntoView` go on the node beside these for the two callers that reach a viewport through
- * the tree rather than through this component: the store's reveal, and a pane that windows its own
- * content (../keys/regions.ts § revealInViewports, ./showing.tsx § DiffPane).
+ * `ownViewport` below installs every one of these on the node, so the key tables and `./showing.tsx`
+ * reach a viewport through this shape rather than through whatever drew it. `scrollChildIntoView`
+ * goes on the node beside them for the one caller that reaches a viewport through the tree rather
+ * than through this component, which is the store's reveal
+ * (../keys/regions.ts § revealInViewports, ./showing.tsx § DiffPane).
  */
-type Viewport = {
+export type Viewport = {
   scrollBy: (delta: number, unit?: 'viewport') => void
   scrollTo: (to: number) => void
+  /** Where the offset is now, for a pane that windows its own content against it. */
+  scrollTop: number
   scrollHeight: number
   viewport: { height: number }
 }
@@ -84,7 +86,7 @@ function bindViewportKeys(box: Renderable, view: Viewport, scrolled: () => void)
 type ViewportProps = {
   children: JSX.Element
   visible?: boolean
-  onBox?: (box: ScrollBoxRenderable) => void
+  onBox?: (box: Renderable & Viewport) => void
   /** Called after this viewport moves its own offset, for a caller that windows its content and so
    *  has to know where the offset now is. The wheel does not come through here: it is caught on a box
    *  *around* this one, where it arrives after the offset has moved rather than before
@@ -125,7 +127,7 @@ const descendant = (at: Node, id: unknown): Node | null => {
  * viewport's own height comes from `flexGrow` inside its column, and Yoga resolves a percentage
  * against the height its *grandparent* offered rather than the height the viewport ended up with. So
  * the content came out one row taller than the viewport everywhere, which is a bar on every panel
- * that fits and a row of scroll in every document that does not — the `editor` golden caught it.
+ * that fits and a row of scroll in every document that does not — the `editor` pane's frame caught it.
  *
  * Nothing on the node knows how to scroll. The offset is a signal here and a prop there, so a node
  * cannot be in a scroll state the component disagrees with, and paint reads one number
@@ -185,11 +187,9 @@ function ownViewport(props: ViewportProps): JSX.Element {
 
   // The offset into the node's props, where paint reads it, and a frame to draw the move.
   //
-  // Written from an effect rather than spelled as a JSX attribute for one reason: while the switch
-  // exists, tsc types every intrinsic in this package against OpenTUI's closed prop shapes whichever
-  // painter the build picked, and `offset` is not one of them
-  // (docs/future/terminal-rewrite/phase-2-the-painter.md § The ten-line colour adapter). It lands
-  // where a JSX attribute would land and asks for the frame `setProperty` would have asked for.
+  // Written from an effect rather than spelled as a JSX attribute, which is a leftover of the two
+  // painters and could now be either: it lands where a JSX attribute would land and asks for the
+  // frame `setProperty` would have asked for.
   createEffect(() => {
     const node = box
     if (!node) return
@@ -206,7 +206,7 @@ function ownViewport(props: ViewportProps): JSX.Element {
       minWidth={0}
       minHeight={0}
       visible={props.visible ?? true}
-      ref={(element: ScrollBoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element as unknown as Node
         // Descriptors rather than a spread, or the three getters above would be copied as whatever
         // numbers they answered at mount, which before the first layout is nought.
@@ -214,7 +214,7 @@ function ownViewport(props: ViewportProps): JSX.Element {
         // A thunk rather than the handler itself, because `props.onScroll` is read every time the
         // keys move it rather than once at mount, and a caller is free to hand a different one.
         bindViewportKeys(element, api, () => props.onScroll?.())
-        props.onBox?.(element)
+        props.onBox?.(element as Renderable & Viewport)
       }}
     >
       <box

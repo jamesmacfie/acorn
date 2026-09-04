@@ -35,12 +35,17 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
 const isReactiveRuntime = (id: string) =>
   id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
-// Aliased to something local, so it must not be externalized first: the `external` callback sees the
-// raw specifier and a `true` there wins before `resolve.alias` runs, which left `@solidjs/router` in the
-// output as a bare import of a package this host deliberately does not have
-// (src/kit/router.ts, docs/future/terminal/phase-6-panes-sweep.md).
+// Aliased to something local, and therefore not externalisable — see `externalizeBareImports` below.
+// The `@codemirror`, `@xterm` and `shiki` entries are the packages this host has no way to run and
+// no longer installs; every one of them is matched by a pattern in `resolve.alias`, so the list here
+// and the list there have to say the same thing.
 const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
   || id.startsWith('@acorn/plugin-api/ui')
+  || id === '@codemirror/theme-one-dark'
+  || id.startsWith('@codemirror/lang-') || id.startsWith('@codemirror/legacy-modes')
+  || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
+  || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
+  || id === 'shiki' || id.startsWith('shiki/')
 const externalizeBareImports = (id: string) =>
   !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
 
@@ -74,10 +79,39 @@ export default defineConfig({
       // it to answer with (src/kit/router.ts).
       { find: /^@solidjs\/router$/, replacement: resolve(import.meta.dirname, 'src/kit/router.ts') },
       // Solid's `node` export condition is its server renderer, which has no reactivity. Every
-      // consumer that runs Solid on a real Node process points at the client build instead; OpenTUI's
-      // own Node harness does the same (references/opentui/packages/solid/scripts/solid-transform.ts).
+      // consumer that runs Solid on a real Node process points at the client build instead.
       { find: /^solid-js$/, replacement: 'solid-js/dist/solid.js' },
       { find: /^solid-js\/store$/, replacement: 'solid-js/store/dist/store.js' },
+      // CodeMirror's grammar and highlight-style half, browser xterm.js and its two addons, and
+      // shiki. Three packages' worth of specifiers, three stubs, and one reason for all of them: each
+      // is reached only from a DOM surface this host cannot draw — a CodeMirror `EditorView` in a
+      // `div`, a `<canvas>` terminal in a drawer slot this host does not have, and a highlighter that
+      // answers in hex when the kit answers in the terminal's own sixteen slots.
+      //
+      // They were left externalised while the packages were installed, so the imports resolved and
+      // the surface simply did not draw. Phase 4 dropped the packages, and an unresolved bare import
+      // in a lazily loaded chunk is a crash the moment a reader opens that surface rather than a
+      // surface that quietly cannot draw. So the specifiers are answered here, by stubs that throw
+      // with the host's name on them (src/kit/codemirrorGrammars.ts, src/kit/xterm.ts,
+      // src/kit/shiki.ts, docs/future/terminal-rewrite/phase-4-cut-over.md).
+      //
+      // Patterns rather than one line each, because the grammar and theme sets are open: a language
+      // added to `client-core/src/features/editor/language.ts` or a theme added to
+      // `client-core/src/infra/highlight/langs.ts` must not become a package this host has to install
+      // again.
+      //
+      // Two packages are deliberately NOT matched, and both are the same mistake caught twice.
+      // `@xterm/headless` is the emulator behind the `pty` rectangle (src/kit/rectangle.tsx).
+      // `@codemirror/language` is a dependency of `codemirror`, which the `editor` pane really does
+      // import — so aliasing it by name reaches inside a package this host uses, and under vitest,
+      // where `ssr.noExternal` inlines node_modules too, `basicSetup` then threw and the editor pane
+      // drew nothing. A stub may only stand in front of a specifier no working surface reaches.
+      {
+        find: /^@codemirror\/(?:theme-one-dark|lang-[^/]+|legacy-modes(?:\/.*)?)$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/codemirrorGrammars.ts'),
+      },
+      { find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/, replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts') },
+      { find: /^shiki(?:\/.*)?$/, replacement: resolve(import.meta.dirname, 'src/kit/shiki.ts') },
     ],
   },
   plugins: [solid({ solid: { generate: 'universal', moduleName: RECONCILER } })],
@@ -96,10 +130,6 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'src/main.tsx'),
         capture: resolve(import.meta.dirname, 'src/capture.tsx'),
-        // The golden set, its own entry beside the screenshot for the same reason the screenshot has
-        // one: it is a script Node runs by path, so its name has to be stable
-        // (src/captureGolden.tsx). It goes with the goldens in phase 4.
-        captureGolden: resolve(import.meta.dirname, 'src/captureGolden.tsx'),
         // The plugin sandbox's bootstrap, emitted beside `main.js` because a worker is pointed at it
         // by path and it has to be one file a thread with almost no filesystem can read. Its own
         // entry rather than a chunk, so its name is stable and `workerFactory.ts` can spell it.

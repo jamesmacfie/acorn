@@ -12,7 +12,8 @@
 
 import { createEffect, onCleanup } from 'solid-js'
 import type { Binding, Command } from '@opentui/keymap'
-import type { KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { toKeymapKey } from '@acorn/client-core/kit/keys/keymap.ts'
 import {
   commandAvailable, commandRegistry, commandTitle, executeCommand,

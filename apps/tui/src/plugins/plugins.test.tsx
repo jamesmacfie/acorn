@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

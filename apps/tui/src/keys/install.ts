@@ -22,7 +22,9 @@ import { join } from 'node:path'
 import { onCleanup } from 'solid-js'
 import { Keymap, type TargetMode } from '@opentui/keymap'
 import { registerDefaultKeys, registerEnabledFields, registerMetadataFields } from '@opentui/keymap/addons'
-import type { CliRenderer, KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnRenderer } from '../ownRenderer'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
@@ -267,7 +269,7 @@ const syncTypingShadow = (engine: TuiKeymap): void => {
  * is the shell's and not an intent. Everything else reaches it through the singleton. The teardown is
  * the caller's, which on this host is the process ending.
  */
-export function installKeymap(renderer: CliRenderer): TuiKeymap {
+export function installKeymap(renderer: OwnRenderer): TuiKeymap {
   // Which renderable has the keys is half of installing a keyboard, so the region store's
   // subscription to the renderer's focus event goes on here rather than at each of the three call
   // sites: the app, the shell harness and the kit's own renderer (./regions.ts § The one owner).

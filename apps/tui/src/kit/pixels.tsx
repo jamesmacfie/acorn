@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { Show, type JSX } from 'solid-js'
 import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens/support.ts'
 import { Line, slot } from './cells'

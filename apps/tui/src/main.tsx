@@ -1,13 +1,11 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { parseArgs } from 'node:util'
-import { CliRenderEvents, type CliRenderer } from '@opentui/core'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
 import { COMMAND } from './keys/tiers'
-import { installRenderGuard, RENDERER_LISTENER_CAP } from './renderGuard'
-import { openOwnSurface } from './ownRenderer'
+import { openOwnSurface, type OwnRenderer } from './ownRenderer'
 
 // `acorn`.
 //
@@ -130,7 +128,6 @@ bootMark('App imported')
 // `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
 // the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
-installRenderGuard()
 // The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
 // the cells, and the screen closes first on the way out so the last frame lands while the alternate
 // screen is still ours (./input/terminal.ts § The two halves compose, ./ownRenderer.ts).
@@ -145,13 +142,11 @@ installRenderGuard()
 //
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
-const renderer: CliRenderer = openOwnSurface() as unknown as CliRenderer
+const renderer: OwnRenderer = openOwnSurface()
 bootMark('renderer created')
-// Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
-// number, but it is an on-screen label: it would have to be mounted in the tree and would paint a debug
-// overlay over the shell. The renderer's own first `frame` event is the same moment with nothing drawn
-// over.
-renderer.once(CliRenderEvents.FRAME, () => {
+// Time to first draw: the renderer's own first `frame` event, which is the moment the first cells
+// reached the terminal with nothing drawn over them.
+renderer.once('frame', () => {
   bootMark('first draw')
   void fillIn()
 })
@@ -198,14 +193,6 @@ async function fillIn(): Promise<void> {
   const { initBellNotices } = await import('./kit/bell')
   initBellNotices()
 }
-// A library's log must not cover the screen, and must not be written to it either. OpenTUI's console
-// stays ACTIVE — it replaces `global.console` with one that captures — and hidden. Active because
-// stderr is the file the renderer draws on, so a line written there garbles the shell until the next
-// full repaint; hidden because a debug panel over the workspace is not what a stray log deserves.
-// Nothing is lost: the capture is printed after `renderer.destroy()` with the rest of the held output.
-renderer.console.hide()
-// Every live `scrollbox` subscribes to the renderer's `selection` event (./renderGuard.ts).
-renderer.setMaxListeners(RENDERER_LISTENER_CAP)
 // Node's own warnings never pass through that console. `process.emitWarning` writes to stderr, which
 // is the file the renderer draws on, so one arriving mid-session leaves the shell reading as garbage
 // until the next full repaint. Held while the renderer owns the terminal and printed once it hands it
@@ -222,8 +209,8 @@ process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warnin
 // nothing draws from it. It starts true because unknown counts as focused — a terminal that never
 // answers must not be treated as one nobody is watching (client-core § defaultDeliveryContext).
 let terminalFocused = true
-renderer.on(CliRenderEvents.FOCUS, () => { terminalFocused = true })
-renderer.on(CliRenderEvents.BLUR, () => { terminalFocused = false })
+renderer.on('focus', () => { terminalFocused = true })
+renderer.on('blur', () => { terminalFocused = false })
 setHostFocused(() => terminalFocused)
 
 const engine = installKeymap(renderer)
@@ -235,11 +222,11 @@ async function quit(code = 0): Promise<never> {
   leaving = true
   renderer.destroy()
   // The terminal is ours again, so everything held while the screen was busy can go out: the boot
-  // account, then what this process logged, then a started node's own stderr, then whatever this file
-  // wanted to say, then Node's warnings.
+  // account, then a started node's own stderr, then whatever this file wanted to say, then Node's
+  // warnings. Nothing captures `console` any more — we paint cells to stdout and leave stderr alone —
+  // so a library's log lands on stderr where it always was, and the terminal is handed back before
+  // any of this is printed.
   printBootMarks()
-  const logged = renderer.console.getCachedLogs()
-  if (logged.trim()) console.error(logged)
   for (const line of opened.held ?? []) console.error(`[node] ${line}`)
   for (const line of heldLines) console.error(line)
   for (const warning of heldWarnings) console.error(warning)
@@ -276,7 +263,7 @@ if (opened.starting) {
 
 // The tree mounts on the screen's root node rather than on the surface around it
 // (./tree/renderer.ts § render).
-const target = (renderer as unknown as { root: unknown }).root
+const target = renderer.root
 
 await render(
   () => (

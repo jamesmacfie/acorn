@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { For } from 'solid-js'
 import { Modal, ModalBody } from '../kit/grouping'
 import { Kbd } from '../kit/showing'

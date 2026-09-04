@@ -23,7 +23,7 @@ import { fromVisual, toVisual, type Row } from '../wrap'
 // **Home and End go to the visual line's ends, not the document's**, which is a deliberate departure
 // from `defaultTextareaKeyBindings`, where they are `buffer-home` and `buffer-end` and the line
 // boundaries are on Ctrl+A and Ctrl+E. Both spellings reach the visual line here, because that is
-// what a reader in a wrapped composer means by the key and no golden frame records a cursor press
+// what a reader in a wrapped composer means by the key and no frame here records a cursor press
 // (docs/tui.md § The five key groups).
 
 /** A field's whole state.
@@ -167,7 +167,7 @@ const killLine: Action = (field) =>
 /**
  * Every chord a field answers, keyed the way `chordOf` below spells one.
  *
- * The set is `defaultTextareaKeyBindings` (`@opentui/core` 0.5.9) minus selection and undo, plus the
+ * The set is the old painter's `defaultTextareaKeyBindings` minus selection and undo, plus the
  * Home and End departure the header names. It is written out rather than derived because a reader
  * comparing the two tables should be able to do it by eye, and because these are the keys a reader
  * already has and would notice losing.

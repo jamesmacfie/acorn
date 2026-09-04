@@ -1,6 +1,7 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import type { CliRenderer, Renderable } from '@opentui/core'
+import type { Renderable } from './tree/compat'
+import type { OwnRenderer } from './ownRenderer'
 import { focusedKind, words, activeHints, type FocusedKind } from './chrome/bindings'
 import { renderFixture, type Caret, type Screen } from './harness'
 import {
@@ -104,7 +105,7 @@ const labelOf = (node: Renderable, frame: string): string =>
   (frame.split('\n')[node.y] ?? '').trim() || `${node.constructor.name} at row ${node.y}`
 
 /** The questions, asked after every press. Each throws where it fails, naming the surface. */
-const invariants = (where: string, caret: Caret, frame: string, renderer: CliRenderer): void => {
+const invariants = (where: string, caret: Caret, frame: string, renderer: OwnRenderer): void => {
   // 9. There is one focus value, and it names a node that is really there.
   //
   //    This used to be "the renderer and the store agree about what has the keys", because focus was

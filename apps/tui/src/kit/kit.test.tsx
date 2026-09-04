@@ -1,7 +1,8 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, type JSX } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { TextAttributes, type Renderable } from '@opentui/core'
+import { ATTRS } from '../paint/buffer'
+import type { Renderable } from '../tree/compat'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens/focusRoles.ts'
@@ -893,7 +894,7 @@ describe('the kit in cells', () => {
     // that used to throw — out of `insertNode`, inside a signal write, which aborts the update pass
     // and stops the screen following with nothing to say why.
     //
-    // Every case below is one that reached a reader before `kit/reconciler.ts` answered it in one
+    // Every case below is one that reached a reader before the reconciler patch answered it in one
     // place. They stay together because what is being tested is the boundary, not the six components.
     const [count, setCount] = createSignal(7)
     const cases: [string, () => JSX.Element][] = [
@@ -988,7 +989,7 @@ const lit = (screen: Cells, text: string) => {
   const run = screen.runs().find((entry) => entry.text.includes(text))
   expect(run, `no run containing ${JSON.stringify(text)}`).toBeDefined()
   expect(run!.fg.r).toBeLessThan(run!.fg.g)
-  expect(run!.attributes & TextAttributes.BOLD).toBe(TextAttributes.BOLD)
+  expect(run!.attributes & ATTRS.bold).toBe(ATTRS.bold)
 }
 
 const BEHAVIOURS: Behaviour[] = [
@@ -1609,7 +1610,7 @@ describe('every control is a stop', () => {
       expect(held, 'nothing holds the keys').not.toBe(null)
       expect(held!.isDestroyed).toBe(false)
       // And what holds them can give them up, which is the whole point of not clearing the flag on a
-      // node that has the keys (@opentui/core § Renderable.blur).
+      // node that has the keys (./regions.ts § paintCaret).
       expect(held!.focusable, 'the keys are on a node that cannot be blurred').toBe(true)
     } finally {
       screen.done()

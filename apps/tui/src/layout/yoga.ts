@@ -13,9 +13,9 @@ import { measureField, measureRun } from './measure'
 // The one thing it forbids is `require()` from CommonJS, and nothing in this package requires
 // anything.
 //
-// **Why the same engine OpenTUI uses.** 153 boxes already say `flexDirection`, `flexGrow` and `gap`,
-// and OpenTUI lays them out with Yoga. Using the same engine is what makes the golden frames from
-// phase 0 match cell for cell and the eight layouts port without redesign. Speed is not the reason
+// **Why the same engine the old painter used.** 153 boxes already say `flexDirection`, `flexGrow`
+// and `gap`, and the old painter laid them out with Yoga. Using the same engine is what let the
+// frames it drew be compared cell for cell against ours, and the eight layouts port without redesign. Speed is not the reason
 // and not a worry: a 1,708-node list-detail lays out in 0.19 ms warm and 1.9 ms with every row
 // changed, against a 5 ms budget.
 //

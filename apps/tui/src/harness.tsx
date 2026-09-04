@@ -1,5 +1,5 @@
-/** @jsxImportSource @opentui/solid */
-import type { CliRenderer } from '@opentui/core'
+/** @jsxImportSource @acorn/tui/jsx */
+import type { OwnRenderer } from './ownRenderer'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
 import { _resetRequests, stubTransport, TASK } from './fixture'
@@ -66,7 +66,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *  `width` is not `text.length`. `captureCharFrame` gives us one character per grapheme, so a frame
  *  held as characters alone cannot see a column shift at all — `你|` comes back with the bar at index
  *  1 whether the wide character drew in one cell or two. The run frame is the only place the column
- *  count survives, which is why the golden capture reads it and why it must not be dropped again
+ *  count survives, which is why a test that cares about width reads spans rather than characters
  *  (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 3). */
 export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number; width: number }
 
@@ -86,7 +86,7 @@ export type Screen = {
   /** The renderer, for the questions the store does not answer: the tree a case wants to count nodes
    *  in, and the console a capture sends away before it takes its frame (./diffLong.test.tsx,
    *  ./keys/keys.test.tsx). */
-  renderer: CliRenderer
+  renderer: OwnRenderer
   done: () => void
 }
 
@@ -101,7 +101,7 @@ type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: bool
  * (docs/future/terminal-rewrite/architecture.md § 7).
  */
 type Surface = {
-  renderer: CliRenderer
+  renderer: OwnRenderer
   /** Resolve once the render loop has nothing left to do. */
   flush: () => Promise<unknown>
   captureCharFrame: () => string
@@ -118,7 +118,7 @@ type Surface = {
 function openSurface(size: { width: number; height: number }): Surface {
   const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
   return {
-    renderer: renderer as unknown as CliRenderer,
+    renderer: renderer as unknown as OwnRenderer,
     // Turn the event loop until the tree stops asking for frames, then draw once.
     //
     // A wait rather than a draw, because the scheduler draws by itself: an operation on the tree asks
@@ -139,13 +139,13 @@ function openSurface(size: { width: number; height: number }): Surface {
       await framesSettled()
       renderer.frame()
     },
-    // A trailing newline, because that is the shape the other painter's capture has and the shape the
-    // phase 0 goldens hold: 24 rows and an empty twenty-fifth after the split.
+    // A trailing newline: 24 rows and an empty twenty-fifth after the split, which is the shape every
+    // test that splits a frame on newlines is written against.
     captureCharFrame: () => `${renderer.screen.lines().join('\n')}\n`,
     captureSpans: () => renderer.screen.runs().map((line) => line.map((run) => ({
       text: run.text,
-      // As the `{ r, g, b }` triple in 0 to 1 the goldens hold, so a comparison is about which slot a
-      // role chose rather than about two spellings of one grey (./colourCompat.ts § rgbOf).
+      // As the `{ r, g, b }` triple in nought to one, so a comparison is about which slot a role
+      // chose rather than about two spellings of one grey (./colourCompat.ts § rgbOf).
       fg: rgbOf(run.fg),
       attributes: run.attrs,
       width: run.width,
@@ -191,7 +191,6 @@ export async function renderFixture(size: {
 } = {}): Promise<Screen> {
   const { render } = await import('./tree/renderer')
   const { installKeymap } = await import('./keys/install')
-  const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('./renderGuard')
   const { _resetCollections } = await import('./keys/collection')
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
@@ -270,7 +269,6 @@ export async function renderFixture(size: {
   // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
   // their layer as they draw, and a layer registered against no engine is silently dropped.
-  installRenderGuard()
   // Whatever the last render left behind. A test that fails an assertion before its `done()` never
   // tears its renderer down, so the Solid root stays mounted, its `onCleanup` never runs, and the
   // next render in the same worker throws "command contribution already registered" from the shell's
@@ -281,7 +279,6 @@ export async function renderFixture(size: {
   const height = size.height ?? 24
   const surface = openSurface({ width, height })
   const { renderer, flush, captureCharFrame, captureSpans, resize } = surface
-  renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)
   let quits = 0
   // The same client the shell reads in production: one per node, built by client-core's fleet

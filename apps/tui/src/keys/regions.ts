@@ -31,41 +31,31 @@
 // The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
 
 import { createSignal, onCleanup } from 'solid-js'
-import {
-  InputRenderable, MouseButton, ScrollBoxRenderable, TextareaRenderable,
-  type CliRenderer, type MouseEvent, type Renderable,
-} from '@opentui/core'
-import { isRemoved } from '../tree/compat'
+import { isRemoved, type Renderable } from '../tree/compat'
+import type { Press } from '../tree/hit'
+import type { OwnRenderer } from '../ownRenderer'
 
 export type RegionRef = { paneId: string; regionId: string }
 
 /** Is this a scroll viewport?
  *
- *  `instanceof` answers under the painter we are leaving. Under ours a node is a plain object with a
- *  `kind`, and no shim can be an instance of somebody else's class, so the question is asked by name
- *  as well (../tree/compat.ts). Phase 4 leaves the second half.
+ *  By `kind`, because a node here is a plain object and there is no class to be an instance of
+ *  (../tree/compat.ts).
  *
  *  Exported for the footer, which has to say `scroll` rather than `move` for the one stop that
- *  scrolls, and which asked the same question with the same `instanceof`
- *  (../chrome/bindings.ts § focusedKind). */
-export const isViewport = (node: Renderable): node is ScrollBoxRenderable =>
-  node instanceof ScrollBoxRenderable || (node as unknown as { kind?: string }).kind === 'scrollbox'
+ *  scrolls (../chrome/bindings.ts § focusedKind). */
+export const isViewport = (node: Renderable): boolean => node.kind === 'scrollbox'
 
 /** Is this a field somebody types into?
  *
- *  The same shape as `isViewport` above and for the same reason, and this one is the reason nothing
- *  typed under our painter at all: `../keys/install.ts § isTypingTarget` was two `instanceof`s, so the
- *  typing shadow never went up, the bare keys stayed bound to the collection around the field, and the
- *  hand-off had nothing it recognised to hand a key to.
+ *  By `kind` for the same reason `isViewport` is, and this one is the reason nothing typed under our
+ *  painter at first: `../keys/install.ts § isTypingTarget` asked two `instanceof`s of a plain object,
+ *  so the typing shadow never went up, the bare keys stayed bound to the collection around the field,
+ *  and the hand-off had nothing it recognised to hand a key to.
  *
  *  Exported for its two askers, which are the dispatcher's hand-off and the footer's row of words —
- *  both of which had their own copy of the pair (`../chrome/bindings.ts § focusedKind`). Phase 4
- *  leaves the second half. */
-export const isField = (node: Renderable): node is InputRenderable | TextareaRenderable => {
-  if (node instanceof InputRenderable || node instanceof TextareaRenderable) return true
-  const kind = (node as unknown as { kind?: string }).kind
-  return kind === 'input' || kind === 'textarea'
-}
+ *  both of which had their own copy of the pair (`../chrome/bindings.ts § focusedKind`). */
+export const isField = (node: Renderable): boolean => node.kind === 'input' || node.kind === 'textarea'
 
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
  *  is the one: the column at the far left is the chrome's and has no pane behind it, which is what
@@ -191,7 +181,7 @@ export const focusedRenderable = focusedNode
  * hidden box goes on reporting `visible: true` about itself, and two things here hide a whole subtree
  * rather than unmounting it: the shell's main row behind an overlay, and the `TabPanel` that is not
  * showing. Asking the node alone said the keys were fine while they sat behind a dialog
- * (../chrome/Shell.tsx, ../kit/grouping.tsx, @opentui/core § Renderable.visible).
+ * (../chrome/Shell.tsx, ../kit/grouping.tsx, ../tree/compat.ts § visible).
  *
  * The end of the walk is the fourth question and it is our painter's. Nothing is destroyed there —
  * that is the fault class it exists to end — so `isDestroyed` cannot answer "Solid took this away",
@@ -353,7 +343,7 @@ export function pushScope(box: Renderable): () => void {
     // still telling the truth of the last render: the reconciler defers destruction to
     // `process.nextTick` for Suspense's sake, so the pass below would find a dying dialog attached,
     // visible, and, its own scope gone, inside the screen's, and would leave the keys on it
-    // (../kit/reconciler.ts, docs/tui.md § Destroy on disposal).
+    // (docs/tui.md § Destroy on disposal).
     const at = focusedNode()
     if (at && within(box, at)) setFocus(null)
     scheduleSettle()
@@ -567,14 +557,9 @@ export const onFocusMove = (listener: (node: Renderable | null) => void): (() =>
 /**
  * Draw the caret, which is the one thing about focus the renderer still owns.
  *
- * `EditBufferRenderable.renderCursor` returns without drawing unless the renderer has focused the
- * node, so an `Input` this store has handed the keys to would draw its text and no caret. This is
- * the one mirror, it is paint state, and nothing reads it back.
- *
- * `CliRenderer.focusRenderable` blurs whatever it displaces, so one caret costs one call; the blur
- * is the other direction, the keys going nowhere. Both refuse a node whose `focusable` flag has
- * gone, which costs nothing, since the landing rule is about to take the keys off it anyway
- * (@opentui/core § Renderable.focus, ./stops.ts § pressable).
+ * A field asks this store whether it has the keys and writes the answer into its own props, where
+ * paint reads it, so these two are no-ops on our nodes and the mirror is one-way: nothing here holds
+ * focus state for the store to disagree with (../tree/compat.ts, ../kit/asking.tsx § ownInput).
  */
 const paintCaret = (previous: Renderable | null, node: Renderable | null): void => {
   if (node) node.focus()
@@ -633,18 +618,13 @@ const setFocus = (node: Renderable | null): void => {
 // So the reveal runs on the renderer's `frame`, which is the side of layout where the numbers are
 // real, and that is the whole of it under our painter: a frame there is layout, then this, then
 // paint, so one reveal reads the geometry of the frame the reader is about to see. Under the old
-// painter it runs twice, once synchronously in `setFocus` and once here, because there a `frame` is
-// the render loop's and a store under a test renderer's `flush()` may never see one — phase 1 took
-// the synchronous half out on the grounds that the settle pass would do it, and the pass is a
-// microtask, so it read the same stale numbers. `../kit/scrolling.test.tsx § reveals the caret in a
-// list that has only just mounted` is the case that pins both halves
-// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md). Phase 4 deletes the branch with the
-// painter.
+// painter it ran twice, once synchronously in `setFocus` and once here.
+// `../kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted` is the case
+// that pins it.
 //
 // One renderer listener for the whole store rather than one per viewport, which is what the design
-// first asked for. Every live `scrollbox` already carries a `selection` listener and a pull request
-// draws enough of them that `RENDERER_LISTENER_CAP` is 200; one more each would double that count to
-// do the same work this does once (../renderGuard.ts).
+// first asked for: a pull request draws enough viewports that one listener each is a crowd, and they
+// would all be doing the work this does once.
 
 /** The node the post-layout reveal still owes a scroll to. One slot and not a queue: the reveal is
  *  about where the keys are now, and where they were two frames ago is nobody's question. */
@@ -653,10 +633,9 @@ let pendingReveal: Renderable | null = null
 // ── Clicks are hit tests ──────────────────────────────────────────────────────────────────────
 //
 // The renderer resolves which renderable the pointer was over; what that means is the store's. It
-// used to be the renderer's too — `dispatchMouseEvent` walks up from the hit renderable and focuses
-// the first focusable ancestor, and `autoFocus` defaults to true — which is a second opinion about
-// focus for exactly the case this module exists to have one answer to. So the flag is off wherever a
-// renderer is built, in ../main.tsx and in both harnesses, and this replaces it.
+// used to be the renderer's too — the old painter walked up from the hit renderable and focused the
+// first focusable ancestor by itself — which is a second opinion about focus for exactly the case
+// this module exists to have one answer to. `../tree/hit.ts` hits and this decides.
 //
 // A click focuses a clicked stop and scrolls, and does nothing else, which is the pointer rule this
 // host already states (docs/tui.md § What the TUI never does). Pressing what was clicked stays the
@@ -667,8 +646,11 @@ let pendingReveal: Renderable | null = null
  *  `reachable` is the whole of "is this a stop": a stop, a collection row, a region's frame and a
  *  scope's box are the focusable things in the tree and nothing else is. It answers for the top scope
  *  too, so a click behind an open dialog reaches nothing rather than past it (§ Scopes). */
-const focusClicked = (event: MouseEvent): void => {
-  if (event.button !== MouseButton.LEFT) return
+/** The left button, as `../tree/hit.ts` numbers one. */
+const LEFT_BUTTON = 0
+
+const focusClicked = (event: Press): void => {
+  if (event.button !== LEFT_BUTTON) return
   for (let at: Renderable | null = event.target; at; at = at.parent) {
     step()
     // Through a name of its own, because `reachable` is a type guard and narrowing the cursor of the
@@ -685,7 +667,7 @@ let detach = (): void => {}
 /** Point the store at a renderer: where a click landed, and the frame the reveal waits for.
  *  Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and where
  *  the keys are is half of it (./install.ts). */
-export function installRegions(renderer: CliRenderer): void {
+export function installRegions(renderer: OwnRenderer): void {
   detach()
   // And whatever the last renderer's keymap and typing shadow left listening here: an engine is
   // built per renderer and tears nothing down itself (§ onFocusMove).
@@ -700,8 +682,8 @@ export function installRegions(renderer: CliRenderer): void {
   const afterFrame = (): void => {
     const node = pendingReveal
     pendingReveal = null
-    // Still there and still holding the keys. A frame later either can be false: the reconciler
-    // destroys a removed renderable on `process.nextTick`, and a landing may have moved on.
+    // Still there and still holding the keys. A frame later either can be false: a landing may have
+    // moved on, and a node Solid removed is off the screen whatever it still points at.
     if (!node || node.isDestroyed || focusedNode() !== node) return
     revealInViewports(node)
   }
@@ -1174,7 +1156,7 @@ let settleQueued = false
  * A tree to read is the whole of what it buys. It orders nothing against the reconciler's
  * `process.nextTick` destruction, which is Suspense's and stays Suspense's: nothing here depends on a
  * corpse still reporting itself live, `pushScope`'s pop takes the keys out of a box that is going,
- * and the keys going nowhere asks for a pass of its own (§ The one owner, ../kit/reconciler.ts).
+ * and the keys going nowhere asks for a pass of its own (§ The one owner).
  */
 export function scheduleSettle(): void {
   if (settleQueued) return

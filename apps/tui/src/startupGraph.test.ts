@@ -67,10 +67,10 @@ describe('check-startup-graph', () => {
 
   it('fails over the byte ceiling', () => {
     chunk('App-aaaa.js', `import "./big-bbbb.js";\n`)
-    chunk('big-bbbb.js', 'x'.repeat(1_200_000))
+    chunk('big-bbbb.js', 'x'.repeat(1_500_000))
     const { code, output } = run(dist)
     expect(code).toBe(1)
-    expect(output).toContain('over its 870000B ceiling')
+    expect(output).toContain('over its 995000B ceiling')
   })
 
   it('refuses to guess when there is no single App chunk to walk from', () => {

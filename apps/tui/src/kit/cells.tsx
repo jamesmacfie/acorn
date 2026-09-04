@@ -1,9 +1,8 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { borderCell, styled, textStyle } from './roles'
 import { slotColor } from '../appearance'
-import { paintColor } from '../colourCompat'
 import { sliceToWidth, stringWidth } from '../width'
 
 // The three things every component in this package needs, and the reason each exists.
@@ -86,15 +85,13 @@ export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; chil
  *
  *  Only for a caller that owns the `text` around it. Everything else uses `Line`.
  *
- *  Both shapes of one answer, because the two painters read a span's colour in different places. Ours
- *  reads the props, the same ones a `text` takes. The old one ignores every prop on a text node but
- *  `href` and `style` and reads the colour and the attributes out of that one object as booleans, so a
- *  span given only props drew in its parent's colour — which was white, on a white terminal, on every
- *  line of every diff. Saying it twice is what keeps one component source drawing the same cells under
- *  both, and phase 4 drops the `style` half (./roles.ts § textStyle). */
+ *  A span takes the same props a `text` does, because it is the same thing at a different size, and
+ *  paint reads its colour off them (./roles.ts § textStyle). It used to have to be said twice — the
+ *  old painter ignored every prop on a text node but `href` and `style` — and a span given only props
+ *  drew in its parent's colour, which was white, on a white terminal, on every line of every diff. */
 export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
-  return <span {...run().style} style={run().style}>{run().text}</span>
+  return <span {...run().style}>{run().text}</span>
 }
 
 /** A divider between two regions, along the axis it separates: a line across for `x`, a column of
@@ -108,7 +105,7 @@ export function Rule(props: { axis?: 'x' | 'y' }) {
   const vertical = () => props.axis === 'y'
   return (
     <Show when={borderCell('divider').glyph}>
-      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={paintColor(slotColor('default'))} flexShrink={0} />
+      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={slotColor('default')} flexShrink={0} />
     </Show>
   )
 }

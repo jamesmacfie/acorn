@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
 
@@ -45,8 +45,7 @@ describe('a browse list longer than its panel', () => {
 
       // Then walk it. Each move loads a different pull into the main panel. The 'destroyed' filter
       // below is a canary from the era when a re-suspending boundary destroyed its own subtree
-      // (./kit/reconciler.ts § Destroy on disposal; ./browseSlow.test.tsx is the test that reaches
-      // that shape on purpose) — kept because it is one line and it catches a regression for free.
+      // (./browseSlow.test.tsx is the test that reaches that shape on purpose) — kept because it is one line and it catches a regression for free.
       const logged: string[] = []
       const [error, warn] = [console.error, console.warn]
       console.error = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }

@@ -142,10 +142,9 @@ describe('the store is the only owner of focus', () => {
 //
 // The four folders are the tree Solid mutates, the Yoga pass over it, the cell buffer and the input
 // parser, and the whole point of the programme is that none of them is a wrapper around somebody
-// else's renderer. An import that crept back in would be a dependency phase 4 could not delete and a
-// runtime floor it could not lower, and it would not fail anything else: the package still has
-// `@opentui/core` in it, so the import would resolve and the tests would pass
-// (docs/future/terminal-rewrite/phase-2-the-painter.md § Done when).
+// else's renderer. The keymap engine is still a dependency of this package, so an import of it here
+// would resolve and nothing else would notice — which is what this rule is for now that the painter
+// packages are gone (docs/future/terminal-rewrite/phase-4-cut-over.md).
 describe('the new painter is ours', () => {
   it('reaches for nothing from @opentui anywhere under tree, layout, paint or input', () => {
     const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) => filesIn(join(ROOT, folder))

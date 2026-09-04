@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { createKeySplit } from './split'
 import { Panel } from '../panel'
@@ -33,7 +33,7 @@ const MAX_DOCUMENT_FRACTION = 0.7
 const SECOND_COLUMN = 2
 
 const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [extent, setExtent] = createSignal(0)
   const split = createKeySplit({
     stateKey: props.stateKey,
@@ -45,13 +45,13 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
     // ceiling to apply, which is the honest answer: the floor still holds.
     ceiling: () => Math.floor(extent() * MAX_DOCUMENT_FRACTION),
   })
-  const measure = (element: BoxRenderable) => setExtent(axis === 'x' ? element.width : element.height)
+  const measure = (element: Renderable) => setExtent(axis === 'x' ? element.width : element.height)
 
   return (
     <box
       flexDirection={axis === 'x' ? 'row' : 'column'}
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         measure(element)
         split.attach(element)

@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { Line, ellipsise } from '../kit/cells'
 import { enteredRectangle } from '../kit/rectangle'
@@ -24,7 +24,7 @@ import { nodeSentence, nodeStarting } from './nodeState'
 const ENTERED = 'esc leave · esc esc send escape'
 
 export function Footer(props: { nodeId: string }) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [width, setWidth] = createSignal(80)
   const state = () => nodeState(props.nodeId)
   const sentence = () => nodeSentence(state())
@@ -42,7 +42,7 @@ export function Footer(props: { nodeId: string }) {
       flexDirection="row"
       gap={1}
       flexShrink={0}
-      ref={(element: BoxRenderable) => { box = element; setWidth(element.width) }}
+      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
       onSizeChange={() => setWidth(box?.width ?? 80)}
     >
       <Line role="muted">{hints()}</Line>

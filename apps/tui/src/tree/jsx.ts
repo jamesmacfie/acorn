@@ -1,7 +1,7 @@
 import type { JSX as SolidJSX } from 'solid-js'
 import type { Color } from '../colour'
+import type { Renderable } from './compat'
 import type { Wheel } from './hit'
-import type { Node } from './node'
 
 // What the intrinsics take, for tsc's benefit.
 //
@@ -14,9 +14,7 @@ import type { Node } from './node'
 //
 // The colour props take `../colour.ts`'s three answers and nothing else: the terminal's own colour,
 // one of its sixteen slots, or a 24-bit triple. This module does not decide what a colour is, it just
-// says which type carries one — and while the old painter still runs, `../kit/roles.ts` is still
-// handing these props OpenTUI's `RGBA`, which paint reads as `default`. The slice that rewrites
-// `../appearance.ts` is what starts filling them in.
+// says which type carries one.
 
 /** Cells, a percentage of the parent, or whatever the content asks for. */
 type Extent = number | `${number}%` | 'auto'
@@ -62,7 +60,7 @@ export type FlexProps = {
 type Scroll = Wheel
 
 export type BoxProps = FlexProps & {
-  ref?: Ref<Node>
+  ref?: Ref<Renderable>
   /** `true` is every side; an array is the sides a `Rule` asks for. Costs a cell of layout where it
    *  draws, which is why it is Yoga's business as well as paint's. */
   border?: boolean | readonly ('top' | 'right' | 'bottom' | 'left')[]
@@ -82,7 +80,7 @@ export type BoxProps = FlexProps & {
 
 /** A run of text. `wrapMode` is an input to the measure function rather than a Yoga style. */
 export type TextProps = FlexProps & {
-  ref?: Ref<Node>
+  ref?: Ref<Renderable>
   wrapMode?: 'word' | 'none'
   fg?: Color
   /** The bold, dim, underline and inverse bits as one mask, which is what `../kit/roles.ts` computes. */
@@ -98,7 +96,7 @@ export type TextProps = FlexProps & {
 export type SpanProps = TextProps
 
 export type ScrollBoxProps = FlexProps & {
-  ref?: Ref<Node>
+  ref?: Ref<Renderable>
   /** How many rows the viewport has scrolled its content by. The component owns the number and this
    *  is where paint and the read-back read it (../kit/scrolling.tsx, ../layout/pass.ts). */
   offset?: number
@@ -114,7 +112,7 @@ export type ScrollBoxProps = FlexProps & {
 /** The two editable widgets and the PTY rectangle, whose content props phase 3 owns. To layout they
  *  are boxes, which is all this slice needs them to be. */
 export type InputProps = FlexProps & {
-  ref?: Ref<Node>
+  ref?: Ref<Renderable>
   value?: string
   placeholder?: string
   textColor?: Color
@@ -124,7 +122,7 @@ export type InputProps = FlexProps & {
 }
 
 export type TextareaProps = FlexProps & {
-  ref?: Ref<Node>
+  ref?: Ref<Renderable>
   initialValue?: string
   placeholder?: string
   textColor?: Color
@@ -132,7 +130,7 @@ export type TextareaProps = FlexProps & {
   onContentChange?: (value: string) => void
 }
 
-export type PtyProps = FlexProps & { ref?: Ref<Node> }
+export type PtyProps = FlexProps & { ref?: Ref<Renderable> }
 
 export namespace JSX {
   export type Element = SolidJSX.Element

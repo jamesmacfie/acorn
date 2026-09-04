@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { Lines } from './showing'
 import { htmlLines } from './markdown'

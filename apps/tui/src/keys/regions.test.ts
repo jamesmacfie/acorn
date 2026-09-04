@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemo, createRoot, getOwner, onCleanup, runWithOwner, type Owner } from 'solid-js'
-import type { CliRenderer, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnRenderer } from '../ownRenderer'
 import {
   _resetRegions, activationEntersMain, focusRenderable, focusedInScope, focusedRenderable,
   installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
@@ -61,9 +62,8 @@ const fakeRenderer = () => {
   }
 }
 
-/** A left mouse-down as the store sees it: the renderable the renderer resolved, and the button.
- *  `dispatchMouseEvent` bubbles the real thing up to the root carrying exactly this much
- *  (@opentui/core § CliRenderer.dispatchMouseEvent). */
+/** A left mouse-down as the store sees it: the node the hit test resolved, and the button. That is
+ *  exactly what reaches the root's own handler (`../tree/hit.ts § pressAt`). */
 type FakeClick = { type: 'down'; button: number; target: Renderable | null }
 
 let renderer = fakeRenderer()
@@ -137,7 +137,7 @@ const opened = (box: Renderable): (() => void) => {
  * Unmounting is two things a turn apart, and the fake keeps them apart on purpose: Solid disposes the
  * reactive scope now, and the reconciler destroys the renderable on `process.nextTick`. So the
  * cleanups run while the row still reports itself live, which is the state the pass has to survive
- * without depending on (../kit/reconciler.ts, ./regions.ts § scheduleSettle).
+ * without depending on (./regions.ts § scheduleSettle).
  */
 const row = (parent: Renderable, children: Renderable[], identity?: string): (() => void) => {
   const box = item()
@@ -167,7 +167,7 @@ const fresh = (): void => {
   dispose()
   _resetRegions()
   renderer = fakeRenderer()
-  installRegions(renderer as unknown as CliRenderer)
+  installRegions(renderer as unknown as OwnRenderer)
   createRoot((stop) => { dispose = stop; owner = getOwner() })
 }
 
@@ -917,7 +917,7 @@ describe('a key press costs the depth of the tree', () => {
       // And the same move in a region with ten times the rows costs the same, which is the property
       // the number alone cannot state.
       _resetRegions()
-      installRegions(renderer as unknown as CliRenderer)
+      installRegions(renderer as unknown as OwnRenderer)
       const wide = deepRegion(2000, 3)
       focusRenderable(wide.button)
       walkSteps.reset()

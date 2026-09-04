@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
 import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { StatusDot } from '../kit/showing'

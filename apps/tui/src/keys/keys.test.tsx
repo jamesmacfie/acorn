@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
@@ -194,16 +194,17 @@ describe('keys and focus in cells', () => {
       // Anti-vacuity: the dialog is real and its choices answer their own arrows.
       await screen.press('j')
       expect(caretLine((await screen.frame()).split('\n'))).toContain("Don't run it")
-      const before = screen.renderer.currentFocusedRenderable
+      const before = focusedRenderable()
       const region = focusedRegion()
 
-      // Both halves are asserted, because the renderer used to recover and that is what made this
-      // hard to see. The walk moved the keys onto a rail row behind the dialog and the next landing,
-      // which a query arriving supplies sooner or later, handed them back. What never recovered is
-      // the store's idea of which region has them, so the region had silently moved to the rail while
-      // the keys were in the dialog.
+      // Both halves are asserted, because the keys used to recover and that is what made this hard
+      // to see. The walk moved them onto a rail row behind the dialog and the next landing, which a
+      // query arriving supplies sooner or later, handed them back. What never recovered is the
+      // store's idea of which region has them, so the region had silently moved to the rail while
+      // the keys were in the dialog. Both halves are the store's own now: there is one focus value
+      // and this reads it (./regions.ts § The one owner).
       await screen.press('TAB')
-      expect(screen.renderer.currentFocusedRenderable).toBe(before)
+      expect(focusedRenderable()).toBe(before)
       expect(focusedRegion()).toEqual(region)
 
       // And the footer never offers the key that did this. It reads the store's count of regions in
@@ -223,11 +224,11 @@ describe('keys and focus in cells', () => {
       await screen.press('q')
       const up = await screen.until('Quit and stop the node')
       expect(up).toContain('Quit and stop the node')
-      const before = screen.renderer.currentFocusedRenderable
+      const before = focusedRenderable()
       const region = focusedRegion()
 
       await screen.press('TAB')
-      expect(screen.renderer.currentFocusedRenderable).toBe(before)
+      expect(focusedRenderable()).toBe(before)
       expect(focusedRegion()).toEqual(region)
       expect(activeHints().map((hint) => hint.keys)).not.toContain('tab')
     } finally {
@@ -249,9 +250,9 @@ describe('keys and focus in cells', () => {
       await screen.press('b', { ctrl: true })
       await screen.frame()
 
-      const before = screen.renderer.currentFocusedRenderable
+      const before = focusedRenderable()
       await screen.press('TAB')
-      const moved = screen.renderer.currentFocusedRenderable !== before
+      const moved = focusedRenderable() !== before
       const offered = activeHints().some((hint) => hint.keys === 'tab')
       expect(moved || !offered, 'the footer offers tab and tab does nothing').toBe(true)
     } finally {

@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createComponent } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { bootFixture } from './harness'

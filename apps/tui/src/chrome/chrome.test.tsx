@@ -1,10 +1,11 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { createRoot, createSignal } from 'solid-js'
-import type { KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'

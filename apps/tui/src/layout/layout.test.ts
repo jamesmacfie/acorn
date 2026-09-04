@@ -53,7 +53,7 @@ describe('the prop table', () => {
 
   it('maps the flex props the kit actually spends onto Yoga', () => {
     // The twenty-one with a setter, spelled out, so a rename of one of Yoga's setters fails here
-    // rather than in a golden frame.
+    // rather than in a whole frame.
     const box = createElement('box')
     setProperty(box, 'flexDirection', 'row')
     setProperty(box, 'flexGrow', 1)
@@ -130,7 +130,7 @@ describe('the layout read-back', () => {
   })
 
   it('clamps the rectangle of a node that joined the tree after the pass', () => {
-    // This is what `../renderGuard.ts` guarded, moved to the one place a rectangle is read. The fault
+    // This is what the old render guard guarded, moved to the one place a rectangle is read. The fault
     // is Yoga's rather than OpenTUI's: an unmeasured node's computed width and height are `NaN`, and
     // it survives the move to wasm unchanged.
     const box = root(40, 10)

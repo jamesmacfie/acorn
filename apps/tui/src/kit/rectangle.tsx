@@ -1,7 +1,8 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createRequire } from 'node:module'
 import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
-import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import type { Terminal as HeadlessTerminal } from '@xterm/headless'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusRenderable, focusWithin, focusedRenderable, onScreen } from '../keys/regions'
@@ -130,7 +131,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   // only half worth storing: the other half is the box's own focus, which the store owns
   // (§ entered).
   const [armed, setArmed] = createSignal(false)
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   let inside: Inside | undefined
   let leftAt = 0
   const dataListeners: ((bytes: Uint8Array) => void)[] = []
@@ -318,7 +319,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
 
   return (
     <box
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         element.focusable = true
         ;(element as unknown as { handlePaste?: (event: { text: string }) => void }).handlePaste = pasted

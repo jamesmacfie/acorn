@@ -21,20 +21,31 @@ const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])
 
-// Measured at 841,142 B on 2026-09-03, and rounded up by about 3% so an unrelated comment does not
-// turn the build red. The history, because each step moved it for a different reason
-// (docs/performance.md):
+// Measured at 963,998 B on 2026-09-04, and rounded up by about 3% so an unrelated comment does not
+// turn the build red — the same rule every ceiling here has had. The history, because each step moved
+// it for a different reason (docs/performance.md, docs/future/terminal-rewrite/phase-4-cut-over.md):
 //
-//   1,114,282 B  phase 0's first measurement
-//   1,024,422 B  phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this host
-//                holds was never in the graph at all — `../src/plugins/RemoteTree.tsx` is lazy already.
-//     841,142 B  phase 4 moved the twelve-plugin roster out of `../src/App.tsx` into
-//                `../src/roster.ts`, which `../src/main.tsx` imports after the first frame.
+//   1,114,282 B  the performance programme's phase 0, its first measurement.
+//   1,024,422 B  its phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this
+//                host holds was never in the graph at all — `../src/plugins/RemoteTree.tsx` is lazy.
+//     841,142 B  its phase 4 moved the twelve-plugin roster out of `../src/App.tsx` into
+//                `../src/roster.ts`, which `../src/main.tsx` imports after the first frame. The
+//                ceiling was set at 870,000 B here.
+//     875,265 B  and then the graph drifted past it. The check had been red for a while before the
+//                terminal rewrite started, which is why "lower the ceiling" turned out to be
+//                "raise it honestly".
+//     963,998 B  the terminal rewrite. The painter is ours now, so it is in this bundle instead of
+//                being a 6 MB native library outside it: `ownRenderer`, `renderer` and `ownKeys`
+//                together are 97,889 B of the closure, and that is nearly the whole of the rise.
 //
-// What is left is the chrome and the client-core it draws with, which is what the first frame is made
-// of. There is no registry in it and nothing here is waiting to be made lazy: the next honest saving
-// is a smaller kit, not a later import.
-const CEILING = 870_000
+// Dropping dead dependencies moved none of this and was never going to. Every bare import is left to
+// the runtime by `../vite.config.ts`, so a package that is only ever imported weighs nothing here
+// whether it is installed or not; what this counts is built chunk bytes.
+//
+// What is left is the chrome, the client-core it draws with, and the painter, which is what the first
+// frame is made of. There is no registry in it and nothing here is waiting to be made lazy: the next
+// honest saving is a smaller kit, not a later import.
+const CEILING = 995_000
 
 // The same list the desktop's check holds, for the same reason: a chunk with one of these names in a
 // startup graph is a lazy surface that leaked into the eager one. Written twice rather than shared,

@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
 import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { commandRegistry } from '@acorn/client-core/host/registries/commands/commands.ts'

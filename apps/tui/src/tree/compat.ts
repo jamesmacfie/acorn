@@ -1,28 +1,69 @@
+// The one type this folder takes from above it, and it is erased at build: the widget hooks below
+// are the seam between the tree and the components, so the vocabulary they speak is the kit's.
+import type { Press as KeyPress } from '../kit/field'
+import type { Press as MousePress } from './hit'
 import { isFieldKind, laysOut, type Kind, type Node } from './node'
 
-// The `Renderable`-shaped view of a node, and the whole reason it exists is that the region store is
-// still typed on OpenTUI's tree.
+// A node as everything above the painter reads one: the region store, the key layers, and every
+// component that takes a `ref`.
 //
 // `../keys/regions.ts` is 1,071 lines that walk `parent`, read `visible`, `isDestroyed` and
-// `focusable` and a rectangle off a node, and index a node among `getChildren()`. None of that is OpenTUI's Zig
-// half — it is a tree walk over whatever the components handed it through a `ref` — so the cheapest
-// way to run the store over our nodes is to answer those names. Phase 4 rewrites the store against
-// `Node` directly and deletes this file; a rewrite now would be the same work done twice, against a
-// painter nothing yet draws with.
+// `focusable` and a rectangle off a node, and index a node among `getChildren()`. That vocabulary is
+// OpenTUI's, and this file is what answers it now that OpenTUI is gone: a `Renderable` here is our
+// own plain object with those names on its prototype. Rewriting the store to read `Node` directly is
+// a pass of its own and it is not this one — the names are the store's whole surface, so changing
+// them is a thousand lines of diff with no behaviour in it.
 //
-// **A prototype per kind, not fields per node.** Two reasons, and the second is the surprising one.
-// An accessor per node would be ten `defineProperty` calls on every one of the 1,708 nodes a pane
-// builds; and `../golden.ts § focusPath` holds a focused node's path as `constructor.name` per step,
-// which is `BoxRenderable` in every golden phase 0 captured. A named constructor function per kind
-// answers that for free, so a frame's focus path compares without the golden being touched.
+// **A prototype per kind, not fields per node.** An accessor per node would be ten `defineProperty`
+// calls on every one of the 1,708 nodes a pane builds. A named constructor function per kind also
+// gives each node a `constructor.name`, which is what the focus path in a key trace reads.
 //
-// **What is deliberately not answered.** `instanceof` — a shim cannot be an instance of somebody
-// else's class, so the two `instanceof ScrollBoxRenderable` tests in the store ask
-// `../keys/regions.ts § isViewport` instead. And none of this holds state of its own: every accessor
-// reads a field the tree or the layout pass already wrote, and `focusable` and `onMouseDown`, which
-// the components and the store assign, are plain properties on an ordinary object.
+// **What is deliberately not answered.** `instanceof` — these are not instances of any class the
+// store could name, so `../keys/regions.ts § isViewport` and § isField ask by `kind`. And none of
+// this holds state of its own: every accessor reads a field the tree or the layout pass already
+// wrote, and `focusable` and `onMouseDown`, which the components and the store assign, are plain
+// properties on an ordinary object.
 
-/** The class name OpenTUI's renderer gave each kind, which is what a golden's focus path holds. */
+/** A node as the store and the components read one: the tree's own fields, plus the names above the
+ *  painter ask by. Every node this host makes is one — `makeNode` is the only maker — so the split
+ *  from `Node` is about who is allowed to read what, not about two kinds of object.
+ *
+ *  `parent` and `children` are narrowed rather than added: a walk that starts here stays here. */
+export interface Renderable extends Node {
+  parent: Renderable | null
+  children: Renderable[]
+  /** Minted per render, because a key trace and a reveal both name a node. */
+  id: number
+  /** The last layout, under the four names the store reads it by. */
+  x: number
+  y: number
+  width: number
+  height: number
+  visible: boolean
+  /** Always false. A plain object has no lifecycle to be on the wrong side of. */
+  isDestroyed: boolean
+  focusable: boolean
+  /** The caret mirror, and no-ops: focus is a value the region store holds. */
+  focus: () => void
+  blur: () => void
+  /** The children that lay out, which is what a walk looking for stops wants. */
+  getChildren: () => Renderable[]
+  /** Assigned by `../keys/stops.ts` and by the store, on the object rather than through a prop. */
+  onMouseDown?: (event: MousePress) => void
+  /** What a widget installs on itself, from its own `ref`, for the two callers that reach it through
+   *  the tree rather than through the component that drew it. Optional because most nodes are neither
+   *  a field nor a viewport, and both askers check.
+   *
+   *    handleKeyPress       the dispatcher's typing hand-off, which asks whatever has the keys
+   *                         (`../kit/asking.tsx § FieldApi`, `../keys/install.ts § typeInto`).
+   *    scrollChildIntoView  the store's reveal, which walks up to the viewports a stop is inside
+   *                         (`../kit/scrolling.tsx`, `../keys/regions.ts § revealInViewports`). */
+  handleKeyPress?: (key: KeyPress) => boolean
+  scrollChildIntoView?: (childId: unknown) => void
+}
+
+/** The name each kind's constructor carries, which is what a focus path in a key trace reads. Still
+ *  OpenTUI's spelling of them, because the traces and the docs are written in it. */
 const CLASS: Readonly<Record<Kind, string>> = {
   box: 'BoxRenderable',
   text: 'TextRenderable',
@@ -35,7 +76,7 @@ const CLASS: Readonly<Record<Kind, string>> = {
 }
 
 /** Every node gets an id, because `scrollChildIntoView` and the key trace both name one. A counter
- *  rather than anything meaningful: the ids are minted per render and no golden holds one. */
+ *  rather than anything meaningful: the ids are minted per render and nothing outside a run holds one. */
 let minted = 0
 
 /**
@@ -125,7 +166,7 @@ const PROTOTYPES: Partial<Record<Kind, object>> = {}
 const prototypeFor = (kind: Kind): object => {
   const made = PROTOTYPES[kind]
   if (made) return made
-  // A named function purely so `constructor.name` answers what the goldens hold (see the header).
+  // A named function purely so `constructor.name` names the kind (see the header).
   const shim = { [CLASS[kind]]: function () {} }[CLASS[kind]] as unknown as { prototype: object }
   Object.defineProperties(shim.prototype, accessors as unknown as PropertyDescriptorMap)
   PROTOTYPES[kind] = shim.prototype
@@ -133,8 +174,8 @@ const prototypeFor = (kind: Kind): object => {
 }
 
 /** A fresh node of this kind, with the store's view of it on its prototype. */
-export function makeNode(kind: Kind): Node {
-  const node = Object.create(prototypeFor(kind)) as Node & { id: number }
+export function makeNode(kind: Kind): Renderable {
+  const node = Object.create(prototypeFor(kind)) as Renderable
   node.kind = kind
   node.props = {}
   node.parent = null

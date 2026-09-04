@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createComponent, ErrorBoundary, Show, Suspense } from 'solid-js'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import { Tabs } from '../kit/grouping'

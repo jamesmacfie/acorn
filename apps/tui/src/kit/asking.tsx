@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createSignal, For, Index, onCleanup, Show, untrack, type JSX } from 'solid-js'
-import type { BoxRenderable, InputRenderable, Renderable, TextareaRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import {
   COLLECTION_INTENTS, createCollectionIntents,
@@ -25,7 +25,6 @@ import { bindKeys } from '../keys/install'
 import { flatten, hasNode, Line, slot } from './cells'
 import { boxBorder, litControl } from './roles'
 import { slotColor } from '../appearance'
-import { paintColor } from '../colourCompat'
 import { create, edit, paste, setValue, type Field, type Press } from './field'
 import { toVisual, wrapRows, type Row } from '../wrap'
 import { requestFrame } from '../tree/frames'
@@ -279,8 +278,8 @@ function ownField(spec: {
  *  any theme, so both say a slot out loud
  *  (../appearance.ts, docs/ui-design.md § Roles, and what each host makes of them). */
 const fieldColors = () => ({
-  textColor: paintColor(slotColor('default')),
-  placeholderColor: paintColor(slotColor('muted')),
+  textColor: slotColor('default'),
+  placeholderColor: slotColor('muted'),
 })
 
 export function Input(props: InputProps) {
@@ -297,7 +296,7 @@ export function Input(props: InputProps) {
       flexGrow={props.width === 'narrow' ? 0 : 1}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
-      ref={install as (element: InputRenderable) => void}
+      ref={install as (element: Renderable) => void}
     />
   )
 }
@@ -336,10 +335,10 @@ type TextareaProps = {
 /** Everything a `Textarea` does that is not the edit buffer: the caller's `ref`, and the one chord
  *  that reaches a field while somebody is typing. Its own function because it is the half of the
  *  component that has nothing to do with what is typed into it. */
-function textareaRef(props: TextareaProps, element: TextareaRenderable): void {
+function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void {
   // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
   // buffer's text when its submit button is pressed, and there is no other way to ask.
-  if (typeof props.ref === 'function') (props.ref as (node: TextareaRenderable) => void)(element)
+  if (typeof props.ref === 'function') (props.ref as (node: Renderable & FieldApi) => void)(element)
   // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
   // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
   // in `focus` mode, so a composer inside a list does not answer for the list.
@@ -361,9 +360,11 @@ export function Textarea(props: TextareaProps) {
       flexGrow={props.grow ? 1 : 0}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
-      ref={(element: TextareaRenderable) => {
+      ref={(element: Renderable) => {
         install(element)
-        textareaRef(props, element)
+        // `install` has just put the field's own API on the node, so from here it is one
+        // (§ FieldApi).
+        textareaRef(props, element as Renderable & FieldApi)
       }}
     />
   )
@@ -608,7 +609,7 @@ export function Composer(props: {
   hint?: JSX.Element
   rows?: number
 }) {
-  let area: TextareaRenderable | undefined
+  let area: (Renderable & FieldApi) | undefined
   // One send, two ways in: `commit` inside the field, and the button. Both read the buffer rather than
   // the prop, because a caller that draws a composer without wiring `onInput` still has the text in
   // front of the reader — and `busy` and `disabled` refuse both, in one place.
@@ -626,7 +627,7 @@ export function Composer(props: {
           disabled={props.disabled}
           rows={props.rows ?? 3}
           grow
-          ref={(element: TextareaRenderable) => { area = element }}
+          ref={(element: Renderable) => { area = element as Renderable & FieldApi }}
           onInput={(value) => props.onInput?.(value)}
           onSubmit={(value) => send(value)}
         />
@@ -672,7 +673,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
     if (!active()) return
     props.onInput(props.value.replace(/\S+$/, `${value} `))
   }
-  let list: BoxRenderable | undefined
+  let list: Renderable | undefined
   return (
     <box flexDirection="column">
       {slot(props.overlay)}
@@ -707,7 +708,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
         onInput={props.onInput}
       />
       <Show when={suggestions().length}>
-        <box flexDirection="column" paddingLeft={2} ref={(element: BoxRenderable) => { list = element }}>
+        <box flexDirection="column" paddingLeft={2} ref={(element: Renderable) => { list = element }}>
           <For each={suggestions()}>
             {(suggestion) => (
               <PickerRow

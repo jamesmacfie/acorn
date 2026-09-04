@@ -11,7 +11,7 @@
 // this is the one it picked. `string-width` asks `emoji-regex` first, which matches a bare
 // text-presentation emoji, so it calls `▶`, `☑`, `⚠`, `⌨`, `☺`, `👁` and `🏷` two cells each —
 // against the standard, against xterm, and against seven names the rail and the footer draw every
-// frame. It also arrives in the tree as a dependency of `@opentui/core` and leaves with it, so
+// frame. It also only arrived in the tree as a dependency of the old painter and left with it, so
 // taking it would be a new dependency rather than the reuse it looked like.
 //
 // The ASCII branch in front is not an optimisation we are being clever about, it is the difference
@@ -35,7 +35,7 @@ const MARKLESS = /^[\p{Mn}\p{Me}\p{Cf}\u200b\u2060\ufeff]/u
  *
  *  Unicode 16. The table is here rather than in a package because it is the file the disagreements
  *  get argued in: when a terminal draws a character at a width this says it is not, the argument is
- *  a line here and a golden frame, not an upgrade of somebody else's regex.
+ *  a line here and the cells it lands in, not an upgrade of somebody else's regex.
  *
  *  Two entries worth naming, because both were measured. U+2630 to U+2637 moved to `W` in Unicode 16,
  *  so `☰` — which `apps/tui/src/kit/glyphs.ts` spends on `list` — is two cells by the standard and one

@@ -286,8 +286,8 @@ The seven layout components are `apps/tui/src/layouts/`, reaching the pane regis
 `client-core/src/host/layouts/table.ts`, which is host-supplied for the same reason the component
 table is.
 
-One guard sits over the renderer, in `apps/tui/src/renderGuard.ts`, installed beside it in `main.tsx`
-and in the test harness. OpenTUI reads a node's size straight from yoga, and a node that joins the tree
+One guard sat over the renderer, in `apps/tui/src/renderGuard.ts` — deleted by the terminal rewrite,
+and in the git history — installed beside it in `main.tsx` and in the test harness. OpenTUI reads a node's size straight from yoga, and a node that joins the tree
 after a frame's layout pass has no measured size: the width comes back `NaN` and the frame hands it to
 the Zig side, which takes a `u32` and throws "Argument 3 must be a uint32" from inside the render loop.
 That ends the process. It lasts one frame and hits any node with a border or a hit box, so no single
@@ -346,8 +346,8 @@ nobody thinks about. It is the one structural difference between the hosts, and 
 rather than to the caller: `<Stack>{count()}</Stack>` is correct kit, and a plugin has no way to know
 which of its two readers will refuse it.
 
-**`apps/tui/src/kit/reconciler.ts` answers it once**, for everything. It is `@opentui/solid`
-re-exported with `insert` replaced, aliased into the Solid transform's `moduleName` so every JSX call
+**`apps/tui/src/kit/reconciler.ts` answered it once**, for everything — deleted by the terminal
+rewrite, and in the git history. It was `@opentui/solid` re-exported with `insert` replaced, aliased into the Solid transform's `moduleName` so every JSX call
 in the process passes through it, and it wraps a bare string or number in a `text` when the parent is
 a box. An empty string becomes nothing, which is what the DOM draws for one.
 

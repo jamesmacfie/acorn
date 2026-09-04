@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { expect, test } from 'vitest'
 import { renderFixture } from './harness'
 

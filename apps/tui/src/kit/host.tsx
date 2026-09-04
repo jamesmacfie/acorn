@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
@@ -185,7 +185,7 @@ export type SlotProps = {
  * The terminal's sibling of `client-core/host/tree/Slot.tsx`, and the same division of labour every
  * other one keeps: `arbitration.ts` decides who draws and is shared unchanged; only the drawing is
  * the host's. Two things differ, and both are the host switch rather than a rule: `Dynamic` comes
- * from `@opentui/solid` rather than `solid-js/web`, because pulling the DOM renderer in for one
+ * from `../tree/renderer.ts` rather than `solid-js/web`, because pulling the DOM renderer in for one
  * component would put a second Solid renderer in this process; and the overflow disclosure is a line
  * of muted text rather than a `<span class="muted">`.
  */

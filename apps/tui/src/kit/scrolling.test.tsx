@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { Button } from './asking'

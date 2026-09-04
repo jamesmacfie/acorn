@@ -547,9 +547,10 @@ drops a frame every five seconds.
 
 #### The reconciler's per-element cost in the terminal client
 
-`apps/tui/src/kit/reconciler.ts` ties every element's destruction to its creating owner and wraps every
-dynamic child in an accessor. Both fix bugs a person can see: a `Suspense` that resolves into a
-destroyed renderable draws nothing, and loose text in a box throws.
+`apps/tui/src/kit/reconciler.ts` — deleted by the terminal rewrite, and in the git history — tied
+every element's destruction to its creating owner and wrapped every dynamic child in an accessor.
+Both fixed bugs a person could see: a `Suspense` that resolves into a destroyed renderable draws
+nothing, and loose text in a box throws.
 
 Phase 9 answered the question the deferred argument asked, from the other end. The cost is per element
 and the element count is bounded now: the heaviest screen in the client, a 5,000-line diff, draws
