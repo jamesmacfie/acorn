@@ -376,11 +376,14 @@ are the two that cannot be below zero.
 
 Nothing may write to stderr while the renderer owns the terminal, because it is the same terminal:
 paint writes cells to stdout and nothing else, and a stray line on stderr leaves the shell reading as
-garbage until the next full repaint. `main.tsx` holds Node's process warnings in a set and prints
-them after the screen is closed and the terminal handed back, beside the boot account and a started
-node's own held stderr. Nothing captures `console`, so a stray log from a library still lands in the
-middle of a frame and stays there until the cells under it change. Node's warnings are the ones this
-host actually provokes, which is why they are the ones held.
+garbage until the next full repaint. So `main.tsx` holds three things and prints all of them after the
+screen is closed and the terminal handed back: Node's process warnings, in a set because Node repeats
+a warning per emitter; a started node's own piped stderr; and every `console` call from the moment the
+renderer is created, swapped for a push into the same list and swapped back in `quit` before the first
+line goes out. The console hold is not belt and braces — client-core's plugin roster and the agents
+plugin's session prime both warn with a stack when a node this run started has not bound its port yet,
+which is the one moment there is a shell to ruin. `format` from `node:util` does the rendering, so an
+`Error` still prints its stack.
 
 Two rules this host used to have are gone, and both are worth knowing because they were crashes
 rather than style. `<Stack>{count()}</Stack>` needed a wrapping `text` node — a bare string under a

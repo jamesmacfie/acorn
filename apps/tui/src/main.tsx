@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { parseArgs } from 'node:util'
+import { format, parseArgs } from 'node:util'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
@@ -143,6 +143,25 @@ bootMark('App imported')
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
 const renderer: Renderer = openTerminalRenderer()
+
+// Every console call from here until the terminal is handed back, held rather than written. A
+// library's `console.warn` goes to stderr, which is this terminal, so one line scrolls the screen and
+// the shell reads as garbage until the next full repaint — and the two places that warn most are
+// client-core's plugin roster and the agents plugin priming its sessions, both of which fire while a
+// node this run started is still booting. So the one moment there is a shell to shred is the one
+// moment something is shredding it.
+//
+// Held, not dropped: the lines go out with the boot account once `renderer.destroy()` has the terminal
+// back, the same way Node's own warnings and a started node's stderr already do. `format` rather than
+// `String`, so an Error still prints its stack and `%s` still means what the caller meant.
+const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
+const realConsole = new Map(CONSOLE_METHODS.map((name) => [name, console[name].bind(console)]))
+const releaseConsole = (): void => {
+  for (const name of CONSOLE_METHODS) console[name] = realConsole.get(name)!
+}
+for (const name of CONSOLE_METHODS) {
+  console[name] = (...args: unknown[]) => { heldLines.push(format(...args)) }
+}
 bootMark('renderer created')
 // Time to first draw: the renderer's own first `frame` event, which is the moment the first cells
 // reached the terminal with nothing drawn over them.
@@ -221,11 +240,11 @@ async function quit(code = 0): Promise<never> {
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()
+  releaseConsole()
   // The terminal is ours again, so everything held while the screen was busy can go out: the boot
-  // account, then a started node's own stderr, then whatever this file wanted to say, then Node's
-  // warnings. Nothing captures `console` any more — we paint cells to stdout and leave stderr alone —
-  // so a library's log lands on stderr where it always was, and the terminal is handed back before
-  // any of this is printed.
+  // account, then a started node's own stderr, then whatever this file and every console call wanted
+  // to say, then Node's warnings. `releaseConsole` first, because the lines below are console calls
+  // themselves and a held console would file them back into the list it is reading.
   printBootMarks()
   for (const line of opened.held ?? []) console.error(`[node] ${line}`)
   for (const line of heldLines) console.error(line)

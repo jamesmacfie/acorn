@@ -76,7 +76,12 @@ export async function openNode(target: string | undefined, at: Custody = custody
       const paired = await pairInteractively(running.endpoint, fleet, { label: label(running.nodeId), local: true })
       return done(paired.nodeId)
     }
-    fleet.remember({ ...running, label: label(running.nodeId), local: true }, token)
+    // `pid` is dropped rather than spread through. A fleet row is parsed back with a strict schema,
+    // so one extra key makes the whole file unreadable on the next launch: the store starts from an
+    // empty fleet, `connect` finds no row to connect, and the shell sits on "the node is unreachable"
+    // for the life of that run.
+    const { pid: _pid, ...record } = running
+    fleet.remember({ ...record, label: label(running.nodeId), local: true }, token)
     return done(running.nodeId)
   }
 
