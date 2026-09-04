@@ -1,14 +1,14 @@
 {
   "name": "@acorn/tui",
   "version": "0.1.0",
-  "description": "The terminal client: client-core booted under Node, drawing the whole kit with OpenTUI.",
+  "description": "The terminal client: client-core booted under Node, drawing the whole kit in cells.",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "vite build && node scripts/check-startup-graph.mjs",
-    "capture": "vite build && node --experimental-ffi dist/capture.js",
-    "golden": "vite build && node --experimental-ffi dist/captureGolden.js",
-    "dev": "vite build && node --experimental-ffi dist/main.js",
+    "capture": "vite build && node dist/capture.js",
+    "golden": "vite build && node dist/captureGolden.js",
+    "dev": "vite build && node dist/main.js",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },

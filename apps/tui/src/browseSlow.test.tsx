@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // Its own file for the same reason as ./browseLong.test.tsx: the query cache is module state, so a
@@ -28,7 +27,7 @@ const caretOn = async (
   return false
 }
 
-describe.skipIf(!canDraw)('browsing over a slow transport', () => {
+describe('browsing over a slow transport', () => {
   it('keeps drawing the list and the detail after a shown Suspense suspends again', async () => {
     process.env.ACORN_FIXTURE_PULLS = '40'
     process.env.ACORN_FIXTURE_DELAY_MS = '50'

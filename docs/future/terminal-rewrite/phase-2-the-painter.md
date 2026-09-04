@@ -548,8 +548,8 @@ which is the whole of the new work drawing and reading on the Node the repo pins
 ### The switch, the colour, the width and the goldens (2026-09-04)
 
 The last part is built and the new painter draws the real app: `ACORN_TUI_PAINTER` in
-`apps/tui/vite.config.ts` picks the alias target for `@opentui/solid`, `apps/tui/src/painter.ts`
-carries the same answer as a define, `apps/tui/src/appearance.ts` and `apps/tui/src/kit/roles.ts`
+`apps/tui/vite.config.ts` picks the alias target for `@opentui/solid`, `apps/tui/src/painter.ts` (deleted
+in phase 4) carries the same answer as a define, `apps/tui/src/appearance.ts` and `apps/tui/src/kit/roles.ts`
 deal in our `Color` and our attribute bits, `apps/tui/src/kit/cells.tsx` measures with
 `apps/tui/src/width.ts`, and `apps/tui/src/golden.test.ts` compares the frames. Four shim files came
 with it, each with phase 4 written on it: `apps/tui/src/colourCompat.ts` (ten lines of `Color` to
@@ -634,8 +634,8 @@ root and then the surface.
 
 **`hasFfi` was the wrong question in 22 test files.** The gate every drawing suite spells is
 `describe.skipIf(!hasFfi)`, and under `own` there is no FFI to have, so the whole suite would skip on
-any Node — including the ones this phase exists to make pass. `canDraw` in `apps/tui/src/ffi.ts` is
-the question they meant, and it is `drawsOwn() || hasFfi`.
+any Node — including the ones this phase exists to make pass. `canDraw` in `apps/tui/src/ffi.ts` (deleted
+in phase 4) is the question they meant, and it is `drawsOwn() || hasFfi`.
 
 **`spanStyle` cannot merge into `textStyle` by dropping a shape.** § Scope has the two becoming one
 because "a span takes the same props as a text", and under our painter it does. Under the old one it

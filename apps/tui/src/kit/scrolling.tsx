@@ -6,11 +6,10 @@ import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { bindKeys } from '../keys/install'
 import { scheduleSettle } from '../keys/regions'
 import { PANE } from '../keys/tiers'
-import { drawsOwn } from '../painter'
 import { requestFrame } from '../tree/frames'
 import type { Node } from '../tree/node'
 
-// A constrained document viewport, under both painters.
+// A constrained document viewport.
 //
 // `overflow="scroll"` is a yoga clipping instruction and nothing more: it hides what will not fit and
 // owns no offset for anything to move, which is why this file is the only one under `apps/tui/src`
@@ -19,18 +18,18 @@ import type { Node } from '../tree/node'
 // free-sized pane wrapper makes those layouts measure a width that is not on screen
 // (../chrome/PaneRow.tsx).
 //
-// **Two implementations, one contract.** OpenTUI's `ScrollBoxRenderable` owns an offset, a bar, wheel
-// acceleration and clamping; under our painter the *component* owns all four and the node carries the
-// offset as a prop paint translates by. The members the rest of this app reaches a viewport through
-// are the same either way, which is what keeps the keys, the reveal and `DiffPane` one piece of code
-// rather than two (§ Viewport). Phase 4 deletes the OpenTUI half
-// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
+// **The component owns the scrolling.** The offset, the bar, wheel acceleration and the clamp are all
+// here, and the node carries the offset as a prop that paint translates its children by. OpenTUI's
+// `ScrollBoxRenderable` owned all four instead, which is why the contract below is a shape rather
+// than a class: it was what let the keys, the reveal and `DiffPane` be one piece of code while both
+// painters existed, and it is worth keeping as the one place this app says what it wants of a
+// viewport (§ Viewport).
 
 /**
  * What this app asks of a viewport.
  *
- * OpenTUI's renderable answers all four already; ours are installed on the node by `ownViewport`
- * below, so the key tables and `./showing.tsx` never learn which painter drew them. `scrollTop` and
+ * `ownViewport` below installs all four on the node, so the key tables and `./showing.tsx` reach a
+ * viewport through this shape rather than through whatever drew it. `scrollTop` and
  * `scrollChildIntoView` go on the node beside these for the two callers that reach a viewport through
  * the tree rather than through this component: the store's reveal, and a pane that windows its own
  * content (../keys/regions.ts § revealInViewports, ./showing.tsx § DiffPane).
@@ -233,31 +232,6 @@ function ownViewport(props: ViewportProps): JSX.Element {
   )
 }
 
-/** OpenTUI's viewport: the renderable owns the offset, the bar and the wheel, and this hands it the
- *  content box's props rather than drawing one. */
-function nativeViewport(props: ViewportProps): JSX.Element {
-  return (
-    <scrollbox
-      flexGrow={1}
-      flexShrink={1}
-      flexBasis={0}
-      width="100%"
-      minWidth={0}
-      minHeight={0}
-      scrollX={false}
-      scrollY
-      visible={props.visible ?? true}
-      contentOptions={{ flexDirection: 'column', minWidth: '100%', maxWidth: '100%' }}
-      ref={(element: ScrollBoxRenderable) => {
-        bindViewportKeys(element, element, () => props.onScroll?.())
-        props.onBox?.(element)
-      }}
-    >
-      {props.children}
-    </scrollbox>
-  )
-}
-
 /** A vertically scrolling document/detail region with a bar and wheel/trackpad handling. */
 export function ScrollViewport(props: ViewportProps) {
   // A hidden viewport is one of the two ways the keys can go off screen without anybody being told,
@@ -270,5 +244,5 @@ export function ScrollViewport(props: ViewportProps) {
   createEffect(() => {
     if (props.visible === false) scheduleSettle()
   })
-  return drawsOwn() ? ownViewport(props) : nativeViewport(props)
+  return ownViewport(props)
 }

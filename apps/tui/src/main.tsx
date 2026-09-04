@@ -1,13 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 import { parseArgs } from 'node:util'
-import { CliRenderEvents, createCliRenderer, type CliRenderer } from '@opentui/core'
-import { render } from '@opentui/solid'
+import { CliRenderEvents, type CliRenderer } from '@opentui/core'
+import { render } from './tree/renderer'
 import { installPlatform } from './platform'
-import { drawsOwn } from './painter'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
 import { COMMAND } from './keys/tiers'
 import { installRenderGuard, RENDERER_LISTENER_CAP } from './renderGuard'
+import { openOwnSurface } from './ownRenderer'
 
 // `acorn`.
 //
@@ -48,21 +48,6 @@ const { values } = parseArgs({
   },
   allowPositionals: false,
 })
-
-// OpenTUI's render core is Zig reached over `node:ffi`, a Node 26.4 builtin behind a flag. Checked
-// here rather than left to the loader, because the failure it produces otherwise is a stack trace from
-// inside a chunk. Not declared as an `engines` floor on this package: the rest of the repo builds and
-// tests this one happily on the Node it already has, and only running it needs 26.4 (findings.md,
-// "The runtime floor").
-//
-// And not checked at all under our own painter, which is the whole point of the programme: it is
-// TypeScript, Yoga through wasm and cells on stdout, so it runs on the Node the repo pins with no
-// flag (./painter.ts, docs/future/terminal-rewrite/README.md § Why).
-const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number)
-if (!drawsOwn() && (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4))) {
-  console.error(`acorn draws with OpenTUI, which needs Node 26.4 or later started with --experimental-ffi. This is Node ${process.versions.node}.`)
-  process.exit(2)
-}
 
 // Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
 // no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
@@ -146,43 +131,21 @@ bootMark('App imported')
 // the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 installRenderGuard()
-// The kitty keyboard protocol, asked for and not assumed: a terminal that does not know the request
-// ignores it, and OpenTUI pops the mode on exit either way.
+// The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
+// the cells, and the screen closes first on the way out so the last frame lands while the alternate
+// screen is still ours (./input/terminal.ts § The two halves compose, ./ownRenderer.ts).
 //
-// Not a nicety. Ctrl+Return is the `commit` intent on this host — send this comment, send this message
-// — and a legacy terminal sends the same single byte for Return with Ctrl and Return without it, so
-// the chord does not exist to be bound. `disambiguate` is the one flag that fixes it, and it fixes the
-// same ambiguity for a lone Escape, which the parser otherwise has to wait out
+// The kitty keyboard protocol is asked for there and not assumed: a terminal that does not know the
+// request ignores it, and the mode is popped on exit either way. Not a nicety — Ctrl+Return is the
+// `commit` intent on this host, send this comment, send this message, and a legacy terminal sends the
+// same single byte for Return with Ctrl and Return without it, so the chord does not exist to be
+// bound. Disambiguation is the one flag that fixes it, and it fixes the same ambiguity for a lone
+// Escape, which the parser otherwise has to wait out
 // (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
 //
-// `openConsoleOnError` is off because this host holds its own output. OpenTUI pops its console
-// overlay over the frame on an uncaught error, and the shell now draws in front of a node that may
-// not answer for a second — so one fire-and-forget request rejecting reads as the whole app being
-// replaced by a debug panel. The error is not lost: it is captured below and printed on the way out.
-//
-// `autoFocus` is off because focus is the region store's and the renderer may not have a second
-// opinion about it. Left on, `dispatchMouseEvent` walks up from the renderable a left click hit and
-// focuses the first focusable ancestor it finds — which is a focus move nothing in the store asked
-// for, for exactly the case the store exists to have one answer to. A click is a hit test into the
-// store instead (./keys/regions.ts § Clicks are hit tests).
-//
-// Under `ACORN_TUI_PAINTER=own` none of that applies and the two halves are composed instead: the
-// terminal owns the modes and the bytes, the screen owns the cells, and the screen closes first on
-// the way out so the last frame lands while the alternate screen is still ours
-// (./input/terminal.ts § The two halves compose, ./ownRenderer.ts).
-//
-// Reached through an `import()` rather than a static import, so the painter this build did not pick
-// stays out of the bundle: `./ownRenderer.ts` reaches the tree, the layout pass, the cell buffer and
-// the input parser, and a static import here would put all four into the `main.js` of the build that
-// draws with the other one (./ownRenderer.ts § openOwnSurface).
-const renderer: CliRenderer = drawsOwn()
-  ? (await import('./ownRenderer')).openOwnSurface() as unknown as CliRenderer
-  : await createCliRenderer({
-    exitOnCtrlC: false,
-    useKittyKeyboard: { disambiguate: true },
-    openConsoleOnError: false,
-    autoFocus: false,
-  })
+// Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
+// about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
+const renderer: CliRenderer = openOwnSurface() as unknown as CliRenderer
 bootMark('renderer created')
 // Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
 // number, but it is an on-screen label: it would have to be mounted in the tree and would paint a debug
@@ -311,9 +274,9 @@ if (opened.starting) {
   )
 }
 
-// The root node under our painter and the renderer under OpenTUI's, which is the one line of the
-// mount that differs between them (./harness.tsx § Surface).
-const target = drawsOwn() ? (renderer as unknown as { root: unknown }).root : renderer
+// The tree mounts on the screen's root node rather than on the surface around it
+// (./tree/renderer.ts § render).
+const target = (renderer as unknown as { root: unknown }).root
 
 await render(
   () => (

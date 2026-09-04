@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
@@ -17,7 +16,7 @@ import { focusedRegion } from './keys/regions'
 // has to be a region Tab can get to at all — it was not, so nothing in a browse surface could be
 // driven.
 describe('a surface drawn as sections', () => {
-  it.skipIf(!canDraw)('is a strip of tabs, enters with Down, and takes main into the strip when narrow', async () => {
+  it('is a strip of tabs, enters with Down, and takes main into the strip when narrow', async () => {
     const screen = await renderFixture({ width: 160, height: 38, pane: 'pr' })
     const wide = await screen.until('Comments', 45)
 

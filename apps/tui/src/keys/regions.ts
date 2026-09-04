@@ -35,7 +35,6 @@ import {
   InputRenderable, MouseButton, ScrollBoxRenderable, TextareaRenderable,
   type CliRenderer, type MouseEvent, type Renderable,
 } from '@opentui/core'
-import { drawsOwn } from '../painter'
 import { isRemoved } from '../tree/compat'
 
 export type RegionRef = { paneId: string; regionId: string }
@@ -602,9 +601,8 @@ const setFocus = (node: Renderable | null): void => {
     scheduleSettle()
     return
   }
-  // One reveal after the next layout, and under the old painter one now as well, because there the
-  // frame the reveal waits for may not come (§ The reveal).
-  if (!drawsOwn()) revealInViewports(node)
+  // One reveal, after the next layout rather than now, because the node may have moved since
+  // (§ The reveal).
   pendingReveal = node
   // One memory per move, and it belongs to whichever of the two levels holds the keys. A `Modal` or
   // an open `Menu` is drawn inside whatever region had them, so a region that also remembered a

@@ -5,7 +5,6 @@ import { frameRequested } from './frames'
 import {
   createElement,
   createTextNode,
-  extend,
   getFirstChild,
   getNextSibling,
   getParentNode,
@@ -46,16 +45,9 @@ describe('the node operations', () => {
     expect(createTextNode('hello').yoga).toBeNull()
   })
 
-  it('maps the tag `kit/rectangle.tsx` extends onto the `pty` kind and refuses anything else', () => {
-    expect(createElement('embedded_terminal').kind).toBe('pty')
+  it('refuses a tag it has no kind for', () => {
     // A surface on the wrong host says so rather than drawing an empty box.
     expect(() => createElement('main')).toThrow(/Unknown component type/)
-  })
-
-  it('registers nothing when a caller extends the catalogue', () => {
-    // The one call is `kit/rectangle.tsx`'s, and phase 3 removes it. Until then it has to be
-    // harmless, and it has to not add a kind.
-    expect(() => extend({ embedded_terminal: {} })).not.toThrow()
     expect(() => createElement('anything_at_all')).toThrow(/Unknown component type/)
   })
 

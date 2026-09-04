@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { recordedRequests } from './fixture'
 
@@ -24,7 +23,7 @@ const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: n
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 
-describe.skipIf(!canDraw)('the pull request from the keyboard', () => {
+describe('the pull request from the keyboard', () => {
   it('lands the keys on a control in the Details panel, and says which one has them', async () => {
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
     try {

@@ -7,14 +7,8 @@ import { renderFixture } from './harness'
 import { compare, readFrame, type Frame } from './golden'
 import { ATTRS } from './paint/buffer'
 import { SIZES, SURFACES } from './goldenSurfaces'
-import { drawsOwn } from './painter'
 
-// The painter swap, judged against the frames the painter we are leaving drew.
-//
-// Skipped unless the build asked for our painter, so the default suite is unaffected until phase 4
-// takes the switch out:
-//
-//   ACORN_TUI_PAINTER=own pnpm --filter @acorn/tui test src/golden.test.ts
+// The painter swap, judged against the frames the painter we left drew.
 //
 // The promise a golden holds is every cell and every run, which is stricter than anything else in
 // this package tests and deliberately so: the kit is tested by intent — `Badge` draws `[text]` — and
@@ -31,55 +25,52 @@ import { drawsOwn } from './painter'
 // answer, measured rather than assumed
 // (docs/future/terminal-rewrite/phase-2-the-painter.md § What building it found).
 //
-// **Five of the twenty-eight are still held, and none of the five is held by a widget.** The two
-// field slices took `browse`, `palette`, `notes` at 80 and `pr` off this list, and what is left is
-// two measured differences that sit under the painter rather than in it. `changes` and `agents` at 80
-// differ by rows of content, and it is the harness rather than the painter: our `flush` turns the loop
-// until the tree stops asking for frames, which drains the fixture's delayed answers, so a section
-// the capture never saw is on screen. On `agents` that is measured rather than argued — the old
-// painter driven through this same harness draws exactly the cells ours does, on every row. `changes`,
-// `agents` and `notes` at 120 differ by one cell on rows that overflow their column, where the last
-// child keeps a cell under OpenTUI that it loses here: the two Yoga builds round negative free space
-// differently (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
+// **Twenty-five of the twenty-eight match and the three that are left are all one thing.** The two
+// field slices took `browse`, `palette`, `notes` at 80 and `pr` off this list; phase 4 re-captured
+// `changes` and `agents` at 80 and finished the colour correction on the rest. What is left is
+// `changes`, `agents` and `notes` at 120, each differing by one cell on rows that overflow their
+// column: the last child on such a row keeps a cell under OpenTUI's Yoga and loses it under ours.
+// It is not a setting — neither build calls `setPointScaleFactor` — so it is the two builds' own
+// arithmetic over negative free space, and it is accepted rather than chased
+// (docs/future/terminal-rewrite/phase-4-cut-over.md § What building it found).
 //
-// **325 runs across the set were corrected rather than matched, and they carry two colours between
-// them.** 320 were `#00AAFF`, the default `focusedBorderColor` of OpenTUI's `BoxRenderable`: the caret
+// **360 runs across the set were corrected rather than matched, and they carry two colours between
+// them.** 352 were `#00AAFF`, the default `focusedBorderColor` of OpenTUI's `BoxRenderable`: the caret
 // mirror focuses whatever the store focused, and a focused box then drew its own colour over the
-// `borderColor` the role handed it. Five were `#666666`, `TextareaRenderable`'s default
+// `borderColor` the role handed it. Eight were `#666666`, `TextareaRenderable`'s default
 // `placeholderColor`. On a terminal a tone is "default, and the palette's grey, accent, green, yellow
 // and red" (docs/ui-design.md § Roles, and what each host makes of them), and neither hex is one of the
 // sixteen, so the sentence won: each run took the colour the kit's own role returned, read off the live
 // frame at the same column and refused unless it was one of the slots — the accent slot on a lit panel,
 // the terminal's own foreground on an overlay that names no tone, the palette's grey on a placeholder.
+// One run in the whole set refused and stayed `#666666`: the composer's placeholder in
+// `agents-120x40`, on a row the squeeze below has shifted, so there is no live run at its column.
 
 /** The delay the goldens were captured with. Without it every cache is warm before the first frame
  *  and the screen is one no reader ever sees (./captureGolden.tsx). */
 process.env.ACORN_FIXTURE_DELAY_MS ??= '50'
 
 /**
- * Goldens still held, by name and size, with what each is waiting for and how far off it is.
+ * The three goldens that are held, by name and size, with the difference each one accepts.
  *
- * By the full name rather than by surface, because the reasons stopped agreeing across the two sizes:
- * at 80 the harness settles deeper than the capture did, and at 120 the two Yoga builds round a
- * squeezed row differently. Neither is a widget and neither is above the layout pass, so nothing here
- * is a to-do list — each of these is a difference to accept, a Yoga question for somebody with a
- * spare afternoon, or a re-capture (§ Five of the twenty-eight are still held).
+ * All three are the same thing and it is not a to-do list. A row whose children want more room than
+ * the row has gives the overflow up between them, and on the last child of such a row the two Yoga
+ * builds land a cell apart: OpenTUI's keeps it, ours does not. Neither build configures the engine —
+ * OpenTUI never calls `setPointScaleFactor` either — so there is no setting to match, and chasing it
+ * means going into the two builds' arithmetic for a cell at the right-hand edge of three rows.
+ * Accepted, and recorded where somebody who wants it can find the repro
+ * (docs/future/terminal-rewrite/phase-4-cut-over.md § What building it found).
  *
  * The counts were measured with this table emptied, on 2026-09-04, and every other golden in the set
  * matched in the same run. They are counts of *differences* rather than of rows: one row that has
  * shifted a cell is several, because the characters and the runs are compared separately.
  */
-const PHASE_3: Readonly<Record<string, string>> = {
-  'changes-80x24': '23 differences, and the pane\'s own header row is what they are: this harness '
-    + 'settles far enough to draw it and the capture did not',
-  'changes-120x40': '15 differences: one cell of squeeze per overflowing row, plus the blue border '
-    + 'runs phase 2 could not correct because the rows they sit on do not line up',
-  'agents-80x24': '12 differences, over six rows of a section this harness settles far enough to '
-    + 'show; the old painter driven through the same harness draws the same cells on every row, so '
-    + 'the painters agree and the capture is the shallower screen',
-  'agents-120x40': '10 differences: one cell of squeeze on the header row, and the composer\'s hint '
+const SQUEEZED: Readonly<Record<string, string>> = {
+  'changes-120x40': '8 differences: the last cell of four overflowing rows — a copy button\'s '
+    + '\u29c9 and three of a diff count\'s \u2212',
+  'agents-120x40': '10 differences: the last cell of the header row, and the composer\'s hint '
     + 'wrapping a row differently because of it',
-  'notes-120x40': '4 differences: one cell of squeeze on two overflowing rows',
+  'notes-120x40': '4 differences: the last cell of two overflowing rows',
 }
 
 /**
@@ -100,14 +91,32 @@ const RACES: Readonly<Record<string, string>> = {
   'notes-80x24': 'Scratchpad',
 }
 
+/**
+ * The one number in the set that a golden cannot hold, blanked on both sides rather than compared.
+ *
+ * The fixture's pull request is stamped `updatedAt: 0` and the detail row says how long ago that was
+ * (../fixture.ts). So the two `pr` goldens hold a count of months since the epoch, and it goes up by
+ * one every thirty days — which is a golden that is right until it is not, and is nobody's change
+ * when it breaks. Caught on 2026-09-04, the day 689 became 690.
+ *
+ * The digits are replaced rather than the phrase, and by as many characters as they were, so a run
+ * keeps its width and everything either side of it is still compared. A count that gained a digit
+ * would still differ, which is right: that is a column moving.
+ */
+const drifted = (text: string): string => text.replace(/\d+(?=mo ago)/g, (count) => '#'.repeat(count.length))
+
 const settled = (frame: Frame, name: string): Frame => {
   const mark = RACES[name]
-  if (mark === undefined) return frame
   return {
     ...frame,
-    runs: frame.runs.map((line) => line.map((span) => (
-      span.text.includes(mark) ? { ...span, attributes: span.attributes & ~ATTRS.inverse } : span
-    ))),
+    frame: frame.frame.map(drifted),
+    runs: frame.runs.map((line) => line.map((span) => {
+      const text = drifted(span.text)
+      const attributes = mark !== undefined && span.text.includes(mark)
+        ? span.attributes & ~ATTRS.inverse
+        : span.attributes
+      return text === span.text && attributes === span.attributes ? span : { ...span, text, attributes }
+    })),
   }
 }
 
@@ -122,12 +131,12 @@ const readGolden = async (name: string): Promise<Frame> =>
 const say = (found: readonly string[]): string =>
   `${found.length} difference${found.length === 1 ? '' : 's'}\n\n${found.slice(0, 4).join('\n\n')}`
 
-describe.skipIf(!drawsOwn())('the goldens, under our own painter', () => {
+describe('the goldens', () => {
   for (const size of SIZES) {
     for (const surface of SURFACES) {
       const name = `${surface.name}-${size.width}x${size.height}`
-      const owed = PHASE_3[name]
-      it.skipIf(owed !== undefined)(`draws ${name} cell for cell${owed ? ` (phase 3: ${owed})` : ''}`, async () => {
+      const owed = SQUEEZED[name]
+      it.skipIf(owed !== undefined)(`draws ${name} cell for cell${owed ? ` (accepted: ${owed})` : ''}`, async () => {
         _resetNotices()
         for (const notice of surface.notices ?? []) pushNotice(notice)
         const screen = await renderFixture({

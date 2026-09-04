@@ -145,8 +145,6 @@ export namespace JSX {
     input: InputProps
     textarea: TextareaProps
     pty: PtyProps
-    /** The tag `../kit/rectangle.tsx` gets from its `extend` call, until phase 3 removes it. */
-    embedded_terminal: PtyProps
   }
 
   export interface ElementChildrenAttribute {

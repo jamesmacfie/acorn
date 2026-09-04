@@ -28,7 +28,6 @@ import { slotColor } from '../appearance'
 import { paintColor } from '../colourCompat'
 import { create, edit, paste, setValue, type Field, type Press } from './field'
 import { toVisual, wrapRows, type Row } from '../wrap'
-import { drawsOwn } from '../painter'
 import { requestFrame } from '../tree/frames'
 import type { Node } from '../tree/node'
 import { Menu } from './grouping'
@@ -275,16 +274,16 @@ function ownField(spec: {
   }
 }
 
-/** The two colours a field would otherwise invent. Its own text colour is opaque white to OpenTUI,
- *  the same trap every other renderable has, and its placeholder is a hardcoded `#666666` — neither
- *  is one of the sixteen a terminal has or comes from any theme, so both say a slot out loud
+/** The two colours a field would otherwise invent. A field that names neither draws its text opaque
+ *  white and its placeholder `#666666` — neither is one of the sixteen a terminal has or comes from
+ *  any theme, so both say a slot out loud
  *  (../appearance.ts, docs/ui-design.md § Roles, and what each host makes of them). */
 const fieldColors = () => ({
   textColor: paintColor(slotColor('default')),
   placeholderColor: paintColor(slotColor('muted')),
 })
 
-function ownInput(props: InputProps) {
+export function Input(props: InputProps) {
   const install = ownField({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
@@ -293,6 +292,8 @@ function ownInput(props: InputProps) {
   })
   return (
     <input
+      // A `width` role is not a number and should not become one, so the host decides: a field takes
+      // the room its row has left, which is what the stylesheet decides on the DOM.
       flexGrow={props.width === 'narrow' ? 0 : 1}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
@@ -301,38 +302,6 @@ function ownInput(props: InputProps) {
   )
 }
 
-function nativeInput(props: InputProps) {
-  let field: InputRenderable | undefined
-  const text = () => (props.value === undefined ? '' : String(props.value))
-  // An edit buffer owns its text once it has it, so a value set from outside is written in and only
-  // when it differs. Without the guard every keystroke rewrites the buffer under the cursor. There
-  // used to be a liveness guard beside this one, for a field destroyed while its component's effects
-  // still ran; a node now outlives its removal for as long as its owner does, so that shape is gone
-  // (./reconciler.ts § Destroy on disposal).
-  createEffect(() => {
-    const value = text()
-    if (field && field.value !== value) field.value = value
-  })
-  return (
-    <input
-      // A `width` role is not a number and should not become one, so the host decides: a field takes
-      // the room its row has left, which is what the stylesheet decides on the DOM.
-      flexGrow={props.width === 'narrow' ? 0 : 1}
-      {...fieldColors()}
-      value={text()}
-      placeholder={props.placeholder ?? ''}
-      ref={(element: InputRenderable) => { field = element }}
-      onInput={(value: string) => props.onInput?.(value)}
-      // `unknown`, because the renderable's own option and the reconciler's typed prop disagree about
-      // what a submit carries and the intersection accepts only a handler that takes both.
-      onSubmit={(value: unknown) => props.onSubmit?.(typeof value === 'string' ? value : text())}
-    />
-  )
-}
-
-export function Input(props: InputProps) {
-  return drawsOwn() ? ownInput(props) : nativeInput(props)
-}
 
 type TextareaProps = {
   size?: Extract<Size, 'sm' | 'md'>
@@ -365,8 +334,8 @@ type TextareaProps = {
 }
 
 /** Everything a `Textarea` does that is not the edit buffer: the caller's `ref`, and the one chord
- *  that reaches a field while somebody is typing. Shared, because both implementations owe it and
- *  neither owes it differently. */
+ *  that reaches a field while somebody is typing. Its own function because it is the half of the
+ *  component that has nothing to do with what is typed into it. */
 function textareaRef(props: TextareaProps, element: TextareaRenderable): void {
   // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
   // buffer's text when its submit button is pressed, and there is no other way to ask.
@@ -381,7 +350,7 @@ function textareaRef(props: TextareaProps, element: TextareaRenderable): void {
   }, { priority: STOP, mode: 'focus' }))
 }
 
-function ownTextarea(props: TextareaProps) {
+export function Textarea(props: TextareaProps) {
   const install = ownField({
     value: () => props.value ?? '',
     newline: true,
@@ -400,33 +369,6 @@ function ownTextarea(props: TextareaProps) {
   )
 }
 
-function nativeTextarea(props: TextareaProps) {
-  let area: TextareaRenderable | undefined
-  createEffect(() => {
-    const value = props.value ?? ''
-    if (area && area.plainText !== value) area.setText(value)
-  })
-  return (
-    <textarea
-      flexGrow={props.grow ? 1 : 0}
-      {...fieldColors()}
-      // `initialValue`, not a child: a string child of an edit buffer is an orphan text node.
-      initialValue={props.value ?? ''}
-      placeholder={props.placeholder ?? ''}
-      ref={(element: TextareaRenderable) => {
-        area = element
-        textareaRef(props, element)
-      }}
-      // The change event carries no payload — OpenTUI's own comment on it says to ask the renderable
-      // for the text — so this is the one node in the kit that needs a handle on what it drew.
-      onContentChange={() => props.onInput?.(area ? area.plainText : '')}
-    />
-  )
-}
-
-export function Textarea(props: TextareaProps) {
-  return drawsOwn() ? ownTextarea(props) : nativeTextarea(props)
-}
 
 /** `[ value ▾ ]`, opening a `Menu`. The list is the menu's; this is the trigger and the value. */
 export function Select(props: SelectProps) {

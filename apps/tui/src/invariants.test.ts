@@ -131,7 +131,7 @@ describe('the store is the only owner of focus', () => {
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,
       'kit/grouping.tsx': 1,
-      'kit/rectangle.tsx': 2,
+      'kit/rectangle.tsx': 1,
       'kit/showing.tsx': 2,
       'tree/compat.ts': 1,
     })

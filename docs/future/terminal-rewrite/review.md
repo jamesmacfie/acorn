@@ -188,8 +188,9 @@ ten. The same three lines are repeated in both test harnesses.
 
 `apps/tui/src/main.tsx` exits with code 2 below Node 26.4 because OpenTUI's Zig core is reached over
 `node:ffi`, a builtin behind `--experimental-ffi`. `node-runtime.json` pins the repo at 24.11.0 with
-an engines floor of 22.18 or 24.4. `apps/tui/src/ffi.ts` probes for the builtin and every drawing test
-is `describe.skipIf(!hasFfi)`, so on the repo's own runtime the visual suite is a list of skips.
+an engines floor of 22.18 or 24.4. `apps/tui/src/ffi.ts` (deleted in phase 4) probes for the builtin
+and every drawing test is `describe.skipIf(!hasFfi)`, so on the repo's own runtime the visual suite is
+a list of skips.
 `apps/tui/vitest.config.ts` adds the flag only where the running Node accepts it.
 
 The installed `@opentui/core` 0.5.9 is 13 MB with eight optional platform packages; the darwin-arm64

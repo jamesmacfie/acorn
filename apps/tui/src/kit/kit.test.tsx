@@ -5,8 +5,6 @@ import { TextAttributes, type Renderable } from '@opentui/core'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens/focusRoles.ts'
-import { canDraw } from '../ffi'
-import { drawsOwn } from '../painter'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { renderCells, type Cells, type Frame } from './render'
 import {
@@ -820,13 +818,13 @@ const CASES: Case[] = [
  *
  * Two entries are left and neither is a widget, because phase 3 built all five of them. Both are the
  * same measured Yoga-build difference, recorded with everything that was tried, and neither is above
- * the layout pass — so the name is now the only phase 3 thing about them
- * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
+ * the layout pass (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it
+ * found).
  *
  * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
  */
-const PHASE_3: Readonly<Record<string, string>> = {
+const HELD: Readonly<Record<string, string>> = {
   // Not phase 3's, and not the painter's either: the two Yoga builds disagree about what a
   // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
   // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
@@ -841,17 +839,17 @@ const PHASE_3: Readonly<Record<string, string>> = {
     'a viewport in a parent with no height of its own',
 }
 
-/** The reason this case is held, or nothing at all under the painter that can draw it. */
-const owed = (title: string): string | undefined => (drawsOwn() ? PHASE_3[title] : undefined)
+/** The reason this case is held, or nothing at all. */
+const owed = (title: string): string | undefined => HELD[title]
 
 /** A case's title, with what it is waiting for, for the skipped half's report. */
 const held = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
-  rows.filter(([title]) => owed(title)).map(([title, entry]) => [`${title} — phase 3: ${owed(title)!}`, entry] as const)
+  rows.filter(([title]) => owed(title)).map(([title, entry]) => [`${title} — held: ${owed(title)!}`, entry] as const)
 
 const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
   rows.filter(([title]) => !owed(title))
 
-describe.skipIf(!canDraw)('the kit in cells', () => {
+describe('the kit in cells', () => {
   it('has a case for every node in the kit, and no case for a node that is gone', () => {
     expect(CASES.map((entry) => entry.node).sort()).toEqual([...KIT_NODES].sort())
     // Anti-vacuity: two empty lists compare equal, and the kit is not empty.
@@ -872,7 +870,7 @@ describe.skipIf(!canDraw)('the kit in cells', () => {
   it('holds back nothing it cannot name', () => {
     // Every key in the table has to be a title some case is actually reported under, or the skip is
     // silent and the case it meant to hold runs and fails. Checked here rather than trusted, because
-    // the two halves are a rename apart (§ PHASE_3).
+    // the two halves are a rename apart (§ HELD).
     const titles = new Set([
       ...CASES.map((entry) => `${entry.node}: ${entry.draws}`),
       ...BEHAVIOURS.map((entry) => `${entry.node}: ${entry.does}`),
@@ -881,12 +879,12 @@ describe.skipIf(!canDraw)('the kit in cells', () => {
       'types into the field that has the keys, wherever the renderer is drawing its caret',
       'is a parent stop: Down enters the panel it is showing, Escape comes back',
     ])
-    expect(Object.keys(PHASE_3).filter((title) => !titles.has(title))).toEqual([])
+    expect(Object.keys(HELD).filter((title) => !titles.has(title))).toEqual([])
   })
 
   it.each(drawable(cases))('%s', drawCase, 20_000)
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
-  // (§ PHASE_3). Empty under the old painter, which registers nothing.
+  // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
@@ -1427,7 +1425,7 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
 const every = (from: Renderable): Renderable[] =>
   from.getChildren().flatMap((child) => [child, ...every(child)])
 
-describe.skipIf(!canDraw)('every control is a stop', () => {
+describe('every control is a stop', () => {
   const behaviours = BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const)
   const driveCase = async (_name: string, entry: Behaviour): Promise<void> => {
     _resetCollections()
@@ -1521,17 +1519,14 @@ describe.skipIf(!canDraw)('every control is a stop', () => {
       const field = focusedRenderable()
       expect(field, 'the field did not take the keys').not.toBe(null)
 
-      // Now put the renderer's caret somewhere else, behind the store's back. Only the caret moves:
-      // the store still says the field has the keys, and the store is the only thing that decides.
+      // Now call `focus()` on something else, behind the store's back. It is the mirror and the
+      // mirror is a no-op — a node has no focus of its own to move and a field asks the store
+      // whether it has the keys rather than being told (../tree/compat.ts § focus). So this is the
+      // half of the case that survives having one owner: the call happens and nothing about who has
+      // the keys changes.
       const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
       expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
       elsewhere!.focus()
-      // Under our painter there is no caret to move: `focus()` on a node is the mirror, the mirror is
-      // a no-op, and a field asks the store whether it has the keys rather than being told
-      // (../tree/compat.ts § focus). So half of this case has nothing left to disagree with, which is
-      // the point of the phase, and what it checks under that painter is the half that survives —
-      // the store did not move and the key was typed.
-      if (!drawsOwn()) expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
 
       // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
       // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
@@ -1540,8 +1535,6 @@ describe.skipIf(!canDraw)('every control is a stop', () => {
       const one = await screen.press('h')
       expect(typed).toEqual(['h'])
       expect(one.text).toContain('h')
-      // And it went nowhere near the renderer's idea of focus, which has not moved.
-      if (!drawsOwn()) expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
       expect(focusedRenderable()).toBe(field)
     } finally {
       screen.done()
@@ -1693,7 +1686,7 @@ const inPane = (body: () => JSX.Element, height: number) => renderCells(
   { width: 60, height },
 )
 
-describe.skipIf(!canDraw)('a tab strip with panels', () => {
+describe('a tab strip with panels', () => {
   it.skipIf(owed('is a parent stop: Down enters the panel it is showing, Escape comes back'))('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
     const screen = await inPane(() => <TwoPanels />, 12)
     try {

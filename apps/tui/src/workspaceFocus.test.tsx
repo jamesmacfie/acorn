@@ -1,7 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
@@ -10,7 +9,7 @@ const caretLine = (frame: string): string =>
 
 // Its own file because the shell QueryClient intentionally survives a render; changing fixture
 // workspaces inside another shell test would otherwise reuse that file's already-cached roster.
-describe.skipIf(!canDraw)('workspace focus handoff', () => {
+describe('workspace focus handoff', () => {
   it('selects and focuses the first Menu source after changing workspace', async () => {
     process.env.ACORN_FIXTURE_SECOND_WORKSPACE = '1'
     try {

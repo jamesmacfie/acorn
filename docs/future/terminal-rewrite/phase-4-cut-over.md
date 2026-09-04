@@ -1,6 +1,8 @@
 # Phase 4: cut over
 
-Status: not started. Waits on phases 1 and 3. This is the only phase that deletes anything.
+Status: first slice built 2026-09-04 — the goldens settled, the switch, the gates and the harness. The
+remaining checklist steps are the workaround files, the packages, the dead dependencies, the goldens
+and the docs. This is the only phase that deletes anything.
 
 ## Goal
 
@@ -35,7 +37,8 @@ In:
   with client-core for the desktop's HTML adapter; note in `package.json` why it is there.
 - **Delete the workarounds.** `apps/tui/src/kit/reconciler.ts` (replaced by the tree module),
   `apps/tui/src/renderGuard.ts` and `apps/tui/src/renderGuard.test.ts` (replaced by the clamp in the
-  layout read-back and its test), `apps/tui/src/ffi.ts` and every `describe.skipIf(!hasFfi)`, the
+  layout read-back and its test), `apps/tui/src/ffi.ts` and every `describe.skipIf(!hasFfi)` (deleted),
+  the
   Node version check and `createCliRenderer` call and console suppression and listener cap in
   `apps/tui/src/main.tsx`, the `RGBA` adapter in `apps/tui/src/appearance.ts`, the `RAW_KEYS` table in
   `apps/tui/src/kit/render.tsx`, the `extend()` call in `apps/tui/src/kit/rectangle.tsx`, and the
@@ -153,7 +156,7 @@ still open.
 - `node --version` in CI is the repo's pin and `pnpm --filter @acorn/tui test` draws.
 - `grep -rn "opentui" apps/tui --include='*.ts' --include='*.tsx' --include='*.json' --include='*.mjs'`
   returns only the `@opentui/keymap` dependency line and its comment, or nothing.
-- `apps/tui/src/kit/reconciler.ts`, `apps/tui/src/renderGuard.ts`, `apps/tui/src/ffi.ts`, and
+- `apps/tui/src/kit/reconciler.ts`, `apps/tui/src/renderGuard.ts`, `apps/tui/src/ffi.ts` (deleted), and
   `apps/tui/golden/` do not exist.
 - The docs above are rewritten and `tools/arch/docPaths.test.ts` is green.
 - This folder is deleted in the commit after the one that lands the docs, with the retired-folders
@@ -167,3 +170,207 @@ still open.
 - Confirm `node-runtime.json` still pins 24.11.0 and what `engines` it declares.
 - Read the current [tui.md](../../tui.md) end to end before rewriting a section; it holds many rules
   this programme does not change, and a rewrite that drops one is a regression the tests will not see.
+
+## What building it found (2026-09-04)
+
+The first slice is built: the last five goldens are settled, the build switch is gone, the FFI gates
+are gone, and the harness is ours. `pnpm --filter @acorn/tui test` runs on Node 24.11.0 with no
+flag and no `--experimental-ffi`, and it draws: **584 passing, 2 failing, 5 skipped**, against 559,
+2 and 31 at the default switch on Node 26.8.1 the day before. That is the programme's headline
+sentence and it is now a measurement rather than a plan. Neither failure is this slice's, and both
+were checked on their own: `walks into a command group on return and back out of it on escape` fails
+alone and is another session's in-flight palette work; `draws many frames without re-collecting, and
+re-collects when the keys move` passes alone three times and is the load-dependent family this suite
+has always had. The five skips are the three goldens § The three that are left names and the two
+`kit.test.tsx` cases that were never phase 3's. One run of the suite beside another one also red
+`browse climbs to the rail` in `reachability.test.tsx`, which passes alone and on its own run: the
+same family, and a reason not to run two of these at once on one machine.
+
+`pnpm --filter @acorn/tui lint` is clean. The build is clean and the Solid transform now names our
+tree module by its own path, with no alias behind it, which is what § Scope hoped for. The startup
+graph check still fails its pre-existing 870,000 B ceiling: 964,995 B, down 5,042 B from the 970,037 B
+phase 3 measured under `own`. Lowering the ceiling waits on the dead dependencies, which is a later
+step in this phase's own checklist.
+
+### The goldens, settled
+
+Twenty-five of the twenty-eight match cell for cell and run for run under our painter, on the Node
+the repo pins. Two were re-captured, three are accepted, and the whole correction list is below.
+
+**The re-capture is under the old painter through this harness, with five seconds of settle.** Phase
+3 refused to re-capture under our own painter and the reason stands. What it could not have known is
+that the old painter, driven through this harness, does not reproduce its own goldens either: it
+reports 19 differences against `agents-80x24`, 15 against `notes-120x40`, and one each against the
+two `changes` files. So "the golden is what the old painter draws" had already stopped being true,
+and the useful question was why. Three answers, measured:
+
+- **The corrections are one of them, and that half is not a fault.** 360 runs in the set hold a
+  colour phases 2, 3 and 4 wrote into the files by hand, so the live old painter still draws the hex
+  the correction replaced. This accounts for every residual difference on `changes-80x24`,
+  `changes-120x40` and `agents-120x40`.
+- **Settling depth is the other, and it swings both ways.** `agents-80x24`'s capture was taken before
+  the fixture answered the agents pane's `NEEDS YOU` section, and `notes-120x40`'s live old painter
+  is *shallower* than its capture — the detail column still says "Select or create a note". The old
+  painter through this harness is therefore not a stable instrument on the surfaces whose content
+  arrives late.
+- **`changes-80x24` was the same fault as `agents-80x24` and phase 3 had it the wrong way round.**
+  Its table says the old painter reports no differences against that golden, so the difference must
+  be between the two harnesses' flushes. Measured again: held for thirty seconds, the old painter
+  through this harness draws `ChangesHeader` exactly as ours does. The golden was a screen taken
+  while a query was in flight, on both surfaces.
+
+So both 80-by-24 goldens were re-captured under the old painter through this harness on Node 26.8.1,
+with five real seconds between `until()` and the frame — the one thing the re-capture changes, and
+the thing the original capture was missing. Both then took the colour correction, and both now match
+our painter with nothing left over. The evidence that this is a re-capture and not a laundering is
+that the recaptured files differ from the originals in exactly the rows the fixture had not answered
+yet: `agents-80x24` gains its `NEEDS YOU` section, `changes-80x24` gains its header row.
+
+### The three that are left
+
+| Golden | Differences | What it is |
+| --- | --- | --- |
+| `agents-120x40` | 10 | The last cell of the header row, and the composer's hint wrapping a row differently because of it. |
+| `changes-120x40` | 8 | The last cell of four overflowing rows — a copy button's `⧉` and three of a diff count's `−`. |
+| `notes-120x40` | 4 | The last cell of two overflowing rows. |
+
+All three are one thing: a row whose children want more room than the row has gives the overflow up
+between them, and on the last child of such a row the two Yoga builds land a cell apart. Accepted,
+with the reason and the repro recorded here, and `apps/tui/src/golden.test.ts § SQUEEZED` carries the
+same sentences where a reader running the suite will find them. There is no owner to hand it to and
+no ticket to open: the set is deleted later in this phase.
+
+**`pointScaleFactor` is not the lever, and phase 3's "an afternoon on `pointScaleFactor`" was a
+guess.** `@opentui/core` 0.5.9 ships `setPointScaleFactor` as a wrapper over the Zig side and never
+calls it, exactly as we never call it on `yoga-layout` 3.2.1. Both builds run at the default, so
+there is no setting to match and the difference is the two builds' own arithmetic over negative free
+space. Anyone who wants it has the repro: at 120 by 40, `changes` row 3, a 30-cell column holding
+`uncommitted`, `/tmp/acorn-fixture` and `⧉` — the old build keeps the `⧉`, ours drops it. Our
+`flexShrink` rule is not the difference: `apps/tui/src/layout/props.ts § flexShrinkFor` derives the
+same answer `Renderable.setupYogaProperties` did.
+
+### Every correction the set carries
+
+Phase 4 owes this list, and § Scope asks for the sentence in
+[ui-design.md](../../ui-design.md) that justified each. There is one sentence and it covers all 360:
+a tone on a terminal is "default, and the palette's grey, accent, green, yellow and red", and "a
+theme stays 40-odd colours, and on a terminal it is 16 of them plus bold"
+([ui-design.md](../../ui-design.md) § Roles, and what each host makes of them). Neither hex the set
+held is one of the sixteen and neither comes from any theme, so the sentence won and the goldens were
+corrected to the colour the kit's own role returned — read off the live frame at the same column and
+refused unless the answer was one of the slots.
+
+Counted by diffing each file against its phase 0 capture at `f712312b`:
+
+| Correction | Runs | Where it came from |
+| --- | --- | --- |
+| `#00AAFF` → the terminal's own foreground | 184 | An overlay's border. `Modal` asks `boxBorder('surface')` and names no tone. |
+| `#00AAFF` → the accent slot | 168 | A lit panel's border. `panel.tsx` asks for `tone: 'accent'` when focus is within it. |
+| `#666666` → the palette's grey | 8 | A field's placeholder, `TextareaRenderable`'s default. |
+
+Per file, and the two re-captures marked:
+
+| File | Runs | File | Runs |
+| --- | --- | --- | --- |
+| `agents-80x24` (re-captured) | 12 | `agents-120x40` | 12 |
+| `browse-80x24` | 13 | `browse-120x40` | 13 |
+| `changes-80x24` (re-captured) | 13 | `changes-120x40` | 13 |
+| `context-80x24` | 12 | `context-120x40` | 12 |
+| `editor-80x24` | 12 | `editor-120x40` | 12 |
+| `help-80x24` | 32 | `help-120x40` | 32 |
+| `inbox-80x24` | 10 | `inbox-120x40` | 10 |
+| `notes-80x24` | 13 | `notes-120x40` | 13 |
+| `palette-80x24` | 23 | `palette-120x40` | 23 |
+| `pr-80x24` | 12 | `pr-120x40` | 12 |
+| `project-80x24` | 6 | `project-120x40` | 6 |
+| `quit-80x24` | 8 | `quit-120x40` | 8 |
+| `trust-80x24` | 10 | `trust-120x40` | 10 |
+| `workspace-80x24` | 4 | `workspace-120x40` | 4 |
+
+One run in the whole set refused and stayed `#666666`: the composer's placeholder in
+`agents-120x40`, at column 67 of row 35, which the squeeze above has moved — so there is no live run
+at that column to read a colour off. That is phase 2's stated limit doing what it said it would.
+
+**A golden cannot hold a number that comes from the clock, and two of them were.** The fixture's pull
+request is stamped `updatedAt: 0`, so the `pr` detail row says how many months ago the epoch was, and
+it goes up by one every thirty days. It went from 689 to 690 on 2026-09-04, which is the day this
+slice ran, so both `pr` goldens turned red mid-slice for a reason no diff could explain.
+`apps/tui/src/golden.test.ts § drifted` blanks the digits on both sides, by as many characters as
+they were so a run keeps its width. It is the same shape as the `inverse` bit `notes-80x24` has
+carried since phase 0: a golden that cannot be trusted about one value should not become a golden
+nobody checks.
+
+### The switch, the gates and the harness
+
+**Setting `moduleName` to the module's own path works, and the alias goes.** § Scope's "the cleanest
+is to set `moduleName` to the module's own path and drop the alias" is right, with one thing it did
+not say: the alias was doing two jobs. It pointed the Solid transform's emitted calls at our module,
+which `moduleName` now does, *and* it made seven ordinary imports of `@opentui/solid` resolve there
+too — `render` in `main.tsx` and both harnesses, and `Dynamic` in six chrome and plugin surfaces.
+Those had to be rewritten to name `./tree/renderer` directly, and until they were, the built `main.js`
+imported the real package and every drawing test died inside `createCliRenderer`. The two in the
+harnesses are `await import()` calls, so a grep for `from '@opentui/solid'` does not find them.
+
+**`render` and `Dynamic` had to be typed against Solid's `JSX.Element` rather than our `Node`.** Every
+`.tsx` file in the package still carries `/** @jsxImportSource @opentui/solid */`, and tsc reads it,
+so the ambient JSX namespace when a component is checked is still OpenTUI's. Both namespaces define
+`Element` as `SolidJSX.Element`, so typing the two entry points that way satisfies either — which is
+what lets the pragma stay until the packages leave `package.json`. It is worth knowing that the
+pragma is now tsc's business alone: at build time `moduleName` decides, and the emitted calls go to
+our module whatever the pragma says.
+
+**`ACORN_TUI_PAINTER` reached eleven runtime branches and every one collapsed to the `own` side.**
+`kit/scrolling.tsx`'s `nativeViewport`, `kit/asking.tsx`'s `nativeInput` and `nativeTextarea`,
+`kit/rectangle.tsx`'s `handedNative` and its `extend` call, `keys/keymapHost.ts`'s OpenTUI adapter,
+the `revealInViewports` call in `keys/regions.ts`, the paste-listener gate in `keys/install.ts`, the
+`createCliRenderer` call and the Node 26.4 check in `main.tsx`, and `colourCompat.ts`'s conversion.
+`apps/tui/src/painter.ts` and `apps/tui/src/ffi.ts` are deleted, along with `canDraw` in 22 test
+files. `extend` and the `embedded_terminal` tag went with the rectangle's OpenTUI half, so
+`tree/node.ts` and `tree/jsx.ts` each lost an entry and `tree/tree.test.ts` lost two cases.
+`invariants.test.ts`'s focusable census drops from two writes in `kit/rectangle.tsx` to one, which is
+the census doing its job.
+
+**`KEY_SETTLE_MS` was doing a second job nobody had written down.** § Scope says it goes "because
+there is no byte parser between a pushed event and the dispatcher in a test", and that is true: a
+test constructs a `KeyEvent` and pushes it onto the key stream, so nothing is holding a lone Escape
+to see whether a sequence follows. It is gone from `kit/render.tsx`, where a fragment under test has
+no transport behind it and the whole suite is green without it. It had to stay in `harness.tsx`. What
+the wait was also doing is giving real time to whatever the press started: a Tab lands the caret on a
+row whose data the fixture answers on a 50 ms timer, and turning the render loop does not make a
+timer fire however many turns it is given. Taking it out reds `browseSlow.test.tsx`'s re-suspending
+case and `browse at 80 by 24` in `reachability.test.tsx`, and nothing else. The comment above it now
+says the real reason.
+
+**The twenty-step settle loop stays, and it is measured rather than inherited.** § Scope asks for the
+measurement before deciding. Taking the loop out reds the same two cases and nothing else, which is
+the same pair the press wait holds up and the same cause: the first render in a fresh worker pays for
+compiling every module the pane pulls in, which is a Vite cost and is why one painter did not end it.
+
+**`RAW_KEYS` is gone**, with the OpenTUI test renderer it fed. So is the console pair both harnesses
+called before taking a frame: `openOwnRenderer`'s console is a no-op shim, so `deactivate()` and
+`hide()` were doing nothing. `golden.test.ts` and `captureGolden.tsx` still call them and still
+should — they go with the goldens.
+
+### What the next slices must know
+
+- **`apps/tui/src/kit/reconciler.ts` is unreferenced but still compiled.** Nothing imports it and no
+  alias points at it, so deleting it is a one-line change; it was left in place because § Design puts
+  the workaround files after the harness.
+- **`@opentui/core` is still named in 40 files and almost all of it is types** — `CliRenderer`,
+  `Renderable`, `KeyEvent`, `ScrollBoxRenderable`, `InputRenderable`, `TextareaRenderable`. Six
+  imports are values: `RGBA` in `apps/tui/src/colourCompat.ts`, `CliRenderEvents` in
+  `apps/tui/src/main.tsx`, `TextAttributes` in `apps/tui/src/kit/kit.test.tsx`, and `Renderable` or
+  `BoxRenderable` in the three workaround files a later step deletes. Removing the package means
+  replacing those type names with ours, and `colourCompat.ts § paintColor` says which cast goes with
+  them: it is the identity, and only its return type does anything.
+- **Every `.tsx` file still carries `/** @jsxImportSource @opentui/solid */`** and it is tsc's
+  business alone now — the build reads `moduleName` and sends every call to our module whatever the
+  pragma says. The pragma cannot go until the JSX namespace `apps/tui/src/tree/jsx.ts` declares is
+  what tsc reads, which is the same step that removes the package.
+- **`renderer.console` is a shim with four no-op members** (`apps/tui/src/ownRenderer.ts`), kept
+  because `main.tsx` prints `getCachedLogs()` on the way out and the golden capture calls the other
+  three. Both callers go in later steps of this phase, and the shim goes with the second of them.
+- **The `pr` goldens' month count is blanked, not fixed.** If somebody keeps the set past this phase,
+  the real fix is a fixture timestamp that is not the epoch.
+- **The startup graph is 964,995 B against an 870,000 B ceiling.** The check has been failing since
+  before this programme; the dead dependencies are what is supposed to close it.

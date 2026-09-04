@@ -24,7 +24,6 @@ import { Keymap, type TargetMode } from '@opentui/keymap'
 import { registerDefaultKeys, registerEnabledFields, registerMetadataFields } from '@opentui/keymap/addons'
 import type { CliRenderer, KeyEvent, Renderable } from '@opentui/core'
 import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { drawsOwn } from '../painter'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
@@ -313,7 +312,9 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
   // ordinary listener, so it runs after the engine's prepended one and before the renderer routes
   // anything to a renderable of its own.
   renderer.keyInput.on('keypress', typeInto)
-  if (drawsOwn()) renderer.keyInput.on('paste', pasteInto as (event: unknown) => void)
+  // …and a whole paste beside it, on the same stream, because that is where the parser puts one
+  // (§ pasteInto).
+  renderer.keyInput.on('paste', pasteInto as (event: unknown) => void)
 
   // Per-binding gating, the same field the DOM installer registers: `registerEnabledFields` only
   // reaches layers and commands, and a bare key's "not while somebody is typing" is a property of one

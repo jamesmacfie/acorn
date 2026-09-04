@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from '../ffi'
 import { Lines } from './showing'
 import { htmlLines } from './markdown'
 import { renderCells } from './render'
@@ -30,7 +29,7 @@ describe('provider HTML parsing', () => {
   })
 })
 
-describe.skipIf(!canDraw)('provider HTML in cells', () => {
+describe('provider HTML in cells', () => {
   it('keeps spaces at inline style boundaries', async () => {
     const html = [
       '<p><code>new_framework_defaults_7_0.rb</code> had five settings. Two switched on.</p>',

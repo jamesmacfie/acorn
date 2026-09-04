@@ -36,10 +36,8 @@ export type Node = {
 
 /** The tag the JSX transform emits, mapped to the kind we lay out and paint.
  *
- *  `embedded_terminal` is here because `../kit/rectangle.tsx` calls `extend` with it for the PTY box
- *  and phase 3 is what removes that call. Until then the tag exists and has to land somewhere, and
- *  `pty` is where. Anything not on this list is a surface on the wrong host — `<main>` from a DOM
- *  component — and should say so rather than draw an empty box. */
+ *  Anything not on this list is a surface on the wrong host — `<main>` from a DOM component — and
+ *  should say so rather than draw an empty box. */
 export const KINDS: Readonly<Record<string, Kind>> = {
   box: 'box',
   text: 'text',
@@ -48,7 +46,6 @@ export const KINDS: Readonly<Record<string, Kind>> = {
   input: 'input',
   textarea: 'textarea',
   pty: 'pty',
-  embedded_terminal: 'pty',
 }
 
 /**
