@@ -45,14 +45,12 @@ import { copyToTerminal } from './copy'
 // told to take the room its row has left — and an edit buffer owns its own text, so a `value` that
 // changes from outside has to be written into the renderable rather than passed as a prop.
 //
-// **Both fields have two implementations, one contract**, the shape `./scrolling.tsx` set for the
-// scroll viewport. OpenTUI's `InputRenderable` and `TextareaRenderable` own an edit buffer, a wrap
-// and a caret; under our painter `ownField` below owns all three and the node carries the value, the
-// caret's offset and the scroll as props paint reads. What the rest of the app reaches a field
-// through is the same either way — `value`, `plainText`, `setText`, `insertText`, `handleKeyPress`
-// and `handlePaste` — which is what keeps `Composer`, `MentionTextarea` and the dispatcher's typing
-// hand-off one piece of code rather than two. Phase 4 deletes the OpenTUI half
-// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
+// **A field is a contract rather than a class**, the shape `./scrolling.tsx` set for the scroll
+// viewport. `fieldRef` below owns the edit buffer, the wrap and the caret, and the node carries the
+// value, the caret's offset and the scroll as props paint reads. What the rest of the app reaches a
+// field through is six names — `value`, `plainText`, `setText`, `insertText`, `handleKeyPress` and
+// `handlePaste` — which is what keeps `Composer`, `MentionTextarea` and the dispatcher's typing
+// hand-off one piece of code (docs/tui.md § The five key groups).
 
 /** `[ label ]`. `bare` drops the brackets, for a control that is a word inside a sentence. */
 export function Button(props: ButtonProps) {
@@ -113,11 +111,11 @@ export function ConfirmButton(props: ButtonProps & {
   )
 }
 
-/** What the rest of this app asks of a field, whichever painter drew it.
+/** What the rest of this app asks of a field.
  *
- *  OpenTUI's two renderables answer all six already; ours are installed on the node by `ownField`
- *  below, so `Composer`, `MentionTextarea`, the `commit` layer and the dispatcher's typing hand-off
- *  never learn which one they are talking to (../keys/install.ts § typeInto). */
+ *  All six are installed on the node by `fieldRef` below, so `Composer`, `MentionTextarea`, the
+ *  `commit` layer and the dispatcher's typing hand-off reach a field through this shape rather than
+ *  through the component that drew it (../keys/install.ts § typeInto). */
 type FieldApi = {
   value: string
   plainText: string
@@ -128,21 +126,21 @@ type FieldApi = {
 }
 
 /**
- * Our painter's field: the model is a signal here and four props there.
+ * A field: the model is a signal here and four props there.
  *
- * The whole of both fields under this painter, because the two differ by one thing. `newline` says
- * whether Return inserts one, which is exactly `InputRenderable`'s single overridden binding, and it
+ * The whole of both fields, because the two differ by one thing. `newline` says whether Return
+ * inserts one, which is the one binding an `Input` overrides, and it
  * doubles as "does this field wrap" — a one-row field slides sideways where a wrapped one slides up
  * and down, and one `scroll` number says both (../paint/paint.ts § drawField).
  *
  * Nothing on the node knows how to edit. The model is a signal here and a set of props there, so a
  * node cannot be in an edit state the component disagrees with, and paint reads four numbers
- * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design).
+ * (../paint/paint.ts § drawField).
  *
  * Returns the `ref` its two call sites install, because a `ref` callback cannot return a signal —
  * the same reason `../keys/stops.ts § stop` is shaped that way.
  */
-function ownField(spec: {
+function fieldRef(spec: {
   value: () => string
   newline: boolean
   onInput?: (value: string) => void
@@ -165,7 +163,7 @@ function ownField(spec: {
    *  that is deliberate twice over: the cache is keyed by the `value` prop this component writes, so
    *  reading it here would depend on the effect below having already run, and a wrap of a 400-line
    *  note is 163 microseconds — affordable per keystroke, which is the only place this is called
-   *  (../wrap.ts, docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4). */
+   *  (../wrap.ts). */
   const rows = (text: string): readonly Row[] => {
     const node = box()
     return wrapRows(text, spec.newline && node ? Math.max(node.rect.w, 1) : Infinity)
@@ -231,10 +229,9 @@ function ownField(spec: {
   })
 
   // The model into the node's props, where paint reads it, and a frame to draw the move. Written from
-  // an effect rather than spelled as JSX attributes for the reason the viewport's `offset` is: while
-  // the switch exists tsc types every intrinsic in this package against OpenTUI's closed prop shapes
-  // whichever painter the build picked, and none of these four is one of them
-  // (./scrolling.tsx § ownViewport, docs/future/terminal-rewrite/phase-2-the-painter.md).
+  // an effect rather than spelled as JSX attributes because `../tree/jsx.ts § InputProps` carries none
+  // of these four: they are the component's own state on its own node, not something a call site
+  // passes in (./scrolling.tsx § viewportBox).
   createEffect(() => {
     const node = box()
     if (!node) return
@@ -283,7 +280,7 @@ const fieldColors = () => ({
 })
 
 export function Input(props: InputProps) {
-  const install = ownField({
+  const install = fieldRef({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
     onInput: (value) => props.onInput?.(value),
@@ -350,7 +347,7 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
 }
 
 export function Textarea(props: TextareaProps) {
-  const install = ownField({
+  const install = fieldRef({
     value: () => props.value ?? '',
     newline: true,
     onInput: (value) => props.onInput?.(value),

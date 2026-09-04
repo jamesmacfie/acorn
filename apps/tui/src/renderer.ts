@@ -98,7 +98,7 @@ export function openRenderer(options: {
   // a release. So `keypress` carries presses and repeats and `keyrelease` carries releases, which is
   // the split the keymap host's two subscriptions already expect and the split the typing hand-off
   // needs: it listens on `keypress` alone, and a release delivered there would type every character
-  // twice (./keys/keymapHost.ts § ownKeymapHost, ./input/terminal.ts § KITTY_FLAGS).
+  // twice (./keys/keymapHost.ts § tuiKeymapHost, ./input/terminal.ts § KITTY_FLAGS).
   const route = (event: Parameters<InputListener>[0]): void => {
     if (event.type === 'resize') { screen.resize(event.cols, event.rows); return }
     if (event.type === 'key') {

@@ -196,9 +196,9 @@ const isTypingTarget = (node: Renderable | null): boolean => !!node && isField(n
  * installs a handler that calls `handleKeyPress`, and the renderer runs those only after every
  * ordinary listener and only while nothing has called `preventDefault`. With the store owning focus
  * that route is a coincidence — it works while the caret mirror happens to agree — so the dispatcher
- * says it instead. `TextareaRenderable.handleKeyPress` reads the key and its own suspend trait and
- * nothing else, so calling it directly is the whole of typing
- * (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 1).
+ * says it instead. A field's own `handleKeyPress` reads the key and nothing else — it has no focus
+ * of its own to check — so calling it directly is the whole of typing
+ * (docs/tui.md § The five key groups).
  *
  * Claimed afterwards, so the renderer's own route does not type the same key a second time into the
  * node the caret mirror focused. A key some binding took arrives prevented and is left alone, and the

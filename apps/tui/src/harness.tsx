@@ -66,8 +66,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *  `width` is not `text.length`. `captureCharFrame` gives us one character per grapheme, so a frame
  *  held as characters alone cannot see a column shift at all — `你|` comes back with the bar at index
  *  1 whether the wide character drew in one cell or two. The run frame is the only place the column
- *  count survives, which is why a test that cares about width reads spans rather than characters
- *  (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 3). */
+ *  count survives, which is why a test that cares about width reads spans rather than characters. */
 export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number; width: number }
 
 /** Where the keys are and what the line under them says (./keys/regions.ts). */
@@ -97,8 +96,7 @@ type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: bool
  *
  * Its own shape rather than seven loose consts because it is what a test is allowed to do to a
  * screen, said once: everything below it — the fixture, the resets, the roster, the tree — is about
- * the app rather than about the surface it is drawn on
- * (docs/future/terminal-rewrite/architecture.md § 7).
+ * the app rather than about the surface it is drawn on (docs/tui.md § Tests).
  */
 type Surface = {
   renderer: Renderer
@@ -113,8 +111,8 @@ type Surface = {
 
 /** A screen with no terminal under it, read straight out of the cell buffer.
  *
- *  No FFI and no flag, which is the programme's whole point: this draws on the Node the repo pins
- *  (./paint/screen.ts, docs/future/terminal-rewrite/README.md § Done when). */
+ *  No FFI and no flag: this draws on the Node the repo pins
+ *  (./paint/screen.ts, docs/tui.md § The runtime floor). */
 function openSurface(size: { width: number; height: number }): Surface {
   const renderer = openRenderer({ cols: size.width, rows: size.height })
   return {

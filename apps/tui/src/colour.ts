@@ -7,9 +7,9 @@
 //
 // `default` is the one that matters and it is why this type has to exist. OpenTUI has no way to say
 // "leave this the terminal's own colour": an unset foreground is opaque white to it, which on a light
-// terminal is white on white, and that was every markdown paragraph and every line of every diff
-// (docs/future/terminal-rewrite/review.md § 2c). Paint writes `39` and `49` for `default`, so the
-// class is fixed where the colour is emitted rather than by every role remembering to name one.
+// terminal is white on white, and that was every markdown paragraph and every line of every diff.
+// Paint writes `39` and `49` for `default`, so the class is fixed where the colour is emitted rather
+// than by every role remembering to name one.
 //
 // This file knows nothing about paint and nothing about the tree. `./paint/` turns a `Color` into SGR
 // parameters, `./tree/jsx.ts` types the props that carry one, and the slice that rewrites

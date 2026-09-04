@@ -22,7 +22,7 @@
 // these to the runtime means Node resolves them when the chunk loads — which needs seventeen packages
 // installed for a surface that cannot draw. Aliasing them here is what lets `package.json` drop the
 // lot without turning a surface that fails into a chunk that will not load
-// (docs/future/terminal-rewrite/phase-4-cut-over.md).
+// (docs/tui.md § The host switch).
 //
 // **Everything here throws, and that is the point.** A stub that answers plausibly is how this host
 // ended up with an editor pane pulling seventeen grammars it could never highlight. If a surface ever

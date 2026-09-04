@@ -147,7 +147,7 @@ describe('the node operations', () => {
     // The destroy-on-detach race, as a test. OpenTUI destroyed a renderable a tick after it left the
     // tree; `Suspense` removes its children when it suspends and hands the *same instances* back when
     // it resolves, so any boundary that suspended twice went permanently blank
-    // (docs/future/terminal-rewrite/review.md § 2a).
+    // (docs/tui.md § Rendering).
     createRoot((dispose) => {
       const parent = createElement('box')
       const suspended = tagged(5)

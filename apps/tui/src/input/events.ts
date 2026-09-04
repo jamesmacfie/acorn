@@ -1,7 +1,7 @@
 // What the terminal tells us, as five plain objects.
 //
 // One shape, ours, read by the keymap host, the footer, the rectangle's encoder and the test harness
-// (docs/future/terminal-rewrite/architecture.md § 4). The engine in `@opentui/keymap` is generic over
+// (docs/tui.md § How a frame is drawn). The engine in `@opentui/keymap` is generic over
 // the event type and never constructs one, so this is the only definition of a keystroke in the
 // client — which is what makes `../kit/render.tsx`'s `RAW_KEYS` table unnecessary. That table exists
 // because the only way to press a key at OpenTUI's test input is to hand it bytes, and a name it does

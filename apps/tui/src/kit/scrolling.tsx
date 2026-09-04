@@ -28,7 +28,7 @@ import type { Node } from '../tree/node'
 /**
  * What this app asks of a viewport.
  *
- * `ownViewport` below installs every one of these on the node, so the key tables and `./showing.tsx`
+ * `viewportBox` below installs every one of these on the node, so the key tables and `./showing.tsx`
  * reach a viewport through this shape rather than through whatever drew it. `scrollChildIntoView`
  * goes on the node beside them for the one caller that reaches a viewport through the tree rather
  * than through this component, which is the store's reveal
@@ -131,9 +131,9 @@ const descendant = (at: Node, id: unknown): Node | null => {
  *
  * Nothing on the node knows how to scroll. The offset is a signal here and a prop there, so a node
  * cannot be in a scroll state the component disagrees with, and paint reads one number
- * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design).
+ * (docs/tui.md § Scrolling viewports).
  */
-function ownViewport(props: ViewportProps): JSX.Element {
+function viewportBox(props: ViewportProps): JSX.Element {
   const [offset, setOffset] = createSignal(0)
   let box: Node | undefined
   let content: Node | undefined
@@ -244,5 +244,5 @@ export function ScrollViewport(props: ViewportProps) {
   createEffect(() => {
     if (props.visible === false) scheduleSettle()
   })
-  return ownViewport(props)
+  return viewportBox(props)
 }

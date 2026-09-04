@@ -12,7 +12,7 @@ import {
 // The tree into the cells: one depth-first walk, and every behaviour the old renderables had.
 //
 // This is where the rendering fault class ends, because the three things a `Renderable` did wrong are
-// all decisions this file makes instead (docs/future/terminal-rewrite/review.md § 2a to § 2c):
+// all decisions this file makes instead:
 //
 //   a `#text` under a box     is a one-line run at the box's content origin. It was an error thrown
 //                             from inside whatever signal had just moved, and four crashes in one
@@ -285,8 +285,7 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * Everything drawn here comes off the node as a prop, because the state is the component's — the
  * value the model holds, the caret's offset into it, how far the field has scrolled, and whether the
  * region store has given it the keys. Nothing on the node knows how to edit, so nothing on the node
- * can be in a state the component disagrees with
- * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design, ../kit/asking.tsx).
+ * can be in a state the component disagrees with (../kit/asking.tsx).
  *
  * **The rows are the ones Yoga measured**, out of the same cache, which is what keeps the caret on a
  * row the reader can see (../wrap.ts § measuredField).
