@@ -448,6 +448,47 @@ Attachments are validated, task-scoped, stored through the shared blob cache, an
 session records. Artifacts are authenticated no-store downloads; provider paths and worktree paths
 are revalidated against the owning task.
 
+### Draft attachments, and replacing one
+
+An attachment on an unsent turn is a draft: a row and a content-addressed blob that no turn references
+yet. The composer owns which ones are in the turn, as an array in client state with the ids in local
+storage; the node owns the content. Sending a turn is what turns a draft into evidence, and stored
+bytes are never edited in place — content addressing, deduplication, draft recovery and the record of
+what a turn contained all rest on that.
+
+Another plugin may draw an attachment instead of the composer's chip, and may hand back an altered one.
+Two seams make that possible without letting it reach past either owner.
+
+`agents.draftAttachments` is a node capability with exactly two methods
+(`plugins/agents/src/contract/draftAttachments.ts`). `read` returns one PNG or JPEG of a named task
+that no turn has claimed, as bytes — never a filesystem path — and answers `null` for every refusal,
+because saying which kind of no would answer questions about rows the caller may not see.
+`createReplacement` stores an altered copy through the ordinary upload path: same 10 MiB ceiling, same
+magic-byte validation, same safe-name normalization, same deduplication, so bytes identical to the
+source come back as the source and an edit that changed nothing is a no-op. It rechecks the source
+immediately before writing, because an editor stays open while a person draws and the turn can be sent
+in the meantime. A loaded plugin declares `requires.plugins: [{ id: "agents" }]` and the capability in
+`permissions.node.capabilities`, and resolves it at call time rather than at init.
+
+Neither method replaces the draft or deletes the source, deliberately. The node does not own the unsent
+client array and cannot transact with it, and deleting a source before the client has committed would
+lose the reader's only valid attachment. So `createReplacement` produces a candidate, and the composer
+commits it through the `agents:attachment` point's declared `replace` action
+(`docs/plugins.md § Asking the owner`).
+
+That commit is a compare-and-swap, which is the only meaning "atomic" can have across those two
+owners: the id the contributor says it edited has to still be in that slot, the replacement has to
+belong to the same task and be an image, and the draft's count and aggregate-size ceilings have to
+still hold. Exactly one array element changes, order is preserved, and Submit and that slot's remove
+are disabled while it runs. The new id is written to durable draft storage *before* the old one is
+cleaned up, so a crash in between leaves an extra unreferenced row for the 24-hour sweep rather than a
+draft pointing at deleted content. A rejected candidate is deleted on a best-effort basis and the
+original stays.
+
+Nothing downstream needed changing. The turn stores `{ type: 'attachment', attachmentId }` and both
+drivers resolve the id to a local path at dispatch, so replacing the id before enqueue is the whole of
+what makes the agent receive the altered image.
+
 ## Operations and failure
 
 Only one turn dispatches per session. Workspace and provider ceilings bound concurrency, and the owner

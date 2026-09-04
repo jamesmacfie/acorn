@@ -339,6 +339,16 @@ the cap is raised rather than removed so a real runaway still trips it.
 natively rather than handing an element back. The `rectangle` extension kind — a sibling region an
 iframe fills — is absent entirely.
 
+**A companion overlay is the same absence, answered rather than ignored.** A remote tree may ask its
+host to present one of its plugin's overlay frames (`docs/plugins.md § Companion overlays`). There is
+no iframe here to put one in, and a cell-drawn canvas is not something this project is going to invent,
+so `src/plugins/RemoteTree.tsx` answers `overlay.open` with a typed `unsupported_host`. A plugin
+catches that code and leaves its static preview up, and the point owner's own fallback is what a reader
+sees. The other half of that seam, `owner.invoke`, is host-agnostic and goes through the shared check
+in `client-core/host/tree/hostRequests.ts` — what a contributor may ask its owner to do is not a
+question about which host is drawing, and a copy of that check here would be a copy that could
+diverge.
+
 ### Loose text under a box
 
 A run of text must have a `text` parent here, and on the DOM a bare string anywhere is a text node

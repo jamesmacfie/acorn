@@ -627,6 +627,46 @@ your bundle draws, so it holds one bridge and one context; the props are per slo
 A pane tree is mounted with `{ taskId, projectId }`, a project pane and a reference panel with
 `{ item }`. `bridge.onSelect` and `bridge.onSurfaceAction` reach you exactly as they reach a frame.
 
+#### Asking the host for something
+
+Props are data, so a tree that fills somebody else's slot cannot change what it is drawing and cannot
+open a rectangle. Two methods on the mount cover both, and they are on the mount rather than the bridge
+for the reason above: one bridge per bundle could not say which of your four mounted previews asked.
+
+```tsx
+mountTree({
+  attachmentPreview: solidTree((props, { host }) => (
+    <Button onPress={async () => {
+      const result = await host.openOverlay('editor', { taskId: props.taskId, attachmentId: props.attachment.id })
+      if (!result) return                       // dismissed; nothing happened
+      await host.invoke('replace', { expectedAttachmentId: props.attachment.id, ...result })
+    }}>Edit {props.attachment.filename}</Button>
+  )),
+})
+```
+
+`host.invoke(action, payload)` calls an action the owning point declared and the owner bound to that
+exact slot. You learn the names from the owner's published `actions` list; anything else is refused.
+The owner decides whether to do it, so handle a rejection.
+
+`host.openOverlay(overlayId, input)` presents the one overlay your extension descriptor associated:
+
+```json
+{ "id": "image-attachment", "point": "agents:attachment", "label": "Image markup",
+  "remote": "attachmentPreview", "matches": ["image/png", "image/jpeg"], "overlay": "editor" }
+```
+
+That overlay must be a `frame` in your own manifest with `"target": "overlay"`, and naming it here is
+what opens it — you do not also need a command. Inside it, `bridge.context.input` is what you passed,
+and `bridge.ui.close(result)` resolves the call. Every dismissal resolves it with `null` instead, so
+check for that before acting.
+
+Three things will refuse you, all deliberate. Call `openOverlay` from a press or key handler: the host
+honours it only while focus is inside your tree, and at most once a second. Keep payloads, inputs and
+results under 64 KiB and made of JSON — pass an id and fetch the bytes over your own route with
+`bridge.api.getBytes`. And catch `unsupported_host`: the terminal draws trees and has no iframe to put
+an overlay in, so leave your static preview up there rather than showing a control that cannot work.
+
 ### Reaching the bridge
 
 In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
@@ -663,7 +703,8 @@ The sequence (`packages/protocol/src/plugin/bridge.ts`):
 2. You take `event.ports[0]`, set `onmessage`, and call `port.start()`.
 3. The host sends `{ kind: 'ready', context }`. `context` is a **snapshot**, not reactive: `surface`,
    `target`, `nodeId`, and — depending on the surface — `taskId`, `projectId`, `refId`, `item`,
-   `theme`, `style`, `claimsKeys`.
+   `input`, `theme`, `style`, `claimsKeys`. `input` is overlay-only and is what the remote tree that
+   opened this overlay passed; it is the only thing the frame is told about who opened it.
 4. **You must post something back.** The host arms a 10-second deadline when it transfers the port and
    replaces the frame with a labelled "This plugin's UI failed to start" placeholder if nothing
    arrives, because a bundle that throws at module scope otherwise renders a blank rectangle and
@@ -694,9 +735,10 @@ messages by hand:
 | --- | --- |
 | `context` | The `ready` snapshot. |
 | `api` | `get`, `post`, `put`, `patch`, `del` — five, matching `PluginBridgeApiRequest.method` exactly. A method missing from the facade is a method no plugin can reach, however permissive the scope table underneath. |
+| `api.getBytes` / `api.postBytes` | The same call for a route whose body is bytes, on its own wire kind `api.bytes`. GET and POST, capped at 12 MiB each way, with an advisory `type` and `filename`. Reach for it instead of base64 whenever you are moving a file: the JSON verbs stringify everything, which costs a third more on the wire and a decode at each end. The path decision is identical, and another plugin's namespace is refused before the body is read. |
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
-| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. |
+| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |
