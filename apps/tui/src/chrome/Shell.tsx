@@ -2,7 +2,7 @@
 import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
-import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
+import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'

@@ -19,7 +19,7 @@
 
 import { createSignal } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
+import type { KeyEvent } from '../keyEvent'
 import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { hostKeysFor } from '../keys/install'

@@ -2,7 +2,7 @@
 import { createRequire } from 'node:module'
 import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
+import type { KeyEvent } from '../keyEvent'
 import type { Terminal as HeadlessTerminal } from '@xterm/headless'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusRenderable, focusWithin, focusedRenderable, onScreen } from '../keys/regions'

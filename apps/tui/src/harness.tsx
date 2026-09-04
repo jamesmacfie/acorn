@@ -1,13 +1,13 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import type { OwnRenderer } from './ownRenderer'
+import type { Renderer } from './renderer'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
 import { _resetRequests, stubTransport, TASK } from './fixture'
 import { rgbOf } from './colourCompat'
 import { setTerminalBadge } from './kit/notify'
-import { openOwnRenderer } from './ownRenderer'
+import { openRenderer } from './renderer'
 import { frameRequested, framesSettled } from './tree/frames'
-import { pressedKey } from './ownKeys'
+import { pressedKey } from './keyEvent'
 import { focusedRegion, focusedRenderable, type RegionRef } from './keys/regions'
 
 // Booting client-core under Node against no node at all: the same seam, the same boot, a transport
@@ -86,7 +86,7 @@ export type Screen = {
   /** The renderer, for the questions the store does not answer: the tree a case wants to count nodes
    *  in, and the console a capture sends away before it takes its frame (./diffLong.test.tsx,
    *  ./keys/keys.test.tsx). */
-  renderer: OwnRenderer
+  renderer: Renderer
   done: () => void
 }
 
@@ -101,7 +101,7 @@ type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: bool
  * (docs/future/terminal-rewrite/architecture.md § 7).
  */
 type Surface = {
-  renderer: OwnRenderer
+  renderer: Renderer
   /** Resolve once the render loop has nothing left to do. */
   flush: () => Promise<unknown>
   captureCharFrame: () => string
@@ -116,9 +116,9 @@ type Surface = {
  *  No FFI and no flag, which is the programme's whole point: this draws on the Node the repo pins
  *  (./paint/screen.ts, docs/future/terminal-rewrite/README.md § Done when). */
 function openSurface(size: { width: number; height: number }): Surface {
-  const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
+  const renderer = openRenderer({ cols: size.width, rows: size.height })
   return {
-    renderer: renderer as unknown as OwnRenderer,
+    renderer: renderer as unknown as Renderer,
     // Turn the event loop until the tree stops asking for frames, then draw once.
     //
     // A wait rather than a draw, because the scheduler draws by itself: an operation on the tree asks
@@ -156,7 +156,7 @@ function openSurface(size: { width: number; height: number }): Surface {
     },
     // Straight onto the key stream. The parser is not wired to the dispatcher until phase 3, and it
     // is not what a test wants either: a harness that constructs the event has no bytes to get wrong
-    // (./ownRenderer.ts § The key stream is a queue).
+    // (./renderer.ts § The key stream is a queue).
     pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
     destroy: () => renderer.destroy(),
   }
@@ -321,7 +321,7 @@ export async function renderFixture(size: {
   // because a lone Escape is the start of every escape sequence there is and a terminal's parser
   // holds it until it is sure nothing follows — and a test pushes a `KeyEvent` straight onto the key
   // stream, so there is no parser in front of the dispatcher and that reason is gone
-  // (./ownKeys.ts § pressedKey).
+  // (./keyEvent.ts § pressedKey).
   //
   // What the wait was also doing, which nobody had written down, is giving real time to whatever the
   // press started. A key lands the caret on a row whose data the fixture answers on a 50 ms timer,
@@ -424,7 +424,7 @@ export async function renderFixture(size: {
     // A single character is itself; a named key is the parser's own spelling for one, which is upper
     // case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently,
     // which is a good hour to save the next person — and a chord is the key plus a modifiers object,
-    // never the string `'ctrl+k'`, which types five letters and a `k` (./ownKeys.ts § pressedKey).
+    // never the string `'ctrl+k'`, which types five letters and a `k` (./keyEvent.ts § pressedKey).
     press,
     /** The frame as coloured runs rather than characters.
      *

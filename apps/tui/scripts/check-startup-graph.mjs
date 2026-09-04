@@ -21,9 +21,9 @@ const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])
 
-// Measured at 963,998 B on 2026-09-04, and rounded up by about 3% so an unrelated comment does not
+// Measured at 963,940 B on 2026-09-04, and rounded up by about 3% so an unrelated comment does not
 // turn the build red — the same rule every ceiling here has had. The history, because each step moved
-// it for a different reason (docs/performance.md, docs/future/terminal-rewrite/phase-4-cut-over.md):
+// it for a different reason (docs/performance.md § The eager closure, and the new ceiling):
 //
 //   1,114,282 B  the performance programme's phase 0, its first measurement.
 //   1,024,422 B  its phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this
@@ -34,9 +34,10 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 //     875,265 B  and then the graph drifted past it. The check had been red for a while before the
 //                terminal rewrite started, which is why "lower the ceiling" turned out to be
 //                "raise it honestly".
-//     963,998 B  the terminal rewrite. The painter is ours now, so it is in this bundle instead of
-//                being a 6 MB native library outside it: `ownRenderer`, `renderer` and `ownKeys`
-//                together are 97,889 B of the closure, and that is nearly the whole of the rise.
+//     963,940 B  the terminal rewrite. The painter is ours now, so it is in this bundle instead of
+//                being a 6 MB native library outside it: `../src/renderer.ts`, `../src/tree/`
+//                and `../src/keyEvent.ts` together are about 98 KB of the closure, and that is
+//                nearly the whole of the rise.
 //
 // Dropping dead dependencies moved none of this and was never going to. Every bare import is left to
 // the runtime by `../vite.config.ts`, so a package that is only ever imported weighs nothing here

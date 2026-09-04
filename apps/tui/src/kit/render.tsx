@@ -1,10 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import type { JSX } from 'solid-js'
-import type { OwnRenderer } from '../ownRenderer'
+import type { Renderer } from '../renderer'
 import { rgbOf } from '../colourCompat'
-import { openOwnRenderer } from '../ownRenderer'
+import { openRenderer } from '../renderer'
 import { frameRequested, framesSettled } from '../tree/frames'
-import { pressedKey } from '../ownKeys'
+import { pressedKey } from '../keyEvent'
 
 // Drawing one node to a cell buffer, reading it back, and pressing a key at it, which is what a test
 // of this kit is.
@@ -35,7 +35,7 @@ export type Cells = Frame & {
   frame: () => Promise<Cells>
   /** A single character is itself; a named key is the parser's own spelling for one, which is upper
    *  case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently,
-   *  which is a good hour to save the next person (../ownKeys.ts § pressedKey). */
+   *  which is a good hour to save the next person (../keyEvent.ts § pressedKey). */
   press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<Cells>
   /** Send one terminal wheel/trackpad step at a cell. */
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
@@ -48,7 +48,7 @@ export type Cells = Frame & {
   resize: (width: number, height: number) => Promise<Cells>
   /** The renderer, for the questions the store does not answer: the tree a case wants to walk, and
    *  the root a hit test starts from (./kit.test.tsx § every control is a stop). */
-  renderer: OwnRenderer
+  renderer: Renderer
   done: () => void
 }
 
@@ -58,7 +58,7 @@ export type Cells = Frame & {
  * and scrolls where a shell case does not.
  */
 type Surface = {
-  renderer: OwnRenderer
+  renderer: Renderer
   flush: () => Promise<unknown>
   captureCharFrame: () => string
   runs: () => Run[]
@@ -73,9 +73,9 @@ type Surface = {
 type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }
 
 const openSurface = (size: { width: number; height: number }): Surface => {
-  const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
+  const renderer = openRenderer({ cols: size.width, rows: size.height })
   return {
-    renderer: renderer as unknown as OwnRenderer,
+    renderer: renderer as unknown as Renderer,
     // Turn the event loop until the tree stops asking for frames, then draw once, for the reason
     // `../harness.tsx § openSurface` gives: one frame produces the next, so a fixed number of turns
     // reads a screen that is still settling (../tree/frames.ts).
@@ -170,7 +170,7 @@ export async function renderCells(
   // No wait between the press and the frame. A test constructs the event and pushes it onto the key
   // stream, so there is no byte parser in front of the dispatcher to hold a lone Escape while it
   // waits to see whether a sequence follows — the wait that used to be here was for one
-  // (../input/parser.ts, ../ownKeys.ts § pressedKey).
+  // (../input/parser.ts, ../keyEvent.ts § pressedKey).
   const press = async (
     key: string,
     modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },

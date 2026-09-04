@@ -4,7 +4,7 @@ import { onFrame } from './tree/frames'
 import { pressAt, wheelAt } from './tree/hit'
 import { openTerminal } from './input/terminal'
 import type { InputListener } from './input/events'
-import { keyPressed } from './ownKeys'
+import { keyPressed } from './keyEvent'
 import type { Renderable } from './tree/compat'
 
 // A handle on our screen, so the keyboard can be installed on it.
@@ -14,10 +14,9 @@ import type { Renderable } from './tree/compat'
 // event, a key stream, whether it is destroyed, and a `destroy` event. This answers those five over
 // `./paint/screen.ts` and nothing else.
 //
-// It was shaped after OpenTUI's `CliRenderer` while both painters ran, and phase 4 took the names
-// nothing asked for back off it: the console it could quieten, the keyboard capabilities the keymap
-// metadata states outright, the listener cap that counted a `selection` subscriber per viewport, and
-// the renderer's own idea of which node had focus — which is now the region store's one value
+// It is deliberately no bigger than that. A renderer here has no console to quieten, no keyboard
+// capabilities to report — the keymap metadata states those outright — no listener cap, and no idea
+// of its own about which node has focus, which is the region store's one value
 // (./keys/regions.ts § The one owner).
 //
 // **It composes the two halves rather than owning either.** `./paint/screen.ts` owns the cells and
@@ -31,7 +30,7 @@ import type { Renderable } from './tree/compat'
 // nothing downstream can ask, and that is the point — a suite driving a different keyboard from the
 // app would be testing a different keyboard.
 
-export type OwnRenderer = {
+export type Renderer = {
   /** Our screen, for the callers that want cells rather than a renderer. */
   screen: Screen
   root: Renderable
@@ -53,7 +52,7 @@ export type OwnRenderer = {
   destroy: () => void
 }
 
-export function openOwnRenderer(options: {
+export function openRenderer(options: {
   cols: number
   rows: number
   write?: Sink
@@ -62,7 +61,7 @@ export function openOwnRenderer(options: {
   /** Given the terminal, this is how to hear it: everything the parser read, in the order it
    *  happened. Absent in both harnesses, which construct their events instead (§ route). */
   listen?: (listener: InputListener) => () => void
-}): OwnRenderer {
+}): Renderer {
   const events = new EventEmitter()
   const keyInput = new EventEmitter()
   const screen = openScreen({
@@ -148,15 +147,15 @@ export function openOwnRenderer(options: {
 }
 
 /**
- * The whole boot under our painter: take the terminal, open a screen on it, and follow a resize.
+ * The whole boot: take the terminal, open a screen on it, and follow a resize.
  *
- * Here rather than in `./main.tsx` so that file's own two lines are a choice between two functions
- * rather than a second boot sequence, and so the composition root reaches the new painter through one
- * `import()` — which is what keeps it out of the bundle that does not draw with it (./ownKeys.ts).
+ * Here rather than in `./main.tsx` so the composition root asks for a renderer in one line rather
+ * than carrying a boot sequence of its own. The two halves it composes are `./input/terminal.ts` and
+ * `./paint/screen.ts`, and the order matters on the way out (see the header).
  */
-export function openOwnSurface(): OwnRenderer {
+export function openTerminalRenderer(): Renderer {
   const terminal = openTerminal()
-  return openOwnRenderer({
+  return openRenderer({
     ...terminal.size(),
     write: terminal.write,
     closeTerminal: terminal.close,

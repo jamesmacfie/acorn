@@ -26,7 +26,7 @@ const key = (name: string, modifiers: Partial<PtyKey> = {}): PtyKey => ({
 })
 
 /** A key that types a character carries it, exactly as the parser and the harness both do
- *  (../ownKeys.ts § pressedKey, ../input/events.ts § KeyEvent). */
+ *  (../keyEvent.ts § pressedKey, ../input/events.ts § KeyEvent). */
 const types = (character: string, modifiers: Partial<PtyKey> = {}): PtyKey =>
   key(character.toLowerCase(), { sequence: character, ...modifiers })
 

@@ -982,15 +982,17 @@ moved. This is what the kit holds for it:
   `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`, and `roleCell()` beside `roleVar()`
   hands the same answer to a cell renderer. A role names a colour slot, never a colour: which
   sixteenth or which hex is the appearance layer's (`apps/tui/src/appearance.ts`).
-- **The keymap core is host-agnostic.** `@opentui/keymap`'s terminal adapter is in the same package,
-  and acorn adds no key handling outside it. Nodes handle `next`, not `ArrowDown`.
+- **The keymap core is host-agnostic.** One engine, `@opentui/keymap`, and an adapter per host: the
+  package's HTML one on the desktop, and the terminal client's own
+  (`apps/tui/src/keys/keymapHost.ts`). acorn adds no key handling outside them. Nodes handle `next`,
+  not `ArrowDown`.
 - **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`
   the same way.
 - **The tree protocol names nothing about the DOM.** The same mutations apply to a retained tree of
   any kind ([docs/plugins.md § The tree contract](./plugins.md#the-tree-contract)).
 - **Rectangles are the only DOM-only thing**, and `kind="pty"` and `kind="editor"` are native there.
   A `pty` rectangle is filled through `attachPty`, which takes the channel rather than handing back a
-  box: an xterm on the DOM, OpenTUI's emulator in cells, one source in the plugin
+  box: an xterm on the DOM, `@xterm/headless` in cells, one source in the plugin
   ([docs/terminal.md § Client](./terminal.md)). What crosses to a terminal plugin by plugin is in
   [docs/first-party-plugins.md](./first-party-plugins.md) § What each of these loses in a terminal.
 - **A prop type is declared once and both hosts compile against it.** `ButtonProps`, `InputProps`,

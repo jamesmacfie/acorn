@@ -4,7 +4,7 @@ import { setHostFocused } from '@acorn/client-core/features/notifications/delive
 import { installKeymap } from './keys/install'
 import { _resetRegions } from './keys/regions'
 import { openTerminal, type TerminalInput, type TerminalOutput } from './input/terminal'
-import { openOwnRenderer, type OwnRenderer } from './ownRenderer'
+import { openRenderer, type Renderer } from './renderer'
 
 // What the terminal says, arriving where the app listens for it.
 //
@@ -38,17 +38,17 @@ const fakeStdout = (written: string[]): TerminalOutput => ({
 
 type Wired = {
   stdin: EventEmitter
-  renderer: OwnRenderer
+  renderer: Renderer
   written: string[]
   close: () => void
 }
 
-/** A screen at 80 by 24 with a terminal under it, wired the way `openOwnSurface` wires the real one. */
+/** A screen at 80 by 24 with a terminal under it, wired the way `openTerminalRenderer` wires the real one. */
 const wire = (): Wired => {
   const stdin = fakeStdin()
   const written: string[] = []
   const terminal = openTerminal({ stdin, stdout: fakeStdout(written) })
-  const renderer = openOwnRenderer({
+  const renderer = openRenderer({
     cols: 80,
     rows: 24,
     write: () => {},
@@ -70,7 +70,7 @@ afterEach(() => {
 describe('the terminal, wired to the dispatcher', () => {
   it('presses one key once, whatever the protocol sends about it', async () => {
     const { stdin, renderer, close } = wire()
-    const engine = installKeymap(renderer as unknown as OwnRenderer)
+    const engine = installKeymap(renderer as unknown as Renderer)
     let intents = 0
     let presses = 0
     let releases = 0

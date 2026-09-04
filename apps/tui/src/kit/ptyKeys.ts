@@ -200,7 +200,7 @@ export function encodeKeyText(key: PtyKey, modes: PtyModes): string {
   // nothing at all — our parser leaves `text` empty for Ctrl+A and for Alt+B, deliberately, since a
   // terminal that sent `ESC` first has already decided the key is not a character — so the character
   // Ctrl was held over is the *name*, and reading only the text would send a shell nothing at all
-  // (../input/parser.ts § character, ../ownKeys.ts § pressedKey).
+  // (../input/parser.ts § character, ../keyEvent.ts § pressedKey).
   const said = key.sequence ?? ''
   const typed = said !== '' ? said : ([...key.name].length === 1 ? key.name : '')
   if (typed === '') return ''

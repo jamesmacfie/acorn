@@ -20,7 +20,7 @@ import type { Node } from './tree/node'
 // from `./kit/asking.tsx` — which `./main.tsx` reaches eagerly — put the whole own-painter layout
 // module and Yoga's wasm binary into the startup closure of the *OpenTUI* build: 41 KB of chunk and an
 // `await loadYoga()` before the first frame, in a build that never lays a node out with it. Same trap
-// `./ownKeys.ts` exists to avoid, one module over (`../scripts/check-startup-graph.mjs`).
+// `./keyEvent.ts` exists to avoid, one module over (`../scripts/check-startup-graph.mjs`).
 //
 // **This is not `./layout/measure.ts § wrapLines`, and the two are not merging.** That one answers
 // "what lines does this run of text occupy", which is a question about characters, and it drops the

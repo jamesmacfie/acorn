@@ -211,7 +211,7 @@ reader who tabs into a terminal can press Escape to get back out, and xterm owns
 
 **A `pty` rectangle in a terminal is native**, and it is the one thing the terminal client does better
 than the desktop app. Instead of a terminal emulator written in JavaScript running in a browser
-running in an app, `apps/tui/src/kit/rectangle.tsx` draws OpenTUI's own emulator in cells and the
+running in an app, `apps/tui/src/kit/rectangle.tsx` draws `@xterm/headless` in cells and the
 PTY's bytes go straight into it. The PTY does not move: it stays on the Node, reached over the same
 `term` WebSocket channel, and the terminal client is a second emulator for it.
 
@@ -228,7 +228,8 @@ back an element and three plugins each built their own xterm on it, with their o
 and their own resize observer. The caller now describes the channel instead, in the four members of
 `PtyIo` (`client-core/kit/lib/pty.ts`): open at a size, bytes in, bytes out, and a word to print when
 the far end exits. `attachPty(handle, io)` on `@acorn/plugin-api/ui` is the host's end of it, an xterm
-on the DOM and OpenTUI's emulator in cells, and the caller's source is the same file either way.
+on the DOM and `@xterm/headless` in cells — the same parser either way — and the caller's source is
+the same file either way.
 
 That is what let two of the three callers cross. Docker's exec panel and the editor's `$EDITOR` window
 are both throwaway PTYs, both about fifteen lines now, and both work on a host with no browser in it.

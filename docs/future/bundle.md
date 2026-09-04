@@ -66,22 +66,16 @@ it, and types do not need a compiler.
 **node-pty is the only native module the node needs**, and it builds against node-addon-api (N-API), so
 its binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
 `darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
-Linux is the one platform needing a prebuild produced in CI, once. **The terminal client adds a
-second**: OpenTUI's render core is Zig, published as `@opentui/core-<triple>` packages with a prebuilt
-library each (`@opentui/core-darwin-arm64` is already in the lockfile through `@opentui/keymap`). It
-loads over FFI rather than N-API, so it has no ABI to match either, and it has the same question as
-node-pty: which triples upstream prebuilds, and which CI has to build once. Answering that per triple
-is step 7 below. Upstream's own Node acceptance lane runs on Linux x64 alone, and macOS arm64 is
-evidenced only by `acorn` having been developed on it, so an available artifact is not proof of parity:
-check Linux arm64 and Windows arm64 first. The libc decision below applies to both. The node-pty prebuild carries a libc
-decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim` Docker base, but
-not Alpine (musl). Producing a second musl build doubles the Linux matrix for a distribution nobody
-has asked for — pick glibc, let the Docker image use a Debian base, and revisit only if an Alpine
-request actually arrives.
+Linux is the one platform needing a prebuild produced in CI, once. **The terminal client adds
+none**: it draws in cells through its own TypeScript and reaches Yoga as WebAssembly, so a tarball
+that carries `acorn` carries no binary the node tarball did not already have. The node-pty prebuild
+carries a libc decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim`
+Docker base, but not Alpine (musl). Producing a second musl build doubles the Linux matrix for a
+distribution nobody has asked for — pick glibc, let the Docker image use a Debian base, and revisit
+only if an Alpine request actually arrives.
 
 `scripts/rebuild-node-abi.mjs` now probes node-pty rather than asserting anything: on a platform
-where the prebuilt binary loads, it exits immediately. Once the terminal client ships it probes
-OpenTUI's core the same way and exits when both load.
+where the prebuilt binary loads, it exits immediately. It is the only module it has to probe.
 
 ## The build pipeline
 
@@ -97,8 +91,8 @@ compose example; service-manager units stay documentation, not an installer prod
 (settled during the Tauri migration).
 
 The terminal client rides inside the node tarball rather than being a sixth artifact: `pack-node.mjs`
-grows a `dist/tui.js` entry, a `bin/acorn` wrapper, and OpenTUI's packages in the generated
-`package.json`, and the installer links `bin/acorn`. Five tarballs stays five.
+grows a `dist/tui.js` entry and a `bin/acorn` wrapper, and the installer links `bin/acorn`. Five
+tarballs stays five.
 
 ## Docker (2026-08-22)
 
@@ -157,11 +151,14 @@ deliberately installing a headless service, and it keeps the artifact small enou
 
 It is not a reasonable ask of someone who typed `acorn`. The terminal client inverts the argument, so
 bundling the runtime moves from the last step of the order below to before the tarball carries the
-TUI. The desktop already bundles it (`apps/desktop/src-tauri/tauri.conf.json`, `externalBin`), and both
-artifacts read the same pin (`node-runtime.json`), so the cost is size, not a second decision.
+TUI. It is a floor rather than a flag now — `acorn` runs on the range `node-runtime.json` declares,
+the same one every other package here runs on ([tui.md](../tui.md) § The runtime floor) — so this is
+about not asking a reader to install a Node at all rather than about asking them for an unusual one.
+The desktop already bundles it (`apps/desktop/src-tauri/tauri.conf.json`, `externalBin`), and both
+artifacts read the same pin, so the cost is size, not a second decision.
 
 Node SEA (single executable) is *not* the path — combining it with native modules is painful, and
-node-pty means there is still one. With OpenTUI's core there are two.
+node-pty means there is still one.
 
 ## One node, three supervisors
 
@@ -201,35 +198,36 @@ read `node-runtime.json`.
 
 **`bin/acorn`.** A shell script, and a `.cmd` beside it on Windows, that resolves its own directory,
 finds the runtime at `../runtime/bin/node` if one is bundled or `node` on `PATH` if not, and runs
-`../dist/tui.js` with `--experimental-ffi` and the caller's arguments. Nothing else. The flag is the
-wrapper's job because a reader who typed `acorn` should not have to know about it, and the version
-check in `apps/tui/src/main.tsx` is what turns an unbundled old Node into a sentence rather than a
-stack trace. Node SEA stays refused, and with two native modules rather than one it is further off
-than it was.
+`../dist/tui.js` with the caller's arguments. Nothing else, and no flag. Node SEA stays refused.
 
 **The desktop's `acorn`.** A resource inside the app bundle beside `helper/`, sharing the runtime. On
 first run the app offers to symlink it into `/usr/local/bin` or `~/.local/bin`, the way Visual Studio
 Code offers `code`: off by default, behind a setting, never offered by a sandboxed build.
 
-**What the tarball's generated `package.json` has to list, and what it should not.** `@opentui/core`
-and its platform package are real runtime dependencies. Twenty-four other packages are the open
-question. `apps/tui/package.json` lists fifteen CodeMirror language packages, `shiki`,
-`lucide-static`, three `@xterm` packages and `seroval`, because a chunk that cannot resolve an import
-crashes the pane that loads it and `pnpm dev` has to work. Most of them sit behind a chunk this host
-never loads — xterm because the emulator here is OpenTUI's, CodeMirror because the `editor` rectangle
-draws a box and `$EDITOR` opens in it — and a tarball carrying fifteen grammars for a pane that cannot
-use them is carrying about 30 MB for nothing. So step 7 owes a count: which of these a terminal build
-actually reaches at runtime, and whether the panes that mention the rest should reach them through a
-dynamic import the way `attachPty` reaches xterm.
+**What the tarball's generated `package.json` has to list.** This was an open question worth about
+30 MB and it is answered: the terminal rewrite went through `apps/tui/package.json` group by group
+with the built output as the judge, took twenty packages out — nineteen CodeMirror grammars and
+themes, `shiki`, `lucide-static` and the three browser `@xterm` packages — and answered their
+specifiers with three local stubs that throw and name the host
+([tui.md](../tui.md) § The host switch). What went back in is what the build proves this host
+reaches: `codemirror` and three of its packages, because the `editor` pane imports `basicSetup`
+directly, `@xterm/headless`, because it is the `pty` rectangle's emulator, and `idb-keyval`, because
+client-core imports it before the first frame. So the tarball lists what `apps/tui/package.json`
+lists, and the way to check that is the built output rather than the suite: a green suite proves
+nothing here, because vitest resolves a specifier from client-core's own `node_modules` where the
+built bundle would not.
 
 **How it is checked.** Extract the packed tarball on a clean runner: `bin/acorn --version` prints, and
 `bin/acorn` with `ACORN_DATA_DIR` set starts a node that the boot test in `apps/tui/src/node/boot.test.ts`
-passes against. The Tauri packaging properties gain one assertion, that the `acorn` resource is present
-and executable. And `scripts/rebuild-node-abi.mjs` loads both native modules on every matrix runner.
+passes against. Every bare specifier in the built `dist/` has to resolve against what the generated
+`package.json` declares, which is the check the rewrite ran by hand and which belongs in `scripts/`
+the day somebody wants it enforced. The Tauri packaging properties gain one assertion, that the
+`acorn` resource is present and executable. And `scripts/rebuild-node-abi.mjs` loads node-pty on
+every matrix runner.
 
-**Signing is the same gate as everything else.** A downloaded `acorn` with a `.dylib` inside is
-quarantined on macOS exactly as the node tarball is. Linux and Windows first, macOS when the Developer
-ID exists.
+**Signing is the same gate as everything else.** A downloaded `acorn` is quarantined on macOS
+exactly as the node tarball is, node-pty's binary included. Linux and Windows first, macOS when the
+Developer ID exists.
 
 ## Ordering
 
@@ -240,8 +238,8 @@ ID exists.
 5. Replace or bundle `openssl`, and decide the Windows answers for `SIGUSR1` and file modes.
 6. Bundle a Node runtime. Moved up from last: the terminal client's user typed `acorn`, not "install
    a service", and both artifacts already read one pin.
-7. `acorn` in the tarball and in the app bundle, with OpenTUI's core in the prebuild matrix. See
-   § Shipping `acorn` above.
+7. `acorn` in the tarball and in the app bundle. Simpler than it was: there is no second runtime
+   and no second binary to prebuild. See § Shipping `acorn` above.
 8. macOS, once there is a Developer ID. It gates the node tarball and `acorn` alike.
 
 ## Not in scope here

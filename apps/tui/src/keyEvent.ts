@@ -2,10 +2,10 @@ import type { KeyEvent as ParsedKey } from './input/events'
 
 // A key as the keymap engine reads one, and the spelling table the two harnesses press through.
 //
-// Its own module rather than part of `./ownRenderer.ts`, and the reason is a byte count. The keymap
-// host adapter needs `ownKeyEvent` and it is in `App`'s eager graph; `./ownRenderer.ts` reaches the
-// whole new painter. Importing one from the other put 59 KB of a painter nobody had switched on into
-// the startup closure of the build that does not use it, which the budget check caught
+// Its own module rather than part of `./renderer.ts`, and the reason is a byte count. The keymap host
+// adapter needs `keyEvent` and it is in `App`'s eager graph, while `./renderer.ts` reaches the whole
+// painter — the screen, the buffers and the parser. Importing one from the other put 59 KB into a
+// startup closure that had no use for it, which the budget check caught
 // (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget).
 //
 // The parser's own vocabulary meets the engine's here, and the whole of the difference is one word:
@@ -21,7 +21,7 @@ import type { KeyEvent as ParsedKey } from './input/events'
  *  without it `ctx.consume()` was a no-op — an entered `pty` rectangle sent every key to its program
  *  and then let the app's own bindings answer the same key, so Escape's pair left and F6 walked out
  *  of the rectangle it had just taken (@opentui/keymap § handleKeyEvent). */
-export type OwnKeyEvent = {
+export type KeyEvent = {
   name: string
   ctrl: boolean
   meta: boolean
@@ -76,24 +76,24 @@ export function pressedKey(key: string, modifiers: {
   ctrl?: boolean
   meta?: boolean
   super?: boolean
-} = {}): OwnKeyEvent {
+} = {}): KeyEvent {
   const named = NAMED[key]
   // A named key types nothing at all, which is the same thing our parser says by leaving `text`
   // empty: what a Return does inside a field is the edit model's decision from the name, not a
   // character the terminal handed over (./input/events.ts § KeyEvent).
-  if (named) return ownKeyEvent(named, modifiers, '')
-  if (key === ' ') return ownKeyEvent('space', modifiers, ' ')
+  if (named) return keyEvent(named, modifiers, '')
+  if (key === ' ') return keyEvent('space', modifiers, ' ')
   const upper = key.length === 1 && key !== key.toLowerCase()
-  return ownKeyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers, key)
+  return keyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers, key)
 }
 
-export const ownKeyEvent = (name: string, modifiers: {
+export const keyEvent = (name: string, modifiers: {
   shift?: boolean
   ctrl?: boolean
   meta?: boolean
   super?: boolean
-} = {}, typed?: string): OwnKeyEvent => {
-  const event: OwnKeyEvent = {
+} = {}, typed?: string): KeyEvent => {
+  const event: KeyEvent = {
     name,
     ctrl: modifiers.ctrl ?? false,
     // `meta` is the keymap's spelling of Option and `option` is OpenTUI's, and the two vocabularies
@@ -128,8 +128,8 @@ export const ownKeyEvent = (name: string, modifiers: {
  * types nothing carries an empty string, and the model decides from the name what a Return does
  * (./kit/field.ts § typedBy, ./kit/ptyKeys.ts).
  */
-export function keyPressed(key: ParsedKey): OwnKeyEvent {
-  const event = ownKeyEvent(key.name, {
+export function keyPressed(key: ParsedKey): KeyEvent {
+  const event = keyEvent(key.name, {
     ctrl: key.ctrl,
     meta: key.alt,
     shift: key.shift,

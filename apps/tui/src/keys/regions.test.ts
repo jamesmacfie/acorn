@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemo, createRoot, getOwner, onCleanup, runWithOwner, type Owner } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { OwnRenderer } from '../ownRenderer'
+import type { Renderer } from '../renderer'
 import {
   _resetRegions, activationEntersMain, focusRenderable, focusedInScope, focusedRenderable,
   installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
@@ -167,7 +167,7 @@ const fresh = (): void => {
   dispose()
   _resetRegions()
   renderer = fakeRenderer()
-  installRegions(renderer as unknown as OwnRenderer)
+  installRegions(renderer as unknown as Renderer)
   createRoot((stop) => { dispose = stop; owner = getOwner() })
 }
 
@@ -917,7 +917,7 @@ describe('a key press costs the depth of the tree', () => {
       // And the same move in a region with ten times the rows costs the same, which is the property
       // the number alone cannot state.
       _resetRegions()
-      installRegions(renderer as unknown as OwnRenderer)
+      installRegions(renderer as unknown as Renderer)
       const wide = deepRegion(2000, 3)
       focusRenderable(wide.button)
       walkSteps.reset()

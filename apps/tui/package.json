@@ -4,7 +4,7 @@
   "description": "The terminal client: client-core booted under Node, drawing the whole kit in cells.",
   "private": true,
   "type": "module",
-  "//engines": "The repo's own floor, from node-runtime.json. This package used to need a newer Node than the rest of the repo, because the painter reached a native library through node:ffi; it draws its own cells in TypeScript now, so there is no reason left for it to differ (docs/future/terminal-rewrite/phase-4-cut-over.md).",
+  "//engines": "The repo's own floor, from node-runtime.json. This package used to need a newer Node than the rest of the repo, because the painter reached a native library through node:ffi; it draws its own cells in TypeScript now, so there is no reason left for it to differ (docs/tui.md \u00a7 The runtime floor).",
   "engines": {
     "node": ">=22.18 <23 || >=24.4"
   },

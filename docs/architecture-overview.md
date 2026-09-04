@@ -31,8 +31,8 @@ Node
 ```
 
 ```text
-acorn (Node 26.4, --experimental-ffi)
-  @opentui/solid reconciler: the same kit, layouts and panes, drawn to a cell buffer
+acorn (the Node the repo pins, no flag)
+  its own tree, Yoga in wasm and a cell buffer: the same kit, layouts and panes, drawn in cells
   @acorn/custody in-process: broker, fleet, tokens, plugin custody
        │ pinned HTTPS + device bearer, one WebSocket per Node
        └──────────────► the node for this machine's data root, attached or started
