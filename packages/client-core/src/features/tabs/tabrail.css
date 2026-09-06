@@ -70,10 +70,12 @@
    stylesheet positioning one of these is the regression signal that placement escaped the host.
    Logical start/end, even though the app is left-to-right today.
 
-   bottom-center is centred with inset and text-align rather than transform: translateX(-50%),
-   because `.spin` animates `transform` and interpolating a translate into rotate(360deg) goes
-   through matrix decomposition, which reads a full turn as no turn at all. The icon slid sideways
-   instead of spinning. */
+   A busy marker turns because its Icon carries `data-spin`, not because this span does. Keep it
+   that way: `.spin` on the wrapper is guarded by prefers-reduced-motion, so it stops dead for
+   anyone who turns that setting on, and it also fights the centring below. bottom-center centres
+   with inset and text-align rather than transform: translateX(-50%), because a translate
+   interpolated into rotate(360deg) goes through matrix decomposition, which reads a full turn as
+   no turn at all. The icon slid sideways instead of spinning. */
 .tabrail-marker {
   position: absolute;
   font-size: var(--fs-xs);

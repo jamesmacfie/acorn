@@ -69,7 +69,7 @@ export function RailTab(props: RailTabProps) {
       onClick={onClick}
     >
       <Show when={own.busy} fallback={<Show when={own.glyph}>{(name) => <Icon name={name()} />}</Show>}>
-        <span class="spin"><Icon name="loader-circle" /></span>
+        <Icon name="loader-circle" spin />
       </Show>
       {own.children}
       <Show when={own.sublabel}>{(text) => <span class="tabrail-tab-sub">{text()}</span>}</Show>
@@ -79,13 +79,13 @@ export function RailTab(props: RailTabProps) {
       <For each={resolved().placed}>
         {(marker) => (
           <span
-            class={cx('tabrail-marker', marker.busy && 'spin')}
+            class="tabrail-marker"
             data-pos={marker.position}
             data-tone={marker.tone}
             aria-hidden="true"
           >
             <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} />}</Show>}>
-              {(name) => <Icon name={name()} />}
+              {(name) => <Icon name={name()} spin={marker.busy} />}
             </Show>
           </span>
         )}
