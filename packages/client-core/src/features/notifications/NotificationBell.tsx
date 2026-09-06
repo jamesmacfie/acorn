@@ -48,7 +48,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // keeps — a block is still a block after you have read about it.
   const clearAll = () => {
     markAllRead()
-    for (const row of inbox().rows) markAttentionSeen(row.nodeId, row.item.id, row.item.at)
+    for (const row of inbox().rows) markAttentionSeen(row.nodeId, row.item.id)
   }
 
   // Opening a notice, from the row below and from a click on the system banner it raised. One

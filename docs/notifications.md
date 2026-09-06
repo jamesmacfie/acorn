@@ -129,9 +129,16 @@ long after they have read it. So does a memory proposal nobody has reviewed. Loo
 in a focused window, retires it, and so does "Mark all read" in the bell.
 
 `packages/client-core/src/features/notifications/attentionInbox.ts` holds a session-only set keyed by
-node id, the row's own id, and the row's `at`, which for a session is its `updatedAt`. A row whose key
-is in the set is hidden from the inbox and from the pill. Because the key carries that timestamp, a
-session that completes a second time is news again.
+node id and the row's own id. A row whose key is in the set is hidden from the inbox and from the pill.
+
+The key does not carry the row's `at`, and that is the whole of a bug worth remembering. A timestamped
+key looked like it bought re-arming, so that a session completing a second time was news again. For the
+source that raises almost every row it bought the opposite: `at` there is the session's `updatedAt`, and
+the node bumps that on every event it records, including the usage report that lands after the turn
+ended and the controller change a reconnect writes. The key moved when nothing had happened, the ack
+stopped matching, and every row the owner had just cleared came back with the next frame — so the bell's
+number climbed back past where it started. A session that completes again now keeps its cleared row
+hidden, and the completion still raises its own unread notice through the gate, so the pill still moves.
 
 Only a nudge can be retired this way, and `severity` is the word for it: `info` means nothing is
 blocked. A permission, a question, a workflow gate, or an error is `warn` or `danger`, and describes a
