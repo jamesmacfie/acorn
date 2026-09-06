@@ -17,6 +17,7 @@ import {
   activeTaskId, selectedSource, setActiveTaskId, setSelectedSource,
 } from '@acorn/client-core/features/tasks/tasks.ts'
 import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs/railSources.ts'
+import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 import { scheduleSettle } from '../keys/regions'
 import { chosenWorkspace, setChosenWorkspace } from './state'
@@ -62,6 +63,14 @@ export function createShellModel(): ShellModel {
       if (owner) return owner
     }
     return all[0] ?? null
+  })
+
+  // `;` goes back to the workspace before this one, and this memo is where this host settles which
+  // workspace that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
+  // than from `chooseWorkspace`, because following the open task changes workspace too.
+  createEffect(() => {
+    const current = workspace()
+    if (current) noteWorkspaceVisit(current.id)
   })
 
   const tasks = createMemo(() => {

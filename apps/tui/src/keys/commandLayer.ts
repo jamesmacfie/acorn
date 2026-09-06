@@ -104,8 +104,8 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         const key = spelled && asCtrl(spelled)
         if (!key) return []
         if (!mayFire(binding, scope) || !runnable.has(binding.command)) return []
-        // A bare key belongs to the screen. `w`, `p`, `n`, `q` and `?` open a picker, and a reader
-        // who presses one inside a dialog meant the dialog. Before this, `w` over the trust prompt
+        // A bare key belongs to the screen. `w`, `p`, `;`, `n`, `q` and `?` switch or open a picker,
+        // and a reader who presses one inside a dialog meant the dialog. Before this, `w` over the trust prompt
         // raised the workspace picker on top of it. Chords stay live at every depth, because
         // Ctrl+K is not a key anything inside a dialog could want, and the collection layers
         // behind the dialog need no gate of their own: they are focus-within and the focus is

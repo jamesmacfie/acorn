@@ -176,6 +176,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
       { id: 'core.workspace.switch', command: 'core.workspace.switch', description: 'Workspace', category: 'Global', defaultChord: 'w', when: 'global' },
       { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
+      // Beside `w`, because it is the other half of switching workspace, and bare for the same
+      // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
+      // dropped from this layer while there is nowhere to go back to.
+      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Last workspace', category: 'Global', defaultChord: ';', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
       { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
