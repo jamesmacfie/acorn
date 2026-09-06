@@ -1,5 +1,5 @@
-import { createSignal } from 'solid-js'
-import { activeNodeId, fromManagedSession, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import { createEffect, createRoot, createSignal } from 'solid-js'
+import { activeNodeId, fromManagedSession, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { wsOnAgentFrame } from './wsChannel'
 import type {
   AgentEventRecord,
@@ -299,11 +299,27 @@ export const managedAgentStore = {
 // even when neither Agent Center nor a task Agent pane is currently mounted.
 export function activateManagedAgentNotifications(): void {
   managedAgentStore.activate()
-  // Caught, not just `void`ed. This prime runs at activation, so on a node that is still connecting,
-  // or one whose agents plugin is disabled, the rejection had nothing between it and an unhandled
-  // promise rejection. An empty roster is the correct degraded state; Agent Center refetches.
-  managedAgentStore.loadAll().catch((error: unknown) => {
-    console.warn('[agents] could not prime the managed-session roster:', error)
+  // The prime waits for a node that can answer rather than firing at activation. `acorn` draws the
+  // shell in front of a node it started and has not heard from yet (docs/tui.md § Attach or start),
+  // so a prime at activation failed with ECONNREFUSED on every launch, for a request that was never
+  // going to land — and printed a stack onto a terminal the renderer owns.
+  //
+  // Keyed on the node rather than run once, so switching nodes primes the new one. `onScopeEvicted`
+  // below clears the store on that switch and nothing refilled it until Agent Center was opened.
+  //
+  // Still caught. A node that is reachable can still refuse this — its agents plugin may be disabled
+  // — and the rejection has nothing between it and an unhandled promise rejection. An empty roster is
+  // the correct degraded state; Agent Center refetches.
+  let primed: string | null = null
+  createRoot(() => {
+    createEffect(() => {
+      const nodeId = activeNodeId()
+      if (!nodeId || nodeId === primed || nodeState(nodeId) === 'offline') return
+      primed = nodeId
+      managedAgentStore.loadAll().catch((error: unknown) => {
+        console.warn('[agents] could not prime the managed-session roster:', error)
+      })
+    })
   })
 }
 

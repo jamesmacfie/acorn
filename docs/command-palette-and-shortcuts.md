@@ -343,7 +343,10 @@ layer does, or nothing does.
 **Which is why a handler that changed nothing says so.** `onExpand` on a `Rows` may return a boolean:
 `false` means the row did not fold — a leaf, or a list with nothing to open — and hands the key back,
 so the tier below answers it. On the terminal that tier moves one column, which is how Right on a
-file in the editor's tree reaches the document beside the tree. Returning nothing claims the key, the
+file in the editor's tree reaches the document beside the tree. Inside a tab strip's panel the move
+stays within the pane: with no column of the pane's own that way, the key reaches the strip and
+changes the tab rather than landing in the rail ([tui.md](./tui.md) § The five key groups).
+Returning nothing claims the key, the
 way the collection always did, so no caller changes until it opts in; the editor's file tree is the
 one that has (`plugins/editor/src/client/FileTree.tsx`). The terminal's tab strip keeps the same rule
 at its last tab.

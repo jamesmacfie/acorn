@@ -3,8 +3,8 @@ import { createMemo, createRoot, getOwner, onCleanup, runWithOwner, type Owner }
 import type { Renderable } from '../tree/compat'
 import type { Renderer } from '../renderer'
 import {
-  _resetRegions, activationEntersMain, focusRenderable, focusedInScope, focusedRenderable,
-  installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
+  _resetRegions, activationEntersMain, bubbledCrossWord, crossParent, focusRenderable, focusedInScope,
+  focusedRenderable, installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
   moveStop, onScreen, panelsChanged, parentOf, pushScope, regionsInScope, registerRegion,
   scheduleSettle, setTopology, stopsIn, walkSteps,
 } from './regions'
@@ -825,7 +825,7 @@ describe('focus regions', () => {
     expect(stopsIn(panel)).toEqual([inPanel])
   })
 
-  it('moves between the stops of one panel and walls at its edges', () => {
+  it('moves between the stops of one panel, walls at its end, and leaves its top for the strip', () => {
     const strip = control()
     const first = control()
     const second = control()
@@ -845,8 +845,107 @@ describe('focus regions', () => {
     expect(focusedRenderable()).toBe(second)
     expect(moveStop(-1)).toBe(true)
     expect(focusedRenderable()).toBe(first)
+    // Up from the first stop is the strip: Down from the strip is how the reader got in, and the two
+    // are one door.
+    expect(moveStop(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(strip)
+  })
+
+  it('walls at the top of a panel whose strip is not marked', () => {
+    const first = control()
+    const panel = node([first])
+    const region = node([panel])
+    registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
+    focusRenderable(first)
     expect(moveStop(-1)).toBe(true)
     expect(focusedRenderable()).toBe(first)
+  })
+
+  it('hands a cross key from inside a panel to the strip that owns it, and lands on the strip', () => {
+    const stepped: number[] = []
+    const strip = control()
+    const inPanel = control()
+    const panel = node([inPanel])
+    const region = node([strip, panel])
+    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return delta > 0 }))
+    registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
+
+    // Nothing to hand it to from the strip itself or from outside any panel.
+    focusRenderable(strip)
+    expect(bubbledCrossWord()).toBe('column')
+    expect(crossParent(1)).toBe(false)
+
+    // Right switches the tab and puts the keys on the strip, because the panel that had them is the
+    // one that just went away.
+    focusRenderable(inPanel)
+    expect(bubbledCrossWord()).toBe('tab')
+    expect(crossParent(1)).toBe(true)
+    expect(stepped).toEqual([1])
+    expect(focusedRenderable()).toBe(strip)
+
+    // At the strip's edge the tab does not change, and the keys still land on the strip: a visible
+    // move rather than a silent wall, and the next press is the strip's own and says `column`.
+    focusRenderable(inPanel)
+    expect(crossParent(-1)).toBe(true)
+    expect(stepped).toEqual([1, -1])
+    expect(focusedRenderable()).toBe(strip)
+  })
+
+  it('does not switch the tab behind a dialog drawn inside a panel', () => {
+    const stepped: number[] = []
+    const strip = control()
+    const inDialog = control()
+    const dialog = node([inDialog])
+    const panel = node([dialog])
+    const region = node([strip, panel])
+    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return true }))
+    registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
+
+    const close = opened(dialog)
+    focusRenderable(inDialog)
+    expect(bubbledCrossWord()).toBe('column')
+    expect(crossParent(1)).toBe(false)
+    expect(stepped).toEqual([])
+    expect(focusedRenderable()).toBe(inDialog)
+    close()
+  })
+
+  it('moves between the pane\'s own columns from inside a panel, and never into the rail', () => {
+    const stepped: number[] = []
+    const railRow = item()
+    const rail = node([railRow])
+    const strip = control()
+    const leaf = control()
+    const panel = node([leaf])
+    const list = node([strip, panel])
+    const inDetail = control()
+    const detail = node([inDetail])
+    drawn(() => markItem(railRow))
+    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return true }))
+    registerRegion(rail, { paneId: 'chrome', regionId: 'tasks' }, -100, { x: 0 })
+    registerRegion(list, { paneId: 'editor', regionId: 'list' }, 0, { x: 1 })
+    registerRegion(detail, { paneId: 'editor', regionId: 'detail' }, 1, { x: 2 })
+
+    // Right on a leaf is the document beside the tree, as it always was.
+    focusRenderable(leaf)
+    expect(bubbledCrossWord()).toBe('column')
+    expect(crossParent(1)).toBe(true)
+    expect(focusedRenderable()).toBe(inDetail)
+    expect(stepped).toEqual([])
+
+    // Left on the leaf has the rail beyond it, and the rail is not where a control's Left goes: the
+    // strip takes it instead, and it steps.
+    focusRenderable(leaf)
+    expect(crossParent(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(strip)
+    expect(stepped).toEqual([-1])
+
+    // The detail is not inside a panel, so its Left is the plain column move.
+    focusRenderable(inDetail)
+    expect(bubbledCrossWord()).toBe('column')
+    expect(crossParent(-1)).toBe(false)
+    expect(moveColumn(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(strip)
   })
 
   it('hands the arrows back for anything the walk does not own', () => {

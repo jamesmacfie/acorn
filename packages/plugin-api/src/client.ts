@@ -162,7 +162,7 @@ export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 // ── The fleet: which node a request goes to ───────────────────────────────────────────────────
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 export { createFleetQuery } from '@acorn/client-core/infra/node/fanout.ts'
-export { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+export { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/infra/node/tunnelUrl.ts'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────

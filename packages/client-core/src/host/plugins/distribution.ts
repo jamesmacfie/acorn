@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
 import type { PluginAckRecord } from '../../infra/platform'
 import { readJson } from '../../infra/node/apiClient'
-import { nodes } from '../../infra/node/fleet'
+import { nodes, nodeState } from '../../infra/node/fleet'
 import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './host'
 import { resolveActiveBundles, type ActiveBundle, type BundleCandidate } from '../trust/resolveBundles'
 
@@ -79,6 +79,12 @@ const candidatesFrom = (rosters: ReadonlyMap<string, readonly NodePluginRow[]>):
 // we already knew about it, the same stance node/nodePlugins.ts takes for the same reason: an
 // offline node is not a node with no plugins.
 const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | null> => {
+  // Asked only of a node that could answer. The same fail-fast the API client already does for a
+  // mutation (infra/node/apiClient.ts § isWritable), and here it is about noise as much as latency:
+  // this pass runs at boot, a host that draws in front of a node it just started has every node
+  // offline for the first seconds, and the catch below would print a stack per node for a question
+  // nobody could have answered.
+  if (nodeState(nodeId) === 'offline') return null
   try {
     return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
   } catch (error) {

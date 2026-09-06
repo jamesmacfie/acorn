@@ -458,6 +458,70 @@ describe('keys and focus in cells', () => {
       frame.done()
     }
   }, 30_000)
+
+  it('gets back to the strip from inside a panel with Up, and switches tabs from inside with Left and Right', async () => {
+    // The path the report named: a tabbed pane whose panel holds a row of controls. Down enters the
+    // panel; from there Up used to be a wall and Left used to be the column move, which from any
+    // control on the pane put the reader in the rail (./regions.ts § crossParent, § moveStop).
+    const [tab, setTab] = createSignal('one')
+    const frame = await renderCells(() => (
+      <HeaderBodyFooter
+        stateKey="pane"
+        label="Test"
+        regions={{
+          body: () => (
+            <>
+              <Tabs
+                idPrefix="ctl"
+                ariaLabel="Sections"
+                active={tab()}
+                onChange={setTab}
+                tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
+              />
+              <TabPanel idPrefix="ctl" id="one" active={tab()}>
+                <Button onPress={() => {}}>Merge</Button>
+                <Button onPress={() => {}}>Close</Button>
+              </TabPanel>
+              <TabPanel idPrefix="ctl" id="two" active={tab()}>
+                <Text>Second panel</Text>
+              </TabPanel>
+            </>
+          ),
+        }}
+      />
+    ), { width: 44, height: 12 })
+    try {
+      const strip = focusedRenderable()
+      const second = await (await frame.press('ARROW_DOWN')).press('ARROW_DOWN')
+      expect(second.text).toContain('Close')
+      expect(focusedRenderable()).not.toBe(strip)
+
+      // Up, twice: back to the first control, then out of the panel onto the strip.
+      await frame.press('ARROW_UP')
+      await frame.press('ARROW_UP')
+      expect(focusedRenderable()).toBe(strip)
+
+      // Right from a control inside the panel is the strip's Right: the tab changes and the keys
+      // land on the strip, since the panel that had them is hidden now.
+      await frame.press('ARROW_DOWN')
+      const switched = await frame.press('ARROW_RIGHT')
+      expect(switched.text).toContain('[Two]')
+      expect(switched.text).toContain('Second panel')
+      expect(focusedRenderable()).toBe(strip)
+
+      // Left from the strip's first tab is the column move, and with one column on screen it does
+      // nothing. From inside a panel at that same edge the keys still come to the strip rather than
+      // staying put or leaving the pane.
+      await frame.press('ARROW_LEFT')
+      await frame.press('ARROW_DOWN')
+      expect(focusedRenderable()).not.toBe(strip)
+      const edge = await frame.press('ARROW_LEFT')
+      expect(edge.text).toContain('[One]')
+      expect(focusedRenderable()).toBe(strip)
+    } finally {
+      frame.done()
+    }
+  }, 30_000)
 })
 
 // ── Typing is a layer ─────────────────────────────────────────────────────────────────────────

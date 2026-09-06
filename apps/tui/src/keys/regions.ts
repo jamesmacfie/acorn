@@ -368,7 +368,15 @@ export const setPaneCycler = (next: ((delta: 1 | -1) => boolean) | null): void =
 //
 // The panels are a getter rather than a list, because a strip's panels mount after its own ref runs
 // and change with its tabs. A strip with none — a list's Open/Closed filter — is an ordinary stop.
-type ParentEntry = { node: Renderable; panels: () => readonly Renderable[] }
+//
+// `cross` is how the strip answers Left and Right, so a cross key that bubbles out of one of its
+// panels can reach it: a panel is the level below the strip, and a key nothing in the panel wanted
+// belongs to the strip before it belongs to the screen (§ crossParent).
+type ParentEntry = {
+  node: Renderable
+  panels: () => readonly Renderable[]
+  cross?: (delta: 1 | -1) => boolean
+}
 
 let parents: ParentEntry[] = []
 // The same entries by their node, because `stopsIn` asks "is this child a parent stop" of every node
@@ -407,8 +415,12 @@ const parentEntry = (node: Renderable): ParentEntry | undefined => parentByNode.
  *  Marking does not make it focusable. Which nodes are reachable is declared where a node is built,
  *  and for a strip that is the `Tabs` ref that calls this (../kit/grouping.tsx,
  *  ../invariants.test.ts § the renderer is the only truth about focus). */
-export function markParent(node: Renderable, panels: () => readonly Renderable[]): void {
-  const entry: ParentEntry = { node, panels }
+export function markParent(
+  node: Renderable,
+  panels: () => readonly Renderable[],
+  cross?: (delta: 1 | -1) => boolean,
+): void {
+  const entry: ParentEntry = cross ? { node, panels, cross } : { node, panels }
   parents.push(entry)
   parentByNode.set(node, entry)
   panelsChanged()
@@ -433,10 +445,62 @@ export function parentOf(node: Renderable): Renderable | undefined {
     // The set first, so the ancestors that are not panels — which is nearly all of them — cost one
     // lookup rather than one scan of the parent stops (§ panelBoxes).
     if (!panelSet().has(at)) continue
-    const owner = parents.find((parent) => parent.node !== at && parent.panels().includes(at as Renderable))
+    const owner = ownerOf(at)
     if (owner) return owner.node
   }
   return undefined
+}
+
+/** The strip that owns this panel. */
+const ownerOf = (panel: Renderable): ParentEntry | undefined =>
+  parents.find((parent) => parent.node !== panel && parent.panels().includes(panel))
+
+/**
+ * The strip above the panel the keys are in, while that panel is in scope.
+ *
+ * `parentOf` without the scope check is Escape's, which the trap tier answers first inside a dialog.
+ * The cross keys have no such guard above them, so a dialog drawn inside a panel must not switch the
+ * tab behind it (§ boxAround, § Scopes).
+ */
+const parentInScope = (node: Renderable | null): ParentEntry | undefined => {
+  const box = node && boxAround(node)
+  return box && isPanel(box) ? ownerOf(box) : undefined
+}
+
+/**
+ * What a bubbled `h` or `l` does from the thing that has the keys, as the footer's word for it.
+ *
+ * `column` wherever there is a column the pair can reach, which inside a panel excludes the rail;
+ * `tab` inside a panel with none, because the strip is what answers there (§ crossParent). Outside a
+ * panel the word is `column` even at an edge, and the footer gates the hint on a second region
+ * (../chrome/bindings.ts).
+ */
+export const bubbledCrossWord = (): 'tab' | 'column' => {
+  if (!parentInScope(focusedNode())) return 'column'
+  const current = groupAt(focused)
+  const beyond = ordered().some((group) => group.x !== current?.x && group.x !== RAIL_COLUMN)
+  return beyond ? 'column' : 'tab'
+}
+
+/**
+ * A cross key that nothing inside the panel wanted: the pane's next column that way, else the strip.
+ *
+ * A panel is the level below its strip, and the strip's Left and Right are bound to the strip by
+ * focus, so a key bubbling up from a control in the panel used to skip that level and land on the
+ * screen's column move — which from anywhere inside a tabbed pane threw the reader into the rail.
+ * The pane's own columns still count, because Right on a file in the editor's tree is how the
+ * document beside the tree is reached (docs/command-palette-and-shortcuts.md § Focus and typing);
+ * the rail does not, because Escape is the way out of a pane and a control's Left is not. With no
+ * column that way the strip switches its tab if it can, and the keys land on the strip either way:
+ * the panel that had them is hidden after a switch, and at the strip's edge a visible move to the
+ * strip beats a silent wall (docs/tui.md § The five key groups).
+ */
+export function crossParent(delta: 1 | -1): boolean {
+  const entry = parentInScope(focusedNode())
+  if (!entry) return false
+  if (moveColumn(delta, { rail: false })) return true
+  entry.cross?.(delta)
+  return focusRenderable(entry.node)
 }
 
 /** Down from a parent stop: into the first stop of the panel it is showing. */
@@ -999,7 +1063,12 @@ export function moveStop(delta: 1 | -1): boolean {
   // walk per key press for nothing (§ walkStops).
   const stops = stopsIn(box)
   if (!stops.includes(node)) return false
-  return walkStops(node, delta, { within: box, stops }) || true
+  if (walkStops(node, delta, { within: box, stops })) return true
+  // Up from the first stop of a panel is the strip that owns it, because Down from the strip is how
+  // the reader got in: the two are one door, and a wall at the top of a panel left Escape as the only
+  // way back to the tabs. The bottom edge stays a wall (docs/tui.md § The five key groups).
+  if (delta < 0 && isPanel(box)) focusRenderable(ownerOf(box)?.node)
+  return true
 }
 
 /**
@@ -1060,12 +1129,14 @@ export function moveRegion(delta: 1 | -1): boolean {
  * region the shell does not call chrome, which is how a first crossing into the pane skips the pane
  * strip above it (../chrome/topology.ts § skips).
  */
-export function moveColumn(delta: 1 | -1): boolean {
+export function moveColumn(delta: 1 | -1, options: { rail?: boolean } = {}): boolean {
   const current = groupAt(focused)
   if (!current) return false
   // `ordered()` rather than `groups`, so both the columns and the memory answer for a region that is
   // still registered *and* still in scope. Out of scope it is the region behind a dialog (§ Scopes).
-  const reachable = ordered()
+  // `rail: false` keeps the move inside the pane, which is what a key bubbling out of a panel asks
+  // for (§ crossParent).
+  const reachable = ordered().filter((group) => options.rail !== false || group.x !== RAIL_COLUMN)
   const beyond = reachable
     .map((group) => group.x)
     .filter((x) => (delta > 0 ? x > current.x : x < current.x))
@@ -1256,9 +1327,11 @@ export function _allStops(): Renderable[] {
  * (../reachability.test.tsx, docs/tui.md § The invariants, invariant 11).
  */
 export function _columns(): { at: number | null; all: readonly number[] } {
+  // The rail is not a column a key bubbling out of a panel can reach (§ crossParent).
+  const inPanel = !!parentInScope(focusedNode())
   return {
     at: groupAt(focused)?.x ?? null,
-    all: [...new Set(ordered().map((group) => group.x))].sort((a, b) => a - b),
+    all: [...new Set(ordered().map((group) => group.x))].filter((x) => !inPanel || x !== RAIL_COLUMN).sort((a, b) => a - b),
   }
 }
 

@@ -541,8 +541,8 @@ does, and a handler returning `false` passes it on.
 
 | Group | Keys | In a collection | On a parent stop | On a plain stop | On a viewport with no stops | Bubbled to the region tier |
 | --- | --- | --- | --- | --- | --- | --- |
-| Move | `↓` `j` / `↑` `k` | next/previous row, wrapping as `collectionIntents.ts` says | Down enters the panel the strip is showing; Up leaves for the previous stop | next/previous stop in reading order within the panel, revealed in every viewport around it; an edge is a wall | scroll a fifth of a page | nothing |
-| Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves; a plain list and a leaf bubble | the next/previous tab; an edge bubbles | bubbles | bubbles | one column left or right, landing on that column's last-used region, no wrap |
+| Move | `↓` `j` / `↑` `k` | next/previous row, wrapping as `collectionIntents.ts` says | Down enters the panel the strip is showing; Up leaves for the previous stop | next/previous stop in reading order within the panel, revealed in every viewport around it; the bottom edge is a wall and Up from the first stop of a panel is the strip that owns it | scroll a fifth of a page | nothing |
+| Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves; a plain list and a leaf bubble | the next/previous tab; an edge bubbles | bubbles | bubbles | one column left or right, landing on that column's last-used region, no wrap; from inside a panel only the pane's own columns count, and with none that way the strip that owns the panel takes it: the tab changes if it can and the keys land on the strip |
 | Act | `⏎` `space` | activate the row, then enter main where the region says so | nothing | press: `onPress`, a toggle, a `Select`'s list, an `Input`'s submit, an entered rectangle | nothing | nothing |
 | Back | `esc` | the parent stop if a panel holds the collection, else the region's home | the region's home | the parent stop, else the region's home | the region's home | a notification clears, else the climb the shell's topology names |
 | Page | `pgup` `pgdn` `home` `end` `g` `G` | `pagePrev`, `pageNext`, `first`, `last` on the collection | scroll the viewport around it | scroll the viewport around it | scroll | nothing |
@@ -562,6 +562,21 @@ the screen. That is a reversal: a tab-strip edge used to be a wall, on the groun
 threw the reader back into the rail unexpectedly. The surprise was smaller than the inconsistency,
 which was one key with five meanings and two of them silent. The footer says `column` where that is
 what the key will do, so the reader is told before they press it.
+
+**A panel is a level, and a bubbled cross key does not skip it.** The strip's Left and Right are
+bound to the strip by focus, so a key bubbling up from a control inside one of its panels used to
+pass the strip and land on the screen's column move — which from any button or row on a tabbed pane
+put the reader in the rail. `crossParent` in `apps/tui/src/keys/regions.ts` is the missing level, and
+the region tier asks it before it moves a column. Inside a panel the pane's own columns still count,
+because Right on a file in the editor's tree is how the document beside the tree is reached; the rail
+does not, because Escape is the way out of a pane and a control's Left is not. With no column that
+way the strip that owns the panel takes the key: it changes its tab if it can, and the keys land on
+the strip either way, because after a switch the panel that had them is hidden, and at the strip's
+edge a visible move to the strip beats a silent wall — the next press is the strip's own. The footer
+says `column` inside a panel while the pane has a second column and `tab` where the strip is the
+answer. Up has the matching rule: the first stop of a panel is entered from the strip with Down, so
+Up from that stop is the strip, and only the bottom edge of a panel is a wall. A dialog drawn inside a
+panel is out of the panel's scope, so neither rule reaches the tab behind it.
 
 Two keys sit at the screen level and never bubble. Tab and Shift+Tab cycle every region on screen in
 declared order and wrap, and the pane chords cross the column edge before they switch the pane. Both
@@ -658,11 +673,14 @@ a `j`. A landing on the frame is never remembered — the list that arrives a mo
 next walk into the region finds. Without that rule a reader who looked into Browse before choosing a
 source came back to a lit border, no caret, and arrows that did nothing, for the rest of the run.
 
-**A strip with panels is a parent stop.** `markParent(node, panels)` marks one, where `panels()`
-returns the boxes whose subtrees it owns. From outside it is one stop: `left`/`h` and `right`/`l` walk
-it without wrapping and an edge bubbles to the column move, `down`/`j` enters the panel it is
-showing, `up`/`k` is the previous stop beside the strip rather than one of the strip's own tabs, and
-Escape from anything inside that panel returns to it. A strip that owns
+**A strip with panels is a parent stop.** `markParent(node, panels, cross)` marks one, where `panels()`
+returns the boxes whose subtrees it owns and `cross` is how it answers Left and Right. From outside it
+is one stop: `left`/`h` and `right`/`l` walk it without wrapping and an edge bubbles to the column
+move, `down`/`j` enters the panel it is showing, `up`/`k` is the previous stop beside the strip rather
+than one of the strip's own tabs, and Escape from anything inside that panel returns to it. From
+inside the panel, Up on its first stop returns to the strip, and a bubbled Left or Right with no
+column of the pane's own that way is handed to the strip's `cross` and lands on the strip (§ The five
+key groups). A strip that owns
 none, such as GitHub's Open/Closed pull filter, is an ordinary control, so Browse still opens on its
 rows and Up/Down reaches the collection. The strip is a sibling of its panels rather than an ancestor,
 so walking up from a control never reaches it: the panel box is what the walk reaches, and the panels
@@ -988,19 +1006,21 @@ Enter opens something. `focusedKind()` asks the region store which kind has the 
 | A field, meaning an `Input` or a `Textarea` | move | press | type | send |
 | A row of a collection | move | open | fold, or column | commit |
 | A parent stop, meaning a strip showing a panel | `j` enter | press | tab | commit |
-| A stop that opens a list, meaning a `Menu` trigger and so every `Select` | move | open | column | commit |
-| A viewport holding no other stop | scroll | press | column | commit |
-| Any other stop | move | press | column, or move | commit |
+| A stop that opens a list, meaning a `Menu` trigger and so every `Select` | move | open | tab, or column | commit |
+| A viewport holding no other stop | scroll | press | tab, or column | commit |
+| Any other stop | move | press | tab, column, or move | commit |
 
 A `Menu` says which it is by passing `opens` to `pressable`, and nothing else in the kit does yet. The
 order is a priority: a field is a stop too, and a viewport is only ever a stop while it holds none.
 
-The `h`/`l` column is the one the kind alone does not settle, so `words()` resolves it from two
-questions the store answers. A collection that was given an `onExpand` folds and says `fold`; one
-that was not declines the intent, which bubbles, and says `column`. A stop that answers `expand` and
-`collapse` itself is a horizontal collection drawn as one stop — `DocumentTabs`, `SegmentedControl`,
-a chip row — and says `move`, because the pair moves inside it and never reaches the column. The
-footer said `fold` for every kind before that, which was true of one of them. A field's bare keys
+The `h`/`l` column is the one the kind alone does not settle, so `words()` resolves it from three
+questions the store answers. A collection that was given an `onExpand` folds and says `fold`. A stop
+that answers `expand` and `collapse` itself is a horizontal collection drawn as one stop —
+`DocumentTabs`, `SegmentedControl`, a chip row — and says `move`, because the pair moves inside it and
+never reaches the column. Anything else says `column` where there is a column the pair can reach —
+which inside a panel leaves out the rail — and `tab` inside a panel with none, because the strip that
+owns the panel is what answers there (§ The five key groups). The footer said `fold` for every kind
+before that, which was true of one of them. A field's bare keys
 type, so their layers are inactive and the engine never reports them live; the words in that row are
 there for the table's sake and the footer draws the chord alone.
 
@@ -1275,7 +1295,8 @@ rail to main and `left`/`h` comes back; neither wraps. `Ctrl+Option+Right` and
 chord works from Menu, Browse, and Tasks. In a rail list, Up/Down and `j`/`k` move; `Enter` performs the
 row's ordinary activation and then enters main. An overlay or entered PTY keeps first refusal on
 Escape. A tabbed detail adds one deliberate level: `left`/`right` (or `h`/`l`) choose a tab, `down`/`j`
-enters its controls, and Escape returns to the tab strip. Moving a focused control beyond the viewport
+enters its controls, and Escape, Up from the first control, or `left`/`right` from any of them return
+to the tab strip — the last pair changing the tab on the way. Moving a focused control beyond the viewport
 reveals it automatically; mouse wheel/trackpad input scrolls the viewport independently.
 
 Escape climbs one level each press, and where it goes at the top of a region is the shell's to say
