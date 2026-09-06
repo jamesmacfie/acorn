@@ -898,8 +898,23 @@ const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable
  * bare keys drive, and landing in a filter box means `j` types a `j`. A filter strip owns no panels,
  * so it is not a parent and the rows below it still win.
  */
+/** Nodes that have asked to be what entering their region lands on (§ entryStop). */
+const entryMarks = new WeakSet<Renderable>()
+
+/** Ask to be the stop a reader lands on when the keys enter this node's region.
+ *
+ *  The default rule is "the thing the bare keys drive", which is why entering a list lands on its
+ *  first row and never in the filter box above it: `j` there types a `j`. A message box is the
+ *  exception and the only one so far. On a chat surface the thing a reader arrives to do is write, so
+ *  the agents pane's composer marks itself and the transcript beside it is reached with Escape or Tab
+ *  (../kit/asking.tsx § MentionTextarea).
+ *
+ *  A mark is per node and a node that leaves the tree is never walked, so nothing has to clear one. */
+export const markEntry = (node: Renderable): void => { entryMarks.add(node) }
+
 const entryStop = (box: Renderable): Renderable | undefined =>
-  walk(box, (child) => !!parentEntry(child)?.panels().length)
+  walk(box, (child) => entryMarks.has(child))
+  ?? walk(box, (child) => !!parentEntry(child)?.panels().length)
     ?? walk(box, (child) => items.has(child))
     // A native scrollbox is focusable so a control-free document can own the arrow keys. It is a
     // transparent viewport when it contains a real stop, though: descending through it here keeps a

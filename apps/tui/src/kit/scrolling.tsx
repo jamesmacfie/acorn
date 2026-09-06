@@ -41,6 +41,9 @@ export type Viewport = {
   scrollTop: number
   scrollHeight: number
   viewport: { height: number }
+  /** Put the offset back on the last line, unless the reader has scrolled away from it. What
+   *  `Timeline follow` calls when a turn arrives (./grouping.tsx). */
+  stickToBottom: () => void
 }
 
 // The arrows, while the viewport itself is the stop. It only is one where it holds no other stop
@@ -135,6 +138,10 @@ const descendant = (at: Node, id: unknown): Node | null => {
  */
 function viewportBox(props: ViewportProps): JSX.Element {
   const [offset, setOffset] = createSignal(0)
+  // Whether the reader is on the newest content right now. Not a signal: nothing draws from it, it is
+  // read only when the content resizes, and it is written by every move so that scrolling up to read
+  // history stops the following and coming back to the bottom starts it again.
+  let stuck = true
   let box: Node | undefined
   let content: Node | undefined
 
@@ -149,7 +156,14 @@ function viewportBox(props: ViewportProps): JSX.Element {
     const most = Math.max(0, total() - fits())
     return Math.max(0, Math.min(Math.round(to), most))
   }
-  const move = (rows: number): void => { setOffset((at) => clamp(at + rows)) }
+  /** The one door the offset changes through, so "is the reader at the bottom" is decided in the same
+   *  place the offset is written and cannot drift from it. */
+  const place = (to: number): void => {
+    const next = clamp(to)
+    setOffset(next)
+    stuck = next >= Math.max(0, total() - fits())
+  }
+  const move = (rows: number): void => { place(offset() + rows) }
 
   const scrollBy = (delta: number, unit?: 'viewport'): void => {
     if (unit !== 'viewport') { move(Math.round(delta)); return }
@@ -178,11 +192,15 @@ function viewportBox(props: ViewportProps): JSX.Element {
 
   const api = {
     scrollBy,
-    scrollTo: (to: number) => { setOffset(clamp(to)) },
+    scrollTo: (to: number) => { place(to) },
     scrollChildIntoView,
     get scrollTop() { return offset() },
     get scrollHeight() { return total() },
     get viewport() { return { height: fits() } },
+    /** Put the offset back on the last line, unless the reader has scrolled away from it. Called from
+     *  a follower's own `onSizeChange`, which the layout raises after the read-back — so the height
+     *  the clamp reads is this frame's rather than last frame's (../layout/pass.ts § readBack). */
+    stickToBottom: () => { if (stuck) place(Number.MAX_SAFE_INTEGER) },
   }
 
   // The offset into the node's props, where paint reads it, and a frame to draw the move.

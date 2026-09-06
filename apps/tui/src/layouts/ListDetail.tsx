@@ -104,7 +104,15 @@ export function ListDetail(props: LayoutProps) {
             is routinely wider than its share. Without it the row reports a width the screen does not
             have (docs/tui.md). */}
         <box flexDirection="column" flexGrow={1} minWidth={0}>
-          <Panel grow scroll title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1, { x: DETAIL_COLUMN })}>
+          {/* The detail column clips; what is in it scrolls. That is the DOM's rule for this region
+              too — `.layout-region-detail` is `overflow: hidden` and the pane's own timeline, diff or
+              rows is the scroller (client-core/infra/styles/shell.css) — and the terminal deviated
+              from it by wrapping the whole region in one viewport. The cost of the deviation was the
+              agents pane: its composer is the column's last child, so it scrolled away with the
+              transcript and a reader had to go looking for the message box after every turn. Both
+              panes that use this layout own their scroll, the transcript through `Timeline follow`
+              and the diff through `DiffPane` (../kit/grouping.tsx, ../kit/showing.tsx). */}
+          <Panel grow title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1, { x: DETAIL_COLUMN })}>
             {props.regions.detail?.()}
           </Panel>
         </box>

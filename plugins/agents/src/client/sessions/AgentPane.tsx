@@ -6,6 +6,7 @@ import {
   Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
+import { hold } from '../hold'
 import AgentComposer from '../composer/AgentComposer'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
@@ -43,7 +44,9 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
           the last word of it. */}
       <Toolbar.Spacer />
       <Show when={model.selected()}>
-        {(session) => (
+        {(narrowed) => {
+          const session = hold(model.selected, narrowed())
+          return (
           <>
             <Inline>
               <RuntimeStateIcon state={session().runtimeState} />
@@ -90,7 +93,7 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
               )}
             </Menu>
           </>
-        )}
+        )}}
       </Show>
       <AgentUsageIndicator />
       <Picker<AgentProviderDescriptor>
@@ -210,7 +213,9 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
       <AgentDetailHeader task={props.task} model={model} />
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} model={model} />}>
-        {(session) => (
+        {(narrowed) => {
+          const session = hold(model.selected, narrowed())
+          return (
           <>
             <Show
               when={model.snapshot()}
@@ -220,7 +225,9 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
                 </EmptyState>
               }
             >
-              {(snapshot) => (
+              {(narrowedSnapshot) => {
+                const snapshot = hold(model.snapshot, narrowedSnapshot())
+                return (
                 <>
                   <AgentTranscript
                     taskId={props.task.id}
@@ -238,7 +245,8 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
                     onError={model.setError}
                   />
                 </>
-              )}
+                )
+              }}
             </Show>
             {/* Gone while a subagent's run owns the window. The composer only ever addresses the
                 session, so leaving it under a subagent's transcript would read as "reply to this
@@ -256,7 +264,8 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
               />
             </Show>
           </>
-        )}
+          )
+        }}
       </Show>
       <AgentSessionDialogs task={props.task} model={model} />
     </>

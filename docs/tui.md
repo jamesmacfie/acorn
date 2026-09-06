@@ -393,6 +393,37 @@ is only a shape. And a node used to be destroyed a tick after it left the tree, 
 `Suspense` boundary that suspended twice; `removeNode` unlinks the object and keeps it, so there is
 nothing to be already destroyed.
 
+### There is no floating layer, so a panel needs somewhere to be laid out
+
+A terminal has no layer to open over, so `Modal`, `Menu`, `Popover` and `Picker` all draw in flow, and
+clipping is unconditional — a child is cut to its parent's content box whatever it asks for
+(§ How a frame is drawn). Together those two make one trap worth naming, because it reads as a
+rendering bug and is a layout one: a panel opened inside a **row** is laid out in the few cells its
+trigger was given. The agents pane header is a `Toolbar` of four controls in about fifty cells, and
+its New-session list drew `ClaAv` — a provider's name and its status colliding — so a reader could not
+tell what they were choosing.
+
+The answer is one layout prop: an open `Menu` or `Popover` gives its own box a flex basis of the full
+width, so the wrap below puts it on a line of its own with the bar's whole width to draw in. That is
+what `Popover`'s own sentence in [ui-design.md](./ui-design.md) always promised. Its trigger moves down
+to that line with it, which is the visible cost and the honest one: the list sits under the control
+that opened it. Outside a row the prop changes nothing, because a box in a column is already the full
+width.
+
+**A bar must not re-scope its children, and that is worth a rule.** The first version of this hoisted
+the panel instead: `Toolbar` held a signal and a slot under its row, and an open panel was handed up
+through a context. Three things were wrong with it, and the third shipped. A Solid signal treats a
+function argument as an updater, and JSX here is routinely a function. Children built inside an effect
+and inserted somewhere else belong to an owner neither place controls. And a context provider wraps
+its children in a memo, so every bar in the app re-ran as a unit whenever anything in it changed —
+which is a change of behaviour for a hot path that nothing asked for. The layout prop is the whole
+feature with none of that, and `apps/tui/src/kit/kit.test.tsx § a toolbar` holds the line.
+
+The bar itself wraps rather than clips, for the same reason and in the same file. A bar is written for
+a window and drawn here in a pane column, and Yoga moves what does not fit onto the next line before
+it shrinks anything — so an overfull bar costs a line instead of its words. The gap is the column gap
+only; a gap on both axes puts a blank row between the wrapped lines.
+
 ### Rectangles
 
 `Rectangle` is the kit's one admission that a pane needs pixels, and it has four kinds. On this host:
@@ -582,6 +613,14 @@ Tab and Shift+Tab cycle every region on screen in declared order and wrap, and t
 the column edge before they switch the pane. Both are in § Navigation. Neither bubbles, and Tab has
 one exception, below.
 
+A `MentionTextarea` sends on a bare `⏎`, and `⇧⏎` is the newline. That is what the shared prop has
+always said the node does — `onSubmit` is documented as "Enter without a modifier. Absent leaves Enter
+as a newline" — and the DOM half reads exactly that; this host had it on the `commit` chord alone, so
+the agents composer's own hint said `Shift+Enter for newline` and described a keyboard nobody had. An
+open suggestion list takes the key first and completes, as it does on the desktop. On a terminal that
+ignores the kitty keyboard protocol there is one byte for both, so `⇧⏎` sends too and a newline has to
+be pasted; that is the same terminal on which `ctrl+⏎` never arrived either.
+
 `ctrl+⏎` is `commit` and submits the `Composer` or `Input` that has the keys. It is typing-exempt, so
 it fires from inside the text, and a `Composer`'s submit button is a plain stop that Tab reaches, for
 a reader who does not know the chord.
@@ -603,6 +642,13 @@ inside its commit box, where Tab toggles the summary and the description and Esc
 needs no such key because its comment box is a mode entered with `c` rather than a stop in the
 reading order, and that shape is still open to us if a field ever wants more keys than a panel can
 spare (§ Doors left open).
+
+**An arrow at a field's edge leaves the field.** A multi-line field answers Up and Down by moving the
+caret a row and says so; where there is no row to move to it declines, and the hand-off below walks
+the stops instead. Without that the hand-off swallowed the key either way, and a field was a wall: the
+agents pane's message box sits between a transcript and an action bar, so with the keys in it the
+header above could not be reached at all. Down at the last line leaves the same way, which is the
+shape every editor with a form under it has.
 
 **Typing is a layer, not a matcher.** That paragraph used to be said once per binding, as
 `active: () => !isTyping()` on every bare key of every control on screen. It is said once now, by a
@@ -678,8 +724,12 @@ harnesses — because with it on the renderer walks up from the same click and f
 focusable ancestor itself, which is a second opinion about focus for exactly the case one owner is
 for.
 
-Entering a region lands on its first parent stop, else its first collection row, else its first stop,
-else the region's own frame, walking the node tree depth first. The middle step is this
+Entering a region lands on a stop that asked for it, else its first parent stop, else its first
+collection row, else its first stop, else the region's own frame, walking the node tree depth first.
+The first of those is `markEntry` and the agents composer is its only caller: a chat surface is one a
+reader arrives at to write, so the message box takes the keys and the transcript above it is a walk
+away. Nothing else may ask — the rule the rest of the list encodes is "the thing the bare keys drive",
+which is why landing in a filter box is refused: `j` there types a `j`. The middle step is this
 host's own: on the desktop a reader arrives with a pointer and clicks what they meant, and here the
 first thing focused is the thing the bare keys drive, so landing in a filter box would mean `j` types
 a `j`. A landing on the frame is never remembered — the list that arrives a moment later is what the
@@ -870,6 +920,34 @@ revealed through every scrollbox ancestor with `scrollChildIntoView`.
 
 A viewport whose `visible` flag goes false asks for a landing pass, because a `TabPanel` is this node
 and hiding a panel raises nothing anybody can hear (§ Focus regions).
+
+**A region that clips beats a region that scrolls, wherever the pane has something pinned.** The
+`list-detail` detail column clips, and what is inside it scrolls. That is the DOM's rule for the same
+region — `.layout-region-detail` is `overflow: hidden` and the pane's own timeline, diff or rows is
+the scroller (`client-core/infra/styles/shell.css`) — and this host deviated from it by wrapping the
+whole region in one viewport. The deviation cost the agents pane its composer: the message box is the
+column's last child, so it scrolled away with the transcript and every turn ended with the reader
+hunting for it. Both panes that use the layout own their scroll, the transcript through
+`Timeline follow` and the diff through `DiffPane`.
+
+A clipping region puts a line between its children, which is `row-gap: var(--gap-stack)` on the
+desktop's own detail region. Stacked straight onto each other, a pane's parts read as one pile: the
+agents pane's detail column is a transcript, a row of provider pickers, an expand toggle and a message
+box, and the reader could not see where one ended. The other half of that separation is the field's
+own frame — `Textarea` draws one, which is what its row in [ui-design.md](./ui-design.md) has always
+said it does, and it lights in the accent tone while the keys are inside it.
+
+**`Timeline follow` is a scroller that stays on its last turn.** It holds the offset at the foot while
+the reader is already there, and lets go the moment they scroll up to read history, which is decided
+in `place()` — the one door the offset changes through, so "is the reader at the foot" cannot drift
+from the offset itself. The growth it reacts to is the height of a box sized by the turns, not of the
+box that grows to fill the region: the second changes whenever anything else in the column does, and
+following that would drag the view to the foot every time a menu opened.
+
+The nesting question is what decides the shape. A viewport's height comes from `flexBasis: 0` on a
+flex line, and the content box inside one is free-sized, so a viewport nested in a viewport has
+nothing to be bounded by — the same reason a scrollbox around a whole pane is refused
+(§ What the TUI never does). One scroller per column, and the pane says which node it is.
 
 A page key clamps rather than wrapping. `pageNext` goes to the last row and `pagePrev` to the first,
 and each hands the key back once the caret is already there, so the viewport below the collection

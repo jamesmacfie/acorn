@@ -167,10 +167,22 @@ const event = (seq: number, value: unknown) => ({
   createdAt: 0,
 })
 
-const AGENT_SNAPSHOT = {
+// A transcript longer than any pane is tall, so a case can ask whether the viewport stayed on the
+// newest turn and kept the composer under it (../kit/scrolling.tsx § followViewport). Behind a flag
+// because every other agents case reads a screen it can hold in its head, and thirty turns of filler
+// would make each of those assert against a scroll position instead of against a pane.
+// A function rather than a constant: a test sets the flag inside its own body, which is long after
+// this module was evaluated (./workspaceFocus.test.tsx does the same with its own flag).
+const agentFiller = () => (process.env.ACORN_FIXTURE_LONG_TRANSCRIPT
+  ? Array.from({ length: 30 }, (_, index) =>
+    event(100 + index, { type: 'assistant_message', text: `Filler turn ${index + 1}.` }))
+  : [])
+
+const agentSnapshot = () => ({
   session: AGENT_SESSIONS[0],
   turns: [AGENT_TURN],
   events: [
+    ...agentFiller(),
     event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
     event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Read src/login.ts', status: 'completed', output: 'export async function signIn(' } }),
     event(3, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
@@ -191,7 +203,7 @@ const AGENT_SNAPSHOT = {
     createdAt: 0,
     resolvedAt: null,
   }],
-}
+})
 
 const LOCAL_CHANGES = [
   { path: 'src/login.ts', status: 'modified', staged: false, additions: 12, deletions: 3 },
@@ -404,7 +416,11 @@ const json = (value: unknown) => ({
       // `Alert` reads the same however unreadable the real thing is.
       if (path === '/v2/p/agents/providers') return json(AGENT_PROVIDERS)
       if (path.startsWith('/v2/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, nextCursor: null })
-      if (/^\/v2\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(AGENT_SNAPSHOT)
+      // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
+      // reads as a session id, and the caller would get a snapshot object where it expects an array
+      // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
+      if (path.startsWith('/v2/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
+      if (/^\/v2\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
       if (path.startsWith('/v2/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
       if (path === `/v2/p/changes/tasks/${TASK.id}/local/changes`) return json(LOCAL_CHANGES)
       if (path === `/v2/p/changes/tasks/${TASK.id}/review-notes`) return json([])

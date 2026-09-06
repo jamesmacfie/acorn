@@ -7,6 +7,7 @@ import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
+import { GLYPHS } from './glyphs'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
@@ -15,7 +16,7 @@ import {
 } from '../keys/regions'
 import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
-import { ScrollViewport } from './scrolling'
+import { ScrollViewport, type Viewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -146,10 +147,45 @@ export function Card(props: {
   )
 }
 
-/** Cards in sequence with a dim rule between turns. `follow` is a no-op: a column of cells pins to
- *  its last child by construction, and the scroll is the region's. */
+/** Cards in sequence with a dim rule between turns.
+ *
+ *  `follow` makes this node the scroller and holds it on the last turn, which is what it means on the
+ *  DOM too: there, `.ui-timeline-scroll` is the scroll container and `.layout-region-detail` around it
+ *  is `overflow: hidden` (client-core/infra/styles/shell.css). The terminal keeps that division. It
+ *  matters for what sits beside the timeline rather than for the timeline itself: the agents pane's
+ *  detail column is a header, this, and the composer, and only a transcript that owns its own scroll
+ *  leaves the other two pinned where the reader can always reach them. While the whole column
+ *  scrolled, typing a message meant first finding the box.
+ *
+ *  Held on the last turn only while the reader is already there. Scrolling up to read history stops
+ *  it and coming back to the foot starts it again, which is the viewport's own rule (./scrolling.tsx
+ *  § place).
+ *
+ *  Without `follow` it is a plain column and whatever is around it scrolls, which is what github's
+ *  pull request conversation wants.
+ *
+ *  `viewKey` is dropped. It is the DOM's per-view scroll memory, and this host has one offset per
+ *  mounted viewport rather than a map of remembered ones.
+ *
+ *  `props.follow` is read once rather than through a `Show`, because it is a constant at every call
+ *  site and a reactive read would rebuild every turn the moment it flipped. */
 export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?: string; children: JSX.Element }) {
-  return <box flexDirection="column" flexGrow={1}>{props.children}</box>
+  if (!props.follow) return <box flexDirection="column" flexGrow={1}>{props.children}</box>
+  let view: Viewport | undefined
+  return (
+    <ScrollViewport onBox={(box) => { view = box }}>
+      {/* An inner box sized by the turns. The viewport's content box is free-sized, so this one's
+          height is the turns' own — which is the event `follow` is about. Reading the viewport's own
+          height instead would chase every change in the region around it. */}
+      <box
+        flexDirection="column"
+        flexShrink={0}
+        onSizeChange={() => view?.stickToBottom()}
+      >
+        {props.children}
+      </box>
+    </ScrollViewport>
+  )
 }
 
 /** One turn in a `Timeline`. The compound half, and it has to exist: `Timeline.Turn` on a `Timeline`
@@ -206,6 +242,14 @@ export function registerPanel(idPrefix: string, box: Renderable): void {
   })
 }
 
+/** The mark a tab carries goes in front of its label rather than beside it, because a cell row has
+ *  no baseline to align an icon against. A Lucide name with no glyph of its own drops out
+ *  (../kit/glyphs.ts), and `title` has nowhere to hover. */
+const labelOf = (tab: { label: string; icon?: string }): string => {
+  const glyph = tab.icon ? GLYPHS[tab.icon] : undefined
+  return glyph ? `${glyph} ${tab.label}` : tab.label
+}
+
 /** `Tab  [Tab]  Tab` on one line, the selected one in brackets.
  *
  *  Each label in a box that refuses to shrink, for the reason `../kit/cells.tsx` § Run gives about a
@@ -215,7 +259,7 @@ export function registerPanel(idPrefix: string, box: Renderable): void {
  *  shrink means the row clips at its end instead, which is the answer every block node in this file
  *  gives and the one a terminal gives. */
 export function Tabs(props: {
-  tabs: readonly { id: string; label: string; count?: number }[]
+  tabs: readonly { id: string; label: string; count?: number; icon?: string; title?: string }[]
   active: string
   onChange: (id: string) => void
   idPrefix: string
@@ -286,7 +330,7 @@ export function Tabs(props: {
           // rows below the first.
           <box flexShrink={0} height={1}>
             <Line role={props.active === tab.id ? 'strong' : 'body'} tone={props.active === tab.id ? 'accent' : undefined}>
-              {props.active === tab.id ? `[${tab.label}]` : tab.label}
+              {props.active === tab.id ? `[${labelOf(tab)}]` : labelOf(tab)}
               {tab.count === undefined ? '' : ` ${tab.count}`}
             </Line>
           </box>
@@ -316,8 +360,24 @@ export function TabPanel(props: {
   )
 }
 
+/** A bar of controls.
+ *
+ *  It wraps rather than clips. A bar is written for a window and drawn here in a pane column — the
+ *  agents pane header is four controls and a title in about fifty cells — and a row that shrinks its
+ *  children cuts their labels to `[Sessio` and `[ Ne`, which names nothing. Yoga moves what does not
+ *  fit onto the next line before it shrinks anything, so an overfull bar costs a line instead of its
+ *  words, and a bar that fits is laid out exactly as it was.
+ *
+ *  The gap is the column gap alone. Yoga's `gap` sets both axes, so a wrapped bar gained a blank row
+ *  between its lines.
+ *
+ *  Nothing here wraps `props.children`. A context provider around them would put them inside a memo
+ *  of Solid's own, and re-running a toolbar's children as a unit broke the changes pane at once: a
+ *  callback-form `<Show>` in that bar had its accessor read again after its condition went false,
+ *  which Solid refuses as `Stale read from <Show>` (ChangesPane.tsx). An open panel widens itself
+ *  instead (§ `Menu`). */
 export function Toolbar(props: { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }) {
-  return <box flexDirection="row" gap={spaceCells('inline')}>{props.children}</box>
+  return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>{props.children}</box>
 }
 
 /** `flexGrow` on an empty box is what "push what follows to the far end" is in a cell layout. */
@@ -413,7 +473,15 @@ export function Menu(props: {
     opens: true,
   })
   return (
-    <box flexDirection="column">
+    // Open, the box claims the whole line it is on. A row shares its width between its children, so a
+    // list laid out where its trigger sits gets the trigger's few cells: the agents pane's
+    // New-session list drew `ClaAv`, a provider's name and its status colliding inside ten of them.
+    // A full basis under the wrap in `Toolbar` above puts the box on a line of its own with the bar's
+    // full width, which is what `Popover`'s sentence in docs/ui-design.md has always promised. There
+    // is no floating layer here and no `overflow` to relax — clipping is unconditional
+    // (../paint/paint.ts) — so widening the box is the only place the width can come from. Outside a
+    // row this changes nothing: a box in a column is already the full width.
+    <box flexDirection="column" {...(open() ? { flexBasis: '100%' as const } : {})}>
       {/* The trigger's characters are the caller's; the box around them is the stop. */}
       <box flexDirection="row" flexShrink={0} ref={control.ref}>
         {props.trigger({ open, toggle: () => set(!open()), focused: control.focused })}
@@ -543,7 +611,9 @@ export function Popover(props: {
     props.onDismiss?.()
   }
   return (
-    <box flexDirection="column">
+    // The whole line while it is open, for the reason `Menu` gives above. The composer's sent-context
+    // preview and the pane header's usage panel are both toolbar children.
+    <box flexDirection="column" {...(open() ? { flexBasis: '100%' as const } : {})}>
       {props.trigger({ open, toggle: () => (props.disabled ? undefined : setOpen(!open())) })}
       <Show when={open()}>
         <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>

@@ -18,7 +18,7 @@ import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/ki
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
-import { focusedRenderable, focusRenderable, moveStop, stopsIn } from '../keys/regions'
+import { focusedRenderable, focusRenderable, focusWithin, markEntry, moveStop, stopsIn } from '../keys/regions'
 import { stop } from '../keys/stops'
 import { STOP } from '../keys/tiers'
 import { bindKeys } from '../keys/install'
@@ -340,6 +340,9 @@ type TextareaProps = {
   placeholder?: string
   rows?: number
   grow?: boolean
+  /** Draw the field's own frame. Default true; `Composer` passes false because it draws one already
+   *  (§ Textarea). Not on the shared `TextareaProps` — the DOM has no box to double up. */
+  boxed?: boolean
   mono?: boolean
   readOnly?: boolean
   maxLength?: number
@@ -372,23 +375,53 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
 }
 
 export function Textarea(props: TextareaProps) {
+  const [box, setBox] = createSignal<Renderable>()
   const install = fieldRef({
     value: () => props.value ?? '',
     newline: true,
     onInput: (value) => props.onInput?.(value),
   })
+  // The box the node's own sentence promises, and it earns its two rows twice over. It is the only
+  // thing separating a message box from whatever is stacked above it — on the agents pane that is a
+  // transcript, a row of provider pickers and an expand toggle, and unboxed the field read as one
+  // more line of that pile. And it is where a reader looks to see whether the keys are in the field,
+  // which a caret alone cannot say once the field is empty.
+  //
+  // `boxed` is how a caller that draws its own frame turns it off: `Composer` is a bordered box around
+  // a field, a hint and a send button, so a second border inside its first is a box in a box
+  // (§ Composer). Not on the shared `TextareaProps`, because on the DOM the two borders are one CSS
+  // rule apart and nobody needed to say it.
+  // A border and no padding. The frame is what separates the field from whatever is stacked above it
+  // and what says where the keys are; a pad inside it would cost two more columns of the reader's own
+  // text for nothing, and at the widths a terminal deals in that is a wrapped word.
+  const boxed = () => props.boxed !== false
   return (
-    <textarea
+    <box
+      flexDirection="column"
       flexGrow={props.grow ? 1 : 0}
-      {...fieldColors()}
-      placeholder={props.placeholder ?? ''}
-      ref={(element: Renderable) => {
-        install(element)
-        // `install` has just put the field's own API on the node, so from here it is one
-        // (§ FieldApi).
-        textareaRef(props, element as Renderable & FieldApi)
-      }}
-    />
+      flexShrink={0}
+      minWidth={0}
+      {...(boxed() ? boxBorder('surface', { tone: focusWithin(box()) ? 'accent' : 'neutral' }) : {})}
+      ref={setBox}
+    >
+      <textarea
+        flexGrow={props.grow ? 1 : 0}
+        // `rows` is "visible lines" on the shared props and was dropped here, so every field was
+        // exactly as tall as what was in it: an empty message box was one line, and the composer's
+        // own "Expand the message box" toggle — which is a swap from 3 rows to 18 — did nothing at
+        // all. A floor rather than a height, because a field taller than its `rows` should still show
+        // what has been typed into it (../layout/measure.ts § measureField).
+        {...(props.grow ? {} : { minHeight: Math.max(1, props.rows ?? 1) })}
+        {...fieldColors()}
+        placeholder={props.placeholder ?? ''}
+        ref={(element: Renderable) => {
+          install(element)
+          // `install` has just put the field's own API on the node, so from here it is one
+          // (§ FieldApi).
+          textareaRef(props, element as Renderable & FieldApi)
+        }}
+      />
+    </box>
   )
 }
 
@@ -648,6 +681,7 @@ export function Composer(props: {
           placeholder={props.placeholder}
           disabled={props.disabled}
           rows={props.rows ?? 3}
+          boxed={false}
           grow
           ref={(element: Renderable) => { area = element as Renderable & FieldApi }}
           onInput={(value) => props.onInput?.(value)}
@@ -710,12 +744,16 @@ export function MentionTextarea(props: MentionTextareaProps) {
         // the `commit` chord here — the same key the footer already names beside a focused field.
         {...(props.onSubmit ? { onSubmit: () => props.onSubmit!() } : {})}
         ref={(element: Renderable) => {
-          // The one arrow key in the kit that fires while somebody is typing, and the reason is the
-          // shape: the field IS the typing target and the list under it is the field's own, so `↓`
-          // cannot mean "type a ↓" and there is nothing else for it to reach. It says so with its
-          // tier: `STOP` sits above the typing shadow, and it is bound to the field itself, which is
-          // the one thing the shadow deliberately leaves alone (../keys/tiers.ts § TYPING). The
-          // palette needs the same thing for the same reason and gets it above the trap instead
+          // Landing here is the point of the pane. A reader who opens an agent run has come to write
+          // to it, so this field is what entering the region gives the keys to, and the transcript
+          // beside it is reached with Escape or Tab (../keys/regions.ts § markEntry).
+          markEntry(element)
+          // Two keys that fire while somebody is typing, and the reason is the shape: the field IS
+          // the typing target and the list under it is the field's own, so neither can mean "type
+          // this" and there is nothing else for them to reach. They say so with their tier: `STOP`
+          // sits above the typing shadow, and both are bound to the field itself, which is the one
+          // thing the shadow deliberately leaves alone (../keys/tiers.ts § TYPING). The palette needs
+          // the same thing for the same reason and gets it above the trap instead
           // (../keys/trap.ts § overlayKeys).
           bindKeys(element, [{
             key: 'down',
@@ -724,6 +762,27 @@ export function MentionTextarea(props: MentionTextareaProps) {
               // Entering the list, not walking it: the field is not one of its stops, so there is
               // nothing to step from (../keys/regions.ts § walkStops).
               return focusRenderable(stopsIn(list)[0])
+            },
+          }, {
+            // Enter sends, which is what the shared prop has always said this field does: `onSubmit`
+            // is documented as "Enter without a modifier. Absent leaves Enter as a newline", and the
+            // DOM half reads exactly that (client-core/kit/components/inputs/MentionTextarea.tsx).
+            // This host had it on the `commit` chord alone, so the composer's own hint — "Shift+Enter
+            // for newline" — described a keyboard nobody had. `commit` still works, and Shift+Return
+            // is not this binding, so it falls through to the typing path and inserts the newline.
+            //
+            // On a terminal that ignores the kitty keyboard protocol there is one byte for both, so
+            // Shift+Return sends too and a newline has to come from the ＋ picker or a paste. That is
+            // the same terminal on which `ctrl+return` never arrived either (../input/terminal.ts).
+            key: 'return',
+            cmd: () => {
+              // An open list takes it first, and takes the row it is showing at the top — the DOM
+              // chooses `suggestions()[selected()]` and lands on the same row when nobody has moved.
+              const [first] = suggestions()
+              if (first) { complete(first.value); return true }
+              if (!props.onSubmit) return false
+              props.onSubmit()
+              return true
             },
           }], STOP, { mode: 'focus' })
         }}

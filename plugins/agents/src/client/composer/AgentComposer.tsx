@@ -614,7 +614,13 @@ export default function AgentComposer(props: {
           onSelect={(contribution) => {
             // Solid delegates click handlers at the document. Mounting a backdrop synchronously
             // lets the selecting click reach the new backdrop and dismiss the modal immediately.
-            window.setTimeout(() => setContextPickerId(contribution.id), 0)
+            //
+            // Bare, not `window.setTimeout`: the terminal host defines `window` as an object holding
+            // `acorn` and nothing else, on the grounds that a `window` answering every question is
+            // worse than none (docs/tui.md § Booting client-core under Node). Reaching through it
+            // threw a TypeError out of a keymap handler and this row did nothing there. The global is
+            // the same function on both hosts, and only the DOM has the delegation this defers past.
+            setTimeout(() => setContextPickerId(contribution.id), 0)
           }}
           disabled={props.disabled}
           placement="top-start"

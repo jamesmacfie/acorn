@@ -426,7 +426,9 @@ no paste event to deliver.
 **Behaviour a pane keeps redoing becomes a node's prop.** Three arrived with the agents pane, and each
 replaced a copy of the same machinery in a plugin. `Timeline follow` makes the timeline the scroller
 and keeps it on the newest turn until the reader scrolls away, with the place they left held per
-`viewKey`; the transcript had 80 lines of that and github's conversation will want it too. `Card focus`
+`viewKey`; the transcript had 80 lines of that and github's conversation will want it too. Both hosts
+put the scroller on the timeline and let the region around it clip, which is what keeps a pane's
+header and composer pinned where the reader can reach them ([tui.md](./tui.md) § Scrolling viewports). `Card focus`
 puts the reader on one card, which is the same argument that made collection state the host's: a pane
 told "show this item" holds a key and nothing else, and the kit gives it no class and no id to select
 on. `Rows` hands back the same item object for an unchanged key, so a list rebuilt from a live store
@@ -1030,14 +1032,14 @@ the kit as a stop without somebody deciding whether this host presses it.
 | `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a grey rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
-| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
-| `Toolbar` | none | children on one line; a `Heading` in a bar is cut short rather than wrapped, as it is on the DOM, so the bar stays one line tall and the controls at the far end stay on screen |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `viewKey` is dropped: this host keeps one offset per mounted viewport rather than a map of remembered ones. `Timeline.Turn` is a node of its own on both hosts |
+| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
+| `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
 | `Menu` | trap | a vertical list in a box |
-| `Popover` | none | reduced: the panel opens as a full-width block under its anchor, not floating |
+| `Popover` | none | reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
 | `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
 | `DetailColumn` | none | the right column, or the whole width |
@@ -1093,7 +1095,7 @@ the kit as a stop without somebody deciding whether this host presses it.
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
-| `Textarea` | stop | a boxed multi-line field; owns keys |
+| `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |

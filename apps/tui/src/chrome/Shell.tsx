@@ -229,7 +229,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
               region is an empty string). It carries the error boundary too, so a surface that
               throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
-          <PanelBody>
+          <PanelBody name="main">
             <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
               {/* A source that declared regions has its list in the Browse panel already, so the
                   main panel is its detail alone. One that did not keeps its whole surface here,

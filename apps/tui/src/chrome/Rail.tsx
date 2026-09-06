@@ -167,7 +167,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         <Show
           when={source()?.regions?.list}
           fallback={
-            <PanelBody>
+            <PanelBody name="browse">
               <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
             </PanelBody>
           }
@@ -187,7 +187,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
                   panel draws for each of those rather than the blank frame both used to leave
                   (../panel.tsx). */}
-              <PanelBody><Dynamic component={list()} /></PanelBody>
+              <PanelBody name="browse"><Dynamic component={list()} /></PanelBody>
             </box>
           )}
         </Show>
