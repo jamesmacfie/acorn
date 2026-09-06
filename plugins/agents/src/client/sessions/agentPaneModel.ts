@@ -88,13 +88,12 @@ export function createAgentPaneModel(task: Task) {
 
   // Acknowledge on view. The node keeps `attention: completed` until the owner speaks again, so a
   // finished session sits in "Needs you" long after they have read it. Looking at it, in a focused
-  // window, is the acknowledgement (client-core attentionInbox.ts). The key carries `updatedAt`, so
-  // a session that completes a second time is news again.
+  // window, is the acknowledgement (client-core attentionInbox.ts).
   const acknowledgeCompleted = (): void => {
     if (activeTaskId() !== task.id || !defaultDeliveryContext.focused()) return
     const nodeId = activeNodeId() ?? ''
     for (const session of taskSessions())
-      if (session.attention === 'completed') markAttentionSeen(nodeId, agentAttentionItemId(session.id), session.updatedAt)
+      if (session.attention === 'completed') markAttentionSeen(nodeId, agentAttentionItemId(session.id))
   }
   createEffect(acknowledgeCompleted)
   // The effect alone misses the commonest case: the session completed while you were elsewhere, and
