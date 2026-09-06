@@ -168,12 +168,17 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-badge[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
 
 /* ── Spinner ────────────────────────────────────────────────────────────────────────────────
-   Terminal spins a braille glyph. A pack that wants a ring replaces the content, not the markup. */
+   Terminal spins a braille glyph. A pack that wants a ring replaces the content, not the markup.
+
+   The turn is here rather than on the shared `.spin` class for the reason written on
+   `.ui-icon[data-spin]` below: `.spin` switches itself off under prefers-reduced-motion, which left
+   a frozen loader on screen for anyone running that setting. */
 .ui-spinner {
   display: inline-block;
   flex: none;
   font-family: var(--font-glyph);
   color: var(--accent);
+  animation: spin 1s linear infinite;
 }
 .ui-spinner[data-size='md'] { font-size: var(--fs-md); }
 
