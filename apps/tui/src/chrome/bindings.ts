@@ -75,11 +75,11 @@ export const focusedKind = (): FocusedKind => {
   return 'stop'
 }
 
-export type Words = { moveKeys: string; move: string; act: string; cross: string; commit: string }
+export type Words = { moveKeys: string; move: string; act: string; cross: string; commit: string; next: string }
 
 /**
  * The words, one row per focused kind. `move` is the vertical pair, `act` is Enter, `cross` is the
- * horizontal pair, and `commit` is the chord.
+ * horizontal pair, `commit` is the chord, and `next` is Tab.
  *
  * A table rather than a run of ternaries because the invariant is over the table: every kind says
  * something for every key, and the reachability suite reads the same rows the footer draws
@@ -90,17 +90,20 @@ export type Words = { moveKeys: string; move: string; act: string; cross: string
  */
 export const WORDS: Record<FocusedKind, Words> = {
   // Down enters the panel the strip is showing and Up leaves the strip, so the pair is not a pair.
-  parent: { moveKeys: 'j', move: 'enter', act: 'press', cross: 'tab', commit: 'commit' },
-  item: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit' },
+  parent: { moveKeys: 'j', move: 'enter', act: 'press', cross: 'tab', commit: 'commit', next: 'region' },
+  item: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit', next: 'region' },
   // A field's bare keys are its own: `j`, `l` and Enter type, so their layers are inactive and the
-  // engine never reports them live. The words are here for the table's sake and the footer draws the
-  // chord alone (../keys/install.ts § typing).
-  field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'type', commit: 'send' },
-  opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'column', commit: 'commit' },
+  // engine never reports them live. The words are here for the table's sake, and what the footer
+  // draws beside a field is the chord, Escape and Tab (../keys/install.ts § typing).
+  //
+  // Tab is the next control of the panel rather than the next region, because the arrows type here
+  // and a field would otherwise be the end of the walk (../kit/asking.tsx § step).
+  field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'type', commit: 'send', next: 'next' },
+  opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'column', commit: 'commit', next: 'region' },
   // A viewport is a stop only while it holds none, and then the arrows are the scroll
   // (../keys/regions.ts § stopsIn).
-  viewport: { moveKeys: 'j/k', move: 'scroll', act: 'press', cross: 'column', commit: 'commit' },
-  stop: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'column', commit: 'commit' },
+  viewport: { moveKeys: 'j/k', move: 'scroll', act: 'press', cross: 'column', commit: 'commit', next: 'region' },
+  stop: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'column', commit: 'commit', next: 'region' },
 }
 
 /**
@@ -164,9 +167,12 @@ const specs = (): Spec[] => {
     {
       probe: bare('nextRegion', 1),
       keys: 'tab',
-      label: 'region',
+      label: says.next,
       detail: 'shift+tab goes back; f6 does too',
-      when: () => regionsInScope() > 1,
+      // Gated on there being a second region to reach, for the reason the cross word is: a hint must
+      // not name a move that cannot happen. A field's Tab moves inside the panel, so it is true
+      // wherever the field is (§ WORDS).
+      when: () => says.next !== 'region' || regionsInScope() > 1,
     },
     { probe: bare('nextPane'), keys: keys.nextPane[0] ?? '', label: 'pane', detail: 'the pane to the right' },
   ]

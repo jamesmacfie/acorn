@@ -18,7 +18,7 @@ import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/ki
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
-import { focusedRenderable, focusRenderable, stopsIn } from '../keys/regions'
+import { focusedRenderable, focusRenderable, moveStop, stopsIn } from '../keys/regions'
 import { stop } from '../keys/stops'
 import { STOP } from '../keys/tiers'
 import { bindKeys } from '../keys/install'
@@ -261,12 +261,37 @@ function fieldRef(spec: {
     handlePaste: (event: { text: string }) => { apply(paste(untrack(model), event.text, spec.newline)) },
   }
 
+  // Tab is the next control before it is the next region.
+  //
+  // The arrows type in a field — the typing shadow claims them so the caret can move — which left a
+  // field the end of its panel's walk: the `[Comment]` button beside a composer, the review box under
+  // it and its three verbs were unreachable from the keyboard, and a reader who pressed Down into the
+  // box could only press Escape back to the strip and Down into the same box again. Tab is the key
+  // somebody in a form presses for this on the DOM, and it is lazygit's inside its commit box; gh-dash
+  // does not need one because its comment box is a mode rather than a stop in the reading order
+  // (references/lazygit § commit_message_controller.go, references/gh-dash § prview).
+  //
+  // It costs the region cycle nothing. The walk answers first and says whether it moved, and at the
+  // panel's edge it declines, so the region layer below still has its Tab
+  // (../keys/install.ts § HOST_KEYS).
+  const step = (delta: 1 | -1) => (): boolean => {
+    const before = focusedRenderable()
+    moveStop(delta)
+    return focusedRenderable() !== before
+  }
+
   return (element: unknown) => {
     const node = element as Node
     setBox(node)
     // Descriptors rather than a spread, or the two getters would be copied as whatever string they
     // answered at mount (./scrolling.tsx § api).
     Object.defineProperties(node, Object.getOwnPropertyDescriptors(api))
+    // At `STOP`, bound to the field itself, which is the one tier the typing shadow leaves alone
+    // (../keys/tiers.ts § TYPING).
+    bindKeys(node as unknown as Renderable, [
+      { key: 'tab', cmd: step(1) },
+      { key: 'shift+tab', cmd: step(-1) },
+    ], STOP, { mode: 'focus' })
   }
 }
 

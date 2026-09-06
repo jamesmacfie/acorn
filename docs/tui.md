@@ -578,18 +578,31 @@ answer. Up has the matching rule: the first stop of a panel is entered from the 
 Up from that stop is the strip, and only the bottom edge of a panel is a wall. A dialog drawn inside a
 panel is out of the panel's scope, so neither rule reaches the tab behind it.
 
-Two keys sit at the screen level and never bubble. Tab and Shift+Tab cycle every region on screen in
-declared order and wrap, and the pane chords cross the column edge before they switch the pane. Both
-are in § Navigation.
+Tab and Shift+Tab cycle every region on screen in declared order and wrap, and the pane chords cross
+the column edge before they switch the pane. Both are in § Navigation. Neither bubbles, and Tab has
+one exception, below.
 
 `ctrl+⏎` is `commit` and submits the `Composer` or `Input` that has the keys. It is typing-exempt, so
-it fires from inside the text, and a `Composer`'s submit button is also a plain stop that Down
-reaches, for a reader who does not know the chord.
+it fires from inside the text, and a `Composer`'s submit button is a plain stop that Tab reaches, for
+a reader who does not know the chord.
 
 While an `Input` or `Textarea` has the keys, bare keys type. The move, cross and page groups go inert
 except `↑` and `↓` inside a multi-line `Textarea`, which move the cursor. Escape leaves the field for
 its parent stop or the region's home, which is how a reader gets out of a composer without sending.
 Tab, Shift+Tab, `ctrl+⏎` and the pane chords all work from inside a field.
+
+**Tab in a field is the next control before it is the next region.** The arrows type there, so a
+field was the end of its panel's walk: on the pull request pane, the `[Comment]` button beside the
+comment box, the review box under it and its three verbs could not be reached from the keyboard at
+all — Escape went back to the tab strip and Down came back to the same box. So a field binds Tab and
+Shift+Tab to the stop walk at its own tier, above the typing shadow, and says whether it moved; at
+the panel's edge it declines and the region tier's Tab answers as it always did
+(`apps/tui/src/kit/asking.tsx` § step). The footer says `tab next` in a field and `tab region`
+everywhere else. This is the DOM's own rule — Tab is the next control in a form — and it is lazygit's
+inside its commit box, where Tab toggles the summary and the description and Escape closes. gh-dash
+needs no such key because its comment box is a mode entered with `c` rather than a stop in the
+reading order, and that shape is still open to us if a field ever wants more keys than a panel can
+spare (§ Doors left open).
 
 **Typing is a layer, not a matcher.** That paragraph used to be said once per binding, as
 `active: () => !isTyping()` on every bare key of every control on screen. It is said once now, by a
@@ -1295,7 +1308,8 @@ rail to main and `left`/`h` comes back; neither wraps. `Ctrl+Option+Right` and
 chord works from Menu, Browse, and Tasks. In a rail list, Up/Down and `j`/`k` move; `Enter` performs the
 row's ordinary activation and then enters main. An overlay or entered PTY keeps first refusal on
 Escape. A tabbed detail adds one deliberate level: `left`/`right` (or `h`/`l`) choose a tab, `down`/`j`
-enters its controls, and Escape, Up from the first control, or `left`/`right` from any of them return
+enters its controls, `Tab` steps between them from inside a text field (§ The five key groups), and
+Escape, Up from the first control, or `left`/`right` from any of them return
 to the tab strip — the last pair changing the tab on the way. Moving a focused control beyond the viewport
 reveals it automatically; mouse wheel/trackpad input scrolls the viewport independently.
 
