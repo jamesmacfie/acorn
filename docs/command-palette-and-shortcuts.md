@@ -85,12 +85,23 @@ contributes those Settings pages is the host that registers their commands, so a
 Appearance page has no Appearance command to disagree with it.
 
 **Core's own catalogue is a small tree.** `Go to` holds the task, workspace, project and node
-searches, `Panes` and `Terminal` hold the task-scoped operations that were loose at the root,
-`Settings` holds one row per registered settings page, and `Appearance` and `Notifications` hold the
-settings core owns. Going to a task or a workspace was a special kind of palette item until
-2026-09-03, composed into the root by hand and invoked through a switch on what a row was about; it is
-a `fleet`-scoped search now, so the root shows one named row instead of every task the fleet has, and
-switching node still happens before a remote task is activated.
+searches and the `Last workspace` action, `Panes` and `Terminal` hold the task-scoped operations that
+were loose at the root, `Settings` holds one row per registered settings page, and `Appearance` and
+`Notifications` hold the settings core owns. Going to a task or a workspace was a special kind of
+palette item until 2026-09-03, composed into the root by hand and invoked through a switch on what a
+row was about; it is a `fleet`-scoped search now, so the root shows one named row instead of every
+task the fleet has, and switching node still happens before a remote task is activated.
+
+**`Last workspace` is an action, not a search, and it is the same pair both ways.**
+`client-core/features/workspaces/lastWorkspace.ts` holds one workspace id: the one open before this
+one. Each shell reports the workspace it has settled on — the desktop from the route, the terminal
+from its own choice — so opening a task in another workspace counts as a switch and the picker is not
+the only way to move. Going back reports the arrival in turn, which makes the workspace just left the
+way back, so `meta+;` on the desktop and `;` in the terminal swap the same two workspaces for as long
+as the reader keeps pressing. The store keeps an id rather than a node, and the desktop looks that id
+up against the fleet when the key is pressed, so a workspace on a node that has come back is found
+again. There is no third step back: this is a toggle, not a history, and the row is hidden until a
+second workspace has been opened.
 
 **Every row in the palette is a command.** There was a second way in until 2026-09-03: a
 `paletteRows` contribution, with `rows` and `invoke` where a command has `run`, fetched by each host

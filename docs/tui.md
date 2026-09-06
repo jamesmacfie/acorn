@@ -1026,7 +1026,7 @@ onto a rail row behind the plugin trust prompt, and the swallow then ate everyth
 one key the footer advertised was the one that broke the dialog. A scope names nothing and has
 nothing to leak.
 
-Two more things follow from the rule. The command layer's bare keys, `w`, `p`, `n`, `q` and `?`,
+Two more things follow from the rule. The command layer's bare keys, `w`, `p`, `;`, `n`, `q` and `?`,
 fire only at the screen's own depth, so a reader who presses one inside a dialog does not get a
 picker over the top of it. Chords stay live at every depth. And the footer has to ask the store
 rather than the engine, because the region layer's Tab is still registered inside a dialog and the

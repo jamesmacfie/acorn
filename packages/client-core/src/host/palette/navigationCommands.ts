@@ -10,6 +10,7 @@ import { createFleetQuery } from '../../infra/node/fanout'
 import { nodes } from '../../infra/node/fleet'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { selectFleetWorkspace, type FleetWorkspaceList } from '../../features/workspaces/fleetWorkspaces'
+import { previousWorkspaceId } from '../../features/workspaces/lastWorkspace'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 import { COMMAND_CLOSED, registerCommands, type CommandOutcome } from '../registries/commands/commands'
 import { CORE_GO_TO_GROUP, goToGroup } from '../registries/commands/coreCommands'
@@ -136,6 +137,26 @@ export function registerNavigationCommands(options: {
           // Mirrors the topbar picker, including the node switch
           // (features/workspaces/fleetWorkspaces.ts explains the order). The rail source is restored
           // per-workspace by the activeWorkspace effect in App.tsx.
+          selectFleetWorkspace(entry, navigate)
+          return COMMAND_CLOSED
+        },
+      },
+      {
+        id: 'core.goto.workspace-last',
+        parentId: CORE_GO_TO_GROUP,
+        title: 'Last workspace',
+        hint: 'back to the workspace you came from',
+        category: 'workspace',
+        palette: true,
+        order: 250,
+        // No identity to gate on: the store holds a workspace id and the fleet is asked where it is
+        // now, so this row means the same thing whichever node is answering.
+        scope: 'none',
+        when: () => !!previousWorkspaceId(),
+        run: (): CommandOutcome => {
+          const entry = workspaceEntries().find((candidate) => candidate.workspace.id === previousWorkspaceId())
+          if (!entry) throw new Error('that workspace is no longer here')
+          // Same handoff as the search above, node switch included.
           selectFleetWorkspace(entry, navigate)
           return COMMAND_CLOSED
         },

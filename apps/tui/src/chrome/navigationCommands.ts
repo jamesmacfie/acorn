@@ -8,6 +8,7 @@ import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activ
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { previousWorkspaceId } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
 import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
 import { chooseProject } from './routing'
 import type { ShellModel } from './model'
@@ -76,6 +77,24 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
         // The rail goes back to following the task, which is what choosing a workspace from anywhere
         // else does (./Rail.tsx).
         setSelectedSource(null)
+        return COMMAND_CLOSED
+      },
+    },
+    {
+      id: 'core.goto.workspace-last',
+      parentId: CORE_GO_TO_GROUP,
+      title: 'Last workspace',
+      hint: 'back to the workspace you came from',
+      category: 'workspace',
+      palette: true,
+      order: 250,
+      scope: 'none',
+      when: () => !!previousWorkspaceId(),
+      run: (): CommandOutcome => {
+        const id = previousWorkspaceId()
+        if (!id) throw new Error('there is no workspace to go back to')
+        // `chooseWorkspace` clears the open task and source itself, same as the search above.
+        model.chooseWorkspace(id)
         return COMMAND_CLOSED
       },
     },

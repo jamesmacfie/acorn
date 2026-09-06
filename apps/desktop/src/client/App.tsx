@@ -13,6 +13,7 @@ import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx
 import WorkspacePicker from '@acorn/client-core/kit/components/inputs/WorkspacePicker.tsx'
 import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
+import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -132,6 +133,9 @@ export default function App() {
     const bindings = registerKeybindings([
       { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
+      // The command is the palette's own Last workspace row, registered with the rest of the Go to
+      // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
+      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Switch to the last workspace', category: 'Global', defaultChord: 'meta+;', when: 'global' },
     ])
     // The two settings core owns, as bounded choices with the current value marked. Both write through
     // the same accessors Settings → Appearance and Settings → Notifications call
@@ -288,6 +292,14 @@ export default function App() {
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
   const activeWorkspace = () => workspaceForProject(workspaces.data, contextProjectId())
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+
+  // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
+  // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
+  // than from the picker, because opening a task in another workspace is a change of workspace too.
+  createEffect(() => {
+    const ws = activeWorkspace()
+    if (ws) noteWorkspaceVisit(ws.id)
+  })
 
   // Whatever source was selected has to still be on offer. A workspace switch can take one away:
   // a browse source only appears where its provider is connected and the workspace links one of its
