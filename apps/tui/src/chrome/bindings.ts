@@ -24,7 +24,7 @@ import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { hostKeysFor } from '../keys/install'
 import {
-  focusedExpands, focusedItem, focusedRenderable, isField, isParentStop, isViewport, regionsInScope,
+  bubbledCrossWord, focusedExpands, focusedItem, focusedRenderable, isField, isParentStop, isViewport, regionsInScope,
 } from '../keys/regions'
 import { focusedCrosses, focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
@@ -115,17 +115,20 @@ export const WORDS: Record<FocusedKind, Words> = {
  *   does this stop cross itself?   `DocumentTabs`, `SegmentedControl` and a chip row are each a
  *                                  horizontal collection drawn as one stop, so the pair moves inside
  *                                  them and never reaches the column
+ *   is it inside a panel?          a bubbled pair moves between the pane's own columns where it has
+ *                                  more than one, and otherwise goes to the strip that owns the
+ *                                  panel and changes its tab; the rail is never where it lands
  *
- * Everything else bubbles, and the region tier has one meaning for a bubbled `h` or `l`: one column
- * left or right (../keys/regions.ts § moveColumn, docs/tui.md § The five key groups).
+ * Everything else bubbles to the region tier, which has one meaning for it: one column left or right
+ * (../keys/regions.ts § crossParent, § moveColumn, docs/tui.md § The five key groups).
  */
 export const words = (): Words => {
   const kind = focusedKind()
   const row = WORDS[kind]
   if (kind === 'field' || kind === 'parent') return row
   if (focusedCrosses()) return { ...row, cross: 'move' }
-  if (kind === 'item') return { ...row, cross: focusedExpands() ? 'fold' : 'column' }
-  return row
+  if (kind === 'item' && focusedExpands()) return { ...row, cross: 'fold' }
+  return { ...row, cross: bubbledCrossWord() }
 }
 
 const specs = (): Spec[] => {

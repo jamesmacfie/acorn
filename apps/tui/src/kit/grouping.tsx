@@ -256,7 +256,9 @@ export function Tabs(props: {
         // anything inside that panel comes back here. A strip with none — GitHub's Open/Closed
         // filter — owns an empty set and stays an ordinary control, which is what `markParent`'s
         // getter is for.
-        markParent(element, () => panelsFor(props.idPrefix))
+        // `step` as well, so Left and Right from a control inside one of those panels change the tab
+        // rather than leaving the pane (../keys/regions.ts § crossParent).
+        markParent(element, () => panelsFor(props.idPrefix), step)
         bindKeys(element, [
           ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
           ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),

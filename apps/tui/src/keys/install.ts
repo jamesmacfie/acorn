@@ -30,7 +30,7 @@ import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
 import {
-  focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
+  crossParent, focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
   movePane, onFocusMove, scopeDepth, walkSteps,
 } from './regions'
 import { tuiKeymapHost } from './keymapHost'
@@ -339,9 +339,12 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
     // notification to clear it returns false and nothing happens.
     ['dismiss', () => clearNotifications() || moveBack()],
   ]
+  // The strip first, where the keys are inside one of its panels: a panel is the level below its
+  // strip, and a cross key nothing in the panel wanted is the strip's before it is the screen's
+  // (./regions.ts § crossParent).
   const columnMoves: [Intent, () => boolean][] = [
-    ['expand', () => moveColumn(1)],
-    ['collapse', () => moveColumn(-1)],
+    ['expand', () => crossParent(1) || moveColumn(1)],
+    ['collapse', () => crossParent(-1) || moveColumn(-1)],
   ]
   engine.registerLayer({
     priority: REGION,
