@@ -1,6 +1,10 @@
 /* Reusable tab strip (core/client/ui/Tabs.tsx). Generalized from the Rollbar item panel. */
+/* Wraps rather than overflowing. A tab holds an 88px floor so a word label is readable, and github's
+   pull strip puts four or more `#20982` tabs in a navigator column narrower than their sum: without
+   this the tabs past the edge were drawn outside the strip with nothing to scroll them back. */
 .ui-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   min-height: var(--tab-h);
   padding: 0 var(--pane-pad);
@@ -9,6 +13,11 @@
 }
 .ui-tab {
   position: relative;
+  /* A row, so a tab can carry a mark before its label without the svg sitting on the text baseline. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   min-width: 88px;
   padding: 0 var(--space-6);
   font: inherit;
@@ -24,7 +33,6 @@
 .ui-tab:active { background: var(--bg-selected); }
 .ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .ui-tab-count {
-  margin-left: var(--space-3);
   padding: 1px 5px;
   font-family: var(--font-ui);
   font-size: var(--fs-xs);

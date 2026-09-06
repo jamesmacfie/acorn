@@ -164,11 +164,12 @@ function build(task: Task) {
       ...(agent.requestId ? { subresourceId: agent.requestId } : {}),
     })
   }
-  const selectTab = (tab: TaskPullTab) => {
-    const linked = linkedTaskRows(tab)
-    if (!tabIsPrimary(tab) && linked.length === 1) return openTask(linked[0])
+  // Selection only. The strip is a tablist and selection follows focus there, so a tab that also
+  // navigated would carry a reader off to another task as they arrowed past it. Opening the linked
+  // task, or the agent that made the pull, is a button beside the strip instead.
+  const selectTab = (key: string) => {
     setTaskError('')
-    setSelectedKey(pullRefKey(tab.pull))
+    setSelectedKey(key)
   }
 
   const offersTaskCreation = () => {

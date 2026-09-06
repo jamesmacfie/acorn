@@ -2,7 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, EmptyState, Icon, Menu, Sections, Stack,
+  Alert, Button, EmptyState, Icon, Menu, Only, Sections, Stack, Tabs,
 } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
@@ -31,79 +31,101 @@ import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 // The registration is next door in ./paneContribution.ts, which is what keeps this file — and the
 // pull-request model behind it — out of the renderer's first paint.
 
+// A destination a related pull has and this pane does not. The mark on the tab says which one, and
+// the control beside the strip is how a reader takes it.
+const DESTINATION_ICON = { task: 'list-checks', agent: 'bot', mention: 'link-2', stack: 'git-branch' } as const
+
 /** The strip of pull requests this task is about, and the offer to make a task for one of them. */
 function PullStrip(props: { tabs: PrTabsModel }) {
   const tabs = () => props.tabs
   const taskId = () => tabs().task.id
+  // Rebuilt when the strip's contents change and never when the selection does. `Tabs` draws with
+  // `For`, which remounts a tab it is handed a new object for, and a remount under a keyboard user
+  // drops the focus they were moving (docs/ui-design.md).
+  const defs = createMemo(() => tabs().tabs().map((tab) => {
+    const kind = destinationKind(tab, taskId())
+    return {
+      id: pullRefKey(tab.pull),
+      label: `#${tab.pull.number}`,
+      title: taskPullTabTooltip(tab, taskId()),
+      ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
+    }
+  }))
+  const selected = () => tabs().selected()
+  const kind = () => {
+    const tab = selected()
+    return tab ? destinationKind(tab, taskId()) : null
+  }
+  const linked = () => {
+    const tab = selected()
+    return tab ? tabs().linkedTaskRows(tab) : []
+  }
   return (
     <Stack gap="row">
-      <Show when={tabs().tabs().length > 1}>
-        <ChipRow ariaLabel="Task pull requests">
-          <For each={tabs().tabs()}>
-            {(tab) => {
-              const kind = () => destinationKind(tab, taskId())
-              const linked = () => tabs().linkedTaskRows(tab)
-              const glyph = () => kind() === 'mention' ? 'link-2' : kind() === 'stack' ? 'git-branch' : null
-              return (
-                <>
-                  <Chip
-                    selected={tabs().selectedKey() === pullRefKey(tab.pull)}
-                    title={taskPullTabTooltip(tab, taskId())}
-                    leading={<Show when={glyph()}>{(name) => <Icon name={name()} size={12} />}</Show>}
-                    onPress={() => tabs().selectTab(tab)}
-                  >#{tab.pull.number}</Chip>
-                  <Show when={kind() === 'task' && linked().length === 1}>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
-                      label={`Open ${linked()[0].title}`}
-                      onPress={() => tabs().openTask(linked()[0])}
-                    ><Icon name="list-checks" size={13} /></Button>
-                  </Show>
-                  <Show when={kind() === 'task' && linked().length > 1}>
-                    <Menu
-                      ariaLabel={`Tasks linked to #${tab.pull.number}`}
-                      trigger={({ toggle }) => (
-                        <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
-                          <Icon name="list-checks" size={13} />
-                        </Button>
-                      )}
-                    >
-                      {(menu) => (
-                        <For each={linked()}>
-                          {(linkedTask) => (
-                            <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
-                              {linkedTask.title}
-                            </Menu.Item>
-                          )}
-                        </For>
-                      )}
-                    </Menu>
-                  </Show>
-                  <Show when={kind() === 'agent'}>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
-                      label="Open creating agent session"
-                      onPress={() => tabs().openAgent(tab)}
-                    ><Icon name="bot" size={13} /></Button>
-                  </Show>
-                </>
-              )
-            }}
-          </For>
-          <Show when={tabs().offersTaskCreation()}>
-            <Button
-              size="sm"
-              disabled={tabs().creatingTask() || !tabs().canCreateTask()}
-              tip={tabs().taskCreationTitle()}
-              onPress={() => void tabs().createSelectedTask()}
-            >{tabs().creatingTask() ? 'Creating…' : '+ Task'}</Button>
-          </Show>
-        </ChipRow>
-      </Show>
+      {/* Desktop only. In a terminal the strip is a second row competing with the section tabs for
+          the same few lines, and the related pulls it switches to are reachable from the pull
+          list. */}
+      <Only hosts={['dom']}>
+        <Show when={tabs().tabs().length > 1}>
+          <Tabs
+            tabs={defs()}
+            active={selected() ? pullRefKey(selected()!.pull) : ''}
+            onChange={(id) => tabs().selectTab(id)}
+            idPrefix="github-task-pulls"
+            ariaLabel="Task pull requests"
+            actions={
+              <>
+                <Show when={kind() === 'task' && linked().length === 1}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label={`Open ${linked()[0].title}`}
+                    onPress={() => tabs().openTask(linked()[0])}
+                  ><Icon name="list-checks" size={13} /></Button>
+                </Show>
+                <Show when={kind() === 'task' && linked().length > 1}>
+                  <Menu
+                    ariaLabel={`Tasks linked to #${selected()!.pull.number}`}
+                    trigger={({ toggle }) => (
+                      <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
+                        <Icon name="list-checks" size={13} />
+                      </Button>
+                    )}
+                  >
+                    {(menu) => (
+                      <For each={linked()}>
+                        {(linkedTask) => (
+                          <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
+                            {linkedTask.title}
+                          </Menu.Item>
+                        )}
+                      </For>
+                    )}
+                  </Menu>
+                </Show>
+                <Show when={kind() === 'agent'}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Open creating agent session"
+                    onPress={() => tabs().openAgent(selected()!)}
+                  ><Icon name="bot" size={13} /></Button>
+                </Show>
+                <Show when={tabs().offersTaskCreation()}>
+                  <Button
+                    size="sm"
+                    disabled={tabs().creatingTask() || !tabs().canCreateTask()}
+                    tip={tabs().taskCreationTitle()}
+                    onPress={() => void tabs().createSelectedTask()}
+                  >{tabs().creatingTask() ? 'Creating…' : '+ Task'}</Button>
+                </Show>
+              </>
+            }
+          />
+        </Show>
+      </Only>
       <Show when={tabs().taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
     </Stack>
   )

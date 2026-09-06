@@ -8,6 +8,7 @@ import { buildConversationItems, findSubagentItem, visibleConversationItems } fr
 import { sessionModelLabel } from '../settings/agentConfigOptions'
 import { Button, EmptyState, Icon, Inline, Section, Stack, Text, Timeline, Toolbar } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
+import { hold } from '../hold'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
 
@@ -73,7 +74,9 @@ export default function AgentTranscript(props: {
         </Section>
       </Show>
       <Show when={focusedSubagent()}>
-        {(subagent) => (
+        {(narrowed) => {
+          const subagent = hold(focusedSubagent, narrowed())
+          return (
           <Toolbar ariaLabel="Subagent run">
             <Button variant="bare" size="sm" onPress={props.onExitSubagent}>
               <Icon name="arrow-left" /> {props.snapshot.session.title}
@@ -83,7 +86,8 @@ export default function AgentTranscript(props: {
               <Text emphasis="muted">{subagentSummary(subagent(), sessionModel())}</Text>
             </Inline>
           </Toolbar>
-        )}
+          )
+        }}
       </Show>
       <Show
         when={items().length}

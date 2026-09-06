@@ -2,7 +2,7 @@
 import type { Renderable } from './tree/compat'
 import { createSignal, ErrorBoundary, Suspense, type JSX } from 'solid-js'
 import { Line } from './kit/cells'
-import { boxBorder } from './kit/roles'
+import { boxBorder, spaceLines } from './kit/roles'
 import { ScrollViewport } from './kit/scrolling'
 import { focusWithin } from './keys/regions'
 
@@ -65,7 +65,17 @@ export function Panel(props: {
           not something each caller has to remember (`./paint/paint.ts`). */}
       {props.scroll
         ? <ScrollViewport>{props.children}</ScrollViewport>
-        : <box flexDirection="column" flexGrow={1} overflow="hidden">{props.children}</box>}
+        : (
+          // A line between the region's children, which is `row-gap: var(--gap-stack)` on the
+          // desktop's own detail region (client-core/infra/styles/shell.css § .layout-region-detail).
+          // A clipping region stacks a pane's parts straight onto each other, and on the agents pane
+          // that put a transcript, a row of provider pickers, an expand toggle and a message box in
+          // one undivided pile. `rowGap`, not `gap`: Yoga's `gap` sets both axes and there is nothing
+          // here to space sideways.
+          <box flexDirection="column" flexGrow={1} rowGap={spaceLines('stack')} overflow="hidden">
+            {props.children}
+          </box>
+        )}
     </box>
   )
 }
@@ -80,12 +90,20 @@ export function Panel(props: {
  *
  *  The message is drawn rather than logged on purpose. This host has one screen and no devtools; a
  *  reader who can read "Cannot read properties of undefined" off the panel can say so, and a reader
- *  looking at a blank frame can only say it is blank. */
-export function PanelBody(props: { children: JSX.Element }) {
+ *  looking at a blank frame can only say it is blank.
+ *
+ *  The stack goes to the console as well, which on this host is held until the screen is handed back
+ *  and printed after it (`./main.tsx`). One line on a panel names the failure and cannot place it:
+ *  `Stale read from <Show>.` is a real message from Solid that says nothing at all about which of the
+ *  four hundred `<Show>` elements in the graph raised it, and without a frame to read there is
+ *  nowhere else for a reader to look. Printing after the screen closes is what makes this safe; a
+ *  write while the renderer owns the terminal is what garbles it. */
+export function PanelBody(props: { name: string; children: JSX.Element }) {
   return (
-    <ErrorBoundary fallback={(error: unknown) => (
-      <Line role="muted" wrap>{error instanceof Error ? error.message : String(error)}</Line>
-    )}>
+    <ErrorBoundary fallback={(error: unknown) => {
+      console.error(`[pane ${props.name}]`, error)
+      return <Line role="muted" wrap>{error instanceof Error ? error.message : String(error)}</Line>
+    }}>
       <Suspense fallback={<Line role="muted">Loading…</Line>}>{props.children}</Suspense>
     </ErrorBoundary>
   )

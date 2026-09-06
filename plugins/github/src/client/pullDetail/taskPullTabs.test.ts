@@ -68,6 +68,27 @@ describe('task pull tabs', () => {
     expect(taskPullTabTooltip(byKey.get('acme/widget#101')!, task.id)).toContain('Open in Child task')
   })
 
+  // A pull body arrives as GitHub's rendered HTML, and GitHub writes a bare `#42` as a link. Only
+  // the `/pull/` form is a pull request, which matters twice over: an issue link is the whole of a
+  // `Fixes #42` reference, and a link to a pull carries the issues spelling of its own number in
+  // `data-url` beside the href.
+  it('takes pull requests out of a body and leaves issues where they are', () => {
+    const body = [
+      '<a data-hovercard-type="issue" href="https://github.com/acme/widget/issues/42">#42</a>',
+      '<a data-url="https://github.com/acme/widget/issues/101"',
+      'data-hovercard-type="pull_request" href="https://github.com/acme/widget/pull/101">#101</a>',
+    ].join(' ')
+    const tabs = buildTaskPullTabs({
+      task,
+      primary,
+      relations: [],
+      openPulls: [],
+      tasks: [task],
+      primaryDetail: { ...detail, pull: { ...detail.pull, body }, comments: [] },
+    })
+    expect(tabs.map((tab) => pullRefKey(tab.pull))).toEqual(['acme/widget#100', 'acme/widget#101'])
+  })
+
   it('keeps a pane intent as a discovered tab even before GitHub evidence is cached', () => {
     const tabs = buildTaskPullTabs({
       task, primary, relations: [], openPulls: [], tasks: [task],

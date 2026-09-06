@@ -199,6 +199,26 @@ describe('a tab strip is a collection', () => {
     press('ArrowRight')
     expect(active).toBe('two')
   })
+
+  // A strip whose labels are all the same shape — github's pull strip labels every tab `#1234` —
+  // needs a mark and a tooltip to tell them apart, and neither may cost the tab its role.
+  it('draws a mark and a title on a tab that asks for one', () => {
+    dispose = render(() => (
+      <Tabs
+        tabs={[{ id: 'one', label: '#1', icon: 'link-2', title: 'Mentioned in #2' }, { id: 'two', label: '#2' }]}
+        active="one"
+        onChange={() => {}}
+        idPrefix="marked"
+        ariaLabel="Pulls"
+      />
+    ), host)
+    const [first, second] = host.querySelectorAll<HTMLElement>('.ui-tab')
+    expect(first.querySelector('.ui-icon')).not.toBeNull()
+    expect(first.title).toBe('Mentioned in #2')
+    expect(first.getAttribute('role')).toBe('tab')
+    expect(second.querySelector('.ui-icon')).toBeNull()
+    expect(second.title).toBe('')
+  })
 })
 
 describe('a modal is a trap', () => {

@@ -31,7 +31,7 @@ import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
 import {
   crossParent, focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
-  movePane, onFocusMove, scopeDepth, walkSteps,
+  movePane, moveStop, onFocusMove, scopeDepth, walkSteps,
 } from './regions'
 import { tuiKeymapHost } from './keymapHost'
 import { REGION, TYPING } from './tiers'
@@ -214,7 +214,17 @@ const typeInto = (event: KeyEvent): void => {
   // `handleKeyPress` from `TextareaRenderable`; ours is installed on the node by the component that
   // owns the model, from its `ref`, which is where a widget's imperative API goes under this painter
   // (../kit/asking.tsx § api).
-  node.handleKeyPress?.(event)
+  const typed = node.handleKeyPress?.(event)
+  // A multi-line field answers Up and Down by moving the caret a row, and says `false` where there is
+  // no row to move to (../kit/field.ts § byRow). At that edge the key is the stop walk's, which is
+  // what makes a message box something a reader can get out of the way they came into it: the agents
+  // composer sits between a transcript and an action bar, and while every arrow was swallowed here
+  // the header above it could not be reached from the keyboard at all. Down at the last line leaves
+  // the same way, which is the shape every editor with a form under it has.
+  if (typed === false && (event.name === 'up' || event.name === 'down') && moveStop(event.name === 'down' ? 1 : -1)) {
+    event.preventDefault()
+    return
+  }
   event.preventDefault()
 }
 

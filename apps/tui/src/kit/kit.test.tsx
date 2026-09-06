@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, type JSX } from 'solid-js'
+import { createSignal, Show, type JSX } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { ATTRS } from '../paint/buffer'
 import type { Renderable } from '../tree/compat'
@@ -59,8 +59,10 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
  *  For the two cases whose promise is which row something landed on rather than whether it is on the
  *  screen at all: a caret is the terminal's own and draws no cell, so the only way to see where it is
  *  is to type at it and say which row the character appeared on (../paint/paint.ts § drawField). */
-const bodyLines = (frame: Frame, count: number): string[] =>
-  frame.lines.slice(1, 1 + count).map((line) => line.replace(/^│/, '').replace(/│$/, '').trimEnd())
+/** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
+ *  field's own border inside it (./asking.tsx § Textarea). */
+const fieldLines = (frame: Frame, count: number): string[] =>
+  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/[│█]+$/, '').trimEnd())
 
 const noteFile = {
   path: 'src/login.ts',
@@ -128,17 +130,20 @@ const CASES: Case[] = [
   },
   {
     node: 'Tabs',
-    draws: 'Tab  [Tab]  Tab on one line, the selected one in brackets',
+    draws: 'Tab  [Tab]  Tab on one line, the selected one in brackets, a marked tab behind its glyph',
     render: () => (
       <Tabs
         idPrefix="t"
         ariaLabel="Tabs"
         active="b"
         onChange={() => {}}
-        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+        tabs={[{ id: 'a', label: 'one', icon: 'git-branch' }, { id: 'b', label: 'two' }]}
       />
     ),
-    check: (frame) => expect(lineWith(frame, 'one')).toContain('[two]'),
+    check: (frame) => {
+      expect(lineWith(frame, 'one')).toContain('[two]')
+      expect(lineWith(frame, 'one')).toContain('⑂ one')
+    },
   },
   {
     node: 'Toolbar',
@@ -1305,24 +1310,25 @@ const BEHAVIOURS: Behaviour[] = [
     render: () => (
       <Textarea value={'alpha bravo charlie delta'} grow />
     ),
-    // Twelve cells, ten of them inside the panel's border, so the value wraps into four rows and the
-    // arrows have rows to move between rather than one line to sit on. Four is also what fits, so no
-    // scroll bar is drawn over the last column of them (../paint/paint.ts § drawBar).
-    size: { width: 12, height: 6 },
+    // Ten cells of text: fourteen less the panel's border and the field's own. The value wraps into
+    // four rows so the arrows have rows to move between rather than one line to sit on, and four is
+    // also what fits, so no scroll bar is drawn over the last column of them
+    // (../paint/paint.ts § drawBar).
+    size: { width: 14, height: 8 },
     drive: async (screen) => {
-      expect(bodyLines(screen, 4)).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
+      expect(fieldLines(screen, 4)).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
       // Home first, so the caret starts somewhere known: the field opens at the end of its value,
       // which is the last row. Then Up three times reaches the first, and typing marks where it
       // landed — which is the only way a test can see a caret.
       const start = await screen.press('HOME')
       const up = await (await (await start.press('ARROW_UP')).press('ARROW_UP')).press('ARROW_UP')
       const typed = await up.press('X')
-      expect(bodyLines(typed, 1)).toEqual(['Xalpha'])
+      expect(fieldLines(typed, 1)).toEqual(['Xalpha'])
       // And Down comes back down at the column it left, over the two short rows in between, which is
       // what the goal column is for (./field.ts § byRow).
       const down = await (await (await typed.press('ARROW_DOWN')).press('ARROW_DOWN')).press('ARROW_DOWN')
       const back = await down.press('Y')
-      expect(bodyLines(back, 4)).toEqual(['Xalpha', 'bravo', 'charlie', 'dYelta'])
+      expect(fieldLines(back, 4)).toEqual(['Xalpha', 'bravo', 'charlie', 'dYelta'])
     },
   },
   {
@@ -1349,7 +1355,7 @@ const BEHAVIOURS: Behaviour[] = [
     drive: async (screen, pressed) => {
       const pasted = await screen.paste('one\ntwo')
       expect(pressed.at(-1)).toBe('one\ntwo')
-      expect(bodyLines(pasted, 2)).toEqual(['one', 'two'])
+      expect(fieldLines(pasted, 2)).toEqual(['one', 'two'])
     },
   },
   {
@@ -1714,6 +1720,38 @@ describe('a tab strip with panels', () => {
       // it is not what entering the region lands on (../keys/regions.ts § entryStop).
       const caret = screen.lines.find((line) => line.includes('\u203a')) ?? ''
       expect(caret).toContain('first pull')
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+})
+
+describe('a toolbar', () => {
+  // The bug this pins: `Toolbar` briefly wrapped its children in a context provider so an open menu
+  // could hand its panel up to a slot under the row. A provider wraps children in a memo of Solid's
+  // own, so the whole bar re-ran as a unit whenever anything in it changed — and re-running a
+  // callback-form `<Show>` reads its accessor again after the condition went false, which Solid
+  // refuses. The changes pane's bar has two of those and drew `Stale read from <Show>.` in place of
+  // the pane (plugins/changes/src/client/ChangesPane.tsx). Nothing may re-scope a bar's children.
+  it('does not re-run a narrowed Show when a sibling changes', async () => {
+    const [label, setLabel] = createSignal('one')
+    const [detail, setDetail] = createSignal<string | undefined>('here')
+    const screen = await renderCells(() => (
+      <Toolbar ariaLabel="Bar">
+        <Text>{label()}</Text>
+        <Show when={detail()}>{(text) => <Text>{text()}</Text>}</Show>
+      </Toolbar>
+    ), { width: 40, height: 4 })
+    try {
+      expect(screen.text).toContain('here')
+      // The narrowed value goes away and a sibling changes in the same update. Re-scoped children
+      // threw here rather than redrawing.
+      setDetail(undefined)
+      setLabel('two')
+      const after = await screen.frame()
+      expect(after.text).toContain('two')
+      expect(after.text).not.toContain('here')
+      expect(after.text).not.toContain('Stale read')
     } finally {
       screen.done()
     }
