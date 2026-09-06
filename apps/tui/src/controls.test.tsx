@@ -118,4 +118,33 @@ describe('the pull request from the keyboard', () => {
       screen.done()
     }
   }, 180_000)
+
+  it('tabs out of the composer onto the rest of the panel', async () => {
+    // The arrows type in a field, so the walk of a panel used to end at its first one: on this pane
+    // the `[Comment]` button, the review box under it and its verbs could not be reached at all.
+    // Tab is the next control before it is the next region, and it says so in the footer
+    // (../kit/asking.tsx § step, docs/tui.md § The five key groups).
+    const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
+    try {
+      await screen.until('[Merge]', 45)
+      const { focusedRegion } = await import('./keys/regions')
+      await screen.press('TAB')
+      await screen.press('ARROW_DOWN')
+      for (let step = 0; step < 6; step += 1) await screen.press('ARROW_RIGHT')
+      await screen.press('ARROW_DOWN')
+      expect(await screen.frame()).toContain('tab next')
+
+      // Onto the composer's own send button, which is the stop after the field.
+      await screen.press('TAB')
+      expect(await litRuns(screen)).toContain('[Comment]')
+      // …and the arrows carry on from there, into the review box under it.
+      await screen.press('ARROW_DOWN')
+      expect(await screen.frame()).toContain('ctrl+return send')
+
+      // The keys never left the pane while any of that was reachable.
+      expect(focusedRegion()).toEqual({ paneId: 'pr', regionId: 'body' })
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
 })
