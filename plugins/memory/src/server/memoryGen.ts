@@ -2,10 +2,8 @@
 // deterministically at task completion (agent session end or archive), runs a headless memory-review
 // step (a fake agent in tests), passes a cheap verify (referenced files exist, duplicate content-hash,
 // contradiction flag), and files proposals through the human gate. Nothing touches disk as memory until
-// a human accepts; accepted memories land in the task worktree, reviewed via its PR, and the index
-// updates.
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+// a human accepts; accepted memories land in the owner's private memory store under the project they
+// belong to, and the index updates.
 import type { HeadlessResult } from '@acorn/plugin-api/node'
 import { contentHashId, MEMORY_TYPES, writeMemoryFile, type MemoryType } from './memory'
 import type { MemoryProposal, MemoryProposalStore } from './memoryProposals'
@@ -133,18 +131,20 @@ export async function generateMemoryProposals(deps: MemoryGenDeps): Promise<Memo
 
 // --- The gate's verdict paths: the only way memory lands on disk from this pipeline ---
 
+// `dir` is the memory directory the caller resolved: projectMemoryDir() for a proposal that names a
+// project, the private root for one that does not. Both live under the owner's home, so acceptance no
+// longer depends on the task worktree still being on disk.
 export async function acceptProposal(
   store: MemoryProposalStore,
   id: string,
-  worktreePath: string | null,
+  dir: string,
   reconcile: () => Promise<void>,
   edited?: { name: string; type: MemoryType; description: string; body: string },
 ): Promise<{ ok: boolean; reason?: string }> {
   const proposal = await store.get(id)
   if (!proposal || proposal.status !== 'pending') return { ok: false, reason: 'Proposal not found or already resolved.' }
-  if (!worktreePath || !existsSync(worktreePath)) return { ok: false, reason: 'The task worktree is gone — project memory has nowhere to land.' }
   const final = { ...proposal, ...edited }
-  await writeMemoryFile(join(worktreePath, '.acorn', 'memory'), {
+  await writeMemoryFile(dir, {
     name: final.name,
     description: final.description,
     type: final.type,

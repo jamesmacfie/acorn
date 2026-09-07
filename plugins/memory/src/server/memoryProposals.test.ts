@@ -11,7 +11,7 @@ describe('memory proposals (docs/notes-and-memory.md — the human gate)', () =>
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-prop-'))
-    memoryDir = join(dir, 'worktree', '.acorn', 'memory')
+    memoryDir = join(dir, 'memory')
     mkdirSync(memoryDir, { recursive: true })
     store = new MemoryProposalStore(join(dir, 'proposals'))
   })
@@ -29,7 +29,7 @@ describe('memory proposals (docs/notes-and-memory.md — the human gate)', () =>
     })
     expect(p.status).toBe('pending')
     expect(await store.list('pending')).toHaveLength(1)
-    // The gate has not run: the worktree memory dir stays untouched.
+    // The gate has not run: the memory dir stays untouched.
     expect(readdirSync(memoryDir)).toEqual([])
     expect(existsSync(join(memoryDir, 'null-token-redirect-guard.md'))).toBe(false)
   })

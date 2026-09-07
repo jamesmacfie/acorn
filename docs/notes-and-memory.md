@@ -40,14 +40,22 @@ stay in the library. Only the workflow-plus-scratch combination counts as a seed
 
 ## Memory
 
-Memory is durable reviewed knowledge. Accepted project entries are Markdown files in a mapped
-project folder's `.acorn/memory/` directory (or an active task worktree); private entries live in
-Node-private memory storage. The memory plugin owns file reconciliation, hash deduplication,
-supersession, proposals, an FTS index, and recall metadata. Plain folders are supported: they use
-project scope without Git revision/diff anchoring.
+Memory is durable reviewed knowledge. Every entry acorn accepts is a Markdown file under the owner's
+private memory root, `~/.acorn/memory`. Scope decides reach rather than storage: a project entry goes
+to `projects/<projectId>/` and applies to that project alone, and through it to that project's
+workspace, while a private entry sits in the root and applies wherever the owner is working. Nothing
+is written into a repo checkout, so a task's diff and its pull request never carry a `.acorn/`
+directory the reviewer did not ask for.
 
-Agents can search and propose memory entries but cannot write accepted knowledge directly. Acceptance
-revalidates the proposal revision and relevant worktree state before updating the authoritative file.
+Reconciliation still reads two more places, and only reads them: `.acorn/memory/` in each active task
+worktree and in each primary checkout. That is what lets a team commit shared memory into its own
+repo, and it keeps entries written before the store moved. The memory plugin owns file
+reconciliation, hash deduplication, supersession, proposals, an FTS index, and recall metadata. Plain
+folders are supported: they use project scope without Git revision/diff anchoring.
+
+Agents can search and propose memory entries but cannot write accepted knowledge directly. A proposal
+carries the project it was made under, so acceptance no longer depends on the task worktree surviving;
+a proposal that names no project is accepted into the private root rather than discarded.
 The index is rebuildable; the Markdown files remain the durable content.
 
 A search hit or a `memory_get` read bumps that row's recall stats (last-accessed time and access
