@@ -6,7 +6,6 @@ import {
   Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
-import { hold } from '../hold'
 import AgentComposer from '../composer/AgentComposer'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
@@ -45,7 +44,7 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
       <Toolbar.Spacer />
       <Show when={model.selected()}>
         {(narrowed) => {
-          const session = hold(model.selected, narrowed())
+          const session = narrowed
           return (
           <>
             <Inline>
@@ -214,7 +213,7 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} model={model} />}>
         {(narrowed) => {
-          const session = hold(model.selected, narrowed())
+          const session = narrowed
           return (
           <>
             <Show
@@ -226,7 +225,7 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
               }
             >
               {(narrowedSnapshot) => {
-                const snapshot = hold(model.snapshot, narrowedSnapshot())
+                const snapshot = narrowedSnapshot
                 return (
                 <>
                   <AgentTranscript

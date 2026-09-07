@@ -1,0 +1,72 @@
+diff --git a/dist/dev.cjs b/dist/dev.cjs
+index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..cc52c2f400e6f61f2068f7c8c90e8c556cd32676 100644
+--- a/dist/dev.cjs
++++ b/dist/dev.cjs
+@@ -1549,10 +1549,9 @@ function Show(props) {
+     if (c) {
+       const child = props.children;
+       const fn = typeof child === "function" && child.length > 0;
+-      return fn ? untrack(() => child(keyed ? c : () => {
+-        if (!untrack(condition)) throw narrowedError("Show");
+-        return conditionValue();
+-      })) : child;
++      // acorn: holds the last value instead of throwing "Stale read from <Show>" (patches/README.md).
++      let last = c;
++      return fn ? untrack(() => child(keyed ? c : () => (last = conditionValue() || last))) : child;
+     }
+     return props.fallback;
+   }, undefined, {
+diff --git a/dist/dev.js b/dist/dev.js
+index 2803ce7f070926657d1b4352741a5fcec67af2f9..24c2a900fbf54b47ab1ea13a130e7334b7fab424 100644
+--- a/dist/dev.js
++++ b/dist/dev.js
+@@ -1547,10 +1547,9 @@ function Show(props) {
+     if (c) {
+       const child = props.children;
+       const fn = typeof child === "function" && child.length > 0;
+-      return fn ? untrack(() => child(keyed ? c : () => {
+-        if (!untrack(condition)) throw narrowedError("Show");
+-        return conditionValue();
+-      })) : child;
++      // acorn: holds the last value instead of throwing "Stale read from <Show>" (patches/README.md).
++      let last = c;
++      return fn ? untrack(() => child(keyed ? c : () => (last = conditionValue() || last))) : child;
+     }
+     return props.fallback;
+   }, undefined, {
+diff --git a/dist/solid.cjs b/dist/solid.cjs
+index 08b339b27b6c149d73a81dd759b483dcde99531b..8887b32d84c0a1672d3cb4bcddf77c02279f280c 100644
+--- a/dist/solid.cjs
++++ b/dist/solid.cjs
+@@ -1490,10 +1490,9 @@ function Show(props) {
+     if (c) {
+       const child = props.children;
+       const fn = typeof child === "function" && child.length > 0;
+-      return fn ? untrack(() => child(keyed ? c : () => {
+-        if (!untrack(condition)) throw narrowedError("Show");
+-        return conditionValue();
+-      })) : child;
++      // acorn: holds the last value instead of throwing "Stale read from <Show>" (patches/README.md).
++      let last = c;
++      return fn ? untrack(() => child(keyed ? c : () => (last = conditionValue() || last))) : child;
+     }
+     return props.fallback;
+   }, undefined, undefined);
+diff --git a/dist/solid.js b/dist/solid.js
+index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..90a3a94944425a849cc2397fc1a43fdec6c56b49 100644
+--- a/dist/solid.js
++++ b/dist/solid.js
+@@ -1488,10 +1488,9 @@ function Show(props) {
+     if (c) {
+       const child = props.children;
+       const fn = typeof child === "function" && child.length > 0;
+-      return fn ? untrack(() => child(keyed ? c : () => {
+-        if (!untrack(condition)) throw narrowedError("Show");
+-        return conditionValue();
+-      })) : child;
++      // acorn: holds the last value instead of throwing "Stale read from <Show>" (patches/README.md).
++      let last = c;
++      return fn ? untrack(() => child(keyed ? c : () => (last = conditionValue() || last))) : child;
+     }
+     return props.fallback;
+   }, undefined, undefined);
