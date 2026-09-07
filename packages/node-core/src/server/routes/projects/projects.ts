@@ -73,6 +73,11 @@ export const projects = new Hono<AppEnv>()
     if (!result.ok) return respondError(c, 400, 'bad_request', [result.reason])
     return c.json({ project: toWireProject(result.project) })
   })
+  .get('/:id', async (c) => {
+    const row = await getProject(getDb(c.env), c.req.param('id'))
+    if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
+    return c.json(toWireProject(row))
+  })
   .get('/:id/config', async (c) => {
     const response = await getProjectConfig(getDb(c.env), c.req.param('id'))
     if (!response) return respondError(c, 404, 'not_found', ['No such project.'])
