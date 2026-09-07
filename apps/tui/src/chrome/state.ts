@@ -5,8 +5,9 @@
 // `features/tasks/tasks.ts` and are read from there (docs/state-ownership.md). What is here is what
 // the desktop keeps in its composition root and its router, because a terminal has neither.
 //
-// Session-only, exactly as the desktop's is: nothing in this file is written to disk, so `acorn`
-// opens where it opened last time and not where it was closed.
+// Session-only. What does survive a run is held elsewhere: which workspace was open, and what was
+// open in it, are two persisted slices (./restore.ts), and the flag below is how the rest of the
+// shell knows whether that restore has happened yet.
 
 import { createSignal } from 'solid-js'
 
@@ -39,6 +40,15 @@ export const closeOverlay = (name: OverlayName): void => {
 
 export const isOverlayOpen = (name: OverlayName): boolean => stack().includes(name)
 
+// Whether the startup restore has finished, so nothing overwrites a stored view before it has been
+// read back (./restore.ts). The shell picks a default source for a workspace the moment its roster
+// loads, and that default is not a choice worth remembering over the one the last run recorded.
+//
+// Stays false when there is nothing to restore from — an unreachable node has no preferences to read
+// and none to write either — so this gates recording rather than rendering. Nothing waits on it.
+const [placeRestored, setPlaceRestored] = createSignal(false)
+export { placeRestored, setPlaceRestored }
+
 // Which workspace the rail is showing.
 //
 // The desktop derives this from the routed project, because its URL always carries one
@@ -52,4 +62,5 @@ export { chosenWorkspace, setChosenWorkspace }
 export function _resetChrome(): void {
   setStack([])
   setChosenWorkspace(null)
+  setPlaceRestored(false)
 }

@@ -54,6 +54,7 @@ Use the persistence scope that owns the state:
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
 | Last path, last task, last source, last Node | device |
+| Last view per workspace; last workspace (terminal client) | owning Node's prefs, keyed by Node + workspace |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text | client + current task |
 | Provider data and task mutations | owning Node |
@@ -68,6 +69,21 @@ Choosing between "keyed by node" and "cleared on switch" is not taste. A LIVE ro
 agent list, terminal sessions, the node's plugin list — because it refetches for the new node within a
 tick, so clearing costs nothing and keying would buy nothing. DURABLE memory is keyed — editor scroll,
 the active terminal tab, the workspace view — because switching back should restore what was there.
+
+**Where you were looking is the node's, not the device's.** Which rail source or task each workspace
+was left on is `core.workspace-views`, one key per workspace
+(`client-core/features/tasks/tasks.ts`, `infra/persistence/stateSlices.ts`). It sits with the pane
+layouts rather than with `last_source` above, and for the same two reasons: it is keyed by that
+node's workspace ids, so it means nothing anywhere else, and both clients paired with a node should
+return you to the same place in it. The terminal client also has no `localStorage`, so a device key
+there is written nowhere and read back as nothing — which is why `last_workspace`, the one thing that
+host restores on top of this, is the node's too (`apps/tui/src/chrome/restore.ts`).
+
+The desktop restores `last_path`, `last_task` and `last_source` on first load and consults the
+per-workspace memory only when you move to a workspace this session has not been in yet, so the two
+never argue. It records on the way out, in the one effect that sees the workspace change; the
+terminal records as you move, because it has no last-task and last-source to fall back on and the
+workspace open when the process ends has to already know its own view.
 
 ### Which mechanism holds a given fact
 

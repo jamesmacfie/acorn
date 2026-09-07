@@ -7,7 +7,6 @@ import { localSearch } from '@acorn/client-core/host/registries/commands/localSe
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { previousWorkspaceId } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
 import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
 import { chooseProject } from './routing'
@@ -73,10 +72,10 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
           workspaceId: workspace.id,
         }))),
       select: (item): CommandOutcome => {
+        // `chooseWorkspace` clears the open task and source and then restores whatever the
+        // destination was left on, so there is nothing to do to the rail here. Clearing the source
+        // after the call threw that restore away and sent every palette switch to the default.
         model.chooseWorkspace(item.id)
-        // The rail goes back to following the task, which is what choosing a workspace from anywhere
-        // else does (./Rail.tsx).
-        setSelectedSource(null)
         return COMMAND_CLOSED
       },
     },
@@ -93,7 +92,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       run: (): CommandOutcome => {
         const id = previousWorkspaceId()
         if (!id) throw new Error('there is no workspace to go back to')
-        // `chooseWorkspace` clears the open task and source itself, same as the search above.
+        // Nothing to do to the rail, same as the search above.
         model.chooseWorkspace(id)
         return COMMAND_CLOSED
       },

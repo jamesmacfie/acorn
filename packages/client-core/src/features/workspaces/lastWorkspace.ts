@@ -12,15 +12,21 @@
 import { createSignal } from 'solid-js'
 
 const [previous, setPrevious] = createSignal<string | null>(null)
-let current: string | null = null
+const [current, setCurrent] = createSignal<string | null>(null)
 
 /** The workspace before the open one, or null until a second one has been opened. */
 export const previousWorkspaceId = previous
 
+/** The workspace open now, as the host settled it. A signal because the terminal client persists it
+ *  and reopens on it (apps/tui/src/chrome/restore.ts); the desktop reopens on its last path instead
+ *  and reads nothing here. */
+export const currentWorkspaceId = current
+
 /** Say which workspace is open now. Only a change moves the pointer, so the effects that call this
  *  on every render of a derivation cost nothing. */
 export function noteWorkspaceVisit(workspaceId: string): void {
-  if (workspaceId === current) return
-  if (current) setPrevious(current)
-  current = workspaceId
+  const open = current()
+  if (workspaceId === open) return
+  if (open) setPrevious(open)
+  setCurrent(workspaceId)
 }

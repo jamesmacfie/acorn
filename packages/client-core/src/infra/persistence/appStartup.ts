@@ -114,6 +114,13 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       binding: appStateBinding(
         () => selectedSource() ?? '',
         (saved) => {
+          // An empty stored value is not "nothing saved" — it is a task view, which has no source.
+          // A fresh install has no key at all and never reaches this function, so the only way to
+          // read an empty string is to have closed the window while looking at a task. Restoring the
+          // default source over it is what used to reopen on Home with the right task selected and
+          // nothing of it on screen. `core.last-task` restores in this phase and ahead of this slice,
+          // so the task is already chosen by the time this asks.
+          if (!saved && activeTaskId()) return setSelectedSource(null)
           // Home is the core-owned default. A saved optional source is restored here and App.tsx
           // corrects it after integrations/plugin contributions are known if that source is disabled.
           setSelectedSource(saved || defaultSourceId() || null)

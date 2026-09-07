@@ -13,6 +13,10 @@ export const PrefKeys = {
   lastTask: 'last_task',
   lastPath: 'last_path',
   lastSource: 'last_source',
+  // Which workspace the terminal client was showing when it was last closed, so `acorn` reopens on
+  // it (apps/tui/src/chrome/restore.ts). The node's, not the device's: the terminal has no
+  // `localStorage`, so a device key would be written nowhere and read back as nothing.
+  lastWorkspace: 'last_workspace',
   taskLayouts: 'task_layouts',
   taskPanesLegacy: 'task_panes',
   notices: 'notices',
@@ -42,6 +46,10 @@ export const PrefKeys = {
   // installed on this machine, and the other client paired with the same node may not have it.
   editorMode: 'editor_mode',
   taskLayoutsScoped: 'core:task-layouts',
+  // Where you were looking in each workspace, one key per workspace (features/tasks/tasks.ts).
+  // The node's, like the pane layouts above and for the same reason: it is keyed by that node's
+  // workspace ids, and both clients paired with the node should return you to the same place.
+  workspaceViewsScoped: 'core:workspace-views',
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
@@ -87,4 +95,5 @@ export const PersistedSliceKeys = {
   editorOpenFiles: PrefKeys.editorOpenFilesScoped,
   prFilters: PrefKeys.prFiltersScoped,
   contextSelection: PrefKeys.contextSelectionScoped,
+  workspaceViews: PrefKeys.workspaceViewsScoped,
 } as const

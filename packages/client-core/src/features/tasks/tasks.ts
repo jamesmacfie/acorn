@@ -3,7 +3,6 @@
 // Signals-only, like ../terminal/sessions.ts. The terminal drawer and topbar key off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
-import { activeNodeId } from '../../infra/node/activeNode'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
@@ -30,22 +29,35 @@ export function setSelectedSource(source: string | null): void {
 }
 
 // Per-workspace memory of the last view, a rail source or a task, so switching workspaces returns
-// you to what you were looking at. Session-only; first-load restore comes from the last_source and
-// last_task prefs.
+// you to what you were looking at. Persisted by the `core.workspace-views` slice
+// (infra/persistence/stateSlices.ts), so it also survives a relaunch; first-load restore of the
+// workspace you were actually in comes from the last_source and last_task prefs on the desktop and
+// from the last_workspace pref in the terminal.
 //
-// Keyed by node and cleared on a switch. The key stops two nodes' workspace ids colliding, since
-// they are node-minted UUIDs (docs/architecture-overview.md § Client state and fleet behavior). The
-// clear stops the persistence pass writing one node's scopes under the other's storage key, because
-// `storageKeyFor` reads the active node at write time and these stores survive the shell's remount.
-// See `clearNodeScopedTaskState` at the foot of this file.
-const viewByWorkspace = new Map<string, WorkspaceView>()
-const viewKey = (workspaceId: string): string => `${activeNodeId() ?? ''}/${workspaceId}`
+// A signal rather than a Map because the persistence pass reads it, and keyed by bare workspace id
+// with the node added at write time by `storageKeyFor` — the same shape as `taskLayouts` below, and
+// cleared by the same node-switch evictor (`clearNodeScopedTaskState` at the foot of this file).
+const [workspaceViews, setWorkspaceViews] = createSignal<Record<string, WorkspaceView>>({})
+export { workspaceViews }
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
-  viewByWorkspace.set(viewKey(workspaceId), view)
+  setWorkspaceViews((current) => ({ ...current, [workspaceId]: view }))
 }
-export const workspaceView = (workspaceId: string): WorkspaceView | undefined => viewByWorkspace.get(viewKey(workspaceId))
+export const workspaceView = (workspaceId: string): WorkspaceView | undefined => workspaceViews()[workspaceId]
 export const evictWorkspaceView = (workspaceId: string): void => {
-  viewByWorkspace.delete(viewKey(workspaceId))
+  setWorkspaceViews((current) => {
+    if (!(workspaceId in current)) return current
+    const next = { ...current }
+    delete next[workspaceId]
+    return next
+  })
+}
+
+// Seed from the persisted slice without clobbering a view this session already recorded, the same
+// rule `hydrateTaskLayout` keeps. An empty source is what the codec answers for a malformed value;
+// it is not a view to return to.
+export function hydrateWorkspaceView(workspaceId: string, view: WorkspaceView): void {
+  if ('source' in view ? !view.source : !view.taskId) return
+  setWorkspaceViews((current) => (current[workspaceId] ? current : { ...current, [workspaceId]: view }))
 }
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).
@@ -207,7 +219,7 @@ export function evictTaskState(taskId: string): void {
 export { activeTaskId, setActiveTaskId, taskLayouts }
 
 export function clearNodeScopedTaskState(): void {
-  viewByWorkspace.clear()
+  setWorkspaceViews({})
   setTaskLayouts({})
   setRecipeBrowserUrls({})
   setTerminalOpenTasks(new Set<string>())
