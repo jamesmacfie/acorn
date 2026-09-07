@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -9,6 +9,8 @@ import {
   memoryIndexSlice,
   memorySources,
   parseMemory,
+  privateMemoryRoot,
+  projectMemoryDir,
   reconcileMemories,
   renderMemoryIndex,
   searchMemories,
@@ -56,7 +58,7 @@ describe('memory store + index over temp checkouts', () => {
   const sources = () => [
     { dir: join(checkoutA, '.acorn', 'memory'), scope: 'project' as const, projectId: 'project-api' },
     { dir: join(checkoutB, '.acorn', 'memory'), scope: 'project' as const, projectId: 'project-api' },
-    { dir: join(home, '.acorn', 'memory'), scope: 'private' as const, projectId: null },
+    { dir: privateMemoryRoot(home), scope: 'private' as const, projectId: null },
   ]
 
   beforeEach(() => {
@@ -121,7 +123,7 @@ describe('memory store + index over temp checkouts', () => {
   it('FTS search ranks by BM25 with the project-scope filter (private rides along)', async () => {
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({}))
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({ name: 'db-layout', description: 'tables and mirrors', type: 'architecture', body: 'The pull mirror caches PRs.\n' }))
-    await writeMemoryFile(join(home, '.acorn', 'memory'), mem({ name: 'my-shortcuts', description: 'private auth shortcuts', type: 'user', body: 'Auth token helper on my machine.\n' }))
+    await writeMemoryFile(privateMemoryRoot(home), mem({ name: 'my-shortcuts', description: 'private auth shortcuts', type: 'user', body: 'Auth token helper on my machine.\n' }))
     writeFileSync(
       join(checkoutB, '.acorn', 'memory', 'other-repo.md'),
       serializeMemory(mem({ name: 'other-repo', description: 'auth notes for another repo' })),
@@ -162,16 +164,20 @@ describe('memory store + index over temp checkouts', () => {
     expect(renderMemoryIndex([])).toBe('')
   })
 
-  it('reconciles by project id, keeps plain-folder memory unanchored, and includes private memory', async () => {
-    await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({ commitSha: null, body: 'Project A guidance.\n' }))
+  it('reconciles by project id from the private store, still reads repo-committed memory, and includes private memory', async () => {
+    // Project A's memory sits in the private store, which is where acorn writes. Project B's is
+    // committed in its own repo, the read-only half of the source set.
+    await writeMemoryFile(projectMemoryDir(home, 'project-a'), mem({ commitSha: null, body: 'Project A guidance.\n' }))
     await writeMemoryFile(join(checkoutB, '.acorn', 'memory'), mem({ commitSha: null, body: 'Project B guidance.\n' }))
-    await writeMemoryFile(join(home, '.acorn', 'memory'), mem({ name: 'private-note', type: 'user', commitSha: null, body: 'Private guidance.\n' }))
+    await writeMemoryFile(privateMemoryRoot(home), mem({ name: 'private-note', type: 'user', commitSha: null, body: 'Private guidance.\n' }))
 
-    const sourceSet = memorySources(
+    const sourceSet = await memorySources(
       [{ dir: checkoutA, projectId: 'project-a' }],
       [{ id: 'project-a', path: checkoutA }, { id: 'project-b', path: checkoutB }],
       home,
     )
+    // Nothing acorn wrote landed in a checkout, which is what keeps `.acorn/` out of a task's PR.
+    expect(existsSync(join(checkoutA, '.acorn', 'memory', 'auth-conventions.md'))).toBe(false)
     await reconcileMemories(t.db, sourceSet)
     expect((await listMemories(t.db, { projectId: 'project-a' })).map((row) => [row.name, row.projectId, row.commitSha])).toEqual([
       ['auth-conventions', 'project-a', null],

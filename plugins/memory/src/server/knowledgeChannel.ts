@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { KnowledgeBridge } from '../server/routes/knowledge'
-import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
+import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, privateMemoryRoot, projectMemoryDir, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
 import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
 import { MemoryProposalStore } from './memoryProposals'
 import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
@@ -70,14 +70,15 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
   }
 
   // Memory (docs/notes-and-memory.md § Memory): files are truth, and the SQLite index reconciles from
-  // every active worktree, primary checkout, and the private home dir before each read.
+  // the private store plus every active worktree and primary checkout before each read. The worktree
+  // and checkout halves are read-only: acorn writes memory under the private root alone.
   const buildMemorySources = async () => {
     const active = (await core.tasks.active())
       .filter((t) => t.worktreePath && isDir(t.worktreePath))
       .filter((t) => t.projectId)
       .map((t) => ({ dir: t.worktreePath!, projectId: t.projectId! }))
     const checkouts = (await core.projects.checkouts()).filter((p) => isDir(p.path))
-    return memorySources(active, checkouts, homedir())
+    return await memorySources(active, checkouts, homedir())
   }
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
 
@@ -176,19 +177,17 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
         await reconciled()
         return searchMemories(db, query, { projectId: projectId ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
       }),
-    // Manual add: project scope writes into the task's worktree, reviewed through its PR and never
-    // the user's primary checkout. Private scope writes into ~/.acorn/memory.
+    // Manual add: both scopes write under the owner's private root, so a memory never turns up in the
+    // repo's diff. Project scope is keyed by the task's project id; private scope applies everywhere.
     memoryAdd: (taskId, p) =>
       guard(async () => {
         const type: MemoryType = MEMORY_TYPES.includes(p.type as MemoryType) ? (p.type as MemoryType) : 'reference'
         const t = await core.tasks.load(taskId)
         let dir: string
-        if (p.scope === 'private') dir = join(homedir(), '.acorn', 'memory')
+        if (p.scope === 'private') dir = privateMemoryRoot(homedir())
         else {
-          const project = t?.projectId ? await core.projects.byId(t.projectId) : null
-          const root = t?.worktreePath && isDir(t.worktreePath) ? t.worktreePath : project?.path
-          if (!root || !isDir(root)) throw new Error('Project memory needs a mapped project folder (or task worktree).')
-          dir = join(root, '.acorn', 'memory')
+          if (!t?.projectId) throw new Error('Project memory needs a task that names a project.')
+          dir = projectMemoryDir(homedir(), t.projectId)
         }
         let commitSha: string | null = null
         if (t?.worktreePath && isDir(t.worktreePath) && existsSync(join(t.worktreePath, '.git'))) {
@@ -221,9 +220,12 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
       if (!approved) return rejectProposal(proposals, id)
       const proposal = await proposals.get(id)
       if (!proposal) return { ok: false, reason: 'Proposal not found.' }
-      const t = await core.tasks.load(proposal.taskId)
-      const project = t?.projectId ? await core.projects.byId(t.projectId) : null
-      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? project?.path ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
+      // The proposal carries its own project id. An agent that could not resolve one proposed
+      // unscoped on purpose (server/agentTools.ts), so accepting that lands a memory that applies
+      // everywhere rather than throwing away what the agent learned.
+      const projectId = proposal.projectId ?? (await core.tasks.load(proposal.taskId))?.projectId ?? null
+      const dir = projectId ? projectMemoryDir(homedir(), projectId) : privateMemoryRoot(homedir())
+      return acceptProposal(proposals, proposal.id, dir, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
     // --- notes ---
     //

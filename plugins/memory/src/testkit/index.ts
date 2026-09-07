@@ -3,7 +3,7 @@
 //   apps/node/test/integration/coreTools.test.ts   memoryAgentTools
 //   apps/node/test/integration/memoryGen.test.ts   everything else
 export { memoryAgentTools } from '../server/agentTools'
-export { contentHashId } from '../server/memory'
+export { contentHashId, privateMemoryRoot, projectMemoryDir } from '../server/memory'
 export { MemoryProposalStore } from '../server/memoryProposals'
 export {
   acceptProposal,

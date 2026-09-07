@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, eq, inArray, sql } from 'drizzle-orm'
@@ -25,6 +25,19 @@ export type MemoryFile = {
 export type MemorySource = { dir: string; scope: MemoryScope; projectId: string | null }
 
 export const isValidMemoryName = (s: string): boolean => /^[a-z0-9][a-z0-9._-]*$/i.test(s) && !s.includes('..')
+
+// Where acorn writes (docs/notes-and-memory.md § Memory). Every memory it accepts lands under the
+// owner's private root, never inside a repo checkout, so a task's diff and its PR stay clear of
+// them. Scope is about reach, not storage: a `projects/<projectId>` directory holds the memories
+// that apply to one project, and through that project to its workspace, while the root holds the
+// ones that apply wherever the owner is working.
+export const privateMemoryRoot = (homeDir: string): string => join(homeDir, '.acorn', 'memory')
+
+// The project id is a path segment here, so it goes through the same name check a memory file does.
+export function projectMemoryDir(homeDir: string, projectId: string): string {
+  if (!isValidMemoryName(projectId)) throw new Error('Invalid project id.')
+  return join(privateMemoryRoot(homeDir), 'projects', projectId)
+}
 
 export const contentHashId = (name: string, body: string, description: string): string =>
   createHash('sha256').update(`${name}\n${description}\n${body}`).digest('hex').slice(0, 24)
@@ -121,9 +134,9 @@ export async function regenerateIndexFile(dir: string): Promise<void> {
   await atomicWrite(join(dir, 'MEMORY.md'), renderMemoryIndex(all))
 }
 
-// Writes a memory file into a dir: the task worktree for project scope, the project folder for a
-// branchless/plain-folder task, or ~/.acorn/memory for private. Never a different project's
-// primary checkout. Regenerates that dir's MEMORY.md afterward.
+// Writes a memory file into a dir. Callers hand it projectMemoryDir() or privateMemoryRoot(), which
+// is what keeps written memory out of every repo checkout. Regenerates that dir's MEMORY.md
+// afterward.
 export async function writeMemoryFile(dir: string, mem: MemoryFile): Promise<{ path: string }> {
   if (!isValidMemoryName(mem.name)) throw new Error('Invalid memory name.')
   mkdirSync(dir, { recursive: true })
@@ -244,7 +257,7 @@ export function formatMemoryInjection(
   const bodiesCap = caps.bodies ?? 5
   const bodyChars = caps.bodyChars ?? 1500
   if (!slice.length && !keyMemories.length) return null
-  const lines: string[] = ['# Project memory (acorn) — ask for full bodies via memory_get / read .acorn/memory/']
+  const lines: string[] = ['# Project memory (acorn) — ask for full bodies via memory_get']
   if (slice.length) {
     lines.push('', '## Index')
     for (const m of slice.slice(0, indexCap)) lines.push(`- ${m.name} — ${m.description}`)
@@ -261,15 +274,25 @@ export function formatMemoryInjection(
   return lines.join('\n')
 }
 
-// Standard source set: every active worktree + each primary checkout + the private home dir.
-export function memorySources(
+// Standard source set: the private root, one directory per project under it, then any memory a repo
+// keeps for itself. acorn writes only the first two. The repo directories stay readable so a team
+// that checks shared memory into its own repo still gets it, and so memory written before the store
+// moved is not lost.
+//
+// The per-project directories come from a readdir rather than the caller's project list: the
+// directory name is the scope key, so a project acorn has since forgotten still reconciles instead
+// of dropping out of the index.
+export async function memorySources(
   activeWorktrees: { dir: string; projectId: string }[],
   checkouts: { id: string; path: string }[],
   homeDir: string,
-): MemorySource[] {
-  const out: MemorySource[] = []
+): Promise<MemorySource[]> {
+  const root = privateMemoryRoot(homeDir)
+  const out: MemorySource[] = [{ dir: root, scope: 'private', projectId: null }]
+  for (const id of await readdir(join(root, 'projects')).catch(() => [] as string[])) {
+    if (isValidMemoryName(id)) out.push({ dir: join(root, 'projects', id), scope: 'project', projectId: id })
+  }
   for (const w of activeWorktrees) out.push({ dir: join(w.dir, '.acorn', 'memory'), scope: 'project', projectId: w.projectId })
   for (const c of checkouts) out.push({ dir: join(c.path, '.acorn', 'memory'), scope: 'project', projectId: c.id })
-  out.push({ dir: join(homeDir, '.acorn', 'memory'), scope: 'private', projectId: null })
-  return out.filter((s, i, arr) => arr.findIndex((x) => x.dir === s.dir) === i && existsSync(s.dir.replace(/\/.acorn\/memory$/, '')))
+  return out.filter((s, i, arr) => arr.findIndex((x) => x.dir === s.dir) === i)
 }

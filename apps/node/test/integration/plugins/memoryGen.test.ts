@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/server/headless.ts'
-import { contentHashId } from '@acorn/plugin-memory/testkit'
+import { contentHashId, projectMemoryDir } from '@acorn/plugin-memory/testkit'
 import { acceptProposal, generateMemoryProposals, rejectProposal, verifyCandidates, MEMORY_REVIEW_SCHEMA, type MemoryCandidate, type MemoryGenDeps } from '@acorn/plugin-memory/testkit'
 import { MemoryProposalStore } from '@acorn/plugin-memory/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
@@ -51,18 +51,22 @@ describe('verifyCandidates (the 3 checks, docs/notes-and-memory.md)', () => {
 describe('the pipeline over the fake agent + real proposal store (docs/notes-and-memory.md)', () => {
   let dir: string
   let worktree: string
+  let home: string
   let store: MemoryProposalStore
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-mgen-'))
     worktree = join(dir, 'wt')
+    home = join(dir, 'home')
     mkdirSync(join(worktree, 'src', 'auth'), { recursive: true })
     writeFileSync(join(worktree, 'src', 'auth', 'login.ts'), 'x')
     store = new MemoryProposalStore(join(dir, 'proposals'))
   })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  const memoryDir = () => join(worktree, '.acorn', 'memory')
+  // Accepted memory lands in the owner's private store under the proposal's project, never in the
+  // worktree the review ran over.
+  const memoryDir = () => projectMemoryDir(home, 'project-api')
 
   const deps = (structured: string): MemoryGenDeps => ({
     runReview: (prompt, schema) => {
@@ -107,7 +111,7 @@ describe('the pipeline over the fake agent + real proposal store (docs/notes-and
     await generateMemoryProposals(deps(REVIEW))
     const [pending] = await store.list('pending')
     let reconciled = 0
-    const res = await acceptProposal(store, pending.id, worktree, async () => void reconciled++, {
+    const res = await acceptProposal(store, pending.id, memoryDir(), async () => void reconciled++, {
       name: pending.name,
       type: 'fix',
       description: 'Edited at the gate.',
@@ -129,13 +133,12 @@ describe('the pipeline over the fake agent + real proposal store (docs/notes-and
     expect((await store.get(rej.id))?.status).toBe('rejected')
   })
 
-  it('a gone worktree fails accept cleanly (memory never lands in the primary checkout)', async () => {
+  it('accept writes outside the repo, so the worktree it reviewed stays clean', async () => {
     await generateMemoryProposals(deps(REVIEW))
     const [pending] = await store.list('pending')
-    const res = await acceptProposal(store, pending.id, join(dir, 'nope'), async () => {})
-    expect(res.ok).toBe(false)
-    expect(res.reason).toContain('worktree is gone')
-    expect((await store.get(pending.id))?.status).toBe('pending') // still gated
+    expect((await acceptProposal(store, pending.id, memoryDir(), async () => {})).ok).toBe(true)
+    expect(existsSync(join(memoryDir(), 'null-token-redirect-guard.md'))).toBe(true)
+    expect(existsSync(join(worktree, '.acorn'))).toBe(false)
   })
 
   it('a failing review step reports a typed error; an idle task proposes nothing', async () => {

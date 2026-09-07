@@ -8,9 +8,9 @@ const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decisi
 
 // The memory surfaces of the Context pane (docs/agent-tools.md), kept in the memory plugin so it owns
 // every memoryApi() call. Two things: the human gate over auto-generated proposals, where accept (with
-// an optional description edit) writes to the task worktree and index and reject leaves no trace, and
-// the manual "+ memory" form, where project scope goes to the task worktree and lands via its PR while
-// private scope goes to ~/.acorn/memory.
+// an optional description edit) writes the file and index and reject leaves no trace, and the manual
+// "+ memory" form. Both scopes write under ~/.acorn/memory and never into the repo, so the choice is
+// about reach: project scope applies to this project alone, private scope everywhere.
 //
 // This is a contribution to `context:section`, so context does not import it and memory does not import
 // context's pane: the host carries the props and draws whichever of the two render paths this happens
@@ -92,7 +92,7 @@ export default function MemorySection(props: {
                 <Select
                   value={memScope()}
                   onChange={(value) => setMemScope(value as 'project' | 'private')}
-                  options={[{ value: 'project', label: 'project (worktree, committed)' }, { value: 'private', label: 'private (~/.acorn)' }]}
+                  options={[{ value: 'project', label: 'project (this project only)' }, { value: 'private', label: 'private (every project)' }]}
                 />
               </Field>
             </Inline>
