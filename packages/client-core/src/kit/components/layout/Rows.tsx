@@ -150,12 +150,20 @@ export function Rows<T extends CollectionItem>(props: {
         <For each={virt.getVirtualItems()}>
           {(slot) => {
             const item = () => items()[slot.index] as T | undefined
+            // `keyed`, because the slot is not the row. The virtualizer hands the same slot object
+            // back for a given index — its list is a store reconciled by `index` — so `For` keeps the
+            // body it already ran, and a plain `Show` only re-runs its child when the condition
+            // changes truthiness. Between them, a list that changed under a slot kept drawing the item
+            // that used to be at that index: filter a pull list down to one match and every row is
+            // built from the pull that was there before, which PullList then fails to find by key and
+            // draws as nothing at all. `children` takes the item by value, so the only way to hand it
+            // a new one is to run it again.
             return (
-              <Show when={item()}>
+              <Show when={item()} keyed>
                 {(row) => props.children(
-                  row(),
-                  collection.itemProps(row().key),
-                  () => collection.selected() === row().key,
+                  row,
+                  collection.itemProps(row.key),
+                  () => collection.selected() === row.key,
                   { offset: slot.start, height: slot.size },
                 )}
               </Show>
