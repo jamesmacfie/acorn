@@ -264,6 +264,13 @@ The badge is the pill: `packages/client-core/src/features/notifications/badge.ts
 `unreadCount()` plus the attention rows on the icon, the same accessor the bell draws. One number
 with one meaning, on the dock and in the terminal client's topbar alike.
 
+The icon keeps whatever it was last told, which is why the tracking clears it when its own scope
+ends. Marking everything read already writes the icon, because the pill it mirrors moved; what needed
+saying was the other case. The desktop tracks the badge from the bell, so a window closing, a shell
+rebuilt on a node switch, a dev reload, or the bell's own contribution boundary catching a render
+error all end the tracking — and without the clear the dock kept a count no surface in the app could
+reach, which reads as "marking them read did nothing".
+
 **Terminal.** `apps/tui/src/kit/notify.ts` writes an escape sequence and lets the emulator decide
 what a notification is. OSC 9 for iTerm2, Ghostty, WezTerm, and Warp; OSC 99 for kitty; OSC 777 for
 rxvt; wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set. Title and body are
