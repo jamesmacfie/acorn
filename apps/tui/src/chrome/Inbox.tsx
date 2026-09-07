@@ -7,6 +7,8 @@ import {
   markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount,
 } from '@acorn/client-core/features/notifications/notifications.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
+import { useNavigate } from '@solidjs/router'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { Line } from '../kit/cells'
 import { Modal, ModalBody } from '../kit/grouping'
@@ -61,6 +63,7 @@ type InboxRow = {
 
 export function Inbox(props: { model: ShellModel }) {
   const close = () => closeOverlay('notifications')
+  const navigate = useNavigate()
 
   const openTask = (taskId: string | undefined): void => {
     if (!taskId) return
@@ -84,7 +87,12 @@ export function Inbox(props: { model: ShellModel }) {
           // task on another node before switching would look up an id that is not there.
           if (row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
           openTask(row.item.taskId)
-          if (row.item.target && row.item.taskId) openTarget(row.item.taskId, row.item.target)
+          // A row that names a project rather than a task routes there first, so a target that
+          // selects a project-scoped source draws the project the row is about.
+          if (!row.item.taskId && row.item.projectId) navigate(projectPath(row.item.projectId))
+          // Not gated on the task: an item may be about the node rather than a task, and the handler
+          // for its kind decides what to do (client-core's NotificationBell.tsx says the same).
+          openTarget(row.item.taskId ?? '', row.item.target)
         },
       })),
       ...notices.map((notice, at): InboxRow => ({

@@ -25,6 +25,16 @@ them through `ctx.attentionSources`
 [contribution-kinds.md](./contribution-kinds.md)). The bell's "Needs you" section is those rows,
 merged across every node.
 
+Both kinds have to say where a click lands, and for an attention item `target` is a required field.
+A row in the inbox is an invitation to go and deal with something, so one that swallows the click
+teaches the reader that the whole section is decorative. Plugin failures shipped without a target and
+did exactly that; making it a type rather than a convention is what stops the next source repeating
+it. A source with nowhere to send the reader has no row to draw.
+
+The click was gated on the row's task as well, which is the same bug wearing a second hat: an item
+about the node rather than a task could not fire its target even once it had one. Both the bell and
+the terminal's inbox now dispatch on the target alone.
+
 Both come from the same reading of a session.
 
 ## Five states
@@ -91,6 +101,74 @@ turn is one step of a run, and the workflows plugin sends `run-done` for the run
 The three kinds carry their glyphs and severities in
 `packages/client-core/src/features/notifications/kindContributions.ts`. There are no PTY-only kinds:
 a terminal agent and a managed agent read the same way in the bell.
+
+## What a row points at
+
+A target is `{ kind, resourceId, subresourceId? }`, resolved through the handler table in
+`packages/client-core/src/features/notifications/notifications.ts`. The kind decides who answers, and
+each owner registers its own: the terminal plugin opens a drawer on a tab, the agents plugin opens a
+session in the Agent pane, and the memory plugin opens the Memory page on the proposal in question.
+
+Two kinds are core's, because what they open is not any plugin's:
+
+| Kind | `resourceId` | Who answers |
+| --- | --- | --- |
+| `settings` | a settings page id | The shell, which owns the modal (`apps/desktop/src/client/activate.ts`) |
+| `source` | a rail source id | `host/chrome/chromeRegister.ts`, where the target is minted, so both hosts answer |
+
+A loaded plugin's attention rows carry display strings only: the manifest names no target and the
+wire does not carry one. So the host supplies the honest answer for that tier — the plugin's own rail
+source, or, for a plugin that offers none, the Settings page that lists it. Neither is a guess about
+what the row means, and both are better than a click that does nothing.
+
+### Getting there before the target runs
+
+Opening a row is a ladder, and the order is the whole point:
+
+1. **The node**, when the row belongs to another one. Every path resolves against the active node, so
+   navigating first looks up an id that is not there, or finds a different thing that shares a name.
+2. **The task**, from `taskId`, or **the project**, from `projectId`. A row carries one or the other.
+   A task route carries no project, so a row naming both would have to pick, and the task is the more
+   specific.
+3. **The target**, last, because a target that selects a `projectScoped` rail source draws whatever
+   project is routed. Arriving on the wrong one opens the page with the row's own subject filtered out
+   of it, which is worse than not moving at all. The memory rows are why this rung exists.
+
+One ceiling worth naming. Routing to a project in another workspace changes the active workspace,
+and the per-workspace view memory in `apps/desktop/src/client/App.tsx` then restores that workspace's
+last view over the source the target just selected. Only an explicit task jump has an escape from
+that today (`features/workspaces/workspaceViewTransition.ts`, `keep-task`). So a cross-workspace row
+lands you in the right workspace on the wrong surface; the row is still in the bell, and clicking it
+again from there works. A `keep-source` twin is the fix, and it belongs to that machinery rather than
+to this one.
+
+### What a row is drawn with
+
+`glyph` is a Lucide name a source may put on its own rows. Without one the inbox draws the pair it
+always has, `info` or `alert-triangle`, chosen by `severity`.
+
+The tone stays with the severity either way. What a row is and how urgent it is are two different
+questions: a memory proposal is a nudge whether or not it is drawn with the memory mark, and a source
+that could dim its own warning by choosing a friendly glyph would make the section unreadable.
+
+## Archiving a task takes its notices with it
+
+A notice is a pointer at a task. Archive the task and the row is still in the ring, still counting
+toward the pill, and clicking it navigates to an id that resolves to nothing. So the ring listens for
+`runtime:task-archived` and drops that task's rows, wired in `deliver.ts` beside the node-switch
+eviction because both answer the same question: what does this client forget when the thing it was
+about goes away.
+
+Active-node rows only. The event carries no node id and two nodes may hold one task id by
+construction, which is the same filter `markTaskRead` keeps.
+
+This covers what the client watched happen. A task archived from another device is still in the ring
+at the next boot, because notices rehydrate from a prefs blob that nobody re-checks. That row is
+stale rather than wrong, and re-checking would mean asking the node about 50 task ids before the bell
+can draw.
+
+Attention items need none of this. They are refetched per node, so a row whose state has gone stops
+coming back on its own.
 
 ## The gate
 

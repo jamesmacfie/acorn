@@ -3010,6 +3010,11 @@ roster row to the device, which raises one attention row per entry on the same p
 failed to register takes. The wording says what it is: this version of acorn does not recognise it, so
 it was ignored. Not a failure of the plugin.
 
+Those rows, and every other row a loaded plugin raises through `contributions.attention`, land on the
+plugin's own rail source when it has one and on Settings > Plugins when it does not. The manifest
+names no target and the wire carries display strings only, so the host supplies it
+([notifications.md](./notifications.md) § What a row points at).
+
 ## Collaboration rules
 
 Plugins collaborate through four mechanisms:

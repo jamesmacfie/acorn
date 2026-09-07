@@ -4,6 +4,8 @@ import { pluginFailureAttention } from '@acorn/client-core/infra/node/pluginFail
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
 import { collectionKey, collectionRegistry } from '@acorn/client-core/host/registries/sources/collections.ts'
 import { noticeKindContributions } from '@acorn/client-core/features/notifications/kindContributions.ts'
+import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
+import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { directPreferenceSlices } from '@acorn/client-core/infra/persistence/preferenceSlices.ts'
 import { purgeRetiredLocalStorage } from '@acorn/client-core/infra/persistence/legacyStorage.ts'
 import { persistedStateRegistry } from '@acorn/client-core/infra/persistence/persistedState.ts'
@@ -40,6 +42,12 @@ clientScheduleRegistry.register(taskStatusScheduleContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
+// ...and where clicking one of its rows lands. The settings modal belongs to the shell, so the shell
+// answers for this target kind; `resourceId` is the settings page id, so any row from anywhere can
+// deep-link to a page without core growing a second vocabulary for it.
+registerNoticeTargetHandler('settings', (_taskId, target) => {
+  clientEvents.emit('presentation:open-settings', { tab: target.resourceId })
+})
 // Core's own collection: this node's tasks, for a dashboard panel. Registered here for the same reason
 // as the attention source above, that there is no plugin whose data this is, and it is what lets anyone
 // rebuild the task list Home used to draw for everybody whether they read it or not.

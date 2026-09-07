@@ -1,4 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount, type Notice } from './notifications'
 import { createAttentionInbox, markAttentionSeen } from './attentionInbox'
@@ -10,6 +11,7 @@ import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { noticeKindContribution } from '../../host/registries/rail/notices'
+import { projectPath } from '../../host/registries/commands/corePaths'
 import Icon from '../../kit/components/content/Icon'
 import { Alert, Button } from '../../kit/components/primitives'
 import Popover from '../../kit/components/overlays/Popover'
@@ -38,6 +40,7 @@ const relTime = (at: number): string => {
 // notice is an event that already happened and is client-local.
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
   const inbox = createAttentionInbox()
+  const navigate = useNavigate()
   const multiNode = () => nodes().length > 1
   // One pill for both sections. An attention item always counts — it is unresolved by definition — so
   // it is added rather than max()'d with the unread notices.
@@ -116,13 +119,24 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                         // The node first, then the task: navigation resolves against the active
                         // node, so selecting a task on another node before switching would look up
                         // an id that is not there (and might collide with a local one).
+                        // Node, then where in it, then the target. The order is the whole point: a
+                        // path resolves against the active node, and a target that selects a
+                        // project-scoped surface has to land after the project it reads is routed.
                         if (row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
                         if (row.item.taskId) props.onSelectTask(row.item.taskId)
-                        if (row.item.target && row.item.taskId) openTarget(row.item.taskId, row.item.target)
+                        else if (row.item.projectId) navigate(projectPath(row.item.projectId))
+                        // Not gated on the task. An item may be about the node rather than a task —
+                        // a plugin that failed to start, a memory proposal whose task is archived —
+                        // and requiring a task here is what left those rows doing nothing at all.
+                        openTarget(row.item.taskId ?? '', row.item.target)
                       }}
                     >
+                      {/* The source's glyph where it has one, and the severity pair otherwise. The
+                          tone stays with the severity either way: what a row is and how urgent it is
+                          are two different questions, and a memory proposal is a nudge whatever it
+                          is drawn with. */}
                       <span class="notify-glyph" classList={{ 'notify-warn': row.item.severity !== 'info' }}>
-                        <Icon name={row.item.severity === 'info' ? 'info' : 'alert-triangle'} />
+                        <Icon name={row.item.glyph ?? (row.item.severity === 'info' ? 'info' : 'alert-triangle')} />
                       </span>
                       <span class="notify-title">{row.item.title}</span>
                       <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>

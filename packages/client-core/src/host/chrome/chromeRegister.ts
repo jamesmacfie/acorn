@@ -39,6 +39,8 @@ import { registerPluginTheme } from './chromeThemes'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../registries/panes/contentLinks'
 import { refResolverRegistry } from '../registries/panes/refResolvers'
+import { registerNoticeTargetHandler } from '../../features/notifications/notifications'
+import { setSelectedSource } from '../../features/tasks/tasks'
 
 // Turning accepted manifests into native shell contributions: the descriptor half of what
 // plugins/frames/register.ts does for rectangles (docs/plugins.md).
@@ -345,6 +347,18 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     add('extension', descriptor.id, () => registerPluginExtension(pluginId, descriptor, pointBinding))
   }
 
+  // Every attention row has to say where clicking it lands (registries/rail/attention.ts), and a
+  // descriptor names nothing: the wire carries display strings only. So the host picks the honest
+  // answer for this tier — the plugin's own rail source, or, for a plugin that offers none, the
+  // Settings page that lists it. Neither is a guess about what the row means; both are "the thing
+  // this plugin is".
+  //
+  // `source` is handled at the foot of this file, since this is where it is minted; `settings` is the
+  // shell's, because the settings modal is (apps/desktop/src/client/activate.ts).
+  const pluginAttentionTarget = contributions.sources?.[0]
+    ? { kind: 'source', resourceId: contributions.sources[0].id }
+    : { kind: 'settings', resourceId: 'plugins' }
+
   for (const descriptor of contributions.attention ?? []) {
     note(descriptor.refresh)
     add('attention', descriptor.id, () => attentionRegistry.register({
@@ -357,7 +371,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
         const items = await readAttention(pluginId, descriptor.items, nodeId, signal)
         // Namespaced with the contribution id, as registries/attention.ts requires: the id is the row key
         // across refetches, and two plugins reporting `stuck` must not collide in one merged list.
-        return items.map((item) => ({ ...item, id: `${descriptor.id}:${item.id}` }))
+        return items.map((item) => ({ ...item, id: `${descriptor.id}:${item.id}`, target: pluginAttentionTarget }))
       },
     }))
   }
@@ -487,3 +501,8 @@ export function _resetChromeContributions(): void {
   disposeAll()
   unwatchChrome()
 }
+
+// "Take me to that rail source", for a row whose owner has a surface but no opinion about where
+// inside it to land. Registered here rather than in a shell's boot because this file mints the target
+// and `setSelectedSource` is core's: both hosts draw from it, so both answer the click.
+registerNoticeTargetHandler('source', (_taskId, target) => setSelectedSource(target.resourceId))

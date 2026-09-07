@@ -22,6 +22,12 @@ const titleFor = (row: NodePluginRow): string => {
   return `Plugin ${row.name} failed to ${row.stage === 'load' ? 'load' : 'start'}`
 }
 
+// Every row here sends the reader to Settings > Plugins, which is the one place a failure can be
+// acted on: disable the plugin, or read the rest of what the node knows about it. The handler for
+// this kind is registered by the shell (apps/desktop/src/client/activate.ts), because opening the
+// settings modal is the shell's business and not this file's.
+const SETTINGS_TARGET = { kind: 'settings', resourceId: 'plugins' } as const
+
 // The generic sentence, used only when the node sends no reason.
 const FALLBACK_DETAIL = 'It is installed on this node but its start-up threw. Its routes and contributions are not registered.'
 
@@ -52,6 +58,7 @@ export const pluginFailureAttention: AttentionSourceContribution = {
         // newest-first sort, so 0 renders a load failure as a 56-year-old event that sorts last. The
         // cost is that such a row does reset to "just now" each poll.
         at: row.failedAt ?? Date.now(),
+        target: SETTINGS_TARGET,
       }))
     // Surfaces this device could not register, from the same plugins. Scoped by the roster just read,
     // because the registration pass merges every node's roster and a surface failure belongs on the
@@ -65,6 +72,7 @@ export const pluginFailureAttention: AttentionSourceContribution = {
         detail: failure.reason,
         severity: 'warn' as const,
         at: failure.at,
+        target: SETTINGS_TARGET,
       })
     }
     return items

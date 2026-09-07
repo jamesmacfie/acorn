@@ -4,6 +4,7 @@ import { setActiveNode } from '../../infra/node/activeNode'
 import {
   _resetNotices,
   capNotices,
+  dropNoticesForTask,
   hydrateNotices,
   markAllRead,
   markTaskRead,
@@ -84,5 +85,33 @@ describe('notices are scoped to the node that raised them', () => {
     setActiveNode('node-a')
     // Still unread: the popover that "marked all read" never displayed it.
     expect(unreadCount()).toBe(1)
+  })
+})
+
+// An archived task's notices point at an id that no longer resolves: the row still counts in the pill
+// and clicking it navigates nowhere. deliver.ts wires this to `runtime:task-archived`.
+describe('archiving a task takes its notices with it', () => {
+  beforeEach(() => _resetNotices())
+  afterEach(() => setActiveNode(null))
+
+  it('drops the archived task rows and leaves the rest alone', () => {
+    setActiveNode('node-a')
+    pushNotice({ taskId: 'gone', kind: 'agent-completed', title: 'archived task', at: 1 })
+    pushNotice({ taskId: 'kept', kind: 'agent-completed', title: 'other task', at: 2 })
+    dropNoticesForTask('gone')
+    expect(noticesForActiveNode().map((n) => n.title)).toEqual(['other task'])
+    expect(unreadCount()).toBe(1)
+  })
+
+  it("leaves another node's rows alone when two nodes share a task id", () => {
+    setActiveNode('node-a')
+    pushNotice({ taskId: 'shared-id', kind: 'agent-completed', title: 'on a', at: 1 })
+    setActiveNode('node-b')
+    pushNotice({ taskId: 'shared-id', kind: 'agent-completed', title: 'on b', at: 2 })
+    // The event carries no node, so the drop is scoped to the node the client is looking at.
+    dropNoticesForTask('shared-id')
+    expect(noticesForActiveNode()).toHaveLength(0)
+    setActiveNode('node-a')
+    expect(noticesForActiveNode().map((n) => n.title)).toEqual(['on a'])
   })
 })
