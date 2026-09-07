@@ -13,7 +13,7 @@ import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRe
 import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
-  Alert, Badge, Button, ConfirmButton, EmptyState, Input, ListColumn, ListDetail, Row, Rows, Section,
+  Alert, Badge, Button, ConfirmButton, EmptyState, Input, ListDetail, Row, Rows, Section,
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
@@ -472,7 +472,7 @@ export default function DockerBrowse() {
   )
 
   return (
-    <ListDetail listLabel="Docker objects" list={<ListColumn>{list}</ListColumn>}>
+    <ListDetail listLabel="Docker objects" list={list}>
       <Show
         when={section() === 'containers' && selected()}
         fallback={<EmptyState align="start">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</EmptyState>}

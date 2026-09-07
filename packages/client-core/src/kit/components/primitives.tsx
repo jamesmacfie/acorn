@@ -1,5 +1,5 @@
 import {
-  createEffect, createSignal, For, onMount, Show, splitProps,
+  children, createEffect, createSignal, For, onMount, Show, splitProps,
   type JSX,
 } from 'solid-js'
 import { Dynamic, Portal } from 'solid-js/web'
@@ -1443,17 +1443,23 @@ export function ListDetail(props: {
   detailAs?: 'div' | 'main'
   children: JSX.Element
 }) {
+  // `list` is a prop, so every read of it re-runs the JSX the caller wrote there. This read it three
+  // times, for the width attribute, the Show and the insert, so the column was built three times
+  // over and two of those copies stayed off screen with their effects still running. Docker's
+  // column came out empty, because the three copies fought over the same nodes. `children()`
+  // resolves the prop once and hands the same nodes to all three readers.
+  const list = children(() => props.list)
   return (
     <div
       class="ui-listdetail"
-      data-list={props.list !== undefined || props.split ? (props.listWidth ?? 'default') : undefined}
+      data-list={list() !== undefined || props.split ? (props.listWidth ?? 'default') : undefined}
     >
-      <Show when={props.list !== undefined} fallback={props.children}>
+      <Show when={list() !== undefined} fallback={props.children}>
         <>
           {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
               screen reader tells two same-shaped columns apart. */}
           <aside class="ui-listdetail-list" aria-label={props.listLabel}>
-            {props.list}
+            {list()}
           </aside>
           <Dynamic
             component={props.detailAs ?? 'div'}
