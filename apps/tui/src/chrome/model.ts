@@ -10,17 +10,18 @@
 // (docs/state-ownership.md). The one thing this file adds is the workspace choice, which the desktop
 // reads off its router and a terminal has no router to read.
 
-import { createEffect, createMemo, type Accessor } from 'solid-js'
+import { batch, createEffect, createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { integrationsOptions, tasksOptions, workspacesOptions, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
 import {
-  activeTaskId, selectedSource, setActiveTaskId, setSelectedSource,
+  activeTaskId, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
+import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs/railSources.ts'
 import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 import { scheduleSettle } from '../keys/regions'
-import { chosenWorkspace, setChosenWorkspace } from './state'
+import { chosenWorkspace, placeRestored, setChosenWorkspace } from './state'
 
 export type ShellModel = {
   workspaces: Accessor<Workspace[]>
@@ -38,6 +39,10 @@ export type ShellModel = {
   /** Show a workspace's tasks. Here rather than as a bare setter so every caller — the topbar's menu
    *  and the palette's row — makes the same handoff. */
   chooseWorkspace: (workspaceId: string) => void
+  /** Whether the node has answered with both rosters. `allTasks()` and `workspaces()` fall back to an
+   *  empty array, which reads the same as a node with nothing on it, so anything that must not act on
+   *  a guess asks this instead (./restore.ts). */
+  ready: Accessor<boolean>
 }
 
 export function createShellModel(): ShellModel {
@@ -48,6 +53,7 @@ export function createShellModel(): ShellModel {
 
   const allTasks = createMemo(() => tasksQuery.data ?? [])
   const workspaces = createMemo(() => workspacesQuery.data ?? [])
+  const ready = createMemo(() => !!workspacesQuery.data && !!tasksQuery.data)
   const task = createMemo(() => (selectedSource() ? null : allTasks().find((row) => row.id === activeTaskId()) ?? null))
 
   // An explicit choice wins; otherwise follow the open task, and fall back to the first workspace so
@@ -120,19 +126,53 @@ export function createShellModel(): ShellModel {
     scheduleSettle()
   })
 
+  // Where you are in this workspace, recorded as you move: which browse source, or which task. Coming
+  // back to the workspace returns you to it, and so does the next run of `acorn`, because the store
+  // behind this is persisted per workspace (client-core features/tasks/tasks.ts, ./restore.ts).
+  //
+  // Recorded as you go rather than on the way out, which is where the desktop records it. The desktop
+  // can wait, because relaunching it restores a last task and a last source of its own; this host has
+  // neither, so the workspace that was open when the process ended has to already know its own view.
+  //
+  // Not until the restore has run, or the default source the effect above picks for the first
+  // workspace on screen lands here before the stored view has been read, and overwrites it with a
+  // choice nobody made (./state.ts § placeRestored).
+  createEffect(() => {
+    const current = workspace()
+    if (!current || !placeRestored()) return
+    const source = selectedSource()
+    if (source) return rememberWorkspaceView(current.id, { source })
+    const taskId = activeTaskId()
+    if (taskId) rememberWorkspaceView(current.id, { taskId })
+  })
+
   // A workspace switch is a change of roster, so whatever was open in the old one is not open in the
-  // new one. Clearing the source rather than picking one leaves the shell on its empty state until a
-  // source in the new roster is ready. Clear the old view before publishing the new workspace: the
-  // defaulting effect above must never observe "new workspace, old selection" and conclude that the
-  // new workspace was already initialized.
+  // new one — but whatever was open in the *new* one is what you want back, so restore it. A
+  // remembered task is checked against the workspace it is being restored into, which is what makes a
+  // memory left over from a repo moving between workspaces heal instead of reopening the wrong task.
+  //
+  // In one batch, because there is no coherent intermediate state here: the two effects above both
+  // read the workspace and the selection together, and either one seeing "new workspace, old
+  // selection" writes the wrong answer. Falling through with nothing selected is not a gap — it is
+  // how an unremembered workspace has always opened, on the first source its Menu draws.
   const chooseWorkspace = (workspaceId: string): void => {
-    setActiveTaskId(null)
-    setSelectedSource(null)
-    setChosenWorkspace(workspaceId)
-    // The focused Menu row is about to be destroyed with the old roster. The landing rule re-enters the
-    // region by its entry rule once reconciliation has produced the new rows.
+    const entering = workspaces().find((entry) => entry.id === workspaceId)
+    const remembered = entering ? workspaceView(entering.id) : undefined
+    const task = remembered && 'taskId' in remembered
+      ? allTasks().find((row) => row.id === remembered.taskId)
+      : undefined
+    batch(() => {
+      setActiveTaskId(null)
+      setSelectedSource(null)
+      if (task && entering?.projects.some((project) => project.id === task.projectId)) activateTaskSignals(task)
+      else if (remembered && 'source' in remembered) setSelectedSource(remembered.source)
+      setChosenWorkspace(workspaceId)
+    })
+    // The focused Menu row is about to be destroyed with the old roster. The landing rule re-enters
+    // the region once reconciliation has produced the new rows, on the row the new workspace's caret
+    // is on — which is the restore above (../keys/regions.ts § entryStop).
     scheduleSettle()
   }
 
-  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace }
+  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready }
 }

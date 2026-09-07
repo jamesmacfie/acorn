@@ -22,6 +22,7 @@ import { installCommandLayer } from '../keys/commandLayer'
 import { focusWithin, regionFocus, scheduleSettle, setPaneCycler, setTopology } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
+import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
 import { closeOverlay, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
@@ -75,6 +76,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // What the path says, read into the shell: which task to open, which source claims it, and which
   // project every project-scoped browse surface reads (./routing.ts).
   installRouting(model)
+
+  // …and where the last run left off: the workspace that was open, and from there the per-workspace
+  // memory of what was open in it (./restore.ts).
+  installRestore(model, () => prefs.data)
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
   // asked for it: the distribution pass found code a node is offering and nothing runs until the

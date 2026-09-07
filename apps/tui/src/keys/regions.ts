@@ -890,8 +890,8 @@ const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable
 }
 
 /**
- * Where entering a box lands: its first parent stop, else its first collection row, else its first
- * stop. The caller falls back to the box itself.
+ * Where entering a box lands: its first parent stop, else its first collection's roving row, else its
+ * first stop. The caller falls back to the box itself.
  *
  * The middle step is a terminal's own departure. The DOM does not need it, because a reader arrives
  * at a pane with a pointer and clicks what they meant; here the first thing focused is the thing the
@@ -912,10 +912,27 @@ const entryMarks = new WeakSet<Renderable>()
  *  A mark is per node and a node that leaves the tree is never walked, so nothing has to clear one. */
 export const markEntry = (node: Renderable): void => { entryMarks.add(node) }
 
+/** The first collection in a box, landed on the row its caret is on rather than on its first row.
+ *
+ *  A region's own memory is a renderable, and a renderable does not survive its list being rebuilt
+ *  from a different roster — so re-entering a list that has been redrawn since used to start again at
+ *  the top. The collection's `active` is keyed and does survive (client-core kit/keys/collectionState.ts),
+ *  and this is where the two meet. It matters wherever entering also picks: the rail's Menu is entered
+ *  with `pickOnEnter`, so landing on the first row is not a caret moving, it is a source being chosen.
+ *
+ *  Falls back to the first row when the caret's row is not drawn, which is the virtual list's case:
+ *  `stopsIn` makes the same allowance for the same reason. */
+const activeRowIn = (box: Renderable): Renderable | undefined => {
+  const container = walk(box, (child) => containerByBox.has(child))
+  const row = container ? containerByBox.get(container)?.active() : undefined
+  if (row && !row.isDestroyed && row.visible) return row
+  return walk(box, (child) => items.has(child))
+}
+
 const entryStop = (box: Renderable): Renderable | undefined =>
   walk(box, (child) => entryMarks.has(child))
   ?? walk(box, (child) => !!parentEntry(child)?.panels().length)
-    ?? walk(box, (child) => items.has(child))
+    ?? activeRowIn(box)
     // A native scrollbox is focusable so a control-free document can own the arrow keys. It is a
     // transparent viewport when it contains a real stop, though: descending through it here keeps a
     // terminal rectangle, composer or field reachable instead of landing on the scrollbar around

@@ -815,6 +815,14 @@ it last had, its entry stop, its frame, which is `focusable` from registration. 
 resolves by collection identity first, because a query refresh redraws the same logical row as a new
 renderable, and a stand-in is never restored.
 
+An entry stop that is a list is its **roving row**, not its first row. A region remembers a
+renderable, and a renderable does not survive its list being rebuilt from a different roster — the
+collection's own `active` is keyed and does survive, so this is where the two meet. It matters most
+where entering also picks: the rail's Menu is entered with `pickOnEnter`, so landing on the first row
+is not a caret moving, it is a source being chosen, and a workspace you return to would lose the
+source you left it on. A virtual list whose active row is off its drawn window falls back to the first
+row, the same allowance `stopsIn` makes.
+
 **Hiding a subtree asks for a pass.** Two boxes here hide what is inside them rather than unmounting
 it, so that the rail and the pane behind an overlay keep their queries and their models and a tab
 that is not showing keeps its state: the shell's main row, and the `ScrollViewport` that a `TabPanel`
@@ -1235,9 +1243,22 @@ workspace has, which the desktop draws under a rule below its task list. Browse 
 chosen one — the source's own `list` region, drawn here rather than inside the surface it belongs to.
 Tasks is the tasks in the workspace. With no explicit task or source, the screen opens on the first
 available Menu source after its provider and workspace-link gates have loaded, with focus on the same
-row. Switching workspace clears the old task/source and repeats that defaulting pass for the new
-workspace; closing the picker restores focus by region when the old row was replaced. An explicit
-`--task` path still opens in Tasks. `ctrl+b` hides the whole column.
+row. Switching workspace clears the old task/source and, for a workspace this session has not been in
+before, repeats that defaulting pass; a workspace you have already been in opens on what you left it
+on. Closing the picker restores focus by region when the old row was replaced. An explicit `--task`
+path still opens in Tasks. `ctrl+b` hides the whole column.
+
+**Reopening where you left off.** `acorn` restores the workspace that was open and, from that,
+whatever was open in it. Two preferences and both the node's: `core.workspace-views`, which the
+desktop writes too, and `last_workspace`, which only this host reads
+([state-ownership.md](./state-ownership.md) § Scope rules). The desktop's own three — a last path, a
+last task and a last source — are device preferences in `localStorage`, and a terminal has neither a
+router to hold a path nor `localStorage` to hold the preference, so none of them is used here.
+
+The restore replays a workspace switch rather than setting the choice, so the one function that knows
+how to apply a remembered view is the one that applies it (`apps/tui/src/chrome/restore.ts`). Nothing
+records a view until that pass has run, or the default source the shell picks for the first workspace
+on screen would land before the stored one had been read and overwrite it with a choice nobody made.
 
 The column takes about a third of the shell's width, between a floor of 20 cells and a ceiling of 34,
 which is the shape `list-detail` uses to size its own list column. A fixed number could not be right at
