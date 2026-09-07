@@ -9,7 +9,7 @@ string owned by the contribution; core does not maintain a closed union of featu
 | --- | ---: | --- |
 | `pr` | 10 | linked GitHub pull request |
 | `agents` | 15 | managed Agent pane |
-| `changes` | 20 | worktree diff and review notes |
+| `changes` | 20 | worktree diff, staging, commit, and remote actions |
 | `notes` | 30 | task/workspace/global notes |
 | `context` | 40 | context selection and sync |
 | `editor` | 50 | worktree editor, with find-in-files as a sidebar panel |
@@ -179,6 +179,13 @@ A region is a component, not an element, so a layout that draws one region at a 
 one. Regions of the same pane are mounted independently, which means anything two of them share has to
 outlive either. Collapsing a library must not take the note being edited with it, and switching from
 Overview to Files must not lose the pull request the reader had chosen.
+
+The changes pane is the sharpest case, because there the region really does go away. Its commit
+message is typed in the `list-footer`, and below 80 columns `list-detail` shows one side at a time, so
+a reader who types half a message and goes to look at the diff unmounts the field they were typing in.
+The draft lives on the pane's model, above every region
+(`plugins/changes/src/client/commitState.ts`), which is also why the two commit chords are registered
+there: a shortcut that comes and goes with a column is not a shortcut.
 
 The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
 builds it once per task inside its own reactive root, hands it to every region, and disposes it when

@@ -325,7 +325,10 @@ describe('the command layer still is the keybinding table', () => {
 
   beforeEach(() => {
     ran = []
-    commands = registerCommands([{ id: 'core.test', title: 'Test', category: 'action', run: () => { ran.push('core.test') } }])
+    commands = registerCommands([
+      { id: 'core.test', title: 'Test', category: 'action', run: () => { ran.push('core.test') } },
+      { id: 'core.bare', title: 'Bare', category: 'action', run: () => { ran.push('core.bare') } },
+    ])
   })
   afterEach(() => commands.dispose())
 
@@ -339,8 +342,34 @@ describe('the command layer still is the keybinding table', () => {
     expect(ran).toEqual(['core.test'])
   })
 
-  it('holds a task chord back while something is being typed into', () => {
-    installWith([binding({ when: 'task' })])
+  // A chord carrying a command modifier reaches a scoped binding from inside a text field, because
+  // nothing types Cmd+K into a message. Before this a pane's own chord could not be pressed in the
+  // pane's own field, which is where the changes pane's Commit lives. The sandboxed-frame SDK and
+  // the terminal host's command layer already drew the line here (./install.ts § scopeActive).
+  it('runs a scoped chord from inside a text field, and holds a bare key back', () => {
+    installWith([
+      binding({ when: 'task' }),
+      binding({ id: 'core.bare', command: 'core.bare', defaultChord: 'r', chord: 'r', when: 'task' }),
+    ])
+    const input = document.createElement('input')
+    host.append(input)
+    input.focus()
+
+    press('k', { metaKey: true })
+    expect(ran).toEqual(['core.test'])
+
+    // `r` is a letter somebody is typing, so the field keeps it.
+    press('r', { code: 'KeyR' })
+    expect(ran).toEqual(['core.test'])
+    input.blur()
+    press('r', { code: 'KeyR' })
+    expect(ran).toEqual(['core.test', 'core.bare'])
+  })
+
+  // Which is the scope's whole point: a bare key that says it is exempt from typing gets what it
+  // asked for, modifier or not.
+  it('holds a typing-exempt binding back while something is being typed into', () => {
+    installWith([binding({ when: 'typing-exempt' })])
     const input = document.createElement('input')
     host.append(input)
     input.focus()

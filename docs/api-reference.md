@@ -313,7 +313,7 @@ aliases for one release and resolve through the same notes store.
 
 | Plugin | Route surface |
 | --- | --- |
-| `changes` | task-local Git actions and review notes |
+| `changes` | task-local Git actions, a model-written commit message, and review notes |
 | `database` | task-scoped PostgreSQL schema/query operations |
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |

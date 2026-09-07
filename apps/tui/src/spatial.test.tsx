@@ -82,7 +82,7 @@ describe('spatial focus', () => {
     // are `list-detail` are changes, notes and agents.
     const screen = await renderFixture({ width: 120, height: 40, pane: 'changes' })
     try {
-      await screen.until('STAGED')
+      await screen.until('Tracked')
       // Tab in, and Tab only. Walking with `↓` reaches the Menu, and landing in the Menu selects the
       // source under the caret, which replaces the whole task pane with that source's surface and
       // takes the two halves this case is about off the screen (./chrome/Rail.tsx § pickOnEnter).

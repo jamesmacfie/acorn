@@ -21,7 +21,14 @@ afterEach(() => {
 
 describe('isDevicePref', () => {
   it('claims presentation and window state', () => {
-    for (const key of [PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder, PrefKeys.leftCollapsed, PrefKeys.lastSource, PrefKeys.notices]) {
+    // `changes_view` is in here with `theme` and `diff_view`: how the Changes pane draws its file
+    // list — flat or nested, sorted how, grouped by what — is about the person reading it, not about
+    // the worktree it is a list of (plugins/changes/src/client/changesPrefs.ts).
+    for (const key of [
+      PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder, PrefKeys.leftCollapsed,
+      PrefKeys.lastSource, PrefKeys.notices, PrefKeys.diffView, PrefKeys.changesView,
+      PrefKeys.changesGenerateConnection,
+    ]) {
       expect(isDevicePref(key), key).toBe(true)
     }
   })

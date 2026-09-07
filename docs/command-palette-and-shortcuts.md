@@ -307,6 +307,26 @@ which are no longer installed. Reset operates per section and Unbind persists an
 Binding ids are persistence keys. Plugin authors must keep command ids stable across versions or a
 renamed command will no longer find the user's override.
 
+**A pane chord gated on a focused editor**, which is the changes pane's Commit
+(`plugins/changes/src/client/commands.ts`). Two things make it work and neither is a key handler:
+
+- The binding is `when: 'pane'`, `pane: 'changes'`, so it is live while the keys are in that pane, and
+  `active` is the message field's own focus, because a pane is wider than its editor and Cmd+Enter
+  inside the diff column's comment box is that box's business. The field reports focus through the
+  kit's `Textarea`, which both hosts answer.
+- The chord carries a command modifier, so it reaches the binding even though a text field has focus.
+  See [Focus and typing](#focus-and-typing) for that rule and the two other paths that already drew
+  the same line.
+
+Registration lives on the pane's model rather than in a region, so the chord's lifetime is the pane's
+and not a column's: `list-detail` shows one side at a time below 80 columns, and a shortcut that
+disappears when the reader looks at the diff is not a shortcut ([panes.md](./panes.md) § Layout model).
+
+The chord itself was chosen by what was free. `meta+enter` is the `commit` chord in the closed intent
+set. Amend is `meta+alt+enter` rather than Zed's `meta+shift+enter`, because core spent that one on
+`core.surface.toggle-maximize`, and two bindings on one chord means the loser registers nothing at
+all.
+
 Resolution happens before the engine sees anything. `resolveKeybindings` applies the user's
 overrides, the first-party-then-lockfile order, and the conflict rule, and hands the engine one
 binding per resolved chord. A losing binding arrives with a null chord and registers nothing, which
@@ -350,6 +370,20 @@ inside of a rectangle.
 An unhandled intent bubbles. A binding whose handler returns `false` is not handled, so the engine
 carries on to the next layer: the focused collection answers, or an ancestor does, or the region
 layer does, or nothing does.
+
+**A bare key belongs to whoever is typing; a chord does not.** While a text field has focus, a
+binding fires only if its chord carries a command modifier — meta, ctrl or alt — because nothing types
+Cmd+Enter into a message. That covers the scoped bindings a reader presses in a pane's own field, the
+changes pane's Commit among them, and it leaves every bare key with the field. `typing-exempt` keeps
+its meaning either way: it is the scope a bare-key binding declares, and a binding that asks to be
+exempt from typing gets what it asked for whatever it spells.
+
+Two other paths already drew this line and this host was the one that refused both. The
+sandboxed-frame SDK forwards a modified chord out of a frame's own input and keeps a bare one
+(`client-core/host/frames/sdk.ts`), and the terminal host's command layer shadows bare keys while a
+field has them and lets chords through at every depth
+(`apps/tui/src/keys/commandLayer.ts`). Escape is not a chord and is unaffected: an open overlay
+answers its own, and the matcher hands it over before any of this.
 
 **Which is why a handler that changed nothing says so.** `onExpand` on a `Rows` may return a boolean:
 `false` means the row did not fold — a leaf, or a list with nothing to open — and hands the key back,

@@ -1,11 +1,11 @@
 // The changes plugin's agent tools: read-only git over the task worktree. Registered through the
 // tools contribution point (docs/agent-tools.md § Contribution).
 //
-// These three read the same module the review pane's LocalGitBridge reads (main/localGit.ts), so the
+// These three read the same module the review pane's LocalGitBridge reads (./localGit.ts), so the
 // agent and the human see one truth about the working tree.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
-import { gitLog, localChanges, localDiff } from './localDiff'
+import { gitLog, localDiff, localStatus } from './localDiff'
 
 // Not an error: a task can legitimately exist before its worktree does, and an agent asking about
 // changes in that state should get an explanation rather than a failed tool call.
@@ -22,13 +22,14 @@ export function localGitAgentTools(core: ToolCore): AgentToolContribution[] {
   return [
     {
       name: 'local_changes',
-      description: 'Uncommitted changes in the task worktree (git status): staged/unstaged/untracked file list.',
+      description: 'Uncommitted changes in the task worktree (git status): staged, unstaged, untracked, and conflicted files.',
       input: empty,
       scope: 'task',
       risk: 'read',
       handler: async (_a, ctx) => {
         const wt = await worktreeFor(core, ctx.taskId)
-        return wt ? localChanges(wt) : NO_WORKTREE
+        // The same read the pane draws from, so the agent's list and the person's cannot disagree.
+        return wt ? (await localStatus(wt)).changes : NO_WORKTREE
       },
     },
     {

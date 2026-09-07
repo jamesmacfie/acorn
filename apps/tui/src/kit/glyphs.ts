@@ -91,6 +91,9 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   // any terminal with an older table, and therefore a width no layout can predict (../width.ts § WIDE).
   list: '≡',
   'list-checks': '☑',
+  // Three bars without their knobs. `≣`, not the gear a settings menu would take, because U+2699 has
+  // an emoji presentation in some terminals and this table is one cell per name or it is nothing.
+  'sliders-horizontal': '≣',
   'layout-grid': '▦',
   kanban: '▤',
   // Version control

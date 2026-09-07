@@ -248,6 +248,25 @@ unbudgeted proxy to whatever the caller asked for. Each connection provider regi
 matching model adapter, and the model registry refuses an adapter naming a connection provider that
 has not registered yet, or one that has not declared `textGeneration`.
 
+Two routes consume the seam, and each owns its own prompt:
+
+| Consumer | Route | Prompt | Answer |
+| --- | --- | --- | --- |
+| database | `POST /v2/p/database/tasks/:taskId/generate` | The live schema, the repo's schema notes, and any saved queries picked as worked examples | SQL, with the fences stripped |
+| changes | `POST /v2/p/changes/tasks/:id/local/commit-message` | The branch name and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the editor's draft |
+
+Both check the same thing before they spend anything: the caller is a device or the node's own service
+scope. An automation caller holding a task-scoped token has no editor to put the answer in, and
+generation spends the owner's provider key (§ Credential handling in
+[security.md](./security.md)). Both also offer the read half, `models.available(userId)`, through a
+route of their own, for the same reason: `/v2/core/integrations` has no bridge scope, and minting one
+would hand every installed plugin the whole connection roster to serve one dropdown. Ids and labels
+cross; the key stays on the node and is resolved inside `generateText`.
+
+A `ProviderOperationError` reaches the client with the status the reader has to act on, 401 to
+reconnect the key and 429 to wait, because a flattened 500 gives them nothing to do. Anything else the
+provider throws is flattened to `provider_unavailable`, per § Provider boundaries below.
+
 ## Provider boundaries
 
 Provider credentials are read through named plugin accessors and CoreServices. The owning provider

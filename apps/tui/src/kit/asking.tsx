@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, For, Index, onCleanup, Show, untrack, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, Index, on, onCleanup, Show, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import {
@@ -376,6 +376,19 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
 
 export function Textarea(props: TextareaProps) {
   const [box, setBox] = createSignal<Renderable>()
+  // The two callbacks the shared props declare and the DOM half has always fired. They were declared
+  // here and never called, so a caller that gated something on "the keys are in this field" got one
+  // answer on the desktop and none here — the changes pane's commit chords are gated on exactly
+  // that.
+  //
+  // Read off the region store rather than off an event, because that is where focus is on a host with
+  // no pointer (../keys/regions.ts). Deferred, so a field that mounts unfocused does not report a
+  // blur nobody performed.
+  createEffect(on(
+    () => focusWithin(box()),
+    (has) => (has ? props.onFocus?.() : props.onBlur?.()),
+    { defer: true },
+  ))
   const install = fieldRef({
     value: () => props.value ?? '',
     newline: true,
@@ -897,7 +910,10 @@ export function Field(props: {
 /** fallback: the level is `fallback` because a terminal cannot reach the clipboard portably. Where
  *  the terminal advertises OSC 52 the button works and the level is `full` at runtime; where it does
  *  not, the host prints the value on its own line to copy by hand (./copy.ts). */
-export function CopyButton(props: { text: () => string; onCopy?: (text: string) => void; title?: string }) {
+// `always` is accepted and ignored. On the DOM host it turns off a hover reveal; a terminal has no
+// hover, so this copy is drawn either way and a caller that needs the button visible on both hosts
+// should not have to ask twice.
+export function CopyButton(props: { text: () => string; onCopy?: (text: string) => void; title?: string; always?: boolean }) {
   const [shown, setShown] = createSignal(false)
   const copy = () => {
     const text = props.text()

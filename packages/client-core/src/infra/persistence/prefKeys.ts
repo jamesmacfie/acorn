@@ -41,6 +41,21 @@ export const PrefKeys = {
   // anything about the node the session ran on.
   agentToolFold: 'agent_tool_fold',
   dockerPrefs: 'docker_prefs',
+  // How the Changes pane draws its file list: list or tree, the sort inside a flat list, and what the
+  // rows are grouped by (plugins/changes/src/client/changesPrefs.ts). One JSON blob in one key, like
+  // `docker_prefs`, because the list reads all three together.
+  //
+  // The device's, like `diff_view` beside it. It is about the person reading the list, not about the
+  // worktree the list is of.
+  changesView: 'changes_view',
+  // Which model connection the Changes pane's commit-message button spends, and which model on it
+  // (plugins/changes/src/client/changesPrefs.ts). A JSON `{ connectionId, modelId }` in one key, like
+  // `changes_view` above, because the model is only meaningful beside the connection that serves it.
+  //
+  // The device's, and this one is not a preference about drawing: the connections a node offers are
+  // the same everywhere, but which of them you want to spend is yours, and it should not follow you
+  // to a machine where you were working on somebody else's budget.
+  changesGenerateConnection: 'changes_generate_connection',
   // Which editor the editor pane's file view mounts: the graphical one, or `$EDITOR` in a throwaway
   // PTY (plugins/editor/src/client/editorPrefs.ts). The device's, like `theme`: it names a program
   // installed on this machine, and the other client paired with the same node may not have it.

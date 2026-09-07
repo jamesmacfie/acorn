@@ -16,7 +16,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
-| [changes/](./changes/README.md) | The Changes pane's list column as a Zed-style git panel: checkbox staging, three groups, a tree view, a multi-line commit editor with amend, a remote bar with fetch, pull, and push, and a generated message. Six phases. | Proposal, 2026-09-07. Not started; phase 0 blocks on nothing. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
@@ -58,6 +57,28 @@ the single `events.md` above on 2026-08-28 when all but three items shipped), `l
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
 `notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+
+`changes/` was six phases that turned the Changes pane's list column into a working git panel: checkbox
+staging over three groups, a list-or-tree view, a multi-line commit editor with amend and sign-off, a
+branch bar with fetch, pull and push, a model-written commit message, and a point another plugin fills
+once a branch is pushed. Shipped and deleted 2026-09-08.
+[diff-rendering.md](../diff-rendering.md) owns the panel: § The source port has the one `LocalStatus`
+read behind every region and why the two signatures are separate, § Data flow has the navigator, the
+checkbox, the three groups, the footer's order, the primary button's verb and the three refresh signals,
+and § What the Changes panel refuses has the ten decisions — a branch picker, hunk staging, other
+remotes, chords on the remote verbs, a split button, a separate pane, a rail surface, git write tools
+for agents, a commit history, and a warning on archive about unpushed commits.
+[panes.md](../panes.md) § Layout model has the commit draft outliving its region, and
+[state-ownership.md](../state-ownership.md) § Scope rules has where the draft, the view preference and
+the model pick live. [plugins.md](../plugins.md) § Hooks has `amend` and `force` on the two payloads,
+and § Cooperative extension points has `changes:push-actions` with its props beside the other
+first-party remote points. [security.md](../security.md) § Process, path, and configuration controls has
+the lease and the abort verb; [integrations.md](../integrations.md) § Model providers has the commit
+message beside the database plugin's SQL as the two `generateText` consumers;
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Plugin shortcuts has the two
+commit chords and the palette rows; [first-party-plugins.md](../first-party-plugins.md) and
+[api-reference.md](../api-reference.md) have the plugin's row and its route surface; and
+[testing.md](../testing.md) has smoke items 43 to 47.
 
 `command-palette/` was seven phases that gave acorn one command graph and one host-neutral palette
 session. Shipped and deleted 2026-09-03.
