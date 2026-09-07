@@ -85,3 +85,20 @@ export function activateManagedAgentPaneIntents(): () => void {
     selectManagedSession(event.taskId, event.intent.item)
   })
 }
+
+// A session you just started is a session you are about to type into, so the composer takes the
+// caret the moment it appears. One-shot and keyed by session: the composer is not remounted when you
+// switch sessions, so a plain "focus on mount" would miss the second session you start and steal the
+// caret when you step back out of a subagent's transcript.
+const [pendingComposerFocus, setPendingComposerFocus] = createSignal<string>()
+
+export function requestComposerFocus(sessionId: string): void {
+  setPendingComposerFocus(sessionId)
+}
+
+/** True once, for the session the focus was asked for. */
+export function consumeComposerFocus(sessionId: string): boolean {
+  if (pendingComposerFocus() !== sessionId) return false
+  setPendingComposerFocus(undefined)
+  return true
+}

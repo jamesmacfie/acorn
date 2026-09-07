@@ -10,6 +10,7 @@ import {
   type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
+import { consumeComposerFocus } from '../sessions/managedSelection'
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from '../sessions/managedDrafts'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
@@ -130,6 +131,14 @@ export default function AgentComposer(props: {
       revision,
       props.previousAutomaticContext?.contextId ?? 'none',
     ].join(':')
+  })
+
+  // A session started from the header, the provider cards or the palette hands the caret straight to
+  // the draft, so the first thing you do with a new agent is type at it (managedSelection.ts).
+  let field: HTMLTextAreaElement | undefined
+  createEffect(() => {
+    if (!consumeComposerFocus(composerSessionId())) return
+    queueMicrotask(() => field?.focus())
   })
 
   createEffect(on(composerSessionId, (sessionId) => {
@@ -551,6 +560,7 @@ export default function AgentComposer(props: {
       </Show>
 
       <MentionTextarea
+        ref={(element) => { field = element }}
         label="Message agent"
         value={draft()}
         disabled={props.disabled}
