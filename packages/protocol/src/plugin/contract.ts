@@ -781,9 +781,9 @@ const themeDescriptor = z.object({
   // is written into a CSS attribute selector.
   id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'theme id must be lower-case alphanumeric with dashes'),
   label: z.string().min(1).max(80),
-  // Drives `--is-dark`, `--color-scheme` and `--syntax-fg`, which is everything that asks a theme
-  // whether it's dark: the terminal and editor bridges read `--is-dark`, and the diff and check logs
-  // pick their syntax palette off `--syntax-fg`.
+  // Drives `--is-dark` and `--color-scheme`, which is everything that asks a theme whether it's
+  // dark: the terminal and editor bridges read `--is-dark`, and the diff and Markdown fence rules
+  // pick their syntax palette with `light-dark()`, which follows `--color-scheme`.
   dark: z.boolean().default(false),
   tokens: z.strictObject(Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [
     name,

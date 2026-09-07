@@ -999,6 +999,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
 /* --surface-border, not --control-bw: this is a surface, and linear's copy had the role wrong. */
 .ui-markdown pre { padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
+/* A highlighted fence, coloured the way a diff row is (diff.css § Shiki dual-theme): both colours
+   ride the token as --l/--r and light-dark() reads the side this theme's color-scheme asks for. */
+.ui-markdown .shiki, .ui-markdown .shiki span { color: light-dark(var(--l), var(--r)); }
 .ui-markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }

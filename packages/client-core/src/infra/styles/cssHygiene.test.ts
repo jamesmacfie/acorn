@@ -161,3 +161,15 @@ describe('the plugin-frame stylesheet is self-contained', () => {
     expect(orphans).toEqual([])
   })
 })
+
+describe('no token defined from a token an element sets on itself', () => {
+  it('never writes var(--l) or var(--r) into another custom property', () => {
+    // `--syntax-fg: var(--l)` on `:root`, flipped to `var(--r)` by every dark block, is how the diff
+    // and the Markdown fences lost their colour: a custom property has its var() references
+    // substituted where it is declared, and `--l` and `--r` exist only on the Shiki token spans, so
+    // the whole indirection computed to nothing. A rule that wants a side has to say
+    // `light-dark(var(--l), var(--r))` on the span itself.
+    const written = withoutComments(corpus).match(/--[a-z0-9-]+:[^;}]*var\(--[lr]\b/g) ?? []
+    expect(written).toEqual([])
+  })
+})

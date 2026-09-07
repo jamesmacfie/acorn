@@ -95,7 +95,7 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(v.manifest.themeTokens).toEqual([...THEME_PALETTE_TOKENS])
     // And the three the host writes from `dark` are not in it. They are not colours, and a manifest
     // that could spell them could tell the terminal it was dark while rendering a light palette.
-    for (const name of ['--is-dark', '--color-scheme', '--syntax-fg']) {
+    for (const name of ['--is-dark', '--color-scheme']) {
       expect(v.manifest.themeTokens).not.toContain(name)
     }
     for (const token of v.manifest.themeTokens) expect(renderPluginAuthoring(v)).toContain(`\`${token}\``)
