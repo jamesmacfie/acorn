@@ -2,18 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 import type { MemoryRow } from './memoryClient'
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), openPane: vi.fn() }))
+const mocks = vi.hoisted(() => ({ search: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn() }))
 vi.mock('./memoryClient', () => ({ memoryApi: () => ({ search: mocks.search }) }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   openPane: mocks.openPane,
+  setSelectedSource: mocks.setSelectedSource,
 }))
 
 import { memoryCommands } from './commands'
 
-// The two memory commands. What is pinned is the scope the query carries, and the fact that a row
-// reveals by the memory's NAME: the context section keys its rows that way, and revealing by the
-// database id would silently scroll to nothing.
+// The two memory commands. What is pinned is the scope each carries, the fact that a search row
+// reveals by the memory's NAME (the context section keys its rows that way, and revealing by the
+// database id would silently scroll to nothing), and the fact that the proposals row goes to the
+// Memory page rather than into a task's Context pane.
 
 const memory = (over: Partial<MemoryRow> = {}): MemoryRow & { rank: number } => ({
   id: 'm1', scope: 'project', projectId: 'p-1', name: 'no-ponytail-comments', type: 'convention',
@@ -34,13 +36,16 @@ const find = (): SearchCommand => at('memory.search') as SearchCommand
 describe('the memory plugin catalogue', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('is a search and one open action, both task-scoped and gated on the plugin', () => {
+  it('is a search and one open action, gated on the plugin, and only the search needs a task', () => {
     expect(memoryCommands.map((command) => command.id)).toEqual(['memory.search', 'memory.proposals.open'])
     for (const command of memoryCommands) {
-      expect(command.scope, command.id).toBe('task')
       expect(command.requires, command.id).toEqual({ plugin: 'memory' })
       expect(command.palette, command.id).toBe(true)
     }
+    // A search hit opens in a task's Context pane, so it needs one. A pending proposal is not
+    // task-scoped and its page is a rail source, so it stays offered with no task in hand.
+    expect(at('memory.search').scope).toBe('task')
+    expect(at('memory.proposals.open').scope).toBeUndefined()
     // Remote, so the defaults apply: it waits for the typing to stop and for two characters.
     expect(find().debounceMs).toBeUndefined()
     expect(find().minQueryLength).toBeUndefined()
@@ -70,8 +75,9 @@ describe('the memory plugin catalogue', () => {
     })
   })
 
-  it('opens the same fold with no row named for the proposals', () => {
+  it('sends the proposals row to the Memory page, not into a task', () => {
     ;(at('memory.proposals.open') as { run: (c: CommandExecutionContext) => void }).run(context())
-    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'context', { kind: 'context:reveal', sectionId: 'memory' })
+    expect(mocks.setSelectedSource).toHaveBeenCalledWith('memory')
+    expect(mocks.openPane).not.toHaveBeenCalled()
   })
 })

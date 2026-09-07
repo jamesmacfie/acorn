@@ -2,23 +2,25 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   openPane,
+  setSelectedSource,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { memoryApi } from './memoryClient'
+import { MEMORY_SOURCE_ID } from './proposalTarget'
 
 // Memory in the palette: search what this project can see, and open the proposals waiting for a
 // decision (docs/notes-and-memory.md § From the command palette).
 //
-// **Both land in the Context pane.** This plugin ships no pane of its own; what it draws is a section
-// inside the context pane's section point (./index.ts), and that pane already takes an intent naming a
-// section and a row in it. So a memory the palette found is revealed exactly where the reader would
-// have scrolled to, and the "proposals" command is the same intent without a row
-// (client-core/host/registries/commands/clientEvents.ts § `context:reveal`).
+// **The two go to different places, because they answer different questions.** A search hit is a
+// memory this task's context could be drawing on, so it reveals in the Context pane's memory section:
+// the reader is shown it where they are already working (client-core/host/registries/commands/
+// clientEvents.ts § `context:reveal`). A pending proposal is not task-scoped at all — accepting one
+// falls back to the project folder when the task's worktree is gone — so it opens the Memory page.
 //
-// **Task-scoped, even though the query is about the project.** The search itself is project-visible —
-// that is the node route's own scope — but the surface a row opens in belongs to a task, and a row
-// that cannot be opened is not worth offering. The project the query names is the captured one.
+// **Which is why only the search is task-scoped.** The search itself is project-visible, that is the
+// node route's own scope, but the surface a hit opens in belongs to a task and a row that cannot be
+// opened is not worth offering. The project the query names is the captured one.
 //
 // Accepting and rejecting a proposal stay in that section: each needs the proposal's body and its
 // verification flags in front of the reader. Adding a memory needs a name, a type, a scope and a body,
@@ -68,13 +70,10 @@ export const memoryCommands: readonly ContributedCommand[] = [
     keywords: ['memory', 'proposals', 'review'],
     category: 'navigation',
     palette: true,
-    scope: 'task',
     requires: { plugin: 'memory' },
-    // The same fold the search reveals into, with no row named: the proposals are drawn at the top of
-    // it, which is where this plugin's own section puts them.
-    run: (context) => {
-      const taskId = context.taskId
-      if (taskId) openPane(taskId, CONTEXT_PANE, { kind: 'context:reveal', sectionId: MEMORY_SECTION })
-    },
+    // The Memory page, not the Context pane's fold. A pending proposal is not task-scoped, so this
+    // row no longer needs a task to be worth offering, and it lands where every pending proposal is
+    // rather than the handful this task happens to have raised (./MemoryCenter.tsx).
+    run: () => setSelectedSource(MEMORY_SOURCE_ID),
   },
 ]

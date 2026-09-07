@@ -54,6 +54,57 @@ A search hit or a `memory_get` read bumps that row's recall stats (last-accessed
 count), the inputs for future decay and ranking. Listing the index does not count as a read. The
 stats survive reconciliation because rows are keyed by a content-hash id.
 
+### The Memory page
+
+Memory has a rail source of its own, `plugins/memory/src/client/MemoryCenter.tsx`: the pending
+proposals at the top, then what has already been accepted, filtered on the device. It draws one
+full-width column, so the contribution declares `component` rather than `regions`.
+
+Both lists are scoped to the routed project, which is why the source declares `projectScoped`. The
+memories half is the node's own rule: `listMemories` returns the project's rows plus the private
+ones, since a private memory in `~/.acorn/memory` applies wherever you are. The proposals half
+applies the same rule on the device, in `proposalsForProject`: this project's, plus the ones that
+name no project at all. That second half matters. An agent whose task will not resolve proposes with
+a null project on purpose, so that a reviewer still sees it rather than losing what it learned
+(`plugins/memory/src/server/agentTools.ts`), and scoping those away would leave them with nowhere to
+be reviewed from. A page opened from a surface that routes no project shows everything, because
+there is no scope to apply.
+
+It exists because a proposal is not task-scoped, however much its record looks it. Acceptance
+resolves the task's worktree and falls back to the project folder
+(`plugins/memory/src/server/knowledgeChannel.ts`), and archiving a task nulls its worktree path, so a
+proposal is still acceptable after the task that raised it is gone. Before the page, the only review
+surface was a fold inside a task's Context pane, which meant those proposals were reachable by the
+API and unreachable by hand.
+
+The Context pane's section stays, drawing this task's proposals where the reader is already working.
+Both surfaces render the same card, `ProposalList.tsx`, so accept and reject cannot drift apart.
+
+The "Review memory" row in the notification bell lands on the proposal it named, not on the top of
+the page: the card takes the kit's `focus`, which scrolls it into view and puts the reader on it, and
+the highlight is cleared when the page unmounts so a later visit does not re-scroll to a proposal
+already dealt with. The row carries the proposal's project, so the inbox routes there before it opens
+the page — without that step the page would scope this very proposal out of the view it just opened.
+It carries no task id. It used to, which sent the click to the task and left the reader on whatever
+pane happened to be open. The row draws with the memory mark rather than the generic nudge glyph,
+since every row this source raises is the same kind of thing. See
+[notifications.md](./notifications.md) § What a row points at.
+
+Accept and reject report their own failures, on the card that was pressed. There are two, and both
+used to be silent. A refusal answers 200 with `ok: false` — most often a worktree removed since the
+proposal was raised — and a route that is gated, unreachable, or 500s throws out of the client
+instead of answering. Neither put anything on screen, so the button read as dead. A page can hold a
+dozen proposals from a dozen tasks, which is why the message sits on the card rather than in a banner
+above the list.
+
+Accepting also refetches the memories below it. Without that the proposal vanishes from the top of
+the page and nothing takes its place, which reads as though the accept did nothing.
+
+Memory stays a first-party plugin. The loaded tier contributes a declarative source descriptor
+(`packages/protocol/src/plugin/contract.ts`), a data-driven list and detail, which cannot draw this
+page; and memory is the human gate on knowledge an agent proposes writing into your repository, which
+is the wrong thing to move behind the sandbox.
+
 ## Context integration
 
 Notes and memory each register a context section. Core assembles sections with GitHub, task, Linear,
@@ -104,10 +155,10 @@ note is a pane intent addressed at a task even when the note is a global one.
 Memory contributes a search and one open action (`plugins/memory/src/client/commands.ts`). **Search
 memory** goes through the existing full-text path, so the ordering is that index's own rank and the
 device does not re-rank it, and a row reveals by the memory's name rather than its id, because the
-name is what the context section keys its rows by. **Review memory proposals** is the same reveal with
-no row named, which lands on the proposals drawn at the top of that section. Both are task-scoped even
-though the query is about the project: the query carries the captured project, but the surface a row
-opens in belongs to a task, and a row that cannot be opened is not worth offering.
+name is what the context section keys its rows by. It is task-scoped even though the query is about
+the project: the query carries the captured project, but the surface a hit opens in belongs to a task,
+and a row that cannot be opened is not worth offering. **Review memory proposals** goes to the Memory
+page instead, and so is offered with no task in hand.
 
 What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note
 list, where the scope and the current value are both on screen. Accepting or rejecting a proposal

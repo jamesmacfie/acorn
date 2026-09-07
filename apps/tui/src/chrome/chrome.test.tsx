@@ -320,13 +320,13 @@ describe('the shell', () => {
     // (client-core/kit/keys/keymap.ts § intentKeys, docs/tui.md § The five key groups).
     expect(await on()).toContain('GitHub')
     await screen.press('g', { shift: true })
-    expect(await on()).toContain('Agents')
+    expect(await on()).toContain('Memory')
     await screen.press('g')
     expect(await on()).toContain('GitHub')
     // The same two intents the page group reaches with the keys a reader without vim in their hands
     // would try.
     await screen.press('END')
-    expect(await on()).toContain('Agents')
+    expect(await on()).toContain('Memory')
     await screen.press('HOME')
     expect(await on()).toContain('GitHub')
     screen.done()
@@ -491,7 +491,9 @@ describe('the footer asks the keymap once per change', () => {
         await screen.press('TAB')
         await screen.frame()
         expect(asks - idle).toBeGreaterThan(0)
-        expect(asks - idle).toBeLessThanOrEqual(8)
+        // The bound tracks the number of controls in the region tabbed into, so it moves when the
+        // rail gains a row. Memory (70) took it from eight to nine.
+        expect(asks - idle).toBeLessThanOrEqual(9)
       } finally {
         engine.getActiveKeys = real
       }
