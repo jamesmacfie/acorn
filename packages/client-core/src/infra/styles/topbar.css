@@ -1,5 +1,10 @@
 /* Top bar side clusters: dropdown (start) and auth (end). */
-.topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }
+/* Each cluster clips at its inner edge, so the two ends of the bar are the two things that always
+   stay on screen: the pane toggle at the start, the bell and the settings menu at the end. The
+   start cluster loses its last control, the end cluster its first, because `flex-end` keeps its
+   content against the far edge. Without the `min-width` the grid track cannot shrink at all and
+   what falls off the end is the controls instead. */
+.topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); min-width: 0; overflow: hidden; }
 .topbar-end { justify-content: flex-end; }
 
 /* Agent-working badge beside the terminal toggle: spinning glyph + active count. */
