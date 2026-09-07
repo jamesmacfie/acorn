@@ -372,10 +372,11 @@ export function TabPanel(props: {
  *  between its lines.
  *
  *  Nothing here wraps `props.children`. A context provider around them would put them inside a memo
- *  of Solid's own, and re-running a toolbar's children as a unit broke the changes pane at once: a
+ *  of Solid's own, and re-running a toolbar's children as a unit used to break the changes pane: a
  *  callback-form `<Show>` in that bar had its accessor read again after its condition went false,
- *  which Solid refuses as `Stale read from <Show>` (ChangesPane.tsx). An open panel widens itself
- *  instead (§ `Menu`). */
+ *  which stock Solid refuses as `Stale read from <Show>`. Our copy holds the last value instead
+ *  (patches/README.md), but the bar still has no reason to re-run its children. An open panel widens
+ *  itself instead (§ `Menu`). */
 export function Toolbar(props: { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }) {
   return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>{props.children}</box>
 }

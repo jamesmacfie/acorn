@@ -9,7 +9,6 @@ import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from '../sessions/agentActivity'
 import { managedAgentApi } from '../sessions/managedClient'
 import { managedAgentStore } from '../sessions/managedStore'
-import { hold } from '../hold'
 import { openManagedSession } from '../sessions/managedSelection'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import {
@@ -287,7 +286,7 @@ export default function AgentCenter() {
                   return (
                     <Show when={row()}>
                       {(narrowed) => {
-                        const current = hold(row, narrowed())
+                        const current = narrowed
                         return (
                         <Row
                           item={itemProps}
