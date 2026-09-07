@@ -13,6 +13,7 @@
     "commands": [
       "task.terminal.new-claude",
       "task.terminal.new-codex",
+      "agents.sessions.new",
       "source.agents.open",
       "agents.sessions.find",
       "changes.open",
@@ -36,7 +37,8 @@
     "sources": [
       "agents",
       "docker",
-      "github"
+      "github",
+      "memory"
     ],
     "settingsPages": [
       "agent-concurrency",

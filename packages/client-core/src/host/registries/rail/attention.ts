@@ -16,8 +16,20 @@ export type AttentionItem = {
   // Which task it concerns, when it concerns one. Absent for a node-level item (an integration that
   // needs reauthenticating, a plugin whose setup is incomplete).
   taskId?: string
+  // Which project it concerns, when it concerns one and no task. The inbox routes there before it
+  // dispatches the target, because a `projectScoped` surface reads the routed project: arriving on
+  // the wrong one draws the page with this row's own subject filtered out of it, which is worse than
+  // not moving at all.
+  //
+  // Read only when `taskId` is absent. A task route carries no project, so a row naming both would
+  // have to pick, and the task is the more specific of the two.
+  projectId?: string
   title: string
   detail?: string
+  // The row's own glyph, a Lucide name (docs/ui-design.md § Icons). Absent falls back to the pair the
+  // inbox draws from `severity`, which is the right answer for a row about a blocked agent and the
+  // wrong one for a source whose rows are all the same kind of thing.
+  glyph?: string
   // Urgency, and with it whether the row can be retired: `info` means nothing is blocked, so the
   // owner can acknowledge it away (attentionInbox.ts § the seen set). `warn` and `danger` name a
   // block only they can lift, so the row stays until they do.
@@ -27,7 +39,12 @@ export type AttentionItem = {
   // Where clicking should land. Reuses the notice target vocabulary and its handler table
   // (notifications/notifications.ts), since "open the thing this is about" is the same problem
   // already solved.
-  target?: { kind: string; resourceId: string; subresourceId?: string }
+  //
+  // Required, and that is the point. A row in the inbox is an invitation to go and deal with
+  // something; a row that swallows the click and does nothing teaches the reader that the whole
+  // section is decorative. Plugin failures shipped without one for exactly that reason, so the rule
+  // is a type rather than a convention. A source with nowhere to send the reader has no row to draw.
+  target: { kind: string; resourceId: string; subresourceId?: string }
 }
 
 export type AttentionSourceContribution = {

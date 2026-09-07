@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { attentionRegistry, attentionSources, compareAttention, type AttentionItem } from './attention'
 
 const item = (id: string, severity: AttentionItem['severity'], at: number): AttentionItem =>
-  ({ id, title: id, severity, at })
+  ({ id, title: id, severity, at, target: { kind: 'test', resourceId: id } })
 
 const disposables: { dispose(): void }[] = []
 afterEach(() => disposables.splice(0).forEach((d) => d.dispose()))

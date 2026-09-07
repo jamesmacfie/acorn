@@ -17,6 +17,10 @@ const serve = (plugins: NodePluginRow[]): void => {
 
 const items = () => pluginFailureAttention.fetch('node-a', new AbortController().signal)
 
+// Every row lands on Settings > Plugins, which is the one place a failure can be acted on. Asserted
+// on both shapes because the two are built in different loops.
+const SETTINGS = { kind: 'settings', resourceId: 'plugins' }
+
 beforeEach(() => {
   mocks.readJson.mockReset()
   clearSurfaceFailures()
@@ -31,6 +35,7 @@ describe('pluginFailureAttention', () => {
       detail: 'could not import node/index.js: SyntaxError',
       severity: 'warn',
       at: 5,
+      target: SETTINGS,
     }])
   })
 
@@ -56,6 +61,7 @@ describe('pluginFailureAttention', () => {
       detail: "pane 'board' is already registered",
       severity: 'warn',
       at: expect.any(Number),
+      target: SETTINGS,
     }])
   })
 

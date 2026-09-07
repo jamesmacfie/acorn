@@ -109,6 +109,18 @@ export function markTaskRead(taskId: string): void {
   )
 }
 
+// Archiving a task takes its notices with it. A notice is a pointer at a task, so once the task is
+// gone the row still counts in the pill and clicking it navigates to an id that resolves to nothing.
+// Wired to `runtime:task-archived` in deliver.ts.
+//
+// Active-node rows only, for the same reason `markTaskRead` filters: the event carries no node id and
+// two nodes may hold one task id by construction.
+export function dropNoticesForTask(taskId: string): void {
+  const doomed = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
+  if (!doomed.size) return
+  setNotices((prev) => prev.filter((n) => !doomed.has(n.id)))
+}
+
 // Hydrate from the persisted prefs blob without clobbering notices raised pre-hydration.
 export function hydrateNotices(json: string | undefined): void {
   if (!json) return

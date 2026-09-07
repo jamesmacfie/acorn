@@ -7,12 +7,13 @@
 //
 // Channels beyond the bell row are sinks. Phase 1 registers none; sound, the system notification and
 // the terminal's OSC sequences each add one.
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 import { showNotification } from '../../infra/platform'
 import { wsOnNotice } from '../../infra/node/wsClient'
 import { activeTaskId } from '../tasks/tasks'
 import { edgesBetween, snapshotKey, type Edge, type Snapshot } from './attention'
-import { pushNotice, type Notice } from './notifications'
+import { dropNoticesForTask, pushNotice, type Notice } from './notifications'
 import { readNotificationSettings, type NotificationSettings } from './settings'
 
 export type DeliveryContext = {
@@ -157,3 +158,12 @@ export function resetDelivery(): void {
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') resetDelivery()
 })
+
+// A notice points at a task, so an archived task's notices point nowhere. Wired here rather than in
+// the ring, which knows nothing about the event bus, and next to the eviction above because both
+// answer the same question: what does this client forget when the thing it was about goes away.
+//
+// Only what this client watched being archived. A task archived from another device is still in the
+// ring at the next boot, because notices rehydrate from a prefs blob that nobody re-checks. The row
+// is stale rather than wrong, and re-checking it would mean asking the node about 50 task ids at boot.
+clientEvents.on('runtime:task-archived', ({ taskId }) => dropNoticesForTask(taskId))

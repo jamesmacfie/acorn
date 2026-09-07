@@ -385,7 +385,7 @@ describe('syncChromeContributions', () => {
     expect(readJson.mock.lastCall?.[0]).toBe('/v2/p/board/collections/cards?lane=doing')
   })
 
-  it('namespaces attention ids and drops malformed rows without throwing', async () => {
+  it('namespaces attention ids, drops malformed rows, and lands clicks on the plugin’s own source', async () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
     syncChromeContributions()
     readJson.mockResolvedValue({
@@ -396,7 +396,12 @@ describe('syncChromeContributions', () => {
       ],
     })
     const items = await attentionRegistry.get('board-stuck')!.fetch('node-a', new AbortController().signal)
-    expect(items).toEqual([{ id: 'board-stuck:card-1', title: 'Stuck', severity: 'warn', at: 5 }])
+    // The wire carries no target, so the host supplies one: this plugin's rail source, because an
+    // inbox row that swallows the click teaches the reader the section is decorative
+    // (registries/rail/attention.ts).
+    expect(items).toEqual([
+      { id: 'board-stuck:card-1', title: 'Stuck', severity: 'warn', at: 5, target: { kind: 'source', resourceId: 'board' } },
+    ])
   })
 
   it('refuses to read a route outside the plugin’s own namespace', async () => {
