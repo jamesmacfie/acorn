@@ -832,6 +832,14 @@ Five kinds of contribution come out of that one manifest, and each has its own s
 frames, remote trees, document surfaces, webviews, and descriptors. The wire format behind the
 second one is in [The tree contract](#the-tree-contract).
 
+**When the device asks.** Every host draws before the node it just started is up, so the pass that reads
+the fleet's rosters, caches the bundles and registers those contributions cannot run from a composition
+root: at that moment the fleet list is still empty and every node reads `offline`, and the pass asks
+nobody. `watchPluginChanges` (`host/plugins/reload.ts`) owns it instead, and runs it the first time each
+node becomes reachable — once per node, so a connection that flaps does not re-hash the fleet's bundles.
+The same watcher then keeps it reconciled for the rest of the session, off the node's `plugins:changed`
+broadcast. Both hosts call it and neither runs a pass of its own.
+
 ## Frames
 
 A pane, reference panel, settings page, project importer, or full-screen overlay picker that the

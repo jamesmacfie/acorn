@@ -12,8 +12,6 @@ import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
-import { syncPluginDistribution } from '@acorn/client-core/host/plugins/distribution.ts'
-import { syncPluginContributions } from '@acorn/client-core/host/plugins/syncContributions.ts'
 import { watchPluginChanges } from '@acorn/client-core/host/plugins/reload.ts'
 import { watchTaskChanges } from '@acorn/client-core/features/tasks/watchTaskChanges.ts'
 import { watchConnectionChanges } from '@acorn/client-core/features/integrations/watchConnectionChanges.ts'
@@ -91,21 +89,16 @@ createRoot(() => {
 })
 
 // Third-party plugin bundles, across the whole fleet rather than just the active node
-// (docs/plugins.md). Not awaited: it talks to every remembered node, and a fleet with an offline
-// machine in it must not hold up the first paint. The trust dialog is an overlay contribution, so
-// whatever it queues renders whenever this settles.
-// …and once it settles, register the surfaces every accepted plugin declared
-// (docs/plugins.md). Chained rather than awaited for the same reason: a fleet
-// with an offline machine in it must not hold up the first paint, and a plugin pane appearing a moment
-// after the shell does is the correct trade. Panes read the active node at render, so a node switch needs
-// no second pass.
-// Chrome (docs/plugins.md) rides the same settle: it is registered from
-// the same roster rows, and a plugin that ships descriptors but no client bundle has nothing else to
-// wait for.
-void syncPluginDistribution().then(syncPluginContributions)
-
-// …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`, and the
-// shell re-runs the two passes above rather than waiting for a restart (docs/plugins.md § The dev loop).
+// (docs/plugins.md): cache the bytes, queue whatever this device has never decided about, and register
+// the surfaces every accepted plugin declared. The trust dialog is an overlay contribution, so whatever
+// it queues renders whenever the pass settles, and panes read the active node at render, so a node
+// switch needs no second pass.
+//
+// Both passes live behind this watcher now, and it runs them when a node first becomes reachable rather
+// than here. A pass fired from this line ran before the fleet list had been read and while the node the
+// helper just started was still `offline`, so it asked nobody and found nothing, and no loaded plugin
+// appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
+// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins.md § The dev loop).
 watchPluginChanges()
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this

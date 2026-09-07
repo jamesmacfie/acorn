@@ -74,8 +74,6 @@ const { fileCacheStorage } = await import('./node/cache')
 const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
 const { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
 const { setNodeStarting } = await import('./chrome/nodeState')
-const { syncPluginDistribution } = await import('@acorn/client-core/host/plugins/distribution.ts')
-const { syncPluginContributions } = await import('@acorn/client-core/host/plugins/syncContributions.ts')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
 const { createEffect, createRoot } = await import('solid-js')
@@ -202,10 +200,10 @@ async function fillIn(): Promise<void> {
   // Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
   // device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
   // has not is queued for the trust prompt, which the shell draws as an overlay.
-  void syncPluginDistribution().then(syncPluginContributions).catch((error: unknown) => {
-    heldLines.push(`[plugins] could not read the fleet's plugins: ${error instanceof Error ? error.message : String(error)}`)
-  })
-  // …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`.
+  //
+  // The watcher owns that first pass as well as the reload one, and runs it when a node first becomes
+  // reachable. Fired from here it asked a node this run had just spawned and was still `offline`, found
+  // no roster, and never ran again — the same boot race the effect above answers for the query cache.
   watchPluginChanges()
 
   // The sound channel: an unseen agent edge rings the terminal.
