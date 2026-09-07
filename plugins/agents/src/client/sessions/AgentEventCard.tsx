@@ -1,18 +1,19 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentPlanEntry, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentPlanEntry, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, saveFile, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, CopyButton, Fold, Icon, Inline, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Icon, Inline, Menu, Row, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
 import { selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
+import { asPlainText } from './copyFormats'
 
 // One event of a session, as a card in the transcript's `Timeline`. Eleven kinds, and the tool call
 // is the twelfth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -40,6 +41,39 @@ const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted
 async function downloadArtifact(artifactId: string, title: string): Promise<void> {
   const { bytes, type, filename } = await managedAgentApi.artifactContent(artifactId)
   await saveFile({ bytes, mimeType: type, suggestedName: filename ?? (downloadName(title, 180) || 'artifact') })
+}
+
+// The reader's way out of the transcript. Three formats because the answer lands in three kinds of
+// place: prose in a chat or a ticket, markdown in a doc, and the raw event when somebody is debugging
+// what the harness actually sent. It mirrors the session's own export menu in the pane header, one
+// answer at a time instead of the whole history.
+function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalizedEvent }) {
+  const copy = (text: string) => void navigator.clipboard.writeText(text)
+  return (
+    <Menu ariaLabel="Copy this response" placement="bottom-end"
+      trigger={({ toggle, open }) => (
+        <Button
+          variant="bare"
+          size="sm"
+          iconOnly
+          label="Copy this response"
+          opens="menu"
+          expanded={open()}
+          onPress={toggle}
+        >
+          <Icon name="ellipsis" />
+        </Button>
+      )}
+    >
+      {(menu) => (
+        <>
+          <Menu.Item context={menu} onSelect={() => copy(asPlainText(props.text()))}>Copy as text</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => copy(props.text())}>Copy as Markdown</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => copy(JSON.stringify(props.event(), null, 2))}>Copy as JSON</Menu.Item>
+        </>
+      )}
+    </Menu>
+  )
 }
 
 export default function AgentEventCard(props: {
@@ -113,7 +147,7 @@ export default function AgentEventCard(props: {
               <Stack gap="row">
                 <Inline>
                   <Text emphasis="eyebrow">Agent</Text>
-                  <CopyButton text={() => message().text} title="Copy response" />
+                  <CopyOutputMenu text={() => message().text} event={message} />
                 </Inline>
                 <AgentMarkdown text={message().text} taskId={props.taskId} />
               </Stack>
