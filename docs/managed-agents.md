@@ -397,18 +397,30 @@ it, not because it shares a store with anything above it.
 
 ## From the command palette
 
-Six rows, all registered by this plugin rather than by the shell.
+Seven rows, all registered by this plugin rather than by the shell.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
 | Row | Kind | What it does |
 | --- | --- | --- |
+| New agent session | search, task-scoped | Lists the harnesses this node has installed, and starting one creates the session, selects it, and shows the Agent pane |
 | Open Agent Center | action, no scope | Selects the `agents` rail source, which is this device's view of the node rather than a property of a task |
 | Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
 | New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |
 | New Codex terminal | action, needs an open task | The same for the `codex` profile |
 | Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
 | How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
+
+**New agent session is a picker, not an action, and it needs an open task.** A session is created
+against a task worktree, so there is nothing to start one in when no task is open and the palette
+hides the row rather than offering one that can only fail. Which harness runs it is a choice, and the
+list comes from the node, so the row is a search whose provider loads once when the frame opens and
+filters on this machine as you type (`localSearch`,
+`packages/client-core/src/host/registries/commands/localSearch.ts`) — the roster does not move while
+somebody is typing, and a request per keystroke would buy nothing. Only installed harnesses are
+listed: an absent CLI cannot start a session, and the pane's provider cards are where the diagnostic
+saying why belongs. The create itself goes through `managedAgentStore.startSession`, the same call the
+pane's New picker makes, so the palette is not a second way to write one.
 
 **The search is task-scoped although the route is not.** The route behind it takes a workspace as
 happily as a task, and Agent Center asks it that way. But a row from another task can only be opened

@@ -213,6 +213,24 @@ function onFrame(value: unknown): void {
 export const managedAgentStore = {
   sessions,
   snapshots,
+  /**
+   * Start a session on this provider and put the row in the store.
+   *
+   * Two surfaces open a session now — the pane's New picker and the palette's "New agent session" —
+   * and neither may be the one that knows what a create looks like. The provider is named by its two
+   * ids rather than by its descriptor, because the palette only carries a picked row.
+   */
+  async startSession(taskId: string, provider: { id: string; profileId: string }): Promise<AgentSession> {
+    const session = await managedAgentApi.createSession({
+      taskId,
+      providerId: provider.id,
+      profileId: provider.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    upsertSession(session)
+    return session
+  },
   activate(): () => void {
     subscribers++
     if (!disposeSocket) disposeSocket = wsOnAgentFrame(onFrame)

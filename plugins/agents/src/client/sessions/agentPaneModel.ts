@@ -10,6 +10,7 @@ import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import {
   agentAttentionItemId,
   clearManagedSession,
+  requestComposerFocus,
   selectManagedSession,
   selectedManagedSession,
 } from './managedSelection'
@@ -136,15 +137,9 @@ export function createAgentPaneModel(task: Task) {
     setCreating(true)
     setError('')
     try {
-      const session = await managedAgentApi.createSession({
-        taskId: task.id,
-        providerId: descriptor.id,
-        profileId: descriptor.profileId,
-        kind: 'interactive',
-        config: {},
-      })
-      managedAgentStore.upsertSession(session)
+      const session = await managedAgentStore.startSession(task.id, descriptor)
       selectManagedSession(task.id, session.id)
+      requestComposerFocus(session.id)
       await managedAgentStore.loadSnapshot(session.id)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to start the managed agent.')
