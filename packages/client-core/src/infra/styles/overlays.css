@@ -56,6 +56,9 @@
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
 .will-concern-details { grid-column: 2 / -1; display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--text-muted); }
 .will-concern-details li { overflow-wrap: anywhere; }
+/* The action checkbox sits under the message, not in the icon column: left where it flows, its
+   label widens that auto column and shoves every row's message to the right. */
+.will-concerns li > .ui-check { grid-column: 2 / -1; margin-top: var(--space-2); }
 
 /* Help: two-column key → description grid. */
 .help-list {
