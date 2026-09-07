@@ -8,7 +8,7 @@ import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 
 /** Theme self-description: the only theme tokens that are not colours. See docs/ui-design.md
  * § Token axes for what each one replaced and why a plugin theme cannot set them. */
-export const SELF_DESCRIPTION_TOKENS = ['--is-dark', '--color-scheme', '--syntax-fg'] as const
+export const SELF_DESCRIPTION_TOKENS = ['--is-dark', '--color-scheme'] as const
 
 /** Declared once on `:root` as `var()` references into the palette. See docs/ui-design.md
  * § Token axes for why a theme block must never restate one. */

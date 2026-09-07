@@ -14,11 +14,10 @@
   --warn: #9a6700;      --badge-border: #d4d4d4;
   --shadow-popover: rgba(0, 0, 0, 0.12);
 
-  /* docs/ui-design.md § Token axes covers why these three are self-description rather than
-     colour. Dark blocks below flip all three. */
+  /* docs/ui-design.md § Token axes covers why these two are self-description rather than
+     colour. Dark blocks below flip both. */
   --is-dark: 0;
   --color-scheme: light;
-  --syntax-fg: var(--l);
 }
 
 /* Derived colour, declared once, following every theme (docs/ui-design.md § Token axes). These
@@ -100,7 +99,7 @@
   --hunk-bg: var(--dark-hunk-bg);   --hunk-text: var(--dark-hunk-text);
   --warn: var(--dark-warn);      --badge-border: var(--dark-badge-border);
   --shadow-popover: var(--dark-shadow-popover);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 
 /* docs/ui-design.md § Token axes covers why this has to work before any JavaScript runs. */
@@ -116,7 +115,7 @@
     --hunk-bg: var(--dark-hunk-bg);   --hunk-text: var(--dark-hunk-text);
     --warn: var(--dark-warn);      --badge-border: var(--dark-badge-border);
     --shadow-popover: var(--dark-shadow-popover);
-    --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+    --is-dark: 1;  --color-scheme: dark;
   }
 }
 
@@ -146,7 +145,7 @@
   --hunk-bg: #073642;   --hunk-text: #839496;
   --warn: #b58900;      --badge-border: #17505d;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="monokai"] {
   --bg: #272822;        --bg-subtle: #2d2e28;   --bg-hover: #34352f;   --bg-selected: #3e3d32;
@@ -159,7 +158,7 @@
   --hunk-bg: #2b2f33;   --hunk-text: #75715e;
   --warn: #e6db74;      --badge-border: #55564f;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="nord"] {
   --bg: #2e3440;        --bg-subtle: #323949;   --bg-hover: #3b4252;   --bg-selected: #434c5e;
@@ -172,7 +171,7 @@
   --hunk-bg: #333b49;   --hunk-text: #7b869c;
   --warn: #ebcb8b;      --badge-border: #4c566a;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="catppuccin-latte"] {
   --bg: #eff1f5;        --bg-subtle: #e6e9ef;   --bg-hover: #dce0e8;   --bg-selected: #ccd0da;
@@ -197,7 +196,7 @@
   --hunk-bg: #2f3a4d;   --hunk-text: #a5adce;
   --warn: #e5c890;      --badge-border: #51576d;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="catppuccin-macchiato"] {
   --bg: #24273a;        --bg-subtle: #1e2030;   --bg-hover: #363a4f;   --bg-selected: #494d64;
@@ -210,7 +209,7 @@
   --hunk-bg: #232f45;   --hunk-text: #a5adcb;
   --warn: #eed49f;      --badge-border: #494d64;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="catppuccin-mocha"] {
   --bg: #1e1e2e;        --bg-subtle: #181825;   --bg-hover: #313244;   --bg-selected: #45475a;
@@ -223,7 +222,7 @@
   --hunk-bg: #1e2b45;   --hunk-text: #a6adc8;
   --warn: #f9e2af;      --badge-border: #45475a;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="one-dark"] {
   --bg: #282c34;        --bg-subtle: #2c313a;   --bg-hover: #333842;   --bg-selected: #3a3f4b;
@@ -236,7 +235,7 @@
   --hunk-bg: #24303f;   --hunk-text: #5c6370;
   --warn: #e5c07b;      --badge-border: #4b5263;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }
 :root[data-theme="dracula"] {
   --bg: #282a36;        --bg-subtle: #21222c;   --bg-hover: #343746;   --bg-selected: #44475a;
@@ -249,5 +248,5 @@
   --hunk-bg: #2b2f4a;   --hunk-text: #6272a4;
   --warn: #f1fa8c;      --badge-border: #44475a;
   --shadow-popover: rgba(0, 0, 0, 0.42);
-  --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
+  --is-dark: 1;  --color-scheme: dark;
 }

@@ -365,7 +365,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'Each value is a hex colour or a flat colour function (`#1e1e2e`, `rgba(0, 0, 0, 0.42)`,',
     '`oklch(0.7 0.15 250)`); named colours, `var()` and nested functions are refused. You write no CSS —',
     'the host generates the `:root[data-theme="plugin:<your-id>:<theme-id>"]` block itself, and writes',
-    '`--is-dark`, `--color-scheme` and `--syntax-fg` from `dark`, so never try to set those three.',
+    '`--is-dark` and `--color-scheme` from `dark`, so never try to set those two.',
     'The theme then appears in Settings → Appearance beside the built-in twelve.',
     '',
     '**Action verbs.** Descriptors do not run plugin code; they hand the host a verb from a closed set.',

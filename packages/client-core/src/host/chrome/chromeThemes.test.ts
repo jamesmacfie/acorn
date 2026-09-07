@@ -36,7 +36,7 @@ describe('generating a theme block', () => {
     const css = pluginThemeBlock('plugin:board:nightfall', theme())
     expect(css.startsWith(':root[data-theme="plugin:board:nightfall"] {')).toBe(true)
     for (const name of THEME_PALETTE_TOKENS) expect(css).toContain(`  ${name}: #123456;`)
-    expect(css).toContain('--is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);')
+    expect(css).toContain('--is-dark: 1;  --color-scheme: dark;')
     // One block, closed once. A generator that emitted two would mean a value had closed one early.
     expect(css.match(/\{/g)).toHaveLength(1)
     expect(css.match(/\}/g)).toHaveLength(1)
@@ -47,7 +47,7 @@ describe('generating a theme block', () => {
     // --is-dark: 1 under an OS dark preference at the same specificity, so a light plugin theme that
     // said nothing would render a light palette while telling the terminal and the diff it was dark.
     const css = pluginThemeBlock('plugin:board:day', theme({ id: 'day', dark: false }))
-    expect(css).toContain('--is-dark: 0;  --color-scheme: light;  --syntax-fg: var(--l);')
+    expect(css).toContain('--is-dark: 0;  --color-scheme: light;')
   })
 
   it('accepts the colour spellings a theme author actually reaches for', () => {
@@ -91,7 +91,7 @@ describe('generating a theme block', () => {
   })
 
   it('refuses the three self-description tokens: a theme states `dark`, the host states the rest', () => {
-    for (const name of ['--is-dark', '--color-scheme', '--syntax-fg']) {
+    for (const name of ['--is-dark', '--color-scheme']) {
       expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ [name]: '1' }) })), name)
         .toThrow(/may not set/)
     }

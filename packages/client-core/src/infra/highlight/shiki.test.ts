@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getHighlighter, LANGS, langFor } from './shiki'
+import { getHighlighter, highlightToHtml, LANGS, langFor } from './shiki'
 
 describe('langFor', () => {
   it('maps known extensions to their shiki language id', () => {
@@ -70,5 +70,18 @@ describe('the highlighter itself', () => {
       const highlighter = await getHighlighter(grammar)
       expect(highlighter.getLoadedLanguages()).toContain(grammar)
     }
+  })
+})
+
+// The dark-theme bug this file could not see before: `codeToHtml` with shiki's own dual-theme default
+// writes the light colour into `color` and hides the dark one in a --shiki-dark no stylesheet reads,
+// so a fence in a dark theme drew github-light on a white ground. Both colours have to leave as
+// variables, and nothing may leave as a fixed colour.
+describe('fence html', () => {
+  it('carries both theme colours as variables and hardcodes neither', async () => {
+    const html = await highlightToHtml('const a = 1', 'typescript')
+    expect(html).toContain('--l:')
+    expect(html).toContain('--r:')
+    expect(html).not.toMatch(/(^|[^-])\b(color|background-color):/)
   })
 })

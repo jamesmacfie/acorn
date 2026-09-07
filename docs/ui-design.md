@@ -114,7 +114,7 @@ The token contract splits three ways, and only the first is declarable:
 | --- | --- | --- |
 | **Palette primitives** (`--bg`, `--text`, `--accent`, `--del-marker`, …) | 22 | The manifest, in full. `@acorn/protocol/themeTokens.ts` is the list, so the node can refuse an incomplete map at parse time without importing the client. |
 | **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 15 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
-| **Self-description** (`--is-dark`, `--color-scheme`, `--syntax-fg`) | 3 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
+| **Self-description** (`--is-dark`, `--color-scheme`) | 2 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
 
 Validation is "every primitive present, no unknown key, every value a hex colour or a flat colour
 function". Named colours, `var()` and nested functions (`url(…)`, `calc(…)`) are refused: the value
@@ -184,12 +184,19 @@ theme on the light values. A pack may restate them; a plugin theme may not, for 
 may not restate a derived token. See `docs/dashboards.md` § Views are derived, not chosen from a
 menu for how a chart mark uses them.
 
-Three tokens describe the theme rather than colour it: `--is-dark`, `--color-scheme`, and
-`--syntax-fg`. The host sets all three from the theme's one `dark` boolean. The previous approach
-derived dark/light from parsing `--bg` as a hex colour (`plugins/terminal/src/client/theme.ts`), which
-required `--bg` to stay a literal 6-digit hex and silently classified every other colour syntax as
-light; `--syntax-fg` replaces two hardcoded lists of dark theme names that lived in `diff.css` and
-`checks-panel.css` and both needed editing by hand every time a dark theme shipped.
+Two tokens describe the theme rather than colour it: `--is-dark` and `--color-scheme`. The host sets
+both from the theme's one `dark` boolean. The previous approach derived dark/light from parsing
+`--bg` as a hex colour (`plugins/terminal/src/client/theme.ts`), which required `--bg` to stay a
+literal 6-digit hex and silently classified every other colour syntax as light.
+
+A third token, `--syntax-fg`, used to sit beside them, declared on `:root` as `var(--l)` and flipped
+to `var(--r)` by every dark block, and it never worked. A custom property has its `var()` references
+substituted where it is declared, not where it is read, and `--l` and `--r` exist only on the
+individual Shiki token spans, so `--syntax-fg` computed to nothing on `:root` and inherited as
+nothing. Both rules that read it fell back to plain body text. What the two syntax rules do instead is
+spell the choice out on the span itself, with `light-dark(var(--l), var(--r))`, which follows
+`color-scheme` and so follows `--color-scheme`. The rule of thumb the token broke: a `:root` token may
+reference another `:root` token, never a token an element sets on itself.
 
 The manual toggle (`data-theme="dark"` on `<html>`) wins over the OS preference
 (`prefers-color-scheme: dark`), and both apply the same `--dark-*` values through one-line `var()`
@@ -491,6 +498,13 @@ caller depends on at least one of them.
   highlighter again. Behind that, `infra/highlight/shiki.ts`'s `highlightToHtml` keeps a small
   first-in-first-out cache of fence html keyed by the exact text and language, which catches the same
   fence coming back after a scroll or a remount.
+
+A fence takes its colour from the theme rather than from Shiki. `highlightToHtml` asks for the
+dual-theme html with `defaultColor: false`, so each token leaves carrying both colours as `--l` and
+`--r` and none of them leaves carrying a fixed one, and `.ui-markdown .shiki` picks a side with
+`light-dark()` the way `.diff-code span` does. Shiki's default writes the light colour into `color`
+and hides the dark one in a `--shiki-dark` that no stylesheet here reads, which is how a fence under a
+dark theme came to draw github-light on a white background.
 
 The one rule a caller has to keep is the one the component already had: `text` is read in an effect,
 and a prop is a getter rather than a memo, so the effect re-runs whenever anything upstream ticks. The

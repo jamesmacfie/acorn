@@ -235,10 +235,11 @@
 .diff-composer-actions { display: flex; gap: var(--space-3); }
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
-/* Shiki dual-theme: each token carries both colours as --l/--r, and the active theme declares
-   which side to read via --syntax-fg. See docs/ui-design.md § Token axes for why that replaced a
-   hardcoded list of dark theme names. */
-.diff-code span { color: var(--syntax-fg); }
+/* Shiki dual-theme: each token carries both colours as --l/--r, and light-dark() reads the side the
+   theme's color-scheme asks for. It has to be spelled out on the element that holds --l and --r: a
+   :root token defined as var(--l) resolves where it is declared, where neither exists, so it computes
+   to nothing and the tokens fall back to plain body text. See docs/ui-design.md § Token axes. */
+.diff-code span { color: light-dark(var(--l), var(--r)); }
 
 /* Diff view-mode toggle (Unified | Split), persisted via the `diff_view` pref. Sits above the
    diff scroller; segmented control styled with the shared button tokens. */

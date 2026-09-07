@@ -206,7 +206,7 @@ an unknown one, a derived one (`--danger`, `--surface-sunken` — those are `var
 declares once) or a style-axis one (`--radius`) all fail the parse. Values are a hex colour or a flat
 colour function — `#1e1e2e`, `rgba(0, 0, 0, 0.42)`, `oklch(0.7 0.15 250)`; named colours, `var()` and
 nested functions are refused. `dark: true` is how a theme says it is dark, and the host writes
-`--is-dark`, `--color-scheme` and `--syntax-fg` from it — never try to set those three. The result is
+`--is-dark` and `--color-scheme` from it — never try to set those two. The result is
 selectable in Settings → Appearance as `plugin:<your-id>:<theme-id>`, and falls back to the built-in
 default whenever your package is not there. **Call `plugin_authoring` for the current token list** — it
 is read off this node's own schema, and getting one name wrong means the manifest does not parse.
