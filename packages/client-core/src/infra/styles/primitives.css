@@ -542,6 +542,15 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Everything past the spacer is a control, and a control keeps its full width. The title gives way,
+   never the state or the buttons at the end of the bar. */
+.ui-toolbar > .ui-toolbar-spacer ~ * { flex: none; }
+/* Which the title can only do if its own text is out of the bar's arithmetic: `flex-basis: 0` means
+   the heading asks for nothing and takes what the controls leave, so no length of session title can
+   push a button off the end. The spacer stands down when there is a heading, because two items that
+   both grow would split the slack and clip the title with a gap beside it. */
+.ui-toolbar:has(> .ui-toolbar-spacer) > .ui-heading { flex: 1 1 0; }
+.ui-toolbar:has(> .ui-heading) > .ui-toolbar-spacer { flex: none; }
 
 /* ── Chip ───────────────────────────────────────────────────────────────────────────────────
    Badge's interactive sibling, sharing its tone tokens so the two read as one family. Static label

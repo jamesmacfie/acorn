@@ -9,7 +9,12 @@
 /* padding-right reserves the full-height .pane-switcher (fixed, right:0); padding-bottom reserves the
    terminal drawer and footer. Both rails/overlays are position:fixed, so content shrinks via padding,
    not flow. */
-.workspace-wrap { display: flex; flex-direction: column; min-height: 0; height: 100%; padding-right: var(--tabrail-w); padding-bottom: calc(var(--term-drawer-h, 0px) + var(--task-footer-h)); }
+/* `min-width: 0` is what keeps the task view inside the window. This is a grid item, and a grid item
+   is at least as wide as its own min-content unless it is told otherwise: one long agent session
+   title in a pane header was enough to lay the whole view out wider than the window, which put the
+   right end of every pane -- the session's state, its buttons, the New picker -- off the screen
+   behind the pane-switcher rail. */
+.workspace-wrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; padding-right: var(--tabrail-w); padding-bottom: calc(var(--term-drawer-h, 0px) + var(--task-footer-h)); }
 .panes.panes-workspace {
   flex: 1;
   min-height: 0;
