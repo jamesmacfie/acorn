@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { Row } from '../primitives'
 import { Rows } from './Rows'
 import { _resetCollectionState } from '../../keys/collectionState'
@@ -25,6 +25,9 @@ afterEach(() => {
 })
 
 const rows = () => [...host.querySelectorAll('.ui-row')]
+
+// The virtual path publishes its scroll element in a frame, so a virtual list is only drawn after one.
+const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 
 describe('Rows reconciles by key', () => {
   it('keeps a row when the list is rebuilt with the same keys', () => {
@@ -73,5 +76,31 @@ describe('Rows reconciles by key', () => {
     expect(rows()).toHaveLength(1)
     // The survivor is the same element, so removing a sibling costs nothing.
     expect(rows()[0]).toBe(first)
+  })
+})
+
+describe('Rows redraws a virtual row whose item changed', () => {
+  it('follows a filter that put a different item at the same index', async () => {
+    // jsdom reports every box as zero and the virtualizer draws nothing without a height, so the
+    // scroller is given one. `offsetHeight` is what it measures, not the bounding rect.
+    const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
+    onTestFinished(() => { if (own) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', own) })
+    const all = ['alpha', 'beta', 'gamma']
+    const [filter, setFilter] = createSignal('')
+    const items = () => all.filter((key) => key.includes(filter())).map((key) => ({ key, label: key }))
+    mount(() => (
+      <Rows virtual id="rows-test-virtual-filter" items={items()}>
+        {(item, itemProps, _selected, place) => (
+          <Row item={itemProps} offset={place.offset} height={place.height}>{item.label}</Row>
+        )}
+      </Rows>
+    ))
+    await frame()
+    expect(rows()[0]?.textContent).toContain('alpha')
+    setFilter('gam')
+    await frame()
+    expect(rows()).toHaveLength(1)
+    expect(rows()[0]?.textContent).toContain('gamma')
   })
 })
