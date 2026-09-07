@@ -6,7 +6,7 @@
 //
 // Its own file rather than a few lines inside the bell, so the tracking below can be asserted
 // without a DOM.
-import { createEffect } from 'solid-js'
+import { createEffect, onCleanup } from 'solid-js'
 import { canSetBadge, setBadge } from '../../infra/platform'
 
 /** Keep the app icon showing `pill()`, or nothing, for as long as the caller's reactive scope lives.
@@ -17,4 +17,9 @@ import { canSetBadge, setBadge } from '../../infra/platform'
 export function trackBadge(pill: () => number, on: () => boolean): void {
   if (!canSetBadge()) return
   createEffect(() => setBadge(on() ? pill() || null : null))
+  // The icon is the host's, and it keeps whatever it was last told. So the number has to come off
+  // when the scope that mirrors it ends: a window closing, the shell being rebuilt on a node switch,
+  // a dev reload. Without this the dock keeps a count no surface in the app can clear, which reads as
+  // "marking them read did nothing".
+  onCleanup(() => setBadge(null))
 }
