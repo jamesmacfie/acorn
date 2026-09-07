@@ -10,6 +10,11 @@
 import { createEffect, on, type Accessor } from 'solid-js'
 import { readLocal, writeLocal } from './deviceStorage'
 
+/** What a draft key is stored under when the caller does not say. Every comment box wrote under this
+ *  before the prefix was an argument, so it is the default rather than one caller's choice. A caller
+ *  whose draft is not a comment passes its own: the changes pane's commit message is
+ *  `changes:commit-draft:<taskId>`, and reading a key back has to spell the same prefix that wrote
+ *  it. */
 const PREFIX = 'comment-draft:'
 
 // Through `deviceStorage.ts` rather than `localStorage` directly, because a host may have nowhere to
@@ -25,10 +30,11 @@ export function persistDraft(
   key: Accessor<string | null>,
   text: Accessor<string>,
   setText: (value: string) => void,
+  prefix: string = PREFIX,
 ): void {
-  createEffect(on(key, (k) => setText(k ? readDraft(k) : '')))
+  createEffect(on(key, (k) => setText(k ? readLocal(prefix + k) ?? '' : '')))
   createEffect(() => {
     const k = key()
-    if (k) writeDraft(k, text())
+    if (k) writeLocal(prefix + k, text())
   })
 }

@@ -23,7 +23,7 @@
 import { createEffect, onCleanup } from 'solid-js'
 import { createDefaultHtmlKeymap, type HtmlKeymapEvent } from '@opentui/keymap/html'
 import type { Binding } from '@opentui/keymap'
-import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
+import { hasCommandModifier, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { commandAvailable, commandRegistry, commandTitle, executeCommand } from '../registries/commands/commands'
 import type { ResolvedKeybinding } from '../registries/commands/keybindings'
 import { setKeymap } from '../../kit/keys/keymapHost'
@@ -68,9 +68,22 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
   // back either: consuming a key here stops the DOM event as well.
   if (binding.chord === 'escape' && target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]')) return false
   if (!isTypingTarget(target)) return true
-  // xterm focuses a hidden textarea, so a terminal reads as a typing target; a command chord there is
-  // never terminal input on macOS, so it still fires. See `isTerminalTarget` above.
-  if (scope !== 'global' && !(event()?.super && isTerminalTarget(target))) return false
+  // A bare key belongs to whoever is typing. A chord carrying a command modifier does not: nothing
+  // types Cmd+Enter into a message. Without this a pane's own chord could not be pressed in the
+  // pane's own field, which is where a reader presses it and where the changes pane's Commit lives.
+  //
+  // Two other paths already answer this question the same way. The sandboxed-frame SDK forwards a
+  // modified chord out of a frame's own input and refuses a bare one (../frames/sdk.ts), and the
+  // terminal host's command layer shadows bare keys while a field has them and lets chords through
+  // at every depth (apps/tui/src/keys/commandLayer.ts). The xterm case below is the same rule read
+  // off the event rather than off the chord: a terminal focuses a hidden textarea, so it counts as a
+  // typing target, and a Cmd chord there is never terminal input on macOS.
+  //
+  // `typing-exempt` keeps its meaning, which is the line after this one: it is the scope a bare-key
+  // binding declares, and a binding that spells a modifier and asks to be exempt from typing gets
+  // what it asked for.
+  const modified = !!binding.chord && hasCommandModifier(binding.chord)
+  if (scope !== 'global' && !modified && !(event()?.super && isTerminalTarget(target))) return false
   return scope !== 'typing-exempt'
 }
 

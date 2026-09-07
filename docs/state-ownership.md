@@ -50,13 +50,15 @@ Use the persistence scope that owns the state:
 | --- | --- |
 | Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
 | Appearance, notification settings ([notifications.md](./notifications.md) § Settings), shortcuts, rail order, notices, trust, tokens | device |
+| How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | device |
+| Which model connection writes a commit message | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
 | Last path, last task, last source, last Node | device |
 | Last view per workspace; last workspace (terminal client) | owning Node's prefs, keyed by Node + workspace |
 | Workspace/task selection | Node + workspace/task |
-| Draft editor/comment text | client + current task |
+| Draft editor/comment text, and a commit message in the Changes pane | client + current task |
 | Provider data and task mutations | owning Node |
 
 Module-level signals or maps that reference a task or workspace must either include the Node ID or be
@@ -69,6 +71,13 @@ Choosing between "keyed by node" and "cleared on switch" is not taste. A LIVE ro
 agent list, terminal sessions, the node's plugin list — because it refetches for the new node within a
 tick, so clearing costs nothing and keying would buy nothing. DURABLE memory is keyed — editor scroll,
 the active terminal tab, the workspace view — because switching back should restore what was there.
+
+**A draft is device-local because it is losable, and keyed by the task because it belongs to a
+worktree.** Every draft goes through one helper, which writes `localStorage` under a prefix its caller
+names (`client-core/kit/lib/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
+pane's commit message uses `changes:commit-draft:<taskId>`. The node id is deliberately absent from
+that key. A commit message is about the files in front of the reader, and the same task on another
+node is another worktree with another set of changes in it.
 
 **Where you were looking is the node's, not the device's.** Which rail source or task each workspace
 was left on is `core.workspace-views`, one key per workspace

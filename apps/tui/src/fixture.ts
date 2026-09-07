@@ -205,11 +205,20 @@ const agentSnapshot = () => ({
   }],
 })
 
-const LOCAL_CHANGES = [
-  { path: 'src/login.ts', status: 'modified', staged: false, additions: 12, deletions: 3 },
-  { path: 'src/session.ts', status: 'modified', staged: true, additions: 4, deletions: 0 },
-  { path: 'src/reset.test.ts', status: 'added', staged: false, additions: 40, deletions: 0 },
-]
+// One `LocalStatus`, the way the route answers it: the branch facts travel with the file list, so the
+// pane's header, groups and footer all read one record (docs/diff-rendering.md § Data flow).
+const LOCAL_STATUS = {
+  branch: 'fix-login',
+  upstream: 'origin/fix-login',
+  ahead: 2,
+  behind: 0,
+  operation: null,
+  changes: [
+    { path: 'src/login.ts', status: 'modified', staged: false, additions: 12, deletions: 3 },
+    { path: 'src/session.ts', status: 'modified', staged: true, additions: 4, deletions: 0 },
+    { path: 'src/reset.test.ts', status: 'added', staged: false, additions: 40, deletions: 0 },
+  ],
+}
 
 const PATCH = [
   'diff --git a/src/login.ts b/src/login.ts',
@@ -422,7 +431,7 @@ const json = (value: unknown) => ({
       if (path.startsWith('/v2/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
       if (/^\/v2\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
       if (path.startsWith('/v2/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
-      if (path === `/v2/p/changes/tasks/${TASK.id}/local/changes`) return json(LOCAL_CHANGES)
+      if (path === `/v2/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
       if (path === `/v2/p/changes/tasks/${TASK.id}/review-notes`) return json([])
       if (path.startsWith(`/v2/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
       if (path.startsWith(`/v2/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)

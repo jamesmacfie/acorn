@@ -60,6 +60,7 @@
       "agents:attachment",
       "agents:composer-actions",
       "changes:diff-line",
+      "changes:push-actions",
       "context:section",
       "docker:stats-beside",
       "docker:container",
@@ -68,6 +69,7 @@
     ],
     "extensions": [
       "changes.tool-card",
+      "github.push-actions",
       "memory.section"
     ],
     "refPanels": [
@@ -87,6 +89,7 @@
     ],
     "persistedStateSlices": [
       "agents.tool-fold",
+      "changes.view",
       "context.section-selection",
       "docker.prefs",
       "editor.open-files",
@@ -126,10 +129,14 @@
         "changes.open"
       ],
       "extensionPoints": [
-        "changes:diff-line"
+        "changes:diff-line",
+        "changes:push-actions"
       ],
       "extensions": [
         "changes.tool-card"
+      ],
+      "persistedStateSlices": [
+        "changes.view"
       ]
     },
     "context": {
@@ -214,6 +221,9 @@
       "extensionPoints": [
         "github:diff-line",
         "github:summary-badges"
+      ],
+      "extensions": [
+        "github.push-actions"
       ],
       "refPanels": [
         "github-pull"

@@ -432,6 +432,51 @@ desktop and in `acorn` in a terminal, and expect the two to agree.
 42. Launch a workflow definition from the palette. It starts exactly as launching it from its own
     surface does, and no approve, cancel or kill row is offered anywhere in the palette.
 
+The next four are the Changes panel's ([diff-rendering.md](./diff-rendering.md) § Data flow). The
+pane's own suites cover the parser, the routes, the checkbox, the editor's state and every remote state
+of the bar against a bare repository in a temp directory. What they cannot see is which diff the column
+swaps to when a checkbox moves, whether a keystroke in the message field reaches a command, and what a
+real remote with real credentials does.
+
+43. Open the Changes pane on a task with both staged and unstaged edits. Tick a row's checkbox: the
+    file moves, the group checkbox above it follows, and the diff column switches to the staged side
+    of that file. Untick it and the column goes back. Tick a group checkbox that is showing the
+    indeterminate mark and only the unstaged files under it move. Then check the rail: its dirty count
+    and the header's totals agree after every one of those actions.
+44. On a task with two edited files and one untracked file and nothing staged, type a message in the
+    commit field. The button reads **Commit tracked**. Narrow the pane until the diff takes the whole
+    column and come back: the message is still there, and so is it after a relaunch. Press Cmd+Enter
+    with the keys still in the field, and both edited files land in one commit with the untracked file
+    untouched. Then open the options menu, turn Amend on with the field empty, and the last commit's
+    message appears; Cmd+Option+Enter from the field amends. Press the expand button and the same text
+    is in the modal, with room for a body.
+45. On a task whose branch has never been pushed, the bar above the commit editor names the project
+    and the branch, its button reads **Publish**, and the counts beside it read "no upstream". Press
+    it: the button reads **Fetch** and the counts go quiet. Commit something and the button reads
+    **Push** with **↑1** beside it; press that, then amend the commit from the options menu and press
+    **Push** again. It is refused, and the reason ends by pointing at Force push. Open the menu
+    beside the button, press **Force push** once — the item reads **Force push?** — and press it again;
+    the push lands. Then have somebody else, or a second clone, push to the same branch and press
+    **Fetch**: the counts read **↓1** and the button reads **Pull**. Copy the project folder from the
+    button beside the branch name, which used to be in the header. Pull a branch that has diverged and
+    the refusal names Pull with rebase; take it, and if it conflicts the banner reads **Rebase in
+    progress**, the Conflicts group is first in the list, the primary button is disabled, and **Abort**
+    puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
+    ahead count move without touching the pane.
+46. With no model provider connected, the commit toolbar has no wand at the left of it. Connect one in
+    Settings, under Integrations, reopen the pane, and stage two files. Press the wand: it spins, and
+    within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
+    a message of your own and press the wand again: it reads **Replace?** and does nothing until a
+    second press. Connect a second provider, press the chevron beside the wand, pick the other one,
+    and press the wand: the tooltip and the message both come from the provider you picked, and the
+    pick survives a relaunch. Disconnect both providers and the wand goes.
+47. On a task in a GitHub-mirrored project whose branch has never been pushed, there is nothing under
+    the branch bar. Press **Publish**, and **Open pull request** appears there; press that, and the
+    create form opens with this branch already chosen as the head. Create the pull request and go back
+    to the Changes pane: the button is gone and the PR pane is in the switcher. Then disable the GitHub
+    plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
+    the plugin on, with no gap where the button was.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

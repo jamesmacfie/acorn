@@ -84,12 +84,23 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('Description')
   }, 60_000)
 
-  it('changes: staged and unstaged, with the commit line at the foot', async () => {
-    const frame = await screenFor('changes', { until: 'STAGED' })
-    expect(frame).toContain('STAGED')
-    expect(frame).toContain('src/login.ts')
-    expect(frame).toContain('+12 −3')
-    expect(frame).toContain('Commit staged')
+  it('changes: the tracked group, its counts, and the commit line at the foot', async () => {
+    const frame = await screenFor('changes', { until: 'Tracked' })
+    // Groups by what a file is, not by which staging area it is in: staging is the checkbox on the
+    // row now, and the fixture's three files are two tracked edits and one new file.
+    expect(frame).toContain('Tracked')
+    expect(frame).toContain('login.ts')
+    // `+12` and not `+12 −3`: the row's counts are decoration, and at 80 the pane is 54 cells shared
+    // between the badge, the name, the directory, the checkbox and the row's two verbs. The name and
+    // the checkbox stay legible and the deletions fall off the end, which is what
+    // docs/ui-design.md § Every node at 80 by 24 says a row's `meta` gives up first.
+    expect(frame).toContain('+12')
+    // The editor is always there, where the one-line field used to appear only once something was
+    // staged, and the button says which commit it is about to make: the fixture has one file in the
+    // index, so it is the index that gets committed.
+    expect(frame).toContain('Commit message')
+    expect(frame).toContain('[Commit]')
+    expect(frame).toContain('Options')
   }, 60_000)
 
   it('notes: the three scopes and the notes in them', async () => {

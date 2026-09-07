@@ -229,6 +229,18 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
 
+**Force push, and the abort verb.** The Changes pane's branch bar can replace what a branch's upstream
+points at, and it does so with `--force-with-lease` and never a bare `--force`
+(`plugins/changes/src/server/localDiff.ts` § `pushArgs`). The lease compares the remote ref against
+this node's remote-tracking ref, so a commit somebody else pushed since the last fetch makes the push
+fail with a reason rather than disappear. Three things have to agree before a remote commit is
+replaced: the reader arms the menu item and presses it a second time, the lease holds, and no
+`changes:before-push` handler vetoes — the payload carries `force`, so a branch-protection plugin can
+refuse that push alone ([plugins.md](./plugins.md) § Hooks). The abort verb beside it is offered only
+while the node's own status read says a merge or a rebase is in flight, and which of the two to abort
+is read off the worktree rather than taken from the request: `merge` and `rebase` are argv, and a
+subcommand chosen over HTTP is one the panel cannot vouch for.
+
 The untrusted input the trust gate hashes is the repo config **and the project row**
 (`server/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
 database is trusted, and that premise only holds while nothing but the owner can write the database.

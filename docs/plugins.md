@@ -981,7 +981,8 @@ the panes, reference panels and settings pages of `http`, `database`, `linear` a
 which declares which host surface it fills and what it matches. The agents pane opens three:
 `agents:tool-card`, keyed by the tool name a harness reports; `agents:attachment`, keyed by an
 attachment's media type; and `agents:composer-actions`, which stacks up to four contributors in the
-composer's action bar.
+composer's action bar. The Changes pane opens `changes:push-actions` under its branch bar. § Cooperative
+extension points has the full list with the props each one hands over.
 
 An author writes the same code either way. `mountTree({ toolCard: … })` on `/ui/sdk` is the entry point
 beside `mountFrame`, keyed by name because one worker serves every tree the bundle contributes and the
@@ -2036,6 +2037,29 @@ the contributor's code has exactly the permissions its own manifest declares —
 grants it nothing of A's. **One level only**: a contributor's tree is a stream of kit node names, and
 `Slot` is not one of them, so a grafted subtree has no way to open a slot of its own.
 
+**The first-party remote points, and what each hands over.** Props are the owner's own data in the
+owner's own words, which is why no two of these agree on a shape:
+
+| Point | Mode | Props |
+| --- | --- | --- |
+| `agents:tool-card` | `replace`, keyed by tool name | `{ tool, taskId, defaultOpen }` |
+| `agents:attachment` | `replace`, keyed by media type | `{ attachment, taskId, sessionId }` |
+| `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
+| `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
+| `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
+| `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
+
+`changes:push-actions` is the one to read if you are opening a point of your own. It sits under the
+Changes pane's branch bar and holds what somebody else does once a branch is on its remote, and the
+five props are the five scalars the bar itself draws — no markup, and nothing about what a filler is
+*for*. The changes plugin cannot say "pull request" and does not learn: the GitHub plugin fills the
+point with **Open pull request** and reads the task's pull number off its own task query, because the
+owner has no such field to hand over. An owner that had tried to model the filler's job would have
+had to import it, which is the coupling the point exists to remove.
+
+With nobody filling it the slot draws nothing and takes no space, which is what lets an owner reserve
+room for a plugin the reader has not installed.
+
 **What a slot's tree may reach.** The host hands the contributor's tree the owner's `taskId` and
 `projectId`, read-only, as its scope — the same two the host gives a rectangle occupant. Without them a
 card drawn in somebody else's pane is inert: `openPane`, in-app `openUrl` and task-scoped key bindings
@@ -2314,7 +2338,7 @@ declares no hook has said no to interceptors. An audit or analytics plugin is an
 
 ```json
 { "id": "before-push", "kind": "hook", "label": "push",
-  "payload": { "taskId": "string", "branch": "string" },
+  "payload": { "taskId": "string", "branch": "string", "force": "boolean" },
   "allows": ["observe", "veto"], "timeoutMs": 5000, "onTimeout": "allow" }
 ```
 
@@ -2330,7 +2354,7 @@ declares no hook has said no to interceptors. An audit or analytics plugin is an
 The owner's node half calls it at the moment:
 
 ```ts
-const verdict = await ctx.hooks.run('before-push', { taskId, branch })
+const verdict = await ctx.hooks.run('before-push', { taskId, branch, force })
 if (!verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
 await push(verdict.payload)   // transformed, or the original if nobody transformed
 ```
@@ -2382,11 +2406,21 @@ exists is the owner's decision: the hook says no, and the owner says what no mea
 | core | `core:before-tool-call` | observe, veto | approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these: a gate that opens when its keeper stops answering is not one |
 | core | `core:before-snapshot` | observe, transform, veto | budget shaping, PII stripping. The payload is section names, so a handler drops a section and nothing else |
 | changes | `changes:before-commit` | observe, transform, veto | commit lint, message helpers |
-| changes | `changes:before-push` | observe, veto | secret scanning, changesets |
+| changes | `changes:before-push` | observe, veto | secret scanning, changesets, branch protection |
 | agents | `agents:before-send` | observe, transform, veto | prompt policy, redaction, context injectors |
 | terminal | `terminal:before-run-target` | observe, veto | change freezes, environment checks. Runs in `RuntimeService.start`, after the repo-config trust gate and before the session is spawned |
 | workflows | `workflows:before-step` | observe, veto | "no deploys today" from an incident tool |
 | editor | `editor:before-save` | observe, transform, veto | format on save, lint on save |
+
+**A payload's booleans are part of the decision, not trimmings.** `changes:before-commit` carries
+`{ taskId, branch, message, amend }` and `changes:before-push` carries `{ taskId, branch, force }`.
+`amend` earns its place because rewriting the message of a commit that already exists is a different
+decision from writing a new one: a commit-lint handler that holds new work to a subject format usually
+wants to leave a reword alone. `force` earns its place for the same shape of reason: a
+branch-protection handler that refuses every push to `main` is a nuisance, and one that refuses only
+the push that replaces a commit somebody else may be standing on is the thing it was written to be.
+Payload matching is exact, so a declared boolean is a field every call has to carry
+(`plugins/changes/src/server/localGit.ts` § `CHANGES_HOOKS`).
 
 **What is refused.** Hooks on streams or per-keystroke paths — PTY output, editor keystrokes, the agent
 token stream. The events design refused those as events, and a hook costs more than an event. A
