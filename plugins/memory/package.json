@@ -21,6 +21,7 @@
     "@acorn/plugin-workflows": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "solid-js": "catalog:",
