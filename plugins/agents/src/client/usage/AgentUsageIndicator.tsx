@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { For, onCleanup, onMount, Show } from 'solid-js'
 import { Button, Icon, Inline, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
 import AgentUsageSection from './AgentUsageSection'
 import { usageSummaryEntries } from './usageModel'
@@ -11,6 +11,11 @@ import { agentUsageStore } from './usageStore'
 // numbers in it, so it has to be reachable from the keyboard and stay open while it is read. The
 // hover-only version of this was a rectangle the kit had no name for.
 export default function AgentUsageIndicator() {
+  // The button is the always-mounted reader, so it starts the load itself. The panel below also calls
+  // init(), and that is fine: the store counts consumers. When the panel was the only caller the
+  // button sat on "reading usage…" forever, because a Popover does not render its content until it opens.
+  onMount(() => onCleanup(agentUsageStore.init()))
+
   const entries = () => usageSummaryEntries(agentUsageStore.snapshot())
 
   return (
