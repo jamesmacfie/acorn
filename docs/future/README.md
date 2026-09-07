@@ -16,6 +16,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
+| [changes/](./changes/README.md) | The Changes pane's list column as a Zed-style git panel: checkbox staging, three groups, a tree view, a multi-line commit editor with amend, a remote bar with fetch, pull, and push, and a generated message. Six phases. | Proposal, 2026-09-07. Not started; phase 0 blocks on nothing. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
