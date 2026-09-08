@@ -50,6 +50,10 @@ type SendOptions = {
   signal?: AbortSignal
   // Explicit target, for fleet fan-out and for tests. Defaults to the active node.
   nodeId?: string
+  // For a route that waits on something slow, such as a model call. The broker kills a request at 30s,
+  // which is less than one model call is allowed to take, so a caller that knows it is slow has to say
+  // so. Unset keeps the broker's default.
+  timeoutMs?: number
 }
 
 // GET and HEAD are the reads, everything else changes something on the node. Defaults to GET, matching
@@ -121,6 +125,7 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
       method: options.method ?? 'GET',
       headers: options.headers ?? {},
       ...(asNodeBody(options.body) ? { body: asNodeBody(options.body)! } : {}),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     })
     return toApiResponse(res)
   } finally {
@@ -269,6 +274,7 @@ export type WriteInit = {
   body?: ApiBody
   signal?: AbortSignal
   nodeId?: string
+  timeoutMs?: number
 }
 
 // JSON POST. Throws the structured error code on failure, such as `merge_failed`, so callers branch.
