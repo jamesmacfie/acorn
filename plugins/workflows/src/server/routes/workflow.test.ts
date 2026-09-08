@@ -261,17 +261,18 @@ describe('workflow definition routes', () => {
     expect(calls).toEqual([])
   })
 
-  it('turns the store’s answers into statuses: 400 on problems, 409 on a stale revision, 404 on a gone row', async () => {
+  // A definition that does not validate is still storable, because that is every workflow partway
+  // through being built (docs/workflows.md § Database definitions). Only a stale revision and a gone
+  // row turn into a status here.
+  it('stores a draft that does not validate, and 409s a stale revision and 404s a gone row', async () => {
     setWorkflowDefsBridge(fakeDefs({
-      create: async () => ({ problems: ['step 1 has no name'] }),
       update: async () => ({ conflict: { ...row, revision: 4 } }),
       get: async () => null,
     }))
     const app = asDevice()
-    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    const def = { name: 'Untitled workflow', steps: [] }
     const created = await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)
-    expect(created.status).toBe(400)
-    expect(await created.text()).toContain('step 1 has no name')
+    expect(created.status).toBe(200)
     const stale = await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 1 }), {} as Env)
     expect(stale.status).toBe(409)
     expect(await stale.json()).toMatchObject({ error: { code: 'revision_conflict', details: { revision: 4 } } })

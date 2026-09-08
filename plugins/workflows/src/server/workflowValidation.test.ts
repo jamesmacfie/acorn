@@ -17,6 +17,14 @@ const catalog: WorkflowValidationCatalog = {
 
 const check = (def: WorkflowDef) => validateWorkflow({ ...def, steps: def.steps.map((step) => ({ profileId: 'claude-code', ...step })) }, catalog)
 
+describe('a draft in progress', () => {
+  // The editor creates a definition with no steps and draws what this reports in its footer. Storing
+  // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
+  it('reports a definition with no steps rather than being a shape the store refuses', () => {
+    expect(check({ name: 'Untitled workflow', steps: [] })).toEqual(['workflow has no steps'])
+  })
+})
+
 describe('the derived graph', () => {
   it('reads an absent after as the step before it, and an empty one as a root', () => {
     const edges = workflowEdges([{ name: 'a' }, { name: 'b' }, { name: 'c', after: [] }, { name: 'd', after: ['a', 'c'] }])

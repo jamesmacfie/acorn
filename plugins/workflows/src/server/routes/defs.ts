@@ -19,9 +19,11 @@ export type WorkflowDefsBridge = {
   // `user:<fileId>`. `projectId` says whose checkout to read a repo file from; a file answers with
   // `revision: 0`, which is how the editor knows it has no row to save into.
   get(id: string, projectId?: string): Promise<unknown | null>
-  create(input: { workspaceId: string; projectId?: string; def: unknown }): Promise<{ row?: unknown; problems?: string[] }>
+  // Neither write validates: a row is a draft, and a workflow being built is invalid most of the
+  // way. `validate` reports, and `start` refuses.
+  create(input: { workspaceId: string; projectId?: string; def: unknown }): Promise<{ row: unknown }>
   // `conflict` is the row that won, so the editor can show what moved underneath it.
-  update(id: string, def: unknown, revision: number): Promise<{ row?: unknown; conflict?: unknown; problems?: string[] } | null>
+  update(id: string, def: unknown, revision: number): Promise<{ row?: unknown; conflict?: unknown } | null>
   remove(id: string): Promise<{ ok: boolean }>
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
   saveToRepo(id: string, opts: { taskId?: string; keepRow: boolean }): Promise<{ path?: string; notFound?: boolean; error?: string }>
@@ -65,7 +67,6 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
     if (!parsed) return respondError(c, 400, 'bad_request')
     return withBridge(c, async (bridge) => {
       const answer = await bridge.create(parsed)
-      if (answer.problems?.length) return respondError(c, 400, 'bad_request', answer.problems)
       return c.json(answer.row)
     })
   })
@@ -86,7 +87,6 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
     return withBridge(c, async (bridge) => {
       const answer = await bridge.update(c.req.param('id'), parsed.def, parsed.revision)
       if (!answer) return respondError(c, 404, 'not_found')
-      if (answer.problems?.length) return respondError(c, 400, 'bad_request', answer.problems)
       if (answer.conflict) {
         return respondError(c, 409, 'revision_conflict', ['This workflow changed since you opened it.'], answer.conflict)
       }

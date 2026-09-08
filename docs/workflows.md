@@ -131,6 +131,12 @@ run may start a file, because the snapshot covers it, and may not start a row.
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
 
+**A row is a draft.** Neither write validates, because a workflow being built is invalid for most of
+the time somebody is building it: it has no steps the moment it is created, and a step has no prompt
+until one is typed. `POST /v2/p/workflows/defs/validate` reports, the editor draws what it says in
+its footer, and starting a run is what refuses. A file layer is the same: a definition that does not
+validate is listed with its problems rather than hidden.
+
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step
 runs, not when the row is saved. The node holding a definition may not have the repository at all, so
 `POST /v2/p/workflows/defs/validate` answers the loader's own problem list and leaves the

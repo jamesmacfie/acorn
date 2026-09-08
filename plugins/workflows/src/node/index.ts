@@ -363,16 +363,15 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           // read-only and offers "Copy to database" instead of Save.
           return { id, workspaceId: project?.workspaceId ?? '', projectId: project?.id ?? null, name: found.name, revision: 0, createdAt: 0, updatedAt: 0, def }
         },
+        // A row is a draft, so neither write validates. A workflow being built is invalid most of
+        // the way: it has no steps the moment it is created, and a step has no prompt until one is
+        // typed. `validate` reports and the editor draws what it says; `start` is what refuses.
         create: async ({ workspaceId, projectId, def }) => {
-          const problems = validateWorkflow(def as WorkflowDef, runner.validationCatalog())
-          if (problems.length) return { problems }
           const row = await createDef(store, { workspaceId, projectId, def: def as WorkflowDef })
           defsChanged(workspaceId)
           return { row }
         },
         update: async (id, def, revision) => {
-          const problems = validateWorkflow(def as WorkflowDef, runner.validationCatalog())
-          if (problems.length) return { problems }
           const answer = await updateDef(store, id, def as WorkflowDef, revision)
           if (answer && 'row' in answer) defsChanged(answer.row.workspaceId)
           return answer
