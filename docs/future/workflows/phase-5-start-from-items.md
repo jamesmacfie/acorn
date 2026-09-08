@@ -1,6 +1,35 @@
 # Phase 5: start a workflow from an item
 
-Status: not started. Waits on phases 2, 3, and 4.
+Status: SHIPPED 2026-09-08. [docs/workflows.md](../../workflows.md) § Starting a run from an item
+owns the flow, [docs/plugins.md](../../plugins.md) § Context menus owns `item.row` and the three
+lists, and [docs/integrations.md](../../integrations.md) § The row menu owns the menu itself.
+
+Five deviations from what is written below, each for a reason:
+
+- **GitHub's source had no `promotion`, so the modal could not draw for a pull request.** It has one
+  now (`plugins/github/src/client/pullTasks.ts` § `githubPullPromotion`), deliberately thinner than
+  the list's own `promotePullToTask`: it keeps the find-or-create, which is what "attach to the PR's
+  task" means here, and drops the Linear link seeding, which needs a QueryClient the contract cannot
+  hand over. The list's own **Create task** row still runs the full path, unchanged. There is no
+  `attachToCurrentTask`, because a pull is recorded as `pullNumber` on the task row rather than as a
+  link.
+- **The modal is mounted in the shell's `overlay` slot by the workflows plugin**, not "through the
+  existing overlay path", which turned out to be the only always-present mount a plugin has. That
+  needed `PromoteToTaskModal` on `@acorn/plugin-api/ui/host` and a terminal counterpart, which is a
+  one-line stub: the terminal mounts no overlay slot and its source panel draws no row menu.
+- **`ContextMenuItems`, the host's `<For>`, did not go onto the plugin API.** `contextMenuItems` and
+  `runContextMenuItem` did instead, and github's list writes its own eight-line loop with its own
+  host's `Menu.Item`. Exporting the component would have meant a second terminal counterpart for a
+  node the terminal already has.
+- **Neither Rollbar nor Linear had a description on a list row to put in `body`.** Linear's triage
+  query asks for one now, capped at 2,000 characters where the row is built. Rollbar's list carries
+  no prose at all — an item's body is its stack trace, a second call per row — so its `body` is the
+  facts the row already has: level, environment, occurrences, permalink. GitHub's comes from the
+  warmed detail cache when there is one.
+- **The prefill rule takes no `inputs`.** It returns the five names it knows and the modal picks the
+  ones its definition declared, which is the same rule with one fewer argument.
+
+`PLUGIN_API_MAJOR` stayed at 10: every change to the surface was additive.
 
 ## Goal
 

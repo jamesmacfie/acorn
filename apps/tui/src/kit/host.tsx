@@ -3,6 +3,8 @@ import { createEffect, createMemo, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
+import type { Task } from '@acorn/client-core/infra/queries.ts'
+import type { PromoteWorkflowStep } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -134,6 +136,30 @@ export default function RefPanelBoxDefault(props: { title: string; onClose: () =
   )
 }
 export { RefPanelBoxDefault as RefPanelBox }
+
+/** Promote a row to a task, with the optional workflow step above it.
+ *
+ *  Absent, and it says so, for the same reason `RefPanelTaskLink` below is: the box needs the routed
+ *  project and the source's registered `promotion`, and this host has no router. The surface that
+ *  opens it is a row menu on a descriptor source's list, and this host's source panel draws no row
+ *  menu (../plugins/SourcePanel.tsx, docs/tui.md § What a plugin loses here). Nothing here mounts an
+ *  `overlay` slot either, so this stands in for a build, not for a screen. */
+export function PromoteToTaskModal(_props: {
+  providerId: string
+  item: unknown
+  itemTitle: string
+  headerLabel: string
+  attachTasks: Task[]
+  existingBranches: string[]
+  workflow?: PromoteWorkflowStep
+  onClose: () => void
+  onCreated: (task: Task) => void
+  onAttached: (task: Task) => void
+}) {
+  return <Line role="muted">Making a task from this row is not drawn here.</Line>
+}
+// Type-only, so the DOM component this names is erased rather than imported.
+export type { PromoteWorkflowStep } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 
 /** "Is there a task for this thing, and if not, start one".
  *

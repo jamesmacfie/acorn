@@ -411,8 +411,9 @@ export type PluginRailTask = {
   origin?: string
   title?: string
   branch?: string
-  // Reserved seed text. The task model has no body column; keeping it on the descriptor contract lets
-  // a future task-seed extension consume it without changing tracker row routes.
+  // The item's own text: a Linear issue's description, a Rollbar item's facts. The task model has no
+  // body column, so nothing is written with it; what reads it is the workflow start from a row menu,
+  // which puts the title and this under an `issue` input (docs/workflows.md § Starting a run).
   body?: string
   link?: Pick<TaskLinkSeed, 'connectionId' | 'identifier' | 'ref'>
 }

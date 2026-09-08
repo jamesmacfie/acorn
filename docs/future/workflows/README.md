@@ -109,7 +109,7 @@ Supporting documents, readable in any order:
 | 2 | [phase-2-database-definitions.md](./phase-2-database-definitions.md) | `workflow_defs`, its routes, the merged read, start by id, save to repo | The editor has somewhere to write | Phase 0 |
 | 3 | [phase-3-editor.md](./phase-3-editor.md) | SHIPPED. The rail source, the project surface, the draft model, the inspector, the JSON tab, layout preferences | Authoring in the UI | Phases 1 and 2 |
 | 4 | [phase-4-run-pane.md](./phase-4-run-pane.md) | SHIPPED. The task pane, per-kind node detail, controls, the attention source, notice targets, the agent pane chip, the sidebar cleanup | Watching a run; every bell row has a destination | Phase 0; reads phase 3's list rendering |
-| 5 | [phase-5-start-from-items.md](./phase-5-start-from-items.md) | `item.row` on the context-menu registry, all three lists on it, the modal's workflow step | The one-click start from an item | Phases 2, 3, 4 |
+| 5 | [phase-5-start-from-items.md](./phase-5-start-from-items.md) | SHIPPED. `item.row` on the context-menu registry, all three lists on it, the modal's workflow step | The one-click start from an item | Phases 2, 3, 4 |
 | 6 | [phase-6-canvas.md](./phase-6-canvas.md) | The kit `Graph` node, both projections, the editor's view toggle, the run pane's graph | A picture of the graph | Phases 3 and 4 |
 
 ## The order of work

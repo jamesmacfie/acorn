@@ -20,6 +20,12 @@ export { default as RefPanelBox } from '@acorn/client-core/host/components/RefPa
 // bare-reference pass and link handling the host owns. Not a kit node: the pass is a registry
 // function, and `ui/` may not import one.
 export { default as ProviderHtml } from '@acorn/client-core/host/components/ProviderHtml.tsx'
+// The shared "promote this row to a task" modal, with the optional workflow step above its tabs
+// (docs/workflows.md § Starting a run). Host-only and the host's on purpose: it reads the routed
+// project, the task list and the source's registered `promotion`, and a plugin opening it supplies
+// the item and what to do with the task, never the mechanics.
+export { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
+export type { PromoteWorkflowStep } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 // The host's own "find or create a task for this reference" control, for a first-party reference
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.

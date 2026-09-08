@@ -57,7 +57,8 @@
       "task.footer/docker-footer-badge",
       "overlay/github.shortcuts",
       "overlay/onboarding.first-run",
-      "drawer/terminal.drawer"
+      "drawer/terminal.drawer",
+      "overlay/workflows.start-from-item"
     ],
     "extensionPoints": [
       "agents:tool-card",
@@ -275,6 +276,9 @@
       ],
       "settingsPages": [
         "workflows"
+      ],
+      "slots": [
+        "overlay/workflows.start-from-item"
       ],
       "schedules": [
         "workflows.task-runs"

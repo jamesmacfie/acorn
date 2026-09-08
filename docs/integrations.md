@@ -101,6 +101,15 @@ store after every refresh. A project list would have had to be written into `iss
 behind task links, agent context sections, and cross-connection identifier resolution, to travel that
 path.
 
+## The row menu
+
+Every integration list draws the same overflow menu on a row, from the context-menu registry's
+`item.row` location ([plugins.md](./plugins.md) § Context menus). Core's rail list draws it for
+Rollbar and Linear, github's pull-request list draws its own, and both fill it from one registry, so
+a row added for one tracker is a row on all of them. **Create task** is core's, or github's for a
+pull; **Start workflow…** is the workflows plugin's
+([workflows.md](./workflows.md) § Starting a run). A loaded plugin can add one through its manifest.
+
 ## GitHub
 
 GitHub is connected with the OAuth device authorization flow. Its account metadata is separate from

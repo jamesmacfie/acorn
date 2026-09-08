@@ -1,10 +1,10 @@
-import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import {
-  activateTaskSignals, CHECK_TONE, checksState, clientEvents, formatRelativeTime,
-  integrationsOptions, pathForTask, projectsOptions, railDotProps, workspaceForProject,
-  workspacesOptions,
+  activateTaskSignals, CHECK_TONE, checksState, clientEvents, contextMenuItems, formatRelativeTime,
+  integrationsOptions, pathForTask, projectsOptions, railDotProps, registerContextMenuItems,
+  runContextMenuItem, workspaceForProject, workspacesOptions, type ItemRowTarget,
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, EmptyState, Icon, Input, Menu, Row, RowActions, Rows, StatusDot, Tabs, Text,
@@ -122,6 +122,43 @@ export default function PullList() {
     }
   }
 
+  // What a row's menu is about, in the shape core's rail list uses, so one registry serves both
+  // (docs/plugins.md § Context menus). The pull itself rides along as `item`; only `providerId` and
+  // `projectId` are facts a contributed row may match on.
+  //
+  // `body` comes from the warmed detail cache when the row has one, because the list route does not
+  // carry a pull's body and asking for a hundred of them to fill a menu nobody opened would be a
+  // worse trade than a menu that sometimes starts a workflow with the title alone.
+  const rowTarget = (pull: Pull, body?: string | null): ItemRowTarget => ({
+    location: 'item.row',
+    id: String(pull.number),
+    title: `#${pull.number} ${pull.title}`,
+    providerId: 'github',
+    projectId: params.projectId ?? '',
+    ...(body ? { body } : {}),
+    ...(owner() && repo() ? { link: `https://github.com/${owner()}/${repo()}/pull/${pull.number}` } : {}),
+    item: pull,
+  })
+
+  onMount(() => {
+    // This list's own row, on the registry rather than written into the menu below. It keeps
+    // `openAsTask` exactly as it was — find the PR's task or make one, with its Linear links — and
+    // it now sits beside whatever else offers an `item.row` action, "Start workflow…" first among
+    // them.
+    const rows = registerContextMenuItems([
+      {
+        id: 'github.pull.create-task',
+        location: 'item.row',
+        label: 'Create task',
+        icon: 'square-plus',
+        order: 10,
+        when: (target) => target.providerId === 'github' && !!(target.item as Pull).headRef,
+        run: (target) => void openAsTask(target.item as Pull),
+      },
+    ])
+    onCleanup(() => rows.dispose())
+  })
+
   let rowPrefetch: { cancel: () => void } | null = null
   const cancelRowPrefetch = () => {
     rowPrefetch?.cancel()
@@ -223,12 +260,20 @@ export default function PullList() {
                       meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
                       metaFields={1}
                       trailing={
-                        <Show when={pull().headRef}>
+                        <Show when={contextMenuItems('item.row', rowTarget(pull())).length}>
                           <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
                             {(menu) => (
-                              <Menu.Item context={menu} onSelect={() => void openAsTask(pull())}>
-                                Create task
-                              </Menu.Item>
+                              <For each={contextMenuItems('item.row', rowTarget(pull()))}>
+                                {(row) => (
+                                  <Menu.Item
+                                    context={menu}
+                                    tone={row.tone ?? 'neutral'}
+                                    onSelect={() => runContextMenuItem(row, rowTarget(pull(), detail.data?.pull?.body))}
+                                  >
+                                    {row.label}
+                                  </Menu.Item>
+                                )}
+                              </For>
                             )}
                           </RowActions>
                         </Show>

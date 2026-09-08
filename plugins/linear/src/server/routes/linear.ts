@@ -125,11 +125,16 @@ async function resolveIssues(
   return null
 }
 
+// How much of an issue's prose a list row carries. Enough for a workflow's `issue` input to say what
+// the ticket is about, and short enough that a hundred of them is still a list.
+const DESCRIPTION_MAX = 2_000
+
 const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue => {
   const detail = linearNodeToDetail(node)
   return {
     ...linearSummaryOf(detail),
     integrationId: row.id,
+    description: detail.description ? detail.description.slice(0, DESCRIPTION_MAX) : null,
     branchName: detail.branchName ?? null,
     priority: detail.priority ?? null,
     priorityLabel: detail.priorityLabel ?? null,

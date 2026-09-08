@@ -63,6 +63,10 @@ export type LinearIssuesRequest = { identifiers: string[] }
 // here.
 export type LinearProjectIssue = LinearIssueSummary & {
   integrationId: string
+  // The issue's own prose, already capped by the route that built the row (server/routes/linear.ts).
+  // A list row does not draw it; what reads it is the workflow start from a row menu. Optional, like
+  // the detail fields above, so a cached row written before this field self-heals on the next fetch.
+  description?: string | null
   branchName: string | null
   priority: number | null
   priorityLabel: string | null

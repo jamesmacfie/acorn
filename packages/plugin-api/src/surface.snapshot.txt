@@ -9,6 +9,9 @@ client: CommandContribution
 client: CommandExecutionContext
 client: CommandOutcome
 client: ContentLinkContribution
+client: ContextMenuContribution
+client: ContextMenuLocation
+client: ContextMenuTarget
 client: ContributedCommand
 client: FAILED_STATUSES
 client: HostCapabilityRequirement
@@ -16,6 +19,7 @@ client: HostRequirement
 client: InAppTarget
 client: InputCommand
 client: IntegrationFlowContribution
+client: ItemRowTarget
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution
@@ -50,6 +54,7 @@ client: SourceContribution
 client: SourceRouteContribution
 client: Task
 client: TaskLayout
+client: TaskRowTarget
 client: TaskSlotContribution
 client: UiSlotContribution
 client: WorkflowNotice
@@ -78,6 +83,8 @@ client: closeTunnelsForTask
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
 client: contentLinkRegistry
+client: contextMenuItems
+client: contextMenuRegistry
 client: contextSnapshot
 client: createDeviceFlow
 client: createFleetQuery
@@ -151,6 +158,7 @@ client: recipeBrowserUrl
 client: refResolutionsOptions
 client: refreshSessions
 client: registerCommands
+client: registerContextMenuItems
 client: registerNoticeTargetHandler
 client: registerWsChannel
 client: rememberActiveTerminal
@@ -161,6 +169,7 @@ client: requireClientCapability
 client: revealCollectionItem
 client: rowHeight
 client: runApi
+client: runContextMenuItem
 client: saveFile
 client: saveJsonPref
 client: savePref
@@ -408,6 +417,8 @@ ui/host: Concern
 ui/host: Drawer
 ui/host: InlineSlot
 ui/host: PaletteSurface
+ui/host: PromoteToTaskModal
+ui/host: PromoteWorkflowStep
 ui/host: ProviderHtml
 ui/host: RefPanelBox
 ui/host: RefPanelTaskLink

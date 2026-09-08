@@ -412,6 +412,42 @@ The pane intent `{ kind: 'workflows:show-run', runId, stepId? }` is how everythi
 run: a bell row, an inbox row, the rail's recent runs, the agent pane's chip. The deep link
 `/t/:taskId?pane=workflows&item=<runId>` is the same thing with an address.
 
+## Starting a run from an item
+
+A Rollbar error, a Linear issue and a GitHub pull request each have **Start workflow…** in their row
+menu, under **Create task**. It picks a workflow, fills its inputs from the item, makes a task or
+attaches to one, starts the run, and lands on the run pane.
+
+All three menus are the context-menu registry's `item.row` location
+([plugins.md](./plugins.md) § Context menus), so this is one contribution rather than three. The
+target the row is handed carries the item's `title`, its `body`, a `link` to it, and the provider's
+own row untouched.
+
+**What the item fills in.** By input name, in `plugins/workflows/src/client/startFromItem.ts`: an
+input named `issue`, `item` or `context` gets the title and the body one blank line apart, and one
+named `link` or `url` gets the external link. Every other name is left for the person, because
+guessing at `focus` or `depth` from an error title puts words in a prompt nobody chose. The rule is
+in the workflows plugin rather than in each integration, so a new tracker gets it for free.
+
+Where the body comes from is each tracker's own answer, and none of them makes a second call to fill
+a menu nobody opened. Linear asks for the issue description on the list query and caps it at 2,000
+characters. Rollbar's list carries no prose at all — an item's body is its stack trace — so its rows
+send the facts they already have: level, environment, occurrence count, and the permalink. GitHub
+sends the pull's body when the row's detail is already warmed, and the title alone when it is not.
+
+**The box** is the promote-to-task modal with a workflow step over its tabs
+(`packages/client-core/src/features/integrations/PromoteToTaskModal.tsx`): a picker, one field per
+declared input with the prefilled values editable, then the existing **New task** and **Attach to
+task** tabs. The primary button reads **Create & run** or **Attach & run** and is refused while a
+required input is empty. Making or attaching the task is the source's registered `promotion`, which
+is why one component serves all three trackers; starting the run is this plugin's, through the same
+route the editor's **Run** and the palette use, so a refusal reads the same everywhere. On success
+the modal closes and the task opens at `?pane=workflows&item=<runId>`.
+
+The modal is drawn in the shell's `overlay` slot, because the list the row sits on belongs to
+somebody else. The terminal client mounts no overlay slot and its descriptor source panel draws no row
+menu, so this flow is desktop-only for now ([tui.md](./tui.md) § What a plugin loses here).
+
 ## From the command palette
 
 Three rows at the palette root, all registered by this plugin's client half

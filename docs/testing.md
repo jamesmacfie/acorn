@@ -509,6 +509,21 @@ Run them on the desktop and in `acorn` in a terminal.
     running from that node. Then check the pane is not there at all on a task that has never run a
     workflow, and that the agents pane draws no workflow step rows anywhere.
 
+The next two are the start-from-an-item flow's ([workflows.md](./workflows.md) § Starting a run).
+Three lists moved onto one registry, and the only way to see that they still offer what they used to
+is to open all three menus.
+
+54. Open the row menu on a Rollbar error, a Linear issue and a GitHub pull request. Each has **Create
+    task** at the top doing exactly what it did before — a Rollbar row opens the promote modal, a
+    pull makes or finds the pull's task with its Linear links — and **Start workflow…** under it. On a
+    row with nothing to promote, and on a source whose click already makes a task, no menu appears at
+    all.
+55. Press **Start workflow…** on a Rollbar error. Pick the owner's first workflow: the `issue` input
+    arrives filled with the error's title and its facts, editable, and the button reads **Create &
+    run** and refuses while a required input is empty. Press it; the task opens on the Workflows pane
+    with both investigators running. Do the same from a pull request that already has a task: it runs
+    on that task rather than making a second one.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
