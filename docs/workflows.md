@@ -194,6 +194,58 @@ select per option that harness advertises through `GET /v2/p/agents/providers`, 
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
 never restates the model list.
 
+### Generating one from a description
+
+**Generate** on the editor toolbar takes a description and answers with the whole definition, which
+replaces the draft. The dialog asks for three things: what you want to happen, which connected model
+provider writes it, and which of that provider's models. The draft's current name and its declared
+inputs go along as context, with the model asked to keep each of them where it still fits what you
+described. The description box takes up to 8,000 characters, which is enough to paste an issue in.
+
+What the model is told about acorn is assembled at request time, not written down. The step kinds
+with the fields each one describes, the policies and the agent profiles all come out of the same
+catalog `GET /v2/p/workflows/catalog` answers, so a plugin that contributes a step kind makes it
+available to the model with no prompt to edit here. That list is also the list the answer is checked
+against: a kind in the catalog but missing from the prompt would be one the model can never use and
+nothing would ever strip. The workspace's own definitions ride along as worked examples, ranked so
+that one with a step waiting on two others comes first, because a fan-in is the thing a model gets
+wrong on its own. The definition being edited is left out of its own examples, and so is any
+definition that does not itself pass the checker: a workspace's broken workflow is the wrong thing to
+learn house style from.
+
+The reply is read back rather than trusted. Anything named in it that this node does not have is
+taken out before the draft is touched. An invented step kind becomes a plain agent step keeping its
+prompt, rather than a deleted step, because deleting one cascades through every `after`, `joins` and
+`branches` that named it. An invented policy loses its value and stays a policy gate, because
+retargeting it to a human gate would silently turn a hard check into a no-op under an autonomous
+posture. An unknown `with` key goes, and a step name that is not slug-shaped is renamed with every
+reference following it. Each of those changes is reported in a dismissible alert above the node list,
+because a list of things that were changed is not something to read in a toast. What the definition
+still gets wrong is not repeated there: the footer already draws it.
+
+There is one repair pass and never two. When the first answer passes the checker, which is the common
+case, that is the only model call. When it does not, the checker's own messages go back once,
+verbatim, along with the definition as it stands after the stripping, and the second answer is taken
+if it parses and has at least one step. It is never chosen on having fewer problems, because the
+cheapest way for a model to shorten a problem list is to delete the steps carrying the problems. The
+answer is applied either way. A definition with problems in the footer is every workflow partway
+through being built, and **Run** is what refuses to start one.
+
+Applying goes through the same door the JSON tab's **Apply** uses, so the whole generated definition
+is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved: **Save** and
+**Run** are still yours to press.
+
+The button is not drawn at all in two cases. One is an owner with no model provider connected, on the
+rule the commit-message wand follows: a control whose only message is "connect one first" is a
+control in the way of the ones beside it, and Settings, under Integrations, is where a connection is
+made. The other is a definition read from a file rather than a row, which the whole editor is
+read-only for anyway.
+
+Two model calls, each with a 60-second ceiling of its own, make this the slowest thing in the editor.
+The dialog counts the seconds rather than spinning, and the client asks for a longer
+request timeout than the broker's 30-second default
+([api-reference.md](./api-reference.md) § Transport).
+
 ### The draft rules
 
 These are why the editor is safe to type in:

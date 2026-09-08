@@ -524,9 +524,8 @@ is to open all three menus.
     with both investigators running. Do the same from a pull request that already has a task: it runs
     on that task rather than making a second one.
 
-The last one is the graph view's ([ui-design.md](./ui-design.md) § The closed kit). A canvas is the
-one kit node whose whole point is what it looks like, so a suite can check the geometry and nothing
-else.
+Next is the graph view's ([ui-design.md](./ui-design.md) § The closed kit). A canvas is the one kit
+node whose whole point is what it looks like, so a suite can check the geometry and nothing else.
 
 56. Open the owner's first workflow and press **Graph**. It draws two roots joining into the
     synthesis node, with the list column still beside it. Drag a card: it lands on the grid and its
@@ -537,6 +536,23 @@ else.
     as its step starts and finishes. In the terminal client, both **Graph** views are the indented
     list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
     the selected card.
+
+The last one is the editor's **Generate** button
+([workflows.md](./workflows.md) § Generating one from a description). A pure suite pins the prompt
+and drives the reader from a table, and neither can see whether the teaching worked on a real model.
+
+57. With no model provider connected, the editor toolbar has no **Generate** between the tab strip
+    and **Undo**. Connect one in Settings, under Integrations, reopen a workflow row, and press it.
+    Describe the owner's first workflow in words: two agents investigate one issue from different
+    angles at the same time, a third reads both and writes the synthesis, and somebody approves
+    before anything is pushed. The dialog counts seconds while it works, and a couple of minutes is
+    normal. What lands has two roots, a step whose `after` names both of them, and a human gate.
+    That is the check the rest of the item hangs off: a straight chain of five steps means the prompt
+    failed to teach the graph. Read the footer, press **Save**, then **Run**, and watch it
+    in the run pane. Press **Undo** once and the draft you had comes back whole. Then generate again
+    from a description that asks for a `code-review` step kind, which no node has: the definition
+    still applies, and the alert above the node list says what was taken out of it. Last, open a
+    committed file from the rail and confirm there is no **Generate** on that toolbar at all.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

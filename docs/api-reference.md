@@ -18,6 +18,14 @@ validation details when changing a contract.
 | Plugin | `/v2/p/<plugin>/*` | device or permitted internal principal |
 | Events/streams | `GET /v2/events` | authenticated WebSocket upgrade |
 
+A request that reaches a node through the desktop broker is killed after 30 seconds. That is less
+than one model call is allowed to take, so a caller that knows its route is slow passes `timeoutMs`
+on the request and the broker uses that instead. It is the exception: the default is what everything
+else runs on, and a route that needs more than half a minute usually wants an event rather than a
+longer wait. Workflow generation is the only route that asks, at 150 seconds for two model calls
+([workflows.md](./workflows.md) § Generating one from a description). A renderer served by the node
+itself, under `dev:node`, never goes through the broker and has no such cap.
+
 All responses carry `X-Request-Id`. Errors use:
 
 ```json
@@ -334,6 +342,24 @@ Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole fami
 | `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
 | `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |
 | `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | `{ path }` after writing `.acorn/workflows/<slug>.toml`, deleting the row unless `keepRow`. |
+| `POST /defs/generate` | `{ connectionId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }`: a whole definition written by a connected model provider, what was taken out of the reply, and what the checker still says about it. |
+| `GET /defs/model-connections` | | The owner's connected model providers with text generation available, ids and labels only. An empty list is why the editor draws no **Generate** button. |
+
+`POST /defs/generate` writes a definition from a sentence
+([workflows.md](./workflows.md) § Generating one from a description). `description` is capped at
+8,000 characters by the same constant the editor's textarea reads. `workspaceId` says whose
+definitions ride along as worked examples and `defId` names the one to leave out of them, since a
+definition is a poor worked example of itself. `notes` is a list of `{ code, message, step? }`, one
+per thing the reply named that this node does not have. `problems` is the checker's list, which the
+editor's footer draws anyway.
+
+It answers 422 `model_answer_unusable` when nothing in the reply could be read as a definition, with
+the reason in `message`, and that is the one failure with no definition to apply. A provider failure
+keeps the status the provider seam gave it, so `provider_not_connected` is a 404 and
+`provider_needs_auth` a 401, and anything else is 502 `provider_unavailable`. The route makes up to
+two model calls, which is longer than the broker's default request timeout, so the client sends its
+own `timeoutMs` (§ Transport). Neither route needs an owner check of its own: generation spends the
+owner's provider key, and the whole `/defs` family is already device-only, which is stricter.
 
 ### Notes and memory
 
