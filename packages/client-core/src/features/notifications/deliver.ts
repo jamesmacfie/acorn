@@ -125,7 +125,13 @@ export function pushManagedAgentNotice(input: {
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
     const detail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
-    deliverNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at: Date.now() })
+    // A notice raised by a run names it, so the row opens the run pane at the node it is about
+    // (docs/notifications.md § What a row points at). The two kinds core raises on this channel name
+    // no run, and those keep no target.
+    const target = n.runId
+      ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) }
+      : undefined
+    deliverNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at: Date.now(), target })
   })
 }
 

@@ -1,4 +1,6 @@
 # plugin API major: 10
+client: AttentionItem
+client: AttentionSourceContribution
 client: CHECK_TONE
 client: COMMAND_CLOSED
 client: ClientPlugin
@@ -194,6 +196,7 @@ client: wsAttach
 client: wsConnect
 client: wsOnNotice
 client: wsOnStatus
+client: wsOnWorkflowStepChanged
 client: wsOnWorkflowStepEvent
 client: wsSend
 client: wsWrite

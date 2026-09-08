@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 import type { CommandExecutionContext, CommandOutcome, SearchCommand } from '@acorn/plugin-api/client'
 
-const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn(), createDef: vi.fn(), requestStart: vi.fn(), setSelectedSource: vi.fn() }))
-vi.mock('./workflowsClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start, createDef: mocks.createDef } }))
+const mocks = vi.hoisted(() => ({
+  defs: vi.fn(), start: vi.fn(), createDef: vi.fn(), runs: vi.fn(),
+  requestStart: vi.fn(), setSelectedSource: vi.fn(), openPane: vi.fn(),
+}))
+vi.mock('./workflowsClient', () => ({
+  workflowApi: { defs: mocks.defs, start: mocks.start, createDef: mocks.createDef, runs: mocks.runs },
+}))
 vi.mock('./editor/startRequest', () => ({ requestWorkflowStart: mocks.requestStart }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setSelectedSource: mocks.setSelectedSource,
+  openPane: mocks.openPane,
 }))
 
 import { workflowsCommands } from './commands'
@@ -17,7 +23,8 @@ import { workflowsCommands } from './commands'
 // rather than as a closed palette.
 
 const run = workflowsCommands[0] as SearchCommand
-const create = workflowsCommands[1] as { run: (context: CommandExecutionContext) => Promise<CommandOutcome> }
+const find = workflowsCommands[1] as SearchCommand
+const create = workflowsCommands[2] as { run: (context: CommandExecutionContext) => Promise<CommandOutcome> }
 
 const navigate = vi.fn()
 const context = (taskId: string): CommandExecutionContext => ({
@@ -41,11 +48,22 @@ describe('the workflows plugin catalogue', () => {
   it('is a task-scoped search and a project-scoped action, both gated on a node that runs terminals', () => {
     // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one. The gate
     // the row source declared, unchanged.
-    expect(workflowsCommands.map((command) => command.id)).toEqual(['workflows.run', 'workflows.new'])
+    expect(workflowsCommands.map((command) => command.id)).toEqual(['workflows.run', 'workflows.runs.find', 'workflows.new'])
     expect(create).toMatchObject({ scope: 'project', category: 'action', requires: { plugin: 'terminal' } })
     expect(run).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'terminal' } })
     expect(run.debounceMs).toBe(0)
     expect(run.minQueryLength).toBe(0)
+  })
+
+  // "Find a run" waited for somewhere to open one (docs/future/workflows/phase-4-run-pane.md).
+  it('lists this task\'s runs and opens the one that was picked', async () => {
+    mocks.runs.mockResolvedValue([
+      { id: 'run-2', name: 'Investigate an issue', status: 'running', createdAt: Date.now() },
+    ])
+    const rows = await find.query('', context('task-1'), signal())
+    expect(rows[0]).toMatchObject({ id: 'run:run-2', title: 'Investigate an issue', ref: 'run-2' })
+    expect(await find.select?.(rows[0], context('task-1'))).toEqual({ effect: 'close' })
+    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'workflows', { kind: 'workflows:show-run', runId: 'run-2' })
   })
 
   it('maps definitions into rows with a step count, and floats config errors first', async () => {

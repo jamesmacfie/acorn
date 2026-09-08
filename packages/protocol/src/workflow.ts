@@ -115,6 +115,10 @@ export type WorkflowRunRow = {
   error: string | null
   createdAt: number
   updatedAt: number
+  // The definition this run froze at start, as JSON. On the wire since the runs route answered with
+  // the row; declared here because the run pane draws its nodes in graph order, and only the
+  // definition knows what each step waits on.
+  defJson?: string
 }
 
 export type WorkflowStepRow = {
@@ -137,4 +141,9 @@ export type WorkflowStepRow = {
   createdAt: number
   updatedAt: number
   resumeCommand?: string | null
+  // The bundle handed to the step: the rendered prompt, and `childTaskId` for a step the runner gave
+  // its own task and checkout. The run pane reads the second to link to that task.
+  inputsJson?: string | null
+  // Which fan-out step spawned this one, when one did. The run pane draws a child under its parent.
+  parentStepId?: string | null
 }

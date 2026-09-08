@@ -102,6 +102,7 @@
   "GET /v2/p/workflows/defs",
   "GET /v2/p/workflows/defs/:id",
   "GET /v2/p/workflows/runs",
+  "GET /v2/p/workflows/sessions/:sessionId/run",
   "GET /v2/p/workflows/tasks/:id/workflows",
   "GET /v2/p/workflows/tasks/:id/workflows/runs",
   "GET /v2/p/workflows/workflows/runs/:runId/steps",

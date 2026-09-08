@@ -42,6 +42,7 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   cancel: async () => ({ ok: true }),
   kill: async () => ({ ok: true }),
   retry: async () => ({ ok: true }),
+  runForSession: async () => null,
   allRuns: async () => ({ runs: [] }),
   ...over,
 })

@@ -477,9 +477,10 @@ real remote with real credentials does.
     plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
     the plugin on, with no gap where the button was.
 
-The next three are the workflow editor's, owed since it shipped and **not yet run**. The draft rules
-have a unit suite and the inspector has a jsdom one, and neither can see what a person building the
-owner's first workflow actually goes through. Run them on the desktop and in `acorn` in a terminal.
+The next six are the workflow editor's and the run pane's, owed since each shipped and **not yet
+run**. The draft rules have a unit suite, the inspector and the run pane have jsdom ones, and none of
+them can see what a person building and watching the owner's first workflow actually goes through.
+Run them on the desktop and in `acorn` in a terminal.
 
 48. Open Workflows in the left rail with a project chosen. Press **+ New**, then build the owner's
     first workflow from the empty definition using only the editor: two agent nodes with no
@@ -496,6 +497,17 @@ owner's first workflow actually goes through. Run them on the desktop and in `ac
     ⌘K → **Run a workflow**: it opens the same dialog rather than starting with an empty input. In the
     terminal client, the definition list is in the Browse panel, the editor is in the main one with
     its node list beside its inspector, and the dialog is a modal the keys stay inside.
+51. Start that run on a task and open the **Workflows** pane on it. Both investigators show running at
+    once, with the same indentation the editor drew. Open each in the Agent pane from its node: the
+    header there carries a "Workflow: …" chip, and pressing the chip comes back to this pane at that
+    node. The command node's output tails as it runs and folds away with its exit code when it stops.
+52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
+    and Reject in front of you; the inbox has the same row and it stays there until you answer.
+    Approve, and the run finishes and keeps a notice.
+53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
+    **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
+    running from that node. Then check the pane is not there at all on a task that has never run a
+    workflow, and that the agents pane draws no workflow step rows anywhere.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

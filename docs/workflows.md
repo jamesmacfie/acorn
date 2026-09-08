@@ -358,16 +358,70 @@ which every schedule already has.
 
 Node routes are under `/v2/p/workflows/` and core task run-target routes under
 `/v2/core/tasks/:id/run/*`. Both clients draw the Workflows rail source and the editor behind it
-(§ Authoring), a Settings page that lists what a task's checkout would load, two command-palette
-rows, task activity, gate controls, and attention items. Workflow notices use `/v2/events`. Durable
-run history is paged from the plugin database.
+(§ Authoring), the run pane below, a Settings page that lists what a task's checkout would load,
+three command-palette rows, gate controls, and attention items. Workflow notices use `/v2/events`.
+Durable run history is paged from the plugin database.
+
+### The run pane
+
+A task with at least one run has a **Workflows** pane
+(`plugins/workflows/src/client/runs/paneContribution.ts`). It is `list-detail`: the task's runs
+newest first, then the selected run's nodes, and one node's detail beside them. The pane is hidden on
+a task that has never run a workflow, so the pane strip does not grow a button for every task; which
+tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
+
+The node list is the editor's list. Both call `graphOrder` in
+`plugins/workflows/src/client/editor/draft.ts`, over the definition the run froze when it started, so
+the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
+more than one step carries the same `⇐ n` mark. A fan-out child is a row under the step that spawned
+it.
+
+The detail depends on the kind and the status:
+
+| Kind | While running | When done | Controls |
+| --- | --- | --- | --- |
+| agent kinds | harness, model, and what it last said | the final text or the structured JSON | Open in Agent pane; Kill step |
+| `terminal:command` | the streamed tail | exit code, duration, the whole output under a disclosure | Kill step |
+| `terminal:run-target` | "Starting…" | the URL | Open terminal |
+| `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
+| `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
+| `gate-human` | "Waiting for you" | approved, or the state it reached | Approve; Reject |
+| any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
+
+A step whose harness session was captured but that never became a managed session offers **Open in
+terminal**, which resumes it: the agents sidebar used to be where that lived. A step given its own
+task links to it. Every control is drawn only when its transition is legal and disabled while one is
+in flight, so a stale button is a race rather than a bug.
+
+The transcript is not here. An agent node says what it last said and hands you to the Agent pane,
+which owns the conversation ([managed-agents.md](./managed-agents.md)).
+
+### What the pane listens to
+
+Three frames, and each one costs what it should:
+
+- `workflow:step-changed` moves one node's glyph and reads nothing.
+- `workflow:step:event` appends to the selected run's per-node tail, capped at 200 events and the
+  last 4,000 characters of output.
+- `plugin:workflows:run-changed` re-reads the run and its steps, because a run beginning or ending
+  changes rows this client never saw.
+
+### Getting there from somewhere else
+
+The pane intent `{ kind: 'workflows:show-run', runId, stepId? }` is how everything else points at a
+run: a bell row, an inbox row, the rail's recent runs, the agent pane's chip. The deep link
+`/t/:taskId?pane=workflows&item=<runId>` is the same thing with an address.
 
 ## From the command palette
 
-Two rows at the palette root, both registered by this plugin's client half
+Three rows at the palette root, all registered by this plugin's client half
 (`plugins/workflows/src/client/commands.ts`). **New workflow** is project-scoped: it creates a row
 bound to the routed project and opens the editor on it, which is the rail toolbar's verb reached
 from ⌘K.
+
+**Find a run** is a task-scoped `search` over this task's runs, newest first, each row naming its
+status and how long ago it started. Picking one opens the run pane at it. The row waited for the pane
+to exist: a search whose result cannot say where it goes is worse than no search.
 
 **Run a workflow**, registered by this plugin's client half
 (`plugins/workflows/src/client/commands.ts`). It is a `search` over every definition the task can
@@ -395,16 +449,6 @@ editor's **Run** and this row from putting two of them on screen.
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.
 
-**Finding an active or recent run is deferred, because there is nowhere to open one.** This plugin
-ships no run pane on either host. The only client that reads its `runs` route for a task is the
-agents plugin's task sidebar (`plugins/agents/src/client/sessions/AgentTaskSidebar.tsx`), which draws a
-run's *steps* into its roster and keys selection on a managed-session id that a workflow step does not
-have; opening a step there spawns a terminal that resumes the step's provider session. A row that
-cannot name where it goes is worse than no row, so the search reopens when there is a run surface to
-point it at, and not before. The rail's recent-run rows already address one
-(`?pane=workflows&item=<runId>`), and a deep link naming a pane nothing has registered is dropped
-rather than dispatched.
-
 ## Configuration trust
 
 Workflow files and executable URL/run-target scripts are repo-authored executable configuration. The
@@ -415,11 +459,11 @@ hashed; § Database definitions holds that half.
 
 ## Gaps
 
-There is no picture of the graph. The editor draws it as an indented list and the graph view is
-[docs/future/workflows/phase-6-canvas.md](./future/workflows/phase-6-canvas.md). There is no run
-surface either: a run is watched through the agents sidebar's step rows until the pane in
-[docs/future/workflows/phase-4-run-pane.md](./future/workflows/phase-4-run-pane.md) lands, so a bell
-row for a gate still has nowhere to go. The desktop must be open for UI interaction, although the
+There is no picture of the graph. The editor and the run pane both draw it as an indented list, and
+the graph view is
+[docs/future/workflows/phase-6-canvas.md](./future/workflows/phase-6-canvas.md). A run pane node
+shows what a step last said, not a rendered view of the prompt it was given, though the run holds
+one. The desktop must be open for UI interaction, although the
 node continues work while the renderer is closed, including the trigger sweep, which moved onto the
 node's own scheduler. A failed node is retried by hand through the retry route; an operation whose
 external outcome is unknown is never retried on its own, because acorn cannot tell a side effect that

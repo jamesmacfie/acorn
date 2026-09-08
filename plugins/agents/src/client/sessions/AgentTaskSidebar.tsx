@@ -1,15 +1,8 @@
-import { createMemo, createResource, createEffect, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo, createEffect, Show } from 'solid-js'
+import type { Task } from '@acorn/plugin-api/client'
 import {
-  clientCapability, hasHostCapability, refreshSessions, requestTerminalFocus, sessions,
-  setTerminalOpen, type Task, wsOnNotice, wsOnWorkflowStepEvent,
-} from '@acorn/plugin-api/client'
-import {
-  Badge, Button, EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader,
-  Stack, Text,
+  Badge, EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
 } from '@acorn/plugin-api/ui'
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
-import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
-import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
 import { sessionModelLabel } from '../settings/agentConfigOptions'
@@ -21,34 +14,19 @@ import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
 } from './managedSelection'
-import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 
-// The Agent pane's `list` region: what is running in this task, in three groups.
+// The Agent pane's `list` region: what is running in this task, in two groups.
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
 // (docs/command-palette-and-shortcuts.md § Focus and typing). Subagents are rows of the sessions collection at depth
 // one, rather than a nested list, because stepping into a child run is a selection and not an
 // expansion.
-
-const LEGACY_ICON: Record<string, string> = {
-  starting: 'clock',
-  working: 'loader-circle',
-  waiting: 'circle-alert',
-  idle: 'circle',
-  blocked: 'octagon-alert',
-  permission: 'octagon-alert',
-  done: 'circle-check',
-  unknown: 'circle-dashed',
-}
-const LEGACY_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'muted'> = {
-  starting: 'ok',
-  working: 'ok',
-  waiting: 'warn',
-  blocked: 'warn',
-  permission: 'warn',
-  failed: 'danger',
-}
+//
+// There is no third group. It merged this task's PTY sessions with its workflow steps, and opening a
+// step spawned a terminal on the harness's resume command. The run pane owns a run's steps now
+// (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
+// rows had two better homes and one confusing one (docs/future/workflows/README.md, decision 14).
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
  *  the list under it scrolls (docs/panes.md § Layout model). */
@@ -59,43 +37,11 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
-  // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
-  // already reads it this way.
-  const hasEngine = () => hasHostCapability({ plugin: 'terminal' })
-  const [workflowData, { refetch }] = createResource(
-    () => props.task.id,
-    async (taskId) => {
-      // Resolved per call, never captured: client plugin registration order isn't a dependency
-      // contract, and `undefined` here is also the honest answer on a node with workflows disabled, so
-      // the roster shows agent sessions alone rather than failing to render.
-      const workflows = clientCapability(WORKFLOW_CONTROL)
-      if (!hasEngine() || !workflows) return { runs: [], steps: [] as WorkflowStepRow[] }
-      const runs = await workflows.runs(taskId)
-      const steps = (await Promise.all(runs.map((run) => workflows.steps(run.id)))).flat()
-      return { runs, steps }
-    },
-    { initialValue: { runs: [], steps: [] } },
-  )
 
   const managedRequests = createMemo(() => model.taskSessions().flatMap((session) =>
     (managedAgentStore.snapshots()[session.id]?.requests ?? [])
       .filter((request) => request.status === 'pending' || request.status === 'resolving')
       .map((request) => ({ session, request }))))
-  const legacy = createMemo(() =>
-    buildRoster(props.task.id, sessions(), workflowData().steps, workflowData().runs))
-
-  onMount(() => {
-    // The two frames the workflow half of this roster actually depends on: a gate or a finished run
-    // for this task, and a live step edge. It used to hang off the content-free `term:status` ping,
-    // which also fired on every terminal idle-to-working edge and refetched every run and every run's
-    // steps on every connected client (docs/performance.md § 2026-09-03 — phase 5).
-    // The session half of the roster is already reactive: `sessions()` and `model.taskSessions()` are
-    // signals somebody else keeps in step.
-    onCleanup(wsOnNotice((notice) => {
-      if (notice.taskId === props.task.id) void refetch()
-    }))
-    onCleanup(wsOnWorkflowStepEvent(() => void refetch()))
-  })
 
   const attentionLoaded = new Map<string, number>()
   createEffect(() => {
@@ -138,44 +84,6 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
     if (found.session.id !== model.selectedSessionId()) openManagedSession(props.task.id, found.session.id)
     else selectManagedSession(props.task.id, found.session.id)
     selectManagedSubagent(found.session.id, found.subagentId)
-  }
-
-  async function openLegacy(row: RosterRow) {
-    if (!hasEngine()) return
-    if (row.kind === 'session') {
-      setTerminalOpen(props.task.id, true)
-      requestTerminalFocus(props.task.id, row.session.id)
-      return
-    }
-    const resume = resumeCommandFor(row.step)
-    if (!resume) {
-      model.setError('This workflow step has no resumable provider session.')
-      return
-    }
-    try {
-      const terminal = await terminalSessions.create({
-        taskId: props.task.id,
-        profileId: row.step.profileId ?? 'claude-code',
-        command: resume,
-        title: `⏎ ${row.step.name}`,
-      })
-      await refreshSessions()
-      setTerminalOpen(props.task.id, true)
-      requestTerminalFocus(props.task.id, terminal.id)
-    } catch (caught) {
-      model.setError(caught instanceof Error ? caught.message : 'Unable to open the session in a terminal.')
-    }
-  }
-
-  async function resolveGate(row: Extract<RosterRow, { kind: 'step' }>, approved: boolean) {
-    try {
-      const workflows = clientCapability(WORKFLOW_CONTROL)
-      if (!workflows) throw new Error('The workflows plugin is not available on this node.')
-      await workflows.gate(row.step.runId, row.step.id, approved)
-      await refetch()
-    } catch (caught) {
-      model.setError(caught instanceof Error ? caught.message : 'Unable to resolve the workflow gate.')
-    }
   }
 
   return (
@@ -283,6 +191,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                         >
                           <Text emphasis="strong">{current().title}</Text>
                           <Inline gap="inline">
+                            {/* A session a workflow started, said once on the row. Its steps live in
+                                the run pane; this is only how you tell the two kinds apart here. */}
+                            <Show when={current().kind === 'workflow'}>
+                              <Icon name="workflow" tone="muted" title="Started by a workflow" />
+                            </Show>
                             <Show when={providerMarkName(current().providerId)}>
                               {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
                             </Show>
@@ -321,69 +234,6 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
           </Rows>
         </Show>
       </Section>
-
-      <Show when={legacy().length}>
-        <Section label="Terminals and workflows">
-          <Rows
-            id={`agents:legacy:${props.task.id}`}
-            ariaLabel="Terminals and workflows"
-            items={legacy().map((row) => ({ key: row.id, label: row.title }))}
-            onActivate={(key) => {
-              const row = legacy().find((candidate) => candidate.id === key)
-              if (row) void openLegacy(row)
-            }}
-          >
-            {(item, itemProps) => {
-              const row = () => legacy().find((candidate) => candidate.id === item.key)
-              return (
-                <Show when={row()}>
-                  {(current) => (
-                    <Row
-                      item={itemProps}
-                      variant="stacked"
-                      density="compact"
-                      leading={
-                        <Icon
-                          name={LEGACY_ICON[current().state] ?? 'circle-dashed'}
-                          tone={LEGACY_TONE[current().state] ?? 'muted'}
-                          spin={current().state === 'working'}
-                        />
-                      }
-                      trailing={
-                        <Show when={current().kind === 'step' && (current() as Extract<RosterRow, { kind: 'step' }>).gate}>
-                          <Inline>
-                            <Button
-                              size="sm"
-                              onPress={() => void resolveGate(current() as Extract<RosterRow, { kind: 'step' }>, true)}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              tone="danger"
-                              onPress={() => void resolveGate(current() as Extract<RosterRow, { kind: 'step' }>, false)}
-                            >
-                              Reject
-                            </Button>
-                          </Inline>
-                        </Show>
-                      }
-                      onPress={() => void openLegacy(current())}
-                    >
-                      <Text emphasis="strong">{current().title}</Text>
-                      <Text emphasis="muted">
-                        {current().kind === 'step'
-                          ? (current() as Extract<RosterRow, { kind: 'step' }>).step.status
-                          : current().state}
-                      </Text>
-                    </Row>
-                  )}
-                </Show>
-              )
-            }}
-          </Rows>
-        </Section>
-      </Show>
     </Stack>
   )
 }
