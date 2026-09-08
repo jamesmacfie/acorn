@@ -51,6 +51,8 @@
       "notes_list",
       "notes_read",
       "notes_write",
+      "pr_checks",
+      "pr_review_comments",
       "run_restart",
       "run_start",
       "run_status",
@@ -184,7 +186,9 @@
         "github/tasks"
       ],
       "tools": [
-        "github_pull_create"
+        "github_pull_create",
+        "pr_checks",
+        "pr_review_comments"
       ],
       "sections": [
         "pr"

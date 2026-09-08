@@ -7,6 +7,7 @@ import {
   type StoredConnection,
 } from '@acorn/plugin-api/node'
 import { createPullRequest } from './createPull'
+import { checkFailed, taskChecks, taskReviewFeedback } from './mirrorQueries'
 
 type GithubToolCore = Pick<CoreServices, 'projects' | 'tasks'>
 type GithubProviderAccess = {
@@ -73,6 +74,40 @@ export function githubAgentTools(
         number: created.number,
         relationship: relation.role,
         pull: { owner: relation.repoOwner, repo: relation.repoName, number: String(relation.pullNumber) },
+      }
+    },
+  }, {
+    // Two reads over the mirror this plugin already keeps fresh, so neither spends a credential or
+    // touches the network. Between them they answer the two questions an agent on a reviewed PR has:
+    // what did people say, and what is red (docs/agent-tools.md § GitHub).
+    name: 'pr_review_comments',
+    description: "What reviewers said about the current task's pull request: submitted reviews, inline comment threads, and conversation comments, from acorn's local mirror. Open threads only unless you ask for resolved ones.",
+    input: z.object({
+      includeResolved: z.boolean().optional().describe('include threads a reviewer has marked resolved (default: false)'),
+    }),
+    scope: 'task',
+    risk: 'read',
+    handler: async (raw, ctx) => {
+      const input = raw as { includeResolved?: boolean }
+      const feedback = await taskReviewFeedback(db, core, ctx.userLogin, ctx.taskId, { includeResolved: input.includeResolved })
+      // Absent is not empty. "No PR mirrored for this task" and "nobody has commented" are different
+      // answers, and an agent that cannot tell them apart reports the wrong thing.
+      if (!feedback) return { status: 'no-mirrored-pr', hint: "This task has no mirrored pull request. Open it in acorn once, or check the task has a GitHub project and a PR." }
+      return feedback
+    },
+  }, {
+    name: 'pr_checks',
+    description: "The CI checks on the current task's pull request from acorn's local mirror, with the failing ones called out. A check with no status has not run yet.",
+    input: z.object({}),
+    scope: 'task',
+    risk: 'read',
+    handler: async (_raw, ctx) => {
+      const mirrored = await taskChecks(db, core, ctx.userLogin, ctx.taskId)
+      if (!mirrored) return { status: 'no-mirrored-checks', hint: "No checks are mirrored for this task's pull request. This is not the same as a green PR." }
+      return {
+        number: mirrored.number,
+        checks: mirrored.checks,
+        failing: mirrored.checks.filter((row) => checkFailed(row.status)).map((row) => row.name),
       }
     },
   }]
