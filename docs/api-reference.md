@@ -290,7 +290,9 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 
 ```text
 /v2/p/terminal/sessions*
+/v2/p/terminal/tasks/:taskId/run-targets
 /v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
+/v2/p/workflows/catalog
 /v2/p/workflows/tasks/:id/workflows*
 /v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry}
 ```
@@ -304,6 +306,16 @@ the definition does not declare. `POST .../runs/:runId/retry` takes `{ stepId, p
 failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
 foreign or unknown run as a 404.
+
+`GET /v2/p/workflows/catalog` answers every step kind this node can run, with the form each one
+draws, plus the policies and the agent profiles
+([workflows.md](./workflows.md) § Contributed step kinds). It takes an optional `projectId` and
+ignores it: the answer is node-wide, and the parameter is there so a later per-project answer needs no
+second route. Two routes answer the option lists that a kind's `select` fields point at, both shaped
+`{ options: [{ value, label, description? }] }`:
+`GET /v2/p/terminal/tasks/:taskId/run-targets` and
+`GET /v2/p/database/projects/:projectId/saved-queries`. The second refuses a task-confined caller,
+because no task in the path means no scope gate.
 
 ### Notes and memory
 

@@ -6,18 +6,12 @@
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
-import type { AgentSessionExecute, AgentSessionExecuteRequest } from '../../contract/sessionExecute'
+import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
 
-// Which agent profiles have a durable managed driver. A profile absent here has no managed path, and
-// sessionExecute returns null so the caller falls back to its own one-shot runner.
-const MANAGED_PROVIDERS: Readonly<Record<string, string>> = {
-  'claude-code': 'claude',
-  codex: 'codex',
-}
-
-export const managedProviderForProfile = (profileId: string | undefined): string | null =>
-  MANAGED_PROVIDERS[profileId ?? ''] ?? null
+// The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
+// calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
+export { managedProviderForProfile }
 
 function promptWithResultContract(prompt: string, schema: object | undefined): string {
   if (!schema) return prompt

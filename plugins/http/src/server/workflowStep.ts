@@ -5,9 +5,9 @@
 // HTTP call needs to be safe already lives in this package — the scheme check that runs *after*
 // interpolation, the 5 MB response cap, the variable layers with their secret redaction, the command
 // deadline. A second caller in the workflows plugin would be a second, worse copy of all of it.
-import type { StepHandler, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
+import type { StepHandler, StepKindDescription, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
-import { httpMethods, type HttpSendInput, type KeyValue } from '../shared/model'
+import { bodyModes, httpMethods, type HttpSendInput, type KeyValue } from '../shared/model'
 import { send, SendError } from './send'
 
 /** `ctx.audit.record`, narrowed to what this module calls. Passed in rather than taking the whole
@@ -19,7 +19,7 @@ export type AuditRecorder = (action: string, entry: { subject: string; details: 
 type StepConfig = {
   method: string
   url: string
-  headers?: Record<string, string>
+  headers?: Record<string, string> | string
   bodyMode?: HttpSendInput['bodyMode']
   body?: string
   auth?: HttpSendInput['auth']
@@ -41,12 +41,47 @@ export const validateHttpStep: StepValidator = (step, { label }) => {
   if (typeof config.method !== 'string' || !(httpMethods as readonly string[]).includes(config.method.toUpperCase())) {
     errors.push(`${label} needs one of ${httpMethods.join(', ')} as its method`)
   }
-  if (config.headers !== undefined && !isRecord(config.headers)) errors.push(`${label} headers must be a table of strings`)
+  if (config.headers !== undefined && !isRecord(config.headers) && typeof config.headers !== 'string') {
+    errors.push(`${label} headers must be a table of strings, or one 'Name: value' per line`)
+  }
   return errors
 }
 
-const toKeyValues = (headers: Record<string, unknown> | undefined): KeyValue[] =>
-  Object.entries(headers ?? {}).map(([name, value]) => ({ name, value: String(value), enabled: true }))
+/**
+ * What this step's form looks like (docs/http-client.md § The workflow step). The field ids are the
+ * keys the handler above reads, which is the whole contract: the host writes what it draws into
+ * `[steps.with]` and the handler finds it there.
+ *
+ * `auth` is deliberately absent. It is an object with a different shape per mode, and a field that
+ * needs a component is not a field (docs/workflows.md § Contributed step kinds). A step that
+ * authenticates writes `auth` in the definition's JSON, or puts the header in `headers`.
+ */
+export const describeHttpStep: StepKindDescription = {
+  label: 'Call an HTTP endpoint',
+  description: 'Send one request through this project’s variables and hand the response on.',
+  icon: 'globe',
+  fields: [
+    { id: 'method', label: 'Method', type: 'select', required: true, options: httpMethods.map((method) => ({ value: method, label: method })) },
+    { id: 'url', label: 'URL', type: 'text', required: true, templates: true, hint: 'The project’s `{{variables}}` resolve here too, after the workflow’s own.' },
+    { id: 'headers', label: 'Headers', type: 'textarea', hint: 'One `Name: value` per line.' },
+    { id: 'bodyMode', label: 'Body type', type: 'select', options: bodyModes.map((mode) => ({ value: mode, label: mode })) },
+    { id: 'body', label: 'Body', type: 'textarea', templates: true },
+  ],
+  output: { description: 'The status, the response headers, and the body as text. A 4xx or 5xx is an answer, not a failure.' },
+}
+
+/** A `[steps.with.headers]` table, or the `Name: value` lines the editor's textarea produces. Both,
+ *  because a workflow file is the readable spelling and a form field is the drawable one. */
+const toKeyValues = (headers: Record<string, unknown> | string | undefined): KeyValue[] => {
+  if (typeof headers === 'string') {
+    return headers.split('\n').flatMap((line) => {
+      const at = line.indexOf(':')
+      const name = at > 0 ? line.slice(0, at).trim() : ''
+      return name ? [{ name, value: line.slice(at + 1).trim(), enabled: true }] : []
+    })
+  }
+  return Object.entries(headers ?? {}).map(([name, value]) => ({ name, value: String(value), enabled: true }))
+}
 
 /** The trail write, as narrow as the manifest's disclosure (../../acorn-plugin.config.mjs). The final
  *  URL is already redacted by `send`, and only its origin goes on the row: a query string is where a

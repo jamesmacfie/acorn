@@ -66,6 +66,19 @@ Every route in this router requires a `device` principal, send included, so inte
 callers cannot use the HTTP pane as a general outbound or secret-reading oracle. Provider
 integrations use their own allowlisted clients.
 
+## The workflow step
+
+`http:request` is this plugin's contribution to `workflows:step-kind`
+([workflows.md](./workflows.md) § Contributed step kinds). It sends through the same `send` path the
+pane uses, so the post-interpolation scheme check, the 5 MB response cap, the project's variable
+layers, and the command deadline all apply unchanged.
+
+Its `describe` names the five fields the handler reads: `method`, `url`, `headers`, `bodyMode`, and
+`body`. `headers` takes either a `[steps.with.headers]` table or one `Name: value` per line, which is
+what the drawn textarea produces. `auth` is not a field. It is an object with a different shape per
+mode, and a field that needs a component is not a field, so a step that authenticates writes `auth`
+in the definition's JSON or puts the header in `headers`.
+
 ## Other outbound consumers in the Node
 
 There is one more, and it is deliberately not built on anything shared: the plugin installer

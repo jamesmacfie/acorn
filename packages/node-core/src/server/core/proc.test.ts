@@ -179,6 +179,31 @@ describe('bounded capture', () => {
   })
 })
 
+describe('live output', () => {
+  it('forwards each chunk while still resolving with the collected result', async () => {
+    const out: string[] = []
+    const err: string[] = []
+    const result = await sh('echo one; sleep 0.05; echo two; echo bad 1>&2', {
+      onStdout: (text) => out.push(text),
+      onStderr: (text) => err.push(text),
+    })
+    // A copy, not a replacement: the caller still gets everything at the end.
+    expect(out.join('')).toBe('one\ntwo\n')
+    expect(err.join('')).toBe('bad\n')
+    expect(result.stdout).toBe('one\ntwo\n')
+    expect(result.stderr).toBe('bad\n')
+  })
+
+  it('keeps a multi-byte character whole across a chunk boundary', async () => {
+    // The reason the live path has a decoder of its own: a pipe read can split a 3-byte character in
+    // half, and each half on its own decodes to a replacement character.
+    const out: string[] = []
+    const wide = '\u00e9'.repeat(20_000)
+    await sh(`printf '%s' '${wide}'`, { onStdout: (text) => out.push(text) })
+    expect(out.join('')).toBe(wide)
+  })
+})
+
 describe('failure taxonomy', () => {
   it('distinguishes "could not start" from "ran and failed"', async () => {
     const missing = await runProcess({ file: join(dir, 'definitely-not-here'), cwd: dir })

@@ -4,6 +4,8 @@ import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
 import { runAgentTools } from '../server/agentTools'
+import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
+import { commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
 import { disposeTerminal, registerTerminalChannel, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
@@ -106,6 +108,11 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         defaultUrl: (taskId) => runTargets.defaultUrl(taskId),
         }))
       ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargets)
+      // This plugin's two workflow step kinds (../server/workflowSteps.ts). Contributed rather than
+      // granted, like http's: workflows opens the point and any plugin may fill it. Nothing happens on
+      // a node with workflows disabled, because the point is never opened.
+      ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'command', value: commandStep(ctx.core) })
+      ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'run-target', value: runTargetStep(runTargets) })
       // The five run_* agent tools, over the service built two lines up. The capability stays published
       // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
       for (const tool of runAgentTools(runTargets, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)

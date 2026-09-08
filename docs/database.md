@@ -114,6 +114,38 @@ introspected schema (`assertTable`, `assertColumns` in `server/database.ts`) and
 use. Arbitrary SQL typed into the editor runs verbatim: it is the reader's own database, and writes
 are the point of the pane.
 
+## Workflow steps
+
+This plugin contributes two step kinds to `workflows:step-kind`
+([workflows.md](./workflows.md) § Contributed step kinds), and one capability behind them.
+
+`database.query` (`plugins/database/src/contract/query.ts`) is the bridge's own query with a row cap
+and a read-only refusal applied. One path, so a caller cannot forget either. Its result is
+`{ columns, rows, rowCount, truncated }`, capped at 200 rows. It connects the task's pool itself when
+nothing has, because a step has no pane to have pressed **Connect** in.
+
+**`database:query`** takes either a `savedQueryId` or inline `sql`, and refuses a step that sets both
+or neither. A saved query id is resolved inside the task's own project, so an id from another
+repository does not run here. **`database:generate`** takes a `prompt` and a `connectionId`, asks the
+model for SQL through the same prompt builder the pane uses, and runs it. Its output carries the SQL
+as well as the rows, and a generated write fails the step with the SQL in the message, because what
+the reader needs to see is what the model thought it was asked for.
+
+Both refuse a result over 256 KB of JSON. A step's output is interpolated into the next step's
+prompt, so a result too big to read is a failure rather than something quietly cut in half.
+
+The read-only rule reads the leading keyword of each statement and, for a `WITH`, refuses a write
+anywhere in the body, which is how PostgreSQL lets a statement that starts like a read change data. It
+is a guard over authored SQL, not a sandbox: a function called from a `SELECT` can still write, and
+catching that needs a read-only transaction. That transaction is the seam `database:write` would
+open, and `database:write` is deferred.
+
+`database:generate` spends a model connection, so the plugin declares the `identity` core facet: a
+step has no request to read an owner from, and a connection is spent as somebody.
+`GET /v2/p/database/projects/:projectId/saved-queries` answers the saved-query picker's options and
+refuses a task-confined caller, because a project id is guessable and no task in the path means no
+scope gate.
+
 ## Boundaries
 
 Task IDs and worktree paths are revalidated by the Node. The database plugin does not expose

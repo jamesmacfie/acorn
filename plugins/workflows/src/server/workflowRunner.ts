@@ -15,13 +15,13 @@ import type {
   WorkflowStepDef,
   WorkflowStepRow,
 } from '../shared/workflowContracts'
-import type { PolicyEvaluator, StepKindContribution } from '../shared/workflowContracts'
+import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
+import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from './workflowBuiltins'
 import { Semaphore } from './workflowSemaphore'
 import { intersectToolCeilings } from './workflowTools'
 import {
-  AGENT_STEP_KINDS,
   assertValidWorkflow,
   frozenWorkflowInputs,
   normalizePersistedWorkflow,
@@ -256,13 +256,44 @@ export class WorkflowRunner {
       ?? this.#extensions.entries(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
   }
 
+  /** Every kind this node can run, with the description the editor draws from. Resolved per call for
+   *  the same reason `validationCatalog` is: the plugin that fills the point may init after this one. */
+  #kindEntries(): { id: string; pluginId: string | null; contribution: StepKindContribution }[] {
+    return [
+      ...[...this.#builtins.stepKinds].map(([id, contribution]) => ({ id, pluginId: null, contribution })),
+      ...this.#extensions.entries(WORKFLOW_STEP_KIND).map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
+    ]
+  }
+
   validationCatalog(): WorkflowValidationCatalog {
+    const kinds = this.#kindEntries()
     return {
-      stepKinds: new Set([...this.#builtins.stepKinds.keys(), ...this.#extensions.entries(WORKFLOW_STEP_KIND).map((entry) => entry.id)]),
+      stepKinds: new Set(kinds.map((kind) => kind.id)),
       policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
+      // A contributed kind joins the agent kinds by saying so in its description, which is the only
+      // place `isolation`, `inputs` and `configOptions` are ever allowed from.
+      agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),
+      describeStepKind: (kind) => this.#stepKind(kind)?.describe,
       validateStepKind: (kind, step, context) => this.#stepKind(kind)?.validate?.(step, context) ?? [],
+    }
+  }
+
+  /** What the editor and the palette offer (docs/api-reference.md § Workflows). */
+  catalog(): WorkflowCatalog {
+    return {
+      kinds: this.#kindEntries().map(({ id, pluginId, contribution }) => ({ id, pluginId, describe: contribution.describe ?? null })),
+      policies: [
+        ...[...this.#builtins.policies.keys()].map((id) => ({ id, pluginId: null })),
+        ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => ({ id: entry.id, pluginId: entry.pluginId })),
+      ],
+      profiles: agentProfileRegistry.list().map((profile) => ({
+        id: profile.id,
+        label: profile.label,
+        managed: managedProviderForProfile(profile.id) !== null,
+        structured: !!profile.aiArgv,
+      })),
     }
   }
 
@@ -520,7 +551,7 @@ export class WorkflowRunner {
     // `isolation = "worktree"` puts the step on a child task with a checkout of its own, through the
     // same factory fan-out uses. `cancelRun` already reads `childTaskId` back out of `inputsJson`.
     let childTaskId: string | undefined
-    if (def.isolation === 'worktree' && AGENT_STEP_KINDS.has(kind)) {
+    if (def.isolation === 'worktree' && (this.#stepKind(kind)?.describe?.runsAgent ?? false)) {
       if (!this.deps.createChildTask) {
         this.unregisterActive(run.id, step.id)
         await this.setStep(step.id, { status: 'failed', error: 'Worktree isolation is unavailable (no child-task factory).' })
@@ -705,7 +736,7 @@ export class WorkflowRunner {
     const workflow = normalizePersistedWorkflow(JSON.parse(run.defJson) as WorkflowDef)
     const def = workflow.steps.find((candidate) => candidate.name === step.name)
     let inputsJson = step.inputsJson
-    if (prompt && def && AGENT_STEP_KINDS.has(def.kind ?? 'agent')) {
+    if (prompt && def && (this.#stepKind(def.kind ?? 'agent')?.describe?.runsAgent ?? false)) {
       // The frozen definition is patched for this step alone, so the run still shows what was asked.
       const previous = (() => {
         try {

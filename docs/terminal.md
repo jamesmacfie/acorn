@@ -145,6 +145,39 @@ the vetoing plugin's id in front of it. Observe and veto only, and no transform:
 one over the target's environment, and a hook payload is scalars and arrays of scalars, so an
 environment map is not expressible in the declared vocabulary (`docs/plugins.md` § Hooks).
 
+## Workflow steps
+
+This plugin contributes two step kinds to `workflows:step-kind`
+([workflows.md](./workflows.md) § Contributed step kinds), because the process broker's environment
+rules, the checkout resolution, and the run-target service all live here.
+
+**`terminal:command`** runs one command as `/bin/sh -c` in the task's checkout, through
+`core.proc.runProcess` with the environment `buildSessionEnv` assembles. Its fields are `command`
+(required), `timeoutMs` (1,000 to 600,000, default 120,000), `allowFailure`, and `env`, which takes
+one `KEY=value` per line. A workflow file is committed, so a secret does not belong in `env`.
+
+The output is `{ exitCode, stdout, stderr, truncated }`, and stdout also becomes the step's handoff
+note. Chunks stream out through `emit` as `stdout` and `stderr` events while the command runs, over
+the optional `onStdout` and `onStderr` callbacks on `ProcSpec`, so a reader watches a tail without
+the step holding a PTY. A non-zero exit fails the step unless `allowFailure` is set, in which case
+the exit code is an answer a later `decide` can branch on. A timeout fails the step; an abort cancels
+it.
+
+It captures rather than opening a terminal on purpose. Reading clean stdout out of a PTY is lossy,
+and a headless node with nobody attached would still have to hold the terminal open.
+
+**`terminal:run-target`** starts one of the project's declared run targets as a step of its own, so a
+later step can wait on it. Its fields are `target`, whose choices come from
+`GET /v2/p/terminal/tasks/:taskId/run-targets`, and `waitForUrl`, which is on by default and gives
+the target 60 seconds to report a URL. The output is `{ targetId, sessionId, url }`. The same
+repo-config trust gate applies, because it is `RuntimeService.start` underneath.
+
+Both kinds are written against a local mirror of the workflows contribution type in
+`plugins/terminal/src/contract/workflowSteps.ts`, and name the point by its string. Importing
+`@acorn/plugin-workflows` here would make the workspace package graph cyclic: workflows already
+depends on this package, directly and through the agents plugin. A test in the workflows plugin holds
+the mirror against the real type.
+
 ## Profiles
 
 Claude, Codex, and Aider launch specifications are registered by literal in

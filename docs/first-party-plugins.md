@@ -155,7 +155,7 @@ Ordered by how strong the first-party claim is.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes six capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `TASK_CREATED`, …) that four other plugins consume, handles the `core:worktree-created` hook, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D, F |
+| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes six capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `TASK_CREATED`, …) that four other plugins consume, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin in the tree. | A, B, D, F |
 | **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because the `agents:tool-card` point's props name it. | D, E, F |
 | **docker** | Owns a WS channel prefix for container log and event streams. Its footer badge and rail slot are component contributions. | A, B |
 | **preview** | Its display lifecycle calls the host-owned webview service any plugin surface can use, and its node half owns the preview page rules the shell enforces, delivered over the service protocol. The browser agent tools left for `plugins/browser`, which drives a browser of the node's own. Supplying shell-enforced policy—not merely showing a page—is why preview remains first-party. | C |
@@ -169,7 +169,7 @@ Ordered by how strong the first-party claim is.
 | --- | --- | --- |
 | **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point a loaded plugin can fill, and everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) was already available. The commit-message route it gained consumes `core.models`, which does not change the answer: the database plugin consumes the same seam as a loaded plugin, through the `ctx.core` every plugin has ([integrations.md](./integrations.md) § Model providers). It stays compiled by preference: it is one of the four panes a task always has. | — |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. Every one of its five surfaces is a host layout filled with kit nodes and it ships no stylesheet, so nothing about how it draws itself keeps it here: what does is `GITHUB_MIRROR` having a consumer. | D |
-| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability and one settings page, `WorkflowsSettings.tsx`, which is kit-pure and ships no stylesheet. | D, E, F |
+| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability and one settings page, `WorkflowsSettings.tsx`, which is kit-pure and ships no stylesheet. Opens the three extension points other plugins add step kinds, policies, and triggers through, and answers the catalog those kinds describe themselves into. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
 
 ### First-party only by history
@@ -192,7 +192,9 @@ the client half" here, because the pane embedded Monaco and Monaco does not fit 
 not to widen the sandbox: the host now owns one editor and lends it through a declarative contract, so
 the pane still has a real editor while the plugin ships 156 KB and no editor library at all
 ([docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) § database has moved). Its `DATABASE` capability turned out to be
-an indirection with nothing on the other side of it and was deleted rather than ported.
+an indirection with nothing on the other side of it and was deleted rather than ported. It publishes
+one capability now, `database.query`, inside its own namespace, and contributes the `database:query`
+and `database:generate` workflow step kinds through it.
 
 **model-providers** also used to be on this table and has moved: it is a loaded package now, in neither
 composition list. It was the easiest possible second move and worth saying why — no client half, so

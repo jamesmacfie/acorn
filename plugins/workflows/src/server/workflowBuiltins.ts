@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
+import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
 import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../shared/workflowContracts'
 import type { RunnerDeps, RunStepOptions } from './workflowRunner'
 import { intersectToolCeilings } from './workflowTools'
@@ -102,7 +103,13 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     decide: runDecision,
   }
   const kinds = new Map<string, StepKindContribution>(
-    BUILTIN_STEP_KINDS.map((kind) => [kind, { handler: stepKinds[kind], validate: BUILTIN_STEP_VALIDATORS[kind] }]),
+    BUILTIN_STEP_KINDS.map((kind) => [kind, {
+      handler: stepKinds[kind],
+      validate: BUILTIN_STEP_VALIDATORS[kind],
+      // The same `describe` a contributed kind carries, from the table in ../shared/stepFields.ts.
+      // The editor draws a built-in and a contribution the same way.
+      describe: BUILTIN_STEP_DESCRIPTIONS[kind],
+    }]),
   )
   // Returned before the handlers below are written, which is fine and deliberate: they are function
   // declarations, so they are hoisted and already bound by the time a step dispatches into one.

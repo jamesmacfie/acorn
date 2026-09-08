@@ -28,6 +28,13 @@ export type ProcSpec = {
   maxOutputBytes?: number
   signal?: AbortSignal
   stdin?: string
+  // Live output, chunk by chunk, for a caller that streams a tail while the command runs. Off by
+  // default: the collected, capped result is still what `runProcess` resolves with, and a chunk sent
+  // here is a copy, not a replacement. Text is decoded across chunk boundaries, so a multi-byte
+  // character split by a pipe read arrives whole. Chunks keep coming after the output cap is reached,
+  // because a tail is what a reader watches and the cap is about how much is kept.
+  onStdout?: (text: string) => void
+  onStderr?: (text: string) => void
   // How long a group member gets between SIGTERM and SIGKILL. Overridable mainly so the escalation path
   // can be tested deterministically under load: a 2s default plus scheduling makes a full-suite run flaky,
   // and loosening the assertion instead would be testing nothing.
@@ -153,8 +160,23 @@ export async function runProcess(spec: ProcSpec): Promise<ProcResult> {
       buffers[which].push(chunk)
       sizes[which] += chunk.byteLength
     }
-    child.stdout?.on('data', (chunk: Buffer) => capture('out', chunk))
-    child.stderr?.on('data', (chunk: Buffer) => capture('err', chunk))
+    // One decoder per stream for the live callbacks, separate from the one the capture uses at the end:
+    // a partial multi-byte sequence has to carry across chunks here too.
+    const live = { out: new StringDecoder('utf8'), err: new StringDecoder('utf8') }
+    const forward = (which: 'out' | 'err', chunk: Buffer): void => {
+      const sink = which === 'out' ? spec.onStdout : spec.onStderr
+      if (!sink) return
+      const text = live[which].write(chunk)
+      if (text) sink(text)
+    }
+    child.stdout?.on('data', (chunk: Buffer) => {
+      capture('out', chunk)
+      forward('out', chunk)
+    })
+    child.stderr?.on('data', (chunk: Buffer) => {
+      capture('err', chunk)
+      forward('err', chunk)
+    })
 
     if (spec.stdin !== undefined && child.stdin) {
       child.stdin.on('error', () => {
