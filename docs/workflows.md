@@ -209,8 +209,10 @@ These are why the editor is safe to type in:
   duplicate and anything that closes a cycle are never on the list.
 - Undo and redo cover the whole draft, with typing folded into one step inside a 600 ms window, 60
   deep.
-- Save is grey while the draft is unchanged, while a required field is empty, or while the node's
-  validate route has a problem with it.
+- Save is grey only while the draft is unchanged or a write is in flight. A draft that does not
+  validate still saves, because that is every workflow partway through being built: the footer says
+  what is wrong, and **Run** is what refuses. A new definition has no steps, so the node list says so
+  under its rows and the footer reports it.
 
 ### The graph view
 
@@ -250,7 +252,9 @@ in scope, and starts the run when the required ones are filled. A definition tha
 and already has a task starts without a dialog.
 
 A committed file opens in the same editor, read-only, with **Copy to database** in place of Save. So
-a workflow somebody reviewed in a pull request is read the same way as one you typed.
+a workflow somebody reviewed in a pull request is read the same way as one you typed. An address that
+names no layer at all says that instead, because read-only and unreadable are different things and
+the editor used to give the second one the first one's words.
 
 ### Where positions live
 
