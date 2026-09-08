@@ -75,3 +75,22 @@ describe('linear provider normalization', () => {
     expect(summary).toEqual({ identifier: 'ENG-42', title: 'Fix login', url: 'https://linear.app/acme/issue/ENG-42', state: { name: 'Done', type: 'completed', color: '#0f0' }, assignee: 'Jo' })
   })
 })
+
+// Core asks every connected workspace in turn (docs/agent-tools.md § issue_detail), so the three
+// answers this has to keep apart are "here it is", "not in this one", and "this one refused".
+describe('linear item detail', () => {
+  const detailFor = (result: unknown) => linearProvider.detail!({ resource: async () => result } as never, 'ENG-42')
+
+  it('returns the issue the resource served', async () => {
+    await expect(detailFor({ ok: true, value: { identifier: 'ENG-42', description: 'the brief' } }))
+      .resolves.toEqual({ identifier: 'ENG-42', description: 'the brief' })
+  })
+
+  it('returns null when this workspace does not have the issue', async () => {
+    await expect(detailFor({ ok: false, failure: { error: 'provider_resource_not_found', status: 404 } })).resolves.toBeNull()
+  })
+
+  it('throws when the workspace refuses', async () => {
+    await expect(detailFor({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })).rejects.toThrow('provider_needs_auth')
+  })
+})

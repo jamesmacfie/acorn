@@ -96,7 +96,7 @@ describe('what the shared composition populates', () => {
   it("registers core's own agent tools under the 'core' owner", () => {
     const db = makeTestDb()
     try {
-      wireAgentTools({ db: db.db })
+      wireAgentTools({ db: db.db, secrets: db.secrets })
       const names = agentToolContributions().map((tool) => tool.name)
       expect(names).toEqual(expect.arrayContaining(['task_context', 'linked_issues', 'repo_info']))
     } finally {

@@ -31,6 +31,7 @@ import {
   type StoredConnection,
 } from '@acorn/plugin-api/node'
 import {
+  LINEAR_ISSUES_RESOURCE,
   linearNodeToDetail,
   linearProvider,
   linearRef,
@@ -61,7 +62,7 @@ const PROVIDER = 'linear'
 // only to say that what arrived is a list of strings.
 const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) satisfies z.ZodType<LinearIssuesRequest, Partial<LinearIssuesRequest>>
 const commentBody = z.object({ body: z.string(), parentId: z.string().optional() })
-const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
+const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === LINEAR_ISSUES_RESOURCE)!.ttlMs
 
 // The only host /uploads will spend a credential against: docs/integrations.md § Linear. Exported and
 // pure so a branch carrying the owner's Linear key can be checked without standing up a request context.
@@ -393,7 +394,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
       const result = await linearResource<LinearResourceInput, LinearIssueDetail>(c, {
         providerId: PROVIDER,
         connectionId: connection.id,
-        resourceId: 'linear.issues',
+        resourceId: LINEAR_ISSUES_RESOURCE,
         input: { kind: 'detail', identifier },
         force,
       })
