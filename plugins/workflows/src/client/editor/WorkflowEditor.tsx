@@ -96,7 +96,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     return { nodes: def.steps.length, roots }
   })
 
-  const canSave = () => !store.readOnly() && store.dirty() && !problems().length && !store.busy()
+  // A draft saves whether or not it validates, the way the store takes one (docs/workflows.md
+  // § Database definitions). Greying Save out while a workflow is half-built is how you lose it on
+  // the way to the next screen. The footer says what is wrong, and Run is what refuses.
+  const canSave = () => !store.readOnly() && store.dirty() && !store.busy()
 
   const save = async (): Promise<void> => {
     if (!(await store.save())) return
@@ -215,7 +218,12 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         </Modal>
       </Show>
       <Show when={store.readOnly()}>
-        <Alert>This one is a committed file. Copy it to the database to change it.</Alert>
+        <Show
+          when={store.unreadable()}
+          fallback={<Alert>This one is a committed file. Copy it to the database to change it.</Alert>}
+        >
+          <Alert tone="danger">This address does not name a workflow. Go back and pick one from the list.</Alert>
+        </Show>
       </Show>
       <Show
         when={tab() !== 'json'}

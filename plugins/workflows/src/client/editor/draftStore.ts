@@ -25,9 +25,22 @@ export type DefRef = { source: 'database' | 'repo' | 'user'; id: string }
 
 export const defRefKey = (ref: DefRef): string => `${ref.source === 'database' ? 'db' : ref.source}:${ref.id}`
 
+/** A key arrives either from the address, where it is encoded, or straight from `defRefKey`, where it
+ *  is not. A malformed escape is not worth throwing over: the caller reads it as unparseable. */
+const decodeItem = (item: string): string => {
+  try {
+    return decodeURIComponent(item)
+  } catch {
+    return item
+  }
+}
+
 export function parseDefRef(item: string | undefined): DefRef | null {
   if (!item) return null
-  const match = /^(db|repo|user):(.+)$/.exec(item)
+  // Decoded here, because Solid Router hands a path parameter back exactly as it sits in the address
+  // and `workflowsSurfacePath` encodes the separator. Reading `db%3Aabc` as a definition nobody can
+  // name is how the whole editor once opened read-only.
+  const match = /^(db|repo|user):(.+)$/.exec(decodeItem(item))
   if (!match) return null
   return { source: match[1] === 'db' ? 'database' : (match[1] as 'repo' | 'user'), id: match[2] }
 }
@@ -46,6 +59,9 @@ export type WorkflowDraftStore = ReturnType<typeof createDraftStore>
 export function createDraftStore(input: { projectId: () => string; item: () => string | undefined }) {
   const ref = createMemo<DefRef | null>(() => parseDefRef(input.item()))
   const readOnly = () => ref()?.source !== 'database'
+  // Told apart from `readOnly`, because "this is committed, copy it" and "this address names nothing"
+  // are different things to say and the second one used to wear the first one's words.
+  const unreadable = () => !!input.item() && !ref()
 
   const [draft, setDraftRaw] = createSignal<WorkflowDraft>(newDraft(emptyDefinition()))
   const [past, setPast] = createSignal<WorkflowDraft[]>([])
@@ -212,6 +228,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   return {
     ref,
     readOnly,
+    unreadable,
     draft,
     apply,
     select,
