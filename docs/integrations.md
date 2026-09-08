@@ -38,8 +38,8 @@ links. The provider mirror is disposable and is never treated as the upstream so
 Every provider registers a `ConnectionProviderContribution`: connection lifecycle, capabilities,
 request budgets, and optionally a project source and a model catalog. A provider that also mirrors
 external items, such as GitHub or Linear, extends that into an `IntegrationProviderContribution`,
-adding the external-id contract, mirrored resources, a codec, task-context formatting, reference
-resolution, and mutations. Two registries hold them: the connection registry holds every provider,
+adding the external-id contract, mirrored resources, a codec, task-context formatting, item detail,
+reference resolution, and mutations. Two registries hold them: the connection registry holds every provider,
 and the integration registry holds only the ones that extend it. Model providers such as OpenAI and
 Anthropic register in the connection registry only, because they have nothing to mirror.
 
@@ -54,6 +54,20 @@ one provider at construction, never through core's own database handle. Provider
 receive that handle directly, which let a route write to any core table and tied Linear's and
 Rollbar's schemas to every core migration. `ExternalItemStore` confines a route to its own rows in the
 external-item cache and nothing else.
+
+### Item detail
+
+`detail` is the read behind core's `issue_detail` agent tool: given an identifier, return everything
+the provider has on that one item, or `null` if this connection does not have it. Core calls it once
+per connected workspace and takes the first answer.
+
+The provider composes its own resources through the one method core lends it, because only the
+provider knows how many the answer takes. Linear reads the issue and Rollbar reads the item, its
+occurrence list and the newest occurrence. Declaring nothing means this provider offers summaries
+only, which is the honest state for a provider whose items have no body.
+
+Why the tool lives in core and the read lives here: Linear and Rollbar ship loaded, and `ctx.tools` is
+compiled-only. For the full contract, see [agent tools](./agent-tools.md) § issue_detail.
 
 ## Project sources
 

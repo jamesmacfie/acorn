@@ -64,6 +64,9 @@ describe('the full agent-tool manifest', () => {
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
+    // Core owns it because Linear and Rollbar ship loaded and `ctx.tools` is compiled-only; the read
+    // itself belongs to whichever provider answers (docs/agent-tools.md § issue_detail).
+    'issue_detail',
   ]
   // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
   const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
@@ -77,7 +80,7 @@ describe('the full agent-tool manifest', () => {
     try {
       const core = { tasks: { load: async () => undefined } } as never
       const names = [
-        ...buildAgentTools({ db: testDb.db }).map((tool) => tool.name),
+        ...buildAgentTools({ db: testDb.db, secrets: testDb.secrets }).map((tool) => tool.name),
         ...browserAgentTools({} as never).map((tool) => tool.name),
         ...localGitAgentTools(core).map((tool) => tool.name),
         ...memoryAgentTools({} as never, {} as never, core).map((tool) => tool.name),

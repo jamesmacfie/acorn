@@ -139,6 +139,8 @@ export type {
   CachedItemCodec,
   CodecResult,
   MirroredResourceContribution,
+  ProviderDetailContext,
+  ProviderItemDetail,
   ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,

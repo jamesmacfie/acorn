@@ -10,13 +10,16 @@ import { SecretService } from '../server/core/secrets'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
 
-export type TestDb = { db: AppDatabase; cleanup: () => void }
+export type TestDb = { db: AppDatabase; secrets: SecretService; cleanup: () => void }
 
 export function makeTestDb(): TestDb {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-test-'))
   const db = openDb(join(dir, 'test.sqlite'))
   return {
     db,
+    // The same binding `testEnv` puts on `c.env`, minted from the same key, for the node-side callers
+    // that take a SecretService directly instead of a request context.
+    secrets: new SecretService(TEST_ENCRYPTION_KEY),
     cleanup: () => {
       try {
         db.close()

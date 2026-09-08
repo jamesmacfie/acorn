@@ -25,16 +25,23 @@ registered groups are:
 
 - Task and pull-request context, from core: `task_current`, `task_context`, `pr_current`,
   `pr_changed_files`, `linked_issues`, `repo_info`.
+- One issue or error in full, from core over whichever provider owns it: `issue_detail`. The tool is
+  core's because Linear and Rollbar ship loaded and cannot register a tool; the read is theirs
+  (docs/agent-tools.md § issue_detail).
 - Plugin authoring and the install request, from core: `plugin_authoring`, `plugin_request`.
 - Local git reads, from `changes`: `local_changes`, `local_diff`, `git_log`.
 - Notes, from `notes`, and memory, from `memory`.
 - The run targets a repo configures, from `terminal`: `run_targets`, `run_start`, `run_stop`,
   `run_restart`, `run_status`.
 - Browser automation, from `browser`.
-- One write, from `github`: `github_pull_create`.
+- The pull request, from `github`: two reads over the local mirror, `pr_review_comments` and
+  `pr_checks`, and one write, `github_pull_create`.
 
 Nothing here reads or writes a file, drives a workflow, opens a database, or talks to Docker. An
-agent that needs a file uses its own harness tools inside the worktree.
+agent that needs a file uses its own harness tools inside the worktree. Driving a workflow from a step
+of one is a loop; the interactive HTTP sender is denied to this principal outright, under Security
+below; and arbitrary SQL against a task's database would be execute-tier, which is denied by
+default.
 
 The server returns structured results for absent task context, unavailable optional plugins, and
 provider errors. It never returns device tokens, provider credentials, raw secret fields, or arbitrary

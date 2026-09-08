@@ -20,12 +20,67 @@ The exact type carries more metadata for rendering, permissions, and task contex
 must validate input again at execution time and use CoreServices for files, Git, processes, secrets,
 and task lookup.
 
-Tool groups cover task and context inspection, Git and changes, notes, memory, terminal handoff,
-workflow controls, database operations, Docker, and browser operations.
+Tool groups cover task and context inspection, the issue and error trackers, Git and changes, the
+pull request, notes, memory, terminal handoff, and browser operations. Nothing drives a workflow,
+opens a database, or talks to Docker: [the MCP doc](./mcp.md) § Tool surface says why, and the
+registry is the authority on the list.
 
-GitHub contributes the write-tier `github_pull_create` tool. It is available only for a managed
-session on a task with a GitHub project and branch, creates from that branch, and records the session
-in core's task-PR relation before returning whether the new PR became primary or related.
+## GitHub
+
+Three tools, one write and two reads.
+
+`github_pull_create` is write-tier. It is available only for a managed session on a task with a
+GitHub project and branch, creates from that branch, and records the session in core's task-PR
+relation before returning whether the new PR became primary or related.
+
+`pr_review_comments` and `pr_checks` are read-tier, and both read the mirror this plugin already keeps
+fresh, so neither spends a credential or touches the network. Between them they answer the two
+questions an agent on a reviewed PR has: what did people say, and what is red. The first groups the
+mirror's per-comment `review_threads` rows back into threads and leaves resolved ones out unless
+asked; the second returns every check with its raw status plus the failing names, by the same rule the
+ci-loop step uses (`checkFailed` in `plugins/github/src/server/mirrorQueries.ts`).
+
+Both distinguish an unmirrored pull request from an empty one, and say which in a `status` field. A
+task whose PR has never been mirrored is not a PR with no feedback, and it is not a green one.
+
+## issue_detail
+
+`linked_issues` answers "what is attached to this task" from the cached summary: an identifier, a
+title, a URL and a state. An agent asked to implement a ticket needs the description and the
+comments, and an agent asked to fix an error needs the trace. Neither is in a summary, and neither is
+in the task-context prompt, which is why an agent used to fall back to its own Linear connector and
+fail.
+
+`issue_detail` is the read that closes that gap. It takes an identifier, an optional provider and an
+optional `refresh`, asks every connected workspace in turn, and returns the first that answers.
+Read-tier, so it is permitted by default.
+
+Core owns the tool and the provider owns the read. That split is not decoration: Linear and Rollbar
+both ship loaded, and `ctx.tools` is compiled-only
+([contribution kinds](./contribution-kinds.md)), so neither plugin can register a tool at all. What
+each declares instead is `detail` on its provider contribution, a function core calls once per
+connection with one method lent back to it:
+
+```ts
+export type ProviderDetailContext = {
+  resource<TInput, TOutput>(resourceId: string, input: TInput, force?: boolean): Promise<RouteResult<TOutput>>
+}
+export type ProviderItemDetail = (context: ProviderDetailContext, identifier: string) => Promise<unknown | null>
+```
+
+That one method is the same resource runtime the provider's own routes go through, so the cache, the
+TTL, the request budget and the credential scope are the ones already in place. The provider composes
+its own resources rather than pointing at one, because only it knows how many the answer takes:
+Linear reads the issue, and Rollbar reads the item, its occurrence list and the newest occurrence,
+where the trace is.
+
+Three answers have to stay apart. A value is the item. `null` is "not in this connection", which is
+what every workspace but one legitimately says. A throw is that workspace refusing, and core reports
+it rather than the not-found, because a 401 from the workspace that owns the ticket must not read as
+"no such ticket".
+
+A provider that declares no `detail` offers summaries only. Naming it explicitly is a `bad_request`
+that says so, and when no provider declares one the tool's `when` withholds it entirely.
 
 ## Projections
 

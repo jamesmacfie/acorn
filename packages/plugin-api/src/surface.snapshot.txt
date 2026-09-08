@@ -265,6 +265,8 @@ node: Principal
 node: ProfileDef
 node: ProjectRef
 node: ProvidedNodeRecord
+node: ProviderDetailContext
+node: ProviderItemDetail
 node: ProviderOperationError
 node: ProviderProjectSource
 node: ProviderResourceContext
