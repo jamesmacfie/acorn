@@ -11,6 +11,7 @@ import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/clie
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import type { WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 
@@ -41,6 +42,9 @@ export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 // A whole definition written from a description (docs/workflows.md § Authoring).
 export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
+// Which providers the owner has connected, for the Generate modal's picker. Device-only like the
+// rest of `/defs`, and ids and labels only — no key ever leaves the node.
+export const workflowModelConnectionsRoute = `${workflowDefsRoute}/model-connections`
 export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
@@ -106,6 +110,7 @@ export const workflowApi = {
   deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
   validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
   saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
+  modelConnections: () => readJson<AvailableModelConnection[]>(workflowModelConnectionsRoute),
   // The one call here that says how long it may take, because the broker's default kills it first.
   generateDef: (input: WorkflowGenerateRequest) =>
     writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {

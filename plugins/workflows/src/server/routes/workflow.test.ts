@@ -214,6 +214,7 @@ describe('workflow definition routes', () => {
     validate: async () => ({ problems: [] }),
     saveToRepo: async () => ({ path: '.acorn/workflows/ship-it.toml' }),
     generate: async () => ({ def: row.def, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'm' }),
+    modelConnections: async () => [],
     ...over,
   })
 

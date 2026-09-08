@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Index, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { activeTaskId, projectPath, toast, workspacesOptions } from '@acorn/plugin-api/client'
@@ -21,7 +21,9 @@ import {
   ToolbarSpacer,
 } from '@acorn/plugin-api/ui'
 import { workflowsSurfacePath } from '../surfacePath'
+import type { WorkflowGenerateNote, WorkflowGenerateResult } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { workflowApi } from '../workflowsClient'
 import {
   addNode,
   connect,
@@ -33,9 +35,11 @@ import {
   setField,
   setInputs,
   setStep,
+  toJson,
   type DraftSelection,
 } from './draft'
 import { createDraftStore, defRefKey } from './draftStore'
+import GenerateModal from './GenerateModal'
 import GraphView from './GraphView'
 import JsonTab from './JsonTab'
 import NodeInspector from './NodeInspector'
@@ -106,6 +110,28 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     toast('Workflow saved.')
   }
 
+  // Which providers the owner has connected. The Generate button is drawn only when there is one, on
+  // the rule ../../../changes/src/client/GenerateButton.tsx sets out: a control whose only message is
+  // "connect a provider first" is a control in the way of the four beside it, and Settings is where
+  // connections are made. A node that cannot answer counts as none.
+  const [connections] = createResource(async () => workflowApi.modelConnections().catch(() => []))
+  const canGenerate = () => !store.readOnly() && (connections()?.length ?? 0) > 0
+  const [generating, setGenerating] = createSignal(false)
+  const [notes, setNotes] = createSignal<WorkflowGenerateNote[]>([])
+
+  // Through the same door the JSON tab's Apply uses, so a whole generated definition is one entry on
+  // the undo stack rather than none or a dozen.
+  const applyGenerated = (result: WorkflowGenerateResult): void => {
+    setGenerating(false)
+    const refused = store.applyText(toJson(result.def))
+    if (refused) {
+      store.setMessage(refused)
+      return
+    }
+    setNotes(result.notes)
+    toast('Workflow generated.')
+  }
+
   // Two steps, because saving to the repository is a decision about where this definition lives from
   // now on (docs/workflows.md § Authoring). The modal asks it; the terminal draws the same one.
   const [askingRepo, setAskingRepo] = createSignal(false)
@@ -156,6 +182,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         tabs={[{ id: 'nodes', label: 'Nodes' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'JSON' }]}
         onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
       />
+      <Show when={canGenerate()}>
+        <Button size="sm" disabled={store.busy()} onPress={() => setGenerating(true)}>Generate</Button>
+      </Show>
       <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
       <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
       <Show
@@ -216,6 +245,35 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             <Button variant="solid" onPress={() => void saveToRepo(true)}>Write it and keep both</Button>
           </ModalActions>
         </Modal>
+      </Show>
+      <Show when={generating()}>
+        <GenerateModal
+          connections={connections() ?? []}
+          context={{
+            workspaceId: workspaceId(),
+            // Only a row can be an example of itself: the worked examples the node picks are rows.
+            ...(store.ref()?.source === 'database' ? { defId: store.ref()?.id } : {}),
+            name: draft().def.name,
+            ...(draft().def.inputs ? { inputs: draft().def.inputs } : {}),
+          }}
+          onDismiss={() => setGenerating(false)}
+          onGenerated={applyGenerated}
+        />
+      </Show>
+      {/* Above the list rather than in a toast: a list of things that were changed is not something
+          to read in three seconds. What the definition still gets wrong is the footer's job. */}
+      <Show when={notes().length}>
+        <Alert
+          tone="warn"
+          title="Changed before this was applied"
+          // Dismissed through `actions` rather than `onDismiss`, which the terminal host's `Alert`
+          // accepts and draws nothing for. One prop, one control, both hosts.
+          actions={<Button size="sm" variant="bare" onPress={() => setNotes([])}>Dismiss</Button>}
+        >
+          <Stack gap="row">
+            <Index each={notes()}>{(note) => <Text wrap>{note().message}</Text>}</Index>
+          </Stack>
+        </Alert>
       </Show>
       <Show when={store.readOnly()}>
         <Show
