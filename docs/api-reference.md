@@ -292,11 +292,18 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 /v2/p/terminal/sessions*
 /v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
 /v2/p/workflows/tasks/:id/workflows*
-/v2/p/workflows/workflows/runs/:runId/*
+/v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry}
 ```
 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Workflows own durable definitions, runs, steps, gates, and reconciliation.
+
+`POST /v2/p/workflows/tasks/:id/workflows` takes `{ def, inputs? }`. `inputs` is a table of strings,
+one per input the definition declares; the runner refuses a required input with no value and a name
+the definition does not declare. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
+failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
+otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
+foreign or unknown run as a 404.
 
 ### Notes and memory
 
@@ -374,8 +381,9 @@ directly.
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
 both ends. Core owns twelve, and every other prefix belongs to the plugin that registered it.
 
-`term:` is transport on both ends and `workflow:` carries the notification bell's notices and step
-events. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
+`term:` is transport on both ends and `workflow:` carries the notification bell's notices, per-step
+stream events, and `workflow:step-changed`, which names one step whose status moved so a run surface
+can redraw that node without re-reading the run. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
 them, described under [Backpressure](./terminal.md#backpressure). The other nine are the Node saying
 that something it owns has moved, and each is one frame:
 

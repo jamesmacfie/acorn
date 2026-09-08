@@ -145,17 +145,37 @@ async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExe
   )
 }
 
+// How long to wait for the provider to report its option list before applying a step's requested
+// config. `wait` hands back the current snapshot on expiry, so a slow provider costs the step this
+// much and then runs on the provider's own settings.
+const CONFIG_READY_TIMEOUT_MS = 30_000
+
+/** The provider options a step asked for, applied to its session. Ordered after the provider's
+ *  `session_metadata` because that list is the only thing a value can be validated against, and
+ *  before the turn is enqueued because the Claude driver reads a switch through `setConfig` only. */
+async function applyRequestedConfig(runtime: ManagedAgentRuntime, sessionId: string, wanted: Record<string, string> | undefined): Promise<void> {
+  if (!wanted || !Object.keys(wanted).length) return
+  await runtime.wait(sessionId, 0, 'ready', CONFIG_READY_TIMEOUT_MS)
+  await runtime.applyRequestedConfig(sessionId, wanted)
+}
+
 export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSessionExecute {
   return async (request) => {
     const providerId = managedProviderForProfile(request.profileId)
     if (!providerId) return null
     const session = await sessionFor(runtime, request, providerId)
+    await applyRequestedConfig(runtime, session.id, request.configOptions)
     const beforeSeq = session.lastEventSeq
     const turn = await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: promptWithResultContract(request.prompt, request.schema) }],
       source: 'workflow',
       effectivePolicy: {
-        model: request.model,
+        // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
+        // them only through the session config above. Both are written so the two drivers see one
+        // request, and `configOptions` wins over the older `model` field where a file sets both.
+        model: request.configOptions?.model ?? request.model,
+        ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
+        ...(request.configOptions ? { configOptions: request.configOptions } : {}),
         workflowRunId: request.runId,
         workflowStepId: request.stepId,
         schema: request.schema,

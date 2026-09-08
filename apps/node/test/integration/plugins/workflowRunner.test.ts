@@ -140,7 +140,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(gated.status).toBe('gated')
     let steps = await runner.steps(runId)
     expect(steps.map((s) => s.status)).toEqual(['done', 'waiting-gate', 'pending'])
-    expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'))
+    expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'), { runId, stepId: steps[1].id })
 
     // No further transitions while gated: the final step must not start.
     await new Promise((r) => setTimeout(r, 300))
@@ -532,6 +532,238 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const [run] = await wf.db.select().from(workflowRuns)
     expect(run.trigger).toBe('src:pr-opened')
     expect((await waitDone(runner, run.id)).status).toBe('done')
+  })
+
+  // ── The graph (docs/workflows.md § Execution model) ─────────────────────────────────────────────
+  //
+  // A scripted runStep: every step reports when it starts, and finishes only when the test releases
+  // it, so "these two ran at the same time" is an assertion rather than a guess about timing.
+  const scripted = () => {
+    const started: string[] = []
+    const finished: string[] = []
+    const gates = new Map<string, () => void>()
+    const d = deps()
+    d.runStep = async (taskId, def, opts) => {
+      started.push(def.name)
+      stepInputs[def.name] = opts.prompt
+      ;(d as { taskFor?: Record<string, string> }).taskFor = { ...(d as { taskFor?: Record<string, string> }).taskFor, [def.name]: taskId }
+      await new Promise<void>((release) => gates.set(def.name, release))
+      finished.push(def.name)
+      const structured = structuredByStep[def.name]
+      return {
+        status: structured === 'FAIL' ? 'error' : 'ok',
+        exitCode: structured === 'FAIL' ? 1 : 0,
+        capture: {
+          result: `${def.name} says so`,
+          structuredOutput: structured && structured !== 'FAIL' ? JSON.parse(structured) as unknown : null,
+          sessionId: `${def.name}-session`,
+          costUsd: null,
+          events: [],
+        },
+        stderrTail: structured === 'FAIL' ? 'it broke' : '',
+      }
+    }
+    const release = async (name: string) => {
+      const deadline = Date.now() + 5_000
+      while (!gates.has(name)) {
+        if (Date.now() > deadline) throw new Error(`step '${name}' never started (started: ${started.join(', ')})`)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      gates.get(name)!()
+      gates.delete(name)
+    }
+    const waitStarted = async (name: string) => {
+      const deadline = Date.now() + 5_000
+      while (!started.includes(name)) {
+        if (Date.now() > deadline) throw new Error(`step '${name}' never started (started: ${started.join(', ')})`)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+    }
+    return { deps: d, started, finished, release, waitStarted }
+  }
+
+  it('two roots run at the same time, and the step after both waits for both', async () => {
+    const script = scripted()
+    const runner = new WorkflowRunner(wf.db, script.deps)
+    const runId = await runner.start('task1', {
+      name: 'diamond',
+      steps: [
+        { name: 'left', after: [] },
+        { name: 'right', after: [] },
+        { name: 'both', after: ['left', 'right'] },
+      ],
+    })
+    // Both roots are in flight before either has finished.
+    await script.waitStarted('left')
+    await script.waitStarted('right')
+    expect(script.finished).toEqual([])
+    expect((await runner.steps(runId)).filter((step) => step.status === 'running').map((step) => step.name).sort())
+      .toEqual(['left', 'right'])
+
+    await script.release('left')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(script.started).not.toContain('both') // one predecessor is not enough
+
+    await script.release('right')
+    await script.waitStarted('both')
+    await script.release('both')
+    expect((await waitDone(runner, runId)).status).toBe('done')
+    expect(script.started.slice(0, 2).sort()).toEqual(['left', 'right'])
+    expect(script.started[2]).toBe('both')
+  })
+
+  it('append hands a node one block per done predecessor, and none in template mode', async () => {
+    const script = scripted()
+    structuredByStep = { left: '{"found":"a null token"}' }
+    const runner = new WorkflowRunner(wf.db, script.deps)
+    const runId = await runner.start('task1', {
+      name: 'merge',
+      steps: [
+        { name: 'left', after: [] },
+        { name: 'right', after: [] },
+        { name: 'both', after: ['left', 'right'], prompt: 'Write one answer.' },
+        { name: 'quiet', after: ['both'], inputs: 'none', prompt: 'Say nothing else.' },
+      ],
+    })
+    await script.release('left')
+    await script.release('right')
+    await script.waitStarted('both')
+    expect(stepInputs.both).toContain('Write one answer.')
+    expect(stepInputs.both).toContain('## Output of left\n\n{"found":"a null token"}')
+    expect(stepInputs.both).toContain('## Output of right\n\nright says so')
+    await script.release('both')
+    await script.waitStarted('quiet')
+    // The handoff context still rides along; what 'none' turns off is the per-edge block.
+    expect(stepInputs.quiet).not.toContain('## Output of')
+    await script.release('quiet')
+    expect((await waitDone(runner, runId)).status).toBe('done')
+  })
+
+  it('a decide skips what only the untaken branch reached, and leaves a shared successor alone', async () => {
+    structuredByStep = { route: '{"verdict":"fix"}' }
+    const runner = new WorkflowRunner(wf.db, deps())
+    const runId = await runner.start('task1', {
+      name: 'branch-tree',
+      steps: [
+        { name: 'route', kind: 'decide', after: [], branches: { ship: 'ship', fix: 'fix' } },
+        { name: 'ship', after: ['route'] },
+        { name: 'ship-only', after: ['ship'] },
+        { name: 'fix', after: ['route'] },
+        { name: 'either', after: ['ship', 'fix'] },
+      ],
+    })
+    expect((await waitDone(runner, runId)).status).toBe('done')
+    const rows = await runner.steps(runId)
+    expect(Object.fromEntries(rows.map((row) => [row.name, row.status]))).toEqual({
+      route: 'done',
+      ship: 'skipped',
+      // Only reachable through the branch that was not taken.
+      'ship-only': 'skipped',
+      fix: 'done',
+      // Reachable through the branch that was, so it runs once `fix` is done.
+      either: 'done',
+    })
+  })
+
+  it('renders ${inputs.x} into prompts and refuses a start with a required input missing', async () => {
+    const runner = new WorkflowRunner(wf.db, deps())
+    const def: WorkflowDef = {
+      name: 'with-inputs',
+      inputs: [{ name: 'issue', required: true }, { name: 'focus', default: 'the parser' }],
+      steps: [{ name: 'look', prompt: 'Investigate ${inputs.issue}, starting with ${inputs.focus}.' }],
+    }
+    const runId = await runner.start('task1', def, { inputs: { issue: 'the crash on save' } })
+    expect((await waitDone(runner, runId)).status).toBe('done')
+    expect(stepInputs.look).toContain('Investigate the crash on save, starting with the parser.')
+
+    await expect(runner.start('task1', def)).rejects.toThrow("needs a value for input 'issue'")
+    await expect(runner.start('task1', def, { inputs: { issue: 'x', nope: 'y' } })).rejects.toThrow("has no input 'nope'")
+  })
+
+  it('an isolated step runs on its own child task, and cancelling the run reaches it', async () => {
+    const script = scripted()
+    const cancelled: string[] = []
+    const seeds: { title: string; branch: string }[] = []
+    script.deps.createChildTask = async (_parent, seed) => {
+      seeds.push(seed)
+      return `iso-child-${seeds.length}`
+    }
+    script.deps.cancelChildTask = async (taskId) => void cancelled.push(taskId)
+    const runner = new WorkflowRunner(wf.db, script.deps)
+    const runId = await runner.start('task1', {
+      name: 'Fix the bug',
+      steps: [
+        { name: 'shared', after: [] },
+        { name: 'writes-code', after: [], isolation: 'worktree' },
+      ],
+    })
+    await script.waitStarted('writes-code')
+    expect(seeds).toEqual([{ title: 'Fix the bug: writes-code', branch: 'fix-the-bug-writes-code' }])
+    expect((script.deps as { taskFor?: Record<string, string> }).taskFor?.['writes-code']).toBe('iso-child-1')
+    expect((script.deps as { taskFor?: Record<string, string> }).taskFor?.shared).toBe('task1')
+
+    await runner.cancelRun(runId)
+    expect(cancelled).toEqual(['iso-child-1'])
+    expect((await runner.run(runId))?.status).toBe('cancelled')
+  })
+
+  it('retry puts a failed node and its skipped descendants back, and the run finishes', async () => {
+    structuredByStep = { middle: 'FAIL' }
+    const d = deps()
+    const runner = new WorkflowRunner(wf.db, d)
+    const runId = await runner.start('task1', {
+      name: 'retryable',
+      steps: [
+        { name: 'first', after: [] },
+        { name: 'middle', after: ['first'] },
+        { name: 'last', after: ['middle'] },
+      ],
+    })
+    expect((await waitDone(runner, runId)).status).toBe('failed')
+    expect(d.notify).toHaveBeenCalledWith('task1', 'run-failed', expect.stringContaining('failed'), expect.objectContaining({ runId }))
+
+    // `last` never started, so it is still pending; skip it by hand to prove the reset walk finds it.
+    const failed = (await runner.steps(runId)).find((step) => step.name === 'middle')!
+    const { eq } = await import('drizzle-orm')
+    await wf.db.update(workflowSteps).set({ status: 'skipped' }).where(eq(workflowSteps.name, 'last'))
+
+    structuredByStep = {}
+    expect(await runner.retryStep(runId, failed.id, 'Try again, more carefully.')).toEqual({ ok: true })
+    expect((await waitDone(runner, runId)).status).toBe('done')
+    const rows = await runner.steps(runId)
+    expect(rows.map((row) => [row.name, row.status])).toEqual([['first', 'done'], ['middle', 'done'], ['last', 'done']])
+    expect(stepInputs.middle).toContain('Try again, more carefully.')
+    // The frozen definition says what was asked, and the row keeps what it used to say.
+    const run = await runner.run(runId)
+    expect(JSON.parse(run!.defJson).steps[1].prompt).toBe('Try again, more carefully.')
+    expect(JSON.parse(rows[1].inputsJson!).retryPrompt).toBe('Try again, more carefully.')
+  })
+
+  it('refuses a retry on a run or a step that is not failed', async () => {
+    const runner = new WorkflowRunner(wf.db, deps())
+    const runId = await runner.start('task1', DEF)
+    await waitDone(runner, runId)
+    const [step] = await runner.steps(runId)
+    expect(await runner.retryStep(runId, step.id, undefined)).toEqual({ ok: false, error: 'A done run cannot be retried.' })
+  })
+
+  it('a restart mid-parallel-run re-queues both running steps', async () => {
+    const script = scripted()
+    const runner = new WorkflowRunner(wf.db, script.deps)
+    const runId = await runner.start('task1', {
+      name: 'parallel-restart',
+      steps: [{ name: 'left', after: [] }, { name: 'right', after: [] }],
+    })
+    await script.waitStarted('left')
+    await script.waitStarted('right')
+    runner.stop() // the process going away mid-run: the rows stay 'running'
+
+    const revived = new WorkflowRunner(wf.db, deps())
+    await revived.reconcile()
+    const requeued = await revived.steps(runId)
+    expect(requeued.every((step) => step.error?.includes('re-queued after app restart'))).toBe(true)
+    expect((await waitDone(revived, runId)).status).toBe('done')
+    expect((await revived.steps(runId)).map((step) => step.status)).toEqual(['done', 'done'])
   })
 
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {

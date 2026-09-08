@@ -12,6 +12,8 @@ const context: StepValidationContext = {
   indexes: new Map([['call', 0]]),
   stepAt: () => undefined,
   policies: new Set(),
+  after: () => [],
+  precedes: () => false,
 }
 
 const step = (withTable: unknown) => ({ name: 'call', kind: 'http:request', with: withTable as Record<string, unknown> })

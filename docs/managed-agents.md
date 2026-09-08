@@ -381,8 +381,17 @@ path that changes one already meets:
   composer sent it or an automation did. Only the options that actually changed are stored, so a
   provider default the owner never touched stays a provider default.
 
-Interactive sessions only, and not a fork. A workflow step names the model it wants in its own policy,
+Interactive sessions only, and not a fork. A workflow step names the settings it wants in the file,
 and a fork continues the session it came from at the settings that session was running.
+
+A workflow turn carries its own settings the same way. `AGENTS_SESSION_EXECUTE` takes
+`configOptions`, a table of provider option ids to values, which the step's `config_options` fills
+([workflows.md](./workflows.md) § Execution model). It is applied through the same
+`optionsWithDefaults` fold and the same `patchSession` write, after the provider reports its option
+list and before the turn is enqueued, because the Claude driver reads a switch only through
+`setConfig`. A value the provider does not offer is dropped and a warning row goes in the transcript.
+The model and the reasoning level also go on the turn's `effectivePolicy`, as `model` and `effort`,
+because the Codex driver reads them from there at turn time.
 
 Settings reads the option list to draw pickers off the newest session that advertised one, because a
 provider reports its models and reasoning levels only once a session is running. A provider you have

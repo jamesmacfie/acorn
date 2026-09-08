@@ -40,7 +40,7 @@ describe('workflow extension points', () => {
       // both call their entry `custom-required`.
       expect(catalog.stepKinds.has('other:custom-required')).toBe(true)
       expect(catalog.validateStepKind?.('other:custom-required', { name: 'x', kind: 'other:custom-required' }, {
-        label: "step 'x'", index: 0, indexes: new Map([['x', 0]]), stepAt: () => undefined, policies: new Set(),
+        label: "step 'x'", index: 0, indexes: new Map([['x', 0]]), stepAt: () => undefined, policies: new Set(), after: () => [], precedes: () => false,
       })).toEqual(["step 'x' requires prompt"])
     } finally {
       testDb.cleanup()

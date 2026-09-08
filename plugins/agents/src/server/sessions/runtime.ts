@@ -181,6 +181,43 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       })
   }
 
+  /**
+   * Apply a caller's requested provider options to a session that has already reported its option
+   * list. `agents.sessionExecute` calls it for a workflow step that names a model or a reasoning
+   * level, which is the one path where the values come from a file rather than from a person.
+   *
+   * A value the provider does not advertise is dropped and recorded, for the same reason a stored
+   * default is: the step asked for something this provider cannot do, and failing the step over it
+   * would be worse than running on the provider's own choice.
+   */
+  async applyRequestedConfig(sessionId: string, wanted: Record<string, string>): Promise<void> {
+    if (!Object.keys(wanted).length) return
+    const session = await this.store.requireSession(sessionId)
+    const advertised = Array.isArray(session.config.configOptions)
+      ? session.config.configOptions as AgentConfigOption[]
+      : []
+    const configOptions = optionsWithDefaults(advertised, wanted)
+    const dropped = Object.entries(wanted).filter(([id, value]) =>
+      !configOptions.some((option) => option.id === id && option.currentValue === value))
+    if (dropped.length) {
+      await this.record(sessionId, null, {
+        type: 'diagnostic',
+        level: 'warning',
+        message: `This provider does not offer ${dropped.map(([id, value]) => `${id} = ${value}`).join(', ')}, so the session kept its own setting.`,
+      })
+    }
+    if (configOptions === advertised) return
+    // `remember: false`: a workflow file's choice is that run's, not the owner's next default.
+    await this.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
+      .catch(async (error) => {
+        await this.record(sessionId, null, {
+          type: 'diagnostic',
+          level: 'warning',
+          message: `The step's provider settings could not be applied: ${error instanceof Error ? error.message : 'unknown error'}`,
+        })
+      })
+  }
+
   /** Carry an in-session switch forward, so the next session of this provider starts where this one is. */
   private async rememberSessionDefaults(
     providerId: string,

@@ -24,12 +24,16 @@ type StatusCb = (pluginId?: string) => void
 // drifts when a kind is added.
 export type WorkflowNotice = {
   taskId: string
-  kind: 'gate' | 'run-done' | 'repo-config-trust' | 'plugin-request'
+  kind: 'gate' | 'run-done' | 'run-failed' | 'repo-config-trust' | 'plugin-request'
   title: string
   action?: 'review-config' | 'review-plugin-request'
+  // Where the row goes: the run pane, at that node. Present on every notice a run raises.
+  runId?: string
+  stepId?: string
 }
 type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
+type StepChangedCb = (event: { runId: string; stepId: string; status: string }) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<StatusCb>()
@@ -51,6 +55,7 @@ type NodeEventMap = {
 const nodeEventSubs = new Map<keyof NodeEventMap, Set<(event: never) => void>>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
+const stepChangedSubs = new Set<StepChangedCb>()
 const reconnectSubs = new Set<() => void>()
 
 const decoder = new TextDecoder()
@@ -157,7 +162,8 @@ registerWsChannel(
 
 registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:notice') return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
-  if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
+  if (frame.channel === 'workflow:step:event') return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
+  if (frame.channel === 'workflow:step-changed') stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
 })
 
 // Core's third prefix (docs/api-reference.md § WebSocket). Content-free like `term:status`, so the
@@ -313,5 +319,11 @@ export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
   stepEventSubs.add(cb)
   connect()
   return () => void stepEventSubs.delete(cb)
+}
+
+export function wsOnWorkflowStepChanged(cb: StepChangedCb): () => void {
+  stepChangedSubs.add(cb)
+  connect()
+  return () => void stepChangedSubs.delete(cb)
 }
 

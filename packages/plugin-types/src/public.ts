@@ -760,7 +760,7 @@ export type CapabilityCatalogue = {
   'workflows.runner': { reconcile(): Promise<void> }
   /** The renderer's notification bell and the per-step event stream. */
   'workflows.notices': {
-    notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
+    notice(taskId: string, kind: 'gate' | 'run-done' | 'run-failed', title: string, ref?: { runId: string; stepId?: string }): void
     stepEvent(runId: string, stepId: string, event: unknown): void
   }
 }

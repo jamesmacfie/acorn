@@ -41,8 +41,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   // which is why they are written as frames here rather than reaching for a core helper: `ctx.events`
   // is the seam, and a plugin does not deep-import server/notify.ts.
   const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
-    notice: (taskId, kind, title) => {
-      ctx.events.send({ channel: 'workflow:notice', notice: { taskId, kind, title } })
+    notice: (taskId, kind, title, ref) => {
+      ctx.events.send({ channel: 'workflow:notice', notice: { taskId, kind, title, ...ref } })
       ctx.events.status()
     },
     stepEvent: (runId, stepId, event) => ctx.events.send({ channel: 'workflow:step:event', runId, stepId, event }),
@@ -87,6 +87,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             prompt: opts.prompt,
             schema: opts.schema,
             model: opts.model,
+            configOptions: def.configOptions,
             tools: opts.tools,
             timeoutMs: opts.timeoutMs,
             managedSessionId: opts.managedSessionId,
@@ -166,6 +167,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         failingChecks: deps.failingChecks,
         notify: notices.notice,
+        // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
+        stepChanged: (runId, stepId, status) => ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
         statusChanged: ctx.events.status,
         // `plugin:workflows:run-changed` (docs/plugins.md § Hearing another plugin).
         runChanged: (runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), runId, status }),
@@ -212,10 +215,10 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
           return loadWorkflowFiles(repoDir, homedir(), runner.validationCatalog())
         },
-        start: async (taskId, def) => {
+        start: async (taskId, def, inputs) => {
           await deps.reconciled // don't start a run the restart sweep would immediately re-queue
           try {
-            return { runId: await runner.start(taskId, def as WorkflowDef) }
+            return { runId: await runner.start(taskId, def as WorkflowDef, { inputs }) }
           } catch (error) {
             if (isRepoConfigTrustError(error)) {
               ctx.events.repoConfigTrustNotice(taskId)
@@ -278,6 +281,10 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           await runner.killStep(runId, stepId)
           return { ok: true }
+        },
+        retry: async (runId, stepId, prompt) => {
+          await deps.reconciled
+          return runner.retryStep(runId, stepId, prompt)
         },
       })
 

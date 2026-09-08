@@ -182,6 +182,7 @@
   "POST /v2/p/workflows/workflows/runs/:runId/cancel",
   "POST /v2/p/workflows/workflows/runs/:runId/gate",
   "POST /v2/p/workflows/workflows/runs/:runId/kill",
+  "POST /v2/p/workflows/workflows/runs/:runId/retry",
   "PUT /v2/p/agents/concurrency",
   "PUT /v2/p/agents/concurrency",
   "PUT /v2/p/agents/pricing",
