@@ -22,7 +22,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [workflows/](./workflows/README.md) | An editor, a database store, a run pane, and item-menu starts over the workflow engine that already runs, plus the engine changes they need: steps that wait on named steps and run in parallel, declared inputs, step kinds that describe their own form, retry. Seven phases. | Proposal, 2026-09-08. Not started; waits on nothing. Reverses two refusals in orchestration.md. |
 
 ## The single files
 
@@ -32,7 +31,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [findings.md](./findings.md) | One core entity, the finding, that gives agent, workflow, and scheduled claims a human disposition, exposed to every harness over MCP; joins notes, memory, gates, and schedules into the harness-engineering loop. | Proposal, 2026-08-29. Not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
-| [orchestration.md](./orchestration.md) | An agent spawning and waiting on acorn's agents. | Step-kind registry opened; the spawn tools and ledger remain. Its refusals of a DAG editor and a workflows pane are reversed by [workflows/](./workflows/README.md), and its step 9 is that folder's phase 2. |
+| [orchestration.md](./orchestration.md) | An agent spawning and waiting on acorn's agents. | Step-kind registry opened; the spawn tools and ledger remain. Its refusals of a DAG editor and a workflows pane were reversed and both are built, and its step 9 shipped with them; [workflows.md](../workflows.md) owns the result. |
 | [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
@@ -58,6 +57,42 @@ the single `events.md` above on 2026-08-28 when all but three items shipped), `l
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
 `notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+
+`workflows/` was seven phases that turned a workflow engine nobody could see into one a person
+authors and watches: steps that wait on named steps and run in parallel, declared inputs, step kinds
+that describe their own form, definitions typed in the app, an editor, a run pane, and a start from a
+tracker row. Shipped and deleted 2026-09-08.
+[workflows.md](../workflows.md) owns most of it. § Execution model has the graph and its one
+readiness rule, `decide` in a graph, inputs, isolation, what an agent step sees, and retry;
+§ Database definitions has the two stores read as one list, the two trust stories, save to repo and
+what a row may name; § Authoring has the rail source, the editor's three kinds of row, the draft
+rules, the graph view, the JSON tab and where positions live; § Contributed step kinds has `describe`,
+the closed field vocabulary and the catalog route; § Routes and UI has the pane, the per-kind detail
+and the three frames it listens to; § Starting a run from an item has the flow and the prefill rule;
+and § What workflows refuses has the twenty-two decisions, from a separate `edges` list to a second
+run list.
+
+The rest went to the contract's owner. [plugins.md](../plugins.md) § Node-side extension points has a
+point's value carrying a description the host draws, and § Context menus has `item.row` beside
+`task.row`, with [contribution-kinds.md](../contribution-kinds.md) naming both locations on one row.
+[panes.md](../panes.md) has the `workflows` pane, `list-detail` and gated by `when`;
+[notifications.md](../notifications.md) has the `workflow-run` target, the gate as an attention row
+and the `run-failed` notice; [managed-agents.md](../managed-agents.md) § Sessions has the config
+options a workflow turn carries and the chip a workflow session draws.
+[terminal.md](../terminal.md) and [database.md](../database.md) each have their two step kinds and
+[http-client.md](../http-client.md) has its one, each beside the safety check that admitted it.
+[api-reference.md](../api-reference.md) has the routes, [data-layer.md](../data-layer.md) has
+`workflow_defs`, [security.md](../security.md) § Process, path, and configuration controls has the
+owner-typed row and the save that re-enters the snapshot, and
+[state-ownership.md](../state-ownership.md) § Device has `plugin:workflows:layout:<defId>`.
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) and
+[first-party-plugins.md](../first-party-plugins.md) have the three palette rows and the plugin's
+grown row, [integrations.md](../integrations.md) has **Start workflow…** as a registry contribution
+rather than three menus, and [ui-design.md](../ui-design.md) § The closed kit and
+[tui.md](../tui.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
+[testing.md](../testing.md) holds what the programme owes: nine manual checks, items 48 to 56, six
+for the editor and the run pane, two for the start-from-an-item flow and one for the graph view. None
+of them has been run.
 
 `changes/` was six phases that turned the Changes pane's list column into a working git panel: checkbox
 staging over three groups, a list-or-tree view, a multi-line commit editor with amend and sign-off, a

@@ -2,7 +2,7 @@
 // to the AgentState enum and to activity-feed items.
 //
 // The roster that merged PTY sessions with workflow steps went with the sidebar section that drew it
-// (docs/future/workflows/README.md, decision 14): a run's steps are the run pane's, and a PTY session
+// (docs/workflows.md § What workflows refuses): a run's steps are the run pane's, and a PTY session
 // is the terminal drawer's.
 import type { AgentState } from '@acorn/protocol/terminal.ts'
 

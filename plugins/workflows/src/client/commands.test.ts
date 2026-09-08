@@ -9,7 +9,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./workflowsClient', () => ({
   workflowApi: { defs: mocks.defs, start: mocks.start, createDef: mocks.createDef, runs: mocks.runs },
 }))
-vi.mock('./editor/startRequest', () => ({ requestWorkflowStart: mocks.requestStart }))
+// The real `needsStartDialog` is kept: it is the rule this row asks before it starts, and a stubbed
+// one would let the row and the dialog disagree without the suite noticing.
+vi.mock('./editor/startRequest', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  requestWorkflowStart: mocks.requestStart,
+}))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setSelectedSource: mocks.setSelectedSource,
@@ -55,7 +60,7 @@ describe('the workflows plugin catalogue', () => {
     expect(run.minQueryLength).toBe(0)
   })
 
-  // "Find a run" waited for somewhere to open one (docs/future/workflows/phase-4-run-pane.md).
+  // "Find a run" waited for somewhere to open one (docs/workflows.md § The run pane).
   it('lists this task\'s runs and opens the one that was picked', async () => {
     mocks.runs.mockResolvedValue([
       { id: 'run-2', name: 'Investigate an issue', status: 'running', createdAt: Date.now() },

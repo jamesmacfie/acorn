@@ -31,19 +31,32 @@ export const closeWorkflowStart = (): void => {
 }
 
 /**
+ * Whether a request has to stop and ask: something is missing, or there is nowhere to run it.
+ *
+ * Exported because the palette's "Run a workflow" row needs the same answer before it starts, and it
+ * cannot call `requestWorkflowStart` for the other half: a command's refusal belongs in the palette
+ * frame rather than in a toast, so that row throws (../commands.ts). One rule, two readers.
+ */
+export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
+  !next.taskId
+  || (next.inputs ?? []).some((input) => input.required && !input.default && !next.prefill?.[input.name])
+
+/**
  * Ask for the dialog.
  *
  * A definition that needs nothing and already has a task starts instead of opening a box with one
  * button in it, which is what keeps "Run a workflow" one keystroke for the common case.
  */
 export async function requestWorkflowStart(next: StartRequest): Promise<void> {
-  const required = (next.inputs ?? []).filter((input) => input.required && !input.default && !next.prefill?.[input.name])
-  if (required.length || !next.taskId) {
+  const taskId = next.taskId
+  // `taskId` is tested twice on purpose. `needsStartDialog` owns the rule; the second half is how the
+  // compiler learns that a request past this point has a task to run on.
+  if (needsStartDialog(next) || !taskId) {
     setRequest(next)
     return
   }
   const values = { ...(next.prefill ?? {}) }
-  const answer = await workflowApi.start(next.taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
+  const answer = await workflowApi.start(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
   if (answer.error) toast(answer.error, { tone: 'danger' })
   else if (answer.runId) next.onStarted?.(answer.runId)
 }

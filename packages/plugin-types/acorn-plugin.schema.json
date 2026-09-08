@@ -2360,7 +2360,8 @@
               "location": {
                 "type": "string",
                 "enum": [
-                  "task.row"
+                  "task.row",
+                  "item.row"
                 ]
               },
               "label": {
