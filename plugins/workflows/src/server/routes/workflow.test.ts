@@ -4,6 +4,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
@@ -212,6 +213,7 @@ describe('workflow definition routes', () => {
     remove: async () => ({ ok: true }),
     validate: async () => ({ problems: [] }),
     saveToRepo: async () => ({ path: '.acorn/workflows/ship-it.toml' }),
+    generate: async () => ({ def: row.def, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'm' }),
     ...over,
   })
 
@@ -254,6 +256,7 @@ describe('workflow definition routes', () => {
       req('/api/defs/def1', 'PUT', { def, revision: 1 }),
       req('/api/defs/def1', 'DELETE'),
       req('/api/defs/validate', 'POST', { def }),
+      req('/api/defs/generate', 'POST', { connectionId: 'c1', description: 'two agents', workspaceId: 'w1' }),
       req('/api/defs/def1/save-to-repo', 'POST', {}),
     ]) {
       expect((await app.fetch(call, {} as Env)).status).toBe(403)
@@ -287,6 +290,40 @@ describe('workflow definition routes', () => {
     expect((await app.fetch(req('/api/defs/def1', 'PUT', { def: { name: 'x', steps: [] } }), {} as Env)).status).toBe(400)
     setWorkflowDefsBridge(null)
     expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(503)
+  })
+
+  // Generate spends the owner's provider key. The device gate above is what stands in front of it,
+  // and `/defs/generate` has to be declared before `/defs/:id` or the parameter swallows the literal
+  // and a generate reads a definition called "generate" instead.
+  describe('generate', () => {
+    const body = { connectionId: 'c1', modelId: 'm', description: 'two agents and a synthesiser', workspaceId: 'w1', defId: 'def1' }
+
+    it('reaches the bridge with the owner rather than the /defs/:id read', async () => {
+      let seen: unknown
+      setWorkflowDefsBridge(fakeDefs({
+        get: async () => (seen = 'get', row),
+        generate: async (input) => (seen = input, { def: row.def, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'm' }),
+      }))
+      const res = await asDevice().fetch(req('/api/defs/generate', 'POST', body), {} as Env)
+      expect(res.status).toBe(200)
+      expect(seen).toEqual({ ...body, userId: 'james' })
+    })
+
+    it('400s a body with no description and 422s a reply that never became JSON', async () => {
+      setWorkflowDefsBridge(fakeDefs({ generate: async () => ({ error: 'The model did not answer with JSON.' }) }))
+      const app = asDevice()
+      expect((await app.fetch(req('/api/defs/generate', 'POST', { connectionId: 'c1', workspaceId: 'w1' }), {} as Env)).status).toBe(400)
+      const res = await app.fetch(req('/api/defs/generate', 'POST', body), {} as Env)
+      expect(res.status).toBe(422)
+      expect(await res.text()).toContain('did not answer with JSON')
+    })
+
+    it('answers a provider failure with the provider status', async () => {
+      setWorkflowDefsBridge(fakeDefs({ generate: async () => { throw new ProviderOperationError('provider_needs_auth', 401) } }))
+      const res = await asDevice().fetch(req('/api/defs/generate', 'POST', body), {} as Env)
+      expect(res.status).toBe(401)
+      expect(await res.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+    })
   })
 
   it('reports a save-to-repo refusal rather than pretending it wrote', async () => {

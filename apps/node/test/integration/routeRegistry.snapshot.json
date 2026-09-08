@@ -187,6 +187,7 @@
   "POST /v2/p/terminal/sessions/:sid/send",
   "POST /v2/p/workflows/defs",
   "POST /v2/p/workflows/defs/:id/save-to-repo",
+  "POST /v2/p/workflows/defs/generate",
   "POST /v2/p/workflows/defs/validate",
   "POST /v2/p/workflows/tasks/:id/workflows",
   "POST /v2/p/workflows/workflows/runs/:runId/cancel",

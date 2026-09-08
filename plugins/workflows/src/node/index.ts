@@ -7,7 +7,8 @@ import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets
 import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
-import { createDef, defsForProject, getDef, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
+import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
+import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
 import { WorkflowRunner, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
@@ -387,6 +388,20 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // project — a run target, a saved query — is checked when the step runs, because the node
         // validating a definition may not have the repository at all.
         validate: async (def) => ({ problems: validateWorkflow(def as WorkflowDef, runner.validationCatalog()) }),
+        // Wiring only; the two calls and the repair pass are in ../server/generateWorkflowRequest.ts.
+        // The runner's validation catalog rather than the pure one built from the kinds alone: it
+        // carries each contributed kind's own `validate`, without which a workspace definition with a
+        // broken step passes the example filter and teaches the model the mistake.
+        generate: async ({ userId, ...request }) =>
+          generateWorkflowRequest({
+            request,
+            catalog: runner.catalog(),
+            validation: runner.validationCatalog(),
+            // Rows, which carry the whole definition. The merged list summarises, and a summary is
+            // not a worked example.
+            examples: (await listDefs(store, request.workspaceId)).map((row) => ({ id: row.id, def: row.def })),
+            generateText: (args) => core.models.generateText({ userId, ...args }),
+          }),
         saveToRepo: async (id, { taskId, keepRow }) => {
           const row = await getDef(store, id)
           if (!row) return { notFound: true }
