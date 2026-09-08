@@ -33,6 +33,10 @@ export type WorkflowDefsBridge = {
   // one failure with no definition to apply. A provider failure throws ProviderOperationError,
   // because its status is the one the caller has to see.
   generate(input: WorkflowGenerateRequest & { userId: string }): Promise<WorkflowGenerateResult | { error: string }>
+  // Which model connections this owner could generate with, ids and labels only. The editor's
+  // Generate button is drawn only when this answers something, so an owner with no provider never
+  // sees a control whose only message is "connect one first".
+  modelConnections(userId: string): Promise<unknown[]>
 }
 
 export const WORKFLOW_DEFS_ROUTE = routeCapability<WorkflowDefsBridge>('workflows.defs')
@@ -120,6 +124,9 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
       }
     })
   })
+  // Also before `/defs/:id`, or the parameter eats the literal.
+  .get('/defs/model-connections', (c) =>
+    withBridge(c, async (bridge) => c.json(await bridge.modelConnections(ownerId(c)))))
   .get('/defs/:id', (c) =>
     withBridge(c, async (bridge) => {
       const row = await bridge.get(c.req.param('id'), c.req.query('projectId'))
