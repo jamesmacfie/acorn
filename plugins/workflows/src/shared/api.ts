@@ -36,8 +36,12 @@ export type WorkflowGenerateRequest = {
  *
  *  The code is stable and a test asserts on it; the message is what the reader sees, and names the
  *  step and the offending value. One code per row of the grounding table
- *  (../server/groundWorkflow.ts), so a note can be counted and grouped without reading English. */
+ *  (../server/groundWorkflow.ts), so a note can be counted and grouped without reading English.
+ *
+ *  `dropped-step` is the one code with no row of its own: it is raised while parsing, for an entry
+ *  of the steps array that is not a step at all. Grounding never deletes a step. */
 export type WorkflowGenerateNoteCode =
+  | 'dropped-step'
   | 'unknown-kind'
   | 'unknown-policy'
   | 'unknown-profile'
