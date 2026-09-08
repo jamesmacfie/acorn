@@ -12,7 +12,8 @@ import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/s
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 
 // What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
-// disclosure line in the trust prompt).
+// disclosure line in the trust prompt). `byWorkspace` is deliberately not here: no loaded plugin asks
+// for it yet, and adding it means another line in that prompt.
 const PROJECT_READS = ['byId', 'byGithub', 'checkouts', 'externalProjects'] as const
 // Behind its own token because config() and setup() return the shell commands acorn executes. The
 // trust assertion sits on the same surface: code with no reason to read project config has no reason

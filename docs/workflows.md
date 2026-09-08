@@ -1,12 +1,13 @@
 # Workflows
 
-Workflows are durable Node orchestration defined in `.acorn/workflows/*.toml`. The file is the source
-of definitions; SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.
+Workflows are durable Node orchestration. A definition is either a committed
+`.acorn/workflows/*.toml` file or a `workflow_defs` row the owner typed in the app, and the two are
+read as one list. SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.
 
 ## Execution model
 
 The workflow loader parses and validates a definition, rejects cycles, expands static branches, and
-checks the exact repository configuration trust snapshot before starting a run. Steps can invoke
+checks the exact repository configuration trust snapshot before starting a run from a committed file. Steps can invoke
 managed agent sessions, terminal/run targets, GitHub checks policies, or human gates. Structured step
 output is the only value that controls branching and joins; transcript prose cannot satisfy a gate.
 
@@ -97,12 +98,56 @@ proposed branch name is checked against every task, not only its siblings, becau
 keyed on the branch and a collision with an unrelated task would hand two tasks one checkout.
 
 Workflow files load from the repo checkout or worktree and layer over `~/.acorn/workflows` the same
-way `config.toml` layers repo before user, so a repo-defined id wins over a user one. A step can
+way `config.toml` layers repo before user, so a repo-defined id wins over a user one. Database rows
+sit under both, as § Database definitions describes. A step can
 reference another workflow by id. The reference expands inline, one level of nesting, and a chain
 that revisits an id is rejected as a cycle rather than followed into a hang. A malformed file
 surfaces as an error row instead of being skipped silently. A sub-workflow's steps are prefixed with
 its id, and so are the `after` and `joins` names inside it, so an expanded block keeps its own shape
 inside the outer graph.
+
+## Database definitions
+
+A definition does not have to be a file. `workflow_defs`, in this plugin's own SQLite file, holds one
+the owner typed in the app: a workspace id, an optional project id, the definition as JSON, and a
+`revision` that a save checks. A row bound to no project can run on any task in its workspace.
+
+**Two stores, one read.** `GET /v2/p/workflows/defs?workspaceId=` folds three layers into one list:
+this workspace's rows, every project's committed files, and `~/.acorn/workflows`. A repo id beats a
+user id beats a row id, so a definition somebody can review in a pull request always wins. Each entry
+says which layer it came from and which project it belongs to. The task-scoped
+`GET /v2/p/workflows/tasks/:id/workflows` answers the same three layers for one task, which is what
+the palette searches.
+
+**Two trust stories.** A committed file is executable configuration somebody put in the repository,
+so starting a run from one hashes the snapshot and asks for an acknowledgement. A row was typed by
+the node's owner in this app, behind the device gate, so there are no committed bytes to hash and the
+snapshot check does not apply. That is the whole reason every route under `/v2/p/workflows/defs` is
+device-only, and the reason a start by id refuses a row to a task-confined caller: an agent inside a
+run may start a file, because the snapshot covers it, and may not start a row.
+
+**Starting by id.** `POST /v2/p/workflows/tasks/:id/workflows` takes either the whole definition or
+`{ defId }`. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
+than trusting a `source` field in the request body.
+
+**What a row may name.** A run target, a saved query, or an agent profile is checked when the step
+runs, not when the row is saved. The node holding a definition may not have the repository at all, so
+`POST /v2/p/workflows/defs/validate` answers the loader's own problem list and leaves the
+project-specific names to the step handlers.
+
+**Save to repo.** `POST /v2/p/workflows/defs/:id/save-to-repo` writes the row as
+`.acorn/workflows/<slug>.toml` in the task's checkout, or in the project folder when no task is
+given, and deletes the row unless `keepRow` is set. The file id is a slug of the definition name,
+deduplicated against the folder, so nothing a person types can address a path. The write is confined
+to the checkout by the same symlink-aware check every other checkout write takes, and it lands
+through a temporary file and a rename. From then on the trust snapshot covers the file, and the next
+start from it asks for the acknowledgement any committed configuration asks for.
+
+`plugin:workflows:defs-changed { workspaceId }` goes out on every write.
+
+A deleted project leaves its rows behind with a `projectId` that resolves to nothing. The merged list
+marks those rows rather than hiding them, so they can be rebound or deleted instead of vanishing.
 
 ## Limits and capabilities
 
@@ -234,10 +279,11 @@ run history is paged from the plugin database.
 ## From the command palette
 
 One row at the palette root, **Run a workflow**, registered by this plugin's client half
-(`plugins/workflows/src/client/commands.ts`). It is a `search` over the definitions this task's
-repository commits: a row carries the workflow's name and its step count, a parse or cycle error is a
-badged row at the top of the list rather than a row that is quietly missing, and picking a definition
-starts it. There is no group, because one row does not need one.
+(`plugins/workflows/src/client/commands.ts`). It is a `search` over every definition the task can
+run, which is its repository's committed files, `~/.acorn/workflows`, and this workspace's rows: a
+row carries the workflow's name, its step count and its layer, a parse or cycle error is a badged row
+at the top of the list rather than a row that is quietly missing, and picking a definition starts it.
+There is no group, because one row does not need one.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
@@ -245,9 +291,13 @@ The command is task-scoped and gated on the terminal plugin, because the runner 
 these routes answer 503 on a node that does not run terminals. Definitions load once when the frame
 opens and are filtered on the device after that, through the same load-once adapter the terminal's
 searches use (`client-core/host/registries/commands/localSearch.ts`): no debounce and no minimum
-query, because a read of the repository is not something a keystroke moves. Starting is unchanged from
-the row source this replaced — the whole definition goes to the start route rather than its id, and a
-refusal keeps the frame open with the node's own message on it.
+query, because a read of the repository is not something a keystroke moves. Starting sends the id
+rather than the definition, so the node resolves it and, for a committed file, hashes the bytes on
+disk instead of trusting what the request carried. A refusal keeps the frame open with the node's own
+message on it.
+
+A definition that declares a required input with no default cannot be started from a row in a list,
+so the frame says to run it from the editor instead.
 
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.
@@ -265,11 +315,14 @@ point it at, and not before.
 Workflow files and executable URL/run-target scripts are repo-authored executable configuration. The
 Node hashes the exact snapshot, requires an acknowledgement, and fails closed if the snapshot changes.
 Declarative Docker matching data is separate from this gate, but commands that start/stop services
-remain executable actions and are trust-checked.
+remain executable actions and are trust-checked. A `workflow_defs` row is not repo-authored and is not
+hashed; § Database definitions holds that half.
 
 ## Gaps
 
-Authoring is file-based. The desktop must be open for UI interaction, although the node continues
+Authoring has a store but no editor: a definition can live in `workflow_defs` and be written back to
+the repository as TOML, and the routes that do it have no surface in front of them yet. The desktop
+must be open for UI interaction, although the node continues
 work while the renderer is closed, including the trigger sweep, which moved onto the node's own
 scheduler. A step kind describes its form, but nothing draws it yet: there is no general DAG editor. A failed node is retried by hand through the retry route;
 an operation whose external outcome is unknown is never retried on its own, because acorn cannot tell
@@ -277,4 +330,5 @@ a side effect that landed from one that did not.
 
 An agent cannot start or drive a run: no workflow or session tool is registered, so orchestration is
 declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an
-agent-driven path would cost, including database-truth definitions.
+agent-driven path would cost. Database rows have no trigger and no schedule; committed files keep
+theirs.

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
+import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
@@ -34,6 +35,7 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   defs: async () => ({ workflows: [], errors: [] }),
   catalog: async () => ({ kinds: [], policies: [], profiles: [] }),
   start: async () => ({ runId: 'run1' }),
+  startById: async () => ({ runId: 'run1' }),
   runs: async () => [],
   steps: async () => [],
   gate: async () => ({ ok: true }),
@@ -112,6 +114,37 @@ describe('workflow routes', () => {
     expect((await app.fetch(req('/api/workflows/runs/run1/retry', 'POST', {}), {} as Env)).status).toBe(400)
   })
 
+  it('starts a definition by id and refuses a body carrying both, or neither', async () => {
+    let seen: unknown = null
+    setWorkflowBridge(fake({ startById: async (_t, defId, inputs) => ((seen = { defId, inputs }), { runId: 'run1' }) }))
+    const app = authed()
+    const res = await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship', inputs: { issue: 'x' } }), {} as Env)
+    expect(res.status).toBe(200)
+    expect(seen).toEqual({ defId: 'repo:ship', inputs: { issue: 'x' } })
+    const def = { name: 'W', steps: [{ name: 's1' }] }
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, defId: 'repo:ship' }), {} as Env)).status).toBe(400)
+  })
+
+  // A row skips the repo trust snapshot because it has no committed bytes to hash. An agent inside the
+  // task may still start a file, which the snapshot does cover.
+  it('lets a task-confined caller start a file by id but never a row', async () => {
+    const started: string[] = []
+    setWorkflowBridge(fake({ startById: async (_t, defId) => (started.push(defId), { runId: 'run1' }) }))
+    const app = asTask1()
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'user:ship' }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'a-row-uuid' }), {} as Env)).status).toBe(403)
+    expect(started).toEqual(['repo:ship', 'user:ship'])
+  })
+
+  it('hands a task-confined caller the file layers alone', async () => {
+    const asked: boolean[] = []
+    setWorkflowBridge(fake({ defs: async (_id, includeRows) => (asked.push(includeRows), { workflows: [], errors: [] }) }))
+    await authed().fetch(req('/api/tasks/task1/workflows'), {} as Env)
+    await asTask1().fetch(req('/api/tasks/task1/workflows'), {} as Env)
+    expect(asked).toEqual([true, false])
+  })
+
   it('401s without a principal; 503s without a bridge', async () => {
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api', workflow)
     expect((await gated.fetch(req('/api/tasks/task1/workflows'), {} as Env)).status).toBe(401)
@@ -159,5 +192,105 @@ describe('a task-scoped credential is confined to its own runs', () => {
   it('still answers 503 rather than 404 when the runner is not wired', async () => {
     // dev:node's degraded mode must not be shadowed by the guard.
     expect((await asTask1().fetch(req('/api/workflows/runs/run2/cancel', 'POST'), {} as Env)).status).toBe(503)
+  })
+})
+
+
+// The definitions store (docs/workflows.md § Database definitions). Writing one is authoring
+// executable configuration, so the whole family is device-only.
+describe('workflow definition routes', () => {
+  afterEach(() => setWorkflowDefsBridge(null))
+
+  const row = { id: 'def1', workspaceId: 'w1', projectId: null, name: 'Ship it', revision: 1, createdAt: 1, updatedAt: 1, def: { name: 'Ship it', steps: [] } }
+
+  const fakeDefs = (over: Partial<WorkflowDefsBridge> = {}): WorkflowDefsBridge => ({
+    list: async () => ({ workflows: [], errors: [] }),
+    get: async () => row,
+    create: async () => ({ row }),
+    update: async () => ({ row }),
+    remove: async () => ({ ok: true }),
+    validate: async () => ({ problems: [] }),
+    saveToRepo: async () => ({ path: '.acorn/workflows/ship-it.toml' }),
+    ...over,
+  })
+
+  const defsApp = (principal: unknown) => {
+    const app = new Hono<AppEnv>()
+    app.use('/api/*', async (c, next) => {
+      c.set('principal', principal as never)
+      await next()
+    })
+    return app.route('/api', workflowDefsRoutes)
+  }
+  const asDevice = () => defsApp({ kind: 'device', userId: 'james' })
+
+  it('lets a device caller list, create, save and delete', async () => {
+    const calls: string[] = []
+    setWorkflowDefsBridge(fakeDefs({
+      list: async (workspaceId) => (calls.push(`list:${workspaceId}`), { workflows: [], errors: [] }),
+      create: async (input) => (calls.push(`create:${input.workspaceId}`), { row }),
+      update: async (id, _def, revision) => (calls.push(`update:${id}:${revision}`), { row }),
+      remove: async (id) => (calls.push(`remove:${id}`), { ok: true }),
+    }))
+    const app = asDevice()
+    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 3 }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/defs/def1', 'DELETE'), {} as Env)).status).toBe(200)
+    expect(calls).toEqual(['list:w1', 'create:w1', 'update:def1:3', 'remove:def1'])
+  })
+
+  it('refuses every route to a task-confined caller', async () => {
+    const calls: string[] = []
+    setWorkflowDefsBridge(fakeDefs({ list: async () => (calls.push('list'), { workflows: [], errors: [] }) }))
+    const app = defsApp({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    for (const call of [
+      req('/api/defs?workspaceId=w1'),
+      req('/api/defs', 'POST', { workspaceId: 'w1', def }),
+      req('/api/defs/def1'),
+      req('/api/defs/def1', 'PUT', { def, revision: 1 }),
+      req('/api/defs/def1', 'DELETE'),
+      req('/api/defs/validate', 'POST', { def }),
+      req('/api/defs/def1/save-to-repo', 'POST', {}),
+    ]) {
+      expect((await app.fetch(call, {} as Env)).status).toBe(403)
+    }
+    expect(calls).toEqual([])
+  })
+
+  it('turns the store’s answers into statuses: 400 on problems, 409 on a stale revision, 404 on a gone row', async () => {
+    setWorkflowDefsBridge(fakeDefs({
+      create: async () => ({ problems: ['step 1 has no name'] }),
+      update: async () => ({ conflict: { ...row, revision: 4 } }),
+      get: async () => null,
+    }))
+    const app = asDevice()
+    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    const created = await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)
+    expect(created.status).toBe(400)
+    expect(await created.text()).toContain('step 1 has no name')
+    const stale = await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 1 }), {} as Env)
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toMatchObject({ error: { code: 'revision_conflict', details: { revision: 4 } } })
+    expect((await app.fetch(req('/api/defs/def1'), {} as Env)).status).toBe(404)
+  })
+
+  it('400s a list with no workspace and a body that is not a definition, and 503s without a bridge', async () => {
+    setWorkflowDefsBridge(fakeDefs())
+    const app = asDevice()
+    expect((await app.fetch(req('/api/defs'), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def: { name: 'x' } }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/defs/def1', 'PUT', { def: { name: 'x', steps: [] } }), {} as Env)).status).toBe(400)
+    setWorkflowDefsBridge(null)
+    expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(503)
+  })
+
+  it('reports a save-to-repo refusal rather than pretending it wrote', async () => {
+    setWorkflowDefsBridge(fakeDefs({ saveToRepo: async () => ({ error: 'That file would land outside the checkout.' }) }))
+    const res = await asDevice().fetch(req('/api/defs/def1/save-to-repo', 'POST', { keepRow: true }), {} as Env)
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('outside the checkout')
   })
 })

@@ -8,7 +8,8 @@ import {
 } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 
-// "Run a workflow", as one search over the definitions committed to this task's repo
+// "Run a workflow", as one search over the definitions this task can run: the files its repository
+// commits, the user layer, and the rows the owner saved for this workspace
 // (docs/workflows.md § From the command palette).
 //
 // A `paletteRows` source until 2026-09-03, which put one row per definition into the palette root and
@@ -72,7 +73,9 @@ export const workflowsCommands: readonly ContributedCommand[] = [
         ...defs.workflows.map((workflow): CommandSearchItem => ({
           id: `workflow:${workflow.id}`,
           title: workflow.name,
-          subtitle: `${workflow.steps.length} steps`,
+          // The layer is worth a word here: the list merges this repository's committed files with the
+          // rows the owner typed, and the two are not edited in the same place.
+          subtitle: `${workflow.steps.length} steps · ${workflow.source === 'database' ? 'saved here' : workflow.source}`,
           ref: workflow.id,
         })),
       ]
@@ -84,9 +87,16 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       const workflows = await loaded.get(context)
       const def = workflows?.find((candidate) => candidate.id === item.ref)
       if (!def) throw new Error(`'${item.ref}' is no longer a workflow of this task`)
-      // The whole definition rather than the id, which is what `start` takes, and it already turns a
-      // thrown HTTP error into `{ error }` and handles the needs-trust prompt (./workflowsClient.ts).
-      const result = await workflowApi.start(taskId, def)
+      // A definition that asks for something cannot be started from a row in a list. The start dialog
+      // that collects the values lands in phase 3 of docs/future/workflows/; until then the frame says
+      // where to go rather than starting a run with an empty input.
+      if (def.inputs?.some((input) => input.required && !input.default)) {
+        return { effect: 'stay', status: `${def.name} needs its inputs filled in. Run it from the workflow editor.` }
+      }
+      // The id, not the definition: the node resolves it and, for a committed file, checks the repo
+      // trust snapshot against the bytes on disk. `start` turns a thrown HTTP error into `{ error }`
+      // and handles the needs-trust prompt (./workflowsClient.ts).
+      const result = await workflowApi.start(taskId, { defId: def.source === 'database' ? def.id : `${def.source}:${def.id}` })
       if (result.error) throw new Error(result.error)
       return COMMAND_CLOSED
     },

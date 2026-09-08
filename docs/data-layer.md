@@ -90,7 +90,7 @@ These plugins own SQLite files and migrations:
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
-| `plugins/workflows.sqlite` | definitions, runs, steps, gates, and trigger state |
+| `plugins/workflows.sqlite` | `workflow_defs` (definitions typed in the app, scoped to a workspace and optionally a project), runs, steps, gates, and trigger state |
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no

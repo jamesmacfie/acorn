@@ -14,12 +14,19 @@ export type WorkflowBridge = {
   // `null` means no such run, and the guard treats that as "not yours" so run ids cannot be
   // enumerated.
   taskIdForRun(runId: string): Promise<string | null>
-  defs(taskId: string): Promise<unknown> // { workflows, errors }
+  // { workflows, errors } for a task: its project's files, the user layer, and — for a device caller
+  // only — this workspace's `workflow_defs` rows. A row is owner-typed configuration that skips the
+  // repo trust snapshot, so an agent inside the task neither sees one nor starts one.
+  defs(taskId: string, includeRows: boolean): Promise<unknown>
   // Every step kind, policy and profile this node can run, with the form each kind draws
   // (../../shared/workflowContracts.ts § WorkflowCatalog). Node-wide: nothing about a kind depends
   // on the project, and `projectId` on the route is for the editor phase that reads it.
   catalog(): Promise<unknown>
   start(taskId: string, def: unknown, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
+  // Start a definition the node resolves itself: `repo:<fileId>` or `user:<fileId>` for a file this
+  // task's project loads, anything else for a `workflow_defs` row. Resolving here rather than taking
+  // the definition in the body is what lets the repo trust snapshot be checked for real.
+  startById(taskId: string, defId: string, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<unknown[]>
   steps(runId: string): Promise<unknown[]>
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
@@ -38,12 +45,21 @@ export const setWorkflowBridge = (bridge: WorkflowBridge | null): void => setRou
 // start executes an agent CLI, gate resumes one; both get validated bodies (the privileged-boundary
 // contract). The def shape is validated structurally (name + steps[]); the runner re-checks the
 // rest.
-const startBody = z.object({
-  def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough(),
-  // Values for the definition's declared inputs. Which names are allowed and which are required is
-  // the runner's answer, because only the definition knows.
-  inputs: z.record(z.string(), z.string()).optional(),
-})
+const startBody = z
+  .object({
+    def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough().optional(),
+    // A definition the node resolves for itself, instead of the whole thing in the body.
+    defId: z.string().min(1).max(256).optional(),
+    // Values for the definition's declared inputs. Which names are allowed and which are required is
+    // the runner's answer, because only the definition knows.
+    inputs: z.record(z.string(), z.string()).optional(),
+  })
+  // One or the other, never both and never neither.
+  .refine((body) => !!body.def !== !!body.defId)
+
+// A `defId` that names a file rather than a row. A row is owner-typed configuration that skips the
+// repo trust snapshot, so a task-confined caller may start a file and not a row.
+const FILE_DEF_ID = /^(repo|user):/
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
 const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
@@ -68,11 +84,16 @@ export const workflow = new Hono<AppEnv>()
   // The editor's and the palette's list of what a step may be. `projectId` is accepted and unused:
   // the catalog is node-wide, and the editor sends it so a later per-project answer needs no new route.
   .get('/catalog', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.catalog()))
-  .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'))))
+  .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'), !isTaskConfined(c))))
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), parsed.data.def, parsed.data.inputs))
+    const { def, defId, inputs } = parsed.data
+    if (defId) {
+      if (isTaskConfined(c) && !FILE_DEF_ID.test(defId)) return respondError(c, 403, 'forbidden')
+      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs))
+    }
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), def, inputs))
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
