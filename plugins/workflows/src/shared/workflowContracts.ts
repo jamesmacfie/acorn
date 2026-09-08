@@ -139,7 +139,59 @@ export type StepValidationContext = {
   precedes(candidate: string, step: string): boolean
 }
 export type StepValidator = (step: WorkflowStepDef, context: StepValidationContext) => string[]
-export type StepKindContribution = { handler: StepHandler; validate?: StepValidator }
+
+// What a kind's form looks like, as data (docs/workflows.md § Contributed step kinds). The host draws
+// it, so a kind can be edited in the UI on either host without the plugin shipping a component.
+export type StepFieldType = 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'prompt'
+
+export type StepFieldOption = { value: string; label: string; description?: string }
+
+export type StepField = {
+  /** The key inside `with`, or the step's own field for a built-in. ../shared/stepFields.ts says which. */
+  id: string
+  label: string
+  type: StepFieldType
+  required?: boolean
+  hint?: string
+  placeholder?: string
+  /** A select whose choices are fixed. The host checks the value against them before `validate` runs. */
+  options?: StepFieldOption[]
+  /** A select whose choices come from a route in the contributing plugin's own namespace, answering
+   *  `{ options }`. Not checked at load time: the node validating the file may not be able to reach
+   *  the project the route needs. */
+  optionsRoute?: string
+  /** Numbers only. Checked by the host before `validate` runs. */
+  min?: number
+  max?: number
+  /** Text kinds only: whether `${inputs.x}` and `${steps.x.output}` are allowed here. Defaults to true
+   *  for a prompt field and false everywhere else. */
+  templates?: boolean
+}
+
+export type StepKindDescription = {
+  label: string
+  description?: string
+  /** A Lucide name or a `brand:` mark. */
+  icon?: string
+  /** True for a kind that runs an agent, and so may take `isolation`, `inputs` and `configOptions`.
+   *  The editor draws the profile, model and ceiling fields for these from the provider descriptors,
+   *  which is why they are not in `fields`. */
+  runsAgent?: boolean
+  fields: StepField[]
+  output?: { description: string; schema?: object }
+}
+
+// `describe` is optional so every contribution written before it keeps loading. A kind without one
+// draws as a name and a raw JSON `with`.
+export type StepKindContribution = { handler: StepHandler; validate?: StepValidator; describe?: StepKindDescription }
+
+/** What the editor and the palette need to offer every kind this node can run
+ *  (docs/api-reference.md § Workflows). `pluginId` is null for a built-in. */
+export type WorkflowCatalog = {
+  kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
+  policies: { id: string; pluginId: string | null }[]
+  profiles: { id: string; label: string; managed: boolean; structured: boolean }[]
+}
 export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
 
 export type WorkflowTriggerMatch = {

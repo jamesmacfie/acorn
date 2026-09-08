@@ -443,7 +443,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runId = await runner.start('task1', {
       name: 'unmatched',
       steps: [
-        { name: 'route', kind: 'decide', branches: { yes: 'yes' } },
+        { name: 'route', kind: 'decide', prompt: 'Ship or not?', branches: { yes: 'yes' } },
         { name: 'yes' },
       ],
     })
@@ -491,7 +491,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runId = await runner.start('task1', {
       name: 'cancel-tree',
       steps: [
-        { name: 'plan', kind: 'fan-out', childStep: { name: 'build' } },
+        { name: 'plan', kind: 'fan-out', prompt: 'Split the work.', childStep: { name: 'build' } },
         { name: 'join', kind: 'join', joins: 'plan' },
       ],
     })
@@ -645,7 +645,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runId = await runner.start('task1', {
       name: 'branch-tree',
       steps: [
-        { name: 'route', kind: 'decide', after: [], branches: { ship: 'ship', fix: 'fix' } },
+        { name: 'route', kind: 'decide', after: [], prompt: 'Ship or fix?', branches: { ship: 'ship', fix: 'fix' } },
         { name: 'ship', after: ['route'] },
         { name: 'ship-only', after: ['ship'] },
         { name: 'fix', after: ['route'] },

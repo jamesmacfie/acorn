@@ -95,6 +95,8 @@
   "GET /v2/p/notes/workspaces/:wsId/notes/:slug",
   "GET /v2/p/terminal/profiles",
   "GET /v2/p/terminal/sessions",
+  "GET /v2/p/terminal/tasks/:taskId/run-targets",
+  "GET /v2/p/workflows/catalog",
   "GET /v2/p/workflows/runs",
   "GET /v2/p/workflows/tasks/:id/workflows",
   "GET /v2/p/workflows/tasks/:id/workflows/runs",

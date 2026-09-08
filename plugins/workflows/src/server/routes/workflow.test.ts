@@ -32,6 +32,7 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   // run1 belongs to task1; run2 to task2. Anything else does not exist.
   taskIdForRun: async (runId) => (runId === 'run1' ? 'task1' : runId === 'run2' ? 'task2' : null),
   defs: async () => ({ workflows: [], errors: [] }),
+  catalog: async () => ({ kinds: [], policies: [], profiles: [] }),
   start: async () => ({ runId: 'run1' }),
   runs: async () => [],
   steps: async () => [],

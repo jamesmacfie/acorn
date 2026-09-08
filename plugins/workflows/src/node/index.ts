@@ -215,6 +215,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
           return loadWorkflowFiles(repoDir, homedir(), runner.validationCatalog())
         },
+        catalog: async () => runner.catalog(),
         start: async (taskId, def, inputs) => {
           await deps.reconciled // don't start a run the restart sweep would immediately re-queue
           try {

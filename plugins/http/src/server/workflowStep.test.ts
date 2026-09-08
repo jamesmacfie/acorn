@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StepValidationContext } from '@acorn/plugin-workflows/contract/extensions.ts'
-import { validateHttpStep } from './workflowStep'
+import { bodyModes, httpMethods } from '../shared/model'
+import { describeHttpStep, validateHttpStep } from './workflowStep'
 
 // The `http:request` step's authoring check. Worth its own test because it is the reason the step is
 // validated at load rather than at run: a bad step should be a red row in the workflow list, not a run
@@ -38,8 +39,16 @@ describe('the http:request step', () => {
       .toEqual(["step 'call' needs one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS as its method"])
   })
 
-  it('refuses headers that are not a table', () => {
+  it('refuses headers that are neither a table nor lines', () => {
     expect(validateHttpStep(step({ method: 'GET', url: 'https://x.test', headers: ['a: b'] }), context))
-      .toEqual(["step 'call' headers must be a table of strings"])
+      .toEqual(["step 'call' headers must be a table of strings, or one 'Name: value' per line"])
+  })
+
+  it('describes the fields the handler reads, and nothing it does not', () => {
+    // The whole contract of `describe`: the host writes what it draws into `[steps.with]` under these
+    // ids, and the handler finds it there. A drift here is a field the editor fills and nothing reads.
+    expect(describeHttpStep.fields.map((field) => field.id)).toEqual(['method', 'url', 'headers', 'bodyMode', 'body'])
+    expect(describeHttpStep.fields.find((field) => field.id === 'method')?.options?.map((option) => option.value)).toEqual([...httpMethods])
+    expect(describeHttpStep.fields.find((field) => field.id === 'bodyMode')?.options?.map((option) => option.value)).toEqual([...bodyModes])
   })
 })

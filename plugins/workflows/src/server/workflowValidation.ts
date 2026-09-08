@@ -1,5 +1,8 @@
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
+import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../shared/stepFields'
 import type {
+  StepField,
+  StepKindDescription,
   StepValidationContext,
   WorkflowBudget,
   WorkflowDef,
@@ -12,10 +15,6 @@ const STEP_TEMPLATE_TOKEN_RE = /\$\{steps\.[^}]*\}/g
 const INPUT_RE = /\$\{inputs\.([^}]+)\}/g
 const INPUT_TOKEN_RE = /\$\{inputs\.[^}]*\}/g
 const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
-
-/** The kinds that run an agent, and so may carry `isolation`, `inputs` and `configOptions`. A
- *  contributed kind joins this list in phase 1, through the `runsAgent` flag on its description. */
-export const AGENT_STEP_KINDS = new Set(['agent', 'ci-loop', 'fan-out', 'decide'])
 
 /**
  * The edges, derived and never stored. A step with an `after` list waits on exactly those steps; a
@@ -76,6 +75,11 @@ export type WorkflowValidationCatalog = {
   profiles: ReadonlySet<string>
   // Profiles with a one-shot structured (aiArgv) mode: the only ones `decide` can run on.
   structuredProfiles: ReadonlySet<string>
+  // Every kind whose description says it runs an agent, built-in or contributed. Absent means the
+  // built-ins alone, which is what a catalog assembled without descriptions knows.
+  agentStepKinds?: ReadonlySet<string>
+  // A kind's description, for the host-applied field checks below. Absent for a kind that has none.
+  describeStepKind?: (kind: string) => StepKindDescription | undefined
   validateStepKind?: (kind: string, step: WorkflowStepDef, context: StepValidationContext) => string[]
 }
 
@@ -127,6 +131,35 @@ function validateBudget(label: string, budget: WorkflowBudget | undefined): stri
     if (field !== 'maxCostUsd' && !Number.isInteger(value)) return [`${label} ${field} must be an integer`]
     return []
   })
+}
+
+/**
+ * The checks a description states, applied by the host before the kind's own validator runs
+ * (docs/workflows.md § Contributed step kinds). A validator can then assume the shape and check the
+ * meaning. A select with an `optionsRoute` is skipped: the node reading the file may not be able to
+ * reach the project whose route lists the choices.
+ */
+function fieldProblems(label: string, step: WorkflowStepDef, kind: string, fields: readonly StepField[]): string[] {
+  const errors: string[] = []
+  for (const field of fields) {
+    const value = readStepField(step as Parameters<typeof readStepField>[0], kind, field.id)
+    const missing = value == null || (typeof value === 'string' && !value.trim())
+    if (missing) {
+      if (field.required) errors.push(`${label} needs ${field.label.toLowerCase()}`)
+      continue
+    }
+    if (field.type === 'number') {
+      if (typeof value !== 'number' || !Number.isFinite(value)) errors.push(`${label} ${field.label.toLowerCase()} must be a number`)
+      else if ((field.min != null && value < field.min) || (field.max != null && value > field.max)) {
+        errors.push(`${label} ${field.label.toLowerCase()} must be between ${field.min ?? '-'} and ${field.max ?? '-'}`)
+      }
+    } else if (field.type === 'boolean' && typeof value !== 'boolean') {
+      errors.push(`${label} ${field.label.toLowerCase()} must be true or false`)
+    } else if (field.type === 'select' && field.options && !field.options.some((option) => option.value === value)) {
+      errors.push(`${label} ${field.label.toLowerCase()} must be one of ${field.options.map((option) => option.value).join(', ')}`)
+    }
+  }
+  return errors
 }
 
 function budgetNarrows(parent: WorkflowBudget | undefined, child: WorkflowBudget | undefined): boolean {
@@ -204,7 +237,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
       errors.push(`${label} child budget widens its parent budget`)
     }
 
-    if (['agent', 'ci-loop', 'fan-out', 'decide'].includes(kind)) {
+    if ((catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       const profileId = step.profileId ?? DEFAULT_PROFILE_ID
       if (!catalog.profiles.has(profileId)) errors.push(`${label} names unknown profile '${profileId}'`)
       else if (kind === 'decide' && !catalog.structuredProfiles.has(profileId)) {
@@ -214,8 +247,15 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (step.childStep?.profileId && !catalog.profiles.has(step.childStep.profileId)) {
       errors.push(`${label} child names unknown profile '${step.childStep.profileId}'`)
     }
-    errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }) ?? []))
-    if (!AGENT_STEP_KINDS.has(kind)) {
+    // The description's own checks first, and the kind's validator only when they pass: the
+    // contract a validator relies on is "the shape is already right".
+    const described = catalog.describeStepKind?.(kind)
+    const fieldErrors = described ? fieldProblems(label, step, kind, described.fields) : []
+    errors.push(...fieldErrors)
+    if (!fieldErrors.length) {
+      errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }) ?? []))
+    }
+    if (!(catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       for (const field of ['isolation', 'inputs', 'configOptions'] as const) {
         if (step[field] != null) errors.push(`${label} is a '${kind}' step, which cannot take ${field}`)
       }

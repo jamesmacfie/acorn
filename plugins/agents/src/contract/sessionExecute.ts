@@ -36,3 +36,15 @@ export type AgentSessionExecuteRequest = {
 export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<HeadlessResult | null>
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')
+
+// Which agent profiles have a durable managed driver. Here rather than beside the implementation
+// because it is the other half of the sentence above: a caller reads it to know, before it calls,
+// whether this profile will resolve to a session or to `null`. The workflows catalog says `managed`
+// on a profile from this (docs/workflows.md § Contributed step kinds).
+const MANAGED_PROVIDERS: Readonly<Record<string, string>> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+}
+
+export const managedProviderForProfile = (profileId: string | undefined): string | null =>
+  MANAGED_PROVIDERS[profileId ?? ''] ?? null

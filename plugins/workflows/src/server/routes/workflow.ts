@@ -15,6 +15,10 @@ export type WorkflowBridge = {
   // enumerated.
   taskIdForRun(runId: string): Promise<string | null>
   defs(taskId: string): Promise<unknown> // { workflows, errors }
+  // Every step kind, policy and profile this node can run, with the form each kind draws
+  // (../../shared/workflowContracts.ts § WorkflowCatalog). Node-wide: nothing about a kind depends
+  // on the project, and `projectId` on the route is for the editor phase that reads it.
+  catalog(): Promise<unknown>
   start(taskId: string, def: unknown, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<unknown[]>
   steps(runId: string): Promise<unknown[]>
@@ -61,6 +65,9 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
   .use('/workflows/runs/:runId/*', ownsRun)
+  // The editor's and the palette's list of what a step may be. `projectId` is accepted and unused:
+  // the catalog is node-wide, and the editor sends it so a later per-project answer needs no new route.
+  .get('/catalog', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.catalog()))
   .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'))))
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))

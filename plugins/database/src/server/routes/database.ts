@@ -251,6 +251,17 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ ok: true })
     })
 
+    // The project's saved queries as field options, for the `database:query` workflow step's picker
+    // (../workflowSteps.ts). Project-scoped rather than task-scoped, unlike every route above, because
+    // the workflow editor is a project surface and has no task to address one through.
+    .get('/projects/:projectId/saved-queries', async (c) => {
+      // No task in the path means no scope gate, so the check is here: a project id is guessable and a
+      // task-confined agent has no business enumerating another repository's saved queries.
+      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+      const rows = await db.select().from(dbSavedQueries).where(projectScope(c.req.param('projectId'))).orderBy(dbSavedQueries.name)
+      return c.json({ options: rows.map((row) => ({ value: row.id, label: row.name, ...(row.notes ? { description: row.notes } : {}) })) })
+    })
+
     // --- the command palette's two rows (docs/plugins.md § Command kinds) ---
     //
     // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
@@ -335,7 +346,10 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     .get('/tasks/:taskId/model-connections', async (c) => {
       if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
       const connections = await core.models.available(owner(c))
-      return c.json({ connections })
+      // `options` beside `connections`, not instead of it: the pane's dropdown reads the rows and the
+      // workflow editor reads the field-option shape every `optionsRoute` answers
+      // (docs/workflows.md § Contributed step kinds).
+      return c.json({ connections, options: connections.map(({ connection, provider }) => ({ value: connection.id, label: connection.label || provider.label })) })
     })
 
     // Generate a PostgreSQL query from a natural-language description through a connected model

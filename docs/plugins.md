@@ -2308,6 +2308,23 @@ for (const entry of ctx.extensionPoints.handlers(WORKFLOW_STEP_KIND)) { /* … *
 ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
 ```
 
+**A point's value may carry a description the host draws.** A step kind's value is
+`{ handler, validate?, describe? }`, and `describe` is the kind's form as data: a label, an icon, and
+a closed list of fields. The host renders it on both hosts and applies the field rules first:
+`required`, `min`, `max`, and a static select's membership. Then it calls the plugin's own
+`validate`. That splits
+the work the way it should be split: the contributor keeps every judgement that needs its own code,
+and gives up only the drawing. A `GET /catalog` route on the owning plugin then answers the whole
+vocabulary, resolved per request rather than cached, because the plugin that fills the point may start
+after the owner does. See [workflows.md](./workflows.md) § Contributed step kinds for the field
+vocabulary and the worked kinds.
+
+A contributor that cannot import the owner's `contract/` names the point by its string instead. That
+happens when importing it would make the workspace package graph cyclic, as it does for
+`plugins/terminal`, which the workflows plugin already depends on. The string is the contract; the
+contributor mirrors as much of the value type as it uses, in its own `contract/`, and the owner's
+test suite holds the mirror against the real type.
+
 Unlike the client's, this one carries **functions, not descriptors**, and that is not an inconsistency:
 a client contribution crosses an iframe boundary into another realm, and a node contribution does not
 — both tiers of plugin run in the node's own process. The rung-1 argument applies unchanged

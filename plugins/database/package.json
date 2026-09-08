@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./node/index.ts": "./src/node/index.ts"
+    "./node/index.ts": "./src/node/index.ts",
+    "./contract/*": "./src/contract/*"
   },
   "scripts": {
     "lint": "tsc --noEmit",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-virtual": "^3.13.29",
     "drizzle-orm": "catalog:",

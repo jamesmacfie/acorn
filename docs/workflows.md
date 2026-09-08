@@ -129,10 +129,69 @@ package will run the step, and two plugins can both call their entry `request` w
 shadowing the other.
 
 A contributed kind's inputs go in `[steps.with]`, an opaque table the runner passes through unread.
-The contributing plugin validates it — at load time, so a bad step is a red row in the workflow list
-rather than a run that starts and fails on its third step — and reads it in its handler. Built-in
-kinds do not use `with`; their inputs are named fields, which is what keeps them checkable by the
-host.
+The contributing plugin validates it at load time, so a bad step is a red row in the workflow list
+rather than a run that starts and fails on its third step, and reads it again in its handler.
+Built-in kinds do not use `with`. Their inputs are named fields, which is what keeps them checkable
+by the host.
+
+A handler's `with` arrives rendered. `${inputs.x}` and `${steps.x.output}` are substituted one level
+deep before the handler runs, so `terminal:command` is handed the command it will run and never a
+template.
+
+### A kind describes its own form
+
+A kind can carry a `describe`: a label, an icon, and its inputs as a list of fields. The host draws
+that form, on the desktop and in the terminal, so a plugin adds an editable step kind without
+shipping a component. `describe` is optional. A kind without one is listed by name with a raw JSON
+`with`.
+
+A field is `text`, `textarea`, `number`, `boolean`, `select`, or `prompt`. A `prompt` field is a
+textarea that accepts template references. A `select` either lists its `options` or names an
+`optionsRoute` in the contributing plugin's own namespace, which answers
+`{ options: [{ value, label, description? }] }`.
+
+The host applies `required`, `min`, `max`, and a static select's membership before it calls the
+kind's `validate`, and skips `validate` when any of those fail. So a validator can assume the shape
+is right and check only the meaning. A field with an `optionsRoute` is not checked at load time,
+because the node reading the file may have no way to reach the project the route needs.
+
+The seven built-in kinds describe themselves through the same type, with the fields naming a step's
+own keys rather than keys in `with`
+(`plugins/workflows/src/shared/stepFields.ts`). The editor does not need to know which is which: it
+asks `fieldHome(kind, fieldId)`. A kind whose description says `runsAgent` may also take `isolation`,
+`inputs`, and `config_options`, and that is the only way a contributed kind gets them.
+
+`GET /v2/p/workflows/catalog` answers the whole vocabulary: every kind with its description, every
+policy, and every agent profile with whether it has a managed driver and a one-shot structured mode.
+It is resolved per request rather than cached, because the plugin that fills the point may start
+after workflows does.
+
+### The kinds other plugins contribute
+
+| Kind | Owner | What it does |
+| --- | --- | --- |
+| `http:request` | [http-client.md](./http-client.md) | One HTTP request through the project's variables. |
+| `terminal:command` | [terminal.md](./terminal.md) | One shell command in the task's checkout, streamed and captured. |
+| `terminal:run-target` | [terminal.md](./terminal.md) | Starts a declared run target and reports its URL. |
+| `database:query` | [database.md](./database.md) | A saved query or inline SQL, capped and read-only. |
+| `database:generate` | [database.md](./database.md) | A model writes the SQL, then the same read runs it. |
+
+Each lives with the code that already knows how to do the thing safely, which is the rule for
+admitting a kind at all. The command kind sits beside the process broker's environment allowlist, the
+HTTP kind beside the scheme check that runs after interpolation, the database kinds beside the
+connection resolution and the row cap.
+
+### Progress events
+
+A handler's `emit` takes anything, and the run pane shows what it does not recognise as JSON. Four
+shapes it does recognise (`plugins/workflows/src/shared/stepEvents.ts`):
+
+| Event | From | Drawn as |
+| --- | --- | --- |
+| `{ type: 'managed-agent', … }` | agent kinds | State, last assistant text, cost |
+| `{ type: 'stdout' \| 'stderr', text }` | `terminal:command` | A tail of the output |
+| `{ type: 'progress', text }` | any kind | One line under the node |
+| `{ type: 'rows', count }` | database kinds | "n rows" while it runs |
 
 The worked example is `http:request`, contributed by the http plugin, where the post-interpolation
 scheme check, the 5 MB response cap and the project's variable layers already live
@@ -212,7 +271,7 @@ remain executable actions and are trust-checked.
 
 Authoring is file-based. The desktop must be open for UI interaction, although the node continues
 work while the renderer is closed, including the trigger sweep, which moved onto the node's own
-scheduler. There is no general DAG editor. A failed node is retried by hand through the retry route;
+scheduler. A step kind describes its form, but nothing draws it yet: there is no general DAG editor. A failed node is retried by hand through the retry route;
 an operation whose external outcome is unknown is never retried on its own, because acorn cannot tell
 a side effect that landed from one that did not.
 

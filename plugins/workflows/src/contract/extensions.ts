@@ -10,7 +10,13 @@ import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution
 // `kind = "http:request"` names the package that will run the step. Two plugins can both call their
 // entry `request` and neither shadows the other, and the workflow file says which one it meant.
 
-export type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidationContext, StepValidator, WorkflowDef, WorkflowStepDef, WorkflowTriggerContribution, WorkflowTriggerMatch } from '../shared/workflowContracts'
+export type { PolicyEvaluator, StepField, StepFieldOption, StepFieldType, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepKindDescription, StepValidationContext, StepValidator, WorkflowCatalog, WorkflowDef, WorkflowStepDef, WorkflowTriggerContribution, WorkflowTriggerMatch } from '../shared/workflowContracts'
+
+// A kind may also carry a `describe`: its label, its icon, and its fields as data
+// (docs/workflows.md § Contributed step kinds). The host draws that form on both hosts and applies
+// `required`, `min`, `max` and a static select's membership before calling `validate`, so a validator
+// can assume the shape and check the meaning. `describe` is optional, and a kind without one is
+// listed by name with a raw `with` table.
 
 /** A step kind the runner will dispatch to. Entry id becomes the second half of `kind`. */
 export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workflows:step-kind')
