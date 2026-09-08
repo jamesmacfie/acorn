@@ -11,7 +11,13 @@ import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/clie
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
+
+/** How long the generate route may take: two model calls at the runtime's 60-second ceiling, and
+ *  half a minute for the prompt, the checker and the wire. Not the broker's 30-second default, which
+ *  one model call already outlives. */
+const GENERATE_TIMEOUT_MS = 150_000
 
 export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
@@ -33,6 +39,8 @@ export const workflowAllRunsRoute = '/v2/p/workflows/runs'
 export const workflowDefsRoute = '/v2/p/workflows/defs'
 export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
+// A whole definition written from a description (docs/workflows.md § Authoring).
+export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
@@ -98,4 +106,12 @@ export const workflowApi = {
   deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
   validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
   saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
+  // The one call here that says how long it may take, because the broker's default kills it first.
+  generateDef: (input: WorkflowGenerateRequest) =>
+    writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      timeoutMs: GENERATE_TIMEOUT_MS,
+    }),
 }
