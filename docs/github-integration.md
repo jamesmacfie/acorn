@@ -57,6 +57,13 @@ created PR through `CoreServices.tasks.attachPull`: the first attachment claims
 Shelling out to `gh pr create` still has only branch-adoption semantics and does not gain agent
 attribution.
 
+Two read-tier tools sit beside it. `pr_review_comments` returns the submitted reviews, the inline
+threads and the conversation comments for the task's PR, and `pr_checks` returns every mirrored check
+with the failing ones named. Both read this plugin's mirror, so neither spends the credential or
+touches the network, and both distinguish an unmirrored PR from an empty one. Before they existed, an
+agent asked to address review feedback had to shell out to `gh` against data acorn already had
+([agent tools](./agent-tools.md) § GitHub).
+
 The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
 live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only
 mirror through the PR-detail sync, which runs only for PRs already in the mirror because this account
