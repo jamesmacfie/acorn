@@ -10,7 +10,7 @@ import { refreshFleet, _resetFleet } from './fleet'
 
 const node: NodeRecord = { nodeId: 'n1', label: 'Node One', endpoint: 'https://127.0.0.1:9443', local: true }
 
-let attempted: { path: string; method: string }[] = []
+let attempted: { path: string; method: string; timeoutMs?: number }[] = []
 
 function installBroker(state: NodeConnectionState): void {
   attempted = []
@@ -19,8 +19,10 @@ function installBroker(state: NodeConnectionState): void {
       desktop: true,
       fleetList: () => Promise.resolve({ nodes: [node], statuses: [{ nodeId: 'n1', state }] }),
       onNodeStatus: () => () => {},
-      nodeFetch: (_nodeId: string, request: { path: string; method: string }) => {
-        attempted.push({ path: request.path, method: request.method })
+      nodeFetch: (_nodeId: string, request: { path: string; method: string; timeoutMs?: number }) => {
+        // Recorded only when it is there, so the requests that ask for nothing keep the shape the
+        // assertions below already spell out.
+        attempted.push({ path: request.path, method: request.method, ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }) })
         return Promise.resolve({ status: 200, headers: {}, body: new TextEncoder().encode('{"ok":true}') })
       },
       nodeAbort: () => {},
@@ -72,5 +74,19 @@ describe('mutations against an unreachable node', () => {
     await expect(readJson('/v2/core/workspaces')).resolves.toEqual({ ok: true })
     await expect(writeJson('/v2/core/devices/d1', { method: 'DELETE' })).rejects.toThrow(/offline/)
     expect(attempted.map((a) => a.method)).toEqual(['GET'])
+  })
+})
+
+describe('a caller that knows its request is slow', () => {
+  it('hands its timeout to the transport, and says nothing when it has none to give', async () => {
+    // The broker cuts a request off at 30 seconds, which is shorter than one model call is allowed to
+    // take. A route that waits on one is unusable on the desktop unless this reaches the broker.
+    await ready('online')
+    await readJson('/v2/core/workspaces')
+    await writeJson('/v2/p/workflows/defs/generate', { method: 'POST', body: '{}', timeoutMs: 150_000 })
+    expect(attempted).toEqual([
+      { path: '/v2/core/workspaces', method: 'GET' },
+      { path: '/v2/p/workflows/defs/generate', method: 'POST', timeoutMs: 150_000 },
+    ])
   })
 })
