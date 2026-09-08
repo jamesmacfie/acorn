@@ -21,6 +21,8 @@
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "smol-toml": "^1.7.0",

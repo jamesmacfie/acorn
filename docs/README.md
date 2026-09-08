@@ -56,7 +56,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
-| [workflows.md](./workflows.md) | File-defined orchestration: runs, gates, budgets, branching, joins. |
+| [workflows.md](./workflows.md) | Orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, and the editor that writes one. |
 | [notes-and-memory.md](./notes-and-memory.md) | Task notes and the memory proposals loop. |
 | [http-client.md](./http-client.md) | The HTTP request pane and the outbound-request gap. |
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |

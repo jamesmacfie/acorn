@@ -32,13 +32,15 @@
       "terminal.run.targets",
       "terminal.run.layouts",
       "terminal.run.sessions",
-      "workflows.run"
+      "workflows.run",
+      "workflows.new"
     ],
     "sources": [
       "agents",
       "docker",
       "github",
-      "memory"
+      "memory",
+      "workflows"
     ],
     "settingsPages": [
       "agent-concurrency",
@@ -257,7 +259,11 @@
     },
     "workflows": {
       "commands": [
-        "workflows.run"
+        "workflows.run",
+        "workflows.new"
+      ],
+      "sources": [
+        "workflows"
       ],
       "settingsPages": [
         "workflows"

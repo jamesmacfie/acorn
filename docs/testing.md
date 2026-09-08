@@ -477,6 +477,26 @@ real remote with real credentials does.
     plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
     the plugin on, with no gap where the button was.
 
+The next three are the workflow editor's, owed since it shipped and **not yet run**. The draft rules
+have a unit suite and the inspector has a jsdom one, and neither can see what a person building the
+owner's first workflow actually goes through. Run them on the desktop and in `acorn` in a terminal.
+
+48. Open Workflows in the left rail with a project chosen. Press **+ New**, then build the owner's
+    first workflow from the empty definition using only the editor: two agent nodes with no
+    predecessor, a `terminal:command` node, a third agent node waiting on both investigators, and a
+    human gate after it. Declare an input, put it in a prompt from the chip row, and rename one of the
+    investigators. Every reference to the old name follows it, and the footer reads valid. Press
+    **Save**, reload the surface, and the same nodes come back.
+49. From the same definition, press **Save to repo** on a task with a checkout. The file appears at
+    `.acorn/workflows/<slug>.toml` in that worktree. Open it from the rail: it draws the same nodes
+    read-only, with **Copy to database** where Save was. Start a run from it and the repo trust prompt
+    appears, because the snapshot now covers the file.
+50. Press **Run** in the editor. The dialog asks for the declared input and for a task, refuses to
+    confirm until the required one is filled, and starts the run. Then run the same definition from
+    ⌘K → **Run a workflow**: it opens the same dialog rather than starting with an empty input. In the
+    terminal client, the definition list is in the Browse panel, the editor is in the main one with
+    its node list beside its inspector, and the dialog is a modal the keys stay inside.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

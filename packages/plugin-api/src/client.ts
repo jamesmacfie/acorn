@@ -70,6 +70,12 @@ export { closeRefPanel, openRefPanel } from '@acorn/client-core/host/registries/
 // surface; a plugin registers through `ctx.refPanels`, which binds the provider to the plugin's own
 // name.
 export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/host/registries/panes/refPanels.ts'
+// A project-scoped surface: the plugin's own page at `/p/:projectId/x/<plugin>/…`, drawn beside its
+// rail list. The registry itself, because there is no named member on the context for it and
+// docs/contribution-kinds.md already names `ctx.contribute(projectSurfaceRegistry)` as the compiled
+// way in.
+export { projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
+export type { ProjectSurfaceContribution } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
 // The registry value, not just the props type: first-run onboarding hosts whichever importers are
 // registered rather than importing another plugin's component.
 export { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
