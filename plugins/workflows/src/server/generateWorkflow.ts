@@ -39,9 +39,9 @@ export const GENERATE_MAX_SYSTEM_CHARS = 90_000
  *  applied: that section is fixed text and is never cut, so growing it past this is a decision
  *  somebody makes on purpose. */
 export const GENERATE_MAX_CONCEPT_CHARS = 22_000
-export const GENERATE_MAX_KIND_CHARS = 24_000
-export const GENERATE_MAX_VOCABULARY_CHARS = 4_000
-export const GENERATE_MAX_EXAMPLE_CHARS = 24_000
+const GENERATE_MAX_KIND_CHARS = 24_000
+const GENERATE_MAX_VOCABULARY_CHARS = 4_000
+const GENERATE_MAX_EXAMPLE_CHARS = 24_000
 
 /** Caps inside those budgets. A select with hundreds of options and a node with hundreds of profiles
  *  are both real, and neither teaches more at 300 entries than at 12. */
@@ -54,18 +54,20 @@ export const GENERATE_MAX_EXAMPLE_SIZE = 6_000
  *  repairing ever has, and it bounds a prompt built from a reply we did not write. */
 export const GENERATE_MAX_REPAIR_PROBLEMS = 40
 
-/** The five keys nothing can check.
+/** The keys nothing can check.
  *
  *  None of them appears in the catalog, so what the prompt cannot list, grounding cannot refute: a
  *  model name, a provider option or a run target the model invents would pass every validator and
  *  then fail at run time. They are forbidden here and stripped in ./groundWorkflow.ts.
  *
  *  `requiresRun` is also a described field of the built-in `agent` kind, so the generated section
- *  below filters it out. A field whose last dotted part is forbidden goes with it, which is what
- *  keeps `childStep.model` out of a prompt that has just said never to write `model`. */
+ *  below filters it out. That filter is derived from this list rather than written out again: a key
+ *  added here has to vanish from the field lists too, and a second list is a second place to forget.
+ *  A field whose last dotted part is forbidden goes with it, which is what keeps `childStep.model`
+ *  out of a prompt that has just said never to write `model`. */
 export const FORBIDDEN_KEYS = ['trigger', 'tools.allow', 'model', 'configOptions', 'requiresRun'] as const
 
-const FORBIDDEN_FIELD_IDS = new Set(['model', 'configOptions', 'requiresRun'])
+const FORBIDDEN_FIELD_IDS = new Set<string>(FORBIDDEN_KEYS.flatMap((key) => [key, key.split('.').pop() ?? key]))
 const isForbiddenField = (id: string): boolean => FORBIDDEN_FIELD_IDS.has(id) || FORBIDDEN_FIELD_IDS.has(id.split('.').pop() ?? id)
 
 // --- 1. the role and the output contract ---
@@ -105,15 +107,19 @@ const SECTION_CONCEPTS = [
   '  "inputs": [',
   '    { "name": "issue", "description": "The issue to work on", "required": true }',
   '  ],',
-  '  "steps": []',
+  '  "steps": [',
+  '    { "name": "reproduce", "after": [], "prompt": "Reproduce the issue and say which command shows it." }',
+  '  ]',
   '}',
   '',
-  'Only `name` and `steps` are required, and `posture` defaults to `gated`.',
+  'Only `name` and `steps` are required, and `posture` defaults to `gated`. `steps` always holds at',
+  'least one step: a definition with none is refused.',
   '',
-  'An input is a value the person supplies when they start the run. Its `name` takes letters, digits',
-  'and underscores, and no dashes. `description`, `required` and `default` are optional. Declare an',
-  'input when the description asks for something that changes each time the workflow runs, and give',
-  'it a description, because that is the label on the box the person fills in.',
+  'An input is a value the person supplies when they start the run. Its `name` starts with a letter',
+  'and then takes letters, digits and underscores. No dashes, and no leading digit. `description`,',
+  '`required` and `default` are optional. Declare an input when the description asks for something',
+  'that changes each time the workflow runs, and give it a description, because that is the label on',
+  'the box the person fills in.',
   '',
   '### A step',
   '',
@@ -252,7 +258,7 @@ const SECTION_CONCEPTS = [
   '',
   '### Keys never to write',
   '',
-  'These five look plausible and are not available here. Each one is stripped out of your answer:',
+  'These look plausible and are not available here. Each one is stripped out of your answer:',
   '',
   '  trigger          what starts a workflow on its own.',
   '  tools.allow      a named tool allowlist. Use tools.maxRisk.',
@@ -282,12 +288,12 @@ const SECTION_KINDS_PREAMBLE = [
   '',
   'A dotted key is a nested one: `childStep.prompt` means `prompt` inside a `childStep` object.',
   '',
-  "A field's JSON type follows the word in brackets. `text`, `textarea` and `prompt` are strings,",
-  '`number` is a number, `boolean` is true or false, and a listed field takes one of the values',
-  'listed. The single exception is `schema`, which is a JSON Schema object, as above.',
+  "A field's JSON type follows the word in brackets. `text`, `textarea`, `prompt` and `string` are",
+  'all strings, `number` is a number, `boolean` is true or false, and a field written as "one of" takes',
+  'one of the values listed. The single exception is `schema`, which is a JSON Schema object, as above.',
   '',
-  'A kind marked "runs an agent" may also take `profileId`, `isolation` and `inputs`. A kind that is',
-  'not marked may take none of the three.',
+  'A kind marked "runs an agent" may also take `profileId`, `isolation` and `inputs`. On any other',
+  'kind `isolation` and `inputs` are errors and `profileId` does nothing, so leave all three off.',
 ].join('\n')
 
 const optionValues = (options: readonly StepFieldOption[], detail: KindDetail): string => {
@@ -297,17 +303,37 @@ const optionValues = (options: readonly StepFieldOption[], detail: KindDetail): 
 }
 
 const fieldType = (field: StepField, detail: KindDetail): string => {
-  if (field.type === 'select' && field.options?.length) return `one of ${optionValues(field.options, detail)}`
+  // A select with no fixed options — a policy, a fan-out step name, a child profile — has nothing to
+  // list, and the bare word `select` is not a JSON type and means nothing to a model with no form in
+  // front of it. Each one holds an identifier, so say what the model actually writes: a string.
+  if (field.type === 'select') return field.options?.length ? `one of ${optionValues(field.options, detail)}` : 'string'
   if (field.type === 'number' && (field.min != null || field.max != null)) {
     return `number from ${field.min ?? 'any'} to ${field.max ?? 'any'}`
   }
   return field.type
 }
 
-const fieldLine = (field: StepField, prefix: string, detail: KindDetail): string => {
-  const shape = [fieldType(field, detail), ...(field.required ? ['required'] : [])].join(', ')
-  const hint = detail === 0 && field.hint ? ` ${field.hint}` : ''
-  return `- \`${prefix}${field.id}\` (${shape}).${hint}`
+/** One line of a kind's key list, from either a described field or the table below. */
+type PromptField = { id: string; shape: string; hint?: string }
+
+const fieldLine = (field: PromptField, prefix: string, detail: KindDetail): string =>
+  `- \`${prefix}${field.id}\` (${field.shape}).${detail === 0 && field.hint ? ` ${field.hint}` : ''}`
+
+/** Keys a built-in kind really takes that its `describe` does not list.
+ *
+ *  `describe` is the editor's form, and these three have no control on it: a decide's branches are
+ *  drawn as edges on the graph, a fan-out's schema is written for it, and a child step's name is a
+ *  slug the runner defaults. A model has no graph to draw on and no form to fill in, so it has to be
+ *  handed the keys. They live here rather than in `describe` because adding them there would put
+ *  three empty boxes in the inspector to fix a problem the inspector does not have.
+ *
+ *  Only built-ins appear here. A contributed kind's `describe` is the whole contract it has. */
+const UNDESCRIBED_FIELDS: Readonly<Record<string, readonly PromptField[]>> = {
+  decide: [{ id: 'branches', shape: 'object of verdict to step name, required', hint: 'Section 4 shows one.' }],
+  'fan-out': [
+    { id: 'schema', shape: 'textarea, required', hint: 'JSON Schema for the task list. Section 4 has it.' },
+    { id: 'childStep.name', shape: 'text', hint: 'A slug naming each child. Defaults to `child`.' },
+  ],
 }
 
 type CatalogKind = WorkflowCatalog['kinds'][number]
@@ -316,12 +342,22 @@ type CatalogKind = WorkflowCatalog['kinds'][number]
 const orderedKinds = (catalog: WorkflowCatalog): CatalogKind[] =>
   [...catalog.kinds].sort((a, b) => Number(a.pluginId !== null) - Number(b.pluginId !== null))
 
-const kindFields = (kind: CatalogKind): StepField[] =>
-  (kind.describe?.fields ?? []).filter((field) => kind.pluginId !== null || !isForbiddenField(field.id))
+const kindFields = (kind: CatalogKind, detail: KindDetail): PromptField[] => [
+  ...(kind.describe?.fields ?? [])
+    .filter((field) => kind.pluginId !== null || !isForbiddenField(field.id))
+    .map((field) => ({
+      id: field.id,
+      shape: [fieldType(field, detail), ...(field.required ? ['required'] : [])].join(', '),
+      hint: field.hint,
+    })),
+  ...(kind.pluginId === null ? UNDESCRIBED_FIELDS[kind.id] ?? [] : []),
+  // Top-level keys, then the nested ones, so a `childStep` is not split in half by a key added
+  // above. The sort is stable, so each group keeps the order it was described in.
+].sort((a, b) => Number(a.id.includes('.')) - Number(b.id.includes('.')))
 
 const kindBlock = (kind: CatalogKind, detail: KindDetail): string => {
   const builtin = kind.pluginId === null
-  const fields = kindFields(kind)
+  const fields = kindFields(kind, detail)
   const prefix = builtin ? '' : 'with.'
   const lines = [`### \`${kind.id}\``]
   const summary = [
@@ -345,7 +381,7 @@ const kindBlock = (kind: CatalogKind, detail: KindDetail): string => {
 
 const kindOneLine = (kind: CatalogKind): string => {
   const prefix = kind.pluginId === null ? '' : 'with.'
-  const fields = kindFields(kind)
+  const fields = kindFields(kind, 4)
   const keys = fields.length ? fields.map((field) => `${prefix}${field.id}`).join(', ') : 'no keys'
   return `- \`${kind.id}\`, ${kind.describe?.label ?? kind.id}: ${keys}`
 }
@@ -386,6 +422,12 @@ const SECTION_CONTRACTS = [
   'to be unique across every task on the machine, so build it out of something from the run. At most',
   '12 entries.',
   '',
+  'An empty `tasks` array is not an answer. It fails the step with that same message, exactly as a',
+  'missing array does. So write the planning prompt to ask for at least one entry, and only reach for',
+  'a fan-out where the work is certainly there to split up. When the description says there may be',
+  'nothing to do, an ordinary agent step handles it, or a `decide` in front that branches on whether',
+  'there is anything.',
+  '',
   'So a fan-out step needs three things: a prompt asking for that list and saying what one entry is,',
   'a `schema` matching it, and a `childStep.prompt` telling each child what to do with its own entry.',
   'Each child is handed its title and its extra prompt automatically.',
@@ -394,7 +436,7 @@ const SECTION_CONTRACTS = [
   '  "name": "plan",',
   '  "kind": "fan-out",',
   '  "after": [],',
-  '  "prompt": "Run the test suite. Answer with a tasks array holding one entry per package whose tests fail, with title set to the package name and branch set to fix/ followed by the package name. At most 12 entries.",',
+  '  "prompt": "List the packages in this repository that carry their own dependency manifest. Answer with a tasks array holding one entry per package, with title set to the package name and branch set to deps/ followed by the package name. At least one entry and at most 12.",',
   '  "schema": {',
   '    "type": "object",',
   '    "required": ["tasks"],',
@@ -410,8 +452,8 @@ const SECTION_CONTRACTS = [
   '    }',
   '  },',
   '  "childStep": {',
-  '    "name": "fix",',
-  '    "prompt": "Fix the failing tests in the package this task names. Run that package\'s tests until they pass and change nothing outside it. Answer with what you changed."',
+  '    "name": "update",',
+  '    "prompt": "Bring the dependencies of the package this task names up to date. Run that package\'s tests until they pass and change nothing outside it. Answer with what you moved."',
   '  }',
   '}',
   '',
@@ -433,13 +475,16 @@ const SECTION_CONTRACTS = [
   '- The default schema asks for one string field called `verdict`. The keys of `branches` are the',
   '  verdicts, so the prompt has to name the same words.',
   '- Every branch target must wait for the decision. Give each target an `after` naming the decide',
-  '  step, or a step behind it.',
+  '  step, or naming a step that already waits for it.',
   '- A verdict matching no key fails the run, unless `branches` holds a key literally called',
   '  `default`. Add one whenever the prompt could produce a word you did not list.',
   '- When the verdict picks a target, every other target is marked skipped, and so is every step that',
   '  can only be reached through one of them. A step a live branch also reaches still runs.',
-  '- Never point two branches at the same step, and never put a step that both branches lead to in',
-  '  `branches`. Give each branch its own step, and put the shared work after them.',
+  '- Give each verdict its own step. Two verdicts pointing at one step means one of them was never a',
+  '  real branch. `default` is the exception: pointing it at a step a listed verdict already uses is',
+  '  how you say "treat anything else like that one".',
+  '- Never put the step that follows the branches in `branches`. Put that work after them, with an',
+  '  `after` naming every branch, and it runs whichever way the verdict went.',
 ].join('\n')
 
 // --- 5. the policies and profiles this node has ---
@@ -525,13 +570,12 @@ const SECTION_RULES = [
   '- A `kind` that section 3 does not list.',
   '- A `${steps.x.output}` reference to a step that is not behind this one, or a malformed token.',
   '- A `${inputs.x}` reference to an input that is not declared.',
-  '- A step `tools.maxRisk` looser than the workflow ceiling, or a step budget larger than the',
-  '  workflow budget.',
+  '- A step `tools.maxRisk` looser than the workflow ceiling.',
   '- An autonomous workflow with no `tools.maxRisk`.',
   '- A `decide` step with no `branches`, or a branch target that does not wait for the decision.',
   '- A `join` step whose `joins` does not name a fan-out behind it.',
   '- A required field of a kind left empty.',
-  '- `isolation`, `inputs` or `configOptions` on a kind that does not run an agent.',
+  '- `isolation` or `inputs` on a kind that does not run an agent.',
   '',
   '### Mistakes to avoid',
   '',
@@ -544,8 +588,10 @@ const SECTION_RULES = [
   '  than after it.',
   '- Leaving out a `default` branch when the verdict could be a word you did not list.',
   '- A `join` with no `fan-out` behind it in `joins`.',
-  '- A `fan-out` whose prompt does not ask for the task list, or that has no `schema`.',
-  '- A dash in an input name. Inputs take letters, digits and underscores. Step names take dashes.',
+  '- A `fan-out` whose prompt does not ask for the task list, that has no `schema`, or that offers an',
+  '  empty list as an answer. An empty list fails the step.',
+  '- A dash in an input name, or a digit at the front of one. An input name starts with a letter and',
+  '  then takes letters, digits and underscores. Step names take dashes.',
   '- A space in a step name.',
   '- An autonomous workflow with no `tools.maxRisk`.',
   '- Inventing a kind, a policy or a profile. Sections 3 and 5 list what exists.',
@@ -644,12 +690,14 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
   },
   {
     note: [
-      'One fan-out planning the work, a join collecting it, and a decision with a branch each way.',
-      '`write-it-up` waits for both branches, and the skipped one contributes nothing, which is why it',
-      'reads them with `append` rather than a reference.',
+      'One fan-out planning the work, a join collecting it, and a decision with a branch each way. The',
+      'planning prompt asks for at least one entry, because a fan-out that plans nothing fails.',
+      '`default` shares a step with `dirty`, which is how an unexpected verdict is treated as the',
+      'careful one. `write-it-up` waits for both branches, and the skipped one contributes nothing,',
+      'which is why it reads them with `append` rather than a reference.',
     ].join(' '),
     def: {
-      name: 'Fix every failing package',
+      name: 'Update the dependencies in every package',
       posture: 'gated',
       tools: { maxRisk: 'execute' },
       steps: [
@@ -657,11 +705,11 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
           name: 'plan',
           kind: 'fan-out',
           after: [],
-          prompt: 'Run the test suite for every package in this repository. Answer with a tasks array holding one entry per package whose tests fail, with title set to the package name and branch set to fix/ followed by the package name. At most 12 entries. If nothing fails, answer with an empty array.',
+          prompt: 'List the packages in this repository that carry their own dependency manifest. Answer with a tasks array holding one entry per package, with title set to the package name and branch set to deps/ followed by the package name. At least one entry and at most 12.',
           schema: TASK_LIST_SCHEMA,
           childStep: {
-            name: 'fix',
-            prompt: "Fix the failing tests in the package this task names. Run that package's tests until they pass and change nothing outside it. Answer with what you changed and the command you ran.",
+            name: 'update',
+            prompt: "Bring the dependencies of the package this task names up to date. Run that package's tests until they pass and change nothing outside it. Answer with what you moved and the command you ran.",
           },
         },
         { name: 'collect', kind: 'join', after: ['plan'], joins: 'plan' },
@@ -669,7 +717,7 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
           name: 'verdict',
           kind: 'decide',
           after: ['collect'],
-          prompt: 'The result of every package fix follows. Answer with a verdict of either clean, when every package passes, or dirty, when any of them still fails.',
+          prompt: 'The result of every package update follows. Answer with a verdict of either clean, when every package passes, or dirty, when any of them still fails.',
           branches: { clean: 'note-what-changed', dirty: 'second-pass', default: 'second-pass' },
         },
         {
@@ -680,12 +728,12 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
         {
           name: 'note-what-changed',
           after: ['verdict'],
-          prompt: 'Every package passes. Answer with one line per package saying what was changed in it.',
+          prompt: 'Every package passes. Answer with one line per package saying which dependencies moved.',
         },
         {
           name: 'write-it-up',
           after: ['second-pass', 'note-what-changed'],
-          prompt: 'Write the summary for the person who started this run: which packages failed, what fixed them, and anything still outstanding.',
+          prompt: 'Write the summary for the person who started this run: which packages moved, what broke, and anything still outstanding.',
         },
       ],
     },
@@ -710,7 +758,7 @@ const SCRUBBED_WITH_KEYS = ['headers', 'auth']
 
 /** An example as the prompt shows it: no credentials, and none of the loader's own bookkeeping. `id`
  *  and `source` ride on a definition read from a file, and a model shown one starts writing them. */
-export function exampleForPrompt(def: WorkflowDef): WorkflowDef {
+function exampleForPrompt(def: WorkflowDef): WorkflowDef {
   const { id: _id, source: _source, ...rest } = def as WorkflowDef & { id?: unknown; source?: unknown }
   return {
     ...rest,
@@ -771,7 +819,7 @@ export function selectExamples(args: {
 }
 
 /** The workspace's own definitions, or nothing at all. The only section that can disappear. */
-export function renderWorkspaceExamples(selected: { include: readonly WorkflowExample[]; omit: readonly WorkflowExample[] }): string {
+function renderWorkspaceExamples(selected: { include: readonly WorkflowExample[]; omit: readonly WorkflowExample[] }): string {
   if (!selected.include.length) return ''
   const lines = [
     '## 8. Worked examples from this workspace',
