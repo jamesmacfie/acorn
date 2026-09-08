@@ -293,6 +293,7 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 /v2/p/terminal/tasks/:taskId/run-targets
 /v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
 /v2/p/workflows/catalog
+/v2/p/workflows/defs[/*]
 /v2/p/workflows/tasks/:id/workflows*
 /v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry}
 ```
@@ -300,9 +301,13 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Workflows own durable definitions, runs, steps, gates, and reconciliation.
 
-`POST /v2/p/workflows/tasks/:id/workflows` takes `{ def, inputs? }`. `inputs` is a table of strings,
-one per input the definition declares; the runner refuses a required input with no value and a name
-the definition does not declare. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
+`POST /v2/p/workflows/tasks/:id/workflows` takes `{ def, inputs? }` or `{ defId, inputs? }`, one or
+the other. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+anything else names a `workflow_defs` row, and a task-confined caller is refused that with a 403
+because a row skips the repository trust snapshot. `inputs` is a table of strings, one per input the
+definition declares; the runner refuses a required input with no value and a name the definition does
+not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
+device caller. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
 failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
 foreign or unknown run as a 404.
@@ -316,6 +321,19 @@ second route. Two routes answer the option lists that a kind's `select` fields p
 `GET /v2/p/terminal/tasks/:taskId/run-targets` and
 `GET /v2/p/database/projects/:projectId/saved-queries`. The second refuses a task-confined caller,
 because no task in the path means no scope gate.
+
+Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole family is device-only
+([workflows.md](./workflows.md) § Database definitions):
+
+| Route | Body or query | Answer |
+| --- | --- | --- |
+| `GET /defs?workspaceId=` | | The merged list: the workspace's rows, every project's committed files, and the user layer, each with its `source`, `projectId` and `problems`. A repo id wins a collision. |
+| `POST /defs` | `{ workspaceId, projectId?, def }` | The row. A definition the loader would reject is a 400 carrying its problems. |
+| `GET /defs/:id` | | The row with its definition, or a 404. |
+| `PUT /defs/:id` | `{ def, revision }` | The row with `revision + 1`. A stale `revision` is a 409 whose `details` carry the row that won. |
+| `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
+| `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |
+| `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | `{ path }` after writing `.acorn/workflows/<slug>.toml`, deleting the row unless `keepRow`. |
 
 ### Notes and memory
 

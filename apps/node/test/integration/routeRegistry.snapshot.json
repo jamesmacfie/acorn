@@ -21,6 +21,7 @@
   "ALL /v2/p/notes/workspaces/:wsId/notes",
   "ALL /v2/p/notes/workspaces/:wsId/notes/*",
   "ALL /v2/p/terminal/sessions/:sid/*",
+  "ALL /v2/p/workflows/defs/*",
   "ALL /v2/p/workflows/workflows/runs/:runId/*",
   "DELETE /v2/p/agents/attachments/:attachmentId",
   "DELETE /v2/p/agents/sessions/:sessionId",
@@ -33,6 +34,7 @@
   "DELETE /v2/p/memory/workspaces/:wsId/notes/:slug",
   "DELETE /v2/p/notes/tasks/:id/notes/:slug",
   "DELETE /v2/p/notes/workspaces/:wsId/notes/:slug",
+  "DELETE /v2/p/workflows/defs/:id",
   "GET /v2/p/agents/artifacts/:artifactId",
   "GET /v2/p/agents/artifacts/:artifactId/content",
   "GET /v2/p/agents/attachments/:attachmentId",
@@ -97,6 +99,8 @@
   "GET /v2/p/terminal/sessions",
   "GET /v2/p/terminal/tasks/:taskId/run-targets",
   "GET /v2/p/workflows/catalog",
+  "GET /v2/p/workflows/defs",
+  "GET /v2/p/workflows/defs/:id",
   "GET /v2/p/workflows/runs",
   "GET /v2/p/workflows/tasks/:id/workflows",
   "GET /v2/p/workflows/tasks/:id/workflows/runs",
@@ -180,6 +184,9 @@
   "POST /v2/p/terminal/sessions/:sid/remove",
   "POST /v2/p/terminal/sessions/:sid/resize",
   "POST /v2/p/terminal/sessions/:sid/send",
+  "POST /v2/p/workflows/defs",
+  "POST /v2/p/workflows/defs/:id/save-to-repo",
+  "POST /v2/p/workflows/defs/validate",
   "POST /v2/p/workflows/tasks/:id/workflows",
   "POST /v2/p/workflows/workflows/runs/:runId/cancel",
   "POST /v2/p/workflows/workflows/runs/:runId/gate",
@@ -196,5 +203,6 @@
   "PUT /v2/p/memory/tasks/:id/notes/:slug",
   "PUT /v2/p/memory/workspaces/:wsId/notes/:slug",
   "PUT /v2/p/notes/tasks/:id/notes/:slug",
-  "PUT /v2/p/notes/workspaces/:wsId/notes/:slug"
+  "PUT /v2/p/notes/workspaces/:wsId/notes/:slug",
+  "PUT /v2/p/workflows/defs/:id"
 ]

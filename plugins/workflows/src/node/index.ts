@@ -7,13 +7,15 @@ import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets
 import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
+import { createDef, defsForProject, getDef, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
 import { WorkflowRunner, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/workflowTools'
-import { WorkflowValidationError } from '../server/workflowValidation'
+import { validateWorkflow, WorkflowValidationError } from '../server/workflowValidation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
+import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../shared/runStatus'
 import { workflowRuns, workflowSteps } from './schema'
 
@@ -36,6 +38,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   // Held so dispose can abort in-flight steps before the database closes (see dispose below).
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
+  let defsCapability: { dispose(): void } | null = null
   // The bell and the step stream, this plugin's own vocabulary rather than a member of the broadcast
   // surface every plugin receives (../contract/notices.ts). Both go out on core's `workflow:` channels,
   // which is why they are written as frames here rather than reaching for a core helper: `ctx.events`
@@ -200,6 +203,32 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // Kept so dispose can abort in-flight steps before the database closes.
       live = runner
 
+      // A task's project and the checkout its workflow files load from. `null` once the task is gone.
+      const taskScope = async (taskId: string) => {
+        const task = await core.tasks.load(taskId)
+        if (!task) return null
+        const project = await core.projects.byId(task.projectId)
+        const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
+        return { task, project, repoDir }
+      }
+
+      const startDef = async (taskId: string, def: WorkflowDef, inputs?: Record<string, string>) => {
+        await deps.reconciled // don't start a run the restart sweep would immediately re-queue
+        try {
+          return { runId: await runner.start(taskId, def, { inputs }) }
+        } catch (error) {
+          if (isRepoConfigTrustError(error)) {
+            ctx.events.repoConfigTrustNotice(taskId)
+            return { error: 'needs-trust' }
+          }
+          return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }
+        }
+      }
+
+      // `plugin:workflows:defs-changed` (docs/plugins.md § Hearing another plugin): the rail list and
+      // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
+      const defsChanged = (workspaceId: string) => ctx.events.send({ channel: pluginChannel('workflows', 'defs-changed'), workspaceId })
+
       routeCapability = ctx.capabilities.provide(WORKFLOW_ROUTE, {
         // One column off this plugin's own runs table. See WorkflowBridge for why the router needs it.
         taskIdForRun: async (runId) => {
@@ -208,25 +237,40 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         // Declared workflows for a task (docs/workflows.md): `.acorn/workflows/*.toml` from the
         // worktree/checkout plus ~/.acorn, with parse/cycle errors surfaced as palette rows.
-        defs: async (taskId) => {
-          const task = await core.tasks.load(taskId)
-          if (!task) return { workflows: [], errors: [] }
-          const project = await core.projects.byId(task.projectId)
-          const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
-          return loadWorkflowFiles(repoDir, homedir(), runner.validationCatalog())
+        defs: async (taskId, includeRows) => {
+          const scope = await taskScope(taskId)
+          if (!scope) return { workflows: [], errors: [] }
+          const files = loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
+          if (!includeRows || !scope.project) return files
+          const ids = new Set(files.workflows.map((workflow) => workflow.id))
+          const rows = await defsForProject(store, scope.project.workspaceId, scope.project.id)
+          return {
+            ...files,
+            // A file wins an id collision, the rule the merged rail list applies as well.
+            workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const }))],
+          }
         },
         catalog: async () => runner.catalog(),
-        start: async (taskId, def, inputs) => {
-          await deps.reconciled // don't start a run the restart sweep would immediately re-queue
-          try {
-            return { runId: await runner.start(taskId, def as WorkflowDef, { inputs }) }
-          } catch (error) {
-            if (isRepoConfigTrustError(error)) {
-              ctx.events.repoConfigTrustNotice(taskId)
-              return { error: 'needs-trust' }
-            }
-            return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }
+        start: (taskId, def, inputs) => startDef(taskId, def as WorkflowDef, inputs),
+        startById: async (taskId, defId, inputs) => {
+          const scope = await taskScope(taskId)
+          if (!scope) return { error: 'That task no longer exists.' }
+          const file = /^(repo|user):(.+)$/.exec(defId)
+          if (file) {
+            const loaded = loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
+            const found = loaded.workflows.find((workflow) => workflow.id === file[2] && workflow.source === file[1])
+            if (!found) return { error: `'${file[2]}' is not a workflow this task can run.` }
+            // `found.source` is what makes runner.start assert the repo trust snapshot for a committed
+            // file. Resolving here rather than trusting a definition in the request body is the point.
+            return startDef(taskId, found, inputs)
           }
+          const row = await getDef(store, defId)
+          if (!row || !scope.project || row.workspaceId !== scope.project.workspaceId || (row.projectId && row.projectId !== scope.project.id)) {
+            return { error: 'That workflow is not one this task can run.' }
+          }
+          // No trust check: a row was typed by the owner behind the device gate and has no committed
+          // bytes to hash (docs/security.md § Process, path, and configuration controls).
+          return startDef(taskId, row.def, inputs)
         },
         runs: async (taskId) => {
           const rows = await store.select().from(workflowRuns).where(eq(workflowRuns.taskId, taskId))
@@ -289,10 +333,63 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
       })
 
+      // The second store a definition can live in (docs/workflows.md § Database definitions). Every
+      // route behind it is device-only, because a row is executable configuration with no committed
+      // bytes for the trust snapshot to hash.
+      defsCapability = ctx.capabilities.provide(WORKFLOW_DEFS_ROUTE, {
+        list: async (workspaceId) =>
+          mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
+        get: (id) => getDef(store, id),
+        create: async ({ workspaceId, projectId, def }) => {
+          const problems = validateWorkflow(def as WorkflowDef, runner.validationCatalog())
+          if (problems.length) return { problems }
+          const row = await createDef(store, { workspaceId, projectId, def: def as WorkflowDef })
+          defsChanged(workspaceId)
+          return { row }
+        },
+        update: async (id, def, revision) => {
+          const problems = validateWorkflow(def as WorkflowDef, runner.validationCatalog())
+          if (problems.length) return { problems }
+          const answer = await updateDef(store, id, def as WorkflowDef, revision)
+          if (answer && 'row' in answer) defsChanged(answer.row.workspaceId)
+          return answer
+        },
+        remove: async (id) => {
+          const row = await getDef(store, id)
+          if (!row) return { ok: true }
+          await removeDef(store, id)
+          defsChanged(row.workspaceId)
+          return { ok: true }
+        },
+        // `projectId` is accepted and unused, as the catalog route's is. What a step may name inside a
+        // project — a run target, a saved query — is checked when the step runs, because the node
+        // validating a definition may not have the repository at all.
+        validate: async (def) => ({ problems: validateWorkflow(def as WorkflowDef, runner.validationCatalog()) }),
+        saveToRepo: async (id, { taskId, keepRow }) => {
+          const row = await getDef(store, id)
+          if (!row) return { notFound: true }
+          const scope = taskId ? await taskScope(taskId) : null
+          if (taskId && !scope) return { error: 'That task no longer exists.' }
+          if (scope?.project && scope.project.workspaceId !== row.workspaceId) return { error: 'That task is in another workspace.' }
+          // The task's checkout when one is named, and its worktree is created here if the task has
+          // not needed one yet: the file has to land on the branch the person is working on. Otherwise
+          // the project folder, which is why an unbound row cannot be saved without a task.
+          const checkoutDir = scope
+            ? (await core.tasks.resolveCwd(scope.task, undefined, core.identity.active())).cwd
+            : row.projectId ? (await core.projects.byId(row.projectId))?.path ?? null : null
+          if (!checkoutDir) return { error: 'This workflow has no repository to save into. Open it from a task, or bind it to a project.' }
+          const saved = await saveDefToRepo(store, id, { checkoutDir, keepRow, resolveInRoot: core.fs.resolveInRoot })
+          if ('error' in saved) return saved.error === 'not_found' ? { notFound: true } : { error: 'That file would land outside the checkout.' }
+          defsChanged(row.workspaceId)
+          return { path: saved.path }
+        },
+      })
+
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
       // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared, so the
       // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
+      ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
 
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
       // the route above, so nothing here knows what else is on that list.
@@ -341,6 +438,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       live?.stop()
       live = null
       routeCapability?.dispose()
+      defsCapability?.dispose()
     },
   }
 }

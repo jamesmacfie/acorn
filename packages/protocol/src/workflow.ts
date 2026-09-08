@@ -69,10 +69,32 @@ export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefi
 export type WorkflowDefSummary = {
   id: string
   name: string
-  source: 'repo' | 'user'
+  // 'database' is a row the owner typed in the app rather than a file somebody committed
+  // (docs/workflows.md § Database definitions). The three layers are read as one list and a repo id
+  // wins a collision.
+  source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
   inputs?: WorkflowInput[]
   steps: { name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+  // The project this definition belongs to: the one whose checkout holds the file, or the one a row
+  // is bound to. Null on a row that any project in the workspace may run.
+  projectId?: string | null
+  // Why this one cannot be run as it stands, when the merged read already knows.
+  problems?: string[]
+}
+
+// A definition stored as a row (docs/workflows.md § Database definitions). `def` is the plugin's own
+// `WorkflowDef`; it is `unknown` here because that shape lives in plugins/workflows and protocol may
+// not depend on a plugin. The editor narrows it there.
+export type WorkflowDefRow = {
+  id: string
+  workspaceId: string
+  projectId: string | null
+  name: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+  def: unknown
 }
 
 // A value a run is started with. The palette asks for one before it starts a definition that declares

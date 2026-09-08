@@ -47,8 +47,8 @@ describe('the workflows plugin catalogue', () => {
     })
     expect(await run.query('', context('task-1'), signal())).toEqual([
       { id: 'problem:0', title: 'repo: cycle: a → b → a', badge: 'error' },
-      { id: 'workflow:ship', title: 'SHIP', subtitle: '3 steps', ref: 'ship' },
-      { id: 'workflow:review', title: 'REVIEW', subtitle: '1 steps', ref: 'review' },
+      { id: 'workflow:ship', title: 'SHIP', subtitle: '3 steps · repo', ref: 'ship' },
+      { id: 'workflow:review', title: 'REVIEW', subtitle: '1 steps · repo', ref: 'review' },
     ])
   })
 
@@ -60,12 +60,30 @@ describe('the workflows plugin catalogue', () => {
     expect(mocks.defs).toHaveBeenCalledTimes(1)
   })
 
-  it('starts the picked definition, passing the whole thing rather than re-fetching', async () => {
-    mocks.defs.mockResolvedValue({ workflows: [def('ship')], errors: [] })
+  // By id, not by definition: the node resolves it, and for a committed file that is what makes the
+  // repo trust snapshot apply to the bytes on disk rather than to whatever the request carried.
+  it('starts the picked definition by its layered id', async () => {
+    mocks.defs.mockResolvedValue({ workflows: [def('ship'), { ...def('mine'), source: 'database' }], errors: [] })
     const world = context('task-1')
     const rows = await run.query('', world, signal())
     expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.start).toHaveBeenCalledWith('task-1', def('ship'))
+    expect(mocks.start).toHaveBeenCalledWith('task-1', { defId: 'repo:ship' })
+    // A row is addressed by its own id, because it belongs to no layer.
+    await run.select(rows[1], world)
+    expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' })
+  })
+
+  // The dialog that collects input values is phase 3 of docs/future/workflows/. Until it lands, a row
+  // in a list says where to go instead of starting a run with an empty required input.
+  it('will not start a definition whose required input has no value yet', async () => {
+    mocks.defs.mockResolvedValue({
+      workflows: [{ ...def('ship'), inputs: [{ name: 'issue', required: true }] }],
+      errors: [],
+    })
+    const world = context('task-1')
+    const rows = await run.query('', world, signal())
+    expect(await run.select(rows[0], world)).toEqual({ effect: 'stay', status: 'SHIP needs its inputs filled in. Run it from the workflow editor.' })
+    expect(mocks.start).not.toHaveBeenCalled()
   })
 
   it('keeps the frame open with the node’s own refusal', async () => {

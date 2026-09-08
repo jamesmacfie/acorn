@@ -614,6 +614,9 @@ export type CoreProjectService = {
   byId(id: string): Promise<ProjectRef | null>
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
   checkouts(): Promise<{ id: string; path: string }[]>
+  /** Every project of one workspace, keeping the ones with no folder on disk. Not granted by
+   *  `projects:read` today: no loaded plugin has asked for it. */
+  byWorkspace(workspaceId: string): Promise<ProjectRef[]>
   /** Scoped to the provider ids the host registered for your plugin, so another provider's connection
    *  never crosses this boundary. `projectId` is `''` when the link covers the whole workspace. */
   externalProjects(

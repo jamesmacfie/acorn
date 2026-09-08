@@ -224,6 +224,13 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 - Executable configuration is hash-gated: the repository's own files (`.acorn/config.toml`, workflow
   files, and URL scripts) **and the project row's script columns**. The exact snapshot must be
   acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
+- A workflow definition stored as a `workflow_defs` row is executable configuration with no committed
+  bytes, so it is owner-typed instead of hashed. Every route under `/v2/p/workflows/defs` is
+  device-only, and a start by id refuses a row to a task-confined caller while still allowing a
+  committed file, which the snapshot does cover. Save to repo turns the row into a file and hands it
+  back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
+  by `resolveInRoot`, and the next start from that file asks for the acknowledgement
+  ([workflows.md](./workflows.md) § Database definitions).
 - Docker matching configuration is declarative; Docker and run-target execution remains subject to
   the appropriate trust gate.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to

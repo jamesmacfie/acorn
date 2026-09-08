@@ -29,6 +29,7 @@
       "memory",
       "notes",
       "terminal",
+      "workflows",
       "workflows"
     ],
     "tools": [
@@ -95,6 +96,7 @@
       "terminal.sessions",
       "terminal.taskCreatedHook",
       "terminal.taskSessionsRoute",
+      "workflows.defs",
       "workflows.notices",
       "workflows.route",
       "workflows.runner"
@@ -207,9 +209,11 @@
     },
     "workflows": {
       "routes": [
+        "workflows",
         "workflows"
       ],
       "capabilities": [
+        "workflows.defs",
         "workflows.notices",
         "workflows.route",
         "workflows.runner"

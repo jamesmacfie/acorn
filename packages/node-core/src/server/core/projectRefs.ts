@@ -17,6 +17,10 @@ export type ProjectService = {
   // use project checkouts and their own project-level IDs rather than guessing from the pair.
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
   checkouts(): Promise<{ id: string; path: string }[]>
+  // Every project of one workspace, in the rail's order. Unlike `checkouts()` this keeps a project
+  // with no folder on disk, because a caller deciding what a workspace contains has to be able to
+  // tell "no checkout" from "no project" (plugins/workflows' merged definition list).
+  byWorkspace(workspaceId: string): Promise<ProjectRef[]>
   // Provider project mappings belong to core's workspace model. Core callers may omit providerIds;
   // loaded plugins are wrapped with the provider ids the host registered for their plugin owner, so
   // another provider's connection and external id never cross the CoreServices boundary.
@@ -43,6 +47,12 @@ export function createProjectService(db: AppDatabase): ProjectService {
       const row = await projectByGithub(db, owner, name)
       return row ? toProjectRef(row) : null
     },
+    byWorkspace: async (workspaceId) => db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.workspaceId, workspaceId))
+      .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt))
+      .then((rows) => rows.map(toProjectRef)),
     checkouts: async () => db
       .select({ id: schema.projects.id, path: schema.projects.path })
       .from(schema.projects)

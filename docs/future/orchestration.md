@@ -229,8 +229,9 @@ spawns a terminal instead of showing what the step is doing.
 7. Surface `tasks.parentId` in the task list, so a spawned child stops looking unrelated.
 8. ~~`registerStepKind` on `WORKFLOWS_RUNNER`, then the `http` step in the HTTP plugin.~~ **Done**,
    through node extension points rather than the capability — see above for why.
-9. ~~`workflow_defs` as database truth, merged under the repo layer.~~ Moved to
-   [docs/future/workflows/](./workflows/README.md) as its phase 2.
+9. ~~`workflow_defs` as database truth, merged under the repo layer.~~ **Done**, as phase 2 of
+   [docs/future/workflows/](./workflows/README.md). [docs/workflows.md](../workflows.md)
+   § Database definitions owns it.
 
 Steps 1 through 5 are the herdr experience. Everything after is acorn keeping the durability it
 already has.
