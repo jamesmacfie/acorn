@@ -25,6 +25,7 @@ import {
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
+import { Graph } from './graph'
 import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 import { focusedRenderable } from '../keys/regions'
@@ -477,6 +478,25 @@ const CASES: Case[] = [
     check: (frame) => {
       has(frame, 'name')
       has(frame, 'of 3')
+    },
+  },
+  {
+    node: 'Graph',
+    draws: 'reduced: the indented list, one line per card, indented by rank',
+    render: () => (
+      <Graph
+        id="graph"
+        ariaLabel="Steps"
+        nodes={[{ id: 'a', label: 'investigate' }, { id: 'b', label: 'review' }]}
+        edges={[{ from: 'a', to: 'b' }]}
+      />
+    ),
+    size: { width: 30, height: 5 },
+    check: (frame) => {
+      expect(rowOf(frame, 'review')).toBe(rowOf(frame, 'investigate') + 1)
+      // The rank is the picture, so the child has to start further in than the card it waits on.
+      expect(lineWith(frame, 'review').indexOf('review'))
+        .toBeGreaterThan(lineWith(frame, 'investigate').indexOf('investigate'))
     },
   },
   {
@@ -1159,6 +1179,30 @@ const BEHAVIOURS: Behaviour[] = [
     drive: async (screen, pressed) => {
       await screen.press('ARROW_DOWN')
       expect(pressed).toEqual(['1'])
+    },
+  },
+  {
+    node: 'Graph',
+    does: 'walks its cards on the arrows and reports the one the keys are on',
+    render: (record) => {
+      const [chosen, setChosen] = createSignal('a')
+      return (
+        <Graph
+          id="graph"
+          ariaLabel="Steps"
+          nodes={[
+            { id: 'a', label: 'investigate', selected: chosen() === 'a' },
+            { id: 'b', label: 'review', selected: chosen() === 'b' },
+          ]}
+          edges={[{ from: 'a', to: 'b' }]}
+          onSelect={(id) => { setChosen(id); record(id) }}
+        />
+      )
+    },
+    size: { width: 30, height: 6 },
+    drive: async (screen, pressed) => {
+      await screen.press('ARROW_DOWN')
+      expect(pressed).toEqual(['b'])
     },
   },
   {

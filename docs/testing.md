@@ -524,6 +524,20 @@ is to open all three menus.
     with both investigators running. Do the same from a pull request that already has a task: it runs
     on that task rather than making a second one.
 
+The last one is the graph view's ([ui-design.md](./ui-design.md) § The closed kit). A canvas is the
+one kit node whose whole point is what it looks like, so a suite can check the geometry and nothing
+else.
+
+56. Open the owner's first workflow and press **Graph**. It draws two roots joining into the
+    synthesis node, with the list column still beside it. Drag a card: it lands on the grid and its
+    wires follow. Drag from one card's bottom port onto another: the second now waits on the first,
+    and the footer agrees. Press the `×` on that wire and it goes. Select a card and press Backspace:
+    it is removed, and the same edit is in the JSON tab. Reload the surface and the cards are where
+    you left them. Then start a run and press **Graph** in the pane's Nodes header: a card recolours
+    as its step starts and finishes. In the terminal client, both **Graph** views are the indented
+    list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
+    the selected card.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

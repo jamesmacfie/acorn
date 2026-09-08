@@ -6,9 +6,9 @@
 // device storage instead, which is the one guarded accessor for a per-device scrap and is a no-op on
 // a host with nowhere to keep one (client-core kit/lib/deviceStorage.ts).
 //
-// Nothing draws a position until the canvas lands (docs/future/workflows/phase-6-canvas.md). The
-// module exists now because the two operations that must not be forgotten are here: a rename has to
-// carry the position with the node, and deleting a definition has to take its layout with it.
+// The graph view reads and writes these (./editor/GraphView.tsx), 400 ms after a drag stops. The two
+// operations that are easy to forget are here rather than there: a rename has to carry the position
+// with the node, and deleting a definition has to take its layout with it.
 import { clearLocal, readLocal, writeLocal } from '@acorn/plugin-api/client'
 
 export type NodePosition = { x: number; y: number }

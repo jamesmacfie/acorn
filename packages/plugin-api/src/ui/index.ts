@@ -104,6 +104,12 @@ export { Facts } from '@acorn/client-core/kit/components/content/Facts.tsx'
 export { ChipRow } from '@acorn/client-core/kit/components/layout/ChipRow.tsx'
 export { Log } from '@acorn/client-core/kit/components/content/Log.tsx'
 export { Grid } from '@acorn/client-core/kit/components/layout/Grid.tsx'
+// The canvas: cards on a grid, edges as curves, one card selected. A picture is exactly what a
+// plugin may not draw for itself — no raw DOM, no SVG — so the kit draws it and the terminal host
+// draws the same cards as an indented list. See docs/ui-design.md § The closed kit.
+export { Graph } from '@acorn/client-core/kit/components/content/Graph.tsx'
+export type { GraphCard } from '@acorn/client-core/kit/components/content/Graph.tsx'
+export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib/graphLayout.ts'
 // The container a run of `Row`s or `TreeRow`s lives in. It is what makes a list keyboard-operable:
 // the arrows, Home, End, the page keys, type-ahead, `aria-activedescendant`, and a selection that
 // survives a refetch all come from it, and the pane writes no key handling at all.

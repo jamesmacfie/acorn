@@ -85,9 +85,11 @@ be saved back into a repository as TOML and read on somebody else's screen, so x
 in it: they would be noise in every diff and wrong on every other monitor. They live under
 `plugin:workflows:layout:<defId>` in device storage instead, as `Record<nodeName, { x, y }>`
 (`plugins/workflows/src/client/layoutPrefs.ts`). Renaming a node carries its position with it and
-deleting a definition drops its layout, which is the whole reason that module exists before anything
-draws a position. The terminal client has no `localStorage`, so the write lands nowhere there and the
-graph falls back to the list the editor already draws.
+deleting a definition drops its layout. A drag writes 400 ms after it stops, and a draft with no row
+yet keeps its positions in memory for the session. Which of rows and graph the run pane draws its
+nodes as is the same kind of thing and sits beside it, under `plugin:workflows:runs:nodeView`. The
+terminal client has no `localStorage`, so both writes land nowhere there — and neither is missed,
+because that host draws the graph as the list either way.
 
 **Where you were looking is the node's, not the device's.** Which rail source or task each workspace
 was left on is `core.workspace-views`, one key per workspace

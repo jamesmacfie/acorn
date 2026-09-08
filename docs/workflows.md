@@ -206,6 +206,26 @@ These are why the editor is safe to type in:
 - Save is grey while the draft is unchanged, while a required field is empty, or while the node's
   validate route has a problem with it.
 
+### The graph view
+
+**Graph** in the tab strip draws the same nodes as a picture: cards on a grid, the edges as curves,
+the selected card the one the list has selected. The list column stays beside it on a wide layout and
+collapses under it on a narrow one, which is the `list-detail` layout's own rule.
+
+Drag from a card's bottom port onto another card to make it wait on the first. The `×` on a wire
+removes that edge. Delete or Backspace removes the card the keys are on. Drag a card to put it where
+you want it; it lands on a 22 px grid and stays there. Every one of those is the same draft operation
+the inspector's own controls call, so the rules are the same: no self edge, no duplicate, nothing that
+closes a cycle, and a delete never bridges what it stood between.
+
+A card with no position of its own is placed from the edges: one rank below the deepest step it waits
+on, sharing that rank with its siblings. So a new node appears at its rank without anybody placing it,
+and moving a card is an override rather than a commitment to place the rest.
+
+The canvas is the kit's `Graph` node, not this plugin's drawing
+([ui-design.md](./ui-design.md) § The closed kit). That is what gives the terminal client this view
+too: there it is the indented list, with a picker under it to draw an edge out of the selected card.
+
 ### The JSON tab
 
 The escape hatch: the definition as the runner's own JSON, formatted. **Apply** is atomic. A document
@@ -231,8 +251,8 @@ a workflow somebody reviewed in a pull request is read the same way as one you t
 Node positions for the graph view are device preferences under
 `plugin:workflows:layout:<defId>`, never in the definition, so a definition stays portable and a
 committed file has no x and y in its diff. A rename carries a node's position with it and deleting a
-definition drops its layout. Nothing draws a position until the graph view lands
-([docs/future/workflows/phase-6-canvas.md](./future/workflows/phase-6-canvas.md)).
+definition drops its layout. A drag writes 400 ms after it stops, and a draft with no row yet keeps
+its positions in memory for the session.
 
 ## Limits and capabilities
 
@@ -370,6 +390,11 @@ newest first, then the selected run's nodes, and one node's detail beside them. 
 a task that has never run a workflow, so the pane strip does not grow a button for every task; which
 tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
 
+**Rows | Graph** in the Nodes header picks how the nodes are drawn: as the list, or as the same
+picture the editor authors on, coloured by status. The choice is remembered per device. The run's
+graph has no ports and nothing to drag — a run froze its definition when it started, so an edge here
+is a record.
+
 The node list is the editor's list. Both call `graphOrder` in
 `plugins/workflows/src/client/editor/draft.ts`, over the definition the run froze when it started, so
 the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
@@ -495,11 +520,9 @@ hashed; § Database definitions holds that half.
 
 ## Gaps
 
-There is no picture of the graph. The editor and the run pane both draw it as an indented list, and
-the graph view is
-[docs/future/workflows/phase-6-canvas.md](./future/workflows/phase-6-canvas.md). A run pane node
-shows what a step last said, not a rendered view of the prompt it was given, though the run holds
-one. The desktop must be open for UI interaction, although the
+The graph has no groups, no minimap and no labels on its edges, so a definition much larger than a
+screen is read by panning. A run pane node shows what a step last said, not a rendered view of the
+prompt it was given, though the run holds one. The desktop must be open for UI interaction, although the
 node continues work while the renderer is closed, including the trigger sweep, which moved onto the
 node's own scheduler. A failed node is retried by hand through the retry route; an operation whose
 external outcome is unknown is never retried on its own, because acorn cannot tell a side effect that

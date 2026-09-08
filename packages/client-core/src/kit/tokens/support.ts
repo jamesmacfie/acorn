@@ -104,6 +104,12 @@ export const NODE_SUPPORT = {
     dom: 'full', tui: 'reduced',
     loss: 'a row-range indicator instead of a scrollbar, and the same column truncation as Table',
   },
+  // The canvas. Ranks and lanes are a picture here and an indentation there, which is the whole of
+  // what the terminal loses: the same cards, the same order, the same selection, no positions.
+  Graph: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the indented list the editor already draws — one line per card, no positions, no wires, and no dragging an edge into place',
+  },
   Meter: { dom: 'full', tui: 'full' },
   CodeBlock: { dom: 'full', tui: 'full' },
   Log: { dom: 'full', tui: 'full' },

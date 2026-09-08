@@ -765,6 +765,87 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-stripe='warn'] { border-left-color: var(--warn); }
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 
+/* ── Graph ──────────────────────────────────────────────────────────────────────────────────
+   The canvas. Card size and card position are inline, from kit/lib/graphLayout.ts: only the
+   layout knows both numbers and no stylesheet can compute them, which is the same exception
+   Grid and Rows already take for a virtualiser. Everything else is here.
+
+   The dotted grid is a background gradient rather than an element, so panning it costs nothing
+   and a card never has to be drawn above one more layer. */
+.ui-graph {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+  cursor: grab;
+  background-color: var(--surface-sunken);
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.ui-graph-plane { position: absolute; inset: 0 auto auto 0; transform-origin: 0 0; }
+.ui-graph-edges { position: absolute; inset: 0 auto auto 0; overflow: visible; pointer-events: none; }
+.ui-graph-wire { fill: none; stroke: var(--border-strong); stroke-width: 2; }
+.ui-graph-wire[data-pending] { stroke: var(--accent); stroke-dasharray: 4 4; }
+.ui-graph-card {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 200px;
+  height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--card-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  padding: var(--pad-surface);
+  cursor: pointer;
+}
+.ui-graph-card:hover { border-color: var(--accent); }
+.ui-graph-card:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+.ui-graph-card[data-selected] { background: var(--bg-selected); border-color: var(--accent); }
+.ui-graph-card[data-moving] { opacity: 0.85; }
+.ui-graph-card[data-tone='accent'] { border-left: var(--stripe-w) solid var(--accent); }
+.ui-graph-card[data-tone='ok'] { border-left: var(--stripe-w) solid var(--state-ok); }
+.ui-graph-card[data-tone='warn'] { border-left: var(--stripe-w) solid var(--warn); }
+.ui-graph-card[data-tone='danger'] { border-left: var(--stripe-w) solid var(--danger); }
+.ui-graph-card-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ui-graph-card-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); }
+.ui-graph-card-detail { color: var(--text-muted); overflow: hidden; font-size: var(--fs-xs); }
+.ui-graph-card-joins { margin-top: auto; color: var(--text-muted); font-size: var(--fs-2xs); }
+.ui-graph-port {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: var(--control-border);
+  border-radius: var(--radius-circle);
+  background: var(--accent);
+  cursor: crosshair;
+}
+.ui-graph-cut {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  line-height: 1;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  border: var(--control-border);
+  border-radius: var(--radius-circle);
+  background: var(--bg);
+  cursor: pointer;
+}
+.ui-graph-cut:hover { color: var(--danger); border-color: var(--danger); }
+.ui-graph-cut:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+
 /* ── Meter ──────────────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built (Meter) for why this is a div rather than
    a native <meter>. */
