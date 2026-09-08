@@ -10,6 +10,7 @@ import {
   buildGenerateUserPrompt,
   buildRepairUserPrompt,
   catalogValidation,
+  FORBIDDEN_KEYS,
   GENERATE_MAX_CONCEPT_CHARS,
   GENERATE_MAX_EXAMPLE_SIZE,
   GENERATE_MAX_FIELD_OPTIONS,
@@ -86,10 +87,17 @@ describe('the output contract', () => {
     expect(text).toContain('needs no references at all')
   })
 
-  it('forbids the five keys nothing can ground', () => {
+  // Asserting the whole prompt merely contains 'model' proves nothing: the word is all over the
+  // ordinary prose. The claim worth pinning is that the block that forbids these keys lists every
+  // one of them and nothing else, so a key added to FORBIDDEN_KEYS without prose here fails here.
+  it('names every ungroundable key in the block that forbids them', () => {
     const text = prompt()
-    for (const key of ['trigger', 'tools.allow', 'model', 'configOptions', 'requiresRun']) expect(text).toContain(key)
-    expect(text).toContain('Write no key that this prompt does not name.')
+    const start = text.indexOf('### Keys never to write')
+    expect(start).toBeGreaterThan(0)
+    const block = text.slice(start, text.indexOf('## 3.'))
+    for (const key of FORBIDDEN_KEYS) expect(block).toContain(`\n  ${key} `)
+    expect(block.split('\n').filter((line) => /^ {2}\S/.test(line))).toHaveLength(FORBIDDEN_KEYS.length)
+    expect(block).toContain('Write no key that this prompt does not name.')
   })
 
   it('stays under the runtime ceiling, and section 2 stays under its own', () => {
@@ -104,8 +112,20 @@ describe('the two kind spellings', () => {
     const text = renderStepKinds(catalog())
     expect(text).toContain('### `agent`')
     expect(text).toContain('- `prompt` (prompt).')
-    expect(text).toContain('- `joins` (select, required).')
+    // A select with no fixed options is an identifier, so it renders as the JSON type it really is.
+    // `select` is not a JSON type and the preamble never explains the word.
+    expect(text).toContain('- `joins` (string, required).')
+    expect(text).not.toContain('(select')
     expect(text).not.toContain('- `with.prompt`')
+  })
+
+  // `describe` drives the editor's inspector, and three keys have no control there. A model reads
+  // the kind's key list, so the list has to name every key the kind really takes.
+  it('names the keys a kind takes that its description leaves out', () => {
+    const text = renderStepKinds(catalog())
+    expect(text).toContain('- `branches` (object of verdict to step name, required).')
+    expect(text).toContain('- `schema` (textarea, required).')
+    expect(text).toContain('- `childStep.name` (text).')
   })
 
   it('renders a contributed kind namespaced with everything in with', () => {
@@ -238,6 +258,34 @@ describe('the built-in worked examples', () => {
     expect(first.steps.filter((step) => step.after?.length === 0)).toHaveLength(2)
     expect(first.steps.some((step) => (step.after?.length ?? 0) > 1)).toBe(true)
     expect(first.steps.some((step) => step.kind === 'gate-human')).toBe(true)
+  })
+
+  // `validateWorkflow` cannot catch either of the next two. An instruction to answer with an empty
+  // array is ordinary text in a definition that passes every rule, and two branches sharing a target
+  // is something the runner handles. Both are wrong only against what the prose says, so the prose
+  // and the examples are what these check against each other.
+
+  it('never offers a fan-out planner an empty list, which fails the step', () => {
+    // `runFanOut` answers 'Plan emitted no task list' on an empty array as well as a missing one
+    // (./workflowBuiltins.ts), so a planning prompt that invites one teaches a broken definition.
+    const planners = prompt().split('\n').filter((line) => line.includes('"prompt"') && line.includes('tasks array'))
+    expect(planners.length).toBeGreaterThanOrEqual(2)
+    for (const line of planners) {
+      expect(line).toContain('At least one entry')
+      expect(line).not.toMatch(/empty (array|list)/i)
+    }
+    expect(prompt()).toContain('An empty `tasks` array is not an answer.')
+  })
+
+  it('gives each verdict its own step, and says why `default` may share one', () => {
+    expect(prompt()).toContain('`default` is the exception')
+    for (const { def } of BUILTIN_EXAMPLES) {
+      for (const step of def.steps) {
+        const listed = Object.entries(step.branches ?? {}).filter(([verdict]) => verdict !== 'default')
+        const targets = listed.map(([, target]) => target)
+        expect(new Set(targets).size).toBe(targets.length)
+      }
+    }
   })
 
   it('shows a fan-out, its join, and a decision with a default branch', () => {
