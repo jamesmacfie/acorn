@@ -36,6 +36,7 @@ import {
   type DraftSelection,
 } from './draft'
 import { createDraftStore, defRefKey } from './draftStore'
+import GraphView from './GraphView'
 import JsonTab from './JsonTab'
 import NodeInspector from './NodeInspector'
 import NodeList from './NodeList'
@@ -52,11 +53,17 @@ import { forgetNodeInLayout } from '../layoutPrefs'
 export default function WorkflowEditor(props: { projectId: string; item?: string }) {
   const navigate = useNavigate()
   const store = createDraftStore({ projectId: () => props.projectId, item: () => props.item })
-  const [tab, setTab] = createSignal<'graph' | 'json'>('graph')
+  const [tab, setTab] = createSignal<'nodes' | 'graph' | 'json'>('nodes')
   const workspaces = createQuery(() => workspacesOptions(true))
   const workspaceId = () => workspaces.data?.find((entry) => entry.projects.some((project) => project.id === props.projectId))?.id ?? ''
 
   const draft = () => store.draft()
+  // What the graph's positions are filed under. The same key `layoutPrefs.ts` keeps across a rename,
+  // and an empty string for a draft that has no row yet, which reads and writes nothing.
+  const layoutId = () => {
+    const ref = store.ref()
+    return ref ? defRefKey(ref) : ''
+  }
   const sourceLabel = () => (store.ref()?.source === 'database' ? 'database' : store.ref()?.source ?? '')
 
   const apply = (change: Parameters<typeof store.apply>[0], coalesce = false): void => store.apply(change, { coalesce })
@@ -143,8 +150,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         idPrefix="workflows-editor"
         ariaLabel="Editor view"
         active={tab()}
-        tabs={[{ id: 'graph', label: 'Nodes' }, { id: 'json', label: 'JSON' }]}
-        onChange={(id) => setTab(id as 'graph' | 'json')}
+        tabs={[{ id: 'nodes', label: 'Nodes' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'JSON' }]}
+        onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
       />
       <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
       <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
@@ -211,9 +218,11 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         <Alert>This one is a committed file. Copy it to the database to change it.</Alert>
       </Show>
       <Show
-        when={tab() === 'graph'}
+        when={tab() !== 'json'}
         fallback={<JsonTab json={store.json()} readOnly={store.readOnly()} onApply={store.applyText} />}
       >
+        {/* The list column stays beside the canvas and collapses under it on a narrow layout, which
+            is `list-detail`'s own rule rather than anything this pane decides. */}
         <ListDetail split>
           <ListColumn>
             <NodeList
@@ -225,15 +234,31 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
               onRemove={actions.remove}
             />
           </ListColumn>
-          <DetailColumn scroll>
-            <NodeInspector
-              draft={draft()}
-              catalog={store.catalog()}
-              providers={store.providers()}
-              projectId={props.projectId}
-              readOnly={store.readOnly()}
-              actions={actions}
-            />
+          <DetailColumn scroll={tab() === 'nodes'}>
+            <Show
+              when={tab() === 'graph'}
+              fallback={(
+                <NodeInspector
+                  draft={draft()}
+                  catalog={store.catalog()}
+                  providers={store.providers()}
+                  projectId={props.projectId}
+                  readOnly={store.readOnly()}
+                  actions={actions}
+                />
+              )}
+            >
+              <GraphView
+                draft={draft()}
+                catalog={store.catalog()}
+                defId={layoutId()}
+                readOnly={store.readOnly()}
+                onSelect={(selection: DraftSelection) => store.select((current) => selectRow(current, selection))}
+                onConnect={actions.connect}
+                onDisconnect={actions.disconnect}
+                onRemove={actions.remove}
+              />
+            </Show>
           </DetailColumn>
         </ListDetail>
       </Show>

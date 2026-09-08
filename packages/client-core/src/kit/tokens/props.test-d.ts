@@ -14,6 +14,7 @@ import type { ChipRow } from '../components/layout/ChipRow'
 import type { Facts } from '../components/content/Facts'
 import type { Fold } from '../components/layout/Fold'
 import type { Grid } from '../components/layout/Grid'
+import type { Graph } from '../components/content/Graph'
 import type { Heading } from '../components/content/Heading'
 import type { Inline } from '../components/layout/Inline'
 import type { Log } from '../components/content/Log'
@@ -46,6 +47,7 @@ type _Facts = NoStyling<Styling<typeof Facts>>
 type _Field = NoStyling<Styling<typeof Field>>
 type _Fold = NoStyling<Styling<typeof Fold>>
 type _Grid = NoStyling<Styling<typeof Grid>>
+type _Graph = NoStyling<Styling<typeof Graph>>
 type _Heading = NoStyling<Styling<typeof Heading>>
 type _Inline = NoStyling<Styling<typeof Inline>>
 type _Input = NoStyling<Styling<typeof Input>>

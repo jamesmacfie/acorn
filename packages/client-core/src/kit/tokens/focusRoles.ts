@@ -72,6 +72,9 @@ export const NODE_FOCUS = {
   // The exception named at the top of this file: it roves, but over a `selected` index the caller
   // holds rather than the host's collection store.
   Grid: 'collection',
+  // A collection, and the cards are its items: one tab stop, the arrows walk them, type-ahead finds
+  // one by name. A picture nobody can reach by keyboard is a picture, not a node.
+  Graph: 'collection',
   Meter: 'none',
   CodeBlock: 'none',
   Log: 'stop',

@@ -1,8 +1,10 @@
-import { createMemo, Show } from 'solid-js'
-import { formatRelativeTime, type Task } from '@acorn/plugin-api/client'
+import { createMemo, createSignal, Show } from 'solid-js'
+import { formatRelativeTime, readLocal, type Task, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, ConfirmButton, EmptyState, Icon, Row, Rows, SectionHeader, Stack, Text,
+  Badge, Button, ConfirmButton, EmptyState, Icon, Row, Rows, SectionHeader, SegmentedControl, Stack,
+  Text,
 } from '@acorn/plugin-api/ui'
+import { RunGraph } from './RunGraph'
 import { formatCost, kindLabel, runCost, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
@@ -12,6 +14,13 @@ import { isLiveRun, type RunPaneModel } from './runPaneModel'
 // Two `Rows` collections rather than one, because they answer different questions and the arrows
 // should not walk from a run into a node. Each is the kit's, so the keyboard, the type-ahead and the
 // selection that survives a refetch come for free.
+//
+// The nodes half draws either way: rows, or the kit's `Graph` over the same model. Which one is a
+// per-device preference, because it is a reading habit rather than anything about the run
+// (docs/state-ownership.md § Device).
+
+type NodeView = 'rows' | 'graph'
+const NODE_VIEW_KEY = 'plugin:workflows:runs:nodeView'
 
 /** The list header: how many runs this task has. */
 export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
@@ -20,6 +29,11 @@ export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
 
 export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
+  const [nodeView, setNodeView] = createSignal<NodeView>(readLocal(NODE_VIEW_KEY) === 'graph' ? 'graph' : 'rows')
+  const showNodes = (view: NodeView): void => {
+    writeLocal(NODE_VIEW_KEY, view)
+    setNodeView(view)
+  }
 
   const runItems = createMemo(() => model.runs().map((run) => ({ key: run.id, label: run.name })))
   const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.name })))
@@ -64,50 +78,69 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
       </Show>
 
       <Show when={model.selectedRun()}>
-        <SectionHeader level="group" count={model.nodes().length}>Nodes</SectionHeader>
-        <Rows
-          tree
-          id={`workflows:nodes:${props.task.id}`}
-          ariaLabel="Workflow nodes"
-          items={nodeItems()}
-          selected={model.selectedStepId() ?? null}
-          onSelect={selectNode}
-          onActivate={selectNode}
-        >
-          {(item, itemProps, selected) => (
-            <Show when={nodeFor(item.key)}>
-              {(node) => (
-                <Row
-                  item={itemProps}
-                  selected={selected()}
-                  depth={node().depth}
-                  density="compact"
-                  variant="tree"
-                  title={node().parents.length > 1 ? `Waits on ${node().parents.join(', ')}` : kindLabel(node().step?.kind ?? 'agent')}
-                  leading={(
-                    <Icon
-                      name={stepGlyph(node().step?.status)}
-                      tone={stepTone(node().step?.status)}
-                      spin={node().step?.status === 'running'}
-                    />
-                  )}
-                  meta={(
-                    <>
-                      <Show when={node().parents.length > 1}>
-                        <Badge size="xs">{`⇐ ${node().parents.length}`}</Badge>
-                      </Show>
-                      <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
-                      <Text emphasis="muted">{stepElapsed(node().step, model.now())}</Text>
-                    </>
-                  )}
-                  onPress={() => selectNode(item.key)}
-                >
-                  {node().name}
-                </Row>
-              )}
-            </Show>
+        <SectionHeader
+          level="group"
+          count={model.nodes().length}
+          actions={(
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Node view"
+              value={nodeView()}
+              options={[{ value: 'rows' as const, label: 'Rows' }, { value: 'graph' as const, label: 'Graph' }]}
+              onChange={showNodes}
+            />
           )}
-        </Rows>
+        >
+          Nodes
+        </SectionHeader>
+        <Show when={nodeView() === 'graph'}>
+          <RunGraph model={model} />
+        </Show>
+        <Show when={nodeView() === 'rows'}>
+          <Rows
+            tree
+            id={`workflows:nodes:${props.task.id}`}
+            ariaLabel="Workflow nodes"
+            items={nodeItems()}
+            selected={model.selectedStepId() ?? null}
+            onSelect={selectNode}
+            onActivate={selectNode}
+          >
+            {(item, itemProps, selected) => (
+              <Show when={nodeFor(item.key)}>
+                {(node) => (
+                  <Row
+                    item={itemProps}
+                    selected={selected()}
+                    depth={node().depth}
+                    density="compact"
+                    variant="tree"
+                    title={node().parents.length > 1 ? `Waits on ${node().parents.join(', ')}` : kindLabel(node().step?.kind ?? 'agent')}
+                    leading={(
+                      <Icon
+                        name={stepGlyph(node().step?.status)}
+                        tone={stepTone(node().step?.status)}
+                        spin={node().step?.status === 'running'}
+                      />
+                    )}
+                    meta={(
+                      <>
+                        <Show when={node().parents.length > 1}>
+                          <Badge size="xs">{`⇐ ${node().parents.length}`}</Badge>
+                        </Show>
+                        <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
+                        <Text emphasis="muted">{stepElapsed(node().step, model.now())}</Text>
+                      </>
+                    )}
+                    onPress={() => selectNode(item.key)}
+                  >
+                    {node().name}
+                  </Row>
+                )}
+              </Show>
+            )}
+          </Rows>
+        </Show>
       </Show>
     </Stack>
   )

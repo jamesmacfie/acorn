@@ -1,6 +1,6 @@
 # Phase 6: the canvas
 
-Status: not started. Waits on phases 3 and 4.
+Status: SHIPPED. Waited on phases 3 and 4.
 
 ## Goal
 

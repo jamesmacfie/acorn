@@ -587,6 +587,10 @@ ui: Field
 ui: FileHead
 ui: FindBar
 ui: Fold
+ui: Graph
+ui: GraphCard
+ui: GraphEdgeRef
+ui: GraphPoint
 ui: Grid
 ui: Heading
 ui: Icon

@@ -24,6 +24,10 @@ export {
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'
+// The canvas, as the indented list. Its own file because it reaches into two of the three above.
+export { Graph } from './graph'
+export type { GraphCard } from '@acorn/client-core/kit/components/content/Graph.tsx'
+export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib/graphLayout.ts'
 // The other half of a `pty` rectangle: the caller says what the channel is and the host draws the
 // emulator. On the DOM that is an xterm on an element; here it is OpenTUI's, already drawn
 // (./pty.ts, client-core/features/terminal/attachPty.ts).

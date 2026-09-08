@@ -8,8 +8,8 @@ import { DEFINITION_ROW, effectiveAfter, graphOrder, INPUTS_ROW, type DraftSelec
 //
 // One list, not two, because the inspector's subject is whatever is selected here and the definition's
 // own fields need a row to be selected from. The graph rows are indented by rank and a node waiting on
-// more than one step says how many, which is the only thing a list can say that a picture says better
-// (docs/future/workflows/phase-6-canvas.md).
+// more than one step says how many. This list stays beside the graph view rather than being replaced
+// by it: it is the one place the definition's own rows can be selected from (./GraphView.tsx).
 
 const kindLabel = (kind: string, catalog: WorkflowCatalog | undefined): string =>
   catalog?.kinds.find((entry) => entry.id === kind)?.describe?.label ?? BUILTIN_STEP_DESCRIPTIONS[kind]?.label ?? kind

@@ -47,6 +47,7 @@ import { Facts } from '../../kit/components/content/Facts'
 import { ChipRow } from '../../kit/components/layout/ChipRow'
 import { Log } from '../../kit/components/content/Log'
 import { Grid } from '../../kit/components/layout/Grid'
+import { Graph } from '../../kit/components/content/Graph'
 import { Rows } from '../../kit/components/layout/Rows'
 import { Only } from '../../kit/components/layout/Only'
 import { Fallback } from '../../kit/components/content/Fallback'
@@ -72,7 +73,7 @@ export const KIT_COMPONENTS: KitTable = {
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
-  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log,
+  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log,
   EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,

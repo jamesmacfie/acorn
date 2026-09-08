@@ -1549,6 +1549,14 @@ agents' two settings are desktop-only, because the registrations that mint them 
 editor's ⌘P quick-open used to be in the same list and is not any more — it is a `search` command its
 plugin registers at boot, so it works here.
 
+**A canvas is not one of the losses.** The kit's `Graph` node draws cards on a grid with the edges as
+curves on the desktop, and here it draws the indented list the workflows editor drew before the
+canvas existed: the same cards in the same reading order with the same selection, indented by rank
+instead of placed by coordinate, and `⇐ n` on a card that waits on more than one. Both hosts take the
+ranks from the same `kit/lib/graphLayout.ts`, so neither can put a card under the wrong one. Positions
+and wires are not drawn, and the one affordance that would otherwise go with them — dragging an edge
+into place — is a picker under the list instead. A plugin writes the same `Graph` for both.
+
 **A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
 `Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region
 its host registered. A contributor that draws only `Text` is not a stop, and `↓` walks past it. The

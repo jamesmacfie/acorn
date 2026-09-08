@@ -400,6 +400,15 @@ by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, 
 and a pane that wants a control to look different asks for that in the kit rather than in its own
 stylesheet.
 
+**One node is a picture, and it is still a list.** `Graph` draws cards on a grid with the edges as
+curves: the workflows editor authors a definition on it and the run pane watches a run on it. It is in
+the kit rather than in the plugin because plugin client code may not emit raw DOM or SVG, and a canvas
+is the one thing a terminal cannot draw — so admitting it meant writing both projections first. In
+cells it is the indented list the editor already drew: the same cards, the same order, the same
+selection, indented by rank instead of placed by coordinate. `kit/lib/graphLayout.ts` is the geometry,
+shared by both hosts, so the two cannot disagree about which card sits under which. Where a card goes
+is a device preference the caller holds, never part of what it is drawing.
+
 **One node is a box, and admits it.** `Rectangle kind="pty" | "webview" | "frame" | "editor"` is what
 the kit offers a surface that owns its own pixels: a PTY, a webview, a plugin's iframe, a code editor.
 The node owns the box and the keyboard contract, one tab stop from outside, Enter to hand the keys to
@@ -1086,6 +1095,7 @@ the kit as a stop without somebody deciding whether this host presses it.
 | `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
+| `Graph` | collection | reduced: the indented list, one line per card — glyph, label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
 | `Meter` | none | `████░░░░ 62%` |
 | `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
