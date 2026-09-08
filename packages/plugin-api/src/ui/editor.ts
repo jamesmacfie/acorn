@@ -13,3 +13,7 @@
 export { editorTheme, refreshEditorTheme, watchEditorTheme } from '@acorn/client-core/features/editor/theme.ts'
 export { languageForPath } from '@acorn/client-core/features/editor/language.ts'
 export { applyViewState, captureViewState, type EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
+// A code box that is not a document: the library and the theme, and the caller keeps the text
+// (client-core features/editor/embed.ts). Workflows' JSON tab is the case.
+export { mountEmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
+export type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'

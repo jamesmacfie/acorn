@@ -407,10 +407,12 @@ ui/diff: synth
 ui/diff: toBands
 ui/diff: tokenizeDocument
 ui/editor: EditorViewState
+ui/editor: EmbeddedEditor
 ui/editor: applyViewState
 ui/editor: captureViewState
 ui/editor: editorTheme
 ui/editor: languageForPath
+ui/editor: mountEmbeddedEditor
 ui/editor: refreshEditorTheme
 ui/editor: watchEditorTheme
 ui/host: Acorn

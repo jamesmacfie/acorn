@@ -18,10 +18,13 @@
 // the code that uses them — `stateFor` runs only once `mountEditor` has a view, and the `editor`
 // rectangle never mounts one — so it is bytes in a lazy chunk rather than work. Routing those three
 // through the facade too is what would let this host drop the library, and nothing has asked for it.
+import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 
 export type { EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
+export type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
+import type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
 import type { EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
 
 /** No grammar, because there is no highlighter to give one to. An empty extension is a real answer
@@ -41,3 +44,15 @@ export const watchEditorTheme = (_view: EditorView): (() => void) => () => {}
 export const captureViewState = (_view: EditorView): EditorViewState => ({ anchor: 0, head: 0, scrollTop: 0 })
 
 export const applyViewState = (_view: EditorView, _state: EditorViewState): void => {}
+
+/** No library and no pixels, so a caller's box stays whatever it drew for this host — for workflows'
+ *  JSON tab, the plain textarea inside its `editor` rectangle. The handle still answers, because the
+ *  caller stores it and destroys it on cleanup. */
+export const mountEmbeddedEditor = (
+  _element: HTMLElement,
+  options: { doc: string; languageId: LanguageId; readOnly?: boolean; onChange?: (text: string) => void },
+): EmbeddedEditor => ({
+  read: () => options.doc,
+  write: () => {},
+  destroy: () => {},
+})

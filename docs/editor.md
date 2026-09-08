@@ -478,6 +478,26 @@ The honest bar for using the template: the plugin wants a *real* editor — comp
 multiline editing, the host's save semantics. A plugin that needs one input line keeps using its own
 input inside its frame; the template is not a text-field delivery mechanism.
 
+### A code box that is not a document
+
+Below that bar there is still one case: a field whose text is code, already in the plugin's hand,
+with its own buttons underneath it. Workflows' JSON tab is the example — the definition as the
+runner's own JSON, with Apply, Format and Revert beside it. None of the machinery above applies:
+there is no read route, no write route, no autosave and no view state to remember. What the plugin
+still cannot get for itself is the editor library and the app's theme, because reaching for
+CodeMirror directly would carry it into a host that cannot draw it.
+
+So `@acorn/plugin-api/ui/editor` also exports `mountEmbeddedEditor(element, { doc, languageId,
+readOnly, onChange })`, which is those two things and nothing else: it returns `read`, `write` and
+`destroy`, and the caller keeps the text. The element comes from a `Rectangle kind="editor"`, the
+same box the document surface uses, so the keyboard contract for getting in and out of it is the
+kit's either way. The grammar arrives after the first paint, as it does everywhere else.
+
+The terminal host aliases that entrypoint (`apps/tui/src/kit/editor.ts`), so there
+`mountEmbeddedEditor` is a no-op and the caller's rectangle keeps whatever it drew for cells — for
+workflows, a plain textarea under `Only hosts={['tui']}`. That is the whole reason the function
+lives on the facade rather than in the plugin.
+
 ## Language smarts: completions, and the growth rule
 
 Table/column autocomplete for database is the obvious first ask, and it is cheap — for a reason worth

@@ -124,6 +124,7 @@ export default function NodeList(props: {
               <Row
                 item={itemProps}
                 selected={selected()}
+                onPress={() => select(item.key)}
                 density="compact"
                 leading={<Icon name={item.key === DEFINITION_ROW ? 'workflow' : 'list'} />}
                 meta={(
@@ -140,6 +141,7 @@ export default function NodeList(props: {
               <Row
                 item={itemProps}
                 selected={selected()}
+                onPress={() => select(item.key)}
                 depth={row().depth + 1}
                 density="compact"
                 variant="tree"

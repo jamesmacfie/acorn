@@ -1050,7 +1050,7 @@ the kit as a stop without somebody deciding whether this host presses it.
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines |
+| `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
 | `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
 | `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |

@@ -36,8 +36,20 @@ import type { KitSection } from '@acorn/client-core/kit/components/layout/Sectio
 // line above it — which drew the PR pane as two screens interleaved character by character
 // (docs/tui.md). The region that holds them scrolls or clips, which is
 // the reader's own answer.
-export function Stack(props: { gap?: Space; children: JSX.Element }) {
-  return <box flexDirection="column" flexShrink={0} gap={spaceLines(props.gap ?? 'stack')}>{props.children}</box>
+export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Element }) {
+  // `grow`: the stack is the region and takes what is left of it, so a scroller or a canvas inside
+  // it has a height to work against. Still `flexShrink={0}`, by the rule above: what does not fit
+  // is clipped by the region, never squeezed into the line above.
+  return (
+    <box
+      flexDirection="column"
+      flexShrink={0}
+      flexGrow={props.grow ? 1 : 0}
+      gap={spaceLines(props.gap ?? 'stack')}
+    >
+      {props.children}
+    </box>
+  )
 }
 
 export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Element }) {
