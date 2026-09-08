@@ -1,5 +1,8 @@
-import { lazy } from 'solid-js'
-import { openPane, projectSurfaceRegistry, registerNoticeTargetHandler, type ClientPlugin } from '@acorn/plugin-api/client'
+import { createComponent, lazy } from 'solid-js'
+import {
+  contextMenuRegistry, openPane, projectSurfaceRegistry, registerNoticeTargetHandler,
+  type ClientPlugin,
+} from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
 import { workflowApi } from './workflowsClient'
 import { workflowsCommands } from './commands'
@@ -8,8 +11,10 @@ import { workflowsAttentionSource } from './runs/attentionSource'
 import { workflowsPaneContribution } from './runs/paneContribution'
 import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 import { workflowRunCountsSchedule } from './runs/runStore'
+import { openStartFromItem, startFromItemTarget } from './startFromItem'
 
 const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
+const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
 
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
@@ -47,6 +52,29 @@ export const workflowsClientPlugin: ClientPlugin = {
     // context and this is the compiled way in (docs/contribution-kinds.md § Project surfaces). The
     // host records the disposable, so a disable takes the surface with it.
     ctx.contribute(projectSurfaceRegistry, workflowsSurfaceContribution)
+    // "Start workflow…" on a Rollbar, Linear or GitHub row (./startFromItem.ts). One registration
+    // serves all three, because all three draw their row menu from the context-menu registry
+    // (docs/plugins.md § Context menus). After Create task, which is the commoner verb.
+    ctx.contribute(contextMenuRegistry, {
+      id: 'workflows.start-from-item',
+      location: 'item.row',
+      label: 'Start workflow…',
+      icon: 'workflow',
+      order: 20,
+      // Narrowed rather than cast: the registry holds every location's rows, and this one is only
+      // ever handed the target it was filtered on.
+      run: (target) => { if (target.location === 'item.row') openStartFromItem(target) },
+    })
+    // Where the box it opens is drawn. The shell's overlay slot, because the list the row sits on
+    // belongs to somebody else (./StartFromItemHost.tsx). Gated on the ask rather than mounted
+    // empty, so the chunk stays off the first paint: nobody has right-clicked a row yet.
+    ctx.slots.register({
+      id: 'workflows.start-from-item',
+      slot: 'overlay',
+      order: 50,
+      when: () => !!startFromItemTarget(),
+      component: () => createComponent(StartFromItemHost, {}),
+    })
     ctx.settingsPages.register({
       id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: { plugin: 'workflows' },
       component: WorkflowsSettings,

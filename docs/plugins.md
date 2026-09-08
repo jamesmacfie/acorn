@@ -1752,14 +1752,16 @@ they cannot offer different things.
 
 An entry is `{ id, location, label, icon?, order?, when?, action }`:
 
-- **`location`** comes from a closed vocabulary (`@acorn/protocol/contextMenus.ts`). `task.row` is the
-  only member today; the list grows when a surface appears to draw it, never ahead of one.
+- **`location`** comes from a closed vocabulary (`@acorn/protocol/contextMenus.ts`). There are two:
+  `task.row` is a row in the tab rail, and `item.row` is a row in an integration's list — a Rollbar
+  error, a Linear issue, a GitHub pull request. The list grows when a surface appears to draw it,
+  never ahead of one.
 - **`when`** is a map of literals that must *all* equal the target's own facts — not an expression. A
   manifest is data, and a predicate language would need a parser, an evaluator and a decision about
-  what it may call. `task.row` supplies `origin`, `projectId` and `pinned`; naming anything else is a
-  parse error, because a predicate that can never match is a contribution that installs and does
-  nothing. Identity fields (`id`, `title`) are deliberately not facts: a menu row keyed to one task id
-  is not an extension point.
+  what it may call. `task.row` supplies `origin`, `projectId` and `pinned`; `item.row` supplies
+  `providerId` and `projectId`. Naming anything else is a parse error, because a predicate that can
+  never match is a contribution that installs and does nothing. Identity fields (`id`, `title`) are
+  deliberately not facts: a menu row keyed to one task id is not an extension point.
 - **`action`** is the *context-free* verb set — the same one a command and a slot badge take. A menu
   row can therefore do exactly what a command can do and nothing more. `createTask` and `navigate` are
   absent because the thing under the cursor is a **core** resource: the first needs the host's
@@ -1784,6 +1786,27 @@ An entry is `{ id, location, label, icon?, order?, when?, action }`:
     }
   }
   ```
+
+### Three lists, one menu
+
+`item.row` exists because three lists were each writing their own overflow menu: core's rail list for
+descriptor sources (`ChromeSourcePanel.tsx`), which is Rollbar's and Linear's, and github's
+pull-request list (`PullList.tsx`). Every one of them offered "Create task" and none of them could
+gain a second row without gaining it three times. They all draw from `contextMenuItems('item.row',
+target)` now, and each still contributes its own **Create task** row: core's promotes through the
+source's registered `promotion`, github's finds or makes the pull's task with its Linear links. What
+changed is that a fourth party can add a row — the workflows plugin's **Start workflow…** is the
+first, and a loaded plugin's manifest is the next.
+
+An `item.row` target carries more than its facts. `id`, `title`, `body` and `link` are the four things
+every tracker has, and `item` is the provider's own row handed back untouched, which is what lets one
+contribution serve three lists that agree on nothing else. None of those is a fact, so no `when` can
+match on them.
+
+Both halves of the registry are on the plugin API: `registerContextMenuItems` for a plugin adding a
+row, and `contextMenuItems` with `runContextMenuItem` for a plugin that draws a list and wants the
+registry's rows in it. No component crosses — the loop over those rows is eight lines with each host's
+own `Menu.Item`, which is what keeps it working in a terminal.
 
 Nothing here is reachable from a plugin frame. The registry is populated host-side from manifests the
 device read; the frame bridge gained no message kind and no route, so a frame can neither open a menu

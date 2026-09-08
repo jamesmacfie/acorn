@@ -6,6 +6,7 @@ import {
   registerContextMenuItems,
   runContextMenuItem,
   type ContextMenuContribution,
+  type ItemRowTarget,
   type TaskRowTarget,
 } from './contextMenus'
 
@@ -24,12 +25,24 @@ const target = (over: Partial<TaskRowTarget> = {}): TaskRowTarget => ({
   ...over,
 })
 
-const item = (over: Partial<ContextMenuContribution> = {}): ContextMenuContribution => ({
+const item = (over: Partial<ContextMenuContribution<'task.row'>> = {}): ContextMenuContribution<'task.row'> => ({
   id: 'x', location: 'task.row', label: 'X', order: 500, run: () => {}, ...over,
 })
 
+// A row in a tracker's list: the second location, added when three lists needed one menu
+// (docs/plugins.md § Context menus).
+const rowTarget = (over: Partial<ItemRowTarget> = {}): ItemRowTarget => ({
+  location: 'item.row',
+  id: 'RB-4412',
+  title: 'TypeError in pullsBatch',
+  providerId: 'rollbar',
+  projectId: 'p1',
+  item: { id: 'RB-4412' },
+  ...over,
+})
+
 const disposables: { dispose(): void }[] = []
-const register = (items: ContextMenuContribution[]) => {
+const register = <L extends 'task.row' | 'item.row'>(items: ContextMenuContribution<L>[]) => {
   const entry = registerContextMenuItems(items)
   disposables.push(entry)
   return entry
@@ -77,6 +90,34 @@ describe('what a location offers', () => {
     entry.dispose()
     expect(contextMenuItems('task.row', target())).toEqual([])
     expect(contextMenuRegistry.entries()).toEqual([])
+  })
+})
+
+describe('an item row', () => {
+  // The registry is what stops the Rollbar, Linear and GitHub lists from offering different things,
+  // so the question every one of them asks is "what does this provider's row get".
+  it('offers a row keyed to one provider on that provider and nowhere else', () => {
+    register([
+      { id: 'rollbar.only', location: 'item.row', label: 'Investigate', order: 10, when: compileWhen({ providerId: 'rollbar' }), run: () => {} },
+      { id: 'anywhere', location: 'item.row', label: 'Start workflow…', order: 20, run: () => {} },
+    ])
+    expect(contextMenuItems('item.row', rowTarget()).map((row) => row.id)).toEqual(['rollbar.only', 'anywhere'])
+    expect(contextMenuItems('item.row', rowTarget({ providerId: 'linear' })).map((row) => row.id)).toEqual(['anywhere'])
+  })
+
+  it('keeps the two locations apart', () => {
+    register([item({ id: 'task.pin' })])
+    expect(contextMenuItems('item.row', rowTarget())).toEqual([])
+    expect(contextMenuItems('task.row', target())).toHaveLength(1)
+  })
+
+  it('hands the whole row through, not only its facts', () => {
+    const run = vi.fn()
+    const pull = { number: 42, headRef: 'james/fix' }
+    register([{ id: 'workflows.start', location: 'item.row', label: 'Start workflow…', order: 20, run }])
+    const target = rowTarget({ providerId: 'github', item: pull, body: 'the description', link: 'https://example.test/42' })
+    runContextMenuItem(contextMenuItems('item.row', target)[0], target)
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ item: pull, body: 'the description' }))
   })
 })
 

@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ContextMenuHost, type ContextMenuOpening } from './contextMenuHost'
-import { registerContextMenuItems, type ContextMenuTarget } from './contextMenus'
+import { registerContextMenuItems, type TaskRowTarget } from './contextMenus'
 import type { Disposable } from '../../../kit/lib/registry'
 
 // The right-click door. The registry's decisions — which rows, in what order, filtered by `when` —
@@ -14,7 +14,7 @@ let host: HTMLElement
 let dispose: () => void
 const registered: Disposable[] = []
 
-const target = (overrides: Partial<ContextMenuTarget> = {}): ContextMenuTarget => ({
+const target = (overrides: Partial<TaskRowTarget> = {}): TaskRowTarget => ({
   location: 'task.row',
   id: 'task-1',
   title: 'Fix the thing',

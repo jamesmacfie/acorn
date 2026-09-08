@@ -1,12 +1,16 @@
 import type { QueryClient } from '@tanstack/solid-query'
+import { tasksRoute } from '@acorn/protocol/api.ts'
 import {
   createTask,
   integrationsOptions,
+  readJson,
   scanContentRefs,
   tasksKey,
   tasksOptions,
+  type SourceContribution,
   type Task,
 } from '@acorn/plugin-api/client'
+import type { Pull } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
@@ -63,4 +67,35 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
   })
   await queryClient.invalidateQueries({ queryKey: tasksKey })
   return task
+}
+
+/**
+ * The source's promotion contract, for the one caller that is not this plugin: the shared
+ * promote-to-task modal, which the workflows plugin opens from a pull request's row menu
+ * (docs/workflows.md § Starting a run). Without it the modal has no way to turn a pull into a task
+ * and refuses to draw.
+ *
+ * Deliberately thinner than `promotePullToTask` above. It keeps the half that matters — a pull that
+ * already has an active task gets that task rather than a second one, which is what "attach to the
+ * PR's task" means here — and drops the Linear link seeding, which needs the warmed detail cache and
+ * therefore a QueryClient this contract has no way to hand over. The list's own **Create task** row
+ * still runs the full path. There is no `attachToCurrentTask`: a pull request is recorded on the task
+ * row as `pullNumber`, not as a link, so attaching one to somebody else's task is not a thing.
+ */
+export const githubPullPromotion: NonNullable<SourceContribution<Pull>['promotion']> = {
+  canPromote: (pull, context) => !!context.projectId && !!pull.headRef,
+  prepare: (pull, context) => ({
+    origin: 'github-pr',
+    projectId: context.projectId,
+    title: pull.title,
+    branch: pull.headRef ?? context.branch,
+    pullNumber: pull.number,
+  }),
+  create: async (seed) => {
+    const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])
+    const existing = tasks.find((task) => task.status === 'active'
+      && task.projectId === seed.projectId
+      && task.pullNumber === seed.pullNumber)
+    return existing ?? createTask(seed)
+  },
 }

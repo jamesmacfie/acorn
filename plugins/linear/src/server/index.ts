@@ -34,8 +34,11 @@ export type Viewer = { viewer: { name: string; organization: { name: string } } 
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 
-// The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote default.
-const TRIAGE_FIELDS = `id identifier title url branchName priority priorityLabel updatedAt
+// The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote
+// default. `description` is the issue's own prose, capped before it reaches a row: a workflow
+// started from a row menu puts the title and this in its `issue` input, and the alternative was a
+// second call per issue at the moment somebody opened a menu (docs/workflows.md § Starting a run).
+const TRIAGE_FIELDS = `id identifier title url description branchName priority priorityLabel updatedAt
       state { name type color } assignee { name }
       labels { nodes { id name color } }`
 

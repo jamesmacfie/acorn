@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -10,8 +10,9 @@ import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
 import Icon from '../../kit/components/content/Icon'
-import { Menu } from '../../kit/components/overlays/Menu'
 import { RowActions } from '../../kit/components/layout/RowActions'
+import { contextMenuItems, registerContextMenuItems, type ItemRowTarget } from '../registries/panes/contextMenus'
+import { ContextMenuItems } from '../registries/panes/contextMenuHost'
 import { runChromeAction } from './actions'
 import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../infra/queries'
@@ -121,6 +122,40 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   }
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
 
+  // What a row's menu is about. `item` is the row itself, handed back untouched to whoever
+  // contributed the action; only `providerId` and `projectId` are facts a `when` may name
+  // (docs/plugins.md § Context menus).
+  const rowTarget = (item: PluginRailItem): ItemRowTarget => ({
+    location: 'item.row',
+    id: item.id,
+    title: item.title,
+    providerId: props.descriptor.id,
+    projectId: params.projectId ?? '',
+    ...(item.task?.body ? { body: item.task.body } : {}),
+    ...(item.task?.link?.ref?.url ? { link: item.task.link.ref.url } : {}),
+    item,
+  })
+
+  onMount(() => {
+    // Core's own row action, registered rather than written inline, so this list and github's cannot
+    // offer different things (docs/plugins.md § Context menus). One registration per mounted panel
+    // and one panel on screen at a time: `Dynamic` disposes the source it is leaving before it
+    // creates the one it is going to.
+    const rows = registerContextMenuItems([
+      {
+        id: 'item.create-task',
+        location: 'item.row',
+        label: 'Create task…',
+        icon: 'square-plus',
+        order: 10,
+        // A row with no `task` block has no promotion seed, and a source whose click already
+        // creates a task does not need the menu offering it twice.
+        when: (target) => !!(target.item as PluginRailItem).task && props.descriptor.onSelect?.verb !== 'createTask',
+        run: (target) => setPromoteItem(target.item as PluginRailItem),
+      },
+    ])
+    onCleanup(() => rows.dispose())
+  })
 
   const select = (item: PluginRailItem): void => {
     // Discarded on purpose: a rail row has already had any refusal as a toast, and only the palette
@@ -230,16 +265,13 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
                   trailing={(
                     <>
                       <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
-                      {/* Row-level actions behind the shared overflow menu. Creating a task is the
-                          only one today; task, workflow and agent verbs land here next, which is why
-                          this is a menu rather than the button it replaced. */}
-                      <Show when={item.task && props.descriptor.onSelect?.verb !== 'createTask'}>
+                      {/* Row-level actions behind the shared overflow menu, drawn from the
+                          context-menu registry: core's "Create task…" above, the workflows plugin's
+                          "Start workflow…" beside it, and a loaded plugin's `item.row` row after
+                          those. No menu at all when nothing offers a row. */}
+                      <Show when={contextMenuItems('item.row', rowTarget(item)).length}>
                         <RowActions ariaLabel={`Actions for ${item.title}`}>
-                          {(menu) => (
-                            <Menu.Item context={menu} onSelect={() => setPromoteItem(item)}>
-                              Create task…
-                            </Menu.Item>
-                          )}
+                          {(menu) => <ContextMenuItems context={menu} location="item.row" target={rowTarget(item)} />}
                         </RowActions>
                       </Show>
                     </>

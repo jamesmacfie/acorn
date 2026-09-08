@@ -12,6 +12,7 @@ import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
 import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
+import { githubPullPromotion } from './pullTasks'
 import GithubImporter from './GithubImporter'
 
 // Two lazy chunks off one module, because the source declares its list and its detail separately and
@@ -34,9 +35,9 @@ export const githubClientPlugin: ClientPlugin = {
     // The PR rail is provider-owned and appears only once GitHub is connected. Core home stays the
     // default landing source, so a disconnected provider never becomes the startup view.
     //
-    // No `promotion`: github's browse creates a task inline from its PR list, seeding provider links
-    // as it goes, rather than through PromoteToTaskModal. The client host enforces `providerId` and
-    // gates the source on the GitHub integration.
+    // Its list still creates a task inline, seeding provider links as it goes; the `promotion` below
+    // is the thinner path the shared modal needs (./pullTasks.ts). The client host enforces
+    // `providerId` and gates the source on the GitHub integration.
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', defaultPane: 'pr',
       regions: { list: GithubBrowseList, detail: GithubBrowseDetail },
@@ -55,6 +56,8 @@ export const githubClientPlugin: ClientPlugin = {
       // pull request as `pullNumber` on the task row; `links` holds the Linear tickets from the body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
+      // How a pull becomes a task for anyone but this plugin's own list (./pullTasks.ts).
+      promotion: githubPullPromotion,
     })
     ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: 'brand:github', component: GithubImporter })
     ctx.commands.register({
