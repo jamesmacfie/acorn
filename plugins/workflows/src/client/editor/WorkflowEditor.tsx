@@ -115,7 +115,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // "connect a provider first" is a control in the way of the four beside it, and Settings is where
   // connections are made. A node that cannot answer counts as none.
   const [connections] = createResource(async () => workflowApi.modelConnections().catch(() => []))
-  const canGenerate = () => !store.readOnly() && (connections()?.length ?? 0) > 0
+  // A project whose workspace is not known counts the same way. The route requires a `workspaceId`
+  // and answers 400 without one, which reads as the model having failed rather than as a list that
+  // has not arrived. The workspaces query resolves long before a description is typed.
+  const canGenerate = () => !store.readOnly() && !!workspaceId() && (connections()?.length ?? 0) > 0
   const [generating, setGenerating] = createSignal(false)
   const [notes, setNotes] = createSignal<WorkflowGenerateNote[]>([])
 

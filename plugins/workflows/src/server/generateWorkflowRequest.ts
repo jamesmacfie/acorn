@@ -17,6 +17,10 @@
 // "fewer problems" would sometimes hand back a three-step version of an eight-step workflow. A
 // problem count is not a quality measure.
 //
+// When the repair answer wins, its notes are the whole list. The first pass's notes describe a
+// definition that was discarded, and a reader has no way to tell them apart from the ones about the
+// draft in front of them.
+//
 // There is never a third call. A first answer that is not JSON at all has nothing to repair — the
 // repair prompt is built from a grounded definition and the checker's messages, and neither exists —
 // so it returns the parse error for the route to answer 422 with.
@@ -98,11 +102,13 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
   const second = await ask(buildRepairUserPrompt({ userPrompt, def: answer.def, notes: answer.notes, problems: answer.problems }))
   const repair = readAnswer(second.text, catalog, validation)
   if ('error' in repair) return kept
-  // Both note lists, because the first pass's notes still describe things the model wrote and this
-  // node does not have, and the repair was told not to put them back.
+  // The repair pass's notes alone. A note describes a change made to the reply it came in, and this
+  // reply was read through the same pipeline, so anything the model put back is reported again and
+  // anything it did not is a change to a definition nobody will ever see. Carrying both lists tells
+  // the reader a kind was dropped from a draft that was thrown away.
   return {
     def: repair.def,
-    notes: [...answer.notes, ...repair.notes],
+    notes: repair.notes,
     problems: repair.problems,
     repaired: true,
     providerId: second.providerId,

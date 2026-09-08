@@ -124,11 +124,20 @@ describe('generateWorkflowRequest', () => {
     }
   })
 
-  it('merges the notes from both passes', async () => {
+  it('reports only what changed in the answer it kept', async () => {
     const first: WorkflowDef = { ...duplicated, steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!] }
     const second: WorkflowDef = { ...duplicated, steps: [duplicated.steps[0]!, { ...duplicated.steps[1]!, policy: 'ships-green' }] }
     const result = await run(answers(reply(first), reply(second)))
-    expect((result as { notes: { code: string }[] }).notes.map((note) => note.code)).toEqual(['unknown-kind', 'unknown-policy'])
+    // The invented kind was in the draft that was thrown away, so saying it was dropped would be a
+    // note about a definition nobody sees.
+    expect((result as { notes: { code: string }[] }).notes.map((note) => note.code)).toEqual(['unknown-policy'])
+  })
+
+  it('keeps the first pass\'s notes when the first answer is the one applied', async () => {
+    const first: WorkflowDef = { ...duplicated, steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!] }
+    const result = await run(answers(reply(first), 'I could not do that.'))
+    expect(result).toMatchObject({ repaired: false })
+    expect((result as { notes: { code: string }[] }).notes.map((note) => note.code)).toEqual(['unknown-kind'])
   })
 
   it('answers with the reason when the first reply is not JSON, and never calls again', async () => {

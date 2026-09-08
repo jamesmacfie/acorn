@@ -15,10 +15,14 @@ import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts
 import type { WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 
-/** How long the generate route may take: two model calls at the runtime's 60-second ceiling, and
- *  half a minute for the prompt, the checker and the wire. Not the broker's 30-second default, which
- *  one model call already outlives. */
-const GENERATE_TIMEOUT_MS = 150_000
+/** How long the generate route may take.
+ *
+ *  Two model calls, each held to 60 seconds by the model runtime, and on top of them the prompt
+ *  build, the worked-example read, two checker passes and the wire. The slack is deliberate: being a
+ *  few seconds short throws away a generation at the moment it would have landed. Nothing above here
+ *  shortens it either. The broker honours the number it is handed and only falls back to 30 seconds,
+ *  which one model call already outlives. */
+const GENERATE_TIMEOUT_MS = 240_000
 
 export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 

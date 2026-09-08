@@ -288,6 +288,20 @@ describe('step names', () => {
     expect(messages(result)).toContain("Step 'Read the issue' is not a step name acorn can use, so it is now 'read-the-issue'.")
   })
 
+  it('renames one shared name once, and never reports a rename it did not make', () => {
+    // Two steps called the same thing: the first rename does both, because `renameStep` works by
+    // name. Going round again used to mint 'reproduce-the-bug-2', rename nothing, and leave a note
+    // naming a step no reader could find. The duplicate is left for the checker and the repair pass.
+    const result = ground(workflow([
+      { name: 'Reproduce the bug', after: [], prompt: 'One.' },
+      { name: 'Reproduce the bug', after: [], prompt: 'Two.' },
+    ]))
+    expect(result.def.steps.map((step) => step.name)).toEqual(['reproduce-the-bug', 'reproduce-the-bug'])
+    expect(codes(result)).toEqual(['renamed-step'])
+    const names = new Set(result.def.steps.map((step) => step.name))
+    for (const note of result.notes) if (note.step) expect(names.has(note.step)).toBe(true)
+  })
+
   it('never takes a name another step already has', () => {
     const result = ground(workflow([
       { name: 'read-the-issue', after: [], prompt: 'One.' },

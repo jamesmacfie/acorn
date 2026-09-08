@@ -229,7 +229,9 @@ verbatim, along with the definition as it stands after the stripping, and the se
 if it parses and has at least one step. It is never chosen on having fewer problems, because the
 cheapest way for a model to shorten a problem list is to delete the steps carrying the problems. The
 answer is applied either way. A definition with problems in the footer is every workflow partway
-through being built, and **Run** is what refuses to start one.
+through being built, and **Run** is what refuses to start one. The alert above the node list
+describes the answer that was applied and only that one. When the repair is the one kept, a note
+about the first draft would be about a definition nobody ever sees.
 
 Applying goes through the same door the JSON tab's **Apply** uses, so the whole generated definition
 is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved: **Save** and
