@@ -1,8 +1,10 @@
-// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events to
-// the AgentState enum, activity-feed items, and task-sidebar roster composition, which merges PTY
-// sessions and workflow steps into one list.
-import type { AgentState, TerminalSession } from '@acorn/protocol/terminal.ts'
-import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events
+// to the AgentState enum and to activity-feed items.
+//
+// The roster that merged PTY sessions with workflow steps went with the sidebar section that drew it
+// (docs/future/workflows/README.md, decision 14): a run's steps are the run pane's, and a PTY session
+// is the terminal drawer's.
+import type { AgentState } from '@acorn/protocol/terminal.ts'
 
 export type StreamEvent = Record<string, unknown> & { type?: string }
 
@@ -67,65 +69,3 @@ export function streamJsonToFeedItems(event: StreamEvent): FeedItem[] {
 }
 
 export const feedFromEvents = (events: StreamEvent[]): FeedItem[] => events.flatMap(streamJsonToFeedItems)
-
-// Parse a step row's persisted result into its feed + terminal-resume handle.
-export function stepFeed(step: WorkflowStepRow): { items: FeedItem[]; costUsd: number | null } {
-  try {
-    const parsed = JSON.parse(step.resultJson ?? '{}') as { events?: StreamEvent[] }
-    return { items: feedFromEvents(parsed.events ?? []), costUsd: step.costUsd }
-  } catch {
-    return { items: [], costUsd: step.costUsd }
-  }
-}
-
-// Open-in-terminal: the resume command for a step's captured session id, per profile, the same seam
-// the headless argv templates use. Runs through the drawer's $SHELL -lc path.
-export function resumeCommandFor(step: { profileId: string | null; sessionId: string | null; resumeCommand?: string | null }): string | null {
-  if (!step.sessionId) return null
-  if (/[^A-Za-z0-9_-]/.test(step.sessionId)) return null // session ids are opaque tokens; never shell metachars
-  return typeof step.resumeCommand === 'string' ? step.resumeCommand : null
-}
-
-// --- Roster (15 §panel): PTY sessions + workflow steps for one task, merged + ordered:
-// needs-you first (blocked/waiting-gate), then active, then the rest, newest first.
-export type RosterRow =
-  | { kind: 'session'; id: string; title: string; state: AgentState; session: TerminalSession }
-  | { kind: 'step'; id: string; title: string; state: AgentState; step: WorkflowStepRow; run: WorkflowRunRow | undefined; gate: boolean }
-
-const stepState = (s: WorkflowStepRow): AgentState =>
-  s.status === 'running'
-    ? 'working'
-    : s.status === 'waiting-gate'
-      ? 'blocked'
-      : s.status === 'done' || s.status === 'cancelled' || s.status === 'skipped'
-        ? 'done'
-        : s.status === 'failed' || s.status === 'safety-rail'
-          ? 'blocked'
-          : 'unknown'
-
-const urgency = (state: AgentState): number => (state === 'blocked' || state === 'permission' ? 0 : state === 'working' || state === 'starting' ? 1 : 2)
-
-export function buildRoster(taskId: string, sessions: TerminalSession[], steps: WorkflowStepRow[], runs: WorkflowRunRow[]): RosterRow[] {
-  const runById = new Map(runs.map((r) => [r.id, r]))
-  const sessionRows: RosterRow[] = sessions
-    .filter((s) => s.taskId === taskId)
-    .map((s) => ({ kind: 'session', id: s.id, title: s.title, state: s.agentState, session: s }))
-  const stepRows: RosterRow[] = steps
-    .filter((s) => s.status !== 'pending' && s.status !== 'skipped')
-    .map((s) => ({
-      kind: 'step',
-      id: s.id,
-      title: `${runById.get(s.runId)?.name ?? 'workflow'} · ${s.name}`,
-      state: stepState(s),
-      step: s,
-      run: runById.get(s.runId),
-      gate: s.status === 'waiting-gate',
-    }))
-  return [...sessionRows, ...stepRows].sort((a, b) => {
-    const u = urgency(a.state) - urgency(b.state)
-    if (u !== 0) return u
-    const at = a.kind === 'session' ? a.session.createdAt : a.step.updatedAt
-    const bt = b.kind === 'session' ? b.session.createdAt : b.step.updatedAt
-    return bt - at
-  })
-}

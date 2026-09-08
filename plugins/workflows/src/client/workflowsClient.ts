@@ -23,6 +23,9 @@ export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/
 export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
 export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
 export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
+export const workflowRetryRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/retry`
+// Which run a managed agent session belongs to, for the agent pane's chip.
+export const workflowSessionRunRoute = (sessionId: string) => `/v2/p/workflows/sessions/${sessionId}/run`
 // Every run on this node, the same route core's merged run list reads.
 export const workflowAllRunsRoute = '/v2/p/workflows/runs'
 // Definitions stored as rows (docs/workflows.md § Database definitions). Device-only on the node, so
@@ -44,13 +47,23 @@ type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message
 const post = <T>(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') =>
   writeJson<T>(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
+// A read addressed at one node rather than the active one. The attention inbox fans out over the
+// whole fleet, so its source must say which node it is asking (client-core registries/attention.ts).
+type At = { nodeId?: string; signal?: AbortSignal }
+
 export const workflowApi = {
   defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
   runs: (taskId: string) => readJson<WorkflowRunRow[]>(workflowRunsRoute(taskId)),
-  steps: (runId: string) => readJson<WorkflowStepRow[]>(workflowStepsRoute(runId)),
+  steps: (runId: string, at: At = {}) => readJson<WorkflowStepRow[]>(workflowStepsRoute(runId), at),
   gate: (runId: string, stepId: string, approved: boolean) => post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved }),
   cancel: (runId: string) => writeJson<{ ok: boolean }>(workflowCancelRoute(runId), { method: 'POST' }),
   kill: (runId: string, stepId: string) => post<{ ok: boolean }>(workflowKillRoute(runId), { stepId }),
+  // A failed or safety-railed node, back to pending, and the run back to running. Device-only on the
+  // node: a retry that an agent could ask for is a loop around the rail that stopped it.
+  retry: (runId: string, stepId: string, prompt?: string) =>
+    post<{ ok: boolean; error?: string }>(workflowRetryRoute(runId), { stepId, ...(prompt ? { prompt } : {}) }),
+  runForSession: (sessionId: string) =>
+    readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
   // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
   // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
   // is what lets it apply the repo trust snapshot to a committed file.
@@ -75,7 +88,7 @@ export const workflowApi = {
   providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
   // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
   // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
-  allRuns: () => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute),
+  allRuns: (at: At = {}) => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute, at),
   // A select field's own options, from the route its `describe` named. The host substitutes the two
   // placeholders and the contributing plugin answers `{ options }` (docs/workflows.md § Contributed
   // step kinds).

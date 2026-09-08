@@ -1,8 +1,21 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WorkflowNotice } from '../../infra/node/wsClient'
+
+// The socket, so `initWorkflowNotices` can be driven a frame at a time. Nothing else in this file
+// touches it, and deliver.ts imports exactly this one function from it.
+let onNotice: ((notice: WorkflowNotice) => void) | undefined
+vi.mock('../../infra/node/wsClient', () => ({
+  wsOnNotice: (cb: (notice: WorkflowNotice) => void) => {
+    onNotice = cb
+    return () => { onNotice = undefined }
+  },
+}))
+
 import {
-  HOLD_MS, defaultDeliveryContext, deliverNotice, observeAttention, registerNoticeSink, resetDelivery,
-  setHostFocused, systemSink, type DeliveryContext, type NoticeSink,
+  HOLD_MS, defaultDeliveryContext, deliverNotice, initWorkflowNotices, observeAttention,
+  registerNoticeSink, resetDelivery, setHostFocused, systemSink, type DeliveryContext,
+  type NoticeSink,
 } from './deliver'
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'
 import type { AttentionState, Snapshot } from './attention'
@@ -194,5 +207,34 @@ describe('the system channel', () => {
     deliverNotice({ taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 2 }, context)
     drop()
     expect(shown.map((r) => r.body)).toEqual(['Review & trust', undefined])
+  })
+})
+
+// A workflow notice names the run it came from, and that is what gives the bell row somewhere to go
+// (docs/notifications.md § What a row points at).
+describe('workflow notices', () => {
+  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
+    ({ taskId: 't1', kind: 'gate', title: 'a gate', ...over })
+
+  it('turns a run and a step into a workflow-run target', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ runId: 'run-1', stepId: 'step-2' }))
+    expect(notices()[0].target).toEqual({ kind: 'workflow-run', resourceId: 'run-1', subresourceId: 'step-2' })
+    stop()
+  })
+
+  it('names no step when the frame names none', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ kind: 'run-done', runId: 'run-1' }))
+    expect(notices()[0].target).toEqual({ kind: 'workflow-run', resourceId: 'run-1' })
+    stop()
+  })
+
+  it('keeps no target for a notice that is not about a run', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ kind: 'repo-config-trust', title: 'Repo configuration needs review', action: 'review-config' }))
+    expect(notices()[0].target).toBeUndefined()
+    expect(notices()[0].detail).toBe('Review & trust')
+    stop()
   })
 })

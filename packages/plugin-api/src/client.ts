@@ -29,7 +29,7 @@ export { openTarget } from '@acorn/client-core/features/notifications/notificati
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
+export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
 // A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.
@@ -64,6 +64,10 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/features/tabs/railMarkers.ts'
 export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell/schedules.ts'
+// Rows for the attention inbox (docs/notifications.md § What a row points at). The registry stays off
+// this surface; a plugin registers through `ctx.attentionSources`, which binds the source to its own
+// name. The types are here so a source that lives in its own file can say what it returns.
+export type { AttentionItem, AttentionSourceContribution } from '@acorn/client-core/host/registries/rail/attention.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/host/registries/panes/refPanels.ts'
 // The props a first-party reference panel receives. The registry value itself stays off this

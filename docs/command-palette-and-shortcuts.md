@@ -128,7 +128,7 @@ Each plugin's catalogue is short on purpose. The editor contributes quick-open a
 github a changed-file finder, a pull-request finder, create-a-pull-request and its rail source; agents
 the Agent Center, a session search, the two harness terminals and two settings; docker an open action
 and one search over containers, images, volumes and networks; terminal a run-target search, a layout
-search and a session search; workflows a definition search and a create action; database and http their groups of saved
+search and a session search; workflows a definition search, a run search and a create action; database and http their groups of saved
 rows and one submitted input each; linear and rollbar an issue search each; memory a search and the
 proposals view; notes a three-scope finder and a create-a-note input; changes, context and preview one
 open action each; and onboarding none. Each plugin's own document has the whole of its share under

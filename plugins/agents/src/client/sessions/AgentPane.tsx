@@ -1,10 +1,11 @@
-import { For, Show } from 'solid-js'
-import type { Task } from '@acorn/plugin-api/client'
+import { createResource, For, Show } from 'solid-js'
+import { clientCapability, openPane, type Task } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import {
-  Alert, Button, Card, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker, Stack,
-  Text, Toolbar,
+  Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker,
+  Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
+import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
@@ -24,9 +25,22 @@ import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } 
 // the scroll and takes what height is left, so the bar above it and the composer below it are pinned
 // by being its siblings rather than by a second set of regions (docs/panes.md § Layout model).
 
-/** The header bar: which session is open, what it is doing, and how to start another. */
-function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
+/** The header bar: which session is open, what it is doing, and how to start another.
+ *
+ *  Exported for its own test: the pane around it needs a snapshot, a composer and a transcript, and
+ *  the claim worth checking here is one chip. */
+export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  // A session a workflow started says so, and the chip opens the run that started it. The session row
+  // has carried `kind` and `workflowRunId` since the runtime wrote them; nothing read either until
+  // the run pane existed to open (docs/managed-agents.md § Sessions).
+  //
+  // Resolved per call, never captured: a node with workflows disabled answers `undefined` here, and
+  // the chip is simply absent.
+  const [workflow] = createResource(
+    () => (model.selected()?.kind === 'workflow' ? model.selected()?.id : undefined),
+    async (sessionId) => (await clientCapability(WORKFLOW_CONTROL)?.runForSession(sessionId)) ?? null,
+  )
   return (
     <Toolbar ariaLabel="Agent session">
       {/* The provider's mark, then the title, on one line. It used to be a "CLAUDE" eyebrow stacked
@@ -38,6 +52,20 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
         )}
       </Show>
       <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
+      <Show when={workflow()}>
+        {(found) => (
+          <Chip
+            leading={<Icon name="workflow" />}
+            onPress={() => openPane(props.task.id, 'workflows', {
+              kind: 'workflows:show-run',
+              runId: found().run.id,
+              stepId: found().step.id,
+            })}
+          >
+            {`Workflow: ${found().run.name} · ${found().step.name}`}
+          </Chip>
+        )}
+      </Show>
       {/* Right after the title, not after the session's controls: the title truncates, so a spacer
           further along the bar never gets any width and the state and the buttons end up crowding
           the last word of it. */}

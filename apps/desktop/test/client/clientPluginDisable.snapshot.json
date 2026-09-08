@@ -8,7 +8,8 @@
       "editor",
       "pr",
       "notes",
-      "preview"
+      "preview",
+      "workflows"
     ],
     "commands": [
       "task.terminal.new-claude",
@@ -33,6 +34,7 @@
       "terminal.run.layouts",
       "terminal.run.sessions",
       "workflows.run",
+      "workflows.runs.find",
       "workflows.new"
     ],
     "sources": [
@@ -83,7 +85,8 @@
       "acorn-terminals"
     ],
     "schedules": [
-      "docker.task-containers"
+      "docker.task-containers",
+      "workflows.task-runs"
     ],
     "railMarkers": [
       "agents",
@@ -102,7 +105,8 @@
     ],
     "attentionSources": [
       "agents.sessions",
-      "memory.proposals"
+      "memory.proposals",
+      "workflows.gates"
     ],
     "collections": [
       "agents:sessions",
@@ -258,8 +262,12 @@
       ]
     },
     "workflows": {
+      "panes": [
+        "workflows"
+      ],
       "commands": [
         "workflows.run",
+        "workflows.runs.find",
         "workflows.new"
       ],
       "sources": [
@@ -267,6 +275,12 @@
       ],
       "settingsPages": [
         "workflows"
+      ],
+      "schedules": [
+        "workflows.task-runs"
+      ],
+      "attentionSources": [
+        "workflows.gates"
       ]
     }
   }

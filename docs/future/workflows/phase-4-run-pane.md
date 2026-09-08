@@ -1,6 +1,19 @@
 # Phase 4: the run pane, and the links in both directions
 
-Status: not started. Waits on phase 0. Reads phase 3's list rendering when it exists.
+Status: SHIPPED 2026-09-08. [docs/workflows.md](../../workflows.md) § The run pane owns it now,
+[docs/notifications.md](../../notifications.md) § What a row points at owns the targets, and
+[docs/managed-agents.md](../../managed-agents.md) § Session model owns the chip.
+
+Three deviations from what is written below, each for a reason:
+
+- **No `run(runId)` on `WORKFLOW_CONTROL`.** Nothing needed it. The pane reads `runs(taskId)` and
+  already holds the task; `runForSession` answers the chip's question in one call.
+- **"Open in Agent pane" goes through `openPane` with a `plugin:select` intent**, not
+  `openManagedSession`, which lives in the agents plugin's own client half and is not on a contract.
+  The agents pane's intent listener turns that into the same selection.
+- **An agent node's last text comes from the step's `resultJson` only.** `managedAgentStore` is the
+  agents plugin's client store, and a plugin does not reach into another plugin's client. The button
+  to the Agent pane is one press away, and that is where the transcript is.
 
 ## Goal
 

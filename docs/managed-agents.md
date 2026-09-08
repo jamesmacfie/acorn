@@ -15,6 +15,13 @@ Session state changes and their event records are committed together. Once a tur
 events, a restart never silently resubmits it. Reconciliation marks interrupted work and leaves an
 explicit state for the owner to inspect.
 
+A session names what started it. `kind` is `interactive`, `workflow`, or `imported`, and a workflow
+session's `config` carries `workflowRunId` and `workflowStepId`. Both are read: the pane's header
+draws a chip, "Workflow: <name> · <step>", that opens the run pane at that node
+([workflows.md](./workflows.md) § The run pane), and the sidebar row for such a session carries the
+workflow glyph beside its provider mark. The names come from the workflows plugin's
+`WORKFLOW_CONTROL.runForSession`, so a node with workflows disabled simply draws no chip.
+
 A workspace-scoped list or search resolves the task ids first, through
 `CoreServices.tasks.idsForWorkspace()`, then narrows this plugin's own tables to those ids. An empty
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
@@ -147,7 +154,9 @@ be tested against what the harness actually sent.
 
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
 roster, with a header region of its own so the count stays put while the list scrolls; the detail
-column is the open session. Nothing in the plugin lays anything out and nothing in it ships a
+column is the open session. The roster is sessions and their subagents, and nothing else: it used to
+carry a third group merging this task's terminals with a run's workflow steps, and both halves have a
+better home — the terminal drawer, and the Workflows pane. Nothing in the plugin lays anything out and nothing in it ships a
 stylesheet: every surface here is a tree of kit nodes, so the same source draws in the shell today and
 through the remote root when a harness plugin is loaded rather than compiled
 (docs/ui-design.md § The closed kit).

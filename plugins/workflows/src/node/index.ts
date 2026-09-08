@@ -331,6 +331,15 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           return runner.retryStep(runId, stepId, prompt)
         },
+        // The chip the agent pane draws over a workflow session (docs/managed-agents.md § Sessions).
+        // Two indexed reads rather than a join, because the session row is in another plugin's
+        // database and this one only holds the id.
+        runForSession: async (sessionId) => {
+          const [step] = await store.select().from(workflowSteps).where(eq(workflowSteps.agentSessionId, sessionId)).limit(1)
+          if (!step) return null
+          const [run] = await store.select().from(workflowRuns).where(eq(workflowRuns.id, step.runId)).limit(1)
+          return run ? { run, step } : null
+        },
       })
 
       // The second store a definition can live in (docs/workflows.md § Database definitions). Every

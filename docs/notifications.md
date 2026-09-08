@@ -107,7 +107,16 @@ a terminal agent and a managed agent read the same way in the bell.
 A target is `{ kind, resourceId, subresourceId? }`, resolved through the handler table in
 `packages/client-core/src/features/notifications/notifications.ts`. The kind decides who answers, and
 each owner registers its own: the terminal plugin opens a drawer on a tab, the agents plugin opens a
-session in the Agent pane, and the memory plugin opens the Memory page on the proposal in question.
+session in the Agent pane, the workflows plugin opens the run pane at a node, and the memory plugin
+opens the Memory page on the proposal in question.
+
+The workflows one is `workflow-run`: `resourceId` is the run and `subresourceId` the node, and the
+handler opens the task's Workflows pane there ([workflows.md](./workflows.md) § The run pane). Every
+notice a run raises carries it, because the node sends the run and step ids on the notice frame. A
+gate is also an attention row — `warn`, so it stays until somebody answers it — with the same target
+and the id `workflow:gate:<stepId>`. A run that ends `failed` or `safety-rail` raises a `run-failed`
+notice; a run that ends well keeps its `run-done` one. An agent's permission question inside a run
+stays the agents plugin's row and opens the Agent pane, which is where the question is.
 
 Two kinds are core's, because what they open is not any plugin's:
 

@@ -1,7 +1,9 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
+  formatRelativeTime,
   localSearch,
+  openPane,
   setSelectedSource,
   type CommandExecutionContext,
   type CommandOutcome,
@@ -12,6 +14,7 @@ import { requestWorkflowStart } from './editor/startRequest'
 import { emptyDefinition } from './editor/draft'
 import { defRefKey } from './editor/draftStore'
 import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
+import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 
 // "Run a workflow", as one search over the definitions this task can run: the files its repository
 // commits, the user layer, and the rows the owner saved for this workspace
@@ -22,11 +25,9 @@ import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
 // frame is entered, and local filtering after that
 // (client-core/host/registries/commands/localSearch.ts).
 //
-// **What is not here, and why.** The catalogue also asked for "find an active or recent run and open
-// it". There is still nowhere to open one: the run pane is phase 4 of docs/future/workflows/, and a
-// search whose row cannot name where it goes is worse than no search
-// (docs/command-palette-and-shortcuts.md). Approving, cancelling and killing a run stay in the run
-// surface for the reason they always did.
+// Beside it, "Find a run": the same shape over this task's runs, opening each in the run pane
+// (./runs/paneContribution.ts). Approving, cancelling and killing a run stay in that pane, for the
+// reason they always did (docs/command-palette-and-shortcuts.md).
 
 /** A parse or cycle error from `.acorn/workflows/*.toml`, as a row.
  *
@@ -104,6 +105,36 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       }
       const result = await workflowApi.start(taskId, { defId })
       if (result.error) throw new Error(result.error)
+      return COMMAND_CLOSED
+    },
+  },
+  {
+    // Deferred until the run pane existed, because a row that cannot say where it goes is worse than
+    // no row. Task scope: a run belongs to a task, and the pane is that task's.
+    id: 'workflows.runs.find',
+    kind: 'search',
+    title: 'Find a run',
+    hint: 'a workflow run on this task',
+    keywords: ['workflow', 'run', 'history'],
+    category: 'action',
+    palette: true,
+    scope: 'task',
+    order: 325,
+    requires: { plugin: 'workflows' },
+    placeholder: 'Find a run…',
+    ...localSearch(async (context) => {
+      const runs = await workflowApi.runs(context.taskId ?? '')
+      return runs.map((run): CommandSearchItem => ({
+        id: `run:${run.id}`,
+        title: run.name,
+        subtitle: `${run.status} · ${formatRelativeTime(run.createdAt)}`,
+        ref: run.id,
+      }))
+    }),
+    select: (item, context): CommandOutcome => {
+      const taskId = context.taskId
+      if (!item.ref || !taskId) return COMMAND_CLOSED
+      openPane(taskId, WORKFLOWS_PANE_ID, { kind: 'workflows:show-run', runId: item.ref })
       return COMMAND_CLOSED
     },
   },

@@ -33,6 +33,9 @@ export type WorkflowBridge = {
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
   retry(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }>
+  // The run and step behind a managed agent session, for the chip the agent pane draws over one
+  // (docs/managed-agents.md § Sessions). `null` when the session was not started by a run.
+  runForSession(sessionId: string): Promise<{ run: unknown; step: unknown } | null>
   // Every run on this node, for the merged run list (@acorn/protocol/runs.ts). Node-wide by
   // construction; core filters it for a confined caller, so this must not.
   allRuns(): Promise<{ runs: unknown[] }>
@@ -116,6 +119,11 @@ export const workflow = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.retry(c.req.param('runId'), parsed.data.stepId, parsed.data.prompt))
   })
+  // Which run a managed agent session belongs to. Device-only: the answer names a run and a step on
+  // whatever task the session belongs to, and the caller is the agent pane's header, which is a
+  // device surface. An agent inside a run already knows its own run.
+  .get('/sessions/:sessionId/run', (c) =>
+    isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.runForSession(c.req.param('sessionId'))))
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Read by the node with no
   // client and no request in sight, through the plugin dispatcher, so it takes no params and answers
   // node-wide; `/v2/core/runs` applies the caller's confinement over the merged answer.
