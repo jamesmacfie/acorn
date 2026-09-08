@@ -1308,6 +1308,11 @@ a.ui-row:hover { background: var(--bg-hover); }
 .remote-tree { display: contents; }
 
 .ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
+/* `grow`: the stack IS the region. Same pair of values, and the same reason, as `.ui-graph` and
+   `textarea[data-grow]`: without a definite height nothing inside a stack can scroll, because a
+   flex column with an `auto` height is as tall as its content and its content is then as tall as
+   it likes. `min-height: 0` is the half that is easy to forget and the half that does the work. */
+.ui-stack[data-grow] { flex: 1; min-height: 0; }
 .ui-inline { display: flex; align-items: center; min-width: 0; gap: var(--kit-gap); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }
 

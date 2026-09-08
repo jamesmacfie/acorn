@@ -104,6 +104,14 @@ export function WorkflowsBrowseList() {
     }
   }
 
+  // The three ways into a definition: a mouse press on the row, and the collection's own select and
+  // activate for the keyboard. All of them come here, because a `Row` in a `Rows` has no click of its
+  // own unless it is given one (client-core kit/components/primitives.tsx § Row).
+  const open = (key: string): void => {
+    if (key.startsWith('problem:')) return
+    navigate(workflowsSurfacePath(scope.projectId(), key))
+  }
+
   const openRun = (runId: string): void => {
     const run = recent().find((entry) => entry.id === runId)
     const task = (tasks.data ?? []).find((entry) => entry.id === run?.taskId)
@@ -132,14 +140,8 @@ export function WorkflowsBrowseList() {
             ariaLabel="Workflows"
             items={items()}
             selected={scope.item() ?? null}
-            onSelect={(key) => {
-              if (key.startsWith('problem:')) return
-              navigate(workflowsSurfacePath(scope.projectId(), key))
-            }}
-            onActivate={(key) => {
-              if (key.startsWith('problem:')) return
-              navigate(workflowsSurfacePath(scope.projectId(), key))
-            }}
+            onSelect={open}
+            onActivate={open}
           >
             {(item, itemProps, selected) => (
               <Show
@@ -154,6 +156,7 @@ export function WorkflowsBrowseList() {
                   <Row
                     item={itemProps}
                     selected={selected()}
+                    onPress={() => open(item.key)}
                     title={definition().problems?.join(' ')}
                     meta={(
                       <Text emphasis="muted">
@@ -194,6 +197,7 @@ export function WorkflowsBrowseList() {
                 <Row
                   item={itemProps}
                   selected={selected()}
+                  onPress={() => openRun(run().id)}
                   leading={<Icon name={STATUS_GLYPH[run().status] ?? 'circle'} />}
                   meta={<Text emphasis="muted">{run().detail ?? run().status}</Text>}
                 >

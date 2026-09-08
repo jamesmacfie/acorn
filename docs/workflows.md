@@ -295,6 +295,12 @@ that parses and is a definition replaces the draft; one that does not leaves the
 was, keeps the text for correction, and says what is wrong. **Format** reprints what is in the box
 and **Revert** puts the draft's own projection back. Node positions are not in this document.
 
+The box is a real editor — highlighting, line numbers, bracket matching — through
+`mountEmbeddedEditor` on `@acorn/plugin-api/ui/editor`
+([editor.md](./editor.md) § A code box that is not a document), so this plugin holds no CodeMirror of
+its own. The terminal client draws the same rectangle as a plain textarea, since it has no library to
+draw one with.
+
 ### Saving
 
 **Save** writes the row at the revision it was read at. A stale revision answers 409 and the draft is

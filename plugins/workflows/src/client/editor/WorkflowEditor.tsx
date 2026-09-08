@@ -230,7 +230,12 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   )
 
   return (
-    <Stack gap="none">
+    // `grow`, because this stack is the pane: the header and the footer are pinned strips and the
+    // region between them is the split, which needs a height of its own before anything in it can
+    // scroll. Without it the stack was as tall as whatever the inspector held, so the node list ran
+    // off the bottom of the window with nothing to scroll, and the graph and the JSON box got
+    // whatever height the list's rows happened to give them.
+    <Stack gap="none" grow>
       {header}
       <Show when={store.message()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <Show when={askingRepo()}>
