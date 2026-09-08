@@ -37,11 +37,23 @@ export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent
   wsBroadcast({ channel: 'worktree:status-changed', ...event })
 }
 
-// Workflow gate / run-done notices for the renderer bell (docs/workflows.md); the memory-proposal
-// gate reuses the same channel.
-export function broadcastWorkflowNotice(taskId: string, kind: 'gate' | 'run-done', title: string): void {
-  wsBroadcast({ channel: 'workflow:notice', notice: { taskId, kind, title } })
+// Workflow gate / run-done / run-failed notices for the renderer bell (docs/workflows.md); the
+// memory-proposal gate reuses the same channel. `ref` is where the bell row goes when it is clicked:
+// the run pane, at that node. Absent for a notice that is not about a run.
+export function broadcastWorkflowNotice(
+  taskId: string,
+  kind: 'gate' | 'run-done' | 'run-failed',
+  title: string,
+  ref?: { runId: string; stepId?: string },
+): void {
+  wsBroadcast({ channel: 'workflow:notice', notice: { taskId, kind, title, ...ref } })
   broadcastStatus()
+}
+
+// One workflow step changed status. Per step, unlike the run-level `plugin:workflows:run-changed`:
+// the run pane moves a node's glyph from this instead of re-reading every step on every event.
+export function broadcastWorkflowStepChanged(runId: string, stepId: string, status: string): void {
+  wsBroadcast({ channel: 'workflow:step-changed', runId, stepId, status })
 }
 
 export function broadcastRepoConfigTrustNotice(taskId: string): void {

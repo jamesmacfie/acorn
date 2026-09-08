@@ -11,6 +11,7 @@ import type {
   ToolRisk,
   WorkflowBudget,
   WorkflowDef,
+  WorkflowInput,
   WorkflowStepDef,
 } from '../shared/workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
@@ -37,6 +38,7 @@ type RawWorkflow = {
   trigger?: string
   tools?: ToolCeiling
   budget?: WorkflowBudget
+  inputs?: WorkflowInput[]
   steps: RawStep[]
   source: 'repo' | 'user'
 }
@@ -62,6 +64,34 @@ function parseBudget(value: unknown): WorkflowBudget | undefined {
     maxTurns: number('max_turns'),
   }
   return Object.values(budget).some((item) => item != null) ? budget : undefined
+}
+
+function parseAfter(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((name): name is string => typeof name === 'string' && !!name.trim()).map((name) => name.trim())
+}
+
+function parseStringTable(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => typeof item === 'string')
+  return entries.length ? Object.fromEntries(entries as [string, string][]) : undefined
+}
+
+function parseInputs(value: unknown): WorkflowInput[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const inputs = value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const raw = item as Record<string, unknown>
+    const name = str(raw.name)
+    if (!name) return []
+    return [{
+      name,
+      description: str(raw.description),
+      ...(raw.required === true ? { required: true } : {}),
+      default: str(raw.default),
+    }]
+  })
+  return inputs.length ? inputs : undefined
 }
 
 function parseBranches(value: unknown): Record<string, string> | undefined {
@@ -104,9 +134,15 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
           budget: parseBudget((childRaw as Record<string, unknown>).budget),
         }
       : undefined
+  const isolation = str(o.isolation)
+  const inputsMode = str(o.inputs)
   return {
     name,
     kind,
+    after: parseAfter(o.after),
+    isolation: isolation === 'worktree' ? 'worktree' : isolation === 'shared' ? 'shared' : undefined,
+    inputs: inputsMode === 'append' || inputsMode === 'template' || inputsMode === 'none' ? inputsMode : undefined,
+    configOptions: parseStringTable(o.config_options),
     profileId: str(o.profile),
     model: str(o.model),
     prompt: str(o.prompt),
@@ -148,6 +184,7 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     trigger: str(doc.trigger),
     tools: parseTools(doc.tools),
     budget: parseBudget(doc.budget),
+    inputs: parseInputs(doc.inputs),
     steps,
     source,
   }
@@ -182,6 +219,9 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
         ...inner.map((s) => ({
           ...s,
           name: `${prefix}${s.name}`,
+          // An absent `after` still means "the step declared before me", which after a linear
+          // expansion is the previous inner step, or the step before the reference for the first one.
+          after: s.after?.map((name) => `${prefix}${name}`),
           joins: s.joins ? `${prefix}${s.joins}` : undefined,
           branches: s.branches ? Object.fromEntries(Object.entries(s.branches).map(([verdict, targetName]) => [verdict, `${prefix}${targetName}`])) : undefined,
           prompt: s.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`),
@@ -204,6 +244,7 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
         trigger: w.trigger,
         tools: w.tools,
         budget: w.budget,
+        inputs: w.inputs,
         steps,
         source: w.source,
       }

@@ -38,6 +38,7 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   gate: async () => ({ ok: true }),
   cancel: async () => ({ ok: true }),
   kill: async () => ({ ok: true }),
+  retry: async () => ({ ok: true }),
   allRuns: async () => ({ runs: [] }),
   ...over,
 })
@@ -87,6 +88,29 @@ describe('workflow routes', () => {
     expect((await app.fetch(req('/api/workflows/runs/run1/kill', 'POST', {}), {} as Env)).status).toBe(400)
   })
 
+  it('carries the start body\'s inputs to the runner and refuses a value that is not a string', async () => {
+    let seen: unknown = 'unset'
+    setWorkflowBridge(fake({ start: async (_t, _def, inputs) => ((seen = inputs), { runId: 'run1' }) }))
+    const app = authed()
+    const def = { name: 'W', steps: [{ name: 's1' }] }
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, inputs: { issue: 'It crashes' } }), {} as Env)).status).toBe(200)
+    expect(seen).toEqual({ issue: 'It crashes' })
+    // Absent is not the same as empty: which names are allowed is the runner's answer, not the route's.
+    await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def }), {} as Env)
+    expect(seen).toBeUndefined()
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, inputs: { issue: 12 } }), {} as Env)).status).toBe(400)
+  })
+
+  it('retries a failed step, and 400s a retry with no stepId', async () => {
+    let retried: unknown = null
+    setWorkflowBridge(fake({ retry: async (runId, stepId, prompt) => ((retried = { runId, stepId, prompt }), { ok: true }) }))
+    const app = authed()
+    const res = await app.fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 'step1', prompt: 'Again.' }), {} as Env)
+    expect(res.status).toBe(200)
+    expect(retried).toEqual({ runId: 'run1', stepId: 'step1', prompt: 'Again.' })
+    expect((await app.fetch(req('/api/workflows/runs/run1/retry', 'POST', {}), {} as Env)).status).toBe(400)
+  })
+
   it('401s without a principal; 503s without a bridge', async () => {
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api', workflow)
     expect((await gated.fetch(req('/api/tasks/task1/workflows'), {} as Env)).status).toBe(401)
@@ -119,6 +143,16 @@ describe('a task-scoped credential is confined to its own runs', () => {
     // Its own run still works.
     expect((await app.fetch(req('/api/workflows/runs/run1/cancel', 'POST'), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['cancel:run1'])
+  })
+
+  // Retry is the one run action a confined caller may not take, even on its own run: an agent could
+  // otherwise loop a failed step straight past the rail that stopped it.
+  it('cannot retry even its own run', async () => {
+    const calls: string[] = []
+    setWorkflowBridge(fake({ retry: async (runId) => (calls.push(`retry:${runId}`), { ok: true }) }))
+    const res = await asTask1().fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 's' }), {} as Env)
+    expect(res.status).toBe(403)
+    expect(calls).toEqual([])
   })
 
   it('still answers 503 rather than 404 when the runner is not wired', async () => {

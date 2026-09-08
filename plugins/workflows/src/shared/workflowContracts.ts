@@ -25,9 +25,33 @@ export type WorkflowChildStepDef = {
   budget?: WorkflowBudget
 }
 
+// A value the person starting the run supplies. `${inputs.<name>}` reaches it from a prompt, a child
+// prompt, and any string inside `with` (docs/workflows.md § Execution model). A run freezes the
+// values it started with into its own copy of the definition, so `default` on a frozen run reads as
+// "what this run was given".
+export type WorkflowInput = {
+  name: string
+  description?: string
+  required?: boolean
+  default?: string
+}
+
 export type WorkflowStepDef = {
   name: string
   kind?: string
+  // The steps this one waits on, by name. Absent means the step declared before it; an empty list
+  // means a root. Edges are derived from this and never stored, so a file written before the graph
+  // existed still runs as the chain it always was.
+  after?: string[]
+  // Agent kinds only. 'worktree' gives the step a child task with a checkout of its own; 'shared'
+  // runs it on the run's task beside its siblings.
+  isolation?: 'shared' | 'worktree'
+  // Agent kinds only. 'append' puts every incoming edge's output under a heading after the prompt,
+  // 'template' expects the prompt to place `${steps.x.output}` itself, 'none' sends the prompt alone.
+  inputs?: 'append' | 'template' | 'none'
+  // Agent kinds only. A provider option id to the value the step wants, as the provider advertises
+  // them (`model`, `reasoning`, and whatever else its descriptor lists).
+  configOptions?: Record<string, string>
   profileId?: string
   model?: string
   prompt?: string
@@ -53,6 +77,7 @@ export type WorkflowDef = {
   trigger?: string
   tools?: ToolCeiling
   budget?: WorkflowBudget
+  inputs?: WorkflowInput[]
   steps: WorkflowStepDef[]
 }
 
@@ -72,6 +97,13 @@ export type StepHandlerContext = {
   tools: ToolCeiling
   budget: WorkflowBudget
   signal: AbortSignal
+  // The values this run started with, by declared input name. `${inputs.<name>}` in the prompt is
+  // already substituted; a handler needs these only to render something of its own, as fan-out does
+  // for its child prompt.
+  inputs: Readonly<Record<string, string>>
+  // The outputs of this step's incoming edges, in `after` order, already rendered the way
+  // `${steps.<name>.output}` would render them. Only steps that finished `done` appear.
+  upstream: readonly { name: string; output: string }[]
   emit(event: WorkflowStepEvent): void
 }
 
@@ -101,6 +133,10 @@ export type StepValidationContext = {
   indexes: ReadonlyMap<string, number>
   stepAt(name: string): WorkflowStepDef | undefined
   policies: ReadonlySet<string>
+  /** The steps this one waits on, with the "absent means the previous step" rule already applied. */
+  after(name: string): readonly string[]
+  /** Whether `candidate` runs before `step` on every path, meaning it is a transitive predecessor. */
+  precedes(candidate: string, step: string): boolean
 }
 export type StepValidator = (step: WorkflowStepDef, context: StepValidationContext) => string[]
 export type StepKindContribution = { handler: StepHandler; validate?: StepValidator }

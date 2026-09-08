@@ -13,6 +13,12 @@ export type AgentSessionExecuteRequest = {
   prompt: string
   schema?: object
   model?: string
+  // Provider option ids to the values this turn wants, as the provider advertises them (`model`,
+  // `reasoning`, and whatever else its descriptor lists). Applied to the session after the provider
+  // reports its option list and before the turn is enqueued, because that list is the only thing a
+  // value can be validated against. A value the provider does not offer is dropped with a diagnostic
+  // rather than failing the step.
+  configOptions?: Record<string, string>
   tools?: ToolCeiling
   timeoutMs?: number
   // Reuse an existing managed session rather than creating one. Validated by the provider against

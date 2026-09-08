@@ -12,8 +12,10 @@ import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 // The one other consumer is the memory-proposal gate (plugins/memory), which raises a `'gate'` notice
 // of its own when proposals are waiting for review.
 export type WorkflowNotices = {
-  // A bell row against a task. `kind` decides the copy and the row's action on the client side.
-  notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
+  // A bell row against a task. `kind` decides the copy and the row's action on the client side, and
+  // `ref` is where the row goes when it is clicked: the run pane, at that node. Absent for a notice
+  // that is not about a run, which is how plugins/memory's proposal gate uses this.
+  notice(taskId: string, kind: 'gate' | 'run-done' | 'run-failed', title: string, ref?: { runId: string; stepId?: string }): void
   // One step's progress, for a run panel that is open. Fire-and-forget: a client that is not watching
   // re-reads the run when it opens it.
   stepEvent(runId: string, stepId: string, event: unknown): void

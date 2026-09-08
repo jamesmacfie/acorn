@@ -71,7 +71,17 @@ export type WorkflowDefSummary = {
   name: string
   source: 'repo' | 'user'
   posture?: 'gated' | 'autonomous'
-  steps: { name: string; kind?: string }[]
+  inputs?: WorkflowInput[]
+  steps: { name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+}
+
+// A value a run is started with. The palette asks for one before it starts a definition that declares
+// any, and the editor lists them (docs/workflows.md § Execution model).
+export type WorkflowInput = {
+  name: string
+  description?: string
+  required?: boolean
+  default?: string
 }
 
 export type WorkflowRunRow = {

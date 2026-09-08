@@ -15,12 +15,13 @@ export type WorkflowBridge = {
   // enumerated.
   taskIdForRun(runId: string): Promise<string | null>
   defs(taskId: string): Promise<unknown> // { workflows, errors }
-  start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
+  start(taskId: string, def: unknown, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<unknown[]>
   steps(runId: string): Promise<unknown[]>
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
+  retry(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }>
   // Every run on this node, for the merged run list (@acorn/protocol/runs.ts). Node-wide by
   // construction; core filters it for a confined caller, so this must not.
   allRuns(): Promise<{ runs: unknown[] }>
@@ -33,9 +34,15 @@ export const setWorkflowBridge = (bridge: WorkflowBridge | null): void => setRou
 // start executes an agent CLI, gate resumes one; both get validated bodies (the privileged-boundary
 // contract). The def shape is validated structurally (name + steps[]); the runner re-checks the
 // rest.
-const startBody = z.object({ def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough() })
+const startBody = z.object({
+  def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough(),
+  // Values for the definition's declared inputs. Which names are allowed and which are required is
+  // the runner's answer, because only the definition knows.
+  inputs: z.record(z.string(), z.string()).optional(),
+})
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
+const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
 
 // The task-scoped half of this router (/tasks/:id/...) inherits core's mounted requireTaskScope. The
 // run-scoped half does not, because the task is not in the path. Same shape as terminal's and
@@ -58,7 +65,7 @@ export const workflow = new Hono<AppEnv>()
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), parsed.data.def))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), parsed.data.def, parsed.data.inputs))
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
@@ -72,6 +79,14 @@ export const workflow = new Hono<AppEnv>()
     const parsed = killBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
+  })
+  // Retry is a device action. A task-confined caller — an agent inside the run — is refused, because
+  // it could otherwise loop a failed step past the rail that stopped it.
+  .post('/workflows/runs/:runId/retry', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
+    const parsed = retryBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.retry(c.req.param('runId'), parsed.data.stepId, parsed.data.prompt))
   })
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Read by the node with no
   // client and no request in sight, through the plugin dispatcher, so it takes no params and answers

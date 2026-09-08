@@ -14,6 +14,80 @@ Runs and steps persist state transitions. A restart reconciles persisted operati
 blindly repeats an external side effect with unknown outcome. Ambiguous work parks in an explicit
 recovery/gated state. Cancellation propagates to child sessions and process groups.
 
+### The graph
+
+A step declares `after`, the names of the steps it waits on. A step with no `after` key waits on the
+step declared before it, and `after = []` makes it a root. Edges are derived from that and never
+stored, so a file written as a plain list still runs as the chain it always was.
+
+The runner keeps one rule: a step is ready when every step in its `after` is `done`. Every ready step
+starts at once, up to the four-slot headless semaphore fan-out children already queue on. A step that
+ended `skipped` counts as done for readiness, because a skip is how a branch is not taken and the
+step after the decision still has to run. `idx` is the declaration order and nothing but the row
+insert reads it.
+
+A `decide` step's `branches` map a verdict to a step name, and each target must have the deciding
+step among its predecessors. When the verdict picks one target, every other target is marked
+`skipped`, and so is every step whose only path back to a root runs through a skipped step. A step
+that a taken branch also reaches stays pending and runs when its live predecessors finish.
+
+Validation follows the graph rather than the list. `${steps.<name>.output}` must name a transitive
+predecessor, because two roots are not ordered and a step beside this one may well have run first and
+still be the wrong thing to read. A cycle is refused and the error names it, as `a → b → a`.
+
+### Inputs
+
+A definition declares `[[inputs]]`, each with a `name`, an optional `description`, `required`, and
+`default`. A run starts with a value per input. The start route refuses a run that misses a required
+input with no default, and refuses a value for a name the definition does not declare.
+
+`${inputs.<name>}` renders wherever `${steps.<name>.output}` renders: a prompt, a child prompt, and
+every string value inside `[steps.with]`, one level deep. A contributed kind receives its `with`
+already rendered, so a step handler sees the substituted command and never the template. A run
+freezes the values it started with into its own copy of the definition, so the definition a finished
+run shows says what it was given.
+
+### What an agent step sees
+
+An agent step takes `inputs = "append" | "template" | "none"`, default `append`. With `append`, the
+runner renders the prompt and then adds one `## Output of <name>` block per incoming edge whose step
+finished `done`, in `after` order. With `template`, nothing is added and the prompt places its own
+`${steps.<name>.output}` references. With `none`, the step sees only its prompt. The handoff context
+rides along in every mode, because that is a separate thing from the graph's edges.
+
+An agent step also takes `config_options`, a table of provider option ids to values as the provider
+advertises them, such as `model` and `reasoning`. The runner hands them to the agents plugin, which
+applies them to the session after the provider reports its option list and before the turn is
+enqueued. A value the provider does not offer is dropped and recorded in the transcript rather than
+failing the step. Where a step sets both `model` and `config_options.model`, validation refuses the
+file.
+
+### Isolation
+
+An agent step with `isolation = "worktree"` runs on a child task with a checkout of its own, created
+through `CoreServices.tasks.createChild()` with a branch derived from the run name and the step name.
+The child task id lands in the step's `inputs_json`, the same field fan-out children use, so
+cancelling the run reaches it. The default, `shared`, runs the step on the run's own task beside its
+siblings. Two investigators reading the same checkout do not need a worktree each, and paying for one
+is what made fan-out feel heavy.
+
+### Retry
+
+`POST /v2/p/workflows/workflows/runs/:runId/retry` takes a `stepId` and an optional `prompt`. The run
+must be `failed` or at a safety rail, and so must the step. The step goes back to `pending` with its
+error cleared and its iteration count kept, every skipped step that only the retried step could reach
+comes back with it, and the run returns to `running`. A step with a managed session reuses it, so a
+retry with an edited prompt is another turn in the session the owner is already watching.
+
+An edited prompt patches the run's frozen definition for that step alone. The original is kept in the
+step's `inputs_json` as `originalPrompt`, so the record of what was first asked survives the re-run.
+
+Retry is a device action. A task-confined caller, meaning an agent inside the run, gets a 403,
+because it could otherwise loop a failed step past the rail that stopped it. The budget rule holds
+either way: a retry's usage adds to the run's persisted sum and the same rail fires again.
+
+### Fan-out, and where a file comes from
+
 A step that fans out into parallel branches creates each branch as a child task under the workflow's
 own task, through `CoreServices.tasks.createChild()`. `resolveCwd()` creates the child's worktree
 lazily, when its first step runs, the same path every other task-worktree consumer takes. Cancelling
@@ -26,7 +100,9 @@ Workflow files load from the repo checkout or worktree and layer over `~/.acorn/
 way `config.toml` layers repo before user, so a repo-defined id wins over a user one. A step can
 reference another workflow by id. The reference expands inline, one level of nesting, and a chain
 that revisits an id is rejected as a cycle rather than followed into a hang. A malformed file
-surfaces as an error row instead of being skipped silently.
+surfaces as an error row instead of being skipped silently. A sub-workflow's steps are prefixed with
+its id, and so are the `after` and `joins` names inside it, so an expanded block keeps its own shape
+inside the outer graph.
 
 ## Limits and capabilities
 
@@ -135,9 +211,10 @@ remain executable actions and are trust-checked.
 ## Gaps
 
 Authoring is file-based. The desktop must be open for UI interaction, although the node continues
-work while the renderer is closed — including the trigger sweep, which moved onto the node's own
-scheduler. There is no general DAG
-editor, and no automatic retry of an operation whose external outcome is unknown.
+work while the renderer is closed, including the trigger sweep, which moved onto the node's own
+scheduler. There is no general DAG editor. A failed node is retried by hand through the retry route;
+an operation whose external outcome is unknown is never retried on its own, because acorn cannot tell
+a side effect that landed from one that did not.
 
 An agent cannot start or drive a run: no workflow or session tool is registered, so orchestration is
 declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an

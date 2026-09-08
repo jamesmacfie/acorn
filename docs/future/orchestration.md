@@ -201,16 +201,21 @@ Two things fell out that this file did not anticipate:
 
 ## What this does not build
 
-**A DAG editor.** The declarative half covers fixed pipelines and the agent-driven half covers dynamic
-ones. A visual editor serves neither, and `docs/workflows.md` already names its absence as a current
-limit rather than a gap.
+**A DAG editor.** ~~The declarative half covers fixed pipelines and the agent-driven half covers
+dynamic ones. A visual editor serves neither, and `docs/workflows.md` already names its absence as a
+current limit rather than a gap.~~ **Reversed** by
+[docs/future/workflows/](./workflows/README.md). The argument above weighed an agent driving agents.
+It did not weigh a person authoring a workflow in the UI, which is what that folder builds.
 
 **Cross-task MCP scope.** Widening `AgentToolContribution.scope` past `task` is a security change
 bought for a convenience. The ledger gets the same result without touching the boundary.
 
-**A workflows pane.** Tempting, but the Agents sidebar already merges sessions with workflow steps, and
-an implicit run makes agent-driven work appear there with no new surface. Revisit only if reading a run
-turns out to need more than a roster.
+**A workflows pane.** ~~Tempting, but the Agents sidebar already merges sessions with workflow steps,
+and an implicit run makes agent-driven work appear there with no new surface. Revisit only if reading
+a run turns out to need more than a roster.~~ **Reversed** by
+[docs/future/workflows/](./workflows/README.md). Reading a run does need more than a roster: the
+sidebar keys selection on a managed-session id a workflow step does not have, and opening a step row
+spawns a terminal instead of showing what the step is doing.
 
 ## Suggested phasing
 
@@ -224,7 +229,8 @@ turns out to need more than a roster.
 7. Surface `tasks.parentId` in the task list, so a spawned child stops looking unrelated.
 8. ~~`registerStepKind` on `WORKFLOWS_RUNNER`, then the `http` step in the HTTP plugin.~~ **Done**,
    through node extension points rather than the capability — see above for why.
-9. `workflow_defs` as database truth, merged under the repo layer.
+9. ~~`workflow_defs` as database truth, merged under the repo layer.~~ Moved to
+   [docs/future/workflows/](./workflows/README.md) as its phase 2.
 
 Steps 1 through 5 are the herdr experience. Everything after is acorn keeping the durability it
 already has.

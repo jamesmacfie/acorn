@@ -6,6 +6,9 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'error', glyph: 'x', severity: 'danger', toast: true },
   { id: 'gate', glyph: 'ban', severity: 'warn', toast: true },
   { id: 'run-done', glyph: 'play', severity: 'info', toast: true },
+  // A run that ended `failed` or at a safety rail. Its own kind rather than `error`, so the bell says
+  // which workflow stopped and the row can point at the node that stopped it.
+  { id: 'run-failed', glyph: 'triangle-alert', severity: 'danger', toast: true },
   { id: 'background-error', glyph: 'triangle-alert', severity: 'danger', toast: false },
   { id: 'repo-config-trust', glyph: 'triangle-alert', severity: 'warn', toast: true },
   // An agent asked for a plugin to be installed, updated or removed (docs/plugins.md §

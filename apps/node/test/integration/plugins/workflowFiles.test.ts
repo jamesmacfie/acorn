@@ -191,9 +191,9 @@ allow = ["read_tool", "write_tool"]
     expect(workflows).toEqual([])
     const messages = errors.map((error) => error.message).join('\n')
     expect(messages).toContain("dangling join 'missing-plan'")
-    expect(messages).toContain("backward target 'earlier'")
+    expect(messages).toContain("target 'earlier' does not wait on step 'route'")
     expect(messages).toContain("invalid target 'missing'")
-    expect(messages).toContain("forward template reference 'later'")
+    expect(messages).toContain("references 'later', which is not one of its predecessors")
     expect(messages).toContain('tool ceiling widens the workflow ceiling')
   })
 
@@ -302,6 +302,102 @@ name = "build"
     const messages = invalid.errors.map((error) => error.message).join('\n')
     expect(messages).toContain("step 'build' budget widens the workflow budget")
     expect(messages).toContain('maxTurns must be an integer')
+  })
+
+  it('parses the graph keys: inputs, after, isolation, the inputs mode, and config options', () => {
+    writeWf(repoDir, 'graph', `
+name = "graph"
+
+[[inputs]]
+name = "issue"
+description = "The bug report, as the tracker shows it"
+required = true
+
+[[inputs]]
+name = "focus"
+default = "anything"
+
+[[steps]]
+name = "reproduce"
+after = []
+prompt = "Reproduce: \${inputs.issue}"
+
+[[steps]]
+name = "history"
+after = []
+prompt = "What changed lately?"
+
+[[steps]]
+name = "synthesise"
+after = ["reproduce", "history"]
+inputs = "append"
+isolation = "worktree"
+config_options = { model = "claude-opus-5", reasoning = "high" }
+prompt = "Write one explanation."
+`)
+    const { workflows, errors } = loadWorkflowFiles(repoDir, null)
+    expect(errors).toEqual([])
+    const graph = workflows[0]!
+    expect(graph.inputs).toEqual([
+      { name: 'issue', description: 'The bug report, as the tracker shows it', required: true, default: undefined },
+      { name: 'focus', description: undefined, default: 'anything' },
+    ])
+    expect(graph.steps.map((step) => step.after)).toEqual([[], [], ['reproduce', 'history']])
+    expect(graph.steps[2]).toMatchObject({
+      isolation: 'worktree',
+      inputs: 'append',
+      configOptions: { model: 'claude-opus-5', reasoning: 'high' },
+    })
+  })
+
+  it('leaves a file written before the graph byte-identical once serialised', () => {
+    // What `workflow_runs.def_json` freezes. Every key this phase added is absent, so it must not
+    // appear in the JSON of a definition that names none of them.
+    writeWf(repoDir, 'classic', `
+name = "classic"
+posture = "gated"
+
+[[steps]]
+name = "build"
+prompt = "Build the feature."
+
+[[steps]]
+name = "ship?"
+kind = "gate-human"
+`)
+    const { workflows } = loadWorkflowFiles(repoDir, null)
+    expect(JSON.stringify(workflows[0])).toBe(
+      '{"id":"classic","name":"classic","posture":"gated","steps":[{"name":"build","kind":"agent","prompt":"Build the feature."},{"name":"ship?","kind":"gate-human"}],"source":"repo"}',
+    )
+  })
+
+  it('prefixes an expanded sub-workflow\'s after entries the way it prefixes joins', () => {
+    writeWf(repoDir, 'pair', `
+[[steps]]
+name = "left"
+after = []
+prompt = "Left."
+[[steps]]
+name = "right"
+after = ["left"]
+prompt = "Right."
+`)
+    writeWf(repoDir, 'outer', `
+[[steps]]
+name = "build"
+prompt = "Build."
+[[steps]]
+workflow = "pair"
+`)
+    const { workflows, errors } = loadWorkflowFiles(repoDir, null)
+    expect(errors).toEqual([])
+    const outer = workflows.find((workflow) => workflow.id === 'outer')!
+    expect(outer.steps.map((step) => [step.name, step.after])).toEqual([
+      ['build', undefined],
+      // An explicit root inside the block stays a root; the reference to `left` is prefixed with it.
+      ['pair:left', []],
+      ['pair:right', ['pair:left']],
+    ])
   })
 
   it('read-normalizes a frozen pre-Phase-8 implicit join without weakening new-file validation', () => {

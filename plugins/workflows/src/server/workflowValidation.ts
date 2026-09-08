@@ -9,6 +9,66 @@ import { intersectToolCeilings, narrowsToolCeiling } from './workflowTools'
 
 const TEMPLATE_RE = /\$\{steps\.([^}]+)\.output\}/g
 const STEP_TEMPLATE_TOKEN_RE = /\$\{steps\.[^}]*\}/g
+const INPUT_RE = /\$\{inputs\.([^}]+)\}/g
+const INPUT_TOKEN_RE = /\$\{inputs\.[^}]*\}/g
+const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
+
+/** The kinds that run an agent, and so may carry `isolation`, `inputs` and `configOptions`. A
+ *  contributed kind joins this list in phase 1, through the `runsAgent` flag on its description. */
+export const AGENT_STEP_KINDS = new Set(['agent', 'ci-loop', 'fan-out', 'decide'])
+
+/**
+ * The edges, derived and never stored. A step with an `after` list waits on exactly those steps; a
+ * step without one waits on the step declared before it, which is what a plain list always meant.
+ * `after = []` is an explicit root.
+ */
+export function workflowEdges(steps: readonly WorkflowStepDef[]): Map<string, string[]> {
+  const edges = new Map<string, string[]>()
+  steps.forEach((step, index) => {
+    const previous = index > 0 ? steps[index - 1]?.name : undefined
+    edges.set(step.name, step.after ?? (previous ? [previous] : []))
+  })
+  return edges
+}
+
+/** Every transitive predecessor of `name`, or `null` when the walk meets a cycle. */
+function ancestors(edges: ReadonlyMap<string, string[]>, name: string): Set<string> | null {
+  const seen = new Set<string>()
+  const stack = [...(edges.get(name) ?? [])]
+  while (stack.length) {
+    const current = stack.pop()!
+    if (current === name) return null
+    if (seen.has(current)) continue
+    seen.add(current)
+    stack.push(...(edges.get(current) ?? []))
+  }
+  return seen
+}
+
+/** The first cycle the graph holds, named the way the error reads: `a → b → a`. */
+function findCycle(edges: ReadonlyMap<string, string[]>): string[] | null {
+  const state = new Map<string, 'open' | 'closed'>()
+  const path: string[] = []
+  const walk = (name: string): string[] | null => {
+    const seen = state.get(name)
+    if (seen === 'closed') return null
+    if (seen === 'open') return [...path.slice(path.indexOf(name)), name]
+    state.set(name, 'open')
+    path.push(name)
+    for (const next of edges.get(name) ?? []) {
+      const cycle = walk(next)
+      if (cycle) return cycle
+    }
+    path.pop()
+    state.set(name, 'closed')
+    return null
+  }
+  for (const name of edges.keys()) {
+    const cycle = walk(name)
+    if (cycle) return cycle
+  }
+  return null
+}
 
 export type WorkflowValidationCatalog = {
   stepKinds: ReadonlySet<string>
@@ -31,9 +91,23 @@ export function templateReferences(prompt: string | undefined): string[] {
   return [...prompt.matchAll(TEMPLATE_RE)].map((match) => match[1])
 }
 
+export function inputReferences(prompt: string | undefined): string[] {
+  if (!prompt) return []
+  return [...prompt.matchAll(INPUT_RE)].map((match) => match[1])
+}
+
 function invalidTemplateExpressions(prompt: string | undefined): string[] {
   if (!prompt) return []
-  return (prompt.match(STEP_TEMPLATE_TOKEN_RE) ?? []).filter((token) => !/^\$\{steps\.[^}]+\.output\}$/.test(token))
+  return [
+    ...(prompt.match(STEP_TEMPLATE_TOKEN_RE) ?? []).filter((token) => !/^\$\{steps\.[^}]+\.output\}$/.test(token)),
+    ...(prompt.match(INPUT_TOKEN_RE) ?? []).filter((token) => !/^\$\{inputs\.[^}]+\}$/.test(token)),
+  ]
+}
+
+/** Every string a definition may hold a reference in: the prompt, the child prompt, and one level of
+ *  `with`. Anywhere else, a `${...}` is just text. */
+function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
+  return [step.prompt, step.childStep?.prompt, ...Object.values(step.with ?? {}).filter((value): value is string => typeof value === 'string')]
 }
 
 const BUDGET_FIELDS: Array<keyof WorkflowBudget> = [
@@ -82,6 +156,31 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     return index == null ? undefined : def.steps[index]
   }
 
+  const declaredInputs = new Set<string>()
+  for (const [index, input] of (def.inputs ?? []).entries()) {
+    const name = input?.name ?? ''
+    if (!INPUT_NAME_RE.test(name)) errors.push(`input ${index + 1} has an invalid name '${name}'`)
+    else if (declaredInputs.has(name)) errors.push(`input '${name}' is declared more than once`)
+    else declaredInputs.add(name)
+  }
+
+  // The graph. `after` is checked before the cycle walk, because a dangling name would send the walk
+  // looking for a step that is not there.
+  for (const step of def.steps) {
+    for (const name of step.after ?? []) {
+      if (name === step.name) errors.push(`step '${step.name}' waits on itself`)
+      else if (!indexes.has(name)) errors.push(`step '${step.name}' waits on unknown step '${name}'`)
+    }
+  }
+  const edges = workflowEdges(def.steps)
+  const cycle = errors.length ? null : findCycle(edges)
+  if (cycle) errors.push(`workflow '${def.name}' has a cycle: ${cycle.join(' → ')}`)
+  const predecessors = new Map<string, Set<string>>(
+    def.steps.map((step) => [step.name, (cycle ? null : ancestors(edges, step.name)) ?? new Set<string>()]),
+  )
+  const after = (name: string): readonly string[] => edges.get(name) ?? []
+  const precedes = (candidate: string, step: string): boolean => predecessors.get(step)?.has(candidate) ?? false
+
   for (const [index, step] of def.steps.entries()) {
     const kind = step.kind ?? 'agent'
     const label = `step '${step.name || index + 1}'`
@@ -115,14 +214,26 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (step.childStep?.profileId && !catalog.profiles.has(step.childStep.profileId)) {
       errors.push(`${label} child names unknown profile '${step.childStep.profileId}'`)
     }
-    errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies }) ?? []))
-    for (const expression of [...invalidTemplateExpressions(step.prompt), ...invalidTemplateExpressions(step.childStep?.prompt)]) {
+    errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }) ?? []))
+    if (!AGENT_STEP_KINDS.has(kind)) {
+      for (const field of ['isolation', 'inputs', 'configOptions'] as const) {
+        if (step[field] != null) errors.push(`${label} is a '${kind}' step, which cannot take ${field}`)
+      }
+    } else if (step.model && step.configOptions?.model) {
+      errors.push(`${label} sets both model and config_options.model; config_options wins, so drop one`)
+    }
+    const strings = templatedStrings(step)
+    for (const expression of strings.flatMap(invalidTemplateExpressions)) {
       errors.push(`${label} has invalid template expression '${expression}'`)
     }
-    for (const reference of [...templateReferences(step.prompt), ...templateReferences(step.childStep?.prompt)]) {
-      const targetIndex = indexes.get(reference)
-      if (targetIndex == null) errors.push(`${label} has invalid template reference '${reference}'`)
-      else if (targetIndex >= index) errors.push(`${label} has forward template reference '${reference}'`)
+    for (const reference of strings.flatMap(templateReferences)) {
+      // A transitive predecessor, not "declared earlier": two roots are not ordered, so a step
+      // beside this one may well have run first and still be the wrong thing to read.
+      if (!indexes.has(reference)) errors.push(`${label} has invalid template reference '${reference}'`)
+      else if (!precedes(reference, step.name)) errors.push(`${label} references '${reference}', which is not one of its predecessors`)
+    }
+    for (const reference of strings.flatMap(inputReferences)) {
+      if (!declaredInputs.has(reference)) errors.push(`${label} references undeclared input '${reference}'`)
     }
   }
   return errors
@@ -144,20 +255,74 @@ export function normalizePersistedWorkflow(def: WorkflowDef): WorkflowDef {
   return { ...def, steps }
 }
 
-export function renderWorkflowPrompt(prompt: string | undefined, rows: { name: string; status: string; structuredJson: string | null; resultJson: string | null }[]): string {
-  return (prompt ?? '').replace(TEMPLATE_RE, (_match, name: string) => {
-    const row = rows.find((candidate) => candidate.name === name)
-    if (!row) throw new WorkflowValidationError([`invalid template reference '${name}'`])
-    if (row.status !== 'done') throw new WorkflowValidationError([`template reference '${name}' points to a ${row.status} step`])
-    if (row.structuredJson) return row.structuredJson
-    if (row.resultJson) {
-      try {
-        const result = JSON.parse(row.resultJson) as { result?: unknown }
-        return typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? result)
-      } catch {
-        return row.resultJson
-      }
-    }
-    return ''
-  })
+export type WorkflowStepOutputRow = { name: string; status: string; structuredJson: string | null; resultJson: string | null }
+
+/** What `${steps.<name>.output}` stands for: the structured JSON if the step produced one, its final
+ *  text otherwise. */
+export function stepOutput(row: WorkflowStepOutputRow): string {
+  if (row.structuredJson) return row.structuredJson
+  if (!row.resultJson) return ''
+  try {
+    const result = JSON.parse(row.resultJson) as { result?: unknown }
+    return typeof result.result === 'string' ? result.result : JSON.stringify(result.result ?? result)
+  } catch {
+    return row.resultJson
+  }
+}
+
+export function renderWorkflowPrompt(
+  prompt: string | undefined,
+  rows: WorkflowStepOutputRow[],
+  inputs: Record<string, string> = {},
+): string {
+  return (prompt ?? '')
+    .replace(TEMPLATE_RE, (_match, name: string) => {
+      const row = rows.find((candidate) => candidate.name === name)
+      if (!row) throw new WorkflowValidationError([`invalid template reference '${name}'`])
+      if (row.status !== 'done') throw new WorkflowValidationError([`template reference '${name}' points to a ${row.status} step`])
+      return stepOutput(row)
+    })
+    .replace(INPUT_RE, (_match, name: string) => {
+      if (!(name in inputs)) throw new WorkflowValidationError([`invalid input reference '${name}'`])
+      return inputs[name] ?? ''
+    })
+}
+
+/** One level of a contributed kind's `[steps.with]` table, rendered. A handler never sees a template:
+ *  `terminal:command` gets the substituted command, not `${inputs.issue}`. */
+export function renderWith(
+  table: Record<string, unknown> | undefined,
+  rows: WorkflowStepOutputRow[],
+  inputs: Record<string, string> = {},
+): Record<string, unknown> | undefined {
+  if (!table) return undefined
+  return Object.fromEntries(
+    Object.entries(table).map(([key, value]) => [key, typeof value === 'string' ? renderWorkflowPrompt(value, rows, inputs) : value]),
+  )
+}
+
+/** The values a run starts with: the declared default unless the caller supplied one. Refuses a
+ *  missing required input and a name the definition does not declare, so a bad start is a refusal
+ *  rather than a prompt with a hole in it. */
+export function resolveWorkflowInputs(def: WorkflowDef, supplied: Record<string, string> | undefined): Record<string, string> {
+  const declared = def.inputs ?? []
+  const problems: string[] = []
+  for (const name of Object.keys(supplied ?? {})) {
+    if (!declared.some((input) => input.name === name)) problems.push(`workflow '${def.name}' has no input '${name}'`)
+  }
+  const resolved: Record<string, string> = {}
+  for (const input of declared) {
+    const value = supplied?.[input.name] ?? input.default
+    if (value == null || (input.required && !value.trim())) {
+      if (input.required) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
+      resolved[input.name] = value ?? ''
+    } else resolved[input.name] = value
+  }
+  if (problems.length) throw new WorkflowValidationError(problems)
+  return resolved
+}
+
+/** The values a started run froze into its own copy of the definition. */
+export function frozenWorkflowInputs(def: WorkflowDef): Record<string, string> {
+  return Object.fromEntries((def.inputs ?? []).map((input) => [input.name, input.default ?? '']))
 }

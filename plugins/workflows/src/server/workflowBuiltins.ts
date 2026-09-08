@@ -19,21 +19,23 @@ export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)
     if (!step.policy) return [`${label} has no policy`]
     return policies.has(step.policy) ? [] : [`${label} names unknown policy '${step.policy}'`]
   },
-  join: (step, { label, index, indexes, stepAt }) => {
+  join: (step, { label, indexes, stepAt, precedes }) => {
     if (!step.joins) return [`${label} must declare joins`]
-    const targetIndex = indexes.get(step.joins)
-    if (targetIndex == null) return [`${label} has dangling join '${step.joins}'`]
-    return targetIndex >= index || (stepAt(step.joins)?.kind ?? 'agent') !== 'fan-out'
+    if (!indexes.has(step.joins)) return [`${label} has dangling join '${step.joins}'`]
+    return !precedes(step.joins, step.name) || (stepAt(step.joins)?.kind ?? 'agent') !== 'fan-out'
       ? [`${label} joins '${step.joins}', which is not a preceding fan-out`]
       : []
   },
-  decide: (step, { label, index, indexes }) => {
+  decide: (step, { label, indexes, precedes }) => {
     const errors: string[] = []
     if (!step.branches || !Object.keys(step.branches).length) errors.push(`${label} has no branches`)
     for (const [verdict, target] of Object.entries(step.branches ?? {})) {
-      const targetIndex = indexes.get(target)
-      if (targetIndex == null) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
-      else if (targetIndex <= index) errors.push(`${label} branch '${verdict}' has backward target '${target}'`)
+      // The edges, not the list position. A target has to wait on the decision, directly or through
+      // the steps between them, or it would start beside it and the verdict would arrive too late to
+      // matter. "Through the steps between them" is what a plain list of steps has always meant, so a
+      // file written before the graph existed still passes.
+      if (!indexes.has(target)) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
+      else if (!precedes(step.name, target)) errors.push(`${label} branch '${verdict}' target '${target}' does not wait on ${label}`)
     }
     return errors
   },
@@ -113,6 +115,11 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       const target = await services.deps.startRunTarget(ctx.run.taskId, ctx.def.requiresRun)
       if (!target.ok) return { status: 'failed', error: `Could not start run target '${ctx.def.requiresRun}'.` }
       if (target.url) prompt = `${prompt}\n\nThe app is running at: ${target.url}`
+    }
+    // Every incoming edge's output under a heading, unless the step says otherwise. 'template' means
+    // the prompt places `${steps.x.output}` itself and 'none' means the prompt stands alone.
+    if ((ctx.def.inputs ?? 'append') === 'append' && ctx.upstream.length) {
+      prompt = [prompt, ...ctx.upstream.map((step) => `## Output of ${step.name}\n\n${step.output}`)].filter(Boolean).join('\n\n')
     }
     const context = await services.deps.assembleContext(ctx.run.taskId, ctx.run.id)
     const inputs = context ? `${prompt}\n\n${context}` : prompt
@@ -211,7 +218,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     // against completed earlier steps, not the literal token.
     let childPrompt: string
     try {
-      childPrompt = renderWorkflowPrompt(childDef.prompt, (await services.steps(ctx.run.id)).filter((row) => row.parentStepId == null))
+      childPrompt = renderWorkflowPrompt(childDef.prompt, (await services.steps(ctx.run.id)).filter((row) => row.parentStepId == null), ctx.inputs)
     } catch (error) {
       return { status: 'failed', error: error instanceof Error ? error.message : `Fan-out '${ctx.def.name}' has an invalid child template reference.` }
     }
