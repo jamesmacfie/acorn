@@ -86,6 +86,15 @@ was already inside plugins/agents, so a new profiles package bought a menu entry
 not run. The driver registry was the seam that had never been opened. The packages were not, and they
 were folded back in.
 
+**A headless turn runs in `auto`, a decide turn in `dontAsk`.** The two modes are not "prompt" and
+"do not prompt". `dontAsk` denies anything that is not already in a `permissions.allow` rule, and
+acorn writes no such rules, so a headless step ran with every tool acorn projects visible, listed,
+and denied on call. `auto` approves through a classifier instead of a prompt, which is the only shape
+that works with nobody at the keyboard. What an agent may reach is still decided at the node, by the
+owner's tier and per-tool preferences narrowed by the step's own ceiling, so this widens the CLI's
+gate to match acorn's rather than replacing it. `aiArgv` keeps `dontAsk`, because it passes
+`--tools ''`: with nothing to approve, denying whatever tries anyway is the point.
+
 **What ACP offers the client side is declined.** The driver answers no to `fs`, `terminal`, and
 `mcpServers` at `initialize`. Each is worth adopting on its own merits and none of them blocks, or is
 blocked by, harness contributions. `fs` would make the agent ask acorn to read and write files, which

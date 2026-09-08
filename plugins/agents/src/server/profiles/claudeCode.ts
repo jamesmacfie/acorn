@@ -17,6 +17,14 @@ export const claudeCodeProfile: AgentProfileContribution = {
     '--append-system-prompt',
     'This session runs inside acorn, which projects the current task as MCP tools. Before starting work, call task_context to read the task: its pull request, linked issues, workspace notes and the repo memory index. Follow up with notes_read for any note it lists, and memory_search / memory_get for relevant repo memory — conventions and past feedback live there. Re-read them when the task shifts; the user edits notes while you work. Never ask the user for context you can pull yourself.',
   ],
+  // `auto` rather than `dontAsk`, which is what this was until an agent tool got called and denied.
+  // `dontAsk` does not mean "do not prompt", it means "deny anything not already in a `permissions.allow`
+  // rule", and acorn writes no such rules. So every tool acorn projects — task_context, notes_read,
+  // memory_search, issue_detail — was denied in a workflow step, on a server the step could see and
+  // list. `auto` approves with a classifier instead of a prompt, which is the only shape that works
+  // when nobody is at the keyboard. The tools an agent may reach are still acorn's decision, taken at
+  // the node: the tier and per-tool preferences the owner set, narrowed by the step's own ceiling
+  // (docs/agent-tools.md § Projections).
   headlessArgv: (command, opts) => ({
     file: command,
     args: [
@@ -26,14 +34,17 @@ export const claudeCodeProfile: AgentProfileContribution = {
       'stream-json',
       '--verbose',
       '--permission-mode',
-      'dontAsk',
+      'auto',
       ...(opts.model ? ['--model', opts.model] : []),
       ...(opts.schema ? ['--json-schema', JSON.stringify(opts.schema)] : []),
       opts.prompt,
     ],
   }),
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['--resume', sessionRef] }),
-  // A decision is one structured turn with both built-in and projected tools disabled.
+  // A decision is one structured turn with both built-in and projected tools disabled. It keeps
+  // `dontAsk` where the headless turn moved to `auto`: with `--tools ''` there is nothing to approve,
+  // and a deny is the right answer for anything that gets past that. A decide step reads and does not
+  // act, so it is the one place the denying mode is the point.
   aiArgv: (command, opts) => ({
     file: command,
     args: [

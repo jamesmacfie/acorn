@@ -23,17 +23,18 @@ describe('the claude-code profile', () => {
   it('builds a headless turn that streams JSON and never prompts for permission', () => {
     const { file, args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'do the thing' })
     expect(file).toBe('claude')
-    // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; dontAsk is why
-    // a headless agent does not block on the first tool approval with nobody there to answer it. The prompt is
-    // last and positional; a flag inserted after it would be read as part of it.
-    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', 'do the thing'])
+    // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; `auto` is why
+    // a headless agent neither blocks on the first tool approval with nobody there to answer it nor has every
+    // acorn tool denied out from under it, which is what `dontAsk` did. The prompt is last and positional; a
+    // flag inserted after it would be read as part of it.
+    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'do the thing'])
   })
 
   it('resumes a headless turn by prepending --resume, leaving the rest of the invocation identical', () => {
     // The one branch the no-options equality above cannot cover, and it comes first: after `-p`
     // claude reads the session ref as part of the prompt.
     const { args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'again', resumeSessionId: 'sess-1' })
-    expect(args).toEqual(['--resume', 'sess-1', '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', 'again'])
+    expect(args).toEqual(['--resume', 'sess-1', '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'again'])
   })
 
   it('threads an optional model and schema through, and omits them when absent', () => {
@@ -57,7 +58,8 @@ describe('the claude-code profile', () => {
     // `aiArgv` is the structured-decision path: a workflow gate policy, an AI SQL draft. An empty
     // `--tools` is the whole difference from a headless turn, because a decision reads and does not
     // edit. Pinned as a whole array, since `args[indexOf('--tools') + 1] === ''` would still pass with
-    // a second non-empty `--tools` or an inserted `--add-dir` appended later.
+    // a second non-empty `--tools` or an inserted `--add-dir` appended later. This is also the one path
+    // that keeps `dontAsk`: with no tools to call, denying is the right answer for anything that tries.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
     expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', 'decide'])
   })
