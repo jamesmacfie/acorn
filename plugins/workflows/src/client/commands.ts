@@ -10,7 +10,7 @@ import {
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
-import { requestWorkflowStart } from './editor/startRequest'
+import { needsStartDialog, requestWorkflowStart } from './editor/startRequest'
 import { emptyDefinition } from './editor/draft'
 import { defRefKey } from './editor/draftStore'
 import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
@@ -94,15 +94,19 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       // trust snapshot against the bytes on disk (./workflowsClient.ts).
       const defId = def.source === 'database' ? def.id : `${def.source}:${def.id}`
       // A definition that asks for something opens the dialog that collects the values; one that asks
-      // for nothing starts where it stands (./editor/startRequest.ts).
+      // for nothing starts where it stands. `needsStartDialog` is that rule, and it lives with the
+      // dialog so this row cannot answer it differently (./editor/startRequest.ts).
       //
       // The rail goes to Workflows first, because that is where the dialog is drawn: one mount, in the
       // source's list region, so the editor's Run and this row cannot put two of them on screen.
-      if (def.inputs?.some((input) => input.required && !input.default)) {
+      const request = { defId, name: def.name, inputs: def.inputs, taskId, projectId: context.projectId ?? undefined }
+      if (needsStartDialog(request)) {
         setSelectedSource(WORKFLOWS_SOURCE_ID)
-        void requestWorkflowStart({ defId, name: def.name, inputs: def.inputs, taskId, projectId: context.projectId ?? undefined })
+        void requestWorkflowStart(request)
         return COMMAND_CLOSED
       }
+      // Started here rather than through `requestWorkflowStart`, which reports a refusal as a toast. A
+      // command's refusal belongs in the frame the person is looking at, so this one throws.
       const result = await workflowApi.start(taskId, { defId })
       if (result.error) throw new Error(result.error)
       return COMMAND_CLOSED

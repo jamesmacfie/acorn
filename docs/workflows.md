@@ -532,3 +532,105 @@ An agent cannot start or drive a run: no workflow or session tool is registered,
 declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an
 agent-driven path would cost. Database rows have no trigger and no schedule; committed files keep
 theirs.
+
+## What workflows refuses
+
+Twenty-two decisions from the programme that built the editor, the row store, the run pane and the
+item menu, each with what would reopen it. They are here rather than in a design folder because every
+one of them is a thing workflows will keep being asked for.
+
+**A separate `edges` list.** Refused. proliferate's wire shape is `nodes[]` beside
+`edges[{from, to}]`. `after` on each step keeps every committed TOML file meaning what it meant, puts
+a step's dependencies beside the step that has them, and avoids a second top-level section to
+validate against the first. The editor derives the edges and draws them either way, so the picture
+cost nothing here.
+
+**A `parallel` group step.** Refused. Keeping the list linear and adding a kind whose children run
+together boxes the model in the moment a node needs two upstreams from different groups, which is the
+first thing a synthesising step asks for. `after` says that with no group at all.
+
+**Always a child task per parallel step.** Refused as the default. Investigate, review and summarise
+do not write, and a worktree per reader is what made fan-out feel heavy. A step asks for one with
+`isolation = "worktree"` when it will write (§ Isolation).
+
+**One implicit context string.** Refused. A single free-text context per run, with `${context}` in
+the prompts, cannot ask for two different things, cannot say that one of them is required, and leaves
+the item menu no way to tell which field a link belongs in. `[[inputs]]` is the same idea with names
+on it.
+
+**Relying on task-context injection for inputs.** Refused as the only path. Attaching the item to the
+task as a link and letting the context assembler tell the agent works for an agent step and for
+nothing else, because `terminal:command` reads no context. A task may also track several items, and
+the run needs the one it was started from.
+
+**Moving the TOML into the database.** Refused, again. A repo file is hashed by the trust snapshot
+and reviewed in a pull request. A row is typed by the owner behind the device gate. Two trust
+stories, two stores, one merged read, and **Save to repo** turns one into the other on purpose
+(§ Database definitions).
+
+**Project-only or node-wide definitions.** Refused. Project-only makes a general "investigate an
+issue" workflow a copy per project. Node-wide leaves nothing about a repo checkable while somebody is
+writing the definition. A workspace row with an optional project is the shape the rail already has.
+
+**JSON Schema forms.** Refused. A kind could ship a JSON Schema for its `with` and let the host
+render it, but the host would then need a schema-to-form renderer that works in cells, and model
+lists and run targets are dynamic where JSON Schema has no way to say "fetch these". A closed field
+vocabulary with an options route is what credential fields and collection parameters already are.
+
+**A plugin-rendered inspector.** Refused. A kind naming a remote tree that the plugin draws into the
+inspector gives every kind a client bundle, leaves the host unable to validate or index the form, and
+makes the built-ins the only kinds drawn one way. A descriptor is data, and a form is a descriptor
+(§ A kind describes its own form).
+
+**A PTY per command, or a per-node tee.** Refused. A clean stdout out of a PTY stream is lossy, and a
+headless node with nobody attached would still have to hold the PTY. A tee on demand was refused as a
+second code path to keep honest. `terminal:run-target` is the node for a process somebody wants to
+watch.
+
+**`database:write`.** Deferred, not refused. It needs an execute-tier ceiling check and an audit row,
+and nothing built so far writes. The read-only rule in `database:query` is the seam it would open.
+
+**A canvas as a rectangle.** Refused. An iframe owning its own pixels draws as one muted line in the
+terminal. The kit's admission rule is how a canvas earns a cell projection instead, which is why the
+graph view is the kit's `Graph` node ([ui-design.md](./ui-design.md) § The closed kit). The list came
+first for the same reason: every rule the picture needed was proven on rows both hosts already draw.
+
+**A task pane, or the Settings page, as the editor.** Refused. A definition is not task state and it
+outlives the task. Settings has no project in scope for run targets and saved queries, and no
+terminal counterpart. The rail source has both.
+
+**A separate start dialog from the item menu.** Refused. The promote-to-task modal already knows how
+to create a task or attach to one, and two modals that create tasks drift apart.
+
+**Grouping workflow sessions in the agent sidebar.** Refused. The run pane owns steps, and a group in
+the sidebar would draw them a second way. A glyph on the row and a chip in the header are enough to
+get from a session to its run.
+
+**Rerun from an arbitrary node.** Refused for this programme. Rerunning from a node that is done
+means unwinding its successors' handoffs and outputs, and deciding what a downstream node that
+already read them should see. Retry of a failed node covers the case people hit (§ Retry).
+
+**A minted `id` beside `name`.** Refused, and it is proliferate's rule.
+`${steps.s3.output}` is worse to read in a TOML file than `${steps.reproduce.output}`, and every
+committed file would need an `id` defaulted on load. The editor rewrites references on rename
+instead, in the draft, until it is saved.
+
+**Positions in the definition.** Refused. A definition travels between a file, a row and a run's
+frozen copy, and none of the three cares where a card was. Device preferences keyed by definition id
+hold them (§ Where positions live).
+
+**Triggers and schedules for database rows.** Deferred. The sweep reads files, and reading rows too
+is small. But a row that fires on its own runs an agent when nobody typed anything, and that wants
+the same trust thinking the file layer had.
+
+**Agent tools that start or drive a run.** Not refused on principle, and not built. `agent_spawn` and
+its spawn ledger belong to [orchestration.md](./future/orchestration.md), and § Gaps says what their
+absence costs.
+
+**Editing a live run's definition.** Refused. A run freezes its definition when it starts and stays
+that way, so the editor never offers to retarget one. Retry with an edited prompt patches one step of
+the frozen copy and keeps the original in the step's `inputs_json`.
+
+**A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
+addressed by task, and `packages/protocol/src/runs.ts` already says when a core runs table would be
+earned.

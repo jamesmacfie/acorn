@@ -26,7 +26,7 @@ import {
 // There is no third group. It merged this task's PTY sessions with its workflow steps, and opening a
 // step spawned a terminal on the harness's resume command. The run pane owns a run's steps now
 // (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
-// rows had two better homes and one confusing one (docs/future/workflows/README.md, decision 14).
+// rows had two better homes and one confusing one (docs/workflows.md § What workflows refuses).
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
  *  the list under it scrolls (docs/panes.md § Layout model). */
