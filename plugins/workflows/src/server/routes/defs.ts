@@ -15,7 +15,10 @@ export type WorkflowDefsBridge = {
   // The merged read: this workspace's rows, every project's `.acorn/workflows/*.toml`, and the user
   // layer, with a repo id winning a collision.
   list(workspaceId: string): Promise<unknown>
-  get(id: string): Promise<unknown | null>
+  // A row by id, or a definition the node loads from a file, addressed `repo:<fileId>` or
+  // `user:<fileId>`. `projectId` says whose checkout to read a repo file from; a file answers with
+  // `revision: 0`, which is how the editor knows it has no row to save into.
+  get(id: string, projectId?: string): Promise<unknown | null>
   create(input: { workspaceId: string; projectId?: string; def: unknown }): Promise<{ row?: unknown; problems?: string[] }>
   // `conflict` is the row that won, so the editor can show what moved underneath it.
   update(id: string, def: unknown, revision: number): Promise<{ row?: unknown; conflict?: unknown; problems?: string[] } | null>
@@ -74,7 +77,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
   })
   .get('/defs/:id', (c) =>
     withBridge(c, async (bridge) => {
-      const row = await bridge.get(c.req.param('id'))
+      const row = await bridge.get(c.req.param('id'), c.req.query('projectId'))
       return row ? c.json(row) : respondError(c, 404, 'not_found')
     }))
   .put('/defs/:id', async (c) => {

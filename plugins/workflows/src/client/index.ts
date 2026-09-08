@@ -1,8 +1,9 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { projectSurfaceRegistry, type ClientPlugin } from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
 import { workflowApi } from './workflowsClient'
 import { workflowsCommands } from './commands'
+import { workflowsSourceContribution, workflowsSurfaceContribution } from './sourceContribution'
 
 const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 
@@ -23,6 +24,13 @@ export const workflowsClientPlugin: ClientPlugin = {
     // "Run a workflow", as one search over this task's committed definitions (./commands.ts). A
     // `paletteRows` source until 2026-09-03.
     for (const contribution of workflowsCommands) ctx.commands.register(contribution)
+    // The Workflows rail source and the editor behind it (./sourceContribution.tsx). A local source:
+    // no `providerId`, so nothing has to be connected for the row to be in the rail.
+    ctx.sources.register(workflowsSourceContribution)
+    // Through `ctx.contribute`, because the project-surface registry has no named member on the
+    // context and this is the compiled way in (docs/contribution-kinds.md § Project surfaces). The
+    // host records the disposable, so a disable takes the surface with it.
+    ctx.contribute(projectSurfaceRegistry, workflowsSurfaceContribution)
     ctx.settingsPages.register({
       id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: { plugin: 'workflows' },
       component: WorkflowsSettings,

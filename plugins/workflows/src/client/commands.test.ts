@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
-import type { CommandExecutionContext, SearchCommand } from '@acorn/plugin-api/client'
+import type { CommandExecutionContext, CommandOutcome, SearchCommand } from '@acorn/plugin-api/client'
 
-const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn() }))
-vi.mock('./workflowsClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
+const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn(), createDef: vi.fn(), requestStart: vi.fn(), setSelectedSource: vi.fn() }))
+vi.mock('./workflowsClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start, createDef: mocks.createDef } }))
+vi.mock('./editor/startRequest', () => ({ requestWorkflowStart: mocks.requestStart }))
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setSelectedSource: mocks.setSelectedSource,
+}))
 
 import { workflowsCommands } from './commands'
 
@@ -12,9 +17,11 @@ import { workflowsCommands } from './commands'
 // rather than as a closed palette.
 
 const run = workflowsCommands[0] as SearchCommand
+const create = workflowsCommands[1] as { run: (context: CommandExecutionContext) => Promise<CommandOutcome> }
 
+const navigate = vi.fn()
 const context = (taskId: string): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null,
+  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null, navigate,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -31,10 +38,11 @@ describe('the workflows plugin catalogue', () => {
     mocks.start.mockResolvedValue({})
   })
 
-  it('is one task-scoped search, gated on a node that runs terminals', () => {
+  it('is a task-scoped search and a project-scoped action, both gated on a node that runs terminals', () => {
     // `{ plugin: 'terminal' }` because the runner is a node engine: the routes 503 without one. The gate
     // the row source declared, unchanged.
-    expect(workflowsCommands.map((command) => command.id)).toEqual(['workflows.run'])
+    expect(workflowsCommands.map((command) => command.id)).toEqual(['workflows.run', 'workflows.new'])
+    expect(create).toMatchObject({ scope: 'project', category: 'action', requires: { plugin: 'terminal' } })
     expect(run).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'terminal' } })
     expect(run.debounceMs).toBe(0)
     expect(run.minQueryLength).toBe(0)
@@ -73,17 +81,27 @@ describe('the workflows plugin catalogue', () => {
     expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' })
   })
 
-  // The dialog that collects input values is phase 3 of docs/future/workflows/. Until it lands, a row
-  // in a list says where to go instead of starting a run with an empty required input.
-  it('will not start a definition whose required input has no value yet', async () => {
-    mocks.defs.mockResolvedValue({
-      workflows: [{ ...def('ship'), inputs: [{ name: 'issue', required: true }] }],
-      errors: [],
-    })
+  // A definition that asks for something opens the dialog instead of starting a run with an empty
+  // required input (./editor/StartDialog.tsx).
+  it('opens the start dialog for a definition whose required input has no value yet', async () => {
+    const inputs = [{ name: 'issue', required: true }]
+    mocks.defs.mockResolvedValue({ workflows: [{ ...def('ship'), inputs }], errors: [] })
     const world = context('task-1')
     const rows = await run.query('', world, signal())
-    expect(await run.select(rows[0], world)).toEqual({ effect: 'stay', status: 'SHIP needs its inputs filled in. Run it from the workflow editor.' })
+    expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
+    expect(mocks.requestStart).toHaveBeenCalledWith({
+      defId: 'repo:ship', name: 'SHIP', inputs, taskId: 'task-1', projectId: 'p-1',
+    })
+    // The rail goes to Workflows, because that is the one place the dialog is mounted.
+    expect(mocks.setSelectedSource).toHaveBeenCalledWith('workflows')
     expect(mocks.start).not.toHaveBeenCalled()
+  })
+
+  it('creates a row and opens it, for "New workflow"', async () => {
+    mocks.createDef.mockResolvedValue({ id: 'row-1' })
+    expect(await create.run(context('task-1'))).toEqual({ effect: 'close' })
+    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { name: 'Untitled workflow', steps: [] } })
+    expect(navigate).toHaveBeenCalledWith('/p/p-1/x/workflows/db%3Arow-1')
   })
 
   it('keeps the frame open with the node’s own refusal', async () => {

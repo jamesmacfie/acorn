@@ -339,7 +339,21 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       defsCapability = ctx.capabilities.provide(WORKFLOW_DEFS_ROUTE, {
         list: async (workspaceId) =>
           mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
-        get: (id) => getDef(store, id),
+        // A row, or a committed file the editor opens read-only. The merged list carries a summary of
+        // each definition and the editor needs the whole thing, so a file id resolves here rather than
+        // fattening every list read (docs/workflows.md § Authoring).
+        get: async (id, projectId) => {
+          const file = /^(repo|user):(.+)$/.exec(id)
+          if (!file) return getDef(store, id)
+          const project = projectId ? await core.projects.byId(projectId) : null
+          const loaded = loadWorkflowFiles(file[1] === 'repo' ? project?.path ?? null : null, homedir(), runner.validationCatalog())
+          const found = loaded.workflows.find((workflow) => workflow.id === file[2] && workflow.source === file[1])
+          if (!found) return null
+          const { id: _id, source: _source, ...def } = found
+          // `revision: 0` is the marker: a file has no row to save into, so the editor draws it
+          // read-only and offers "Copy to database" instead of Save.
+          return { id, workspaceId: project?.workspaceId ?? '', projectId: project?.id ?? null, name: found.name, revision: 0, createdAt: 0, updatedAt: 0, def }
+        },
         create: async ({ workspaceId, projectId, def }) => {
           const problems = validateWorkflow(def as WorkflowDef, runner.validationCatalog())
           if (problems.length) return { problems }

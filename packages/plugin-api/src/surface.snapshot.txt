@@ -29,6 +29,7 @@ client: Project
 client: ProjectImporterProps
 client: ProjectPatch
 client: ProjectSeed
+client: ProjectSurfaceContribution
 client: REF_LINK_CLASS
 client: RailMarker
 client: RailMarkerContribution
@@ -109,6 +110,7 @@ client: linkifyRefs
 client: localSearch
 client: markAttentionSeen
 client: nodeReady
+client: nodeState
 client: nodes
 client: observeAttention
 client: onClosePaneWhen
@@ -134,6 +136,7 @@ client: prefsOptions
 client: previewViews
 client: projectImporterRegistry
 client: projectPath
+client: projectSurfaceRegistry
 client: projectsKey
 client: projectsOptions
 client: pushManagedAgentNotice

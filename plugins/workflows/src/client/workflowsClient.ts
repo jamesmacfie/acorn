@@ -8,7 +8,10 @@
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.
 
 import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/client'
+import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowCatalog } from '../shared/workflowContracts'
 
 export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
@@ -20,12 +23,21 @@ export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/
 export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
 export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
 export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
+// Every run on this node, the same route core's merged run list reads.
+export const workflowAllRunsRoute = '/v2/p/workflows/runs'
 // Definitions stored as rows (docs/workflows.md § Database definitions). Device-only on the node, so
 // these answer 403 to anything but the app.
 export const workflowDefsRoute = '/v2/p/workflows/defs'
 export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
+// Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
+// Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
+export const workflowCatalogRoute = '/v2/p/workflows/catalog'
+// The harnesses, with the config options each one advertises. Read from the agents plugin's own route
+// rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
+// agent pane offers (docs/managed-agents.md § Providers).
+export const agentProvidersRoute = '/v2/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 
@@ -54,7 +66,20 @@ export const workflowApi = {
   },
   // The merged list for a workspace: rows, every project's committed files, and the user layer.
   defsList: (workspaceId: string) => readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
-  def: (id: string) => readJson<WorkflowDefRow>(workflowDefRoute(id)),
+  // A row by id, or a committed file addressed as `repo:<fileId>` / `user:<fileId>`. A file answers
+  // with `revision: 0`, which is how the editor knows it is read-only.
+  def: (id: string, projectId?: string) =>
+    readJson<WorkflowDefRow>(`${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+  catalog: (projectId?: string) =>
+    readJson<WorkflowCatalog>(`${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+  providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
+  // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
+  // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
+  allRuns: () => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute),
+  // A select field's own options, from the route its `describe` named. The host substitutes the two
+  // placeholders and the contributing plugin answers `{ options }` (docs/workflows.md § Contributed
+  // step kinds).
+  fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
   createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),
   updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
   deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),

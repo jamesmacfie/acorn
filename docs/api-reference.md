@@ -329,7 +329,7 @@ Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole fami
 | --- | --- | --- |
 | `GET /defs?workspaceId=` | | The merged list: the workspace's rows, every project's committed files, and the user layer, each with its `source`, `projectId` and `problems`. A repo id wins a collision. |
 | `POST /defs` | `{ workspaceId, projectId?, def }` | The row. A definition the loader would reject is a 400 carrying its problems. |
-| `GET /defs/:id` | | The row with its definition, or a 404. |
+| `GET /defs/:id` | `?projectId=` | The row with its definition, or a 404. An `:id` of `repo:<fileId>` or `user:<fileId>` names a committed file instead, read from the named project's checkout, and answers `revision: 0` so the editor knows it has no row to save into. |
 | `PUT /defs/:id` | `{ def, revision }` | The row with `revision + 1`. A stale `revision` is a 409 whose `details` carry the row that won. |
 | `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
 | `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |

@@ -1,6 +1,22 @@
 # Phase 3: the editor
 
-Status: not started. Waits on phases 1 and 2.
+Status: SHIPPED 2026-09-08. [docs/workflows.md](../../workflows.md) § Authoring owns it now.
+
+Three things landed differently from the plan below, and each is written where it happened:
+
+- The editor is drawn by the rail source's `detail` region, not by the shell mounting the project
+  surface. Both hosts render a source's regions and mount a contributed route as a no-op, so the
+  surface registration exists for the URL pattern and the registry entry, and the region is what
+  draws. The read-only summary the plan gave the detail region went with it: the editor already draws
+  a committed file read-only, and a second renderer of the same facts is a second thing to keep true.
+- Backspace and Delete on the list are a **Delete** button in the list toolbar and one in the
+  inspector, both armed when the node has edges. A destructive key needs a binding, a binding is a
+  global chord, and the kit gives a plugin's collection no per-list key seam on both hosts.
+- `GET /v2/p/workflows/defs/:id` gained a `projectId` query and resolves `repo:<fileId>` and
+  `user:<fileId>`, because the merged list carries a summary and the editor needs the whole
+  definition. The alternative was putting every definition's full JSON in every list read.
+- A 409 on save keeps the draft and says so rather than showing the winning row: `ApiError` on the
+  client drops the envelope's `details`, and re-reading is one press.
 
 ## Goal
 

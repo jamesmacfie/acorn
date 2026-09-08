@@ -30,6 +30,10 @@ export default function WorkflowsSettings() {
         Read-only view of the workflows the active task's worktree would load (.acorn/workflows/*.toml
         in the repo, plus ~/.acorn/workflows). Launch one from the command palette (⌘K).
       </Text>
+      <Text emphasis="muted" wrap>
+        To write one, open Workflows in the left rail. That is where every workflow this workspace can
+        run is listed, and where the editor is.
+      </Text>
 
       <Show
         when={workflows().length}

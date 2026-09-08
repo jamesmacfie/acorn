@@ -51,6 +51,7 @@ Use the persistence scope that owns the state:
 | Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
 | Appearance, notification settings ([notifications.md](./notifications.md) § Settings), shortcuts, rail order, notices, trust, tokens | device |
 | How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | device |
+| Where a workflow's nodes sit in the graph view | device |
 | Which model connection writes a commit message | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
@@ -78,6 +79,15 @@ names (`client-core/kit/lib/draftState.ts`): a comment box uses `comment-draft:`
 pane's commit message uses `changes:commit-draft:<taskId>`. The node id is deliberately absent from
 that key. A commit message is about the files in front of the reader, and the same task on another
 node is another worktree with another set of changes in it.
+
+**A workflow's node positions are the device's, because a definition is portable.** A definition can
+be saved back into a repository as TOML and read on somebody else's screen, so x and y have no place
+in it: they would be noise in every diff and wrong on every other monitor. They live under
+`plugin:workflows:layout:<defId>` in device storage instead, as `Record<nodeName, { x, y }>`
+(`plugins/workflows/src/client/layoutPrefs.ts`). Renaming a node carries its position with it and
+deleting a definition drops its layout, which is the whole reason that module exists before anything
+draws a position. The terminal client has no `localStorage`, so the write lands nowhere there and the
+graph falls back to the list the editor already draws.
 
 **Where you were looking is the node's, not the device's.** Which rail source or task each workspace
 was left on is `core.workspace-views`, one key per workspace

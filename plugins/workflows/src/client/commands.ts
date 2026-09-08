@@ -2,11 +2,16 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   localSearch,
+  setSelectedSource,
   type CommandExecutionContext,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
+import { requestWorkflowStart } from './editor/startRequest'
+import { emptyDefinition } from './editor/draft'
+import { defRefKey } from './editor/draftStore'
+import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
 
 // "Run a workflow", as one search over the definitions this task can run: the files its repository
 // commits, the user layer, and the rows the owner saved for this workspace
@@ -18,13 +23,10 @@ import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 // (client-core/host/registries/commands/localSearch.ts).
 //
 // **What is not here, and why.** The catalogue also asked for "find an active or recent run and open
-// it". There is nowhere to open one: this plugin ships no pane and no run surface on either host, and
-// the only client reader of `workflowApi.runs` is plugins/agents' task sidebar, which draws a run's
-// *steps* into its roster and keys selection on a managed-session id that a workflow step does not
-// have. A search whose row cannot name where it goes is worse than no search
-// (docs/command-palette-and-shortcuts.md), so the row is
-// deferred in the catalogue with that evidence rather than pointed at a pane it cannot address.
-// Approving, cancelling and killing a run stay in the run surface for the reason they always did.
+// it". There is still nowhere to open one: the run pane is phase 4 of docs/future/workflows/, and a
+// search whose row cannot name where it goes is worse than no search
+// (docs/command-palette-and-shortcuts.md). Approving, cancelling and killing a run stay in the run
+// surface for the reason they always did.
 
 /** A parse or cycle error from `.acorn/workflows/*.toml`, as a row.
  *
@@ -87,17 +89,42 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       const workflows = await loaded.get(context)
       const def = workflows?.find((candidate) => candidate.id === item.ref)
       if (!def) throw new Error(`'${item.ref}' is no longer a workflow of this task`)
-      // A definition that asks for something cannot be started from a row in a list. The start dialog
-      // that collects the values lands in phase 3 of docs/future/workflows/; until then the frame says
-      // where to go rather than starting a run with an empty input.
-      if (def.inputs?.some((input) => input.required && !input.default)) {
-        return { effect: 'stay', status: `${def.name} needs its inputs filled in. Run it from the workflow editor.` }
-      }
       // The id, not the definition: the node resolves it and, for a committed file, checks the repo
-      // trust snapshot against the bytes on disk. `start` turns a thrown HTTP error into `{ error }`
-      // and handles the needs-trust prompt (./workflowsClient.ts).
-      const result = await workflowApi.start(taskId, { defId: def.source === 'database' ? def.id : `${def.source}:${def.id}` })
+      // trust snapshot against the bytes on disk (./workflowsClient.ts).
+      const defId = def.source === 'database' ? def.id : `${def.source}:${def.id}`
+      // A definition that asks for something opens the dialog that collects the values; one that asks
+      // for nothing starts where it stands (./editor/startRequest.ts).
+      //
+      // The rail goes to Workflows first, because that is where the dialog is drawn: one mount, in the
+      // source's list region, so the editor's Run and this row cannot put two of them on screen.
+      if (def.inputs?.some((input) => input.required && !input.default)) {
+        setSelectedSource(WORKFLOWS_SOURCE_ID)
+        void requestWorkflowStart({ defId, name: def.name, inputs: def.inputs, taskId, projectId: context.projectId ?? undefined })
+        return COMMAND_CLOSED
+      }
+      const result = await workflowApi.start(taskId, { defId })
       if (result.error) throw new Error(result.error)
+      return COMMAND_CLOSED
+    },
+  },
+  {
+    // The rail toolbar's verb, as a command, so it is reachable from ⌘K as well
+    // (docs/command-palette-and-shortcuts.md). Project scope, because a new row is bound to the
+    // project the reader is in.
+    id: 'workflows.new',
+    title: 'New workflow',
+    hint: 'a workflow of your own, saved on this node',
+    keywords: ['workflow', 'create'],
+    category: 'action',
+    palette: true,
+    scope: 'project',
+    order: 330,
+    requires: { plugin: 'terminal' },
+    run: async (context): Promise<CommandOutcome> => {
+      const { workspaceId, projectId, navigate } = context
+      if (!workspaceId || !projectId) return { effect: 'stay', status: 'Choose a project first.' }
+      const row = await workflowApi.createDef({ workspaceId, projectId, def: emptyDefinition() })
+      navigate?.(workflowsSurfacePath(projectId, defRefKey({ source: 'database', id: row.id })))
       return COMMAND_CLOSED
     },
   },
