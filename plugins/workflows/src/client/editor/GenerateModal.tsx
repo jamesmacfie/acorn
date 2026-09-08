@@ -59,6 +59,16 @@ export default function GenerateModal(props: {
   let ticker: ReturnType<typeof setInterval> | undefined
   onCleanup(() => clearInterval(ticker))
 
+  // Escape and a backdrop click go through the same gate the Cancel button does. Nothing calls a
+  // generation off once it has been asked for, so a dialog that vanished on a stray press would let
+  // the reply land two minutes later on top of whatever was edited in between. Before the press both
+  // gestures dismiss the way they do in every other dialog, which is why the guard is `busy()` and
+  // not `dismissOn={[]}` the way ../../../onboarding/src/client/OnboardingWizard.tsx has it: that
+  // prop is read once, when the dialog mounts, on both hosts.
+  const dismiss = (): void => {
+    if (!busy()) props.onDismiss()
+  }
+
   const generate = async (): Promise<void> => {
     if (busy() || !description().trim() || !connectionId()) return
     setBusy(true)
@@ -81,7 +91,7 @@ export default function GenerateModal(props: {
   }
 
   return (
-    <Modal title="Generate a workflow" onDismiss={props.onDismiss} size="md">
+    <Modal title="Generate a workflow" onDismiss={dismiss} size="md">
       <Modal.Body>
         <Textarea
           label="Description"
@@ -115,7 +125,7 @@ export default function GenerateModal(props: {
         <Show when={error()}>{(reason) => <Alert>{reason()}</Alert>}</Show>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="bare" disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
+        <Button variant="bare" disabled={busy()} onPress={dismiss}>Cancel</Button>
         <Button variant="solid" busy={busy()} disabled={busy() || !description().trim()} onPress={() => void generate()}>
           Generate
         </Button>

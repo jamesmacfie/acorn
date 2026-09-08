@@ -188,6 +188,35 @@ describe('applying a generated definition', () => {
     expect(host.textContent).not.toContain('is not a step kind here')
   })
 
+  it('cannot be dismissed while the model is writing, so a late reply lands on the draft it was asked for', async () => {
+    // There is no way to call a generation off once it is running, so Escape and a backdrop click
+    // have to refuse for as long as Cancel does. Otherwise the dialog goes, the reply arrives two
+    // minutes later, and it replaces whatever was edited in the meantime.
+    let land: (result: WorkflowGenerateResult) => void = () => undefined
+    generateDef.mockReturnValue(new Promise<WorkflowGenerateResult>((resolve) => { land = resolve }))
+    await mount('db:abc')
+    await generate()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    host.querySelector<HTMLElement>('.overlay-backdrop')?.click()
+    await settle()
+    expect(dialog()).not.toBeNull()
+
+    land({ def: generated, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'opus' })
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(host.textContent).toContain('synthesise')
+  })
+
+  it('closes on Escape before anything has been asked for', async () => {
+    await mount('db:abc')
+    await press('Generate')
+    expect(dialog()).not.toBeNull()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await settle()
+    expect(dialog()).toBeNull()
+  })
+
   it('keeps the draft and says why when the model answer is unusable', async () => {
     generateDef.mockRejectedValue(Object.assign(new Error('The reply was not JSON.'), { code: 'model_answer_unusable' }))
     await mount('db:abc')

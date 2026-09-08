@@ -47,9 +47,14 @@ const STEP_KEYS = [
 const CHILD_STEP_KEYS = ['name', 'profileId', 'model', 'prompt', 'schema', 'tools', 'budget']
 const INPUT_KEYS = ['name', 'description', 'required', 'default']
 
-/** The keys the prompt forbids, read from the prompt's own list so the two cannot drift. `tools.allow`
- *  is nested and handled where a ceiling is read. */
+/** The keys the prompt forbids, read from the prompt's own list so the two cannot drift. The nested
+ *  ones are split off below, because a key list is checked against the keys of one record. */
 const FORBIDDEN_TOP_KEYS = new Set<string>(FORBIDDEN_KEYS.filter((key) => !key.includes('.')))
+
+/** The forbidden keys that sit inside a `tools` ceiling, off the same list. That is `allow` and
+ *  nothing else, and reading it from the list rather than writing it out here is what stops a sixth
+ *  forbidden key being added in one file and missed in this one. */
+const FORBIDDEN_TOOL_KEYS = FORBIDDEN_KEYS.filter((key) => key.startsWith('tools.')).map((key) => key.slice('tools.'.length))
 
 // The same tokens the checker matches, so grounding removes exactly what it would refuse.
 const STEP_TOKEN_RE = /\$\{steps\.[^}]*\}/g
@@ -193,11 +198,13 @@ function pruneKeys<T extends object>(
   return Object.fromEntries(Object.entries(record).filter(([key]) => !drop.includes(key))) as T
 }
 
-/** A tool ceiling with no allowlist, or nothing when the allowlist was all it held. */
-function pruneCeiling<T extends object>(tools: T | undefined, report: () => void): T | undefined {
-  if (!isRecord(tools) || !('allow' in tools)) return tools
-  report()
-  const rest = without(tools, 'allow')
+/** A tool ceiling with nothing forbidden left in it, or nothing when that was all it held. */
+function pruneCeiling<T extends object>(tools: T | undefined, report: (key: string) => void): T | undefined {
+  if (!isRecord(tools)) return tools
+  const drop = FORBIDDEN_TOOL_KEYS.filter((key) => key in tools)
+  if (!drop.length) return tools
+  for (const key of drop) report(key)
+  const rest = Object.fromEntries(Object.entries(tools).filter(([key]) => !drop.includes(key))) as T
   return Object.keys(rest).length ? rest : undefined
 }
 
@@ -228,13 +235,20 @@ function renameStep(def: WorkflowDef, from: string, to: string): WorkflowDef {
 
 /** Every step name shaped the way the editor and the reference syntax need it.
  *
- *  The checker never asks: `STEP_NAME_RE` lives with the editor's draft operations and the server
- *  checks only that a name is there and unique. So "Reproduce the bug" validates, breaks the rename
- *  field, and produces a `${steps.Reproduce the bug.output}` that the template regex matches. */
+ *  The checker never asks: `STEP_NAME_RE` lives in ../shared/stepNames.ts and the server checks only
+ *  that a name is there and unique. So "Reproduce the bug" validates, breaks the rename field, and
+ *  produces a `${steps.Reproduce the bug.output}` that the template regex matches.
+ *
+ *  One rename per name, not per step. `renameStep` rewrites every step called `from`, so two steps
+ *  sharing one ill-formed name are both done on the first pass, and going round again would mint a
+ *  second name, rename nothing, and leave a note naming a step that is not in the draft. The
+ *  duplicate that survives is the checker's to report and the repair pass's to fix. */
 function groundNames(def: WorkflowDef, notes: Notes): WorkflowDef {
   let next = def
+  const done = new Set<string>()
   for (const step of def.steps) {
-    if (STEP_NAME_RE.test(step.name)) continue
+    if (STEP_NAME_RE.test(step.name) || done.has(step.name)) continue
+    done.add(step.name)
     const renamed = uniqueStepName(next, step.name)
     add(notes, 'renamed-step', `Step '${step.name}' is not a step name acorn can use, so it is now '${renamed}'.`, renamed)
     next = renameStep(next, step.name, renamed)
@@ -322,8 +336,8 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
     add(notes, code, `The workflow set '${key}', ${why}, so it was dropped.`)
   })
 
-  const ceiling = pruneCeiling(next.tools, () => {
-    add(notes, 'forbidden-key', 'The workflow set `tools.allow`, which a generated workflow cannot set, so it was dropped.')
+  const ceiling = pruneCeiling(next.tools, (key) => {
+    add(notes, 'forbidden-key', `The workflow set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`)
   })
   if (ceiling !== next.tools) next = ceiling ? { ...next, tools: ceiling } : without(next, 'tools')
 
@@ -349,8 +363,8 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
       add(notes, 'unknown-key', `Step '${step.name}' set \`after\` to something that is not a list, so it was dropped.`, step.name)
       ahead = without(ahead, 'after')
     }
-    const stepCeiling = pruneCeiling(ahead.tools, () => {
-      add(notes, 'forbidden-key', `Step '${step.name}' set \`tools.allow\`, which a generated workflow cannot set, so it was dropped.`, step.name)
+    const stepCeiling = pruneCeiling(ahead.tools, (key) => {
+      add(notes, 'forbidden-key', `Step '${step.name}' set \`tools.${key}\`, which a generated workflow cannot set, so it was dropped.`, step.name)
     })
     if (stepCeiling !== ahead.tools) ahead = stepCeiling ? { ...ahead, tools: stepCeiling } : without(ahead, 'tools')
 
@@ -362,8 +376,8 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
         const why = code === 'forbidden-key' ? 'which a generated workflow cannot set' : 'which is not part of a child step'
         add(notes, code, `Step '${step.name}' set 'childStep.${key}', ${why}, so it was dropped.`, step.name)
       })
-      const childCeiling = pruneCeiling(child.tools, () => {
-        add(notes, 'forbidden-key', `Step '${step.name}' set \`childStep.tools.allow\`, which a generated workflow cannot set, so it was dropped.`, step.name)
+      const childCeiling = pruneCeiling(child.tools, (key) => {
+        add(notes, 'forbidden-key', `Step '${step.name}' set \`childStep.tools.${key}\`, which a generated workflow cannot set, so it was dropped.`, step.name)
       })
       if (childCeiling !== child.tools) child = childCeiling ? { ...child, tools: childCeiling } : without(child, 'tools')
       if (child !== ahead.childStep) ahead = { ...ahead, childStep: child }
