@@ -1469,7 +1469,7 @@ handshake either way (`docs/security.md § Rung 0 — The client sandbox`).
 table from a kit node name to the thing that draws it
 (`packages/client-core/src/host/tree/components.ts`, `apps/tui/src/kit/components.tsx`). Cheap
 primitives are the component; the heavy names — the diff viewer, the diff rows, `Markdown`, `Timeline`,
-`ModelConnectionPicker` — are a loader, because a table that holds every value puts every value in the
+`ModelBackendPicker` — are a loader, because a table that holds every value puts every value in the
 chunk that holds the table, and the DOM host's table is fetched on every cold window whether or not a
 loaded plugin exists (`packages/client-core/src/host/tree/kitEntry.ts` says which and why). Each root
 is drawn under a `Suspense` with a `null` fallback, so **a tree that names a heavy node draws nothing
@@ -3057,6 +3057,14 @@ The trust line sits under `Enforced`, not `Declared`, and it is the only line in
 a program: the host spawns exactly the declared command with the declared arguments, and the plugin
 never gets a process of its own. The grant key is the whole spawn plus the environment passthrough, so
 swapping the binary, changing its arguments or widening a glob all read as newly requested.
+
+A descriptor's `terminal.oneShot` block gets a second line, keyed on its own arguments. It is the one
+argv a manifest may assemble: the arguments that make the CLI answer a single prompt and exit, which is
+what puts the harness in every Generate control beside a connected API key
+([integrations.md § Model providers](./integrations.md)). Two variables in fixed positions, the model
+and the prompt, so there is nothing to substitute and nothing to branch on. `headlessArgv` and
+`resumeArgv` stay code-only, because a manifest that can say "if resuming, add these two arguments" is
+a template language.
 
 Four per plugin, the same ceiling as schedules and task checks.
 [managed-agents.md § Harnesses](./managed-agents.md) owns the behaviour and the two driver tiers;

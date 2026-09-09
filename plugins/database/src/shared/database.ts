@@ -69,6 +69,11 @@ export const databaseQueriesRoute = (taskId: string) => taskRoute(taskId, '/quer
 // row and not about what is in the editor right now.
 export const databaseScratchRoute = (taskId: string) => taskRoute(taskId, '/scratch')
 export const databaseQueryRoute = (taskId: string, queryId: string) => taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
-// Which model connections this owner could generate with. A plugin route rather than a bridge call
-// because `/v2/core/integrations` has no bridge scope, and the frame needs ids and labels, not keys.
-export const databaseModelConnectionsRoute = (taskId: string) => taskRoute(taskId, '/model-connections')
+// Which backends this owner could generate with — a stored key, or an agent CLI installed on this
+// machine. A plugin route rather than a bridge call because `/v2/core/integrations` has no bridge
+// scope, and the frame needs ids and labels, not keys.
+//
+// The path still says `model-connections` after the rename. Only code that ships with this plugin
+// reads it — this client and the `optionsRoute` on the `database:generate` step field — so a rename
+// would be churn with nothing on the other side of it.
+export const databaseModelBackendsRoute = (taskId: string) => taskRoute(taskId, '/model-connections')

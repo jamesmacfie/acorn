@@ -129,9 +129,10 @@ export function localGitBridge(
       if (!operation) return { ok: false, reason: 'No merge or rebase is in progress.' }
       return abortOperation(root, operation)
     }),
-    // Ids and labels of the connections this owner could generate with. Core resolves the key inside
-    // `generateText`; nothing here has ever seen one.
-    modelConnections: (userId) => core.models.available(userId),
+    // Ids and labels of the backends this owner could generate with: a stored key, or an agent CLI
+    // installed on this machine. Core resolves the key, or the command, inside `generateText`; nothing
+    // here has ever seen either.
+    modelBackends: (userId) => core.models.available(userId),
     // Ask a connected provider for the message the next commit should carry.
     //
     // Not a `withRoot` mutation: it writes nothing, moves no marker, and its answer goes into a field
@@ -154,7 +155,7 @@ export function localGitBridge(
       const patch = await commitDiffText(root, scope === 'staged', include.map((file) => file.path))
       const result = await core.models.generateText({
         userId: request.userId,
-        connectionId: request.connectionId,
+        backendId: request.backendId,
         input: {
           system: COMMIT_MESSAGE_SYSTEM,
           prompt: buildCommitPrompt({ branch: status.branch, scope, include, omit, patches: splitPatch(patch) }),

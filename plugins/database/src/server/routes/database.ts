@@ -57,7 +57,7 @@ const updateBody = z.object({ schema: z.string(), name: z.string(), column: z.st
 const insertBody = z.object({ schema: z.string(), name: z.string(), values: z.record(z.string(), cell) })
 const deleteBody = z.object({ schema: z.string(), name: z.string(), pk: z.record(z.string(), cell) })
 const generateBody = z.object({
-  connectionId: z.string().min(1),
+  backendId: z.string().min(1),
   modelId: z.string().min(1).optional(),
   prompt: z.string().min(1).max(GENERATE_MAX_PROMPT_CHARS),
   queryIds: z.array(z.string()).max(10).optional(), // saved queries to include as worked examples
@@ -292,10 +292,12 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     // The `Generate SQL` fast path: the modal's six steps with every choice already made
     // (docs/database.md § From the command palette).
     //
-    // The choices it does not offer are the point. One text field cannot carry a connection, a model
-    // and a set of worked examples, so this takes the first available connection and that provider's
-    // own default model — the selection the modal opens on — and generates with no examples. Choosing
-    // any of the three remains the modal's job, unchanged.
+    // The choices it does not offer are the point. One text field cannot carry a backend, a model and
+    // a set of worked examples, so this takes the first available backend and that backend's own
+    // default model — the selection the modal opens on — and generates with no examples. Backends
+    // arrive connections-first, so this keeps spending the key the owner configured and reaches for an
+    // installed CLI only when there is no key at all. Choosing any of the three remains the modal's
+    // job, unchanged.
     //
     // The write comes before the answer, and that ordering is the contract: the success action opens
     // the Database pane, whose editor GETs the scratch route on mount, so answering first would race
@@ -309,15 +311,15 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
       const { input, taskId } = p.data
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
-      const connection = (await core.models.available(owner(c)))[0]
-      if (!connection) return respondError(c, 404, 'provider_not_connected')
-      const modelId = defaultModelIdFor(connection)
+      const backend = (await core.models.available(owner(c)))[0]
+      if (!backend) return respondError(c, 404, 'provider_not_connected')
+      const modelId = defaultModelIdFor(backend)
       const schemaRes = await bridge.schema(taskId)
       if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
       try {
         const result = await core.models.generateText({
           userId: owner(c),
-          connectionId: connection.connection.id,
+          backendId: backend.id,
           input: {
             system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples: [] }),
             prompt: input,
@@ -339,17 +341,17 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       }
     })
 
-    // Which model connections this owner could generate with. The frame cannot ask core directly:
-    // `/v2/core/integrations` has no bridge scope, and minting one would hand every installed plugin
-    // the whole connection roster to serve one dropdown. This answers ids and labels. The key stays
-    // on the node and is resolved inside `models.generateText`.
+    // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
+    // machine. The frame cannot ask core directly: `/v2/core/integrations` has no bridge scope, and
+    // minting one would hand every installed plugin the whole roster to serve one dropdown. This
+    // answers ids and labels. The key stays on the node and is resolved inside `models.generateText`.
     .get('/tasks/:taskId/model-connections', async (c) => {
       if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
-      const connections = await core.models.available(owner(c))
-      // `options` beside `connections`, not instead of it: the pane's dropdown reads the rows and the
+      const backends = await core.models.available(owner(c))
+      // `options` beside `backends`, not instead of it: the pane's dropdown reads the rows and the
       // workflow editor reads the field-option shape every `optionsRoute` answers
       // (docs/workflows.md § Contributed step kinds).
-      return c.json({ connections, options: connections.map(({ connection, provider }) => ({ value: connection.id, label: connection.label || provider.label })) })
+      return c.json({ backends, options: backends.map((backend) => ({ value: backend.id, label: backend.label })) })
     })
 
     // Generate a PostgreSQL query from a natural-language description through a connected model
@@ -365,7 +367,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       try {
         const result = await core.models.generateText({
           userId: owner(c),
-          connectionId: p.data.connectionId,
+          backendId: p.data.backendId,
           input: {
             system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples }),
             prompt: p.data.prompt,

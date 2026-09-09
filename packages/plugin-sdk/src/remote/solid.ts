@@ -26,7 +26,7 @@ export {
   DiffLine, FileHead,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, CopyButton, ModelConnectionPicker, Only, Fallback,
+  KeyValueEditor, FindBar, Field, CopyButton, ModelBackendPicker, Only, Fallback,
 } from '@acorn/plugin-api/ui/tree'
 export type { KitNodeProps } from '@acorn/plugin-api/ui/tree'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write

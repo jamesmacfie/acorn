@@ -58,6 +58,36 @@ the single `events.md` above on 2026-08-28 when all but three items shipped), `l
 `notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
 
+`ai-harness/` was six phases that gave acorn one "generate with" list over stored API keys and the
+agent CLIs already on the machine, so someone holding `claude` or `codex` and no key stops seeing a
+Generate control that is not there. Shipped and deleted 2026-09-09.
+[integrations.md](../integrations.md) § Model providers owns the seam: what a backend is and why a CLI
+is not a synthesized connection, the two id prefixes with the bare uuid that has to keep resolving,
+the connections-first ordering the palette fast path and the silent fallback depend on, the probe on
+every read with no cache, the dispatch on the prefix, the containment of a CLI generate, and the one
+core read route beside the generate endpoint that is still refused.
+[managed-agents.md](../managed-agents.md) § Harnesses has `aiArgv` as the whole code-tier opt-in,
+`HeadlessOpts.system` and who joins it to the prompt, the catalog each profile declares or refuses,
+and the two stream shapes, including the standing bug the programme found: Codex's stream was being
+read with Claude's parser, so no Codex headless or `decide` turn had ever succeeded.
+[plugin-authoring.md](../plugin-authoring.md) § Harnesses has the manifest `oneShot` block, the
+OpenCode example and the two things to check before choosing `output`; § Permissions has what the one
+`models` token does and does not decide; and [plugins.md](../plugins.md) § Harnesses has the second
+trust line. [security.md](../security.md) § Credential handling has the rule that a harness spends the
+CLI's own login and never a key acorn holds. [state-ownership.md](../state-ownership.md) § Scope rules
+has the one `models.generatePick` default and the SQL dialog's known limit, which is the programme's
+one unclosed deviation: that dialog is a remote tree in a worker and cannot read a device preference,
+so it opens on the first backend and remembers nothing. [ui-design.md](../ui-design.md) § The closed
+kit has the renamed picker, [features.md](../features.md) and
+[first-party-plugins.md](../first-party-plugins.md) have the Settings section and the wizard step,
+[api-reference.md](../api-reference.md) has the route, and
+[workflows.md](../workflows.md) § What an agent step sees has `decide` on Codex and why a manifest
+harness passes that check and then fails at run time. [testing.md](../testing.md) holds everything the
+programme owes: five manual checks, items 58 to 62, including the acceptance test that someone writes
+the OpenCode plugin from the authoring doc alone. Its refusals are in git history, and the two worth
+not re-arguing are a CLI as a synthesized connection row and a second `models:harness` permission
+token.
+
 `workflows/` was seven phases that turned a workflow engine nobody could see into one a person
 authors and watches: steps that wait on named steps and run in parallel, declared inputs, step kinds
 that describe their own form, definitions typed in the app, an editor, a run pane, and a start from a

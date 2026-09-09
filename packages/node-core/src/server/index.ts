@@ -12,6 +12,7 @@ import { security } from './routes/security/security'
 import { attachment } from './routes/attachment'
 import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
+import { models } from './routes/models'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins/plugins'
@@ -113,6 +114,10 @@ export function createApp() {
     // service-scope calls (docs/security.md § Credential handling), never a task-scoped child.
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
+    // Which model backends the owner holds, and which agent CLI is installed here. Device-only: it is a
+    // roster of what this machine can spend, and no task-scoped child has any use for it.
+    .use(`${CORE_NAMESPACE}/models`, requireDevice)
+    .use(`${CORE_NAMESPACE}/models/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // /history: the measure series a stat's trend is drawn from
@@ -134,6 +139,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/tasks`, agentTools) // /:id/tools + /:id/tools/:name: the agent-tool registry projection (docs/agent-tools.md)
     .route(`${CORE_NAMESPACE}/agent-tools`, agentToolsCatalog) // static tool catalog for the permissions settings page
     .route(`${CORE_NAMESPACE}/integrations`, integrations) // connect/disconnect/status for third-party providers
+    .route(`${CORE_NAMESPACE}/models`, models) // /backends: the connections and installed CLIs a Generate control can spend
     // Provider-owned routes projected from the integration registry. Mounted at the plugin namespace
     // root rather than a core one, because the projection already prefixes each router with its
     // provider id (server/integrations/providerRoutes.ts).

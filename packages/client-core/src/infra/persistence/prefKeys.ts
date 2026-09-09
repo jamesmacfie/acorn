@@ -48,14 +48,17 @@ export const PrefKeys = {
   // The device's, like `diff_view` beside it. It is about the person reading the list, not about the
   // worktree the list is of.
   changesView: 'changes_view',
-  // Which model connection the Changes pane's commit-message button spends, and which model on it
-  // (plugins/changes/src/client/changesPrefs.ts). A JSON `{ connectionId, modelId }` in one key, like
-  // `changes_view` above, because the model is only meaningful beside the connection that serves it.
+  // Which backend every Generate control in the app spends, and which model on it
+  // (features/settings/models/generatePick.ts). A JSON `{ backendId, modelId }` in one key, like
+  // `changes_view` above, because the model is only meaningful beside the backend that serves it.
   //
-  // The device's, and this one is not a preference about drawing: the connections a node offers are
-  // the same everywhere, but which of them you want to spend is yours, and it should not follow you
-  // to a machine where you were working on somebody else's budget.
-  changesGenerateConnection: 'changes_generate_connection',
+  // One key for all of them rather than one per dialog: with agent CLIs in the list beside API keys,
+  // re-picking in every dialog is the common case, so a pick made in one is what the next opens on.
+  //
+  // The device's, and this one is not a preference about drawing: the backends a node offers are the
+  // same everywhere, but which of them you want to spend is yours, and it should not follow you to a
+  // machine where you were working on somebody else's budget.
+  generatePick: 'models.generatePick',
   // Which editor the editor pane's file view mounts: the graphical one, or `$EDITOR` in a throwaway
   // PTY (plugins/editor/src/client/editorPrefs.ts). The device's, like `theme`: it names a program
   // installed on this machine, and the other client paired with the same node may not have it.

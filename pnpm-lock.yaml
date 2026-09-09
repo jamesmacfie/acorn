@@ -1423,6 +1423,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2))

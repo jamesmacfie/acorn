@@ -1,7 +1,7 @@
 import { createMemo, createSignal } from 'solid-js'
 import { persistDraft } from '@acorn/plugin-api/client'
 import type { CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit } from '../shared/api'
-import { commitMode, generateReason, type ChangesGroups, type CommitMode } from './model'
+import { commitMode, generateReason, type ChangesGroups, type CommitMode, type PickedBackend } from './model'
 
 // The commit editor's state: the message, the three options, what the button will do, and the two
 // verbs behind it.
@@ -18,8 +18,8 @@ export type CommitDeps = {
   groups: () => ChangesGroups
   headCommit: () => Promise<HeadCommit | null>
   commit: (message: string, options: CommitOptions) => Promise<{ ok: boolean; reason?: string }>
-  /** Ask a connected model provider for a message. Throws on a refusal, unlike `commit`: the node
-   *  answers a provider failure as an error envelope, and the code in it is what the alert needs
+  /** Ask the picked backend for a message. Throws on a refusal, unlike `commit`: the node answers a
+   *  failed generate as an error envelope, and the code in it is what the alert needs
    *  (./model.ts § generateReason). */
   commitMessage: (request: CommitMessageRequest) => Promise<GeneratedCommitMessage>
   /** The footer's alert line. Cleared with `''`, which is what a commit that landed writes. */
@@ -127,7 +127,10 @@ export function createCommitState(deps: CommitDeps) {
    * Whether it is safe to overwrite what is there is the button's question, not this one's: the wand
    * arms before it replaces a message somebody wrote (./GenerateButton.tsx).
    */
-  async function generate(pick: CommitMessageRequest): Promise<void> {
+  //
+  // `backend` is only for the failure copy: an installed CLI that is signed out fails the same way an
+  // unreachable provider does, and the two need different next steps (./model.ts § generateReason).
+  async function generate(pick: CommitMessageRequest, backend?: PickedBackend): Promise<void> {
     if (generating()) return
     setGenerating(true)
     deps.onError('')
@@ -141,7 +144,7 @@ export function createCommitState(deps: CommitDeps) {
       // difference from `toggleAmend` above, where nobody was asked.
       if (result.message.trim()) setDraft(result.message)
     } catch (error) {
-      deps.onError(generateReason(error))
+      deps.onError(generateReason(error, backend))
     } finally {
       setGenerating(false)
     }

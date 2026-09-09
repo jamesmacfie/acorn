@@ -13,7 +13,7 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { onServerError } from '@acorn/node-core/server/respond.ts'
 import { localGit, setLocalGitBridge, type GitActionResult } from './localGit'
 import { ProviderOperationError, type GenerateTextRequest } from '@acorn/plugin-api/node'
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Wiring test over a real git worktree: working-tree status, a stage mutation, auth, body validation,
@@ -262,11 +262,11 @@ describe('the generated commit message', () => {
     generateText: (request: GenerateTextRequest) => {
       asked = request
       if (fail) return Promise.reject(fail)
-      return Promise.resolve({ text: answer, providerId: 'anthropic', connectionId: request.connectionId, modelId: 'a-model' })
+      return Promise.resolve({ text: answer, providerId: 'anthropic', backendId: request.backendId, modelId: 'a-model' })
     },
     available: () => Promise.resolve([
-      { provider: { id: 'anthropic', label: 'Anthropic' }, connection: { id: 'conn-1', label: 'Work key' } },
-    ] as unknown as AvailableModelConnection[]),
+      { id: 'connection:conn-1', kind: 'connection', label: 'Work key', models: [], defaultModelId: '' },
+    ] satisfies ModelBackend[]),
   }
 
   // An agent's credential: an internal token bound to one task. It may drive that task's tools and it
@@ -319,7 +319,7 @@ describe('the generated commit message', () => {
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
     git('add', 'a.txt')
 
-    const response = await generate(authed(), { connectionId: 'conn-1', modelId: 'a-model' })
+    const response = await generate(authed(), { backendId: 'conn-1', modelId: 'a-model' })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ message: 'feat: something\n\nAnd why.', providerId: 'anthropic', modelId: 'a-model' })
     // The prompt is built on the node from the diff the next commit would take, so the branch and the
@@ -332,14 +332,14 @@ describe('the generated commit message', () => {
 
   it('describes every tracked change when nothing is staged', async () => {
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
-    expect((await generate(authed(), { connectionId: 'conn-1' })).status).toBe(200)
+    expect((await generate(authed(), { backendId: 'conn-1' })).status).toBe(200)
     expect(asked!.input.prompt).toContain('Nothing is staged')
     // No model asked for, so none is passed on and the provider runtime picks.
     expect(asked!.input.modelId).toBeUndefined()
   })
 
   it('refuses a clean tree before it spends anything', async () => {
-    const response = await generate(authed(), { connectionId: 'conn-1' })
+    const response = await generate(authed(), { backendId: 'conn-1' })
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ error: { code: 'nothing_to_commit' } })
     expect(asked).toBe(null)
@@ -348,23 +348,23 @@ describe('the generated commit message', () => {
   it('400s a body with no connection in it', async () => {
     const app = authed()
     expect((await generate(app, {})).status).toBe(400)
-    expect((await generate(app, { connectionId: '' })).status).toBe(400)
-    expect((await generate(app, { connectionId: 'conn-1', modelId: 7 })).status).toBe(400)
+    expect((await generate(app, { backendId: '' })).status).toBe(400)
+    expect((await generate(app, { backendId: 'conn-1', modelId: 7 })).status).toBe(400)
     expect((await generate(app, 'not json at all')).status).toBe(400)
   })
 
   // An automation caller has no editor to put the text in and no business paying for one.
   it('403s an agent credential on both routes', async () => {
     const app = asAgent()
-    expect((await app.fetch(req('/api/tasks/task1/local/commit-message', 'POST', { connectionId: 'conn-1' }), {} as Env)).status).toBe(403)
+    expect((await app.fetch(req('/api/tasks/task1/local/commit-message', 'POST', { backendId: 'conn-1' }), {} as Env)).status).toBe(403)
     expect((await app.fetch(req('/api/tasks/task1/local/model-connections'), {} as Env)).status).toBe(403)
   })
 
-  it('answers the connections this owner could generate with, ids and labels only', async () => {
+  it('answers the backends this owner could generate with, ids and labels only', async () => {
     const response = await authed().fetch(req('/api/tasks/task1/local/model-connections'), {} as Env)
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual([
-      { provider: { id: 'anthropic', label: 'Anthropic' }, connection: { id: 'conn-1', label: 'Work key' } },
+      { id: 'connection:conn-1', kind: 'connection', label: 'Work key', models: [], defaultModelId: '' },
     ])
   })
 
@@ -373,17 +373,17 @@ describe('the generated commit message', () => {
   it('maps a provider refusal to its own status and code', async () => {
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
     fail = new ProviderOperationError('provider_needs_auth', 401)
-    const denied = await generate(authed(), { connectionId: 'conn-1' })
+    const denied = await generate(authed(), { backendId: 'conn-1' })
     expect(denied.status).toBe(401)
     expect(await denied.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
 
     fail = new ProviderOperationError('provider_rate_limited', 429)
-    expect((await generate(authed(), { connectionId: 'conn-1' })).status).toBe(429)
+    expect((await generate(authed(), { backendId: 'conn-1' })).status).toBe(429)
 
     // Anything else is flattened, as core does for its own provider calls: an upstream exception
     // message can quote a URL or a response body.
     fail = new Error('https://api.example.test failed with sk-abc')
-    const flattened = await generate(authed(), { connectionId: 'conn-1' })
+    const flattened = await generate(authed(), { backendId: 'conn-1' })
     expect(flattened.status).toBe(502)
     expect(await flattened.text()).not.toContain('sk-abc')
   })
@@ -391,7 +391,7 @@ describe('the generated commit message', () => {
   it('unwraps a fenced answer, so nothing has to be edited out of the field', async () => {
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
     answer = '```\nfix: the header\n```'
-    const response = await generate(authed(), { connectionId: 'conn-1' })
+    const response = await generate(authed(), { backendId: 'conn-1' })
     expect(await response.json()).toMatchObject({ message: 'fix: the header' })
   })
 

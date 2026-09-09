@@ -182,8 +182,8 @@ describe('the draft on this device', () => {
 describe('a message somebody else wrote', () => {
   it('lands in the draft, where a commit picks it up unchanged', async () => {
     const state = build([change('a.ts', true)])
-    await state.generate({ connectionId: 'conn-1', modelId: 'a-model' })
-    expect(commitMessage).toHaveBeenCalledWith({ connectionId: 'conn-1', modelId: 'a-model' })
+    await state.generate({ backendId: 'conn-1', modelId: 'a-model' })
+    expect(commitMessage).toHaveBeenCalledWith({ backendId: 'conn-1', modelId: 'a-model' })
     expect(state.draft()).toBe('feat: written for you')
     expect(localStorage.getItem(`${DRAFT_PREFIX}task-1`)).toBe('feat: written for you')
 
@@ -196,9 +196,19 @@ describe('a message somebody else wrote', () => {
       commitMessage: () => Promise.reject(Object.assign(new Error('The tree is clean.'), { code: 'nothing_to_commit' })),
     })
     state.setDraft('feat: mine')
-    await state.generate({ connectionId: 'conn-1' })
+    await state.generate({ backendId: 'conn-1' })
     expect(onError).toHaveBeenLastCalledWith('The tree is clean.')
     expect(state.draft()).toBe('feat: mine')
+  })
+
+  // The backend is passed only so the alert can say the right next step for a CLI that is installed
+  // but signed out, which fails the same way an unreachable provider does.
+  it('sends a signed-out CLI to a terminal', async () => {
+    const state = build([change('a.ts', true)], {
+      commitMessage: () => Promise.reject(Object.assign(new Error('x'), { code: 'provider_unavailable' })),
+    })
+    await state.generate({ backendId: 'harness:claude-code' }, { kind: 'harness', label: 'Claude Code' })
+    expect(onError).toHaveBeenLastCalledWith('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
   })
 
   it('refuses a second press while a provider is still writing', async () => {
@@ -208,9 +218,9 @@ describe('a message somebody else wrote', () => {
         release = () => resolve({ message: 'feat: late', providerId: 'p', modelId: 'm' })
       }),
     })
-    const first = state.generate({ connectionId: 'conn-1' })
+    const first = state.generate({ backendId: 'conn-1' })
     expect(state.generating()).toBe(true)
-    await state.generate({ connectionId: 'conn-1' })
+    await state.generate({ backendId: 'conn-1' })
     release()
     await first
     expect(state.generating()).toBe(false)
@@ -224,7 +234,7 @@ describe('a message somebody else wrote', () => {
       commitMessage: () => Promise.resolve({ message: '   ', providerId: 'p', modelId: 'm' }),
     })
     state.setDraft('feat: mine')
-    await state.generate({ connectionId: 'conn-1' })
+    await state.generate({ backendId: 'conn-1' })
     expect(state.draft()).toBe('feat: mine')
   })
 })

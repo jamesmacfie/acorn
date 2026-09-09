@@ -202,9 +202,16 @@ be denied. For more information, see approval-mediated install and teaching the 
 | `PATCH` | `/v2/core/integrations/:id` | Enable or disable a connection |
 | `POST` | `/v2/core/integrations/:id/test` | Test provider connectivity |
 | `DELETE` | `/v2/core/integrations/:id` | Disconnect and cascade provider data |
+| `GET` | `/v2/core/models/backends` | List the model backends this owner can generate with |
 
 Integration administration is restricted to device and Node service principals. Secret values are
 write-only.
+
+`GET /v2/core/models/backends` is device-only, and answers `backends` plus `missing`. A backend is a
+connected model provider or an agent CLI installed on this machine, projected to an id, a label and a
+model catalog; connections come first. `missing` names every agent CLI that declares a one-shot text
+mode whose command is not on this machine, which is what the onboarding wizard draws as "not found".
+For more information, see model providers in [the integrations doc](./integrations.md).
 
 ### Workspaces and tasks
 
@@ -342,8 +349,8 @@ Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole fami
 | `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
 | `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |
 | `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | `{ path }` after writing `.acorn/workflows/<slug>.toml`, deleting the row unless `keepRow`. |
-| `POST /defs/generate` | `{ connectionId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }`: a whole definition written by a connected model provider, what was taken out of the reply, and what the checker still says about it. |
-| `GET /defs/model-connections` | | The owner's connected model providers with text generation available, ids and labels only. An empty list is why the editor draws no **Generate** button. |
+| `POST /defs/generate` | `{ backendId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }`: a whole definition written by whichever backend `backendId` names, what was taken out of the reply, and what the checker still says about it. |
+| `GET /defs/model-connections` | | The backends this owner can generate with, ids and labels only, connections before installed agent CLIs. The path keeps the older name because only this plugin's own code calls it. An empty list is why the editor draws no **Generate** button. |
 
 `POST /defs/generate` writes a definition from a sentence
 ([workflows.md](./workflows.md) § Generating one from a description). `description` is capped at

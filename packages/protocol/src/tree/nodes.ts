@@ -32,7 +32,7 @@ export const KIT_NODES = [
   // Asking
   'Button', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
   'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor', 'FindBar', 'Field', 'ConfirmButton',
-  'CopyButton', 'ModelConnectionPicker',
+  'CopyButton', 'ModelBackendPicker',
   // Pixels. A tree naming this gets the box and the keyboard contract, and nothing else: what fills a
   // rectangle with somebody else's pixels is the `rectangle` extension kind, which is an iframe the
   // host places as a sibling region and never a node in another plugin's stream.

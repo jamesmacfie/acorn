@@ -41,7 +41,7 @@ import { validateWorkflow, type WorkflowValidationCatalog } from './workflowVali
  *  Narrower than the core seam on purpose: a test fakes this in one line, and nothing here should be
  *  able to reach a user id or a secret. */
 export type GenerateWorkflowText = (args: {
-  connectionId: string
+  backendId: string
   input: { system: string; prompt: string; modelId?: string; maxOutputTokens: number }
 }) => Promise<{ text: string; providerId: string; modelId: string }>
 
@@ -89,7 +89,7 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
   const userPrompt = buildGenerateUserPrompt(request)
   const ask = (prompt: string) =>
     args.generateText({
-      connectionId: request.connectionId,
+      backendId: request.backendId,
       input: { system, prompt, ...(request.modelId ? { modelId: request.modelId } : {}), maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS },
     })
 

@@ -143,14 +143,14 @@ describe('database routes', () => {
     f.generateText.mockResolvedValueOnce({
       text: '```sql\nSELECT * FROM users;\n```',
       providerId: 'anthropic',
-      connectionId: 'conn1',
+      backendId: 'connection:conn1',
       modelId: 'claude-sonnet-5',
     })
-    const res = await f.call('/tasks/task1/generate', json({ connectionId: 'conn1', modelId: 'claude-sonnet-5', prompt: 'all users' }))
+    const res = await f.call('/tasks/task1/generate', json({ backendId: 'connection:conn1', modelId: 'claude-sonnet-5', prompt: 'all users' }))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ sql: 'SELECT * FROM users;', providerId: 'anthropic', modelId: 'claude-sonnet-5' })
     const args = f.generateText.mock.calls[0][0] as GenerateTextRequest
-    expect(args.connectionId).toBe('conn1')
+    expect(args.backendId).toBe('connection:conn1')
     expect(args.userId).toBe('james')
     expect(args.input.modelId).toBe('claude-sonnet-5')
     expect(args.input.system).toContain('CREATE TABLE "public"."users" ();')
@@ -159,16 +159,16 @@ describe('database routes', () => {
 
   it('422s when the schema source fails; maps provider errors to their status', async () => {
     const noSchema = fake({ schema: async () => ({ error: 'Not connected.' }) })
-    const failed = await f.call('/tasks/task1/generate', json({ connectionId: 'c', prompt: 'x' }), noSchema)
+    const failed = await f.call('/tasks/task1/generate', json({ backendId: 'connection:c', prompt: 'x' }), noSchema)
     expect(failed.status).toBe(422)
     expect(await failed.json()).toMatchObject({ error: { code: 'db_schema_unavailable', message: 'Not connected.' } })
 
     f.generateText.mockRejectedValueOnce(new ProviderOperationError('provider_needs_auth', 401))
-    const denied = await f.call('/tasks/task1/generate', json({ connectionId: 'c', prompt: 'x' }))
+    const denied = await f.call('/tasks/task1/generate', json({ backendId: 'connection:c', prompt: 'x' }))
     expect(denied.status).toBe(401)
     expect(await denied.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
 
-    expect((await f.call('/tasks/task1/generate', json({ connectionId: '', prompt: 'x' }))).status).toBe(400)
+    expect((await f.call('/tasks/task1/generate', json({ backendId: '', prompt: 'x' }))).status).toBe(400)
   })
 
   // Generation and the picker behind it spend the owner's provider key, so a task-scoped agent token
@@ -176,7 +176,7 @@ describe('database routes', () => {
   // loaded bundle does not have, so the rule is read off the request context instead.
   it('refuses generation and the connection list to a task-scoped agent token', async () => {
     const agent = principal('james', 'internal')
-    expect((await f.call('/tasks/task1/generate', json({ connectionId: 'c', prompt: 'x' }), fake(), agent)).status).toBe(403)
+    expect((await f.call('/tasks/task1/generate', json({ backendId: 'connection:c', prompt: 'x' }), fake(), agent)).status).toBe(403)
     expect((await f.call('/tasks/task1/model-connections', undefined, fake(), agent)).status).toBe(403)
     expect(f.generateText).not.toHaveBeenCalled()
   })
@@ -289,11 +289,11 @@ describe('saved queries', () => {
     const withNotes = fake({ schema: async () => ({ schema: 'SCHEMA', source: 'auto', notes: 'orders.meta holds { coupon }' }) })
     const picked: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
     const foreign: DbSavedQuery = await (await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')).json()
-    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'anthropic', connectionId: 'c', modelId: 'm' })
+    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'anthropic', backendId: 'connection:c', modelId: 'm' })
 
     const res = await f.call(
       '/tasks/task1/generate',
-      json({ connectionId: 'c', prompt: 'p', queryIds: [picked.id, foreign.id, 'ghost'] }),
+      json({ backendId: 'connection:c', prompt: 'p', queryIds: [picked.id, foreign.id, 'ghost'] }),
       withNotes,
     )
     expect(res.status).toBe(200)
@@ -340,9 +340,12 @@ describe('the palette routes', () => {
     (await f.call(path)).json()
 
   const connected = [{
-    provider: { id: 'anthropic', defaultModelId: 'claude-sonnet-5', models: [{ id: 'other' }] },
-    connection: { id: 'conn1' },
-  }] as unknown as Awaited<ReturnType<ModelService['available']>>
+    id: 'connection:conn1',
+    kind: 'connection' as const,
+    label: 'Work key',
+    models: [{ id: 'other', label: 'Other' }],
+    defaultModelId: 'claude-sonnet-5',
+  }] satisfies Awaited<ReturnType<ModelService['available']>>
 
   it('answers this task’s project’s queries and never a sibling project’s', async () => {
     const mine: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
@@ -368,19 +371,19 @@ describe('the palette routes', () => {
     expect((await search('/palette/queries')).items).toEqual([])
   })
 
-  it('generates with the first connection and that provider’s default model, and no examples', async () => {
+  it('generates with the first backend and that backend’s default model, and no examples', async () => {
     await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
     f.available.mockResolvedValueOnce(connected)
-    f.generateText.mockResolvedValueOnce({ text: '```sql\nSELECT 2;\n```', providerId: 'anthropic', connectionId: 'conn1', modelId: 'claude-sonnet-5' })
+    f.generateText.mockResolvedValueOnce({ text: '```sql\nSELECT 2;\n```', providerId: 'anthropic', backendId: 'connection:conn1', modelId: 'claude-sonnet-5' })
 
     const res = await f.call('/palette/generate', json({ input: 'all users', taskId: 'task1' }))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true, item: { id: '#scratch', title: 'Generated SQL' } })
 
     const args = f.generateText.mock.calls[0][0] as GenerateTextRequest
-    expect(args.connectionId).toBe('conn1')
+    expect(args.backendId).toBe('connection:conn1')
     expect(args.userId).toBe('james')
-    // The modal opens on the provider's declared default, and so does this.
+    // The modal opens on the backend's declared default, and so does this.
     expect(args.input.modelId).toBe('claude-sonnet-5')
     expect(args.input.prompt).toBe('all users')
     expect(args.input.system).toContain('CREATE TABLE "public"."users" ();')
@@ -396,7 +399,7 @@ describe('the palette routes', () => {
     f.generateText.mockImplementationOnce(async () => {
       // Nothing is written yet at the moment the provider replies.
       expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: '' })
-      return { text: 'SELECT 2;', providerId: 'anthropic', connectionId: 'conn1', modelId: 'm' }
+      return { text: 'SELECT 2;', providerId: 'anthropic', backendId: 'connection:conn1', modelId: 'm' }
     })
     const res = await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }))
     scratchAtAnswer = await (await f.call('/tasks/task1/scratch')).json()
@@ -431,9 +434,9 @@ describe('the palette routes', () => {
     expect(await empty()).toEqual({ text: '' })
   })
 
-  it('omits the model when the provider declares no default, leaving the runtime its own fallback', async () => {
-    f.available.mockResolvedValueOnce([{ provider: { id: 'p' }, connection: { id: 'conn2' } }] as unknown as Awaited<ReturnType<ModelService['available']>>)
-    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'p', connectionId: 'conn2', modelId: 'm' })
+  it('omits the model when the backend declares no default, leaving the runtime its own fallback', async () => {
+    f.available.mockResolvedValueOnce([{ id: 'connection:conn2', kind: 'connection', label: 'p', models: [], defaultModelId: '' }] satisfies Awaited<ReturnType<ModelService['available']>>)
+    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'p', backendId: 'connection:conn2', modelId: 'm' })
     expect((await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }))).status).toBe(200)
     expect((f.generateText.mock.calls[0][0] as GenerateTextRequest).input.modelId).toBeUndefined()
   })

@@ -21,7 +21,7 @@ import {
 } from './showing'
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
-  MentionTextarea, ModelConnectionPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
@@ -774,14 +774,14 @@ const CASES: Case[] = [
     check: (frame) => has(frame, '⧉'),
   },
   {
-    node: 'ModelConnectionPicker',
-    draws: 'a picker over the connected models',
+    node: 'ModelBackendPicker',
+    draws: 'two selects over the backends a Generate control can spend',
     render: () => (
-      <ModelConnectionPicker
-        connectionId="c1"
+      <ModelBackendPicker
+        backendId="connection:c1"
         modelId="m1"
         onChange={() => {}}
-        connections={[{ connection: { id: 'c1', label: 'Anthropic' }, provider: { models: [{ id: 'm1', label: 'Opus' }] } }]}
+        backends={[{ id: 'connection:c1', label: 'Anthropic', models: [{ id: 'm1', label: 'Opus' }] }]}
       />
     ),
     check: (frame) => has(frame, '[ Opus ▾ ]'),
@@ -1403,16 +1403,17 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
-    node: 'ModelConnectionPicker',
+    node: 'ModelBackendPicker',
     does: 'opens its model list on Enter',
     render: (record) => (
-      <ModelConnectionPicker
-        connectionId="c1"
+      <ModelBackendPicker
+        backendId="connection:c1"
         modelId="m1"
-        onChange={(selection) => record(selection.modelId)}
-        connections={[{
-          connection: { id: 'c1', label: 'Anthropic' },
-          provider: { models: [{ id: 'm1', label: 'Opus' }, { id: 'm2', label: 'Sonnet' }] },
+        onChange={(pick) => record(pick.modelId)}
+        backends={[{
+          id: 'connection:c1',
+          label: 'Anthropic',
+          models: [{ id: 'm1', label: 'Opus' }, { id: 'm2', label: 'Sonnet' }],
         }]}
       />
     ),

@@ -107,10 +107,10 @@ describe('the database:query step', () => {
 })
 
 describe('the database:generate step', () => {
-  it('needs something to ask for and a connection', () => {
+  it('needs something to ask for and a backend', () => {
     const validate = generateStep(services()).validate!
     expect(validate(step('database:generate', {}), validationContext))
-      .toEqual(["step 'rows' has nothing to ask for", "step 'rows' names no model connection"])
+      .toEqual(["step 'rows' has nothing to ask for", "step 'rows' names no backend to generate with"])
   })
 
   it('runs the SQL it generated and carries it in the output', async () => {

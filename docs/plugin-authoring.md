@@ -101,7 +101,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'10'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"10"` unless you have checked your plugin against another major too, in which case `"9 || 10"` or `"8-10"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'11'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"11"` unless you have checked your plugin against another major too, in which case `"10 || 11"` or `"9-11"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -302,7 +302,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "10",
+  "apiVersion": "11",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -312,16 +312,20 @@ This is the whole plugin that adds OpenCode:
         "spawn": { "command": "opencode", "args": ["acp"] },
         "envPassthrough": ["OPENCODE_*"],
         "quirks": { "manualCompaction": true },
-        "terminal": { "command": "opencode" }
+        "terminal": {
+          "command": "opencode",
+          "oneShot": { "args": ["run"], "modelFlag": "--model", "output": "text" }
+        }
       }
     ]
   }
 }
 ```
 
-One manifest and one icon path. No node bundle, no client bundle, no build step, and no `exec` grant —
+One manifest and one icon path. No node bundle, no client bundle, no build step, and no `exec` grant:
 you describe a spawn, and the agents plugin owns the child process. Install it like any other package,
-approve the one line the trust prompt shows, and OpenCode appears beside Claude and Codex.
+approve the two lines the trust prompt shows, and OpenCode appears beside Claude and Codex in the Agent
+pane, in a task terminal, and in every Generate control in acorn.
 
 The runtime id is `opencode:opencode`: the host prefixes your harness id with your plugin id, the same
 minting rule extension points follow, and for the same reason — a manifest may not claim a name in
@@ -337,6 +341,7 @@ compatibility break for your users rather than a label edit.
 | `label`, `glyph` | Every surface: Agent Center rows, the pane header, usage sections, notifications |
 | `quirks` | Enables or hides the matching affordance, per harness |
 | `terminal` | Registers the terminal profile: task terminals, handoff, the input-controller lease |
+| `terminal.oneShot` | Lists your agent in every Generate control, and runs one contained turn when it is picked |
 | `probes` | Fetches them and draws the answers |
 | nothing else | The ACP connection, the normalizer, the durable event ledger, transcript rendering, permission plumbing, attachments, session persistence, reconnect, replay |
 
@@ -382,11 +387,52 @@ those off the wire, and a manifest repeating them would only drift.
   provider-health row. `null` means "cannot tell", which is different from `false`; an answer acorn
   cannot read is treated as `null` rather than as signed out.
 
-**What a data-only harness does not get.** Headless and workflow invocation. Turning conditional argv
-assembly into manifest data means inventing an argv template language, and that is the flexibility this
-contract refuses in favour of something a person can hold in their head. A data-only harness works in
-the Agent pane and the terminal; a workflow step cannot name it. A harness that needs headless support
-is asking for first-party investment, not a bigger manifest.
+**One-shot text generation.** `terminal.oneShot` describes how your CLI answers a single prompt and
+exits. Declare it and your agent appears in every Generate control in acorn — the commit message wand,
+the SQL draft, the workflow definition generator — beside whatever API keys the owner has connected.
+Three fields:
+
+- `args` (required) — the subcommand and switches for one prompt in, one answer out. `["run"]` for
+  OpenCode.
+- `modelFlag` — the flag a model id goes behind, in your CLI's own spelling. OpenCode wants
+  `--model` and reads `provider/model`. Leave it out and your CLI answers on whatever model it is
+  configured with.
+- `output` (required) — `text` if your CLI prints the answer on stdout, `json-lines` if it writes a
+  newline-delimited stream with a `result` event in it, which is the shape
+  `claude -p --output-format stream-json` writes. There is no default: guess wrong and every generate
+  fails as unreadable output.
+
+acorn builds the argv in fixed positions: your `args`, then `modelFlag` and the model when a caller
+names one, then the prompt last. A system prompt is prepended to that prompt with a blank line between,
+because a manifest has no way to name a system-prompt flag.
+
+That is the whole language, and it stays that way. There are no placeholders, no `${prompt}`, and no
+per-argument conditions, because a manifest that can say "if resuming, add these two arguments" is a
+template language nobody can hold in their head. A CLI that wants the prompt in the middle, or a flag
+whose value depends on another flag, needs a code-tier profile instead.
+
+Two things to check before you pick `output`. Run your CLI with its stdout on a pipe rather than a
+terminal, because plenty of them print differently to each: `opencode run` sends its `> agent · model`
+header, tool lines and permission prompts to stderr and only the assistant's text to stdout, which is
+what makes `text` right for it. Then look for a terminating event if you were reaching for
+`json-lines`: `opencode run --format json` emits `step_start`, `text`, `tool_use` and `step_finish`
+lines with no `result` among them, so acorn would read the answer as missing.
+
+The generate runs contained, and none of it is yours to arrange: an empty temporary directory, so your
+CLI does not read a repository's `AGENTS.md` in front of the caller's prompt; no acorn token and no MCP
+server in the child, so there is nothing for a tool to call; a 60-second ceiling; and an environment
+with no key acorn holds anywhere in it, so your CLI authenticates with its own stored login. The trust
+prompt names the invocation on its own line, because it is a second program run with different
+arguments: "Runs `opencode run --model MODEL` to generate text". Change those arguments in a later
+version and the owner is asked again.
+
+**What a data-only harness does not get.** Headless and agentic workflow steps. Turning conditional
+argv assembly into manifest data means inventing an argv template language, and that is the flexibility
+this contract refuses in favour of something a person can hold in their head. A data-only harness works
+in the Agent pane, the terminal and the Generate lists; a workflow's agent step cannot name it. A
+workflow `decide` step can, but it needs a JSON verdict back and a manifest cannot ask your CLI for
+one, so a `text` harness will answer prose and the step will fail. A harness that needs either is asking
+for first-party investment, not a bigger manifest.
 
 ### The action verbs
 
@@ -435,6 +481,16 @@ so the first call is a `TypeError` the author sees immediately.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
 - `net`: intended egress hosts. Pure disclosure today.
+
+**`models` is one token, and it does not choose what gets spent.** The trust prompt reads "Generate
+text with your model providers and installed agent CLIs", because the list your picker draws holds
+both: a connected OpenAI or Anthropic key, and any agent CLI on the machine that declares a one-shot
+text mode ([integrations.md](./integrations.md) § Model providers). Which of them runs is decided by
+the person picking from the dropdown, or by your own fallback to the first available backend. You
+cannot name a CLI the owner does not have, and you cannot make one run with tools or inside a
+worktree, because core owns that process. There is no second token for the CLI half: the boundary it
+would draw is not real, and `permissions.node` is declared rather than enforced, so it would buy a
+trust line describing a distinction the runtime does not hold.
 
 `permissions.api` is the **frame's** scope list, and unlike the node block it is genuinely enforced —
 by an allowlist of (path shape, method) pairs at
@@ -830,7 +886,7 @@ it is checked against the contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "10",
+  "apiVersion": "11",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

@@ -7,8 +7,12 @@ export type { ClientPlugin } from '@acorn/client-core/host/registries/extensionP
 
 // ── Data toolkit: transport, queries, events ──────────────────────────────────────────────────
 export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/infra/node/apiClient.ts'
+// `modelBackendsOptions` is everything a Generate control can spend, keys and installed agent CLIs
+// alike. On this barrel because the first-run wizard draws the list on its own step, and the node
+// probes PATH per read, so no plugin can assemble it from the integrations query.
 export {
   integrationsOptions,
+  modelBackendsOptions,
   prefsOptions,
   projectsKey,
   projectsOptions,
@@ -209,10 +213,22 @@ export { parseJson } from '@acorn/client-core/infra/persistence/persistedState.t
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence/persistedState.ts'
 export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/savePref.ts'
+// The one shared "Generate with" default. Here rather than on ./ui because none of it is a component:
+// a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes
+// the reader's next choice back for every other dialog to open on.
+export {
+  effectiveModelPick, readGeneratePick, saveGeneratePick,
+} from '@acorn/client-core/features/settings/models/generatePick.ts'
+export type { ModelPick } from '@acorn/client-core/features/settings/models/generatePick.ts'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings/trust/configTrust.ts'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
 export { createDeviceFlow } from '@acorn/client-core/features/integrations/deviceFlow.ts'
+// The other half of connecting a provider: the declared fields, what is required, and the write. A
+// controller rather than a component for the reason the device flow is one — the wizard draws its own
+// kit nodes, and it draws them on a host that has no DOM.
+export { createCredentialForm } from '@acorn/client-core/features/integrations/credentialForm.ts'
+export type { CredentialFormController } from '@acorn/client-core/features/integrations/credentialForm.ts'
 export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
 export { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
 // The attention model: an adapter turns a session row into a state, and the gate decides whether

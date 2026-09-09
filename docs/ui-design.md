@@ -1132,7 +1132,7 @@ the kit as a stop without somebody deciding whether this host presses it.
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | the label above its child |
 | `CopyButton` | stop | fallback: the button copies over OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
-| `ModelConnectionPicker` | stop | a `Picker` over the connected models, grouped by provider |
+| `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 
 ### Pixels, and the host wrappers
 

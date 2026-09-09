@@ -65,8 +65,10 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // from, so a point's public name here is the one the rest of the app will address it by.
         ...extensionPermissionLines(extensionGrants(request.row.name, installed.contributions)),
         // The headline fact when a package contributes one: acorn will run this program as a managed
-        // agent. `Enforced`, because the host spawns exactly the declared command with the declared
-        // arguments and the plugin never gets a process of its own (docs/managed-agents.md § Harnesses).
+        // agent, and a second line when it also declares a one-shot text mode, because that is a second
+        // invocation with its own arguments. `Enforced`, because the host spawns exactly the declared
+        // command with the declared arguments and the plugin never gets a process of its own
+        // (docs/managed-agents.md § Harnesses).
         ...harnessPermissionLines(harnessGrants(installed.contributions)),
       ],
       was: previous

@@ -28,15 +28,15 @@ export type WorkflowDefsBridge = {
   remove(id: string): Promise<{ ok: boolean }>
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
   saveToRepo(id: string, opts: { taskId?: string; keepRow: boolean }): Promise<{ path?: string; notFound?: boolean; error?: string }>
-  // Writes a whole definition from a description through a connected model provider
+  // Writes a whole definition from a description through the picked backend
   // (docs/workflows.md § Authoring). `error` is a reply nothing could be read out of, which is the
   // one failure with no definition to apply. A provider failure throws ProviderOperationError,
   // because its status is the one the caller has to see.
   generate(input: WorkflowGenerateRequest & { userId: string }): Promise<WorkflowGenerateResult | { error: string }>
-  // Which model connections this owner could generate with, ids and labels only. The editor's
-  // Generate button is drawn only when this answers something, so an owner with no provider never
-  // sees a control whose only message is "connect one first".
-  modelConnections(userId: string): Promise<unknown[]>
+  // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
+  // machine — ids and labels only. The editor's Generate button is drawn only when this answers
+  // something, so an owner with neither never sees a control whose only message is "set one up first".
+  modelBackends(userId: string): Promise<unknown[]>
 }
 
 export const WORKFLOW_DEFS_ROUTE = routeCapability<WorkflowDefsBridge>('workflows.defs')
@@ -53,7 +53,7 @@ const saveBody = z.object({ taskId: z.string().min(1).optional(), keepRow: z.boo
 // The description is bounded against the same constant the modal's textarea reads, so the field a
 // person types into and the field the route accepts cannot drift (../../shared/api.ts).
 const generateBody = z.object({
-  connectionId: z.string().min(1),
+  backendId: z.string().min(1),
   modelId: z.string().min(1).optional(),
   description: z.string().min(1).max(GENERATE_MAX_DESCRIPTION_CHARS),
   workspaceId: z.string().min(1),
@@ -126,7 +126,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
   })
   // Also before `/defs/:id`, or the parameter eats the literal.
   .get('/defs/model-connections', (c) =>
-    withBridge(c, async (bridge) => c.json(await bridge.modelConnections(ownerId(c)))))
+    withBridge(c, async (bridge) => c.json(await bridge.modelBackends(ownerId(c)))))
   .get('/defs/:id', (c) =>
     withBridge(c, async (bridge) => {
       const row = await bridge.get(c.req.param('id'), c.req.query('projectId'))

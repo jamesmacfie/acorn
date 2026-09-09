@@ -214,7 +214,7 @@ describe('workflow definition routes', () => {
     validate: async () => ({ problems: [] }),
     saveToRepo: async () => ({ path: '.acorn/workflows/ship-it.toml' }),
     generate: async () => ({ def: row.def, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'm' }),
-    modelConnections: async () => [],
+    modelBackends: async () => [],
     ...over,
   })
 
@@ -257,7 +257,7 @@ describe('workflow definition routes', () => {
       req('/api/defs/def1', 'PUT', { def, revision: 1 }),
       req('/api/defs/def1', 'DELETE'),
       req('/api/defs/validate', 'POST', { def }),
-      req('/api/defs/generate', 'POST', { connectionId: 'c1', description: 'two agents', workspaceId: 'w1' }),
+      req('/api/defs/generate', 'POST', { backendId: 'c1', description: 'two agents', workspaceId: 'w1' }),
       req('/api/defs/def1/save-to-repo', 'POST', {}),
     ]) {
       expect((await app.fetch(call, {} as Env)).status).toBe(403)
@@ -297,7 +297,7 @@ describe('workflow definition routes', () => {
   // and `/defs/generate` has to be declared before `/defs/:id` or the parameter swallows the literal
   // and a generate reads a definition called "generate" instead.
   describe('generate', () => {
-    const body = { connectionId: 'c1', modelId: 'm', description: 'two agents and a synthesiser', workspaceId: 'w1', defId: 'def1' }
+    const body = { backendId: 'c1', modelId: 'm', description: 'two agents and a synthesiser', workspaceId: 'w1', defId: 'def1' }
 
     it('reaches the bridge with the owner rather than the /defs/:id read', async () => {
       let seen: unknown
@@ -313,7 +313,7 @@ describe('workflow definition routes', () => {
     it('400s a body with no description and 422s a reply that never became JSON', async () => {
       setWorkflowDefsBridge(fakeDefs({ generate: async () => ({ error: 'The model did not answer with JSON.' }) }))
       const app = asDevice()
-      expect((await app.fetch(req('/api/defs/generate', 'POST', { connectionId: 'c1', workspaceId: 'w1' }), {} as Env)).status).toBe(400)
+      expect((await app.fetch(req('/api/defs/generate', 'POST', { backendId: 'c1', workspaceId: 'w1' }), {} as Env)).status).toBe(400)
       const res = await app.fetch(req('/api/defs/generate', 'POST', body), {} as Env)
       expect(res.status).toBe(422)
       expect(await res.text()).toContain('did not answer with JSON')

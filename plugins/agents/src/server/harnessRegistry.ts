@@ -9,7 +9,7 @@
 //   the driver          always, because a harness with no driver is a menu entry that cannot run.
 //   the usage collector only with `probes.usage`. Without it the pane shows no usage section.
 //   the terminal profile only with `terminal`. Without it the harness is Agent-pane only.
-import { agentProfileRegistry, type AgentProfileContribution, type Disposable, type HarnessRegistry, type ManifestHarness } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, lineDelimitedJsonAdapter, textAdapter, type AgentProfileContribution, type Disposable, type HarnessRegistry, type ManifestHarness } from '@acorn/plugin-api/node'
 import { harnessAuthProbeSchema, harnessUsageProbeSchema } from '../shared/harnessProbes'
 import { usageHealth, worstUsageHealth, type AgentProviderUsageReading, type AgentUsageQuota } from '../shared/usage'
 import { agentDriverRegistry, type AgentDriverRegistry } from './drivers/registry'
@@ -85,19 +85,45 @@ const usageReading = (harness: ManifestHarness) => async (): Promise<AgentProvid
   }
 }
 
-const terminalProfile = (harness: ManifestHarness): AgentProfileContribution => ({
-  id: harness.id,
-  label: harness.label,
-  kind: 'agent',
-  command: harness.terminal!.command,
-  backendPreference: harness.terminal!.backendPreference,
-  transport: 'pty',
-  launchArgs: harness.terminal!.launchArgs,
-  // No `headlessArgv`, `resumeArgv`, `aiArgv`, or stream-JSON adapter, on purpose: those need
-  // conditional argv assembly, and putting that in manifest data means inventing a template language.
-  // A data-only harness works in the Agent pane and the terminal, but no workflow step can name it.
-  // See docs/plugin-authoring.md § Harnesses.
-})
+const terminalProfile = (harness: ManifestHarness): AgentProfileContribution => {
+  const oneShot = harness.terminal!.oneShot
+  return {
+    id: harness.id,
+    label: harness.label,
+    kind: 'agent',
+    command: harness.terminal!.command,
+    backendPreference: harness.terminal!.backendPreference,
+    transport: 'pty',
+    launchArgs: harness.terminal!.launchArgs,
+    // No `headlessArgv` and no `resumeArgv`, on purpose: those need conditional argv assembly, and
+    // putting that in manifest data means inventing a template language. A data-only harness works in
+    // the Agent pane and the terminal, but no agentic workflow step can name it.
+    //
+    // `aiArgv` is admitted where those two are refused, and the difference is the whole reason it can
+    // be: a one-shot text turn has two variables in fixed positions and no conditions, so there is
+    // nothing to substitute and nothing to branch on. The line we hold is that `oneShot` never grows a
+    // placeholder syntax. See docs/plugin-authoring.md § Harnesses.
+    ...(oneShot
+      ? {
+        aiArgv: (command, opts) => ({
+          file: command,
+          args: [
+            ...oneShot.args,
+            // Both halves of the condition matter. A caller may name a model the harness has no flag
+            // for, and passing the value with no flag would hand the CLI a second positional argument
+            // where it expects one.
+            ...(opts.model && oneShot.modelFlag ? [oneShot.modelFlag, opts.model] : []),
+            // The same join codex uses, and for the same reason: a manifest has no way to declare a
+            // system-prompt flag either, so the two texts arrive as one prompt with a blank line
+            // between them. `opts.schema` is dropped, because there is no flag to carry it.
+            opts.system ? `${opts.system}\n\n${opts.prompt}` : opts.prompt,
+          ],
+        }),
+        streamJson: oneShot.output === 'json-lines' ? lineDelimitedJsonAdapter : textAdapter,
+      }
+      : {}),
+  }
+}
 
 export function createHarnessRegistry(deps: {
   drivers?: AgentDriverRegistry

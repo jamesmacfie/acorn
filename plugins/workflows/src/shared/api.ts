@@ -17,13 +17,13 @@ export const GENERATE_MAX_DESCRIPTION_CHARS = 8_000
 
 /** The body the generate route carries.
  *
- *  `connectionId` and `modelId` are the pair every generate in the repo sends, so the same picker
+ *  `backendId` and `modelId` are the pair every generate in the repo sends, so the same picker
  *  serves all three. `workspaceId` is what the workspace's own definitions are read from, and
  *  `defId` is the one they are read without: a definition is a poor worked example of itself.
  *  `name` and `inputs` are the draft being replaced, which the model is told to keep where they
  *  still fit. */
 export type WorkflowGenerateRequest = {
-  connectionId: string
+  backendId: string
   modelId?: string
   description: string
   workspaceId: string

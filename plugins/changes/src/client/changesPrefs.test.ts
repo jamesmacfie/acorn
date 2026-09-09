@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PrefKeys } from '@acorn/plugin-api/client'
-import { changeViewSlice, readChangeView, readGeneratePick } from './changesPrefs'
+import { changeViewSlice, readChangeView } from './changesPrefs'
 import { DEFAULT_CHANGE_VIEW } from './model'
 
 const stored = (value: unknown) => ({ [PrefKeys.changesView]: JSON.stringify(value) })
@@ -33,24 +33,5 @@ describe('the view preference', () => {
     expect(changeViewSlice.codec.parse('[]')).toEqual({})
     expect(changeViewSlice.codec.parse('{')).toEqual({})
     expect(changeViewSlice.empty('')).toEqual({})
-  })
-})
-
-// Which connection the commit-message button spends. Its own key, not a fourth field on the view: the
-// view is about how the list is drawn and this is about whose tokens go.
-describe('the remembered model pick', () => {
-  const heldPick = (value: unknown) => ({ [PrefKeys.changesGenerateConnection]: JSON.stringify(value) })
-
-  it('answers nothing when it is absent, is not JSON, or is missing the connection', () => {
-    expect(readGeneratePick(undefined)).toBe(null)
-    expect(readGeneratePick({})).toBe(null)
-    expect(readGeneratePick({ [PrefKeys.changesGenerateConnection]: '{' })).toBe(null)
-    expect(readGeneratePick(heldPick({ modelId: 'fast' }))).toBe(null)
-    expect(readGeneratePick(heldPick({ connectionId: '', modelId: 'fast' }))).toBe(null)
-  })
-
-  it('reads back a stored pick, including a provider that declares no model', () => {
-    expect(readGeneratePick(heldPick({ connectionId: 'c2', modelId: 'slow' }))).toEqual({ connectionId: 'c2', modelId: 'slow' })
-    expect(readGeneratePick(heldPick({ connectionId: 'c2', modelId: '' }))).toEqual({ connectionId: 'c2', modelId: '' })
   })
 })

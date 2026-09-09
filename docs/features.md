@@ -58,6 +58,12 @@ GitHub uses device-flow OAuth. Linear connections, and Rollbar connections when 
 installed, are managed from Settings and expose
 provider sources and task links. OpenAI and Anthropic are model-provider connections used by features
 such as SQL generation; prompts and responses are not persisted by the model-provider plugin.
+Settings also lists what this owner can generate with, keys and installed agent CLIs together, and
+holds the one "Generate with" default every Generate control in the app opens on
+([state-ownership.md](./state-ownership.md) § Scope rules). The first-run wizard shows the same list
+on a **Generate with AI** step and offers a key form per provider. It never blocks: an agent CLI
+already on the machine needs no setup at all, and someone who wants neither a CLI nor a key moves on
+and finds this in Settings later.
 
 ## Notes, memory, and context
 

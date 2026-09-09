@@ -16,7 +16,7 @@ export {
   DiffLine, FileHead,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelConnectionPicker, Rectangle, Only,
+  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
   Fallback,
 } from '@acorn/client-core/host/frames/remoteSolid.ts'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write
@@ -30,6 +30,6 @@ export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts
 // components compiled for a document, and a tree bundle must not pull one in: its own build compiles
 // JSX into acorn's nodes, so a shell component reaching it would come out the far side as a tree.
 export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
-// Which model a connection starts on, for a tree that draws a `ModelConnectionPicker` node and has to
+// Which model a backend starts on, for a tree that draws a `ModelBackendPicker` node and has to
 // seed it. A pure function, and its own module for exactly this reason.
 export { defaultModelIdFor } from '@acorn/client-core/features/settings/models/defaultModel.ts'

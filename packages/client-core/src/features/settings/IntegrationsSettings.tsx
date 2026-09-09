@@ -5,15 +5,15 @@ import CopyButton from '../../kit/components/inputs/CopyButton'
 import Icon from '../../kit/components/content/Icon'
 import { brandStyle } from '../../kit/tokens/brandMarks'
 import {
-  connectIntegration,
   deleteIntegration,
-  rotateIntegration,
   setIntegrationDisabled,
   testIntegration,
 } from '../integrations/integrationClient'
+import { createCredentialForm } from '../integrations/credentialForm'
 import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../../infra/queries'
 import ConnectionProjectMap from './ConnectionProjectMap'
+import GenerateSettings from './models/GenerateSettings'
 import { Alert, Button, Chip } from '../../kit/components/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
@@ -45,9 +45,7 @@ export default function IntegrationsSettings() {
   const [rotationId, setRotationId] = createSignal<string | null>(null)
   const [providerId, setProviderId] = createSignal('')
   const selectedProvider = () => byId().get(providerId()) ?? connectable()[0]
-  const [credentials, setCredentials] = createSignal<Record<string, string>>({})
   const [busy, setBusy] = createSignal(false)
-  const [error, setError] = createSignal('')
 
   // --- Device authorization grant (RFC 8628), for a provider whose descriptor says `kind:
   // 'device-flow'`. Currently only GitHub, and one branch here rather than a page of its own: this
@@ -60,29 +58,16 @@ export default function IntegrationsSettings() {
   })
 
   const refresh = () => qc.invalidateQueries({ queryKey: integrationsKey })
-  const valueFor = (id: string) => credentials()[id] ?? ''
-  const setValue = (id: string, value: string) => setCredentials((current) => ({ ...current, [id]: value }))
-  const complete = () => selectedProvider()?.connection.fields.every((field) => !field.required || !!valueFor(field.id).trim()) ?? false
 
-  const add = async () => {
-    const provider = selectedProvider()
-    if (!provider || !complete()) return
-    setBusy(true)
-    setError('')
-    try {
-      if (rotationId()) await rotateIntegration(rotationId()!, credentials())
-      else await connectIntegration(provider.id, credentials())
-      setCredentials({})
-      setRotationId(null)
-      setAdding(false)
-      await refresh()
-    } catch (cause) {
-      const code = (cause as Error).message
-      setError(code === 'provider_needs_auth' ? `Those credentials were rejected by ${provider.label}.` : 'Could not connect this provider.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  // The fields, the completeness rule, the write and the error copy live in
+  // ../integrations/credentialForm.ts, because first-run onboarding adds a key too and the parts worth
+  // getting right are not the inputs. What stays here is the chrome around it: which provider is
+  // selected, whether this is an addition or a rotation, and closing the panel afterwards.
+  const form = createCredentialForm(selectedProvider, async () => {
+    setRotationId(null)
+    setAdding(false)
+    await refresh()
+  }, rotationId)
 
   const disconnect = async (id: string) => {
     setBusy(true)
@@ -139,7 +124,7 @@ export default function IntegrationsSettings() {
                         has no shape for — the owner never holds the token. Disconnect and connect again
                         is the honest path, so the button is simply absent. */}
                     <Show when={provider()?.connection.kind !== 'device-flow'}>
-                      <Button variant="ghost" tone="danger" onPress={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</Button>
+                      <Button variant="ghost" tone="danger" onPress={() => { setProviderId(connection.providerId); setRotationId(connection.id); form.reset(); setAdding(true) }} disabled={busy()}>Rotate</Button>
                     </Show>
                     <Button variant="ghost" tone="danger" onPress={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
                       {connection.status === 'disabled' ? 'Enable' : 'Disable'}
@@ -159,6 +144,11 @@ export default function IntegrationsSettings() {
         </For>
       </div>
 
+      {/* Between the connections and the form that adds one: what is here to generate with reads as a
+          summary of the list above, and an installed agent CLI is a row in it that no credential form
+          could have produced. */}
+      <GenerateSettings />
+
       <Button onPress={() => setAdding((value) => !value)}>
         <span class="integration-add-icon">+</span> Add or rotate integration
       </Button>
@@ -170,7 +160,7 @@ export default function IntegrationsSettings() {
               {(provider) => (
                 <Chip
                   leading={<span class="integration-logo-mono"><Icon name={provider.glyph} /></span>}
-                  onPress={() => { setProviderId(provider.id); setRotationId(null); setCredentials({}) }}
+                  onPress={() => { setProviderId(provider.id); setRotationId(null); form.reset() }}
                 >
                   {provider.label}
                 </Chip>
@@ -181,7 +171,7 @@ export default function IntegrationsSettings() {
             when={selectedProvider()?.connection.kind === 'device-flow'}
             fallback={
               <>
-                <For each={selectedProvider()?.connection.fields ?? []}>
+                <For each={form.fields()}>
                   {(field) => (
                     <label class="integration-add-label">
                       {field.label}
@@ -190,17 +180,17 @@ export default function IntegrationsSettings() {
                           class="ui-input"
                           type={field.type}
                           placeholder={field.placeholder}
-                          value={valueFor(field.id)}
-                          onInput={(event) => setValue(field.id, event.currentTarget.value)}
-                          onKeyDown={(event) => event.key === 'Enter' && void add()}
+                          value={form.value(field.id)}
+                          onInput={(event) => form.setValue(field.id, event.currentTarget.value)}
+                          onKeyDown={(event) => event.key === 'Enter' && void form.submit()}
                         />
                       </div>
                       <Show when={field.hint}><p class="integration-add-hint muted">{field.hint}</p></Show>
                     </label>
                   )}
                 </For>
-                <Button onPress={() => void add()} disabled={busy() || !complete()}>
-                  {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
+                <Button onPress={() => void form.submit()} disabled={form.busy() || !form.complete()}>
+                  {form.busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
                 </Button>
               </>
             }
@@ -232,7 +222,7 @@ export default function IntegrationsSettings() {
               )}
             </Show>
           </Show>
-          <Show when={error() || deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+          <Show when={form.error() || deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </div>
       </div>
     </div>

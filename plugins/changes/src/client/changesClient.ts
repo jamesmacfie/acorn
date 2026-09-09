@@ -1,11 +1,11 @@
 // Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
 import {
-  localActionRoute, localCommitMessageRoute, localDiffRoute, localHeadCommitRoute, localModelConnectionsRoute, localNewSideRoute,
+  localActionRoute, localCommitMessageRoute, localDiffRoute, localHeadCommitRoute, localModelBackendsRoute, localNewSideRoute,
   localStatusRoute, type CommitMessageRequest, type CommitOptions, type GeneratedCommitMessage, type HeadCommit, type PullOptions,
   type PushOptions,
 } from '../shared/api'
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { LocalStatus } from '@acorn/protocol/terminal.ts'
 
@@ -35,7 +35,7 @@ export const localGitApi = {
   // The wand's two calls. Neither answers `{ ok, reason }`: a refusal comes back as an error envelope
   // with a code the footer turns into a next step (./model.ts § generateReason), because "the provider
   // key was rejected" and "nothing is staged" need different sentences.
-  modelConnections: (taskId: string) => readJson<AvailableModelConnection[]>(localModelConnectionsRoute(taskId)),
+  modelBackends: (taskId: string) => readJson<ModelBackend[]>(localModelBackendsRoute(taskId)),
   commitMessage: (taskId: string, request: CommitMessageRequest) =>
     post<GeneratedCommitMessage>(localCommitMessageRoute(taskId), request),
 }

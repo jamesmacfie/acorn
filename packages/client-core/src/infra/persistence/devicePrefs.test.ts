@@ -27,7 +27,7 @@ describe('isDevicePref', () => {
     for (const key of [
       PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder, PrefKeys.leftCollapsed,
       PrefKeys.lastSource, PrefKeys.notices, PrefKeys.diffView, PrefKeys.changesView,
-      PrefKeys.changesGenerateConnection,
+      PrefKeys.generatePick,
     ]) {
       expect(isDevicePref(key), key).toBe(true)
     }

@@ -81,6 +81,14 @@ a one-shot process, its stream captured into the step's events, and no session f
 draw. A fan-out child resolves its own `profile` rather than inheriting the row it was spawned from,
 which is why the runner reads the definition and not the step row.
 
+One narrowing on top of that: a `decide` step needs a profile with a one-shot structured mode, which
+validation tests for on the profile itself rather than against a list of names, so both `claude-code`
+and `codex` qualify and a profile with no such mode is refused when the file is saved. A harness a
+plugin contributed as manifest data passes that check too, because it declares the same one-shot mode
+to appear in the Generate lists ([plugin-authoring.md](./plugin-authoring.md) § Harnesses). One whose
+stdout is read as plain text has no way to answer with a verdict object, so the step fails while it
+runs rather than when the file is saved. A `decide` step that has to work names a code-tier profile.
+
 An agent step also takes `config_options`, a table of provider option ids to values as the provider
 advertises them, such as `model` and `reasoning`. The runner hands them to the agents plugin, which
 applies them to the session after the provider reports its option list and before the turn is
@@ -262,10 +270,11 @@ Applying goes through the same door the JSON tab's **Apply** uses, so the whole 
 is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved: **Save** and
 **Run** are still yours to press.
 
-The button is not drawn at all in two cases. One is an owner with no model provider connected, on the
-rule the commit-message wand follows: a control whose only message is "connect one first" is a
-control in the way of the ones beside it, and Settings, under Integrations, is where a connection is
-made. The other is a definition read from a file rather than a row, which the whole editor is
+The button is not drawn at all in two cases. One is an owner with nothing to generate with, meaning no
+model provider connected and no agent CLI installed either
+([integrations.md](./integrations.md) § Model providers), on the rule the commit-message wand
+follows: a control whose only message is "connect one first" is a control in the way of the ones
+beside it, and Settings, under Integrations, is where a connection is made. The other is a definition read from a file rather than a row, which the whole editor is
 read-only for anyway.
 
 Two model calls, each with a 60-second ceiling of its own, make this the slowest thing in the editor.

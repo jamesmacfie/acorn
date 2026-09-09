@@ -170,7 +170,7 @@ export const NODE_SUPPORT = {
   FindBar: { dom: 'full', tui: 'full' },
   Field: { dom: 'full', tui: 'full' },
   CopyButton: { dom: 'full', tui: 'fallback' },
-  ModelConnectionPicker: { dom: 'full', tui: 'full' },
+  ModelBackendPicker: { dom: 'full', tui: 'full' },
 
   // Pixels. `absent` on a host with no pixels, and `kind="pty"` is the exception the node handles
   // itself: a terminal draws a PTY better than any of this does.

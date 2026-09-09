@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalStatus } from '@acorn/protocol/terminal.ts'
 import type { CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit, PullOptions, PushOptions } from '../../shared/api'
 import {
@@ -38,8 +38,9 @@ export type LocalGitBridge = {
   push(taskId: string, options?: PushOptions): Promise<GitActionResult>
   /** Undo whichever of a merge or a rebase is mid-flight. Refused when none is. */
   abort(taskId: string): Promise<GitActionResult>
-  /** Which model connections this owner could generate a message with, ids and labels only. */
-  modelConnections(userId: string): Promise<AvailableModelConnection[]>
+  /** Which backends this owner could generate a message with — a stored key, or an agent CLI
+   *  installed on this machine — ids and labels only. */
+  modelBackends(userId: string): Promise<ModelBackend[]>
   /** A commit message written from the diff the next commit would take. Throws: a `BridgeError` when
    *  there is nothing to describe, a `ProviderOperationError` when the provider refuses. */
   commitMessage(taskId: string, request: CommitMessageRequest & { userId: string }): Promise<GeneratedCommitMessage>
@@ -71,10 +72,10 @@ const commitBody = z.object({
 // commit on the remote.
 const pullBody = z.object({ rebase: z.boolean().optional() })
 const pushBody = z.object({ force: z.boolean().optional() })
-// Which connection the wand spends. `connectionId` is required because a route that guessed would
-// spend a key nobody chose; `modelId` is optional because a provider that declares no model leaves
-// the choice to its adapter (@acorn/protocol/modelProviders.ts § defaultModelIdFor).
-const commitMessageBody = z.object({ connectionId: z.string().min(1), modelId: z.string().min(1).optional() })
+// Which backend the wand spends. `backendId` is required because a route that guessed would spend a
+// key nobody chose; `modelId` is optional because a backend that declares no model leaves the choice
+// to itself (@acorn/protocol/modelProviders.ts § defaultModelIdFor).
+const commitMessageBody = z.object({ backendId: z.string().min(1), modelId: z.string().min(1).optional() })
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 
@@ -158,9 +159,9 @@ export const localGit = new Hono<AppEnv>()
     return viaBridge(c, LOCAL_GIT, (b) => b.push(id(c), p.data))
   })
   .post('/:id/local/abort', (c) => viaBridge(c, LOCAL_GIT, (b) => b.abort(id(c))))
-  // Which connections the wand may offer. A bare array, like this plugin's review-note reads, rather
-  // than the database plugin's `{ connections }`: there is one thing to answer.
-  .get('/:id/local/model-connections', (c) => viaModels(c, (bridge, userId) => bridge.modelConnections(userId)))
+  // Which backends the wand may offer. A bare array, like this plugin's review-note reads, rather
+  // than the database plugin's `{ backends }`: there is one thing to answer.
+  .get('/:id/local/model-connections', (c) => viaModels(c, (bridge, userId) => bridge.modelBackends(userId)))
   // Write the message from the diff the next commit would take. The answer lands in the editor's
   // draft like typed text and commits through `before-commit` like any other message, so a
   // commit-lint handler sees no difference and should not (../localGit.ts § CHANGES_HOOKS).

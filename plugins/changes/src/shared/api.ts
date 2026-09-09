@@ -81,24 +81,29 @@ export const COMMIT_MESSAGE_MAX_PROMPT_CHARS = 12_000
 /** How much the model may write back. A subject and a short body, not a review. */
 export const COMMIT_MESSAGE_MAX_OUTPUT_TOKENS = 512
 
-/** Which connection and model the wand spends, as the body a commit-message POST carries and as the
- *  device preference that remembers the last pick. `modelId` is `''` when the provider declares
- *  neither a default nor a list, which is a real answer: the node omits it and the provider runtime
- *  falls back to its adapter's recommendation (@acorn/protocol/modelProviders.ts). */
-export type ModelPick = { connectionId: string; modelId: string }
+/** Which backend and model the wand spends, as the body a commit-message POST carries and as the
+ *  device preference that remembers the last pick. A backend is a stored key or an agent CLI installed
+ *  on this machine (@acorn/protocol/modelProviders.ts § ModelBackend). `modelId` is `''` when the
+ *  backend declares neither a default nor a list, which is a real answer: the node omits it and the
+ *  backend falls back to its own recommendation — an adapter's for a key, the CLI's own configured
+ *  default for a harness. */
+export type ModelPick = { backendId: string; modelId: string }
 
-/** The body a commit-message POST carries. `modelId` is absent rather than empty when the provider
+/** The body a commit-message POST carries. `modelId` is absent rather than empty when the backend
  *  declares no model, so the node has nothing to pass on and the runtime picks. */
-export type CommitMessageRequest = { connectionId: string; modelId?: string }
+export type CommitMessageRequest = { backendId: string; modelId?: string }
 
 /** What the route answers: the message, and which provider and model wrote it. The two ids are for
  *  the reader, so a message that came out wrong can be traced to the model that wrote it. */
 export type GeneratedCommitMessage = { message: string; providerId: string; modelId: string }
 
 export const localCommitMessageRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/commit-message`
-/** Which model connections this owner could generate with, ids and labels only.
+/** Which backends this owner could generate with — a stored key, or an agent CLI installed on this
+ *  machine — ids and labels only.
  *
- *  This plugin's own route rather than a read of core's connection roster: `/v2/core/integrations` has
- *  no bridge scope, and minting one would hand every installed plugin every connection to serve one
- *  dropdown (docs/integrations.md § Model providers). */
-export const localModelConnectionsRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/model-connections`
+ *  This plugin's own route rather than a read of core's roster: `/v2/core/integrations` has no bridge
+ *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
+ *  (docs/integrations.md § Model providers). The path still says `model-connections` after the rename:
+ *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
+ *  side of it. */
+export const localModelBackendsRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/model-connections`

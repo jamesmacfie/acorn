@@ -79,7 +79,8 @@ listed in Settings → Plugins and the owner can turn it off.
 A harness names a program acorn will run, so it is disclosed under **Enforced** in the trust prompt,
 honestly: the host spawns the declared command with the declared arguments and nothing else. The
 whole spawn plus the environment passthrough is the grant key, so a version that swaps the binary,
-changes its arguments, or widens the globs reads as newly requested.
+changes its arguments, or widens the globs reads as newly requested. A one-shot text mode is a second
+invocation with its own arguments, so it gets its own line and its own key on the same rule.
 
 **Ids are persisted, not displayed.** A harness id is stored as a session row's `providerId`, a
 profile id as its `profileId`, and a workflow step's `profile`. Renaming one is a compatibility break
@@ -102,6 +103,40 @@ that works with nobody at the keyboard. What an agent may reach is still decided
 owner's tier and per-tool preferences narrowed by the step's own ceiling, so this widens the CLI's
 gate to match acorn's rather than replacing it. `aiArgv` keeps `dontAsk`, because it passes
 `--tools ''`: with nothing to approve, denying whatever tries anyway is the point.
+
+**`aiArgv` is the one-shot text mode, and declaring it is the whole opt-in.** A profile that returns
+an argv from it can answer one prompt with its tools off, and that makes it two things at once: a
+profile a workflow `decide` step may name, and a backend every Generate control in acorn lists beside
+the owner's connected API keys ([integrations.md](./integrations.md) § Model providers). One field
+and no second registry, so a profile author writes it once. Claude Code and Codex both declare it.
+Aider does not, because it has no one-shot mode that answers without editing files, and the shell
+profile does not, because it is not a model.
+
+The system half of such a turn arrives as `HeadlessOpts.system`, apart from the prompt, because that
+is how the connection runtime and every caller's prompt builder already separate them. **The profile
+decides how to carry it**, and core never joins the two on a profile's behalf, because only the
+profile knows whether its CLI honoured a flag. Claude Code passes `--system-prompt`, which replaces
+the CLI's default prompt rather than appending to it, and that is what a generate wants: the
+coding-agent persona is noise in front of "answer with SQL only". Codex has no such flag, so it
+prepends the system text to the prompt with a blank line between. A profile may also declare `models`,
+`defaultModelId` and `glyph`, the same fields a connection provider declares. Claude Code declares
+the CLI's own aliases, `sonnet`, `opus` and `haiku`, rather than dated model ids, because the CLI
+resolves an alias to whatever it ships with and a pinned id goes stale there before it goes stale
+here. Codex declares none: its model list lives in `~/.codex/config.toml` and the owner's account, so
+a copy here would be a second list that drifts from the one that decides. A backend with no catalog
+draws no model select and runs on the CLI's own configured default.
+
+**The stream shape is the profile's too, and the two harnesses share nothing but the newline.** Claude
+Code writes a `result` event carrying the answer, the cost and the token counts. Codex writes none:
+the answer is the text of the last `item.completed` whose item is an `agent_message`, the resume
+reference arrives up front on `thread.started`, and the token counts arrive at the end on
+`turn.completed`. Read with Claude's parser, every field of a Codex capture comes back null and
+`runHeadless` calls the run malformed, so no Codex headless or `decide` turn could ever succeed. Each
+profile names its own adapter now (`server/agentProfiles/streamJson.ts`). Codex reports tokens and no
+cost, so its cost stays absent rather than being invented from a price table, and with
+`--output-schema` it answers with the JSON as the message text, which the adapter parses only when it
+reads as an object or an array. A prose answer leaves the structured field empty, which is what a
+caller that asked for a shape should see.
 
 **What ACP offers the client side is declined.** The driver answers no to `fs`, `terminal`, and
 `mcpServers` at `initialize`. Each is worth adopting on its own merits and none of them blocks, or is

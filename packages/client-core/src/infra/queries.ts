@@ -4,13 +4,14 @@
 //
 // Provider-specific routes and wire types stay with their plugins. The shell owns only core-backed
 // project, task, workspace, preference, and integration queries.
+import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
 import { readJson } from './node/apiClient'
 import { activeNodeId } from './node/activeNode'
 import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
 import { setPref } from '../features/settings/savePref'
-import { integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
-export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
+export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type { Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
@@ -104,4 +105,18 @@ export const integrationsOptions = (enabled: boolean) => ({
   enabled,
   staleTime: 5 * 60 * 1000,
   queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
+})
+
+// Everything a Generate control can spend: every connected model-provider key, plus every agent CLI
+// installed on this machine. Its own query rather than a projection of `integrationsOptions`, because
+// half the answer is a question only the node can answer — whether `claude` is on PATH — and the node
+// probes it per read (docs/integrations.md § Model providers).
+//
+// A short `staleTime`, unlike the five minutes integrations get: installing a CLI is a trip to a
+// terminal and back, and a list that took five minutes to notice would look broken.
+export const modelBackendsOptions = (enabled: boolean) => ({
+  queryKey: modelBackendsKey,
+  enabled,
+  staleTime: 30 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<ModelBackendsResponse> => readJson<ModelBackendsResponse>(modelBackendsRoute, { signal }),
 })

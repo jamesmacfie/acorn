@@ -41,7 +41,7 @@ your manifest at it and every contribution array is validated as you type:
   "id": "my-widget",
   "name": "My widget",
   "version": "0.1.0",
-  "apiVersion": "10"
+  "apiVersion": "11"
 }
 ```
 
@@ -74,7 +74,7 @@ behind `ctx.storage.open()`, a Zod schema on an agent-tool contribution. Adding 
 adding a dependency to a package that promises none. Narrow them yourself if you need to; the rest
 of the surface is exact, and a test in the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors: write `"10"`, or `"9 || 10"` once you have checked
+`apiVersion` is a range over plugin API majors: write `"11"`, or `"10 || 11"` once you have checked
 your plugin against both.
 
 ## Related

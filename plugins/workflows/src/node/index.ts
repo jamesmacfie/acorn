@@ -409,7 +409,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             examples: (await listDefs(store, request.workspaceId)).map((row) => ({ id: row.id, def: row.def })),
             generateText: (args) => core.models.generateText({ userId, ...args }),
           }),
-        modelConnections: (userId) => core.models.available(userId),
+        modelBackends: (userId) => core.models.available(userId),
         saveToRepo: async (id, { taskId, keepRow }) => {
           const row = await getDef(store, id)
           if (!row) return { notFound: true }

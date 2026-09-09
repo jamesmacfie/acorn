@@ -95,7 +95,7 @@ export declare const KeyValueEditor: (props: KitNodeProps) => JSX.Element
 export declare const FindBar: (props: KitNodeProps) => JSX.Element
 export declare const Field: (props: KitNodeProps) => JSX.Element
 export declare const CopyButton: (props: KitNodeProps) => JSX.Element
-export declare const ModelConnectionPicker: (props: KitNodeProps) => JSX.Element
+export declare const ModelBackendPicker: (props: KitNodeProps) => JSX.Element
 export declare const Only: (props: KitNodeProps) => JSX.Element
 export declare const Fallback: (props: KitNodeProps) => JSX.Element
 /** Every node above, keyed by name, for code that picks one at runtime. */
