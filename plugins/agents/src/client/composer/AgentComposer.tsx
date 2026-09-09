@@ -12,6 +12,7 @@ import {
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from '../sessions/managedDrafts'
+import { composerDraftState, hydrateComposerDraft } from './composerState'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
 import { canStopAgent } from '../sessions/agentActivity'
@@ -63,24 +64,47 @@ export default function AgentComposer(props: {
   disabled?: boolean
   /** Startup keeps the draft editable, but cannot accept a turn until metadata and defaults settle. */
   submitDisabled?: boolean
+  /** Whether this composer answers the one-shot focus request below. Off for every surface but the one
+   *  a session is started from: the request is consumed once, so two visible composers would take the
+   *  caret by whichever effect ran first. */
+  autoFocus?: boolean
   previousAutomaticContext?: AgentContextSnapshot
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
 }) {
-  const [sending, setSending] = createSignal(false)
-  const [uploading, setUploading] = createSignal(false)
-  const [attachments, setAttachments] = createSignal<AgentAttachment[]>([])
-  // Which attachment is mid-swap, if any (`replaceDraftAttachment`). Submit is disabled for the
-  // duration: the editor overlay normally covers the composer, but a turn must not be able to enqueue
-  // an id that is being replaced, and correctness here cannot depend on what is on top.
-  const [replacing, setReplacing] = createSignal('')
-  const [contexts, setContexts] = createSignal<AgentContextSnapshot[]>([])
+  // The turn's own payload and the guards over sending it belong to the session, because a session can
+  // be open in two panes and both draw a composer (./composerState.ts). Read through `shared()` on
+  // every access rather than destructured once: `props.session.id` changes without a remount, and a
+  // captured pair would go on writing the previous session's draft.
+  //
+  // `replacing` is the sharpest of them. It is the id of an attachment mid-swap, and submit is
+  // disabled for the duration: the editor overlay normally covers the composer, but a turn must not be
+  // able to enqueue an id that is being replaced, and correctness here cannot depend on what is on
+  // top — or on which pane the reader happens to be looking at.
+  const shared = createMemo(() => composerDraftState(props.session.id))
+  const attachments = () => shared().attachments()
+  const setAttachments = (next: AgentAttachment[] | ((current: AgentAttachment[]) => AgentAttachment[])) =>
+    shared().setAttachments(next)
+  const contexts = () => shared().contexts()
+  const setContexts = (next: AgentContextSnapshot[] | ((current: AgentContextSnapshot[]) => AgentContextSnapshot[])) =>
+    shared().setContexts(next)
+  const error = () => shared().error()
+  const setError = (next: string) => shared().setError(next)
+  const sending = () => shared().sending()
+  const setSending = (next: boolean) => shared().setSending(next)
+  const uploading = () => shared().uploading()
+  const setUploading = (next: boolean) => shared().setUploading(next)
+  const replacing = () => shared().replacing()
+  const setReplacing = (next: string) => shared().setReplacing(next)
+  // These four stay this composer's own. `capturingContext` and `contextPickerId` are one modal's
+  // state and the modal is per mount; `expanded` is session-only, like the terminal drawer's own
+  // maximise, because a composer that stayed tall across a relaunch would hide the transcript of a
+  // session nobody had started typing into yet; and `dismissedAutomaticPayload` pairs with the
+  // automatic-context effect below, which only ever runs on an `interactive` session and so is never
+  // the one drawn twice — the run pane can only mount a `workflow` session.
   const [capturingContext, setCapturingContext] = createSignal('')
   const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
-  const [error, setError] = createSignal('')
-  // Session-only, like the terminal drawer's own maximise: a composer that stayed tall across a
-  // relaunch would hide the transcript of a session nobody had started typing into yet.
   const [expanded, setExpanded] = createSignal(false)
   const composerSessionId = createMemo(() => props.session.id)
   const configOptions = createMemo<AgentConfigOption[]>(
@@ -137,47 +161,53 @@ export default function AgentComposer(props: {
   // the draft, so the first thing you do with a new agent is type at it (managedSelection.ts).
   let field: HTMLTextAreaElement | undefined
   createEffect(() => {
-    if (!consumeComposerFocus(composerSessionId())) return
+    if (!props.autoFocus || !consumeComposerFocus(composerSessionId())) return
     queueMicrotask(() => field?.focus())
   })
 
+  // Two halves, because they have two owners. This composer's view state resets on every mount that
+  // sees a new session; the session's own draft is read back once, however many composers asked, since
+  // the read fetches an attachment per stored id and may patch the session to clear a consumed fork
+  // context. Folded into one effect, the second mount would stop resetting its own view state.
   createEffect(on(composerSessionId, (sessionId) => {
-    hydrateManagedDraft(sessionId, readLocal(draftKey(sessionId)) ?? '')
-    setError('')
     setExpanded(false)
     setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
-    let ids: string[] = []
-    try {
-      const value = JSON.parse(readLocal(attachmentDraftKey(sessionId)) ?? '[]') as unknown
-      if (Array.isArray(value)) ids = value.filter((item): item is string => typeof item === 'string')
-    } catch {
-      ids = []
-    }
-    try {
-      const stored = JSON.parse(readLocal(contextDraftKey(sessionId)) ?? '[]') as unknown
-      const restored = Array.isArray(stored)
-        ? stored.filter((item): item is AgentContextSnapshot =>
-            typeof item === 'object' && item != null && (item as { type?: unknown }).type === 'context')
-        : []
-      const forkContext = props.session.config.pendingForkContext
-      setContexts(restored.length
-        ? restored
-        : forkContext && typeof forkContext === 'object'
-          && (forkContext as { type?: unknown }).type === 'context'
-          ? [forkContext as AgentContextSnapshot]
-          : [])
-    } catch {
-      setContexts([])
-      if (props.session.config.pendingForkContext) {
-        const { pendingForkContext: _sent, ...config } = props.session.config
-        void managedAgentApi.patch(props.session.id, { config })
-          .then(props.onSessionUpdated)
-          .catch(() => undefined)
+    hydrateComposerDraft(sessionId, () => {
+      hydrateManagedDraft(sessionId, readLocal(draftKey(sessionId)) ?? '')
+      setError('')
+      let ids: string[] = []
+      try {
+        const value = JSON.parse(readLocal(attachmentDraftKey(sessionId)) ?? '[]') as unknown
+        if (Array.isArray(value)) ids = value.filter((item): item is string => typeof item === 'string')
+      } catch {
+        ids = []
       }
-    }
-    void Promise.all(ids.map((id) => managedAgentApi.attachment(id).catch(() => null)))
-      .then((items) => setAttachments(items.filter((item): item is AgentAttachment => item != null)))
+      try {
+        const stored = JSON.parse(readLocal(contextDraftKey(sessionId)) ?? '[]') as unknown
+        const restored = Array.isArray(stored)
+          ? stored.filter((item): item is AgentContextSnapshot =>
+              typeof item === 'object' && item != null && (item as { type?: unknown }).type === 'context')
+          : []
+        const forkContext = props.session.config.pendingForkContext
+        setContexts(restored.length
+          ? restored
+          : forkContext && typeof forkContext === 'object'
+            && (forkContext as { type?: unknown }).type === 'context'
+            ? [forkContext as AgentContextSnapshot]
+            : [])
+      } catch {
+        setContexts([])
+        if (props.session.config.pendingForkContext) {
+          const { pendingForkContext: _sent, ...config } = props.session.config
+          void managedAgentApi.patch(props.session.id, { config })
+            .then(props.onSessionUpdated)
+            .catch(() => undefined)
+        }
+      }
+      return Promise.all(ids.map((id) => managedAgentApi.attachment(id).catch(() => null)))
+        .then((items) => setAttachments(items.filter((item): item is AgentAttachment => item != null)))
+    })
   }))
 
   let automaticCaptureVersion = 0

@@ -2,11 +2,17 @@ import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
+import { provideClientCapability, type Disposable } from '@acorn/plugin-api/testkit/client'
+import { AGENTS_CONVERSATION, type AgentConversationProps } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import type { RunPaneModel } from './runPaneModel'
 
 // Which controls a node offers is the pane's whole promise: a stale button is a race, not a bug
 // (docs/workflows.md § Routes and UI). So the check is per status, in a real render.
+//
+// The second half is which shape a node draws. An agent node hands its detail to the conversation
+// plugins/agents publishes, and every other kind — and an agent node on a machine where that plugin
+// is switched off — keeps the summary this pane has always drawn.
 
 vi.mock('@acorn/plugin-terminal/contract/sessionsClient.ts', () => ({
   terminalSessions: { create: async () => ({ id: 'term-1' }) },
@@ -64,9 +70,33 @@ const press = (label: string): void => {
   found.click()
 }
 
+// Nothing provides the conversation unless a test says so, which is also the real answer on a node
+// with the agents plugin disabled.
+let provided: Disposable | undefined
+const provideConversation = (): Array<Partial<AgentConversationProps>> => {
+  const drawn: Array<Partial<AgentConversationProps>> = []
+  provided = provideClientCapability(AGENTS_CONVERSATION, {
+    Conversation: (props) => {
+      // Read every field here, because props are getters and the recorded copy has to be the values
+      // this render actually passed.
+      drawn.push({
+        sessionId: props.sessionId,
+        workflowStepId: props.workflowStepId,
+        viewKeyPrefix: props.viewKeyPrefix,
+        note: props.note,
+        noSession: props.noSession,
+      })
+      return null
+    },
+  })
+  return drawn
+}
+
 afterEach(() => {
   dispose?.()
   host?.remove()
+  provided?.dispose()
+  provided = undefined
   vi.clearAllMocks()
 })
 
@@ -115,5 +145,65 @@ describe('the controls a node offers', () => {
     mount(step({ kind: 'terminal:run-target', status: 'done', structuredJson: JSON.stringify({ sessionId: 'term-2', url: 'http://localhost:3000' }) }))
     expect(buttons()).toEqual(['Open terminal'])
     expect(host.textContent).toContain('http://localhost:3000')
+  })
+})
+
+describe('which shape a node draws', () => {
+  it('an agent node draws the conversation, named by the step rather than the session', () => {
+    const drawn = provideConversation()
+    mount(step({}))
+
+    // The step, because a running step has no session id on its row yet: the runner writes that in the
+    // completion patch. The agents client is the half that can turn one into the other.
+    expect(drawn[0]?.workflowStepId).toBe('st1')
+    expect(drawn[0]?.sessionId).toBeUndefined()
+    // Its own scroll place, so following live here does not drag the Agent pane's view about.
+    expect(drawn[0]?.viewKeyPrefix).toBe('workflows')
+    // Sending mid-step is legal and surprising, so the box says what it does.
+    expect(drawn[0]?.note).toContain('runs after it finishes')
+  })
+
+  it('says nothing about sending once the step has stopped', () => {
+    const drawn = provideConversation()
+    mount(step({ status: 'done', agentSessionId: 'sess-1' }))
+
+    expect(drawn[0]?.note).toBeUndefined()
+    expect(drawn[0]?.sessionId).toBe('sess-1')
+  })
+
+  it('names the Agent pane as the other place to see it', () => {
+    provideConversation()
+    mount(step({ agentSessionId: 'sess-1' }))
+    // Not "Open": the conversation is already open, here.
+    expect(buttons()).toEqual(['Show in Agent pane', 'Kill step'])
+  })
+
+  it('says why there is no transcript, in the words this pane knows', () => {
+    const drawn = provideConversation()
+    mount(step({ status: 'done' }))
+    // A step with no managed session ran as a bare process. "No session" on its own reads as a bug;
+    // the reason and where the output went are the useful part.
+    expect(drawn[0]?.noSession).toContain('headless')
+    expect(drawn[0]?.noSession).toContain('Step details')
+  })
+
+  it('says a pending step has not started rather than that it ran', () => {
+    const drawn = provideConversation()
+    mount(step({ status: 'pending' }))
+    expect(drawn[0]?.noSession).toBe('This step has not started yet.')
+  })
+
+  it('keeps the summary when nothing provides a conversation', () => {
+    mount(step({}))
+    // The harness and the model, which is what this pane drew before the transcript was here.
+    expect(host.textContent).toContain('claude-code')
+    expect(buttons()).toEqual(['Kill step'])
+  })
+
+  it('leaves every other kind the shape it had', () => {
+    provideConversation()
+    mount(step({ kind: 'terminal:command', status: 'done', structuredJson: JSON.stringify({ exitCode: 3 }) }))
+    expect(host.textContent).toContain('Exit code')
+    expect(buttons()).toEqual([])
   })
 })

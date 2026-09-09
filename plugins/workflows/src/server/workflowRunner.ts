@@ -37,6 +37,11 @@ export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../shared/workfl
 
 export type FanOutTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {
+  /** Which harness runs this step, with "the workflow default" already resolved. The runner answers
+   *  it once, here, because a step that names none still has one and every reader has to agree which:
+   *  the row `start` writes, validation, the managed session, and the headless fallback. They did not,
+   *  and the one that saw `undefined` quietly ran the step as a bare process with no session. */
+  profileId: string
   mode?: 'headless' | 'ai'
   signal?: AbortSignal
   onEvent?: (event: StreamEvent) => void
@@ -49,6 +54,10 @@ export type RunStepOptions = HeadlessOpts & {
   managedSessionId?: string
   timeoutMs?: number
 }
+
+/** What a step handler asks for. The harness is the runner's answer, not the handler's, so it is the
+ *  one field a handler never fills in. */
+export type StepRunRequest = Omit<RunStepOptions, 'profileId'>
 
 export type RunnerDeps = {
   runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<HeadlessResult>
@@ -771,17 +780,30 @@ export class WorkflowRunner {
     return { ok: true }
   }
 
-  private async runHeadless(taskId: string, def: WorkflowStepDef, opts: RunStepOptions, ctx: StepHandlerContext): Promise<HeadlessResult> {
+  private async runHeadless(taskId: string, def: WorkflowStepDef, opts: StepRunRequest, ctx: StepHandlerContext): Promise<HeadlessResult> {
+    // The managed session this step is running in, the first time an event names it. The outcome
+    // carries it too, but that lands in the completion patch, which left `runForSession` answering
+    // nothing for the whole time a reader might want to look — so the Agent pane's "Workflow:" chip
+    // only appeared once the step was over. A bare write: `setStep` announces nothing when the patch
+    // leaves the status alone.
+    let noted = ctx.step.agentSessionId ?? ''
     return this.#headless.use(opts.signal ?? ctx.signal, async () => {
       await opts.onStart?.()
       return this.deps.runStep(taskId, def, {
         ...opts,
+        // The def's own, not the step row's: a fan-out child runs on a rebound row that carries its
+        // parent's profile, so the row would name the wrong harness for the child.
+        profileId: def.profileId ?? DEFAULT_PROFILE_ID,
         workflowRunId: ctx.run.id,
         workflowStepId: ctx.step.id,
         managedSessionId: ctx.step.agentSessionId ?? undefined,
         onEvent: (event) => {
           opts.onEvent?.(event)
           ctx.emit({ at: now(), event })
+          const sessionId = event.sessionId
+          if (typeof sessionId !== 'string' || !sessionId || sessionId === noted) return
+          noted = sessionId
+          void this.setStep(ctx.step.id, { agentSessionId: sessionId })
         },
         timeoutMs: opts.timeoutMs ?? ctx.budget.maxWallTimeMs,
       })

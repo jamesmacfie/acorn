@@ -2,18 +2,19 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import {
-  activateTaskSignals, activeNodeId, createFleetQuery, nodes, pathForTask, readJson, setActiveNode,
-  type Task, tasksOptions, workspaceForProject, workspacesOptions,
+  activateTaskSignals, activeNodeId, createFleetQuery, nodes, openPane, pathForTask, readJson,
+  setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from '../sessions/agentActivity'
 import { managedAgentApi } from '../sessions/managedClient'
 import { managedAgentStore } from '../sessions/managedStore'
-import { openManagedSession } from '../sessions/managedSelection'
+import { openManagedSession, selectManagedSession } from '../sessions/managedSelection'
+import { workflowRunOf } from './workflowRun'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import {
-  Alert, Card, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row, Rows,
-  SegmentedControl, Select, Stack, StatusDot, Text,
+  Alert, Card, Chip, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row,
+  Rows, SegmentedControl, Select, Stack, StatusDot, Text,
 } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from '../sessions/RuntimeStateIcon'
 import { providerTone } from '../sessions/stateTone'
@@ -158,6 +159,22 @@ export default function AgentCenter() {
   // Two nodes may hold the same session id, so a row's key names both (docs/architecture-overview.md
   // § Fleet semantics).
   const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
+
+  // Two targets on one row, because a workflow session has two homes and neither is the obvious one:
+  // the body opens the session, this opens the run it belongs to. Row ignores a click that landed on a
+  // control inside it, so there is nothing to stop here (client-core kit RowActions.tsx).
+  function openRun(row: AgentRow, run: { runId: string; stepId?: string }) {
+    if (!row.task) return setError('The session’s task is no longer available.')
+    if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
+    activateTaskSignals(row.task, { pane: 'workflows' })
+    // Spelled, not imported: plugins/workflows imports this plugin, so an import back would close a
+    // cycle the package graph refuses. The pane's own `when` can also be false on a window that has
+    // not yet counted this task's runs, so the session is selected as well and the Agent pane is
+    // right if the reader goes looking there instead.
+    selectManagedSession(row.task.id, row.session.id)
+    openPane(row.task.id, 'workflows', { kind: 'workflows:show-run', runId: run.runId, stepId: run.stepId })
+    navigate(pathForTask(row.task))
+  }
 
   function open(row: AgentRow) {
     if (!row.task) return setError('The session’s task is no longer available.')
@@ -309,7 +326,21 @@ export default function AgentCenter() {
                           metaFields={2}
                           onPress={() => open(current())}
                         >
-                          <Text emphasis="strong">{current().session.title}</Text>
+                          <Inline>
+                            <Text emphasis="strong">{current().session.title}</Text>
+                            {/* A session a workflow started, and the way back to the run. The same
+                                chip the Agent pane's header carries, so the two read alike. */}
+                            <Show when={workflowRunOf(current().session)}>
+                              {(run) => (
+                                <Chip
+                                  leading={<Icon name="workflow" />}
+                                  onPress={() => openRun(current(), run())}
+                                >
+                                  Run
+                                </Chip>
+                              )}
+                            </Show>
+                          </Inline>
                           <Text emphasis="muted">
                             {current().session.providerId} · {current().session.kind} ·{' '}
                             {current().task?.title ?? 'Missing task'}

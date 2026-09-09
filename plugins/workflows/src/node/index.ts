@@ -4,7 +4,7 @@ import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { buildHeadlessArgv, buildSessionEnv, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
@@ -82,11 +82,17 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       const runner = new WorkflowRunner(store, {
         hooks: ctx.hooks,
         runStep: async (taskId, def, opts) => {
+          // `opts.profileId`, never `def.profileId`: the runner has already resolved "the workflow
+          // default" and both paths below have to name the same harness. Reading the def here is what
+          // made a step with no harness named run as a bare process with no session, because
+          // `managedProviderForProfile(undefined)` answers null and the managed path returns before it
+          // creates anything.
+          //
           // Resolved per call, not at init (docs/plugins.md § Collaboration rules): plugin init
           // order is not defined.
           const managed = await ctx.capabilities.get(AGENTS_SESSION_EXECUTE)?.({
             taskId,
-            profileId: def.profileId,
+            profileId: opts.profileId,
             title: `Workflow: ${def.name}`,
             prompt: opts.prompt,
             schema: opts.schema,
@@ -101,13 +107,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             signal: opts.signal,
           })
           if (managed) return managed
-          // The headless fallback: a profile with no managed driver, or a node with agents disabled.
+          // The headless fallback, which now means what it says: a profile with no managed driver, or
+          // a node with agents disabled. It used to catch a blank harness as well.
           const task = await core.tasks.load(taskId)
           // The identity is passed through because creating the worktree consults the owner's per-repo
           // base_ref preference; dropping it would silently fall back to git's origin/main.
           const { cwd } = task ? await core.tasks.resolveCwd(task, undefined, core.identity.active()) : { cwd: homedir() }
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
-          const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
+          const profile = requireProfile(opts.profileId)
           const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
           if (!argv) {
             return {

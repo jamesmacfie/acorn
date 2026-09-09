@@ -3,7 +3,7 @@ import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@a
 import * as schema from '../node/schema'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
 import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../shared/workflowContracts'
-import type { RunnerDeps, RunStepOptions } from './workflowRunner'
+import type { RunnerDeps, StepRunRequest } from './workflowRunner'
 import { intersectToolCeilings } from './workflowTools'
 import { renderWorkflowPrompt } from './workflowValidation'
 
@@ -45,7 +45,7 @@ export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)
 type BuiltinServices = {
   db: PluginDatabase
   deps: RunnerDeps
-  runHeadless(taskId: string, def: WorkflowStepDef, opts: RunStepOptions, ctx: StepHandlerContext): Promise<HeadlessResult>
+  runHeadless(taskId: string, def: WorkflowStepDef, opts: StepRunRequest, ctx: StepHandlerContext): Promise<HeadlessResult>
   setStep(stepId: string, patch: Partial<WorkflowStepRow>): Promise<void>
   steps(runId: string): Promise<WorkflowStepRow[]>
   childSteps(parentStepId: string): Promise<WorkflowStepRow[]>
@@ -115,6 +115,23 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   // declarations, so they are hoisted and already bound by the time a step dispatches into one.
   return { stepKinds: kinds, policies }
 
+  // What any step that runs an agent actually sends: its own prompt, then every incoming edge's
+  // output under a heading, then the task context block that carries the handoff trail
+  // (docs/workflows.md § What an agent step sees). Shared by all four agent-running kinds, because
+  // the editor offers the Upstream output control on all four and each one used to answer it
+  // differently: until 2026-09-09 only `agent` read `upstream` at all, so a `decide` step set to
+  // Append silently saw none of the analysis it was asked to decide on.
+  //
+  // 'template' means the prompt places `${steps.x.output}` itself and 'none' means it stands alone.
+  // The context block rides along in every mode, because that is separate from the graph's edges.
+  async function agentPrompt(ctx: StepHandlerContext, base: string): Promise<string> {
+    const prompt = (ctx.def.inputs ?? 'append') === 'append' && ctx.upstream.length
+      ? [base, ...ctx.upstream.map((step) => `## Output of ${step.name}\n\n${step.output}`)].filter(Boolean).join('\n\n')
+      : base
+    const context = await services.deps.assembleContext(ctx.run.taskId, ctx.run.id)
+    return context ? `${prompt}\n\n${context}` : prompt
+  }
+
   async function runAgent(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     let prompt = ctx.renderedPrompt
     if (ctx.def.requiresRun) {
@@ -123,13 +140,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       if (!target.ok) return { status: 'failed', error: `Could not start run target '${ctx.def.requiresRun}'.` }
       if (target.url) prompt = `${prompt}\n\nThe app is running at: ${target.url}`
     }
-    // Every incoming edge's output under a heading, unless the step says otherwise. 'template' means
-    // the prompt places `${steps.x.output}` itself and 'none' means the prompt stands alone.
-    if ((ctx.def.inputs ?? 'append') === 'append' && ctx.upstream.length) {
-      prompt = [prompt, ...ctx.upstream.map((step) => `## Output of ${step.name}\n\n${step.output}`)].filter(Boolean).join('\n\n')
-    }
-    const context = await services.deps.assembleContext(ctx.run.taskId, ctx.run.id)
-    const inputs = context ? `${prompt}\n\n${context}` : prompt
+    const inputs = await agentPrompt(ctx, prompt)
     const outcome = headlessOutcome(
       await services.runHeadless(
         ctx.run.taskId,
@@ -150,13 +161,14 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       required: ['verdict'],
       additionalProperties: true,
     }
+    const prompt = await agentPrompt(ctx, ctx.renderedPrompt)
     const result = await services.runHeadless(
       ctx.run.taskId,
       ctx.def,
-      { prompt: ctx.renderedPrompt, model: ctx.def.model, schema, mode: 'ai', signal: ctx.signal, tools: { allow: [] } },
+      { prompt, model: ctx.def.model, schema, mode: 'ai', signal: ctx.signal, tools: { allow: [] } },
       ctx,
     )
-    const outcome = headlessOutcome(result)
+    const outcome = { ...headlessOutcome(result), inputs: { prompt, tools: { allow: [] } } }
     if (outcome.status === 'done' && (!outcome.structured || typeof (outcome.structured as { verdict?: unknown }).verdict !== 'string')) {
       return { ...outcome, status: 'failed', error: `Decision '${ctx.def.name}' returned no scalar verdict.` }
     }
@@ -175,6 +187,10 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     let iteration = ctx.step.iteration
     let sessionId = ctx.step.sessionId ?? undefined
     let agentSessionId = ctx.step.agentSessionId ?? undefined
+    const fallback = ctx.renderedPrompt || 'Fix the failing CI checks, then commit and push.'
+    // Only the turn that opens the session pays for the upstream output and the context block. A
+    // resumed turn already has both in its history.
+    const opening = sessionId ? fallback : await agentPrompt(ctx, fallback)
     for (;;) {
       if (ctx.signal.aborted) return { status: 'cancelled' }
       const failing = await services.deps.failingChecks(ctx.run.taskId)
@@ -189,7 +205,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
         ctx.run.taskId,
         ctx.def,
         {
-          prompt: `${ctx.renderedPrompt || 'Fix the failing CI checks, then commit and push.'}\n\nFailing checks:\n${failing}`,
+          prompt: `${sessionId ? fallback : opening}\n\nFailing checks:\n${failing}`,
           model: ctx.def.model,
           schema: ctx.def.schema,
           resumeSessionId: sessionId,
@@ -207,10 +223,11 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
 
   async function runFanOut(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     if (!services.deps.createChildTask) return { status: 'failed', error: 'Fan-out unavailable (no child-task factory).' }
+    const planPrompt = await agentPrompt(ctx, ctx.renderedPrompt)
     const plan = await services.runHeadless(
       ctx.run.taskId,
       ctx.def,
-      { prompt: ctx.renderedPrompt, model: ctx.def.model, schema: ctx.def.schema, signal: ctx.signal, tools: ctx.tools },
+      { prompt: planPrompt, model: ctx.def.model, schema: ctx.def.schema, signal: ctx.signal, tools: ctx.tools },
       ctx,
     )
     const structured = plan.capture.structuredOutput as { tasks?: { title: string; branch: string; prompt?: string }[] } | { title: string; branch: string; prompt?: string }[] | null
@@ -257,6 +274,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       status: 'done',
       result: { children: children.length, failed: outcomes.filter((ok) => !ok).length },
       structured: seeds,
+      inputs: { prompt: planPrompt, tools: ctx.tools },
       sessionId: plan.capture.sessionId,
       agentSessionId: plan.agentSessionId,
       costUsd: plan.capture.costUsd,

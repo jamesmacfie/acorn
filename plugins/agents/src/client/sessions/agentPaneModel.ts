@@ -6,7 +6,6 @@ import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/mana
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
-import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import {
   agentAttentionItemId,
   clearManagedSession,
@@ -63,8 +62,6 @@ export function createAgentPaneModel(task: Task) {
   })
   const provider = createMemo(() =>
     providers()?.find((candidate) => candidate.id === selected()?.providerId))
-  const previousAutomaticContext = createMemo(() =>
-    latestAutomaticTaskContext(snapshot()?.turns ?? []))
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
@@ -74,18 +71,11 @@ export function createAgentPaneModel(task: Task) {
     })
     .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
 
-  // The dep must be the memo, not an inline `() => selected()?.id`. Solid's `on()` runs its callback on
-  // every notification without comparing the input, so an inline getter re-fires whenever `selected()`
-  // changes identity, and `loadSnapshot` below ends in `upsertSession`, which replaces that object. That
-  // was an infinite reload loop; a memo dedupes with `===` and keeps it quiet.
-  createEffect(on(selectedSessionId, (sessionId) => {
-    setError('')
-    if (!sessionId) return
-    void managedAgentStore.loadSnapshot(sessionId).catch((caught) => {
-      if (selected()?.id !== sessionId) return
-      setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
-    })
-  }))
+  // No snapshot load here. The conversation owns that, because it is the thing that needs one and it
+  // is mounted in two panes now (./AgentConversation.tsx). Loading it here as well made two requests
+  // for the same few thousand event rows every time a session opened. What is left is clearing the
+  // pane's own error when the reader moves on.
+  createEffect(on(selectedSessionId, () => setError('')))
 
   // Acknowledge on view. The node keeps `attention: completed` until the owner speaks again, so a
   // finished session sits in "Needs you" long after they have read it. Looking at it, in a focused
@@ -300,7 +290,6 @@ export function createAgentPaneModel(task: Task) {
     selected,
     selectedSessionId,
     snapshot,
-    previousAutomaticContext,
     creating,
     error,
     setError,

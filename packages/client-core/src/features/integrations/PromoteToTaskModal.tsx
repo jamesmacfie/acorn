@@ -4,7 +4,7 @@ import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 import { projectsOptions } from '../../infra/queries'
-import { slugifyBranch } from '@acorn/protocol/branch.ts'
+import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { createDismissable } from '../../kit/lib/dismissable'
@@ -61,6 +61,7 @@ export function PromoteToTaskModal(props: {
   const [mode, setMode] = createSignal<'new' | 'attach'>('new')
   const [title, setTitle] = createSignal('')
   const [branch, setBranch] = createSignal('')
+  const [branchTouched, setBranchTouched] = createSignal(false)
   const [attachId, setAttachId] = createSignal(props.attachTasks[0]?.id ?? '')
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
@@ -120,13 +121,24 @@ export function PromoteToTaskModal(props: {
       .catch(() => {})
   })
 
+  // The branch the task is actually made on. A name the provider seeded is used verbatim: a pull
+  // request's head branch already exists on the remote, and slugging it away gave the task a local
+  // branch that could never be pushed to that pull request ('npm_and_yarn' became 'npm-and-yarn').
+  // Only what a person types here is slugged, because they are naming a branch that does not exist
+  // yet. Either way an unusable name leaves the button disabled.
+  const effectiveBranch = () => {
+    if (branchTouched()) return slugifyBranch(branch())
+    const seeded = branch().trim()
+    return isValidBranch(seeded) ? seeded : ''
+  }
+
   const canAttach = () => typeof promotion().attachToCurrentTask === 'function' && props.attachTasks.length > 0
 
   async function submitNew(e: Event) {
     e.preventDefault()
     const projectId = params.projectId
     const isGitProject = project()?.vcs === 'git'
-    const b = slugifyBranch(branch())
+    const b = effectiveBranch()
     if (!projectId || !title().trim() || (isGitProject && !b) || !workflowReady()) return
     setBusy(true)
     setError('')
@@ -222,11 +234,11 @@ export function PromoteToTaskModal(props: {
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
               <input class="ui-input" type="text" placeholder="Task title" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
               <Show when={project()?.vcs === 'git'}>
-                <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
+                <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => { setBranchTouched(true); setBranch(e.currentTarget.value) }} />
               </Show>
               <div class="close-actions">
                 <Button onPress={props.onClose}>Cancel</Button>
-                <Button submit disabled={busy() || !workflowReady() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>
+                <Button submit disabled={busy() || !workflowReady() || !title().trim() || (project()?.vcs === 'git' && !effectiveBranch())}>
                   {props.workflow ? 'Create & run' : 'Create task'}
                 </Button>
               </div>

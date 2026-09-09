@@ -257,3 +257,22 @@ describe('a task’s session list', () => {
     expect(sessionCalls).toHaveLength(2)
   })
 })
+
+describe('a session’s snapshot', () => {
+  it('is one read for two readers in the same tick', async () => {
+    served = { session, turns: [], events: [], requests: [] }
+    await Promise.all([managedAgentStore.loadSnapshot(SESSION), managedAgentStore.loadSnapshot(SESSION)])
+    // Two panes open on one session, which is what the run pane makes possible. The transcript is up
+    // to a couple of thousand event rows, so the second reader has to be free.
+    expect(snapshotCalls).toEqual([SESSION])
+  })
+
+  it('is read again once the first has settled', async () => {
+    served = { session, turns: [], events: [], requests: [] }
+    await managedAgentStore.loadSnapshot(SESSION)
+    await managedAgentStore.loadSnapshot(SESSION)
+    // Not a time window: every caller after a send asks because it expects the answer to have
+    // changed, and holding the old one would show the transcript from before the turn.
+    expect(snapshotCalls).toEqual([SESSION, SESSION])
+  })
+})

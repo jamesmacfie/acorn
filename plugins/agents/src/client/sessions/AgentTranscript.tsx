@@ -22,6 +22,9 @@ export default function AgentTranscript(props: {
   snapshot: AgentSessionSnapshot
   focusRequestId?: string
   focusSubagentId?: string
+  /** Which surface is drawing this, for the scroll place below. Two panes can be open on one session
+   *  and a reader can be following live in one while reading history in the other. */
+  viewKeyPrefix?: string
   onExitSubagent: () => void
   onRequestResolved: () => void
 }) {
@@ -53,7 +56,11 @@ export default function AgentTranscript(props: {
   const sessionModel = createMemo(() => sessionModelLabel(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
   // different lists, so one key would restore the wrong offset every time the reader stepped in or out.
-  const viewId = createMemo(() => focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId())
+  // Two surfaces on the same stream are two lists in that same sense, so the prefix is part of the key.
+  const viewId = createMemo(() => {
+    const view = focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId()
+    return props.viewKeyPrefix ? `${props.viewKeyPrefix}:${view}` : view
+  })
 
   return (
     <>

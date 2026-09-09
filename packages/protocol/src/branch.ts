@@ -3,6 +3,12 @@
 // renderer derives the default branch from the task title; main validates separately
 // (worktrees.ts isValidBranch guards the git arg).
 
+// Whether a name can be handed to git as-is. Shared with the Node, which guards the git argument
+// with it (worktrees.ts): one character class, so a name the client accepts is one the Node accepts.
+export function isValidBranch(branch: string): boolean {
+  return !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
+}
+
 export function slugifyBranch(input: string): string {
   const slug = input
     .toLowerCase()

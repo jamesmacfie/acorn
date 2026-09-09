@@ -34,6 +34,8 @@ let dispose: (() => void) | undefined
 const registered: Disposable[] = []
 
 const created = vi.fn(async () => TASK)
+/** What the source's `prepare` seeds the branch field with; a test overrides it before mounting. */
+let seedBranch = 'james/typeerror'
 
 const mount = (workflow?: Parameters<typeof PromoteToTaskModal>[0]['workflow']) => {
   registered.push(sourceRegistry.register({
@@ -43,7 +45,7 @@ const mount = (workflow?: Parameters<typeof PromoteToTaskModal>[0]['workflow']) 
     label: 'Rollbar',
     promotion: {
       canPromote: () => true,
-      prepare: () => ({ origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: 'james/typeerror' }),
+      prepare: () => ({ origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: seedBranch }),
       create: created,
     },
   }))
@@ -78,6 +80,7 @@ const type = (element: HTMLInputElement, value: string) => {
 const settle = async () => { for (let tick = 0; tick < 4; tick += 1) await Promise.resolve() }
 
 afterEach(() => {
+  seedBranch = 'james/typeerror'
   created.mockClear()
   dispose?.()
   host?.remove()
@@ -119,5 +122,37 @@ describe('the workflow step', () => {
       issue: 'TypeError in pullsBatch',
       focus: 'the retry change',
     })
+  })
+})
+
+// A pull request's head branch already exists on the remote, so the field's seeded value is the
+// branch, not a suggestion. Slugging it gave the task a local branch that could never be pushed back.
+describe('the branch field', () => {
+  it('creates the task on the seeded branch verbatim', async () => {
+    seedBranch = 'dependabot/npm_and_yarn/dev-dependencies-0e84c50104'
+    mount()
+    await settle()
+
+    primary().click()
+    await settle()
+
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({
+      branch: 'dependabot/npm_and_yarn/dev-dependencies-0e84c50104',
+    }))
+  })
+
+  it('slugs a branch a person types, and refuses one with nothing left', async () => {
+    mount()
+    await settle()
+
+    const branchField = inputs()[1]
+    type(branchField, 'Fix Login Crash!')
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ branch: 'fix-login-crash' }))
+
+    created.mockClear()
+    type(branchField, '!!!')
+    expect(primary().disabled).toBe(true)
   })
 })

@@ -1,9 +1,10 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
-  openPane, pathForTask, refreshSessions, requestTerminalFocus, setTerminalOpen, type Task,
-  tasksOptions,
+  clientCapability, openPane, pathForTask, refreshSessions, requestTerminalFocus, setTerminalOpen,
+  type Task, tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, CodeBlock, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal, Stack,
@@ -11,14 +12,22 @@ import {
 } from '@acorn/plugin-api/ui'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
+import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
 import { formatCost, formatDuration, kindLabel, kindRunsAgent, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 
 // The run pane's `detail` region: what one node is doing, and the controls that are legal for the
 // state it is in (docs/workflows.md § Routes and UI).
 //
-// The transcript is not here. An agent node says what it last said and offers a button to the Agent
-// pane, which owns the conversation; this pane answers "what is it doing" and "where do I go".
+// An agent node draws the conversation itself, through the capability plugins/agents publishes
+// (@acorn/plugin-agents/contract/conversation.ts): the same transcript, queue and composer the Agent
+// pane draws, because reading what a step is saying should not mean leaving the run. Every other kind
+// answers "what is it doing" the way it always has.
+//
+// Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
+// sizes against the region, so that branch is a fragment with the controls folded into the toolbar;
+// a `Stack` around it, or a row of buttons after it, and the composer ends up below the fold with the
+// pane's own scroll broken (client-core infra/styles/shell.css, docs/panes.md § Layout model).
 
 const readJson = <T,>(raw: string | null | undefined): T | null => {
   if (!raw) return null
@@ -110,10 +119,182 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     if (current) void model.retry(current.id, prompt)
   }
 
+  // Resolved per call, never captured: a node with the agents plugin disabled answers `undefined` and
+  // this pane keeps the summary it always drew (docs/plugins.md § Collaboration rules).
+  const conversation = createMemo(() => clientCapability(AGENTS_CONVERSATION)?.Conversation)
+  const drawsConversation = createMemo(() => shape() === 'agent' && !!conversation())
+
+  // Each of these is used by both shapes, and each takes the accessor rather than the row: a snapshot
+  // would stop the toolbar moving as the step's status does.
+  const meta = (current: () => WorkflowStepRow) => (
+    <Text emphasis="muted">
+      {[kindLabel(current().kind), current().status, formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
+        .filter(Boolean).join(' · ')}
+    </Text>
+  )
+
+  const alerts = (current: () => WorkflowStepRow) => (
+    <>
+      <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+      <Show when={current().error}>{(message) => <Alert title="This node stopped">{message()}</Alert>}</Show>
+    </>
+  )
+
+  const controls = (current: () => WorkflowStepRow) => (
+    <>
+      <Show when={current().agentSessionId}>
+        {(sessionId) => (
+          <Button size="sm" disabled={model.busy()} onPress={() => openAgentPane(sessionId())}>
+            {drawsConversation() ? 'Show in Agent pane' : 'Open in Agent pane'}
+          </Button>
+        )}
+      </Show>
+      {/* A step whose harness session was captured but that never became a managed session.
+          The agents sidebar used to offer this and no longer does; the row still carries the
+          command, and the node has already refused one whose session id is not a plain token. */}
+      <Show when={!current().agentSessionId && current().resumeCommand}>
+        {(command) => (
+          <Button size="sm" disabled={model.busy()} onPress={() => void resumeInTerminal(current().name, current().profileId, command())}>
+            Open in terminal
+          </Button>
+        )}
+      </Show>
+      <Show when={shape() === 'run-target' && (structured() as RunTargetOutput | null)?.sessionId}>
+        {(sessionId) => (
+          <Button size="sm" disabled={model.busy()} onPress={() => openTerminal(sessionId())}>Open terminal</Button>
+        )}
+      </Show>
+      <Show when={current().status === 'running'}>
+        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Kill step</Button>
+      </Show>
+      <Show when={current().status === 'waiting-gate'}>
+        <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.gate(true)}>Approve</Button>
+        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.gate(false)}>Reject</Button>
+      </Show>
+      <Show when={failed()}>
+        <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.retry(current().id)}>Retry</Button>
+        <Show when={shape() === 'agent'}>
+          <Button size="sm" disabled={model.busy()} onPress={() => setRetrying(inputs()?.prompt ?? '')}>
+            Retry with edited prompt
+          </Button>
+        </Show>
+      </Show>
+    </>
+  )
+
+  const retryModal = () => (
+    <Show when={retrying() !== null}>
+      <Modal onDismiss={() => setRetrying(null)} title="Retry with an edited prompt" size="md">
+        <Modal.Body>
+          <Textarea
+            label="Prompt"
+            rows={12}
+            value={retrying() ?? ''}
+            // Typed, because the terminal host's `Textarea` declares `ref` as `unknown`.
+            ref={(el: HTMLTextAreaElement) => queueMicrotask(() => el.focus())}
+            onInput={(value) => setRetrying(value)}
+          />
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="bare" onPress={() => setRetrying(null)}>Cancel</Button>
+          <Button variant="solid" onPress={() => submitRetry(retrying() ?? undefined)}>Retry</Button>
+        </Modal.Actions>
+      </Modal>
+    </Show>
+  )
+
+  const childTaskLine = () => (
+    <Show when={childTask()}>
+      {(child) => (
+        <Text>
+          Runs on its own task. <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>
+        </Text>
+      )}
+    </Show>
+  )
+
+  // What a turn sent from here actually does. The step waits on its own turn and nothing else, so a
+  // turn typed now queues behind it and runs once the run has already recorded the step as done.
+  const note = (current: () => WorkflowStepRow) => current().status === 'running'
+    ? 'This step is still working. A turn you send now runs after it finishes, by which time the run has moved on.'
+    : undefined
+
+  // Why there is no conversation, when there is none. Only two reasons: the step has not run, or it
+  // ran outside a managed session, which is what a profile with no managed driver does. Said here
+  // rather than in the conversation, because the reason is this pane's to know.
+  const noSession = (current: () => WorkflowStepRow) => current().status === 'pending'
+    ? 'This step has not started yet.'
+    : 'This step runs headless, outside a managed session, so there is no transcript. Its output is under Step details.'
+
   return (
     <Show when={step()} fallback={<EmptyState size="sm">Pick a node to see what it is doing.</EmptyState>}>
       {(current) => (
-        <Stack gap="section">
+        <Show
+          when={drawsConversation()}
+          fallback={(
+            <Stack gap="section">
+              <Toolbar ariaLabel="Workflow node">
+                <Icon
+                  name={stepGlyph(current().status)}
+                  tone={stepTone(current().status)}
+                  spin={current().status === 'running'}
+                />
+                <Heading level={2}>{current().name}</Heading>
+                <Toolbar.Spacer />
+                {meta(current)}
+              </Toolbar>
+
+              {alerts(current)}
+              {childTaskLine()}
+
+              <Switch>
+                <Match when={shape() === 'gate'}>
+                  <Show
+                    when={current().status === 'waiting-gate'}
+                    fallback={<Text emphasis="muted">{current().status === 'done' ? 'Approved.' : `This gate is ${current().status}.`}</Text>}
+                  >
+                    <Text>Waiting for you.</Text>
+                  </Show>
+                </Match>
+
+                <Match when={shape() === 'command'}>
+                  <CommandBody step={current()} model={model} />
+                </Match>
+
+                <Match when={shape() === 'run-target'}>
+                  <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
+                </Match>
+
+                <Match when={shape() === 'data'}>
+                  <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
+                </Match>
+
+                <Match when={shape() === 'http'}>
+                  <HttpBody output={structured() as HttpOutput | null} />
+                </Match>
+
+                <Match when={shape() === 'agent'}>
+                  <AgentBody step={current()} structured={structured()} />
+                </Match>
+
+                <Match when={shape() === 'other'}>
+                  <Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>
+                </Match>
+              </Switch>
+
+              <Show when={otherEvents().length}>
+                <Fold label="Events" count={otherEvents().length}>
+                  <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
+                </Fold>
+              </Show>
+
+              <Inline wrap>{controls(current)}</Inline>
+              {retryModal()}
+            </Stack>
+          )}
+        >
+          {/* The agent shape. A fragment, and the controls live in the toolbar, because the
+              conversation below owns the scroll and takes the height that is left. */}
           <Toolbar ariaLabel="Workflow node">
             <Icon
               name={stepGlyph(current().status)}
@@ -122,121 +303,49 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
             />
             <Heading level={2}>{current().name}</Heading>
             <Toolbar.Spacer />
-            <Text emphasis="muted">
-              {[kindLabel(current().kind), current().status, formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
-                .filter(Boolean).join(' · ')}
-            </Text>
+            {meta(current)}
+            {controls(current)}
           </Toolbar>
 
-          <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-          <Show when={current().error}>{(message) => <Alert title="This node stopped">{message()}</Alert>}</Show>
+          {alerts(current)}
 
-          <Show when={childTask()}>
-            {(child) => (
-              <Text>
-                Runs on its own task. <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>
-              </Text>
-            )}
-          </Show>
-
-          <Switch>
-            <Match when={shape() === 'gate'}>
-              <Show
-                when={current().status === 'waiting-gate'}
-                fallback={<Text emphasis="muted">{current().status === 'done' ? 'Approved.' : `This gate is ${current().status}.`}</Text>}
-              >
-                <Text>Waiting for you.</Text>
+          {/* Folded, because the transcript below says most of it in more detail. What is worth
+              keeping is the harness the step ran on, the structured value a schema step answered
+              with, and whatever a handler emitted that this pane has no drawing for. */}
+          <Fold label="Step details">
+            <Stack gap="row">
+              {childTaskLine()}
+              <Facts
+                grouping="rows"
+                size="sm"
+                items={[
+                  { label: 'Harness', value: current().profileId ?? '—' },
+                  { label: 'Model', value: current().model ?? '—' },
+                ]}
+              />
+              <Show when={structured()}>
+                {(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}
               </Show>
-            </Match>
-
-            <Match when={shape() === 'command'}>
-              <CommandBody step={current()} model={model} />
-            </Match>
-
-            <Match when={shape() === 'run-target'}>
-              <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
-            </Match>
-
-            <Match when={shape() === 'data'}>
-              <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
-            </Match>
-
-            <Match when={shape() === 'http'}>
-              <HttpBody output={structured() as HttpOutput | null} />
-            </Match>
-
-            <Match when={shape() === 'agent'}>
-              <AgentBody step={current()} structured={structured()} />
-            </Match>
-
-            <Match when={shape() === 'other'}>
-              <Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>
-            </Match>
-          </Switch>
-
-          <Show when={otherEvents().length}>
-            <Fold label="Events" count={otherEvents().length}>
-              <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
-            </Fold>
-          </Show>
-
-          <Inline wrap>
-            <Show when={current().agentSessionId}>
-              {(sessionId) => (
-                <Button size="sm" disabled={model.busy()} onPress={() => openAgentPane(sessionId())}>Open in Agent pane</Button>
-              )}
-            </Show>
-            {/* A step whose harness session was captured but that never became a managed session.
-                The agents sidebar used to offer this and no longer does; the row still carries the
-                command, and the node has already refused one whose session id is not a plain token. */}
-            <Show when={!current().agentSessionId && current().resumeCommand}>
-              {(command) => (
-                <Button size="sm" disabled={model.busy()} onPress={() => void resumeInTerminal(current().name, current().profileId, command())}>
-                  Open in terminal
-                </Button>
-              )}
-            </Show>
-            <Show when={shape() === 'run-target' && (structured() as RunTargetOutput | null)?.sessionId}>
-              {(sessionId) => (
-                <Button size="sm" disabled={model.busy()} onPress={() => openTerminal(sessionId())}>Open terminal</Button>
-              )}
-            </Show>
-            <Show when={current().status === 'running'}>
-              <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Kill step</Button>
-            </Show>
-            <Show when={current().status === 'waiting-gate'}>
-              <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.gate(true)}>Approve</Button>
-              <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.gate(false)}>Reject</Button>
-            </Show>
-            <Show when={failed()}>
-              <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.retry(current().id)}>Retry</Button>
-              <Show when={shape() === 'agent'}>
-                <Button size="sm" disabled={model.busy()} onPress={() => setRetrying(inputs()?.prompt ?? '')}>
-                  Retry with edited prompt
-                </Button>
+              <Show when={otherEvents().length}>
+                <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
               </Show>
-            </Show>
-          </Inline>
+            </Stack>
+          </Fold>
 
-          <Show when={retrying() !== null}>
-            <Modal onDismiss={() => setRetrying(null)} title="Retry with an edited prompt" size="md">
-              <Modal.Body>
-                <Textarea
-                  label="Prompt"
-                  rows={12}
-                  value={retrying() ?? ''}
-                  // Typed, because the terminal host's `Textarea` declares `ref` as `unknown`.
-                  ref={(el: HTMLTextAreaElement) => queueMicrotask(() => el.focus())}
-                  onInput={(value) => setRetrying(value)}
-                />
-              </Modal.Body>
-              <Modal.Actions>
-                <Button variant="bare" onPress={() => setRetrying(null)}>Cancel</Button>
-                <Button variant="solid" onPress={() => submitRetry(retrying() ?? undefined)}>Retry</Button>
-              </Modal.Actions>
-            </Modal>
-          </Show>
-        </Stack>
+          {/* The step's own id, not just the session's: a running step has no `agentSessionId` on its
+              row yet, and the agents client can find the session from the step
+              (@acorn/plugin-agents/contract/conversation.ts). */}
+          <Dynamic
+            component={conversation()!}
+            sessionId={current().agentSessionId ?? undefined}
+            workflowStepId={current().id}
+            viewKeyPrefix="workflows"
+            note={note(current)}
+            noSession={noSession(current)}
+          />
+
+          {retryModal()}
+        </Show>
       )}
     </Show>
   )

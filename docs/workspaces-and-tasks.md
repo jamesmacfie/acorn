@@ -193,7 +193,11 @@ right, unknown or duplicate pane ids are dropped, and a recipe naming no valid p
 ## Task creation and navigation
 
 The rail creates local tasks from a project and derives a branch from the title when the project is
-Git-backed. An explicitly entered branch is preserved. Ticking "Use the project folder and its
+Git-backed. An explicitly entered branch is preserved. The promote-to-task modal follows the same
+rule from the other direction: a branch a provider seeded is used exactly as given, because a pull
+request's head branch already exists on the remote and a rewritten name could never be pushed back to
+that PR. Only a name a person types is slugged, and either way a name git would refuse leaves the
+button disabled. Ticking "Use the project folder and its
 current branch" creates the task with no branch, so it works in the project folder on whatever is
 already checked out and never gets a worktree. PR, Linear, and Rollbar promotions resolve or
 create the appropriate project and task link, then reuse an existing task when that exact link is

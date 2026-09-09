@@ -6,24 +6,20 @@ import {
   Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
-import AgentTranscript from './AgentTranscript'
-import AgentComposer from '../composer/AgentComposer'
+import AgentConversation from './AgentConversation'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
-import QueuedAgentTurns from '../composer/QueuedAgentTurns'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
 import { canStopAgent } from './agentActivity'
-import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { managedAgentApi } from './managedClient'
-import { managedAgentStore } from './managedStore'
-import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 
-// The Agent pane's `detail` region: the open session's header, its transcript, and the composer.
+// The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
-// Header, body and footer without a nested layout. The transcript is a `Timeline follow`, which owns
-// the scroll and takes what height is left, so the bar above it and the composer below it are pinned
-// by being its siblings rather than by a second set of regions (docs/panes.md § Layout model).
+// Header, body and footer without a nested layout. The transcript inside the conversation is a
+// `Timeline follow`, which owns the scroll and takes what height is left, so the bar above it and the
+// composer below it are pinned by being its siblings rather than by a second set of regions
+// (docs/panes.md § Layout model). That is why everything here is a fragment down to the timeline.
 
 /** The header bar: which session is open, what it is doing, and how to start another.
  *
@@ -239,60 +235,14 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
     <>
       <AgentDetailHeader task={props.task} model={model} />
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+      {/* The transcript, the queue and the composer, addressed by session id alone
+          (./AgentConversation.tsx). The run pane draws the same three through a capability, so a
+          session reads the same way wherever you found it. `autoFocus` is this pane's: a session
+          started here is one you are about to type into. */}
       <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} model={model} />}>
-        {(narrowed) => {
-          const session = narrowed
-          return (
-          <>
-            <Show
-              when={model.snapshot()}
-              fallback={
-                <EmptyState busy>
-                  {agentSessionIsStarting(session()) ? 'Connecting…' : 'Loading conversation…'}
-                </EmptyState>
-              }
-            >
-              {(narrowedSnapshot) => {
-                const snapshot = narrowedSnapshot
-                return (
-                <>
-                  <AgentTranscript
-                    taskId={props.task.id}
-                    snapshot={snapshot()}
-                    focusRequestId={focusedManagedRequest(session().id)}
-                    focusSubagentId={selectedManagedSubagent(session().id)}
-                    onExitSubagent={() => clearManagedSubagent(session().id)}
-                    onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
-                  />
-                  <QueuedAgentTurns
-                    sessionId={session().id}
-                    runtimeState={snapshot().session.runtimeState}
-                    turns={snapshot().turns}
-                    onChanged={() => managedAgentStore.loadSnapshot(session().id)}
-                    onError={model.setError}
-                  />
-                </>
-                )
-              }}
-            </Show>
-            {/* Gone while a subagent's run owns the window. The composer only ever addresses the
-                session, so leaving it under a subagent's transcript would read as "reply to this
-                subagent", which is not a thing either harness offers. The draft survives: it lives in
-                a module signal keyed by session (managedDrafts.ts) plus localStorage, not in the
-                component, so stepping into a subagent and back leaves half-typed text alone. */}
-            <Show when={!selectedManagedSubagent(session().id)}>
-              <AgentComposer
-                session={session()}
-                disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
-                submitDisabled={agentSessionIsStarting(session())}
-                previousAutomaticContext={model.previousAutomaticContext()}
-                onSessionUpdated={managedAgentStore.upsertSession}
-                onSent={() => void managedAgentStore.loadSnapshot(session().id)}
-              />
-            </Show>
-          </>
-          )
-        }}
+        {(narrowed) => (
+          <AgentConversation sessionId={narrowed().id} viewKeyPrefix="agents" autoFocus />
+        )}
       </Show>
       <AgentSessionDialogs task={props.task} model={model} />
     </>
