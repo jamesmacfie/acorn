@@ -22,6 +22,7 @@ vi.mock('../sessions/managedClient', () => ({
 }))
 
 const { default: AgentComposer } = await import('./AgentComposer')
+const { clearComposerDrafts } = await import('./composerState')
 
 const session = {
   id: 's1', taskId: 't1', title: 'A session', config: {}, runtimeState: 'ready', controller: 'acorn',
@@ -32,6 +33,9 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   vi.unstubAllGlobals()
   uploadAttachment.mockClear()
+  // The draft outlives the render now: it is the session's, in a module map (./composerState.ts), so
+  // one test's attachment is the next one's starting state.
+  clearComposerDrafts()
 })
 
 const mount = () => {
@@ -64,6 +68,23 @@ describe('attaching files', () => {
     expect(file.name).toBe('notes.md')
     expect(file.type).toBe('text/markdown')
     expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([104, 105]))
+  })
+
+  it('shows what one composer attached in every composer open on the session', async () => {
+    const pick = vi.fn(async () =>
+      [{ name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) }])
+    vi.stubGlobal('window', Object.assign(globalThis.window, { acorn: { files: { pick, save: vi.fn() } } }))
+
+    // What the Workflows run pane and the Agent pane are, side by side on one session.
+    const first = mount()
+    const second = mount()
+    attachButton(first).click()
+
+    await vi.waitFor(() => expect(second.textContent).toContain('notes.md'))
+    expect(first.textContent).toContain('notes.md')
+    // One upload, and one durable draft. Two component copies of the array meant two writers of the
+    // session's localStorage key and an upload that vanished when the other pane saved.
+    expect(uploadAttachment).toHaveBeenCalledTimes(1)
   })
 
   it('uploads nothing when the owner dismisses the dialog', async () => {

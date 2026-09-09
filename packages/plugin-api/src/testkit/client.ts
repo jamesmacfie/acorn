@@ -26,6 +26,12 @@ export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/c
 // What every registry hands back, so a suite can put its registrations away again.
 export type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
 
+// The writer behind `ctx.capabilities.provide`, for a test that renders a surface belonging to one
+// plugin and needs another plugin on the other end of a capability. `clientCapability` is on ./client
+// because plugins read capabilities in production; providing one outside `init` is test scaffolding,
+// which is what this file is. It hands back a disposable, so a suite puts its provider away again.
+export { provideClientCapability } from '@acorn/client-core/infra/node/clientCapabilities.ts'
+
 // A tree driven offline: the root `solidTree` renders into, with the mutations it emits handed to the
 // test. This is how a pane test sees exactly what the sandbox would post, with no worker and no host on
 // the other side. Production code never builds one; the SDK's `mountTree` does, per slot.

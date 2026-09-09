@@ -12,6 +12,7 @@ import type {
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'
+import { clearComposerDraft, clearComposerDrafts } from '../composer/composerState'
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
@@ -33,6 +34,12 @@ const REFETCH_EVENT_TYPES = new Set(['error'])
 // How long a task's session list is served without asking the node again. See loadTask below.
 const TASK_LOAD_WINDOW_MS = 5_000
 const taskLoads = new Map<string, { at: number; run: Promise<AgentSession[]> }>()
+// A snapshot load in flight, shared rather than repeated. Deliberately not a time window like the one
+// above: every caller after a mutation — a sent turn, a resolved request, a reordered queue — asks
+// because it expects the answer to have changed, and a window would hand back the transcript from
+// before the send. Two readers of one session in the same tick is the case this covers, which is what
+// two panes open on the same session are.
+const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 
 const byRecent = (a: AgentSession, b: AgentSession): number =>
   b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
@@ -60,6 +67,9 @@ function upsertSession(session: AgentSession): void {
 
 function removeSession(sessionId: string): void {
   deletedSessionIds.add(sessionId)
+  // The unsent turn goes with the session it addressed (../composer/composerState.ts). Nothing else
+  // reaps that map, and an attachment id in it names a row the node has dropped.
+  clearComposerDraft(sessionId)
   const refreshTimer = snapshotRefreshTimers.get(sessionId)
   if (refreshTimer) clearTimeout(refreshTimer)
   snapshotRefreshTimers.delete(sessionId)
@@ -278,17 +288,27 @@ export const managedAgentStore = {
     for (const session of page.sessions) upsertSession(session)
     return page.sessions
   },
-  async loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
-    const incoming = await managedAgentApi.snapshot(sessionId)
-    if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
-    let snapshot = incoming
-    setSnapshots((current) => {
-      snapshot = mergeManagedSnapshot(current[sessionId], incoming)
-      return { ...current, [sessionId]: snapshot }
+  loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
+    const held = snapshotLoads.get(sessionId)
+    if (held) return held
+    const run: Promise<AgentSessionSnapshot> = (async () => {
+      const incoming = await managedAgentApi.snapshot(sessionId)
+      if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
+      let snapshot = incoming
+      setSnapshots((current) => {
+        snapshot = mergeManagedSnapshot(current[sessionId], incoming)
+        return { ...current, [sessionId]: snapshot }
+      })
+      indexEvents(sessionId, snapshot.events)
+      upsertSession(snapshot.session)
+      return snapshot
+    })().finally(() => {
+      // Only if the map still holds this one. A caller that asked again while this was settling owns
+      // the entry now, and clearing it would leave a third caller refetching what is already in flight.
+      if (snapshotLoads.get(sessionId) === run) snapshotLoads.delete(sessionId)
     })
-    indexEvents(sessionId, snapshot.events)
-    upsertSession(snapshot.session)
-    return snapshot
+    snapshotLoads.set(sessionId, run)
+    return run
   },
   upsertSession,
   removeSession,
@@ -308,6 +328,10 @@ export const managedAgentStore = {
     seenEventIds.clear()
     usageLines.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
+    // An in-flight read of the old node's session. It resolves after this and merges into an empty
+    // store, so the entry has to go with the rest or the next reader shares a stale request.
+    snapshotLoads.clear()
+    clearComposerDrafts() // another node's sessions, so another node's attachment ids
     for (const timer of snapshotRefreshTimers.values()) clearTimeout(timer)
     snapshotRefreshTimers.clear()
   },

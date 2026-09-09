@@ -16,11 +16,19 @@ events, a restart never silently resubmits it. Reconciliation marks interrupted 
 explicit state for the owner to inspect.
 
 A session names what started it. `kind` is `interactive`, `workflow`, or `imported`, and a workflow
-session's `config` carries `workflowRunId` and `workflowStepId`. Both are read: the pane's header
-draws a chip, "Workflow: <name> · <step>", that opens the run pane at that node
-([workflows.md](./workflows.md) § The run pane), and the sidebar row for such a session carries the
-workflow glyph beside its provider mark. The names come from the workflows plugin's
-`WORKFLOW_CONTROL.runForSession`, so a node with workflows disabled simply draws no chip.
+session's `config` carries `workflowRunId` and `workflowStepId`. Both are read, in three places: the
+pane's header draws a chip, "Workflow: <name> · <step>", that opens the run pane at that node
+([workflows.md](./workflows.md) § The run pane); the sidebar row for such a session carries the
+workflow glyph beside its provider mark; and the row in Agent Center carries a **Run** chip that opens
+the run the same way. The header's names come from the workflows plugin's
+`WORKFLOW_CONTROL.runForSession`, so a node with workflows disabled simply draws no chip. Agent
+Center's chip needs no names and so needs no request: the two ids are on the row already
+(`plugins/agents/src/client/center/workflowRun.ts`).
+
+The ids are also how the run pane finds a session for a step that is still running, since the step row
+records `agentSessionId` only later. Nothing there is a second copy of the truth: the config is
+written once, when the node creates the session, and every later write to a session's config spreads
+what was there.
 
 A workspace-scoped list or search resolves the task ids first, through
 `CoreServices.tasks.idsForWorkspace()`, then narrows this plugin's own tables to those ids. An empty
@@ -176,6 +184,15 @@ newest turn until the reader scrolls away from it, picks the bottom up again whe
 and gives a reader the place they left when they come back to a session. The bar above it and the
 composer below it are pinned by being that scroller's siblings.
 
+That is a property of the region, not of this pane, which is why the conversation reaches its region as
+a fragment and never wraps itself in a box: the region is the flex column the scroller sizes against,
+and the CSS that caps the measure and hands the padding over names the scroller as a direct child of
+it (`packages/client-core/src/infra/styles/shell.css`). Any surface drawing the conversation owes it
+the same treatment, so a test asserts it rather than a comment asking for it
+(`plugins/agents/src/client/sessions/AgentConversation.test.tsx`). Which surface is drawing also keys
+the remembered scroll place, because a reader can be following live in one pane and reading history in
+another.
+
 The timeline is not virtualised, and that is the kit's rule rather than this pane's. The virtualizer
 this transcript used to run called `measure()` on every new event, which clears the item size cache,
 so every row fell back to the estimate, the canvas height jumped, and the rows re-measured, on every
@@ -204,7 +221,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   colour is mixed toward the theme's foreground rather than used raw, because a brand hex is authored
   against white and OpenAI's purple is unreadable on a dark pane.
 - The Agent pane shows the current transcript, composer, queue, context, requests, artifacts, and a
-  same-task roster.
+  same-task roster. The first three of those are one component, `AgentConversation`, addressed by a
+  session id, and the Workflows run pane draws the same one through the `agents.conversation` client
+  capability. So a session can be on screen twice, and everything two composers have to agree about —
+  the attachments and captured context of an unsent turn, and the guards over sending it — lives in a
+  module map keyed by session (`plugins/agents/src/client/composer/composerState.ts`) rather than in
+  the component. What stays per mount is view state: how tall the box is, which picker is open, and
+  which surface's scroll place the transcript restores.
 - Starting an interactive session acknowledges the durable row before waiting for the provider CLI.
   The pane selects that row immediately, draws a **Connecting…** state above the composer, and keeps
   the draft editable while Send and provider configuration remain disabled. `ready` is published only
@@ -289,7 +312,9 @@ it fails for any reason a selection can break, not only for the one it was writt
   out does not restore one list's offset onto another. Picking the session row in the sidebar comes back
   out. The composer is hidden while a subagent's run is showing: it only ever addresses the session, so
   leaving it there would read as a way to reply to the subagent, which neither harness offers. The draft
-  is held per session outside the component, so stepping in and back does not lose typed text.
+  is held per session outside the component, so stepping in and back does not lose typed text — and so
+  does everything else about the unsent turn, which is what lets the run pane draw a second composer on
+  the same session.
 - The composer's field is the kit's `MentionTextarea`. It draws `@file`, `/command` and `$skill` in
   three role tones, `accent`, `warn` and `ok`, which the theme maps the same way it maps every other
   tone; the composer names a meaning per run of text and never a colour. A textarea cannot colour part
@@ -313,7 +338,9 @@ it fails for any reason a selection can break, not only for the one it was writt
   in a textarea. It is not a registered keybinding, because a task-scoped binding never fires from
   inside a typing target and a rebindable row that did nothing would be a lie. The transcript yields
   the height and keeps its place, because the timeline is the scroller and shrinking it does not move
-  what it is following. The state is session-only and per composer.
+  what it is following. The state is session-only and per composer, which is deliberate: two panes open
+  on one session are two readers, and a reader expanding the box in one has not asked the other to
+  change shape.
 - **The composer has two more slots.** `agents:attachment` decides how one attachment on an unsent
   turn is drawn, keyed by its media type and in `replace` mode, so a plugin that knows more about a
   `.png` than a chip can say draws it instead and one attachment is still exactly one chip.

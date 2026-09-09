@@ -21,6 +21,9 @@ export const workflowsPaneContribution: PaneLayoutContribution<RunPaneModel> = {
   order: 25,
   requires: { plugin: 'workflows' },
   when: (task) => taskHasWorkflowRuns(task.id),
+  // The same floor the agents pane declares, for the same reason: an agent node draws the whole
+  // conversation here now, and a composer in a narrow column is unusable.
+  minWidth: 640,
   layout: 'list-detail',
   // The runs, the selection, the live tail and the four verbs, built once per task by the host
   // (client-core registries/panes/paneModels.ts).

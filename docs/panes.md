@@ -10,7 +10,7 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `pr` | 10 | linked GitHub pull request |
 | `agents` | 15 | managed Agent pane |
 | `changes` | 20 | worktree diff, staging, commit, and remote actions |
-| `workflows` | 25 | workflow runs on this task, their nodes, and each node's live progress |
+| `workflows` | 25 | workflow runs on this task, their nodes, and what the selected node is doing, which for an agent node is its whole conversation |
 | `notes` | 30 | task/workspace/global notes |
 | `context` | 40 | context selection and sync |
 | `editor` | 50 | worktree editor, with find-in-files as a sidebar panel |
@@ -22,7 +22,9 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `rollbar` | 100 | loaded Rollbar tree; linked item |
 
 `workflows` is `list-detail` and gated by `when`: a task that has never run a workflow does not get
-the button, because most tasks never will ([workflows.md](./workflows.md) § The run pane).
+the button, because most tasks never will ([workflows.md](./workflows.md) § The run pane). It declares
+the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
+narrow column is unusable.
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
@@ -158,8 +160,10 @@ panel.
 
 `list-detail`'s detail column also takes a small pad below its last child and a gap between its
 children, because the child at the bottom of it is a composer or a row of actions: without them the
-agents composer sat on the pane's bottom border with the transcript touching it from above. A
-`ListDetail` or a diff drops both along with the inline padding.
+agents composer sat on the pane's bottom border with the transcript touching it from above. The
+Workflows pane inherits that the moment an agent node draws a composer of its own, which is the same
+region rule reaching a second pane rather than a second arrangement. A `ListDetail` or a diff drops
+both along with the inline padding.
 
 **The reading column stops at `--pane-measure`** and sits in the middle of whatever the pane has
 left. A pane is as wide as the display someone gave it, and at 3700px an agent transcript ran to

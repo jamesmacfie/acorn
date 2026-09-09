@@ -1,6 +1,7 @@
 import { gitOrThrow } from '../core/git'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
 import { isContainedPath, worktreeBranchDirName } from './pathGuards'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
@@ -44,8 +45,6 @@ export async function resolveBaseRef(checkout: string, preferred?: string | null
 // A branch name safe to pass to git as a positional: no leading dash, so it cannot be read as a
 // flag, and only git-legal ref characters. The directory name is slugged separately. This guards the
 // git argument.
-const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
-
 // The branch a linked worktree has checked out, read off disk. `<dir>/.git` is a file pointing at
 // the repo's admin dir for that worktree, whose HEAD holds the ref. `null` means the directory is
 // not a live linked worktree: pruned, moved, or on a detached HEAD.

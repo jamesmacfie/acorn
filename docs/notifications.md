@@ -116,7 +116,9 @@ notice a run raises carries it, because the node sends the run and step ids on t
 gate is also an attention row — `warn`, so it stays until somebody answers it — with the same target
 and the id `workflow:gate:<stepId>`. A run that ends `failed` or `safety-rail` raises a `run-failed`
 notice; a run that ends well keeps its `run-done` one. An agent's permission question inside a run
-stays the agents plugin's row and opens the Agent pane, which is where the question is.
+stays the agents plugin's row and opens the Agent pane. That is still the right target now that the
+run pane draws the conversation too: the question is the session's, the row is the one the agents
+plugin raised for it, and a reader who wants the run instead has the chip in the pane's header.
 
 Two kinds are core's, because what they open is not any plugin's:
 

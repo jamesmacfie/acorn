@@ -182,7 +182,15 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
       if (frame.channel !== 'agent:event' || frame.event.sessionId !== session.id || frame.event.turnId !== turn.id) return
       if (frame.event.seq <= lastForwardedSeq) return
       lastForwardedSeq = frame.event.seq
-      request.onEvent?.({ type: 'managed-agent', sequence: frame.event.seq, event: frame.event.event })
+      // The session id rides along, because the caller's row has nowhere else to learn it: the outcome
+      // below carries it, and that arrives when the step is over. A workflow step wants it while it is
+      // still running, so the run can hand a reader the conversation.
+      request.onEvent?.({
+        type: 'managed-agent',
+        sessionId: session.id,
+        sequence: frame.event.seq,
+        event: frame.event.event,
+      })
     })
     const startedAt = Date.now()
     const timeoutMs = request.timeoutMs ?? HEADLESS_TIMEOUT_MS

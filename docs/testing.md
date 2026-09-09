@@ -498,16 +498,23 @@ Run them on the desktop and in `acorn` in a terminal.
     terminal client, the definition list is in the Browse panel, the editor is in the main one with
     its node list beside its inspector, and the dialog is a modal the keys stay inside.
 51. Start that run on a task and open the **Workflows** pane on it. Both investigators show running at
-    once, with the same indentation the editor drew. Open each in the Agent pane from its node: the
-    header there carries a "Workflow: …" chip, and pressing the chip comes back to this pane at that
-    node. The command node's output tails as it runs and folds away with its exit code when it stops.
+    once, with the same indentation the editor drew. Select one, while it is still working: its
+    transcript is here, following the newest turn, with the node's toolbar staying put above it and the
+    composer staying put below. The composer says a turn sent now runs after the step. The command
+    node's output tails as it runs and folds away with its exit code when it stops.
+    Then press **Show in Agent pane** and put the two panes side by side on that session: both
+    transcripts move together, a file attached in one appears in the other, and the "Workflow: …" chip
+    in the Agent pane's header comes back to this pane at that node. Last, run one with a fan-out or a
+    worktree-isolated agent step and check the conversation you get is the child task's.
 52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
     and Reject in front of you; the inbox has the same row and it stays there until you answer.
     Approve, and the run finishes and keeps a notice.
 53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
     **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
     running from that node. Then check the pane is not there at all on a task that has never run a
-    workflow, and that the agents pane draws no workflow step rows anywhere.
+    workflow, and that the agents pane draws no workflow step rows anywhere. In **Agent Center**, the
+    workflow session's row carries a **Run** chip: the row body opens the session and the chip opens
+    the run at that node.
 
 The next two are the start-from-an-item flow's ([workflows.md](./workflows.md) § Starting a run).
 Three lists moved onto one registry, and the only way to see that they still offer what they used to

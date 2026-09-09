@@ -50,11 +50,36 @@ run shows says what it was given.
 
 ### What an agent step sees
 
-An agent step takes `inputs = "append" | "template" | "none"`, default `append`. With `append`, the
-runner renders the prompt and then adds one `## Output of <name>` block per incoming edge whose step
-finished `done`, in `after` order. With `template`, nothing is added and the prompt places its own
+A step that runs an agent — `agent`, `decide`, `ci-loop`, `fan-out` — takes
+`inputs = "append" | "template" | "none"`, default `append`. With `append`, the runner renders the
+prompt and then adds one `## Output of <name>` block per incoming edge whose step finished `done`, in
+`after` order. With `template`, nothing is added and the prompt places its own
 `${steps.<name>.output}` references. With `none`, the step sees only its prompt. The handoff context
 rides along in every mode, because that is a separate thing from the graph's edges.
+
+All four kinds assemble that prompt through one function, which they did not until 2026-09-09. Only
+`agent` read the incoming edges, so a `decide` step was sent its prompt and nothing else: the editor
+offered it the Upstream output control, defaulted it to Append, and the runner dropped the output it
+was meant to judge. `ci-loop` pays for the upstream output and the context block on the turn that
+opens its session and not on the resumed turns, which already hold both.
+
+**Which harness, and what that decides.** A step names one with `profile`, and a step that names none
+runs on the node's default, `claude-code`. The editor's Harness select says as much: its blank option
+is "The workflow default". The runner resolves that word once, in `runHeadless`, and hands the answer
+to the step in `opts.profileId`, because four readers have to agree on it — the step row the run pane
+draws, validation, the managed session, and the headless fallback. They did not agree until
+2026-09-09: the managed call read the definition instead of the resolved value, so a step whose
+harness was left blank asked for a session under no profile at all, got told there was no managed
+driver for it, and ran as a bare CLI process with no session and no transcript. Every workflow
+authored in the app was in that state, because the select only writes `profile` when somebody picks
+one.
+
+So a profile is now what decides which of the two paths a step takes, and nothing else does. A profile
+with a managed driver, meaning `claude-code` or `codex`, runs the step as a managed session with a
+durable transcript ([managed-agents.md](./managed-agents.md)). A profile without one runs it headless:
+a one-shot process, its stream captured into the step's events, and no session for the run pane to
+draw. A fan-out child resolves its own `profile` rather than inheriting the row it was spawned from,
+which is why the runner reads the definition and not the step row.
 
 An agent step also takes `config_options`, a table of provider option ids to values as the provider
 advertises them, such as `model` and `reasoning`. The runner hands them to the agents plugin, which
@@ -475,7 +500,7 @@ The detail depends on the kind and the status:
 
 | Kind | While running | When done | Controls |
 | --- | --- | --- | --- |
-| agent kinds | harness, model, and what it last said | the final text or the structured JSON | Open in Agent pane; Kill step |
+| agent kinds | the conversation: transcript, queue and composer | the same conversation, and the structured value under a disclosure | Show in Agent pane; Kill step |
 | `terminal:command` | the streamed tail | exit code, duration, the whole output under a disclosure | Kill step |
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
@@ -488,12 +513,37 @@ terminal**, which resumes it: the agents sidebar used to be where that lived. A 
 task links to it. Every control is drawn only when its transition is legal and disabled while one is
 in flight, so a stale button is a race rather than a bug.
 
-The transcript is not here. An agent node says what it last said and hands you to the Agent pane,
-which owns the conversation ([managed-agents.md](./managed-agents.md)).
+**The conversation is here.** An agent node draws the transcript, the queue and the composer that the
+Agent pane draws, because reading what a step is saying should not mean leaving the run. It is the
+same three components over the same session: plugins/agents publishes them as a client capability
+(`plugins/agents/src/contract/conversation.ts`) and this pane renders it, so the two surfaces cannot
+drift. A node with the agents plugin switched off answers nothing and the pane keeps the summary it
+drew before: the harness, the model, and what the step last said.
+
+A step that ran headless has no session and never will, so the pane says which of the two reasons it
+is: that the step has not started, or that it runs outside a managed session and its output is under
+**Step details**. Those words are the run pane's, passed to the conversation, because the conversation
+knows a session is missing and not why.
+
+The agent shape is a different arrangement, not a different pane. The controls move into the toolbar
+and the harness, the structured value and any events a handler emitted fold away, because the
+conversation's timeline owns the scroll and takes the height that is left
+([panes.md](./panes.md) § Layout model). Every other kind keeps the column it had.
+
+Naming the step is what makes it work while the step runs. The row records its `agentSessionId` in the
+completion write, so the pane passes the step id as well and the agents client resolves the session
+from `config.workflowStepId`, which the node writes when it creates the session. The step row also
+takes the id from the first event that names it, which is what the Agent pane's chip reads.
+
+Typing here is allowed and says so. A step waits on its own turn and nothing else, so a turn sent
+while the step is working queues behind it and runs once the run has already recorded the step as
+done. The composer carries that sentence above it rather than being disabled, because answering an
+agent mid-step is a reasonable thing to want and being told what happens is better than being
+stopped.
 
 ### What the pane listens to
 
-Three frames, and each one costs what it should:
+Three frames of its own, and each one costs what it should:
 
 - `workflow:step-changed` moves one node's glyph and reads nothing.
 - `workflow:step:event` appends to the selected run's per-node tail, capped at 200 events and the
@@ -501,10 +551,16 @@ Three frames, and each one costs what it should:
 - `plugin:workflows:run-changed` re-reads the run and its steps, because a run beginning or ending
   changes rows this client never saw.
 
+An agent node adds the agents plugin's own subscription, which is a session's event stream at about
+25 frames a second ([managed-agents.md](./managed-agents.md) § The transcript store). That is the
+conversation's cost and it is paid by whichever pane is drawing one; the socket is refcounted, so two
+panes open on one session share it.
+
 ### Getting there from somewhere else
 
 The pane intent `{ kind: 'workflows:show-run', runId, stepId? }` is how everything else points at a
-run: a bell row, an inbox row, the rail's recent runs, the agent pane's chip. The deep link
+run: a bell row, an inbox row, the rail's recent runs, the agent pane's chip, and the **Run** chip on
+a workflow session's row in Agent Center. The deep link
 `/t/:taskId?pane=workflows&item=<runId>` is the same thing with an address.
 
 ## Starting a run from an item
