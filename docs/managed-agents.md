@@ -486,7 +486,8 @@ it, not because it shares a store with anything above it.
 
 ## From the command palette
 
-Seven rows, all registered by this plugin rather than by the shell.
+Seven rows plus the open session's own actions, all registered by this plugin rather than by the
+shell.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
@@ -499,6 +500,7 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 | New Codex terminal | action, needs an open task | The same for the `codex` profile |
 | Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
 | How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
+| Agent session | group, task-scoped | Fork, retry, compact, continue in terminal, rename, the two exports and archive — the open session's ••• menu, while the pane is on screen |
 
 **New agent session is a picker, not an action, and it needs an open task.** A session is created
 against a task worktree, so there is nothing to start one in when no task is open and the palette
@@ -537,10 +539,22 @@ plugin init, so these two register from a component mounted in the `overlay` slo
 terminal draws no overlay slot and has nowhere to store a device preference, and a choice that would
 quietly fail to persist is worse than an absent row.
 
-What is missing is deliberate. Stop, archive, unarchive, import and export, fork, compact, and
-handoff each need a selected session, and most need a confirmation, which is a result action panel
-rather than a row. Pricing and concurrency are forms: a number has no list of labelled choices to
-pick from.
+**The session's own actions are registered by the pane, for as long as the pane is drawn.** They need
+a selected session, which only the pane model has, and two of them — rename and archive — are dialogs
+the detail region draws, so a row offered while that region is unmounted would run and show nothing.
+Mounted is therefore the gate: you can reach these when you are looking at the run they are about.
+The pane model stays the only place the roster is written
+(`plugins/agents/src/client/sessions/agentPaneModel.ts` § `sessionActions`). Nothing is enumerated a
+second time in `commands.ts`: the label, the availability and the work are read back out of that memo
+when the row is drawn and again when it is picked, so a session that gains an action gains a command
+with it, and an action the menu would draw disabled is not offered at all — the menu puts the reason
+on the row and the palette has nowhere to put one. Registration is redone only when the set of ids
+changes, so typing in the palette never races a re-register.
+
+What is missing is deliberate. Stop stays out: it is the one destructive verb here, and it needs the
+runtime state a low-context row cannot carry. Unarchive and import belong to Agent Center, which is
+the surface that spans tasks. Pricing and concurrency are forms: a number has no list of labelled
+choices to pick from.
 
 ## Context, files, and attachments
 

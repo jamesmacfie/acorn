@@ -5,6 +5,7 @@ import {
   Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker,
   Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
+import { registerSessionActionCommands } from '../commands'
 import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentConversation from './AgentConversation'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
@@ -231,6 +232,8 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
 
 export default function AgentPaneDetail(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  // The header's ••• menu, in the palette too, for as long as this region is mounted (../commands.ts).
+  registerSessionActionCommands(model)
   return (
     <>
       <AgentDetailHeader task={props.task} model={model} />

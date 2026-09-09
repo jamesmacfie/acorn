@@ -136,6 +136,14 @@ open action each; and onboarding none. Each plugin's own document has the whole 
 note, merging a pull request and approving a workflow gate all need context and a confirmation that a
 low-context row cannot carry, so they stay in the surfaces that have both.
 
+**A surface may lend the palette its own menu while it is on screen.** The agent pane registers the
+open session's `•••` actions from the region that draws them and disposes them when it unmounts
+(`plugins/agents/src/client/commands.ts`, [managed-agents.md](./managed-agents.md) § From the command
+palette). That is the shape for anything needing a selection the palette cannot name: the surface that
+holds the selection owns the registration, so the rows exist exactly while they can work, and the
+dialogs they open have somewhere to draw. It is not a licence to mirror a whole toolbar — stopping an
+agent is still absent.
+
 ## Global commands
 
 | Shortcut | Action |
