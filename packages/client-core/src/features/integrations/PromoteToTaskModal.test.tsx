@@ -67,10 +67,12 @@ const mount = (workflow?: Parameters<typeof PromoteToTaskModal>[0]['workflow']) 
   ), host)
 }
 
-const primary = () => [...host.querySelectorAll('button')].find((button) => button.type === 'submit')!
-const inputs = () => [...host.querySelectorAll<HTMLInputElement>('input.ui-input')]
+/* Queried off the document rather than off `host`: `Modal` portals its backdrop to the body, so
+   nothing it draws is inside the container it was rendered into. */
+const primary = () => [...document.querySelectorAll('button')].find((button) => button.type === 'submit')!
+const inputs = () => [...document.querySelectorAll<HTMLInputElement>('input.ui-input')]
 /** A workflow input by the name it was declared under; the kit puts that on `aria-label`. */
-const field = (name: string) => host.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!
+const field = (name: string) => document.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!
 const type = (element: HTMLInputElement, value: string) => {
   element.value = value
   element.dispatchEvent(new Event('input', { bubbles: true }))

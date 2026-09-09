@@ -1,4 +1,5 @@
 import { Show, type JSX } from 'solid-js'
+import { Portal } from 'solid-js/web'
 import { restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/dismissable'
 
@@ -9,6 +10,13 @@ import { createDismissable } from '../../lib/dismissable'
 // A trap: it holds Tab inside while it is open and hands focus back to whatever opened it when it
 // goes (../keys/trap.ts). Before that, dismissing left the body focused and the next Tab started
 // again from the top of the page.
+//
+// It portals, like every other overlay in the kit. `.pane` sets `contain: layout paint`
+// (infra/styles/shell.css), which makes the pane a containing block for `position: fixed`, so a
+// modal rendered inline inside a pane got a backdrop the size of that pane and clipped by its
+// `overflow: auto` rather than one over the window. The ref-based focus trap and dismissal are
+// unaffected by the move, and a loaded plugin's overlay is inside an iframe, so it stays boxed
+// either way (host/frames/PluginRefPanel.tsx).
 
 export function Modal(props: {
   /** `onDismiss` rather than `onClose` because dismissal is one of the kit's eleven events, and only
@@ -43,26 +51,28 @@ export function Modal(props: {
   if (props.autoFocus) queueMicrotask(() => props.autoFocus?.()?.focus())
 
   return (
-    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-      <div
-        ref={dialog}
-        class="overlay"
-        data-size={props.size ?? 'md'}
-        data-align={props.align ?? 'top'}
-        data-layout={props.layout ?? 'stack'}
-        role={props.role ?? 'dialog'}
-        aria-modal="true"
-        aria-labelledby={props.labelledBy}
-        onClick={dismiss.onContainerClick}
-        onKeyDown={(event) => {
-          if (props.onKeyDown?.(event)) return
-          dismiss.onKeyDown(event)
-        }}
-      >
-        <Show when={props.title}><div class="overlay-title">{props.title}</div></Show>
-        {props.children}
+    <Portal>
+      <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
+        <div
+          ref={dialog}
+          class="overlay"
+          data-size={props.size ?? 'md'}
+          data-align={props.align ?? 'top'}
+          data-layout={props.layout ?? 'stack'}
+          role={props.role ?? 'dialog'}
+          aria-modal="true"
+          aria-labelledby={props.labelledBy}
+          onClick={dismiss.onContainerClick}
+          onKeyDown={(event) => {
+            if (props.onKeyDown?.(event)) return
+            dismiss.onKeyDown(event)
+          }}
+        >
+          <Show when={props.title}><div class="overlay-title">{props.title}</div></Show>
+          {props.children}
+        </div>
       </div>
-    </div>
+    </Portal>
   )
 }
 

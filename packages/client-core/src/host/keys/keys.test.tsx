@@ -229,7 +229,8 @@ describe('a modal is a trap', () => {
     document.body.append(opener)
     opener.focus()
     dispose = render(() => <Modal title="Archive task" onDismiss={() => {}}><span>body</span></Modal>, host)
-    const dialog = host.querySelector('[role="dialog"]')!
+    // On the document, not in `host`: the modal portals its backdrop to the body.
+    const dialog = document.querySelector('[role="dialog"]')!
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     dispose()
     dispose = undefined

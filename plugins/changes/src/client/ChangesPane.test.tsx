@@ -418,7 +418,8 @@ describe('the expanded editor', () => {
     drawFooter([change('src/a.ts', true)], { draft: 'feat: a long one' })
     host.querySelector<HTMLButtonElement>('button[aria-label="Expand the message"]')!.click()
 
-    const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!
+    // On the document, not in `host`: the modal portals its backdrop to the body.
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
     expect(dialog.querySelector('.overlay-title')?.textContent).toBe('Commit message')
     const field = dialog.querySelector<HTMLTextAreaElement>('textarea')!
     expect(field.value).toBe('feat: a long one')

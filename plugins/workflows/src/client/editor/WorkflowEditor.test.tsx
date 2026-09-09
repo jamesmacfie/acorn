@@ -70,9 +70,9 @@ const mount = async (item: string): Promise<void> => {
   await settle()
 }
 
-// The dialog is drawn inside the pane rather than through a portal, and it has a Generate of its own,
-// so every lookup says which half of the screen it means.
-const dialog = (): HTMLElement | null => host.querySelector('.overlay')
+// The dialog portals to the body, outside `host`, and it has a Generate of its own, so every lookup
+// says which half of the screen it means.
+const dialog = (): HTMLElement | null => document.querySelector('.overlay')
 const buttons = (scope: ParentNode = host): HTMLButtonElement[] => [...scope.querySelectorAll('button')]
 const button = (text: string, scope: ParentNode = host): HTMLButtonElement | undefined =>
   buttons(scope).find((el) => el.textContent?.trim() === text)
@@ -223,7 +223,8 @@ describe('applying a generated definition', () => {
     generateDef.mockRejectedValue(Object.assign(new Error('The reply was not JSON.'), { code: 'model_answer_unusable' }))
     await mount('db:abc')
     await generate()
-    expect(host.textContent).toContain('The reply was not JSON.')
+    // The message is in the dialog, which portals out of `host`.
+    expect(dialog()?.textContent).toContain('The reply was not JSON.')
     // Still open, so the description is there to try again with.
     expect(dialog()).not.toBeNull()
     expect(toasts).toEqual([])
