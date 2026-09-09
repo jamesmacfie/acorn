@@ -13,7 +13,7 @@ import {
   disconnectDb,
   insertRow,
   listColumns,
-  listModelConnections,
+  listModelBackends,
   listRows,
   listSavedQueries,
   listTables,
@@ -63,13 +63,14 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
-  // AI SQL generation is offered only when a model-provider key is connected. Read from this plugin's
-  // own route, because a frame cannot see core's integrations. See databaseClient.ts.
-  const [modelConnections] = createResource(
+  // AI SQL generation is offered only when there is something to spend: a connected model-provider
+  // key, or an agent CLI installed on this machine. Read from this plugin's own route, because a frame
+  // cannot see core's integrations. See databaseClient.ts.
+  const [modelBackends] = createResource(
     () => props.taskId,
-    (taskId) => listModelConnections(taskId).catch(() => []),
+    (taskId) => listModelBackends(taskId).catch(() => []),
   )
-  const connections = () => modelConnections() ?? []
+  const backends = () => modelBackends() ?? []
 
   // Saved queries are project-scoped, so they outlive this task, and the route resolves the project
   // from the task id. Failures land in the pane's error line rather than rejecting: a resource in an
@@ -296,7 +297,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             >
               Save
             </Button>
-            <Show when={connections().length}>
+            <Show when={backends().length}>
               <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
             </Show>
             <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
@@ -402,7 +403,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
           <Show when={generating()}>
             <GenerateSqlModal
               taskId={props.taskId}
-              connections={connections()}
+              backends={backends()}
               queries={savedList()}
               onDismiss={() => setGenerating(false)}
               onGenerated={writeSql}

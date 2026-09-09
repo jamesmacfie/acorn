@@ -37,7 +37,7 @@ key and rows left behind are invisible in every rail and impossible to remove. T
 the task count first. Nothing on disk is touched: the folder and any task worktrees remain.
 
 A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
-projects by folder or GitHub, name them and their workspace, done. Its gate is `shouldShowOnboarding`,
+projects by folder or GitHub, name them and their workspace, pick what to generate text with, done. Its gate is `shouldShowOnboarding`,
 meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
 preference, so it never opens twice. Everything it offers is also in Settings → Projects.
 

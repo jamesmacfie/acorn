@@ -229,6 +229,35 @@ describe('the harness grant', () => {
     expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: ['AWS_*'] })).toBe(true)
   })
 
+  it('names the one-shot invocation on its own line, and reads a change to it as newly requested', () => {
+    const withOneShot = (args: string[], modelFlag?: string) => contributions([{
+      id: 'opencode',
+      label: 'OpenCode',
+      spawn: { command: 'opencode', args: ['acp'] },
+      envPassthrough: [],
+      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [], oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) } },
+    }])
+
+    const lines = harnessPermissionLines(harnessGrants(withOneShot(['run'], '--model')))
+    // Two invocations, two lines. The session spawn is not the one a Generate list runs.
+    expect(texts(lines)).toEqual([
+      'Run “opencode acp” as the “OpenCode” agent',
+      'Runs “opencode run --model MODEL” to generate text',
+    ])
+    expect(lines.every((line) => line.high)).toBe(true)
+
+    const keys = new Set(lines.map((line) => line.key))
+    const isNew = (next: ReturnType<typeof withOneShot>) =>
+      harnessPermissionLines(harnessGrants(next)).some((line) => !keys.has(line.key))
+    expect(isNew(withOneShot(['run'], '--model'))).toBe(false)
+    expect(isNew(withOneShot(['run', '--agent', 'plan'], '--model'))).toBe(true)
+    expect(isNew(withOneShot(['run']))).toBe(true)
+    // A harness that drops the block loses the line rather than keeping a stale one.
+    expect(harnessPermissionLines(harnessGrants(contributions([
+      { id: 'opencode', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
+    ])))).toHaveLength(1)
+  })
+
   it('discloses nothing for a spawn the node already refused', () => {
     // The node rejected this at parse, so it can never run. A consent line for it would be noise in the
     // one list that must not have any.

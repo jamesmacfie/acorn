@@ -41,10 +41,22 @@ export const claudeCodeProfile: AgentProfileContribution = {
     ],
   }),
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['--resume', sessionRef] }),
-  // A decision is one structured turn with both built-in and projected tools disabled. It keeps
-  // `dontAsk` where the headless turn moved to `auto`: with `--tools ''` there is nothing to approve,
-  // and a deny is the right answer for anything that gets past that. A decide step reads and does not
-  // act, so it is the one place the denying mode is the point.
+  // One structured turn with both built-in and projected tools disabled. Two callers now: a workflow
+  // `decide` step, and any Generate control in the app spending this CLI as a text backend
+  // (docs/integrations.md § Model providers).
+  //
+  // It keeps `dontAsk` where the headless turn moved to `auto`: with `--tools ''` there is nothing to
+  // approve, and a deny is the right answer for anything that gets past that. Neither caller acts, so
+  // this is the one path where the denying mode is the point.
+  //
+  // `--strict-mcp-config` is unconditional, and reaches `decide` as well as a generate, which is
+  // intended: an MCP server the owner registered in `~/.claude.json` should not be started for a turn
+  // that cannot call it. `--tools ''` empties the tool list but still lets those servers boot.
+  //
+  // `--system-prompt` REPLACES the CLI's default system prompt rather than appending to it, which is
+  // what a generate wants: the coding-agent persona is noise in front of "answer with SQL only". That
+  // is why this is not `--append-system-prompt`, which the launch path above uses for the opposite
+  // reason.
   aiArgv: (command, opts) => ({
     file: command,
     args: [
@@ -56,11 +68,22 @@ export const claudeCodeProfile: AgentProfileContribution = {
       'dontAsk',
       '--tools',
       '',
+      '--strict-mcp-config',
+      ...(opts.system ? ['--system-prompt', opts.system] : []),
       ...(opts.model ? ['--model', opts.model] : []),
       ...(opts.schema ? ['--json-schema', JSON.stringify(opts.schema)] : []),
       opts.prompt,
     ],
   }),
   streamJson: lineDelimitedJsonAdapter,
+  // The CLI's own aliases, not dated model ids: `claude` resolves an alias to whatever it ships with,
+  // and a pinned id goes stale in the CLI before it goes stale here.
+  models: [
+    { id: 'sonnet', label: 'Sonnet' },
+    { id: 'opus', label: 'Opus' },
+    { id: 'haiku', label: 'Haiku' },
+  ],
+  defaultModelId: 'sonnet',
+  glyph: 'brand:agents/claude',
 }
 

@@ -52,7 +52,7 @@ Use the persistence scope that owns the state:
 | Appearance, notification settings ([notifications.md](./notifications.md) § Settings), shortcuts, rail order, notices, trust, tokens | device |
 | How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | device |
 | Where a workflow's nodes sit in the graph view | device |
-| Which model connection writes a commit message | device |
+| Which backend and model every Generate control spends (`models.generatePick`) | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
@@ -90,6 +90,28 @@ yet keeps its positions in memory for the session. Which of rows and graph the r
 nodes as is the same kind of thing and sits beside it, under `plugin:workflows:runs:nodeView`. The
 terminal client has no `localStorage`, so both writes land nowhere there — and neither is missed,
 because that host draws the graph as the list either way.
+
+**One "Generate with" default, and it is the device's.** Every Generate control in the app — the
+commit-message wand, the workflow generator, the Settings section that edits it on its own — opens on
+`models.generatePick`, a `{ backendId, modelId }` pair in one key
+(`client-core/features/settings/models/generatePick.ts`). One key rather than one per dialog because
+the list now holds agent CLIs installed on the machine beside stored API keys, so re-picking is the
+common case and a pick made in one dialog should be what the next one opens on. It is the device's for
+the reason `theme` is: the backends a node offers are the same everywhere, but which of them you want
+to spend is yours, and it should not follow you to a machine where you were working on somebody
+else's budget. A remembered pick whose backend has gone is not honoured — it falls back to the first
+backend, because a disconnected provider or an uninstalled CLI in a preference is a stale note rather
+than a decision.
+
+**The SQL dialog is the one Generate control outside that default, and it is a known limit rather
+than a choice.** It is a remote tree drawn in the database plugin's worker
+(`plugins/database/src/tree/GenerateSqlModal.tsx`), and the default is a device preference: it lives
+in the host's `localStorage`, `/v2/core/prefs` has no bridge scope on purpose, and `bridge.state` is
+that same store namespaced `plugin:<id>:*`, which is what keeps one plugin out of core's keys. So the
+dialog opens on the first backend every time and remembers nothing, and a pick made in it is not
+carried anywhere else. Closing it takes one of two things: a narrow pair of bridge verbs for that one
+key, which is a plugin-API decision rather than a preferences one, or the dialog moving to the
+compiled client tier, where reading a preference is an import.
 
 **Where you were looking is the node's, not the device's.** Which rail source or task each workspace
 was left on is `core.workspace-views`, one key per workspace

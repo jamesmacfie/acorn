@@ -2,10 +2,9 @@ import { createQuery } from '@tanstack/solid-query'
 import { createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
 import { debounce } from '../../kit/lib/debounce'
 import { taskBridge } from '../tasks/taskBridge'
-import { integrationsOptions } from '../../infra/queries'
+import { modelBackendsOptions } from '../../infra/queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
-import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
 import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
 
 // All project-level config for one folder project (docs/workspaces-and-tasks.md § Worktrees and
@@ -31,13 +30,14 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const [branchPrefix, setBranchPrefix] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
-  // The AI-SQL schema-source editor needs a configured model provider connection, matching where
-  // SQL generation itself is available.
-  const integrations = createQuery(() => integrationsOptions(true))
-  const hasModelConnection = () => {
-    const data = integrations.data
-    return data ? availableModelConnections(data).length > 0 : false
-  }
+  // The AI-SQL schema-source editor needs something to generate with, matching where SQL generation
+  // itself is available.
+  //
+  // Core's backends route rather than a count over the integrations query: half the answer is whether
+  // an agent CLI is installed on this machine, which only the node can see, and a person whose only
+  // backend is `claude` should get this editor too.
+  const backends = createQuery(() => modelBackendsOptions(true))
+  const hasModelBackend = () => (backends.data?.backends.length ?? 0) > 0
 
   const config = () => row()?.config
   const trigger = (): SetupTrigger => config()?.setupScriptTrigger ?? 'terminal'
@@ -140,7 +140,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           />
         </label>
 
-        <Show when={hasModelConnection()}>
+        <Show when={hasModelBackend()}>
           <label class="settings-field">
             <span class="settings-label">SQL generation schema source</span>
             <span class="muted settings-hint">

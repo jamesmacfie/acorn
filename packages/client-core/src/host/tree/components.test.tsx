@@ -26,7 +26,7 @@ const HEAVY: KitNodeName[] = [
   // Carries the follow-scroll machinery.
   'Timeline',
   // Reaches features/settings.
-  'ModelConnectionPicker',
+  'ModelBackendPicker',
 ]
 
 const isLoader = (entry: KitEntry): boolean => typeof entry !== 'function'

@@ -43,7 +43,7 @@ const answers = (...texts: string[]) => {
 
 const run = (generateText: ReturnType<typeof answers>, over: Partial<{ description: string; modelId: string }> = {}) =>
   generateWorkflowRequest({
-    request: { connectionId: 'c1', modelId: 'claude-opus', description: 'two agents and a synthesiser', workspaceId: 'w1', ...over },
+    request: { backendId: 'c1', modelId: 'claude-opus', description: 'two agents and a synthesiser', workspaceId: 'w1', ...over },
     catalog,
     validation,
     generateText,
@@ -61,19 +61,19 @@ describe('generateWorkflowRequest', () => {
     expect((result as { def: WorkflowDef }).def).toEqual(clean)
   })
 
-  it('forwards the connection, the model and the output ceiling', async () => {
+  it('forwards the backend, the model and the output ceiling', async () => {
     const generateText = answers(reply(clean))
     await run(generateText)
     expect(generateText.mock.calls[0]![0]).toMatchObject({
-      connectionId: 'c1',
+      backendId: 'c1',
       input: { modelId: 'claude-opus', maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS },
     })
   })
 
-  it('leaves modelId out when none was asked for, so the provider picks its default', async () => {
+  it('leaves modelId out when none was asked for, so the backend picks its default', async () => {
     const generateText = answers(reply(clean))
     await generateWorkflowRequest({
-      request: { connectionId: 'c1', description: 'anything', workspaceId: 'w1' },
+      request: { backendId: 'c1', description: 'anything', workspaceId: 'w1' },
       catalog,
       validation,
       generateText,

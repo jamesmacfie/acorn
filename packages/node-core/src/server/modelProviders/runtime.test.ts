@@ -124,7 +124,7 @@ describe('generateTextForConnection', () => {
     expect(result).toEqual({
       text: 'SELECT 1',
       providerId: PROVIDER_ID,
-      connectionId: 'connection-1',
+      backendId: 'connection-1',
       modelId: 'recommended-model',
       usage: { inputTokens: 10, outputTokens: 3 },
     })

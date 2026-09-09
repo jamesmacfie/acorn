@@ -396,6 +396,9 @@ export type PluginHarnessGrant = {
   run: string
   // Config variables carried from the node's environment into the agent, by name or glob.
   env: string[]
+  // The second invocation, when the harness declares a one-shot text mode: the same command line the
+  // Generate lists spend. Absent means the harness runs only as a session.
+  oneShot?: string
 }
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
@@ -680,6 +683,11 @@ export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
 export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
 export const integrationMappingsRoute = (id: string) => `/v2/core/integrations/${id}/mappings`
+// The read half of the model seam: every backend a Generate control can spend, which is every
+// connected key plus every agent CLI installed on this machine (./modelProviders.ts § ModelBackend).
+// Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v2/core/*` has no
+// bridge scope (docs/integrations.md § Model providers).
+export const modelBackendsRoute = '/v2/core/models/backends'
 
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and stop unrelated query data sharing keys.
@@ -691,3 +699,7 @@ export const tasksKey = ['tasks', 'v3'] as const
 // v3 adds descriptor metadata and normalized connection summaries. A distinct key stops a persisted v2
 // `{ provider, connected }` row from hiding registry-driven sources and settings.
 export const integrationsKey = ['integrations', 'v3'] as const
+// The backends list. New in plugin API major 11, so there is no earlier shape a persisted snapshot
+// could be holding under this key; the suffix is here so the next change to the response has somewhere
+// to move (the persisted query cache has no other buster).
+export const modelBackendsKey = ['model-backends', 'v1'] as const

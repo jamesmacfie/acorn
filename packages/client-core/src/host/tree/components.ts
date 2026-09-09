@@ -60,7 +60,7 @@ import { Rectangle } from '../../kit/components/content/Rectangle'
 //   - `Markdown` fetches a grammar per fence at render time and is the surface a streaming transcript
 //     re-renders; keeping it out of this table's chunk keeps the parser out of the first paint.
 //   - `Timeline` carries the follow-scroll machinery.
-//   - `ModelConnectionPicker` reaches ../../features/settings.
+//   - `ModelBackendPicker` reaches ../../features/settings.
 //
 // One line each and no internal comma, because `tools/arch/kitTable.test.ts` reads this literal as
 // text: importing it there would pull a renderer into a node-env test.
@@ -86,5 +86,5 @@ export const KIT_COMPONENTS: KitTable = {
   FileHead: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.FileHead }))),
   NonCodeRow: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.NonCodeRow }))),
   SplitCell: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.SplitCell }))),
-  ModelConnectionPicker: load(() => import('../../features/settings/models/ModelConnectionPicker')),
+  ModelBackendPicker: load(() => import('../../features/settings/models/ModelBackendPicker')),
 }

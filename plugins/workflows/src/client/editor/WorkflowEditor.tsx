@@ -110,15 +110,16 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     toast('Workflow saved.')
   }
 
-  // Which providers the owner has connected. The Generate button is drawn only when there is one, on
-  // the rule ../../../changes/src/client/GenerateButton.tsx sets out: a control whose only message is
-  // "connect a provider first" is a control in the way of the four beside it, and Settings is where
+  // What the owner can generate with: a stored key, or an agent CLI installed on this machine. The
+  // Generate button is drawn only when there is one, on the rule
+  // ../../../changes/src/client/GenerateButton.tsx sets out: a control whose only message is "connect
+  // a provider first" is a control in the way of the four beside it, and Settings is where
   // connections are made. A node that cannot answer counts as none.
-  const [connections] = createResource(async () => workflowApi.modelConnections().catch(() => []))
+  const [backends] = createResource(async () => workflowApi.modelBackends().catch(() => []))
   // A project whose workspace is not known counts the same way. The route requires a `workspaceId`
   // and answers 400 without one, which reads as the model having failed rather than as a list that
   // has not arrived. The workspaces query resolves long before a description is typed.
-  const canGenerate = () => !store.readOnly() && !!workspaceId() && (connections()?.length ?? 0) > 0
+  const canGenerate = () => !store.readOnly() && !!workspaceId() && (backends()?.length ?? 0) > 0
   const [generating, setGenerating] = createSignal(false)
   const [notes, setNotes] = createSignal<WorkflowGenerateNote[]>([])
 
@@ -256,7 +257,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       </Show>
       <Show when={generating()}>
         <GenerateModal
-          connections={connections() ?? []}
+          backends={backends() ?? []}
           context={{
             workspaceId: workspaceId(),
             // Only a row can be an example of itself: the worked examples the node picks are rows.

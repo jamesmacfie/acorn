@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { WorkflowGenerateRequest, WorkflowGenerateResult } from '../../shared/api'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { generateReason } from './GenerateModal'
@@ -19,13 +19,11 @@ const generated: WorkflowDef = {
   ],
 }
 
-const connection = (id: string): AvailableModelConnection => ({
-  provider: { id: 'anthropic', label: 'Anthropic', models: [{ id: 'opus', label: 'Opus' }] },
-  connection: { id, label: 'Mine' },
-} as unknown as AvailableModelConnection)
+const backend = (id: string): ModelBackend =>
+  ({ id, kind: 'connection', label: 'Mine', models: [{ id: 'opus', label: 'Opus' }], defaultModelId: '' })
 
 const generateDef = vi.fn<(input: WorkflowGenerateRequest) => Promise<WorkflowGenerateResult>>()
-const modelConnections = vi.fn<() => Promise<AvailableModelConnection[]>>()
+const modelBackends = vi.fn<() => Promise<ModelBackend[]>>()
 const toasts: string[] = []
 
 vi.mock('../workflowsClient', () => ({
@@ -38,13 +36,17 @@ vi.mock('../workflowsClient', () => ({
     providers: async () => [],
     validateDef: async () => ({ problems: [] }),
     fieldOptions: async () => ({ options: [] }),
-    modelConnections: () => modelConnections(),
+    modelBackends: () => modelBackends(),
     generateDef: (input: WorkflowGenerateRequest) => generateDef(input),
   },
 }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => undefined }))
+// One `createQuery` for both readers: the editor's workspaces and the Generate dialog's prefs. The
+// dialog asks the prefs record for one key, and an array answers nothing, which is the same as no
+// remembered pick — so the dialog opens on the first backend, which is what these cases assert.
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: [{ id: 'w1', projects: [{ id: 'p-1' }] }] }),
+  useQueryClient: () => ({ setQueryData: () => undefined }),
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -98,7 +100,7 @@ const generate = async (): Promise<void> => {
 }
 
 beforeEach(() => {
-  modelConnections.mockResolvedValue([connection('c1')])
+  modelBackends.mockResolvedValue([backend('c1')])
   generateDef.mockResolvedValue({
     def: generated, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'opus',
   })
@@ -112,8 +114,8 @@ afterEach(() => {
 })
 
 describe('the Generate button', () => {
-  it('is absent when nothing is connected', async () => {
-    modelConnections.mockResolvedValue([])
+  it('is absent when there is nothing to generate with', async () => {
+    modelBackends.mockResolvedValue([])
     await mount('db:abc')
     expect(button('Generate')).toBeUndefined()
     expect(button('Undo')).toBeDefined()
@@ -125,7 +127,7 @@ describe('the Generate button', () => {
     expect(button('Generate')).toBeUndefined()
   })
 
-  it('is drawn beside Undo when a provider is connected', async () => {
+  it('is drawn beside Undo when there is a backend to spend', async () => {
     await mount('db:abc')
     const labels = buttons().map((el) => el.textContent?.trim())
     expect(labels.indexOf('Generate')).toBe(labels.indexOf('Undo') - 1)
@@ -155,7 +157,7 @@ describe('applying a generated definition', () => {
     await mount('db:abc')
     await generate()
     expect(generateDef).toHaveBeenCalledWith(expect.objectContaining({
-      connectionId: 'c1',
+      backendId: 'c1',
       modelId: 'opus',
       workspaceId: 'w1',
       defId: 'abc',
@@ -246,6 +248,16 @@ describe('what a refusal reads as', () => {
 
   it('says to try again when the provider is silent', () => {
     expect(reason('provider_unavailable')).toContain('did not answer')
+  })
+
+  // An installed CLI that is signed out fails the same way an unreachable provider does, and no
+  // amount of retrying fixes it: the next step is to run it once in a terminal.
+  it('sends a silent CLI to a terminal instead of telling it to try again', () => {
+    const unavailable = Object.assign(new Error('raw'), { code: 'provider_unavailable' })
+    expect(generateReason(unavailable, { kind: 'harness', label: 'Claude Code' }))
+      .toBe('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
+    expect(generateReason(unavailable, { kind: 'connection', label: 'Anthropic' }))
+      .toBe('The provider did not answer. Try again shortly.')
   })
 
   it('falls back to the message, then to a sentence of its own', () => {

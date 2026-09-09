@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import {
-  buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, effectiveModelPick, filesUnder, folderState,
+  buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
   generateReason, groupChanges, groupSections, isFolderKey, pickSelected, primaryRemote, remoteCounts,
   remoteReason, sortRows, stackFor, stageableRows, stagedState, toPullFile, totals, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_MAX, PUSH_ACTIONS_POINT } from './extensionPoints'
 
 const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({
@@ -396,53 +395,22 @@ describe('remoteReason', () => {
   })
 })
 
-describe('effectiveModelPick', () => {
-  const at = (id: string, models: string[], defaultModelId?: string): AvailableModelConnection => ({
-    provider: { id: `p-${id}`, label: id, models: models.map((m) => ({ id: m, label: m })), defaultModelId },
-    connection: { id, label: id },
-  } as unknown as AvailableModelConnection)
-
-  it('answers nothing when nothing is connected, which is what hides the wand', () => {
-    expect(effectiveModelPick([], null)).toBe(null)
-    expect(effectiveModelPick([], { connectionId: 'gone', modelId: 'x' })).toBe(null)
-  })
-
-  it('opens on the first connection and that provider\'s default when nothing was remembered', () => {
-    expect(effectiveModelPick([at('c1', ['fast', 'slow'], 'slow'), at('c2', ['other'])], null))
-      .toEqual({ connectionId: 'c1', modelId: 'slow' })
-  })
-
-  it('keeps a remembered pick that still resolves', () => {
-    const connections = [at('c1', ['fast']), at('c2', ['slow'])]
-    expect(effectiveModelPick(connections, { connectionId: 'c2', modelId: 'slow' }))
-      .toEqual({ connectionId: 'c2', modelId: 'slow' })
-  })
-
-  // A disconnected provider in a device preference is a stale note, not a decision to honour.
-  it('falls back to the first connection when the remembered one has gone', () => {
-    expect(effectiveModelPick([at('c1', ['fast'])], { connectionId: 'deleted', modelId: 'x' }))
-      .toEqual({ connectionId: 'c1', modelId: 'fast' })
-  })
-
-  // A provider that dropped a model between releases would otherwise be asked for one it no longer
-  // serves.
-  it('replaces a remembered model the provider no longer lists', () => {
-    expect(effectiveModelPick([at('c1', ['fast'], 'fast')], { connectionId: 'c1', modelId: 'retired' }))
-      .toEqual({ connectionId: 'c1', modelId: 'fast' })
-  })
-
-  // Empty is a real answer: the node omits the model and the provider runtime picks.
-  it('answers an empty model for a provider that declares none', () => {
-    expect(effectiveModelPick([at('c1', [])], null)).toEqual({ connectionId: 'c1', modelId: '' })
-  })
-})
-
 describe('generateReason', () => {
   // Matched on the envelope\'s `code`, because `ApiError` is not on the plugin surface.
   it('turns the two provider codes into a next step', () => {
     expect(generateReason({ code: 'provider_needs_auth', message: 'provider_needs_auth' })).toContain('Reconnect it in Settings')
     expect(generateReason({ code: 'provider_rate_limited', message: 'x' })).toContain('rate-limiting')
     expect(generateReason({ code: 'provider_unavailable', message: 'x' })).toContain('did not answer')
+  })
+
+  // An installed CLI that is signed out fails the same way an unreachable provider does, and
+  // "try again shortly" is the wrong advice: nothing changes until somebody runs it in a terminal.
+  it('sends a harness to a terminal instead of telling it to try again', () => {
+    const unavailable = { code: 'provider_unavailable', message: 'x' }
+    expect(generateReason(unavailable, { kind: 'harness', label: 'Claude Code' }))
+      .toBe('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
+    expect(generateReason(unavailable, { kind: 'connection', label: 'Anthropic' }))
+      .toBe('The provider did not answer. Try again shortly.')
   })
 
   it('keeps the node\'s own prose for a refusal it wrote itself', () => {

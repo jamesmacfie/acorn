@@ -463,8 +463,9 @@ real remote with real credentials does.
     progress**, the Conflicts group is first in the list, the primary button is disabled, and **Abort**
     puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
     ahead count move without touching the pane.
-46. With no model provider connected, the commit toolbar has no wand at the left of it. Connect one in
-    Settings, under Integrations, reopen the pane, and stage two files. Press the wand: it spins, and
+46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
+    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    Press the wand: it spins, and
     within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
     a message of your own and press the wand again: it reads **Replace?** and does nothing until a
     second press. Connect a second provider, press the chevron beside the wand, pick the other one,
@@ -544,12 +545,13 @@ node whose whole point is what it looks like, so a suite can check the geometry 
     list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
     the selected card.
 
-The last one is the editor's **Generate** button
+Next is the editor's **Generate** button
 ([workflows.md](./workflows.md) § Generating one from a description). A pure suite pins the prompt
 and drives the reader from a table, and neither can see whether the teaching worked on a real model.
 
-57. With no model provider connected, the editor toolbar has no **Generate** between the tab strip
-    and **Undo**. Connect one in Settings, under Integrations, reopen a workflow row, and press it.
+57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
+    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    row, and press it.
     Describe the owner's first workflow in words: two agents investigate one issue from different
     angles at the same time, a third reads both and writes the synthesis, and somebody approves
     before anything is pushed. The dialog counts seconds while it works, and a couple of minutes is
@@ -560,6 +562,51 @@ and drives the reader from a table, and neither can see whether the teaching wor
     from a description that asks for a `code-review` step kind, which no node has: the definition
     still applies, and the alert above the node list says what was taken out of it. Last, open a
     committed file from the rail and confirm there is no **Generate** on that toolbar at all.
+
+Next is the first-run wizard's AI step
+([integrations.md](./integrations.md) § Model providers). The plugin's own jsdom suite draws the step
+against a fixture route, and what it cannot see is the route answering from a real `which` on a real
+machine, or the wizard's own flow around the step.
+
+58. Clear the `onboarded` preference on a node with no projects and walk the wizard end to end. On
+    **Generate with AI**, every agent CLI on that machine is a row saying it is installed, and every
+    one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
+    provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
+    step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
+    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    and **Next** still works.
+
+The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
+**not yet run** ([integrations.md](./integrations.md) § Model providers). The list builder, the
+dispatch, the containment and the picker all have suites, and none of them can spend a real CLI on a
+real machine, which is the whole point of the feature: the reader who has `claude` or `codex` on PATH
+and no API key at all. Run them with the keys disconnected first.
+
+59. With no model provider connected and `claude` installed, open the SQL dialog on a task with a
+    database connection, press the commit-message wand on a task with staged changes, and press
+    **Generate** in the workflow editor. All three offer Claude Code, and all three come back with an
+    answer. Then connect a key and run ⌘K → **Generate SQL**, the palette path that draws no picker:
+    it spends the key, not the CLI, because connections come first in the list and that fast path
+    takes the first backend. Last, sign out of the CLI (or rename it off PATH between the read and the
+    press) and generate again: the failure names Claude Code and says to run it once in a terminal,
+    and the node log has the stderr tail while the client gets none of it.
+60. Pick Codex in the commit wand and press it. The picker offers no model select for Codex, because
+    its model list lives in `~/.codex/config.toml` rather than here, and the message still arrives.
+    Then run a workflow with a `decide` step whose profile is `codex`: it reaches a verdict and the
+    run carries on past the gate, which is the check that Codex's own stream shape is being read
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
+    Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
+    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    follow any of this and to open on the first backend every time
+    ([state-ownership.md](./state-ownership.md) § Scope rules).
+62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
+    OpenCode plugin from [plugin-authoring.md](./plugin-authoring.md) § Harnesses alone, without
+    reading this repository, install it from a folder, and approve the trust prompt: it shows two
+    lines, the ACP spawn and `opencode run --model MODEL` to generate text. OpenCode then appears in
+    the Agent pane, in a task terminal, and in every Generate control, and generates a commit
+    message. That the doc is enough on its own is what is being checked, so a step that sent you to
+    the source is a failure of the doc.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

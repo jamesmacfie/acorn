@@ -928,31 +928,43 @@ export function CopyButton(props: { text: () => string; onCopy?: (text: string) 
   )
 }
 
-/** A `Picker` over the connected models, grouped by provider. */
-export function ModelConnectionPicker(props: {
-  connections: readonly { connection: { id: string; label?: string }; provider: { models?: readonly { id: string; label?: string }[] } }[]
-  connectionId: string
+/** Two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI.
+ *
+ *  Structurally typed rather than importing `ModelBackend`, like every other node in this file: the
+ *  terminal kit is a second implementation of the vocabulary, not a consumer of the shell's types.
+ *  What it must match is the behaviour, and until this rename it did not — it always drew the model
+ *  select and never reset the model when the backend changed. Both are fixed here, because two hosts
+ *  that draw the same node and answer differently is a bug a plugin author cannot see coming. */
+export function ModelBackendPicker(props: {
+  backends: readonly { id: string; label?: string; models?: readonly { id: string; label?: string }[]; defaultModelId?: string }[]
+  backendId: string
   modelId: string
-  onChange: (selection: { connectionId: string; modelId: string }) => void
+  onChange: (pick: { backendId: string; modelId: string }) => void
 }) {
-  const current = () => props.connections.find((entry) => entry.connection.id === props.connectionId) ?? props.connections[0]
-  const models = () => current()?.provider.models ?? []
+  const current = () => props.backends.find((entry) => entry.id === props.backendId) ?? props.backends[0]
+  const models = () => current()?.models ?? []
+  // The same rule as `defaultModelIdFor` (@acorn/protocol/modelProviders.ts), restated rather than
+  // imported: that function takes a whole `ModelBackend` and these props are the structural subset.
+  const defaultModel = (backend: (typeof props.backends)[number] | undefined) =>
+    backend?.defaultModelId || backend?.models?.[0]?.id || ''
   return (
     <box flexDirection="row" gap={1}>
-      <Show when={props.connections.length > 1}>
+      <Show when={props.backends.length > 1}>
         <Select
-          label="Connection"
-          value={props.connectionId}
-          options={props.connections.map((entry) => ({ value: entry.connection.id, label: entry.connection.label ?? entry.connection.id }))}
-          onChange={(connectionId) => props.onChange({ connectionId, modelId: props.modelId })}
+          label="Generate with"
+          value={props.backendId}
+          options={props.backends.map((entry) => ({ value: entry.id, label: entry.label ?? entry.id }))}
+          onChange={(backendId) => props.onChange({ backendId, modelId: defaultModel(props.backends.find((entry) => entry.id === backendId)) })}
         />
       </Show>
-      <Select
-        label="Model"
-        value={props.modelId}
-        options={models().map((model) => ({ value: model.id, label: model.label ?? model.id }))}
-        onChange={(modelId) => props.onChange({ connectionId: props.connectionId, modelId })}
-      />
+      <Show when={models().length}>
+        <Select
+          label="Model"
+          value={props.modelId}
+          options={models().map((model) => ({ value: model.id, label: model.label ?? model.id }))}
+          onChange={(modelId) => props.onChange({ backendId: current()?.id ?? '', modelId })}
+        />
+      </Show>
     </box>
   )
 }

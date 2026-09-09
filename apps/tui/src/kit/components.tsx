@@ -12,7 +12,7 @@ import {
 } from './showing'
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
-  MentionTextarea, ModelConnectionPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
@@ -47,7 +47,7 @@ export const KIT_COMPONENTS: KitTable = {
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
-  ModelConnectionPicker,
+  ModelBackendPicker,
   Rectangle,
   Only, Fallback,
 }

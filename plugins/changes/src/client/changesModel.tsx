@@ -1,8 +1,9 @@
 import { For, createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientEvents, focusedPane, formatFileReference, prefsOptions, projectsOptions,
-  readJson, registerCommands, sendReferenceToAgent, taskBridge, taskStatus, type Task,
+  agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, prefsOptions,
+  projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
+  sendReferenceToAgent, taskBridge, taskStatus, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, Button, Inline, Stack, Text } from '@acorn/plugin-api/ui'
@@ -11,9 +12,9 @@ import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNo
 import { emptyLocalStatus, reviewNotesRoute, type ModelPick, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
-import { readChangeView, readGeneratePick, saveChangeView, saveGeneratePick } from './changesPrefs'
+import { readChangeView, saveChangeView } from './changesPrefs'
 import {
-  changeKey, effectiveModelPick, groupChanges, groupSections, isFolderKey, pickSelected, remoteReason,
+  changeKey, groupChanges, groupSections, isFolderKey, pickSelected, remoteReason,
   stackFor, stageableRows, stagedState, toPullFile, totals, viewNodes, type ChangeView, type RemoteAction,
 } from './model'
 import { CHANGES_PANE, changesBindings, changesCommands } from './commands'
@@ -213,19 +214,23 @@ export function createChangesModel(task: Task) {
     await refetch()
   }
 
-  // Which model providers the wand may spend, ids and labels only: the key stays on the node and is
-  // resolved inside `core.models.generateText` (../server/routes/localGit.ts).
+  // Which backends the wand may spend — a stored key, or an agent CLI installed on this machine — ids
+  // and labels only: the key stays on the node and is resolved inside `core.models.generateText`
+  // (../server/routes/localGit.ts).
   //
-  // Read once per task rather than on a poll. A connection is added in Settings, which is a trip out
-  // of the pane and back, and this model is rebuilt when the pane is. An empty list is also what
-  // hides the button, so the pane draws no wand until the read returns, which is the right way round.
-  const [modelConnections] = createResource(
+  // Read once per task rather than on a poll. A connection is added in Settings and a CLI is installed
+  // in a terminal, both of which are a trip out of the pane and back, and this model is rebuilt when
+  // the pane is. An empty list is also what hides the button, so the pane draws no wand until the read
+  // returns, which is the right way round.
+  const [modelBackends] = createResource(
     () => (project()?.vcs === 'git' ? task.id : undefined),
-    async (id) => await localGitApi.modelConnections(id).catch(() => []),
+    async (id) => await localGitApi.modelBackends(id).catch(() => []),
     { initialValue: [] },
   )
-  // The remembered pick, resolved against what is actually connected (./model.ts).
-  const modelPick = createMemo(() => effectiveModelPick(modelConnections(), readGeneratePick(prefs.data)))
+  // The shared "Generate with" default, resolved against what is actually available. The same pick
+  // the workflow generator opens on, so a reader who chose an installed CLI here does not choose it
+  // again there (client-core features/settings/models/generatePick.ts).
+  const modelPick = createMemo(() => effectiveModelPick(modelBackends(), readGeneratePick(prefs.data)))
 
   // The commit editor: the message, the three options, and the two verbs (./commitState.ts). Built
   // here so it lives as long as the pane's model rather than as long as the footer, which the host
@@ -347,12 +352,12 @@ export function createChangesModel(task: Task) {
     /** Run one remote verb: the bar's primary button, its menu, and the banner's Abort all come
      *  through here (./RemoteBar.tsx). */
     remote,
-    /** The connections the wand may offer. Empty hides it: there is nothing to press. */
-    modelConnections,
-    /** Which connection and model a press will spend, or null when none is connected. */
+    /** The backends the wand may offer. Empty hides it: there is nothing to press. */
+    modelBackends,
+    /** Which backend and model a press will spend, or null when there is nothing to spend. */
     modelPick,
-    /** Remember a pick for this device. Written whole, because the model is only meaningful beside
-     *  the connection that serves it (./changesPrefs.ts). */
+    /** Remember a pick for this device, for every Generate control rather than only this one. Written
+     *  whole, because the model is only meaningful beside the backend that serves it. */
     setModelPick: (pick: ModelPick) => void saveGeneratePick(queryClient, pick),
     // The commit editor, spread flat: the footer and the expanded modal take the whole model, and a
     // second dot in every one of their reads would say nothing extra.

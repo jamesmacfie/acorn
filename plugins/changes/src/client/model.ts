@@ -1,9 +1,8 @@
 // ChangesPane model: pure grouping, ordering and selection over LocalChange[], plus the adapter
 // that feeds a local patch into the shared diff pipeline (DiffFile shape, diff.ts).
 import type { DiffFile } from '@acorn/plugin-api/ui/diff'
-import { defaultModelIdFor, type AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/terminal.ts'
-import type { ModelPick } from '../shared/api'
 
 /** The three groups the list draws, top to bottom. Conflicts, tracked edits and untracked files are
  *  three different situations for the reader, and only the middle one is a staging question. */
@@ -184,29 +183,10 @@ export function remoteReason(action: RemoteAction, reason: string): string {
   return reason
 }
 
-/** Which connection and model the wand will spend, given what is connected and what was remembered.
- *
- *  The remembered pick wins while it still resolves, so a reader who chose Anthropic keeps it. A pick
- *  whose connection has gone falls back to the first connection rather than failing, because a
- *  disconnected provider in a device preference is a stale note, not a decision to honour. Its
- *  provider's own default model is the fallback, which is what `ModelConnectionPicker` opens on, so
- *  the picker and the silent path start on the same model by construction.
- *
- *  `null` when nothing is connected, which is what hides the wand. */
-export function effectiveModelPick(
-  connections: readonly AvailableModelConnection[],
-  remembered: ModelPick | null,
-): ModelPick | null {
-  const held = remembered ? connections.find((candidate) => candidate.connection.id === remembered.connectionId) : undefined
-  if (remembered && held) {
-    // The model is checked against the provider's list too: a provider that dropped a model between
-    // releases would otherwise be asked for one it no longer serves.
-    const known = held.provider.models?.some((model) => model.id === remembered.modelId)
-    return { connectionId: remembered.connectionId, modelId: known ? remembered.modelId : defaultModelIdFor(held) }
-  }
-  const first = connections[0]
-  return first ? { connectionId: first.connection.id, modelId: defaultModelIdFor(first) } : null
-}
+/** What the failure copy needs to know about the backend a press spent: whether it was a CLI on this
+ *  machine, and what to call it. A slice of `ModelBackend` rather than the whole thing, so the pure
+ *  function below stays testable with two fields. */
+export type PickedBackend = Pick<ModelBackend, 'kind' | 'label'>
 
 /** What a failed generate says in the footer's alert.
  *
@@ -214,11 +194,18 @@ export function effectiveModelPick(
  *  the plugin surface, and the code is the part of the envelope that is a contract
  *  (docs/api-reference.md § Errors). Two provider codes get a next step; everything else keeps
  *  the node's own prose, which for a refusal is the sentence the bridge wrote. */
-export function generateReason(error: unknown): string {
+export function generateReason(error: unknown, backend?: PickedBackend): string {
   const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : ''
   if (code === 'provider_needs_auth') return 'The provider key was rejected. Reconnect it in Settings, under Integrations.'
   if (code === 'provider_rate_limited') return 'The provider is rate-limiting requests. Try again shortly.'
-  if (code === 'provider_unavailable') return 'The provider did not answer. Try again shortly.'
+  // A CLI generate fails as `provider_unavailable` too, and "try again shortly" is the wrong advice
+  // for it: the usual cause is a CLI that is installed but signed out, which retrying will not fix.
+  // The next step is to run it once in a terminal and see what it says.
+  if (code === 'provider_unavailable') {
+    return backend?.kind === 'harness'
+      ? `${backend.label} did not answer. Run it once in a terminal to check it is signed in.`
+      : 'The provider did not answer. Try again shortly.'
+  }
   return error instanceof Error && error.message ? error.message : 'Writing the message failed.'
 }
 

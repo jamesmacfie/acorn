@@ -127,7 +127,10 @@ nothing has, because a step has no pane to have pressed **Connect** in.
 **`database:query`** takes either a `savedQueryId` or inline `sql`, and refuses a step that sets both
 or neither. A saved query id is resolved inside the task's own project, so an id from another
 repository does not run here. **`database:generate`** takes a `prompt` and a `connectionId`, asks the
-model for SQL through the same prompt builder the pane uses, and runs it. Its output carries the SQL
+model for SQL through the same prompt builder the pane uses, and runs it. That field holds a backend
+id, which may name an installed agent CLI as readily as a connected key
+([integrations.md](./integrations.md) § Model providers); it keeps the name `connectionId` because
+every step already saved holds its pick under that key, and its label reads "Generate with". Its output carries the SQL
 as well as the rows, and a generated write fails the step with the SQL in the message, because what
 the reader needs to see is what the model thought it was asked for.
 

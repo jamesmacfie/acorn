@@ -35,7 +35,7 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   git: { text: 'Read repository history and run Git commands', icon: 'git-branch' },
   tasks: { text: 'Read task details', icon: 'list' },
   context: { text: 'Read task launch context', icon: 'info' },
-  models: { text: 'Generate text with configured model providers', icon: 'sparkles' },
+  models: { text: 'Generate text with your model providers and installed agent CLIs', icon: 'sparkles' },
   prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },
   identity: { text: 'Read the node owner identity', icon: 'user-round' },
   // The three that hand over where code lives on disk, and the reason `high` exists.
@@ -163,19 +163,33 @@ export const harnessGrants = (contributions: PluginContributions): PluginHarness
 //
 // The environment is a second sentence, and both it and the command are in the key, so a version that
 // swaps the binary or widens the globs reads as newly requested.
+//
+// A one-shot text mode is its own line rather than a clause on the first, because it is a second
+// program invocation: different arguments, no session, and it runs whenever the owner picks the
+// harness from a Generate list rather than when they open an agent pane. Its arguments are in their own
+// key for the same reason the spawn's are, so changing them asks again.
 export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((grant) => {
+    .flatMap((grant) => {
       const run = grant.kind === 'command'
         ? `Run “${grant.run}” as the “${grant.label}” agent`
         : `Run JavaScript this package ships (${grant.run}) as the “${grant.label}” agent`
       const env = grant.env.length ? ` and pass it ${grant.env.join(', ')} from this node’s environment` : ''
-      return line(`harness:${grant.id}:${grant.kind}:${grant.run}:${grant.env.join(' ')}`, {
-        text: `${run}${env}`,
-        icon: 'bot',
-        high: true,
-      })
+      return [
+        line(`harness:${grant.id}:${grant.kind}:${grant.run}:${grant.env.join(' ')}`, {
+          text: `${run}${env}`,
+          icon: 'bot',
+          high: true,
+        }),
+        ...(grant.oneShot
+          ? [line(`harness:${grant.id}:oneShot:${grant.oneShot}`, {
+            text: `Runs “${grant.oneShot}” to generate text`,
+            icon: 'sparkles',
+            high: true,
+          })]
+          : []),
+      ]
     })
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>

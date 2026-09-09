@@ -866,13 +866,44 @@ const harnessQuirks = z.object({
   sessionPersistence: z.boolean().default(false),
 })
 
-// The interactive TUI beside the managed session: the data half of an agent profile. The code half,
-// `headlessArgv`, `resumeArgv`, `aiArgv` and the stream-JSON parser, has no manifest form, so a
-// data-only harness works in the Agent pane and the terminal but no workflow step can name it.
+// One prompt in, one answer out, with no session and no tools. Declaring it is what puts the harness
+// in every Generate list beside a connected API key (docs/integrations.md § Model providers), and it
+// is the only argv a manifest may assemble.
+//
+// `headlessArgv` and `resumeArgv` stay refused, because a manifest that can say "if resuming, add
+// these two arguments" is a template language. This one is admitted because it has two variables in
+// fixed positions and nothing to branch on: the model goes after `args` when a caller names one and
+// the CLI has a flag for it, and the prompt is always last. The line we hold is that `oneShot` never
+// grows a placeholder syntax. A CLI that wants the prompt in the middle, or a flag whose value
+// depends on another flag, is asking for a code-tier profile instead.
+const harnessOneShot = z.object({
+  // The subcommand and switches that make the CLI answer once and exit, such as `run` for opencode.
+  // Written out rather than defaulted, because this is the invocation the trust prompt discloses.
+  args: z.array(z.string().min(1).max(256)).max(16),
+  // Omitted means the CLI answers on whatever model it is configured with, and a model a caller names
+  // is dropped rather than guessed at.
+  modelFlag: z.string().min(1).max(64).optional(),
+  // How stdout is read. `text` takes all of it as the answer, which suits a CLI that prints the answer
+  // and sends its own chrome to stderr. `json-lines` reads a newline-delimited stream and looks for a
+  // `result` event, the shape `claude -p --output-format stream-json` writes.
+  //
+  // The one field here with no default, unlike the rest of this descriptor, because there is no common
+  // case to default to: of the four agent CLIs acorn drives, one writes a `result` event and the others
+  // do not. A wrong guess reads as a malformed run with nothing on screen to say why, so we make the
+  // author state it.
+  output: z.enum(['text', 'json-lines']),
+})
+
+// The interactive TUI beside the managed session: the data half of an agent profile. `headlessArgv`,
+// `resumeArgv` and a stream shape of the harness's own have no manifest form, so a data-only harness
+// runs no agentic workflow step, but `oneShot` carries the one-shot text turn.
 const harnessTerminal = z.object({
   command: z.string().min(1).max(128),
   backendPreference: z.enum(['node-pty', 'tmux']).default('tmux'),
   launchArgs: z.array(z.string().min(1).max(4_096)).max(16).default([]),
+  // Runs `command` again with these arguments, so it belongs beside the interactive launch rather than
+  // beside `spawn`, which is the ACP connection and takes no prompt.
+  oneShot: harnessOneShot.optional(),
 })
 
 const harnessDescriptor = z.object({

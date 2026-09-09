@@ -74,7 +74,7 @@ export { rowHeightSm } from '@acorn/client-core/kit/lib/metrics.ts'
 // Controlled connection and model dropdowns over `availableModelConnections`. On this barrel because
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
-export { default as ModelConnectionPicker } from '@acorn/client-core/features/settings/models/ModelConnectionPicker.tsx'
+export { default as ModelBackendPicker } from '@acorn/client-core/features/settings/models/ModelBackendPicker.tsx'
 export { defaultModelIdFor } from '@acorn/client-core/features/settings/models/defaultModel.ts'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────

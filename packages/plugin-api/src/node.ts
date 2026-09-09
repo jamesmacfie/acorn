@@ -101,7 +101,14 @@ export { RUN_TARGETS } from '@acorn/node-core/server/routes/plugins/harness.ts'
 
 // ── Agents: profiles, headless runs, MCP registration ─────────────────────────────────────────
 export { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/server/agentProfiles/index.ts'
-export { lineDelimitedJsonAdapter } from '@acorn/node-core/server/agentProfiles/streamJson.ts'
+// Three stdout readings, because the CLIs frame their answers differently and a profile picks the one
+// that matches its own. See streamJson.ts for what codex emits instead of a `result` event, and for why
+// `textAdapter` reads a plain-text one-shot.
+export { codexJsonAdapter, lineDelimitedJsonAdapter, textAdapter } from '@acorn/node-core/server/agentProfiles/streamJson.ts'
+// The extra environment an agent CLI needs on top of `brokerEnv`'s base allowlist. In core because
+// core spawns a CLI itself for a one-shot generate, and here because the drivers that spawn the
+// interactive ones live in a plugin.
+export { AGENT_TOOL_PASSTHROUGH } from '@acorn/node-core/server/agentProfiles/toolEnv.ts'
 export type { AgentProfileContribution } from '@acorn/node-core/server/agentProfiles/types.ts'
 export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/server/headless.ts'
 export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/server/headless.ts'

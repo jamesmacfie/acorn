@@ -39,7 +39,12 @@ const QUERY_FIELDS: StepField[] = [
 
 const GENERATE_FIELDS: StepField[] = [
   { id: 'prompt', label: 'Ask for', type: 'prompt', required: true, placeholder: 'the ten most recent orders with the customer’s email' },
-  { id: 'connectionId', label: 'Model connection', type: 'select', required: true, optionsRoute: '/v2/p/database/tasks/{taskId}/model-connections' },
+  // The id and the label disagree on purpose. The label is what a backend is now called; the id stays
+  // `connectionId` because every `database:generate` step already saved holds its pick under that key,
+  // and a definition whose field id moved would validate as "names no backend" the next time it ran.
+  // The value it holds is a bare connection uuid, which still resolves — a prefix-less backend id is a
+  // connection (@acorn/protocol/modelProviders.ts § parseBackendId).
+  { id: 'connectionId', label: 'Generate with', type: 'select', required: true, optionsRoute: '/v2/p/database/tasks/{taskId}/model-connections' },
   MAX_ROWS_FIELD,
 ]
 
@@ -56,7 +61,7 @@ const validateGenerate: StepValidator = (step, { label }) => {
   const config = (step.with ?? {}) as GenerateConfig
   const errors: string[] = []
   if (typeof config.prompt !== 'string' || !config.prompt.trim()) errors.push(`${label} has nothing to ask for`)
-  if (typeof config.connectionId !== 'string' || !config.connectionId.trim()) errors.push(`${label} names no model connection`)
+  if (typeof config.connectionId !== 'string' || !config.connectionId.trim()) errors.push(`${label} names no backend to generate with`)
   return errors
 }
 
@@ -141,7 +146,7 @@ export function generateStep(services: DatabaseStepServices): StepKindContributi
     handler: async (ctx) => {
       const config = (ctx.def.with ?? {}) as GenerateConfig
       const userId = services.core.identity.active()
-      if (!userId) return { status: 'failed', error: 'This node has no bound owner, so it cannot spend a model connection.' }
+      if (!userId) return { status: 'failed', error: 'This node has no bound owner, so it cannot generate SQL.' }
       const schema = await services.bridge.schema(ctx.run.taskId)
       if ('error' in schema) return { status: 'failed', error: `The database schema could not be read: ${schema.error}` }
       ctx.emit({ at: Date.now(), event: { type: 'progress', text: 'Writing the SQL' } })
@@ -149,7 +154,7 @@ export function generateStep(services: DatabaseStepServices): StepKindContributi
       try {
         const generated = await services.core.models.generateText({
           userId,
-          connectionId: String(config.connectionId),
+          backendId: String(config.connectionId),
           input: {
             system: buildSystemPrompt(schema.schema, { ...(schema.notes ? { notes: schema.notes } : {}), examples: [] }),
             prompt: String(config.prompt),

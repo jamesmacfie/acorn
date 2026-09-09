@@ -118,7 +118,7 @@ export const NODE_FOCUS = {
   FindBar: 'stop',
   Field: 'none',
   CopyButton: 'stop',
-  ModelConnectionPicker: 'stop',
+  ModelBackendPicker: 'stop',
 
   // Pixels. One stop from outside; Enter hands the keys to what is in the box and Escape takes them
   // back, because whatever is in there will swallow Tab.

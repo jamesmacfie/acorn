@@ -259,17 +259,100 @@ on the rail. Commenting and issue mutation stay in the issue surface.
 
 ## Model providers
 
+A **backend** is one thing a Generate control can spend: a model-provider connection this owner has
+stored a key for, or an agent CLI installed on this machine. `ModelBackend` in
+`packages/protocol/src/modelProviders.ts` is the one read model over both, and it is deliberately
+flat: an id, a kind of `connection` or `harness`, a label, an optional glyph, a model catalog that may
+be empty, and a default model id that may be `''`. A connection's auth kind, scopes, account and
+timestamps do not cross it, because no consumer reads them and a harness has none of them. A caller
+that wants the connection row itself still has `/v2/core/integrations`.
+
+A CLI is not a synthesized connection, and that is the decision the rest of this section follows
+from. `generateTextForConnection` reads a database row, checks its status, reveals its secret and
+marks it `needs-auth` on failure, and an installed CLI has none of those to offer. Giving it a fake
+`Integration` entry would have put an `if (synthetic)` branch in every one of those steps and put an
+`authKind` on the wire that means nothing.
+
 OpenAI and Anthropic connections are registered through the model-provider plugin. Adapters expose a
 typed `generate` capability for consumers such as database SQL generation. Prompts and responses are
 not written to the model-provider database, and ambiguous generation failures are not retried
 automatically.
 
 The model-providers plugin has no database and no routes. It turns a stored credential into an OpenAI
-or Anthropic HTTP call, and nothing more. There is no generic model HTTP endpoint. A consumer calls
-`CoreServices.models.generateText` and owns its own route, because a shared endpoint would be an
+or Anthropic HTTP call, and nothing more. There is no generic model *generate* endpoint. A consumer
+calls `CoreServices.models.generateText` and owns its own route, because a shared endpoint would be an
 unbudgeted proxy to whatever the caller asked for. Each connection provider registers before its
 matching model adapter, and the model registry refuses an adapter naming a connection provider that
 has not registered yet, or one that has not declared `textGeneration`.
+
+**Core mints the ids and core parses them.** There are two prefixes and no others:
+`connection:<uuid>` is an integrations row this owner holds, and `harness:<profileId>` is an entry in
+the agent-profile registry that declares a one-shot text mode. A string with no prefix is read as a
+connection uuid, and that rule is permanent rather than transitional: two stores hold a bare uuid
+written before these ids existed, the `connectionId` of a saved `database:generate` workflow step and
+the changes plugin's own device preference, and neither is rewritten. `parseBackendId` beside the
+type is the one reader, with a test that a bare uuid and its prefixed form resolve to the same
+connection. Because an id reaches a saved workflow step and a device preference, renaming a profile
+is a compatibility break rather than a label edit, the same rule
+[managed-agents.md](./managed-agents.md) § Harnesses states for harness ids.
+
+**Connections come first in the list, and things depend on it.** `models.available(userId)` returns
+every connected model provider with text generation available, in the order
+`/v2/core/integrations` already serves them, and then every profile with a one-shot mode whose
+command is on this machine, in registry order. Two paths take `available()[0]` without asking anyone:
+the database plugin's palette route, where **Generate SQL** runs with no picker at all, and the
+changes plugin's fallback when nothing has been picked yet. Both keep spending the key the owner
+configured on purpose, and a CLI is chosen for someone only when there is no key at all, which is
+the lock-out this list exists to fix.
+
+**Availability is probed on every read, and nothing is cached.** `which` costs milliseconds, and the
+list is read when a dialog opens, a Settings page mounts, or the wizard reaches its step, so a cache
+would be a second source of truth to invalidate when someone installs a CLI while acorn is running.
+The read does wait on one thing first: `spawnsReady()`, the login-shell PATH probe
+(`server/core/loginShellPath.ts`). Off a packaged macOS build that probe can still be running when
+the first read lands, and `which claude` before it settles answers "not installed" for a CLI that is.
+`runHeadless` waits on the same gate before spawning, so the read and the call it leads to agree. A
+profile that goes missing between the two fails the call with `provider_not_connected`, exactly as a
+connection deleted between the two does.
+
+**`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
+in `server/modelProviders/runtime.ts`, unchanged. A `harness:` id goes to `generateTextForHarness` in
+`server/modelProviders/harnessRuntime.ts`. Both return the same result, whose `backendId` says which
+was spent, and both run behind the same `validateInput` first: a 60-second ceiling, 100,000 system
+characters, 1,000,000 prompt characters, and 128,000 output tokens. `maxOutputTokens` is validated
+and then ignored for a harness, because neither `claude` nor `codex` has a flag for it, and a bound
+the caller states and the backend cannot honour is still worth refusing when it is absurd.
+
+**A CLI generate is contained, and the containment is the whole of that function.** Tools are off,
+which the profile's own `aiArgv` does. The working directory is an empty temporary directory, removed
+in a `finally`, and it is empty on purpose: Claude Code reads `CLAUDE.md` from the working directory
+and Codex reads `AGENTS.md`, so a generate started in a worktree would answer with that repository's
+house rules in front of the caller's prompt. Everything the caller wants the model to see is already
+in the prompt. The environment is the broker's base allowlist plus `AGENT_TOOL_PASSTHROUGH`
+(`server/agentProfiles/toolEnv.ts`, which moved into core so core can read it without importing a
+plugin), which is configuration only: no `ACORN_API_URL`, no `ACORN_API_TOKEN`, no
+`ACORN_TOOL_CEILING`, no MCP server in the child, and no key acorn holds anywhere in it, so the CLI
+authenticates with its own stored login (§ Credential handling in [security.md](./security.md)). The
+run goes through the same `providerRequestScheduler` a connection call does, in a lane keyed by
+profile id and bounded at two at once, so four dialogs opened together do not put four agent CLIs on
+the machine. The caller's abort signal is chained the same way. A failure logs the stderr tail with
+the profile id, the status and the duration to the node log and sends the client
+`provider_unavailable`, per § Provider boundaries below.
+
+What a generate deliberately is not is `agents.sessionExecute`. That path needs a task, creates a
+durable session row, and appends to the transcript ledger per call. A commit message is not a
+session, and forty "Workflow: commit message" rows in Agent Center is the wrong record.
+
+**One core read route, and it is not the generate endpoint this section refuses.**
+`GET /v2/core/models/backends` is device-only and answers `backends` in list order plus `missing`,
+which is every profile with a one-shot mode whose command is not on this machine. The refusal above
+is of a generic generate endpoint, an unbudgeted proxy to whatever a caller asked for. This is the
+ids-and-labels projection `/v2/core/integrations` already serves for connections, and its consumers
+are core's own surfaces: the onboarding wizard's step, the Settings section that lists the backends
+and holds the shared default, and the project-settings gate on the AI-SQL schema editor that used to
+count connections client-side. Nothing but the wizard reads `missing`. A plugin frame keeps the proxy
+route its own plugin serves, because `/v2/core/*` has no bridge scope and minting one would hand
+every installed plugin the whole roster to serve one dropdown.
 
 Three routes consume the seam, and each owns its own prompt:
 
@@ -279,14 +362,15 @@ Three routes consume the seam, and each owns its own prompt:
 | changes | `POST /v2/p/changes/tasks/:id/local/commit-message` | The branch name and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the editor's draft |
 | workflows | `POST /v2/p/workflows/defs/generate` | What a workflow is, the step kinds generated from the node's own catalog, and the workspace's valid definitions as worked examples, capped at 90,000 characters | A whole definition, into the editor's draft as one undo step |
 
-All three check the same thing before they spend anything: the caller is a device or the node's own
-service scope. An automation caller holding a task-scoped token has no editor to put the answer in,
-and generation spends the owner's provider key (§ Credential handling in
+All three take a `backendId` and none of them chooses it: the person picking from the dropdown does,
+or the plugin's own fallback to the first available backend. All three check the same thing before
+they spend anything: the caller is a device or the node's own service scope. An automation caller
+holding a task-scoped token has no editor to put the answer in, and a generate spends either the
+owner's provider key or a login on their machine (§ Credential handling in
 [security.md](./security.md)). Workflows gets that gate from its `/defs` family being device-only,
 which is stricter again. Each also offers the read half, `models.available(userId)`, through a route
-of their own, for the same reason: `/v2/core/integrations` has no bridge scope, and minting one would
-hand every installed plugin the whole connection roster to serve one dropdown. Ids and labels cross;
-the key stays on the node and is resolved inside `generateText`.
+of their own, for the same reason the core route exists and no bridge scope does. Ids and labels
+cross; the key, or the command, stays on the node and is resolved inside `generateText`.
 
 Workflows is also the one that asks the model twice. When the first definition does not pass the
 workflow checker, the checker's messages go back once, and the repaired answer is taken if it parses
@@ -295,7 +379,11 @@ at all. That is why its route needs a longer request timeout than the broker's d
 
 A `ProviderOperationError` reaches the client with the status the reader has to act on, 401 to
 reconnect the key and 429 to wait, because a flattened 500 gives them nothing to do. Anything else the
-provider throws is flattened to `provider_unavailable`, per § Provider boundaries below.
+provider throws is flattened to `provider_unavailable`, per § Provider boundaries below. Each
+consumer's failure copy has one branch on the backend kind, because "the provider did not answer" is
+the wrong advice for a CLI that is installed but signed out: a harness failure names the CLI and says
+to run it once in a terminal. Nothing probes for that on read. The agents plugin owns the auth
+probes, core cannot import a plugin, and a probe per read would be a process per dropdown.
 
 ## Provider boundaries
 

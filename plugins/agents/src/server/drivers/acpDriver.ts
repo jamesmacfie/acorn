@@ -14,8 +14,7 @@ import { randomUUID } from 'node:crypto'
 import { Readable, Writable } from 'node:stream'
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import { brokerEnv } from '@acorn/plugin-api/node'
-import { AGENT_TOOL_PASSTHROUGH } from './toolEnv'
+import { AGENT_TOOL_PASSTHROUGH, brokerEnv } from '@acorn/plugin-api/node'
 import type { AgentInputPart, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { normalizeAcpConfig, normalizeAcpPermission, normalizeAcpUpdate } from './acpNormalizer'
@@ -182,7 +181,7 @@ export class AcpDriver implements AgentDriver {
       // brokerEnv, not `{ ...process.env }`: spreading the parent environment would hand the session
       // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security.md § Credential
       // handling. A passthrough glob is for tool configuration, never for credentials, which is why
-      // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist in ./toolEnv.ts.
+      // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist AGENT_TOOL_PASSTHROUGH names.
       env: {
         ...brokerEnv({
           env: options.env,

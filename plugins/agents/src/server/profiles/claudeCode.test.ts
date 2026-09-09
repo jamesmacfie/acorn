@@ -54,13 +54,34 @@ describe('the claude-code profile', () => {
     expect(claudeCodeProfile.resumeArgv!('claude', 'sess-1')).toEqual({ file: 'claude', args: ['--resume', 'sess-1'] })
   })
 
-  it('disables tools for a one-shot decision, so an AI call cannot act', () => {
-    // `aiArgv` is the structured-decision path: a workflow gate policy, an AI SQL draft. An empty
-    // `--tools` is the whole difference from a headless turn, because a decision reads and does not
-    // edit. Pinned as a whole array, since `args[indexOf('--tools') + 1] === ''` would still pass with
-    // a second non-empty `--tools` or an inserted `--add-dir` appended later. This is also the one path
-    // that keeps `dontAsk`: with no tools to call, denying is the right answer for anything that tries.
+  it('disables tools for a one-shot turn, so a decision or a generate cannot act', () => {
+    // `aiArgv` is the one-shot path: a workflow gate policy, an AI SQL draft, a commit message. An
+    // empty `--tools` plus `--strict-mcp-config` is the whole difference from a headless turn, because
+    // neither caller edits anything — the first empties the tool list, the second stops the owner's own
+    // MCP servers from being started for a turn that could not call them anyway. Pinned as a whole
+    // array, since `args[indexOf('--tools') + 1] === ''` would still pass with a second non-empty
+    // `--tools` or an inserted `--add-dir` appended later. This is also the one path that keeps
+    // `dontAsk`: with no tools to call, denying is the right answer for anything that tries.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
-    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', 'decide'])
+    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', '--strict-mcp-config', 'decide'])
+  })
+
+  it('replaces the CLI persona with the caller system prompt, and omits the flag without one', () => {
+    // `--system-prompt`, not `--append-system-prompt`: a generate wants "answer with SQL only" to be
+    // the whole instruction, with the coding-agent persona gone. It sits before the prompt, which stays
+    // last and positional.
+    const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'write it', system: 'Answer with SQL only.' })
+    expect(args).toEqual([
+      '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '',
+      '--strict-mcp-config', '--system-prompt', 'Answer with SQL only.', 'write it',
+    ])
+    expect(claudeCodeProfile.aiArgv!('claude', { prompt: 'p' }).args).not.toContain('--system-prompt')
+  })
+
+  it('offers the CLI aliases as its model catalog, so a picker has something to draw', () => {
+    // Aliases rather than dated ids: the CLI resolves `sonnet` to whatever it ships with.
+    expect(claudeCodeProfile.models?.map((model) => model.id)).toEqual(['sonnet', 'opus', 'haiku'])
+    expect(claudeCodeProfile.defaultModelId).toBe('sonnet')
+    expect(claudeCodeProfile.glyph).toBe('brand:agents/claude')
   })
 })

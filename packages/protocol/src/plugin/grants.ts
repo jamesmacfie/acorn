@@ -107,19 +107,29 @@ export const pluginTaskCheckGrants = (contributions: PluginContributions): Plugi
  *
  *  A descriptor declaring neither a command nor an entry is dropped rather than disclosed, like an
  *  unparseable extension reference. The node refused it at parse, so it can never run, and a consent
- *  line about a grant that cannot exist is noise in the one list that must not have any. */
+ *  line about a grant that cannot exist is noise in the one list that must not have any.
+ *
+ *  A `terminal.oneShot` block is a second program invocation, so it is read out of the descriptor here
+ *  and lands in the key beside the session spawn. That is the same rule the spawn follows: a version
+ *  that changes what acorn runs reads as newly requested. */
 export const pluginHarnessGrants = (contributions: PluginContributions): PluginHarnessGrant[] =>
   (contributions.harnesses ?? [])
     .flatMap((harness): PluginHarnessGrant[] => {
       const args = (harness.spawn.args ?? []).join(' ')
       const target = harness.spawn.command ?? harness.spawn.entry
       if (!target) return []
+      const oneShot = harness.terminal?.oneShot
+      // The model flag is part of the invocation even though its value comes from the person picking, so
+      // it is disclosed with a placeholder standing in for the value. The prompt has no placeholder at
+      // all, because it is what the owner typed rather than what the plugin declared.
+      const oneShotArgs = oneShot ? [...oneShot.args, ...(oneShot.modelFlag ? [oneShot.modelFlag, 'MODEL'] : [])] : []
       return [{
         id: harness.id,
         label: harness.label,
         kind: harness.spawn.command ? 'command' : 'entry',
         run: args ? `${target} ${args}` : target,
         env: [...new Set(harness.envPassthrough ?? [])].sort(),
+        ...(oneShot ? { oneShot: [harness.terminal!.command, ...oneShotArgs].join(' ') } : {}),
       }]
     })
     .sort((a, b) => a.id.localeCompare(b.id))

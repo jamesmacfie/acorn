@@ -192,6 +192,12 @@ const RULES: readonly RouteRule[] = [
   // reason as the row above, plus one of its own: the write replaces the connection's whole map, so a
   // frame that reached it could quietly unfollow everything the owner had set up.
   { path: shape(`/v2/core/integrations/${SEG}/mappings`), scopes: {} },
+  // Every backend a Generate control can spend. Read-shaped and ids-and-labels only, and still not
+  // mappable to a scope: it is the whole roster, and minting a scope for it would hand every installed
+  // plugin every connection the owner holds to serve one dropdown. A plugin that needs the list serves
+  // it from its own `/v2/p/<id>` route over `ctx.core.models.available`, which is what the three
+  // Generate dialogs already do (docs/integrations.md § Model providers).
+  { path: shape('/v2/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
 ]
 
 export type ApiDecision = { allowed: true } | { allowed: false; reason: string }

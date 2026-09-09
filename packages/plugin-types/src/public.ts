@@ -640,11 +640,17 @@ export type CoreContextService = {
 /** Text generation through a stored model-provider connection. You own the prompt; core owns
  *  credential resolution and the provider adapters. */
 export type CoreModelService = {
+  /** One turn of the backend the request names: a stored API key spent over HTTP, or one run of an
+   *  agent CLI installed on this machine with its tools off. The grant does not decide which; the
+   *  person who picked from the dropdown does, and your route passes their `backendId` through. */
   generateText(
-    request: HostOwned<'node-core/server/core/models/text.GenerateTextRequest'>,
+    request: HostOwned<'node-core/server/core/models.GenerateTextRequest'>,
   ): Promise<HostOwned<'node-core/server/modelProviders/types.GenerateTextResult'>>
-  /** Which connections this owner could generate with: ids and labels only. */
-  available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.AvailableModelConnection'>>>
+  /** Which backends this owner could generate with — a stored API key, or an agent CLI installed on
+   *  this machine — as ids and labels only. Connections come first, so a plugin that falls back to
+   *  `[0]` keeps spending the key the owner configured. The grant does not decide which backend runs;
+   *  the person picking from the dropdown does. */
+  available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.ModelBackend'>>>
 }
 
 /** One `(userId, key)` row. A loaded plugin's reads and writes are confined to `plugin:<yourId>:*`,

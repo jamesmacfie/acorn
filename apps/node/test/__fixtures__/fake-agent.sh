@@ -8,6 +8,23 @@
 #   malformed    → exit 0 with garbage output
 MODE="${FAKE_AGENT_MODE:-ok}"
 
+# `--report <file>` first, and then the run continues as normal: dump what this process was actually
+# handed — argv, cwd, how many entries that cwd holds, and the whole environment — one `<key> <value>`
+# line each. It is an argument rather than an env variable because the callers under test build the
+# child environment from an allowlist, so nothing a test sets would survive the trip; argv is the only
+# channel into a contained spawn. Values with a newline in them would break the line format, so keep
+# test prompts on one line.
+if [ "$1" = "--report" ]; then
+  REPORT="$2"
+  shift 2
+  {
+    echo "cwd $PWD"
+    echo "entries $(ls -A . | wc -l | tr -d ' ')"
+    for ARG in "$@"; do echo "arg $ARG"; done
+    env | sed 's/^/env /'
+  } > "$REPORT"
+fi
+
 case "$MODE" in
   fail)
     echo '{"type":"system","subtype":"init","session_id":"fake-fail"}'

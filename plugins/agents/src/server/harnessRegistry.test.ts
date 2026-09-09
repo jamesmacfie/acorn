@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentProfileContribution, ManifestHarness } from '@acorn/plugin-api/node'
+import { lineDelimitedJsonAdapter, textAdapter, type AgentProfileContribution, type ManifestHarness } from '@acorn/plugin-api/node'
 import { createHarnessRegistry } from './harnessRegistry'
 import { AgentDriverRegistry } from './drivers/registry'
 import { AgentUsageCollectorRegistry } from './usage/collectors'
@@ -124,8 +124,63 @@ describe('a contributed harness becomes a driver like any other', () => {
     // the design, not an oversight.
     expect(profiles[0].headlessArgv).toBeUndefined()
     expect(profiles[0].streamJson).toBeUndefined()
+    // And no one-shot mode either, so it is not a model backend: the block below is the opt-in.
+    expect(profiles[0].aiArgv).toBeUndefined()
 
     handle.dispose()
     expect(profiles).toEqual([])
+  })
+})
+
+// The one argv a manifest may assemble. Two variables in fixed positions, which is why it is admitted
+// where `headlessArgv` and `resumeArgv` are refused, so what these pin is the positions.
+
+const oneShotHarness = (oneShot: NonNullable<NonNullable<ManifestHarness['terminal']>['oneShot']>) =>
+  harness({ terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [], oneShot } })
+
+const aiArgv = (
+  oneShot: NonNullable<NonNullable<ManifestHarness['terminal']>['oneShot']>,
+  opts: Parameters<NonNullable<AgentProfileContribution['aiArgv']>>[1],
+) => {
+  const { profiles, registry } = registries()
+  registry.register(oneShotHarness(oneShot))
+  return profiles[0].aiArgv!('opencode', opts)
+}
+
+const runOnce = { args: ['run'], output: 'text' as const, modelFlag: '--model' }
+
+describe('a manifest one-shot block becomes an aiArgv', () => {
+  it('puts the declared arguments first and the prompt last', () => {
+    expect(aiArgv(runOnce, { prompt: 'Write a commit message.' })).toEqual({
+      file: 'opencode',
+      args: ['run', 'Write a commit message.'],
+    })
+  })
+
+  it('carries a model behind the declared flag, and nothing when no model is asked for', () => {
+    expect(aiArgv(runOnce, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args)
+      .toEqual(['run', '--model', 'anthropic/claude-sonnet-4-5', 'p'])
+    expect(aiArgv(runOnce, { prompt: 'p' }).args).not.toContain('--model')
+  })
+
+  it('drops a model the harness declared no flag for, rather than passing it bare', () => {
+    // A bare value would reach the CLI as a second positional argument where it expects one prompt.
+    expect(aiArgv({ args: ['run'], output: 'text' }, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args)
+      .toEqual(['run', 'p'])
+  })
+
+  it('prepends the system half to the prompt, because a manifest cannot declare a flag for it', () => {
+    expect(aiArgv(runOnce, { prompt: 'What colour is the sky?', system: 'Answer with a single word.' }).args)
+      .toEqual(['run', 'Answer with a single word.\n\nWhat colour is the sky?'])
+  })
+
+  it('picks the stdout reading the block names', () => {
+    const text = registries()
+    text.registry.register(oneShotHarness({ args: ['run'], output: 'text' }))
+    expect(text.profiles[0].streamJson).toBe(textAdapter)
+
+    const json = registries()
+    json.registry.register(oneShotHarness({ args: ['run', '--format', 'json'], output: 'json-lines' }))
+    expect(json.profiles[0].streamJson).toBe(lineDelimitedJsonAdapter)
   })
 })

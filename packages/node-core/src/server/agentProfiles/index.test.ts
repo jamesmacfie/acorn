@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID } from './index'
-import { parseStreamJson, parseStreamLine } from './streamJson'
+import { parseStreamJson, parseStreamLine, textAdapter } from './streamJson'
 
 describe('agent profiles', () => {
   it('keeps the shell fallback and default profile policy explicit', () => {
@@ -30,5 +30,23 @@ describe('agent profiles', () => {
       usage: { inputTokens: 4, outputTokens: 6, cachedInputTokens: 2 },
       events: [{ type: 'assistant' }, { type: 'result' }],
     })
+  })
+
+  it('reads a plain-text one-shot as the whole of stdout, and empty output as no answer', () => {
+    expect(textAdapter.parse('  A commit message.\n\n')).toEqual({
+      result: 'A commit message.',
+      // Null on purpose: the data tier has no way to declare a schema flag, so a `decide` step naming a
+      // text-output harness fails on a missing verdict rather than on a coerced string.
+      structuredOutput: null,
+      sessionId: null,
+      costUsd: null,
+      events: [],
+    })
+    // A CLI that exited 0 having printed nothing reads as `malformed` in `runHeadless`, which gates on
+    // a null result, rather than as a successful blank generate.
+    expect(textAdapter.parse('   \n').result).toBeNull()
+    // Plain text carries no events, so the live feed gets nothing rather than a line of prose.
+    expect(textAdapter.parseLine('A commit message.')).toBeNull()
+    expect(textAdapter.parseLine(JSON.stringify({ type: 'result', result: 'done' }))).toBeNull()
   })
 })

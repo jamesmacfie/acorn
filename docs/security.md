@@ -156,6 +156,21 @@ Child environments are built by the process broker. They do not inherit `SESSION
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.
 
+**A harness generate spends the CLI's own login, and never a key acorn holds.** A Generate control
+can be pointed at an agent CLI installed on the machine instead of at a stored API key
+([integrations.md](./integrations.md) § Model providers), and the child that runs it gets no
+credential at all. Its environment is the broker's base allowlist plus `AGENT_TOOL_PASSTHROUGH`
+(`server/agentProfiles/toolEnv.ts`), which is configuration only: `XDG_CONFIG_HOME`, the npm prefix,
+the proxy variables, and the TLS trust files. `ANTHROPIC_*` and `OPENAI_*` are absent from that list
+deliberately, because those globs would carry API keys, and a CLI authenticates through its own
+stored login under `XDG_CONFIG_HOME`. The child also gets no acorn token, no task, and no MCP server,
+so a key held on this node cannot reach it and a tool cannot ask for one. A CLI that is installed but
+signed out fails the generate, which is the honest outcome.
+
+The stderr of a failed harness generate goes to the node log with the profile id, the status and the
+duration, and never to the client. A CLI writes its own diagnostics there, and those can quote a
+config file path, a home directory, or whatever else it read while failing.
+
 Internal tokens are stateless HMAC credentials. A signing key persists across restarts so a
 tmux-reattached agent session can keep authenticating after the Node restarts; rotating the key
 revokes every outstanding token. Tokens carry no expiry of their own, so scope and key rotation are

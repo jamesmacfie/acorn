@@ -143,7 +143,8 @@ visible one, and someone running a migration in the editor above the results gri
 would hit it.
 
 AI query generation sends the introspected schema, the repo's free-form schema notes
-(`projects.db_schema_notes`), and any saved queries picked as examples to a connected model provider.
+(`projects.db_schema_notes`), and any saved queries picked as examples to whichever backend the reader
+picked, a connected model provider or an installed agent CLI.
 The schema text is capped at 80,000 characters (`SCHEMA_CHAR_CAP`) and the notes and examples block
 at 16,000 (`GENERATE_MAX_CONTEXT_CHARS`), so the two together stay under the model runtime's
 100,000-character system prompt limit.

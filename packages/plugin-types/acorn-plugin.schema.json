@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 10)",
+  "title": "acorn plugin manifest (plugin API major 11)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -3370,6 +3370,36 @@
                       "minLength": 1,
                       "maxLength": 4096
                     }
+                  },
+                  "oneShot": {
+                    "type": "object",
+                    "properties": {
+                      "args": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "modelFlag": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "output": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "json-lines"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "args",
+                      "output"
+                    ]
                   }
                 },
                 "required": [

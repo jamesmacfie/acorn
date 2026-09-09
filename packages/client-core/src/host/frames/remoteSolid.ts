@@ -97,7 +97,7 @@ export const {
   DiffLine, FileHead,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelConnectionPicker, Rectangle, Only,
+  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
   Fallback,
 } = KIT_NODE_COMPONENTS
 

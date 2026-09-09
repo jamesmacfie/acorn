@@ -1,4 +1,4 @@
-# plugin API major: 10
+# plugin API major: 11
 client: AttentionItem
 client: AttentionSourceContribution
 client: CHECK_TONE
@@ -13,6 +13,7 @@ client: ContextMenuContribution
 client: ContextMenuLocation
 client: ContextMenuTarget
 client: ContributedCommand
+client: CredentialFormController
 client: FAILED_STATUSES
 client: HostCapabilityRequirement
 client: HostRequirement
@@ -20,6 +21,7 @@ client: InAppTarget
 client: InputCommand
 client: IntegrationFlowContribution
 client: ItemRowTarget
+client: ModelPick
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution
@@ -86,6 +88,7 @@ client: contentLinkRegistry
 client: contextMenuItems
 client: contextMenuRegistry
 client: contextSnapshot
+client: createCredentialForm
 client: createDeviceFlow
 client: createFleetQuery
 client: createOverlayPalette
@@ -97,6 +100,7 @@ client: defaultDeliveryContext
 client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
+client: effectiveModelPick
 client: fileStatusMeta
 client: focusedPane
 client: formatFileReference
@@ -118,6 +122,7 @@ client: learnRefPrefixes
 client: linkifyRefs
 client: localSearch
 client: markAttentionSeen
+client: modelBackendsOptions
 client: nodeReady
 client: nodeState
 client: nodes
@@ -152,6 +157,7 @@ client: pushManagedAgentNotice
 client: railDotProps
 client: readBytes
 client: readDraft
+client: readGeneratePick
 client: readJson
 client: readLocal
 client: recipeBrowserUrl
@@ -171,6 +177,7 @@ client: rowHeight
 client: runApi
 client: runContextMenuItem
 client: saveFile
+client: saveGeneratePick
 client: saveJsonPref
 client: savePref
 client: scanContentRefs
@@ -210,6 +217,7 @@ client: wsOnWorkflowStepEvent
 client: wsSend
 client: wsWrite
 node: AGENTS_HARNESS_REGISTRY
+node: AGENT_TOOL_PASSTHROUGH
 node: AgentProfileContribution
 node: AgentToolContribution
 node: AppEnv
@@ -297,6 +305,7 @@ node: buildSessionEnv
 node: capabilityId
 node: childEnv
 node: chunkRowsByColumnBudget
+node: codexJsonAdapter
 node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability
@@ -349,6 +358,7 @@ node: serveThenRevalidate
 node: serverName
 node: setRouteTestCapability
 node: taskContext
+node: textAdapter
 node: tmuxAvailable
 node: truncateBytes
 node: viaBridge
@@ -520,7 +530,7 @@ ui/tree: Meter
 ui/tree: Modal
 ui/tree: ModalActions
 ui/tree: ModalBody
-ui/tree: ModelConnectionPicker
+ui/tree: ModelBackendPicker
 ui/tree: NonCodeRow
 ui/tree: Only
 ui/tree: Picker
@@ -619,7 +629,7 @@ ui: Meter
 ui: Modal
 ui: ModalActions
 ui: ModalBody
-ui: ModelConnectionPicker
+ui: ModelBackendPicker
 ui: NonCodeRow
 ui: Only
 ui: Picker
