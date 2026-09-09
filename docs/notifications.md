@@ -108,12 +108,13 @@ A target is `{ kind, resourceId, subresourceId? }`, resolved through the handler
 `packages/client-core/src/features/notifications/notifications.ts`. The kind decides who answers, and
 each owner registers its own: the terminal plugin opens a drawer on a tab, the agents plugin opens a
 session in the Agent pane, the workflows plugin opens the run pane at a node, and the memory plugin
-opens the Memory page on the proposal in question.
+opens the Memory page on the proposal in question. Its proposal-gate notice is about however many are
+waiting rather than one of them, so that one targets the page through core's `source` kind instead.
 
 The workflows one is `workflow-run`: `resourceId` is the run and `subresourceId` the node, and the
 handler opens the task's Workflows pane there ([workflows.md](./workflows.md) § The run pane). Every
-notice a run raises carries it, because the node sends the run and step ids on the notice frame. A
-gate is also an attention row — `warn`, so it stays until somebody answers it — with the same target
+notice a run raises carries it, because the plugin turns its own `ref` into that target when it raises
+the row. A gate is also an attention row — `warn`, so it stays until somebody answers it — with the same target
 and the id `workflow:gate:<stepId>`. A run that ends `failed` or `safety-rail` raises a `run-failed`
 notice; a run that ends well keeps its `run-done` one. An agent's permission question inside a run
 stays the agents plugin's row and opens the Agent pane. That is still the right target now that the
@@ -127,10 +128,40 @@ Two kinds are core's, because what they open is not any plugin's:
 | `settings` | a settings page id | The shell, which owns the modal (`apps/desktop/src/client/activate.ts`) |
 | `source` | a rail source id | `host/chrome/chromeRegister.ts`, where the target is minted, so both hosts answer |
 
-A loaded plugin's attention rows carry display strings only: the manifest names no target and the
-wire does not carry one. So the host supplies the honest answer for that tier — the plugin's own rail
-source, or, for a plugin that offers none, the Settings page that lists it. Neither is a guess about
-what the row means, and both are better than a click that does nothing.
+A loaded plugin's rows carry display strings only. An attention descriptor names no target, and a
+notice's target is dropped at the node, because naming one means naming another plugin's handler and
+any resource id it likes — the impersonation `events.send` already refuses. So the host supplies the
+honest answer for that tier — the plugin's own rail source, or, for a plugin that offers none, the
+Settings page that lists it. Neither is a guess about what the row means, and both are better than a
+click that does nothing. One function computes it for both readers,
+`host/plugins/rowTargets.ts`, because they arrive at different times: the attention source asks during
+the registration pass that worked it out, and a notice arrives off the socket with only a plugin id.
+
+### Raising one from a plugin
+
+`ctx.events.notice({ taskId?, title, detail?, kind?, target? })`, on the node. Core's, and available
+whether or not any other plugin is enabled.
+
+This member existed, went to the `workflows.notices` capability in the API-4 batch, and came back. The
+objection then was to the vocabulary rather than the surface: what sat on the context all
+twenty-one plugins receive was a `'gate' | 'run-done'` kind and a `runId`/`stepId` pair, one plugin's
+nouns. A `target` is core's own and is shared with the attention inbox, so nothing on the shared
+context knows what a workflow run is.
+
+The plugins that wanted a bell row borrowed that capability in the meantime, and the memory-proposal
+gate is what the borrow cost: `workflows.notices` can only say "a run, at this node", so the proposal
+notice named nothing, and clicking it — in the bell or on the desktop banner it raised — did nothing
+at all. It cost two smaller things as well. A node with workflows disabled raised no row, and the row
+drew as a `gate`: a ban glyph in warn tone, for a nudge.
+
+A compiled plugin writes the whole row, names its own target kind, and registers the handler for it
+with `registerNoticeTargetHandler` from `@acorn/plugin-api/client`. That client half was always
+there; the node half is what was missing. A loaded plugin writes the title, the detail and the task,
+and the host fills in the rest.
+
+`kind` names a registered notice kind, and an unregistered one resolves to `plugin` rather than to
+nothing. Unresolved, the bell drew an unlabelled circle in warn tone, which says "something is wrong"
+about a row that might be good news.
 
 ### Getting there before the target runs
 
@@ -245,7 +276,7 @@ a real block, which is the point of the block.
 | --- | --- |
 | Bell row | Always. Read if seen. |
 | Sound | Not seen, and `sound` is on. |
-| System notification | Not seen, and `system` is on, and the host has a `notify` seam or the page fallback. |
+| System notification | Not seen, the kind's `toast` is true, `system` is on, and the host has a `notify` seam or the page fallback. |
 | Badge | Whenever the pill changes, if `badge` is on and the host can draw one. |
 | Terminal notification | The terminal client's spelling of the last two: an escape sequence, and BEL for the sound. |
 
@@ -266,6 +297,14 @@ the object until it closes so the click handler survives collection. Its `canSet
 and Settings hides the app-icon row. A shell that installs the group takes the banner over and gains
 the badge. For the desktop half, the two Tauri commands and the focus approximation that stands in
 for a click callback, see [shell.md](./shell.md) § The renderer bridge.
+
+`toast` is the kind's own answer to "may this reach the desktop", beside the owner's, and both have to
+say yes. It went unread for as long as it existed: every kind declared one, three declared `false` with
+a comment saying why, and the banner fired regardless. Reading it stops `background-error` and
+`disk-unencrypted` from raising one, which is what those comments always claimed — a standing
+condition and a swallowed background error belong in the bell. It also makes the loaded tier's rule
+real rather than decorative: a loaded plugin's notice is forced to the `plugin` kind, which is
+`toast: false`, so third-party code cannot put text on the owner's desktop.
 
 The banner's body is the notice's `detail` and nothing else. A title is already free of prompt text,
 responses, filenames, and paths (`pushManagedAgentNotice`), and the notification centre keeps what it

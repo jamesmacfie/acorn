@@ -58,7 +58,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // function because the two are the same act: the banner is the row, drawn by the OS.
   const openNotice = (notice: Notice) => {
     markRead(notice.id)
-    props.onSelectTask(notice.taskId)
+    // Not gated on the task before, which is what made a node-level notice do nothing: a plugin whose
+    // connection expired, or a memory proposal whose task is archived, carries no task, and selecting
+    // `''` moved nowhere and then let the target run against whatever was on screen. The attention row
+    // below has had this guard all along.
+    if (notice.taskId) props.onSelectTask(notice.taskId)
     if (notice.action === 'review-config') openRepoConfigTrust(notice.taskId)
     if (notice.action === 'review-plugin-request') openPluginApproval(notice.taskId)
     openNoticeTarget(notice)

@@ -137,7 +137,7 @@ describe('wsClient', () => {
     const statuses: number[] = []
     const notices: string[] = []
     client.wsOnStatus(() => statuses.push(1))
-    client.wsOnNotice((n) => notices.push(n.kind))
+    client.wsOnNotice((n) => notices.push(n.kind ?? ''))
 
     bridge.emitFrame({ channel: 'term:status' })
     bridge.emitFrame({ channel: 'workflow:notice', notice: { taskId: 't1', kind: 'repo-config-trust', title: 'review', action: 'review-config' } })

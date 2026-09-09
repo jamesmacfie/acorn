@@ -1,6 +1,7 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 
 // "Re-read this plugin's chrome descriptors": rail rows, badges, collections, agent context. One
@@ -37,17 +38,20 @@ export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent
   wsBroadcast({ channel: 'worktree:status-changed', ...event })
 }
 
-// Workflow gate / run-done / run-failed notices for the renderer bell (docs/workflows.md); the
-// memory-proposal gate reuses the same channel. `ref` is where the bell row goes when it is clicked:
-// the run pane, at that node. Absent for a notice that is not about a run.
-export function broadcastWorkflowNotice(
-  taskId: string,
-  kind: 'gate' | 'run-done' | 'run-failed',
-  title: string,
-  ref?: { runId: string; stepId?: string },
-): void {
-  wsBroadcast({ channel: 'workflow:notice', notice: { taskId, kind, title, ...ref } })
-  broadcastStatus()
+// A bell row, from whichever plugin raised it (@acorn/protocol/notices.ts). Reached through
+// `ctx.events.notice` rather than imported, and the tier rules are applied there: a loaded plugin
+// names no target and cannot pick its own kind (server/pluginHost/context.ts).
+//
+// `pluginId` is stamped here from the caller the host bound, never taken from the payload. It is what
+// lets the client answer "where does this row go" for a plugin that named nothing.
+//
+// The chrome bump is scoped to the raiser, which is what `ctx.events.status()` already did at the two
+// call sites this replaces. Unscoped, one plugin raising a row would cost every other plugin a
+// descriptor round trip on every connected client, which is the sweep
+// docs/performance.md § phase 5 narrowed. The rows a notice can have moved are the raiser's.
+export function broadcastNotice(pluginId: string, notice: PluginNotice): void {
+  wsBroadcast({ channel: 'workflow:notice', notice: { ...notice, pluginId } satisfies NoticeFrame })
+  broadcastStatus(pluginId)
 }
 
 // One workflow step changed status. Per step, unlike the run-level `plugin:workflows:run-changed`:

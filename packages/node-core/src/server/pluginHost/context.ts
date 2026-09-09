@@ -34,7 +34,7 @@ import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../transport/wsHub'
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
-import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorktreeStatusChanged } from '../notify'
+import { broadcastNotice, broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorktreeStatusChanged } from '../notify'
 import { buildPluginRequestContext } from './requestContext'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
@@ -358,6 +358,22 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       status: () => broadcastStatus(plugin),
       worktreeStatus: (taskId) => broadcastWorktreeStatusChanged({ taskId }),
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
+      // Stamped with the caller's id by the host, which is what lets the client resolve a target for a
+      // plugin that named none.
+      //
+      // The loaded tier is narrowed here rather than at the wire, because this is the one place that
+      // knows which tier is calling. Its `target` goes, for the same reason `send` above is confined to
+      // the plugin's own namespace: a target names another plugin's handler and any resource id it
+      // likes, and a downloaded package should not be able to drive somebody else's surface through a
+      // display channel. Its `kind` goes too, to `plugin` — the kind whose contribution is `toast:
+      // false`, so third-party code cannot put text on the owner's desktop.
+      //
+      // Silently, not a throw. Unlike `send`, the row still appears and still lands somewhere: the
+      // client stamps this plugin's own rail source. Nothing is invisible, so there is nothing for the
+      // author to debug.
+      notice: permissions
+        ? ({ taskId, title, detail }) => broadcastNotice(plugin, { taskId, title, detail, kind: 'plugin' })
+        : (notice) => broadcastNotice(plugin, notice),
       // The receive side (docs/plugins.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and
       // one prompt sentence per grant rather than two of each. A built-in has no manifest and hears

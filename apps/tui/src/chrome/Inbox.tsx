@@ -104,7 +104,9 @@ export function Inbox(props: { model: ShellModel }) {
         unread: !notice.read,
         open: () => {
           markRead(notice.id)
-          openTask(notice.taskId)
+          // Same guard the attention row above keeps: a notice about the node rather than a task
+          // carries no task id, and opening `''` moved nowhere.
+          if (notice.taskId) openTask(notice.taskId)
           openNoticeTarget(notice)
         },
       })),

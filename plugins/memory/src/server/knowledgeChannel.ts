@@ -15,7 +15,10 @@ export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
   notes(): NotesStoreCapability
-  notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
+  /** A bell row saying proposals are waiting. Where it lands is the wiring layer's to say
+   *  (../node/index.ts), which is why nothing here names a target or a notice kind: this file knows
+   *  when a reviewer is needed, not what page answers that. */
+  notice(taskId: string, title: string): void
   /** This plugin's own channel; the proposal store announces create and resolve on it. */
   emit?(frame: { channel: string } & Record<string, unknown>): void
 }
@@ -157,7 +160,7 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
             originSessionId: null,
           })),
       })
-      if (out.proposed > 0) deps.notice(taskId, 'gate', `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
+      if (out.proposed > 0) deps.notice(taskId, `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
     } catch {
       // auto-generation is best-effort: it never disturbs the task lifecycle
     }
