@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   DetailColumn,
+  Icon,
   Inline,
   Link,
   ListColumn,
@@ -38,7 +39,7 @@ import {
   toJson,
   type DraftSelection,
 } from './draft'
-import { createDraftStore, defRefKey } from './draftStore'
+import { createDraftStore, defRefKey, SOURCE_GLYPH } from './draftStore'
 import GenerateModal from './GenerateModal'
 import GraphView from './GraphView'
 import JsonTab from './JsonTab'
@@ -68,7 +69,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     const ref = store.ref()
     return ref ? defRefKey(ref) : ''
   }
-  const sourceLabel = () => (store.ref()?.source === 'database' ? 'database' : store.ref()?.source ?? '')
+  const sourceGlyph = () => {
+    const source = store.ref()?.source
+    return source ? SOURCE_GLYPH[source] : undefined
+  }
 
   const apply = (change: Parameters<typeof store.apply>[0], coalesce = false): void => store.apply(change, { coalesce })
 
@@ -176,31 +180,42 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     <Toolbar variant="actions" size="sm">
       <Link onPress={() => navigate(projectPath(props.projectId))}>← Workflows</Link>
       <Text emphasis="strong">{draft().def.name}</Text>
-      <Show when={sourceLabel()}>{(label) => <Badge>{label()}</Badge>}</Show>
+      <Show when={sourceGlyph()}>{(glyph) => <Icon name={glyph().icon} title={glyph().title} />}</Show>
       <Show when={store.dirty()}><Badge tone="warn">unsaved</Badge></Show>
       <ToolbarSpacer />
-      <Tabs
-        idPrefix="workflows-editor"
-        ariaLabel="Editor view"
-        active={tab()}
-        tabs={[{ id: 'nodes', label: 'Nodes' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'JSON' }]}
-        onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
-      />
-      <Show when={canGenerate()}>
-        <Button size="sm" disabled={store.busy()} onPress={() => setGenerating(true)}>Generate</Button>
-      </Show>
-      <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
-      <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
-      <Show
-        when={!store.readOnly()}
-        fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
-      >
-        <Button size="sm" variant="solid" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
-        <Button size="sm" disabled={store.busy()} onPress={() => setAskingRepo(true)}>Save to repo</Button>
-        <Button size="sm" variant="bare" disabled={store.busy()} onPress={() => void remove()}>Delete</Button>
-      </Show>
-      <Button size="sm" onPress={run}>Run…</Button>
     </Toolbar>
+  )
+
+  // The strip is its own row rather than an item in the bar above, so the three tabs start at the pane's
+  // left edge and the buttons sit at its right. In the bar they were one item among ten, which packed
+  // the lot into the far corner and left half the width empty. `actions` is the kit's own trailing slot
+  // and both hosts draw it (client-core kit/components/layout/Tabs.tsx).
+  const tabs = (
+    <Tabs
+      idPrefix="workflows-editor"
+      ariaLabel="Editor view"
+      active={tab()}
+      tabs={[{ id: 'nodes', label: 'Nodes' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'JSON' }]}
+      onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
+      actions={(
+        <>
+          <Show when={canGenerate()}>
+            <Button size="sm" disabled={store.busy()} onPress={() => setGenerating(true)}>Generate</Button>
+          </Show>
+          <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
+          <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
+          <Show
+            when={!store.readOnly()}
+            fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
+          >
+            <Button size="sm" variant="solid" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
+            <Button size="sm" disabled={store.busy()} onPress={() => setAskingRepo(true)}>Save to repo</Button>
+            <Button size="sm" variant="bare" disabled={store.busy()} onPress={() => void remove()}>Delete</Button>
+          </Show>
+          <Button size="sm" onPress={run}>Run…</Button>
+        </>
+      )}
+    />
   )
 
   const footer = (
@@ -238,6 +253,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     // whatever height the list's rows happened to give them.
     <Stack gap="none" grow>
       {header}
+      {tabs}
       <Show when={store.message()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <Show when={askingRepo()}>
         <Modal onDismiss={() => setAskingRepo(false)} title="Save this workflow into the repository" size="sm">

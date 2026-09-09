@@ -25,6 +25,11 @@ export type DefRef = { source: 'database' | 'repo' | 'user'; id: string }
 
 export const defRefKey = (ref: DefRef): string => `${ref.source === 'database' ? 'db' : ref.source}:${ref.id}`
 
+/** Where a definition is kept, as a mark rather than a word. The list draws one per row and the editor
+ *  one in its header, so both name the same three icons here. One line, because the icon census reads a
+ *  name only off a line that mentions an icon (client-core scripts/icon-census.mjs). */
+export const SOURCE_GLYPH: Record<DefRef['source'], { icon: string; title: string }> = { database: { icon: 'database', title: 'Kept in this workspace' }, repo: { icon: 'git-branch', title: 'A file the repository commits' }, user: { icon: 'user', title: 'A file of yours on this machine' } }
+
 /** A key arrives either from the address, where it is encoded, or straight from `defRefKey`, where it
  *  is not. A malformed escape is not worth throwing over: the caller reads it as unparseable. */
 const decodeItem = (item: string): string => {

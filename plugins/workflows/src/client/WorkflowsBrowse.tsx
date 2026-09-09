@@ -13,7 +13,7 @@ import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, Stack
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import { emptyDefinition } from './editor/draft'
-import { defRefKey } from './editor/draftStore'
+import { defRefKey, parseDefRef, SOURCE_GLYPH } from './editor/draftStore'
 import StartDialogHost from './editor/StartDialog'
 import WorkflowEditor from './editor/WorkflowEditor'
 import { workflowsSurfacePath } from './surfacePath'
@@ -42,7 +42,13 @@ function useScope() {
   const projectId = () => params.projectId ?? ''
   return {
     projectId,
-    item: () => params.id,
+    // Back through `parseDefRef`, because the address escapes the `db:` separator and the rows are
+    // keyed by what `defRefKey` produced. `db%3Aabc` matches no row, which is why the list showed
+    // nothing selected while its editor was open.
+    item: () => {
+      const ref = parseDefRef(params.id)
+      return ref ? defRefKey(ref) : params.id
+    },
     projectName: (id: string) => projects.data?.find((project) => project.id === id)?.name,
     workspaceId: () => workspaces.data?.find((entry) => entry.projects.some((project) => project.id === projectId()))?.id ?? '',
     loaded: () => !!workspaces.data,
@@ -169,7 +175,7 @@ export function WorkflowsBrowseList() {
                     trailing={(
                       <>
                         <Show when={definition().problems?.length}><Badge tone="warn" size="xs">problem</Badge></Show>
-                        <Badge size="xs">{definition().source === 'database' ? 'database' : definition().source}</Badge>
+                        <Icon name={SOURCE_GLYPH[definition().source].icon} title={SOURCE_GLYPH[definition().source].title} />
                       </>
                     )}
                   >
