@@ -1,11 +1,14 @@
+import { createEffect, createMemo, onCleanup } from 'solid-js'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   localSearch,
+  registerCommands,
   setSelectedSource,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
+import type { AgentPaneModel, SessionAction } from './sessions/agentPaneModel'
 import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession, requestComposerFocus } from './sessions/managedSelection'
 import { managedAgentStore } from './sessions/managedStore'
@@ -26,9 +29,10 @@ import { managedAgentStore } from './sessions/managedStore'
 // Agent Center remains the surface that spans them
 // (docs/command-palette-and-shortcuts.md).
 //
-// Stopping, archiving, forking, compacting and handing off are deliberately absent. Each needs a
-// selected session and most need a confirmation, which is a result action panel rather than a search
-// (docs/command-palette-and-shortcuts.md § What the palette refuses).
+// Stopping is deliberately absent: it is the one destructive verb here, and it needs the runtime
+// state a low-context row cannot carry (docs/command-palette-and-shortcuts.md § What the palette
+// refuses). The rest of the open session's menu is at the bottom of this file, registered by the pane
+// while it is on screen rather than at boot.
 
 /** How many sessions one frame asks the node for. The host caps the rendered set at 50 as well; this
  *  is the provider keeping the same promise on the wire. */
@@ -125,3 +129,70 @@ export const agentsCommands: readonly ContributedCommand[] = [
     },
   },
 ]
+
+// ── The open session's own actions ────────────────────────────────────────────────────────────────
+
+/** The group every mirrored action hangs under, so the root shows one row rather than ten. */
+const SESSION_GROUP = 'agents.session'
+
+/**
+ * Mirror the open session's `•••` menu into the palette for as long as the pane is on screen.
+ *
+ * Registered from the detail region rather than at boot, and that is the whole point of it. These
+ * actions need a selected session, which only the pane model has; two of them — rename and archive —
+ * are dialogs that region draws, so a row offered while it is unmounted would run and show nothing.
+ * Mounted is therefore the honest gate: you can reach these when you are looking at the run they are
+ * about (docs/managed-agents.md § From the command palette).
+ *
+ * The pane model stays the only place the roster is written. Nothing is enumerated here — the labels,
+ * the availability and the work are all read back out of `sessionActions()` at the moment the row is
+ * drawn or picked, so a session that gains an action gains a command with it.
+ */
+export function registerSessionActionCommands(model: AgentPaneModel): void {
+  const live = (id: string): SessionAction | undefined =>
+    model.sessionActions().find((action) => action.id === id)
+  // Which actions exist changes with the session, the provider and the last turn; their labels and
+  // their disabled flag do not need a re-registration, because a command reads both through `live`.
+  // So this notifies on the id set alone, and typing in the palette does not race a re-register.
+  const roster = createMemo(() => model.sessionActions(), [] as readonly SessionAction[], {
+    equals: (before, after) =>
+      before.map((action) => action.id).join() === after.map((action) => action.id).join(),
+  })
+  createEffect(() => {
+    const actions = roster()
+    if (actions.length === 0) return
+    const registered = registerCommands([
+      {
+        id: SESSION_GROUP,
+        kind: 'group',
+        title: 'Agent session',
+        hint: 'what the open session’s ••• menu does',
+        keywords: ['agent', 'session'],
+        category: 'action',
+        palette: true,
+        scope: 'task',
+        requires: { plugin: 'agents' },
+      },
+      ...actions.map((action): ContributedCommand => ({
+        id: `${SESSION_GROUP}.${action.id}`,
+        parentId: SESSION_GROUP,
+        // Read live, so a row renamed by the session it is about says the right thing. The breadcrumb
+        // the group gives it is what a root search for "agent" matches on, so no keywords here.
+        title: () => live(action.id)?.label ?? action.label,
+        hint: () => live(action.id)?.description,
+        category: 'action',
+        palette: true,
+        scope: 'task',
+        requires: { plugin: 'agents' },
+        // The menu draws a disabled row with the reason on it; the palette has nowhere to put that,
+        // so an action that cannot run is not offered.
+        when: () => {
+          const found = live(action.id)
+          return !!found && !found.disabled
+        },
+        run: () => live(action.id)?.run(),
+      })),
+    ])
+    onCleanup(() => registered.dispose())
+  })
+}
