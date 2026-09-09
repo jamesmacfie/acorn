@@ -10,6 +10,7 @@
 // `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
 // `docker:` and `agent:` are registered by the plugins that own them.
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { decodeIdFrame, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
@@ -20,17 +21,14 @@ type OutputCb = (m: ServerMsg) => void
 // `term:status` carries the id of the plugin whose chrome moved, or nothing when core itself pinged and
 // every plugin's descriptors are suspect (node-core/server/notify.ts).
 type StatusCb = (pluginId?: string) => void
-// Exported so subscribers outside this package import it rather than keeping a hand-written twin that
-// drifts when a kind is added.
-export type WorkflowNotice = {
-  taskId: string
-  kind: 'gate' | 'run-done' | 'run-failed' | 'repo-config-trust' | 'plugin-request'
-  title: string
-  action?: 'review-config' | 'review-plugin-request'
-  // Where the row goes: the run pane, at that node. Present on every notice a run raises.
-  runId?: string
-  stepId?: string
-}
+// The bell-row frame, one shape shared with the node that sends it (@acorn/protocol/notices.ts)
+// rather than a hand-written twin here that drifts when a field is added.
+//
+// The name stays `WorkflowNotice` because it is published through the plugin-api facade, where
+// removing a name costs a major bump and this one has no callers to gain from the rename. Nothing
+// about the payload is workflows' any more: `kind` is a contributed id rather than the closed union it
+// was, and `target` replaced the `runId` pair.
+export type WorkflowNotice = NoticeFrame
 type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 type StepChangedCb = (event: { runId: string; stepId: string; status: string }) => void

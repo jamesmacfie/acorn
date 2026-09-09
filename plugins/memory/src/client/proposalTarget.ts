@@ -1,5 +1,8 @@
 import { createSignal } from 'solid-js'
 import { registerNoticeTargetHandler, setSelectedSource } from '@acorn/plugin-api/client'
+import { MEMORY_SOURCE_ID } from '../shared/api'
+
+export { MEMORY_SOURCE_ID }
 
 // Where a "Review memory" row in the notification bell lands: the Memory page, on the proposal the
 // row was about (docs/notifications.md § A notice is not an attention item).
@@ -13,11 +16,12 @@ export { highlightedProposal }
 
 export const clearHighlightedProposal = (): void => setHighlightedProposal(undefined)
 
-export const MEMORY_SOURCE_ID = 'memory'
-
 export function activateMemoryNoticeTargets(): void {
+  // The per-proposal row from the attention inbox, which names one proposal. The node's proposal-gate
+  // notice is about however many are waiting, so it targets the page through core's `source` kind
+  // instead and never reaches this handler (../node/index.ts).
   registerNoticeTargetHandler('memory-proposal', (_taskId, target) => {
-    setHighlightedProposal(target.resourceId)
+    setHighlightedProposal(target.resourceId || undefined)
     setSelectedSource(MEMORY_SOURCE_ID)
   })
 }

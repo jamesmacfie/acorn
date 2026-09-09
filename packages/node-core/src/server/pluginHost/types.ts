@@ -21,6 +21,7 @@ import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../transport/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
+import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 
@@ -319,6 +320,24 @@ export type PluginBroadcast = {
   // "This repo's committed config changed and needs the owner's review". The one notice that carries an
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void
+  // A row in the client's bell, and where clicking it lands (@acorn/protocol/notices.ts).
+  //
+  // This member existed before, lost to the `workflows.notices` capability in the API-4 batch, and is
+  // back because the objection was to the vocabulary rather than to the surface: what sat here was a
+  // `'gate' | 'run-done'` kind and a `runId`/`stepId` pair, one plugin's nouns on the context all
+  // twenty-one receive. A `target` is core's own, shared with the attention inbox
+  // (client-core host/registries/rail/attention.ts), so nothing here knows what a workflow run is.
+  //
+  // Both tiers, and they are not handed the same thing. A loaded plugin's `target` is dropped and its
+  // `kind` is forced to `plugin`: naming a target kind is naming another plugin's handler and an
+  // arbitrary resource in it, which is the impersonation `send` already refuses, and `plugin` is the
+  // kind that stays out of the OS. The client then stamps that tier's honest answer — the plugin's own
+  // rail source, or the Settings page listing it (client-core host/plugins/rowTargets.ts).
+  //
+  // A compiled plugin names its own kind and registers the handler for it with
+  // `registerNoticeTargetHandler` from `@acorn/plugin-api/client`. That half was always here; this is
+  // the half that was missing.
+  notice(notice: PluginNotice): void
   // Hear a core event on this node, whether or not a client is attached
   // (docs/plugins.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
   // a loaded plugin it must also be in its manifest's `permissions.events`. The frame is a hint: the

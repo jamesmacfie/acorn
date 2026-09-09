@@ -8,6 +8,8 @@
 // Channels beyond the bell row are sinks. Phase 1 registers none; sound, the system notification and
 // the terminal's OSC sequences each add one.
 import { clientEvents } from '../../host/registries/commands/clientEvents'
+import { noticeKindContribution } from '../../host/registries/rail/notices'
+import { pluginRowTarget } from '../../host/plugins/rowTargets'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 import { showNotification } from '../../infra/platform'
 import { wsOnNotice } from '../../infra/node/wsClient'
@@ -119,19 +121,39 @@ export function pushManagedAgentNotice(input: {
   })
 }
 
-/** Workflow notices (docs/workflows.md § Routes and UI). Main broadcasts gate and run-done events
- *  over `/v2/events`, and they come through the same gate an agent edge does, so a run that finishes
- *  on the task you are watching lands read and silent. */
+/** Node-pushed notices: a workflow gate, a run finishing, a plugin asking to be installed, a memory
+ *  proposal waiting for review. They come through the same gate an agent edge does, so one raised on
+ *  the task you are watching lands read and silent.
+ *
+ *  Three ways a row learns where it goes, in order (docs/notifications.md § What a row points at):
+ *
+ *  1. The `target` the raiser passed. Every compiled plugin uses this.
+ *  2. The `runId` shorthand, for a node built before `target` existed. A client and the node it talks
+ *     to are separately installed, so a remote node can be older than the window in front of you.
+ *  3. The raising plugin's own surface, for the loaded tier, which is not allowed to name a target
+ *     (host/plugins/rowTargets.ts).
+ *
+ *  Core's own notices — the trust prompt, the install request — name no plugin and no target. They
+ *  carry an `action` instead, which the bell answers by opening a dialog rather than navigating. */
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
-    const detail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
-    // A notice raised by a run names it, so the row opens the run pane at the node it is about
-    // (docs/notifications.md § What a row points at). The two kinds core raises on this channel name
-    // no run, and those keep no target.
-    const target = n.runId
-      ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) }
-      : undefined
-    deliverNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at: Date.now(), target })
+    const actionDetail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
+    const target = n.target
+      ?? (n.runId ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) } : undefined)
+      ?? (n.pluginId ? pluginRowTarget(n.pluginId) : undefined)
+    deliverNotice({
+      // `''` for a notice that is about the node rather than a task: a plugin whose connection
+      // expired, a proposal whose task has been archived. The ring keeps `taskId` required and no real
+      // id is empty, so every per-task filter in it already treats this as "no task"; the bell skips
+      // the task jump on it.
+      taskId: n.taskId ?? '',
+      kind: n.kind ?? 'plugin',
+      title: n.title,
+      detail: n.detail ?? actionDetail,
+      action: n.action,
+      at: Date.now(),
+      target,
+    })
   })
 }
 
@@ -150,6 +172,15 @@ export function initSystemNotices(): () => void {
 /** Exported for the test. Sinks only ever see an unseen notice, so the seen rule is already kept. */
 export function systemSink(notice: Notice): void {
   if (!readNotificationSettings().system) return
+  // `toast` is the kind's own answer to "may this reach the desktop", and until now nothing read it:
+  // every kind declared one, three of them declared `false` with a comment saying why, and the banner
+  // fired anyway. So `background-error` and `disk-unencrypted` stop banner-ing, which is what those
+  // comments always said they did — a standing condition and a swallowed error belong in the bell.
+  //
+  // An unregistered kind resolves to `plugin`, which is `false`. That is the safe default and the one
+  // the tier rule leans on: a loaded plugin's notice is forced to that kind precisely so third-party
+  // code cannot put text on the owner's desktop (node-core server/pluginHost/context.ts).
+  if (!(noticeKindContribution(notice.kind)?.toast ?? false)) return
   void showNotification({ title: notice.title, body: notice.detail, tag: notice.id })
 }
 

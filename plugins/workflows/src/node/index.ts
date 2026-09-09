@@ -9,7 +9,7 @@ import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
 import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
-import { WorkflowRunner, type WorkflowDef } from '../server/workflowRunner'
+import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
@@ -40,17 +40,24 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
   let defsCapability: { dispose(): void } | null = null
-  // The bell and the step stream, this plugin's own vocabulary rather than a member of the broadcast
-  // surface every plugin receives (../contract/notices.ts). Both go out on core's `workflow:` channels,
-  // which is why they are written as frames here rather than reaching for a core helper: `ctx.events`
-  // is the seam, and a plugin does not deep-import server/notify.ts.
+  // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
+  // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
+  // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
+  // a plugin does not deep-import server/notify.ts.
   const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
-    notice: (taskId, kind, title, ref) => {
-      ctx.events.send({ channel: 'workflow:notice', notice: { taskId, kind, title, ...ref } })
-      ctx.events.status()
-    },
     stepEvent: (runId, stepId, event) => ctx.events.send({ channel: 'workflow:step:event', runId, stepId, event }),
   })
+
+  // The bell, through core's seam now that it has one. The runner speaks in runs and steps, and this is
+  // the one place that turns a `ref` into a target: `workflow-run` is this plugin's own kind, and the
+  // handler that answers it opens the run pane at that node (../client/runs/attentionSource.ts).
+  const buildNotify = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): RunnerDeps['notify'] =>
+    (taskId, kind, title, ref) => ctx.events.notice({
+      taskId,
+      kind,
+      title,
+      ...(ref ? { target: { kind: 'workflow-run', resourceId: ref.runId, ...(ref.stepId ? { subresourceId: ref.stepId } : {}) } } : {}),
+    })
   return {
     name: 'workflows',
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
@@ -177,7 +184,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
         },
         failingChecks: deps.failingChecks,
-        notify: notices.notice,
+        notify: buildNotify(ctx),
         // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
         stepChanged: (runId, stepId, status) => ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
         statusChanged: ctx.events.status,

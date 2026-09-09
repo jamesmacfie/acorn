@@ -19,6 +19,7 @@ import {
   pluginInstalledAtOnNode,
 } from '../plugins/distribution'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfaces } from '../plugins/contributions'
+import { pluginRowTarget, setPluginRowSource } from '../plugins/rowTargets'
 import { pluginCommand, usablePluginCommands } from './chromeCommands'
 import { suppliedSourcePanel } from './sourcePanel'
 import {
@@ -349,15 +350,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   // Every attention row has to say where clicking it lands (registries/rail/attention.ts), and a
   // descriptor names nothing: the wire carries display strings only. So the host picks the honest
-  // answer for this tier — the plugin's own rail source, or, for a plugin that offers none, the
-  // Settings page that lists it. Neither is a guess about what the row means; both are "the thing
-  // this plugin is".
+  // answer for this tier, computed by ../plugins/rowTargets.ts.
   //
-  // `source` is handled at the foot of this file, since this is where it is minted; `settings` is the
-  // shell's, because the settings modal is (apps/desktop/src/client/activate.ts).
-  const pluginAttentionTarget = contributions.sources?.[0]
-    ? { kind: 'source', resourceId: contributions.sources[0].id }
-    : { kind: 'settings', resourceId: 'plugins' }
+  // Recorded rather than only used, because the bell needs the same answer for a notice this plugin
+  // raises, and that arrives off the socket with nothing but a plugin id on it.
+  setPluginRowSource(pluginId, contributions.sources?.[0]?.id)
+  const pluginAttentionTarget = pluginRowTarget(pluginId)
 
   for (const descriptor of contributions.attention ?? []) {
     note(descriptor.refresh)

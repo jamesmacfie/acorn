@@ -146,7 +146,8 @@ loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one n
 2026-08-27, when four names moved to say what they mean: `capabilities` became `hostCapabilities`,
 `PollerContribution` became `ClientScheduleContribution`, and the two slot registries folded into one.
 It went to `4` on 2026-08-28, when `ctx.events` lost `notice` and `stepEvent` to the `workflows.notices`
-capability, a loaded plugin's capability ids became bound to its own namespace, and its pane, source and
+capability (`notice` came back on 2026-09-10 with a `target` in place of workflows' `runId` pair, which
+is what the objection had actually been about — adding a name is free, so no bump), a loaded plugin's capability ids became bound to its own namespace, and its pane, source and
 slot ids did too. The same `4` batch then took `hostCapabilities` and the `HostCapabilities` type: a
 contribution's `requires` used to be a closed union with one plugin's name, `terminal`, compiled into
 core, and it is now `'desktop' | { plugin: id } | { seam: group }` or an array of them, answered by
@@ -1685,6 +1686,22 @@ flipping between working and idle fired one per edge. `bumpChrome` in
 socket subscription was the one caller that told it nothing.
 
 **The plugin's own channel** is the fast path, and the one to reach for when data actually streams.
+
+### Raising a notification
+
+`ctx.events.notice({ taskId?, title, detail?, kind?, target? })` puts a row in the owner's bell. Both
+tiers have it, and it is core's, so it works with every other plugin disabled.
+
+Leave `taskId` off for something about the node rather than one task — a connection that expired,
+setup that is incomplete. A compiled plugin names a `target`, whose `kind` it also registers a client
+handler for with `registerNoticeTargetHandler`, so the row opens its own surface at the right thing. A
+loaded plugin's `target` and `kind` are dropped and the host lands the row on that plugin's own rail
+source instead, or the Settings page that lists it. Naming a target means naming another plugin's
+handler and any resource in it, which is what `send` above refuses too, and the `plugin` kind it is
+given is the one that stays out of the OS.
+
+For what a target is, how the click gets there, and which kinds exist, see
+[notifications.md](./notifications.md) § What a row points at.
 
 ### The live channel
 

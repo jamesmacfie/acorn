@@ -188,14 +188,19 @@ and what never will be are in `docs/plugins.md § Hearing another plugin`; what 
 | `ctx.events.worktreeStatus(taskId)` | "Something under this task's worktree changed." Moves the dirty markers |
 | `ctx.events.send(frame)` | Push one frame to every connected client. The hub skips task-confined sockets |
 | `ctx.events.repoConfigTrustNotice(taskId)` | The one notice carrying an action: this repo's committed config needs review |
+| `ctx.events.notice({ title, target, ... })` | A row in the owner's bell, and where clicking it lands. Both tiers |
 | `ctx.events.on(event, listener)` | Hear a core event on this node. The event must be one `permissions.events` named |
 | `ctx.events.channel(prefix, handler)` | Claim a websocket channel prefix and receive client frames on it. Compiled plugins only |
 | `ctx.events.streams(handlers)` | The PTY stream handlers. Exactly one plugin may own these |
 
-The notification bell and the workflow step stream used to sit here too, as `ctx.events.notice` and
-`ctx.events.stepEvent`. They were one plugin's domain vocabulary on the surface every plugin receives,
-and they moved to the `workflows.notices` capability, where the rest of that plugin's cross-plugin
-surface already was.
+The workflow step stream used to sit here too, as `ctx.events.stepEvent`. It was one plugin's domain
+vocabulary on the surface every plugin receives, and it moved to the `workflows.notices` capability,
+where the rest of that plugin's cross-plugin surface already was.
+
+The bell left on the same argument and came back, because the objection was to the vocabulary rather
+than to the surface: a `target` is core's own and is shared with the attention inbox, so nothing here
+knows what a workflow run is. What it cost in the meantime is in
+[notifications.md](./notifications.md) § Raising one from a plugin.
 
 Prefer `status()` to `send()`. A payload a client can trust is a payload you have to keep correct
 across every reconnect and version skew, and re-reading costs one request.
@@ -305,7 +310,7 @@ Pick by how long the message should live.
 | Call | Lifetime | Use it for |
 | --- | --- | --- |
 | `toast(message, { tone, durationMs })` | Seconds | "That worked." No actions, no buttons |
-| `capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)` | Until read | Something happened while the user was elsewhere. `workflows.notices`, from `plugins/workflows/src/contract/notices.ts` |
+| `ctx.events.notice({ title, target, ... })` | Until read | Something happened while the user was elsewhere. Core's, so it works with every other plugin disabled |
 | `pushManagedAgentNotice({ taskId, sessionId, kind, title })` | Until read | An agent finished, needs input, or failed |
 | `ctx.attentionSources.register(source)` | Until resolved | A state on the node that needs the owner to act |
 | `bridge.ui.toast(title, detail)` | Seconds | The same, from inside a sandboxed frame |

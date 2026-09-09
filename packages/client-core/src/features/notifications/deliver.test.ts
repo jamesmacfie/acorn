@@ -17,6 +17,9 @@ import {
   registerNoticeSink, resetDelivery, setHostFocused, systemSink, type DeliveryContext,
   type NoticeSink,
 } from './deliver'
+import { noticeKindContributions } from './kindContributions'
+import { noticeKindRegistry } from '../../host/registries/rail/notices'
+import { _resetPluginRowSources, setPluginRowSource } from '../../host/plugins/rowTargets'
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'
 import type { AttentionState, Snapshot } from './attention'
 import { _resetNotices, notices, type Notice } from './notifications'
@@ -37,6 +40,11 @@ let sunk: Notice[] = []
 let dropSink: () => void
 const sink: NoticeSink = (notice) => sunk.push(notice)
 
+// The shell registers these at boot (apps/desktop/src/client/activate.ts) and the system sink reads
+// them: a kind's `toast` is what says whether the row may reach the desktop. Without them every
+// banner assertion below would be measuring an empty registry.
+for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
+
 beforeEach(() => {
   vi.useFakeTimers()
   focused = false
@@ -45,6 +53,7 @@ beforeEach(() => {
   dropSink = registerNoticeSink(sink)
   resetDelivery()
   _resetNotices()
+  _resetPluginRowSources()
 })
 afterEach(() => {
   dropSink()
@@ -208,6 +217,27 @@ describe('the system channel', () => {
     drop()
     expect(shown.map((r) => r.body)).toEqual(['Review & trust', undefined])
   })
+
+  // `toast` is the kind's own answer, and it went unread for as long as it existed: three kinds
+  // declared `false` with a comment saying why and banner-ed anyway. It is load-bearing now, because a
+  // loaded plugin's notice is forced to the `plugin` kind precisely so third-party code cannot put
+  // text on the owner's desktop (node-core server/pluginHost/context.ts).
+  it('obeys the kind, so a bell-only kind never reaches the desktop', () => {
+    const drop = registerNoticeSink(systemSink)
+    deliverNotice({ taskId: 't1', kind: 'disk-unencrypted', title: 'This disk is not encrypted', at: 1 }, context)
+    deliverNotice({ taskId: 't1', kind: 'plugin', title: 'A loaded plugin said something', at: 2 }, context)
+    deliverNotice({ taskId: 't1', kind: 'agent-error', title: 'claude failed', at: 3 }, context)
+    drop()
+    expect(shown.map((r) => r.title)).toEqual(['claude failed'])
+  })
+
+  // The same rule via the fallback: an unregistered kind resolves to `plugin`, which stays in the bell.
+  it('keeps an unknown kind out of the desktop too', () => {
+    const drop = registerNoticeSink(systemSink)
+    deliverNotice({ taskId: 't1', kind: 'not-a-registered-kind', title: 'who knows', at: 1 }, context)
+    drop()
+    expect(shown).toEqual([])
+  })
 })
 
 // A workflow notice names the run it came from, and that is what gives the bell row somewhere to go
@@ -230,11 +260,68 @@ describe('workflow notices', () => {
     stop()
   })
 
-  it('keeps no target for a notice that is not about a run', () => {
+  it('keeps no target for a core notice, which carries an action instead', () => {
     const stop = initWorkflowNotices()
     onNotice?.(frame({ kind: 'repo-config-trust', title: 'Repo configuration needs review', action: 'review-config' }))
     expect(notices()[0].target).toBeUndefined()
     expect(notices()[0].detail).toBe('Review & trust')
+    stop()
+  })
+})
+
+// The seam this channel grew for: any plugin can raise a row and say where it goes. The memory
+// proposal gate is why — it borrowed workflows' notice channel, which could only name a run, so its
+// row swallowed every click (docs/notifications.md § What a row points at).
+describe('a plugin notice', () => {
+  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
+    ({ title: 'something happened', ...over })
+
+  it('carries the target its raiser named', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ taskId: 't1', kind: 'memory-proposal', target: { kind: 'source', resourceId: 'memory' } }))
+    expect(notices()[0].target).toEqual({ kind: 'source', resourceId: 'memory' })
+    expect(notices()[0].kind).toBe('memory-proposal')
+    stop()
+  })
+
+  // A target beats the shorthand, so a plugin that names one is never second-guessed.
+  it('prefers a named target over the runId a node might also send', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ runId: 'run-1', target: { kind: 'source', resourceId: 'memory' } }))
+    expect(notices()[0].target).toEqual({ kind: 'source', resourceId: 'memory' })
+    stop()
+  })
+
+  // The loaded tier names no target: the node drops it, so the row arrives with a plugin id and
+  // nothing else, and the honest answer is the surface that plugin contributed.
+  it('falls back to the raising plugin rail source', () => {
+    setPluginRowSource('board', 'board.issues')
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ pluginId: 'board' }))
+    expect(notices()[0].target).toEqual({ kind: 'source', resourceId: 'board.issues' })
+    stop()
+  })
+
+  it('falls back to the plugins settings page for a plugin with no source of its own', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ pluginId: 'stats' }))
+    expect(notices()[0].target).toEqual({ kind: 'settings', resourceId: 'plugins' })
+    stop()
+  })
+
+  // A row about the node rather than a task. `''` is what the ring stores, so every per-task filter in
+  // it treats the row as belonging to no task, and the bell skips the task jump.
+  it('stores an empty task id for a notice that names no task', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ pluginId: 'stats' }))
+    expect(notices()[0].taskId).toBe('')
+    stop()
+  })
+
+  it('draws as a plugin row when the kind is missing', () => {
+    const stop = initWorkflowNotices()
+    onNotice?.(frame({ pluginId: 'stats' }))
+    expect(notices()[0].kind).toBe('plugin')
     stop()
   })
 })

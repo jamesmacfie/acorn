@@ -2,10 +2,10 @@ import type { NodePlugin } from '@acorn/plugin-api/node'
 import { memorySection } from '../server/contextSection'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
-import { WORKFLOWS_NOTICES } from '@acorn/plugin-workflows/contract/notices.ts'
 import { memoryAgentTools } from '../server/agentTools'
 import { registerKnowledgeChannel, type KnowledgeDeps } from '../server/knowledgeChannel'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
+import { MEMORY_SOURCE_ID } from '../shared/api'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
 
 // No deps: both of this plugin's former app-supplied thunks resolve through the plugin context now,
@@ -47,12 +47,22 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // doesn't degrade: notes is a `required` plugin, and a notes pane that silently answered "no notes"
       // because a capability was missing would look exactly like data loss.
       const notes = () => ctx.capabilities.require(NOTES_STORE)
-      // workflows.notices, resolved at call time like the two above. The bell used to be a member of
-      // `ctx.events`; it belongs to the plugin whose vocabulary it speaks (docs/plugins.md §
-      // Collaboration rules). Degrades to a drop: with workflows disabled there is no run panel to send
-      // a reviewer to, and proposals still wait in the memory pane.
-      const notice: KnowledgeDeps['notice'] = (taskId, kind, title) =>
-        ctx.capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)
+      // The bell, through core's own seam. This used to reach for `workflows.notices`, borrowed because
+      // the bell had left `ctx.events` in the API-4 batch, and it cost the row its destination: that
+      // capability can only say "a run, at this node", so a proposal notice named nothing and clicking
+      // it did nothing at all. Two other prices came with the borrow — a node with workflows disabled
+      // raised no row, and the row drew as a `gate`, a ban glyph in warn tone for what is a nudge.
+      //
+      // `source` is core's target kind, so opening the Memory page needs no handler of this plugin's.
+      // The row is about however many proposals are waiting rather than one of them, and the page with
+      // no project routed lists every one (../client/MemoryCenter.tsx). The per-proposal row in the
+      // inbox is the one that highlights a single proposal.
+      const notice: KnowledgeDeps['notice'] = (taskId, title) => ctx.events.notice({
+        taskId,
+        title,
+        kind: 'memory-proposal',
+        target: { kind: 'source', resourceId: MEMORY_SOURCE_ID },
+      })
       const runtime = registerKnowledgeChannel(db, dataDir, ctx.core, { sendToAgent, notes, notice, emit: ctx.events.send })
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.

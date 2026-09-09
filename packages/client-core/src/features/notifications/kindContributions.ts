@@ -15,6 +15,11 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   // Approval-mediated install). `toast: true` because it's a question waiting on the owner, and unlike
   // the plugin-authored `plugin` kind below, its title is written by acorn and names no agent text.
   { id: 'plugin-request', glyph: 'puzzle', severity: 'warn', toast: true },
+  // Agents proposed something for a project to remember (docs/notes-and-memory.md § Memory). `info`
+  // and the memory mark rather than the `gate` kind it used to borrow: nothing is blocked on this, and
+  // a ban glyph in warn tone read as a failure. It matches the tone of the attention row for the same
+  // proposals, which is the row beside it in the bell.
+  { id: 'memory-proposal', glyph: 'brain', severity: 'info', toast: true },
   { id: 'agent-completed', glyph: 'circle-dot', severity: 'info', toast: true },
   { id: 'agent-needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
   { id: 'agent-error', glyph: 'triangle-alert', severity: 'danger', toast: true },
