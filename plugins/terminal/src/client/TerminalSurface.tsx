@@ -6,8 +6,10 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, monoFont, xtermTheme } from './theme'
-import { isAppDark, watchAppearance } from '@acorn/plugin-api/client'
+import { isAppDark, watchAppearance, telemetryFor } from '@acorn/plugin-api/client'
 import { TERMINAL_LINE_HEIGHT } from './preferences'
+
+const telemetry = telemetryFor('terminal')
 
 // xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another
 // workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
@@ -87,7 +89,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
     // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
     let disposed = false
-    const safeFit = () => { if (!disposed) { try { fit.fit() } catch { /* term detached mid-resize */ } } }
+    const safeFit = () => { if (!disposed) { try { telemetry.measure('terminal.fit', () => fit.fit()) } catch { /* term detached mid-resize */ } } }
     applyFontSize = (fontSize) => {
       if (disposed || term.options.fontSize === fontSize) return
       term.options.fontSize = fontSize
@@ -112,13 +114,22 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     applyAppearance()
     const unwatchAppearance = watchAppearance(applyAppearance)
 
+    let pendingOutput = 0
     let detach: (() => void) | undefined
     // Size the PTY and main-owned framebuffer to the fitted dims before attaching, so the serialized
     // screen and subsequent TUI redraws share the renderer's width.
     void api.resize(props.sessionId, term.cols, term.rows).then(() => {
       if (disposed) return
       detach = api.attach(props.sessionId, (m) => {
-        if (m.type === 'output') term.write(m.data)
+        if (m.type === 'output') {
+          const size = m.data.length
+          pendingOutput += size
+          telemetry.observe('terminal.output.size', size)
+          telemetry.observe('terminal.pending.size', pendingOutput)
+          void telemetry.measure('terminal.write', () => new Promise<void>((resolve) => {
+            term.write(m.data, () => { pendingOutput -= size; resolve() })
+          }))
+        }
         else if (m.type === 'exit') {
           term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
           props.onExit?.(m.exitCode)

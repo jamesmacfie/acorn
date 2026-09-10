@@ -1,3 +1,4 @@
+import type { ResponsivenessPulse } from '../telemetry/responsiveness'
 import type {
   NodeAdoptRequest,
   NodeFetchRequest,
@@ -199,6 +200,7 @@ type AcornPreload = {
   platform?: string
   onClosePane?: DesktopExtras['onClosePane']
   onWillQuit?: DesktopExtras['onWillQuit']
+  reportResponsiveness?: (pulse: ResponsivenessPulse) => void
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
   nodeSend?: NodeTransport['send']
@@ -242,6 +244,8 @@ const acornGlobal = (): AcornPreload | undefined => (typeof window === 'undefine
 
 // Whether a desktop shell hosts this renderer. A marker only. Do not gate a feature on it, because
 // almost every feature is HTTP plus WS and portable.
+export const reportResponsiveness = (pulse: ResponsivenessPulse): void => acornGlobal()?.reportResponsiveness?.(pulse)
+
 export const isDesktopHost = (): boolean => !!acornGlobal()?.desktop
 
 // 'darwin' | 'win32' | 'linux' when a desktop shell is hosting; undefined otherwise.

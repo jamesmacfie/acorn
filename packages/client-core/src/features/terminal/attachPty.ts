@@ -1,3 +1,5 @@
+import { terminalWork } from '../../infra/telemetry/terminalWork'
+import { measure } from '../../infra/telemetry/emitter'
 import { onCleanup } from 'solid-js'
 import type { PtyIo } from '../../kit/lib/pty'
 
@@ -46,14 +48,15 @@ export function attachPty(handle: unknown, io: PtyIo): void {
     term.open(host)
     fit.fit()
 
+    const output = terminalWork()
     const dispose = io.open({ cols: term.cols, rows: term.rows }, (event) => {
-      if (event.kind === 'out') term.write(event.data)
+      if (event.kind === 'out') term.write(event.data, output(event.data.length))
       else if (io.farewell) term.write(`\r\n\x1b[2m${io.farewell}\x1b[0m\r\n`)
     })
     term.onData((data: string) => io.input(data))
 
     const observer = new ResizeObserver(() => {
-      fit.fit()
+      measure('core', 'terminal.fit', () => fit.fit())
       io.resize({ cols: term.cols, rows: term.rows })
     })
     observer.observe(host)

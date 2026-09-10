@@ -1,3 +1,4 @@
+import { measureWork } from '../../lib/workTelemetry'
 import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
@@ -65,17 +66,19 @@ export function Rows<T extends CollectionItem>(props: {
   // an open menu inside a row. Held only while every field matches: an item whose `label` or
   // `disabled` changed is a different row and must redraw.
   const cache = new Map<string, T>()
-  const items = createMemo<readonly T[]>(() => {
+  const items = createMemo<readonly T[]>(() => measureWork('rows.reconcile', () => {
+    const present = new Set<string>()
     const next = props.items.map((item: T) => {
+      present.add(item.key)
       const held = cache.get(item.key)
       const same = held && Object.keys(item).length === Object.keys(held).length
         && Object.entries(item).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
       if (!same) cache.set(item.key, item)
       return same ? held! : item
     })
-    for (const key of [...cache.keys()]) if (!next.some((item) => item.key === key)) cache.delete(key)
+    for (const key of cache.keys()) if (!present.has(key)) cache.delete(key)
     return next
-  })
+  }, { items: props.items.length }))
 
   const collection = createCollection({
     id: () => props.id,
@@ -100,7 +103,7 @@ export function Rows<T extends CollectionItem>(props: {
     return (
       <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
         <For each={items()}>
-          {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
+          {(item) => measureWork('rows.item.mount', () => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE))}
         </For>
       </div>
     )
@@ -160,12 +163,12 @@ export function Rows<T extends CollectionItem>(props: {
             // a new one is to run it again.
             return (
               <Show when={item()} keyed>
-                {(row) => props.children(
+                {(row) => measureWork('rows.item.mount', () => props.children(
                   row,
                   collection.itemProps(row.key),
                   () => collection.selected() === row.key,
                   { offset: slot.start, height: slot.size },
-                )}
+                ))}
               </Show>
             )
           }}

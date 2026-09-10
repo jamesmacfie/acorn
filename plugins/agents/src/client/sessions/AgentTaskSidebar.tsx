@@ -1,4 +1,5 @@
-import { createMemo, createEffect, Show } from 'solid-js'
+import { agentTelemetry, startAgentView } from './agentTelemetry'
+import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import {
   Badge, EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
@@ -37,6 +38,9 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  const view = startAgentView('agents.sidebar.open')
+  onCleanup(view.dispose)
+  void model.sessionsLoaded.then(view.ready, view.fail)
 
   const managedRequests = createMemo(() => model.taskSessions().flatMap((session) =>
     (managedAgentStore.snapshots()[session.id]?.requests ?? [])
@@ -55,10 +59,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
 
   // Sessions and their subagents in one list, because they are one thing to walk with the arrows.
   // The key says which: `<session id>` or `<session id>/<subagent id>`.
-  const sessionRows = createMemo(() => model.taskSessions().flatMap((session) => [
+  const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () => model.taskSessions().flatMap((session) => [
     { key: session.id, label: session.title },
     ...session.subagents.map((subagent) => ({ key: `${session.id}/${subagent.id}`, label: subagent.title })),
-  ]))
+  ])))
+  createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => {
     const [sessionId, subagentId] = key.split('/')
     const session = model.taskSessions().find((candidate) => candidate.id === sessionId)

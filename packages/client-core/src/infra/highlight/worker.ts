@@ -1,3 +1,4 @@
+import { measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 // The main-thread half of the highlight worker: one worker, lazily spawned, requests matched to
 // replies by id. See docs/diff-rendering.md § Syntax highlighting for why every caller sends a
 // whole document (for a diff, one side of one hunk: ui/diff/model.ts § buildDiffRowsAsync) rather
@@ -61,6 +62,9 @@ async function spawn(): Promise<Worker | null> {
       const entry = pending.get(message.id)
       if (!entry) return
       pending.delete(message.id)
+      if (message.queueMs !== undefined) recordDuration('core', 'highlight.queue.wait', message.queueMs)
+      if (message.executionMs !== undefined) recordDuration('core', 'highlight.worker.execute', message.executionMs)
+      recordSample('core', 'highlight.result', 1, '1', { outcome: message.ok ? 'worker' : 'grammar-error' })
       if (message.ok) {
         state = 'live'
         entry.resolve(message.lines)
@@ -108,16 +112,25 @@ async function onMainThread(path: string, code: string): Promise<HighlightLines>
 export const tokenizeDocument: TokenizeDocument = async (path, code) => {
   const lang = langFor(path)
   if (lang === 'text') return plain(code)
+  recordSample('core', 'highlight.characters', code.length)
+  const fallback = (reason: string) => {
+    recordSample('core', 'highlight.fallback', 1, '1', { reason })
+    return measure('core', 'highlight.main_thread', () => onMainThread(path, code))
+  }
   const w = await spawn()
-  if (!w) return onMainThread(path, code)
+  if (!w) return fallback('unavailable')
   const id = nextId++
-  const request: HighlightRequest = { id, lang, code }
+  const request: HighlightRequest = { id, lang, code, ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}) }
+  let timedOut = false
+  recordSample('core', 'highlight.pending', pending.size + 1)
   const lines = await new Promise<HighlightLines>((resolve) => {
     // A TextMate grammar is a regex program, and a regex program can backtrack catastrophically. The
     // worker cannot block the UI, but a request that never comes back would leave a diff file showing
     // its loading row forever, so give up on it and let the caller render plain text instead.
     const timer = setTimeout(() => {
       pending.delete(id)
+      timedOut = true
+      recordSample('core', 'highlight.timeout', 1)
       resolve([])
     }, TOKENIZE_TIMEOUT_MS)
     pending.set(id, {
@@ -129,7 +142,8 @@ export const tokenizeDocument: TokenizeDocument = async (path, code) => {
     w.postMessage(request)
   })
   // Empty means the worker could not do it (see onmessage). Fall back for this document.
-  if (lines.length === 0 && code.length > 0) return onMainThread(path, code)
+  if (lines.length === 0 && code.length > 0) return fallback(timedOut ? 'timeout' : 'empty-result')
+  recordSample('core', 'highlight.lines', lines.length)
   return lines
 }
 

@@ -1,3 +1,4 @@
+import { measure, recordSample } from '../../infra/telemetry/emitter'
 import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createStore, reconcile, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -146,10 +147,10 @@ export function DiffPane(props: {
   }
 
   const hydrator = createDiffHydrator({
-    parseFile: async (file) => ({
+    parseFile: (file) => measure('core', 'diff.parse', async () => ({
       file,
       diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
-    }),
+    })),
     onParsed: (parsedFile) => setParsedByPath(parsedFile.file.path, parsedFile),
     cachedFile: (path) => source().cachedFile(path),
     fetchPatches: (paths, signal) => source().fetchPatches?.(paths, signal) ?? Promise.resolve([]),
@@ -193,6 +194,8 @@ export function DiffPane(props: {
   // ponytail: re-reads every file in the set, not the ones that moved. The hydrator has retry(path)
   // if the spawn count ever matters; it would need a per-file content key on the port to know which.
   createEffect(on(contentSignature, () => {
+    recordSample('core', 'diff.hydrator.reset', 1)
+    recordSample('core', 'diff.files', files().length)
     hydrator.reset(files(), selectedPath() || undefined)
   }))
 
@@ -207,7 +210,11 @@ export function DiffPane(props: {
     },
   ))
 
-  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), source().threads?.(), expanded(), collapsedFiles()))
+  const rows = createMemo<Row[]>(() => {
+    const result = measure('core', 'diff.rows', () => buildRenderableRows(parsed(), source().threads?.(), expanded(), collapsedFiles()))
+    recordSample('core', 'diff.row_count', result.length)
+    return result
+  })
 
   // Every code row on screen, asked about in one request per contributor rather than one per line. The
   // effect re-runs when the rows do; `requestAnnotations` compares the key set and does nothing when it

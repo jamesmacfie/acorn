@@ -1,3 +1,4 @@
+import { measureWork } from '../../lib/workTelemetry'
 import { createEffect, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { isGrammar, langFor } from '../../../infra/highlight/langs'
@@ -65,14 +66,14 @@ export default function Markdown(props: {
     blocks = []
   })
 
-  createEffect(() => {
+  createEffect(() => measureWork('markdown.render', () => {
     const text = props.text
     // A prop is a getter, not a memo, so this effect re-runs whenever anything upstream ticks, even
     // when the text is identical. Rewriting the DOM throws away the reader's selection, so compare
     // before writing — and then, below, write only the blocks that actually moved.
     if (!root || text === rendered) return
     rendered = text
-    const next = renderBlocks(text, { images: props.images })
+    const next = measureWork('markdown.parse', () => renderBlocks(text, { images: props.images }), { characters: text.length })
 
     // Elements from the last render, queued per key so two identical blocks in one message each keep
     // an element of their own rather than fighting over the same one.
@@ -159,7 +160,7 @@ export default function Markdown(props: {
         if (highlighted) wrap.querySelector('pre')?.replaceWith(highlighted)
       }
     })()
-  })
+  }))
 
   return (
     <div

@@ -65,7 +65,8 @@ export function createAgentPaneModel(task: Task) {
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
-  void managedAgentStore.loadTask(task.id)
+  const sessionsLoaded = managedAgentStore.loadTask(task.id)
+  void sessionsLoaded
     .then((sessions) => {
       if (!selectedManagedSession(task.id) && sessions[0]) selectManagedSession(task.id, sessions[0].id)
     })
@@ -284,6 +285,7 @@ export function createAgentPaneModel(task: Task) {
 
   return {
     task,
+    sessionsLoaded,
     providers: () => providers() ?? [],
     refreshProviders,
     taskSessions,

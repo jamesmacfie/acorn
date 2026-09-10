@@ -4,7 +4,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { del, get, set } from 'idb-keyval'
 import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { fleetBridge, nodeTransport } from '../platform'
-import { emitError } from '../telemetry/emitter'
+import { emitError, measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 import { createLogger, describeError } from '../telemetry/logger'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
@@ -139,7 +139,7 @@ export async function refreshFleet(): Promise<void> {
 }
 
 // The persister type is inferred rather than imported, because the package exports only the factory.
-export type NodeCache = { client: QueryClient; persister: ReturnType<typeof createAsyncStoragePersister> }
+export type NodeCache = { hydrated(): void; client: QueryClient; persister: ReturnType<typeof createAsyncStoragePersister> }
 
 const caches = new Map<string, NodeCache>()
 
@@ -168,7 +168,12 @@ export const setCacheStorage = (storage: CacheStorage): void => {
 export function clientFor(nodeId: string): NodeCache {
   const existing = caches.get(nodeId)
   if (existing) return existing
+  let restoreStarted: number | null = null
   const cache: NodeCache = {
+    hydrated: () => {
+      if (restoreStarted !== null) recordDuration('core', 'cache.restore_to_hydrated', performance.now() - restoreStarted)
+      restoreStarted = null
+    },
     client: new QueryClient({
       ...failureCaches(),
       // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
@@ -188,16 +193,33 @@ export function clientFor(nodeId: string): NodeCache {
       // Through the indirection rather than the object, so a host that swaps the store gets the swap
       // rather than whatever was installed when this line was evaluated.
       storage: {
-        getItem: (key) => cacheStorage.getItem(key),
-        setItem: (key, value) => cacheStorage.setItem(key, value),
+        getItem: (key) => measure('core', 'cache.read', () => cacheStorage.getItem(key)),
+        setItem: (key, value) => measure('core', 'cache.write', () => cacheStorage.setItem(key, value)),
         removeItem: (key) => cacheStorage.removeItem(key),
       },
+      serialize: (client) => measure('core', 'cache.serialize', () => {
+        recordSample('core', 'cache.entries', client.clientState.queries.length)
+        const text = JSON.stringify(client)
+        recordSample('core', 'cache.characters', text.length)
+        return text
+      }),
+      deserialize: (text) => measure('core', 'cache.deserialize', () => JSON.parse(text)),
       key: cacheKeyFor(nodeId),
       // Persistence serializes the whole dehydrated cache, so a wider coalescing window stops a burst
       // of query updates stringifying the same growing snapshot over and over.
       throttleTime: 5_000,
     }),
   }
+  const restore = cache.persister.restoreClient
+  cache.persister.restoreClient = () => {
+    restoreStarted = telemetryEnabled() ? performance.now() : null
+    return restore()
+  }
+  cache.client.getQueryCache().subscribe((event) => {
+    // Fixed action names only. Query keys can contain task IDs, search text, and file paths.
+    if (event.type === 'updated') recordSample('core', 'cache.updates', 1, '1', { action: event.action.type })
+    else if (event.type === 'added' || event.type === 'removed') recordSample('core', 'cache.entries.changed', 1, '1', { action: event.type })
+  })
   caches.set(nodeId, cache)
   return cache
 }
