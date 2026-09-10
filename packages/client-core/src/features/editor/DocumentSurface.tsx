@@ -1,3 +1,4 @@
+import { measure, recordSample } from '../../infra/telemetry/emitter'
 import { createSignal, onMount, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
@@ -116,7 +117,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   // read route answers, and the two land together.
   // `.catch` rather than a rejection the load block has to handle: a grammar that will not download
   // means no highlighting, and no highlighting beats no document.
-  const language = languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext')
+  const language = measure(props.pluginId, 'editor.language.load', () => languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext'))
     .catch(() => [] as Extension)
 
   let host: HTMLElement | undefined
@@ -267,6 +268,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         if (new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
           return setError(`Document is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MiB.`)
         }
+        recordSample(props.pluginId, 'editor.document.characters', body.text.length)
         text = body.text
       } catch (cause) {
         return setError(cause instanceof Error ? cause.message : 'Could not load this document.')
@@ -278,7 +280,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       const grammar = await language
       if (disposed || !host) return
       const autocomplete = completions()
-      const state = EditorState.create({
+      const state = measure(props.pluginId, 'editor.state.create', () => EditorState.create({
         doc: text,
         extensions: [
           basicSetup,
@@ -300,8 +302,8 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
             ]
             : []),
         ],
-      })
-      view = new EditorView({ state, parent: host })
+      }))
+      view = measure(props.pluginId, 'editor.view.create', () => new EditorView({ state, parent: host }))
       saved = view.state.doc
       stopTheme = watchEditorTheme(view)
       const remembered = documentViewState(nodeId, scope, uri) as EditorViewState | undefined

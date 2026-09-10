@@ -1,3 +1,4 @@
+import { measure, recordSample } from '../telemetry/emitter'
 import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { loadGrammar } from './langs'
@@ -56,14 +57,16 @@ const htmlCache = new Map<string, string>()
 export async function highlightToHtml(code: string, lang: string): Promise<string> {
   const key = `${lang}\u0000${code}`
   const hit = htmlCache.get(key)
+  recordSample('core', 'highlight.html.cache', 1, '1', { cache: hit === undefined ? 'miss' : 'hit' })
   if (hit !== undefined) return hit
+  recordSample('core', 'highlight.html.characters', code.length)
   const hl = await getHighlighter(lang)
-  const html = hl.codeToHtml(code, {
+  const html = measure('core', 'highlight.html.render', () => hl.codeToHtml(code, {
     lang,
     themes: { l: 'github-light', r: 'github-dark' },
     defaultColor: false,
     cssVariablePrefix: '--',
-  })
+  }))
   if (code.length > HTML_CACHE_MAX_BYTES) return html
   // First in, first out. A Map iterates in insertion order, so the oldest key is the first one.
   if (htmlCache.size >= HTML_CACHE_ENTRIES) {

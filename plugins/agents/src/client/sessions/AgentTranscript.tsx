@@ -1,3 +1,4 @@
+import { agentTelemetry } from './agentTelemetry'
 import { createMemo, For, Index, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
@@ -31,7 +32,10 @@ export default function AgentTranscript(props: {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient)
-  const conversation = createMemo(() => buildConversationItems(props.snapshot.events))
+  const conversation = createMemo(() => {
+    agentTelemetry.observe('agents.transcript.events', props.snapshot.events.length)
+    return agentTelemetry.measure('agents.transcript.project', () => buildConversationItems(props.snapshot.events))
+  })
   // One map above the list, not `turns.find` inside it. The row body ran that find once per row per
   // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
   // of turns, twenty-five times a second.
@@ -49,7 +53,11 @@ export default function AgentTranscript(props: {
   })
   // Falls back to the session's own stream when the card is not there: selecting a subagent under
   // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
-  const items = createMemo(() => visibleConversationItems(focused()?.children ?? conversation()))
+  const items = createMemo(() => {
+    const items = agentTelemetry.measure('agents.transcript.visible', () => visibleConversationItems(focused()?.children ?? conversation()))
+    agentTelemetry.observe('agents.transcript.items', items.length)
+    return items
+  })
   const pending = createMemo(() => props.snapshot.requests.filter((request) =>
     request.status === 'pending' || request.status === 'resolving'))
   const sessionId = createMemo(() => props.snapshot.session.id)

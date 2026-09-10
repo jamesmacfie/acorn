@@ -538,6 +538,58 @@ A batch is refused whole for one malformed record, and refused at a mebibyte. No
 answers `202` with `{ accepted: 0 }` rather than an error: the switch being off is not the sender's
 failure to handle, and the sender stops on its own when it next reads the preference.
 
+## Diagnosing an unresponsive view
+
+The collector distinguishes waiting for data from processing it and losing responsiveness. Collection
+still requires consent. No transcript, source text, terminal output, search query, or file path is added
+by these hooks. Workload sizes are histogram values, **not labels**. `telemetryFor(owner).observe(name,
+value, unit?, attrs?)` records a non-negative finite sample; the histogram count also counts calls.
+Fixed operation/outcome labels keep the number of series bounded.
+
+| Question | Hooks |
+| --- | --- |
+| Did the renderer stop responding? | `ui.event_loop.delay`, `ui.frame.gap`, and `ui.stall` in the focused, visible renderer. `ui.hang.suspected` and `ui.hang.recovered` come independently from the desktop helper. |
+| Which agent view was opening? | `agents.center.open`, `agents.sidebar.open`, and `agents.session.open` span loading through two animation frames after readiness. Outcomes are `ready`, `error`, `cancelled`, or `timeout` (30 seconds). Initial selection begins before its signal write; `agents.subagent.open` covers selecting an already-loaded child transcript. |
+| Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
+| Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
+| Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
+| Is rendering the content expensive? | `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, and `diff.hydrator.reset` cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor. |
+| Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
+| Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
+| Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |
+| Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write` (through xterm's completion callback), and `terminal.fit`. Sizes count supplied string code units or binary bytes, without copying output to measure it. |
+| Is the backend or helper under pressure? | `runtime.event_loop.p95`, `runtime.event_loop.max`, `runtime.event_loop.utilization`, `runtime.cpu`, `runtime.memory.rss`, and `runtime.memory.heap`. CPU is consumed CPU time / elapsed time; memory is bytes. |
+
+A measured client operation taking at least 100 ms can also produce a detailed span under its
+original interaction, capped at 20 exemplars per flush. Histograms retain every sample even after
+that cap. These are inclusive operation timings, not CPU profiles; overlapping/nested durations must
+not be added together. The ambient renderer interaction remains an approximation for concurrent
+background work, while slow spans capture their parent at the start of the measured operation.
+
+The desktop responsiveness pulse crosses the platform seam and the authenticated helper socket once
+per second while the window is focused and visible, and immediately when the interaction changes.
+The helper validates bounded operation names and trace IDs. It retains the last interaction with
+`contextAgeMs` and `operationActive`, so historical context is not mistaken for currently running work.
+It reports once after five seconds without
+a pulse, and reports recovery if a pulse returns. Blur, hidden state, consent revocation, socket close,
+and a helper timer gap over five seconds disarm the observation; another active pulse re-arms it.
+This is a local responsiveness check, not an uptime ping. A suspected hang can also indicate a delayed
+local transport, so it is a diagnostic lead rather than proof of a JavaScript deadlock. The helper can
+report while the renderer is permanently blocked, but cannot recover its JavaScript stack or report
+if the helper and renderer both stop. No durable hang record is promised across a process restart.
+
+To investigate: select the affected release and runtime, find `ui.hang.suspected` / `ui.stall`, then
+follow the recorded interaction trace. Compare API time with decode, merge, projection, row mounting,
+and highlighting. Check workload counts and `ui.interaction.work` before assuming an individual
+operation is slow. Compare runtime pressure and queue age when several surfaces degrade together.
+A frame gap is a paint-opportunity measurement, not a guarantee that the compositor presented pixels.
+Collection that is still off during startup does not retrospectively measure cache hydration.
+
+Local tests exercise a renderer that never answers, recovery, sleep, consent changes, failed diagnostic
+transport, cancellation, delayed readiness, bounded workload series, slow trace attribution, and
+highlight fallback without content. Before relying on Sentry, perform the live ingestion smoke in
+Verification below, then reproduce opening a large agent history with collection enabled.
+
 ## What this is not
 
 It is not an OpenTelemetry or Sentry dependency in core. An exporter is a plugin and may depend on
@@ -549,7 +601,8 @@ WebSocket.
 ## Deliberate limits
 
 Session replay is refused because the screen contains source code, diffs, agent transcripts and
-terminal output. Uptime pings are refused because sleeping laptops are normal for a local node.
+terminal output. Uptime pings are refused because sleeping laptops are normal for a local node. Active-window
+responsiveness checks exclude suspend gaps as described above.
 Profiling remains deferred until a slow request or render cannot be attributed with spans and
 histograms; it needs a separate profiler and sampling design for each runtime.
 

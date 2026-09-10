@@ -8,6 +8,9 @@ import {
   flushTelemetry,
   measure,
   recordDuration,
+  recordSample,
+  onTelemetryActivity,
+  currentActivity,
   setTelemetryEnabled,
   startClientTelemetry,
   startInteraction,
@@ -232,4 +235,68 @@ it('does not restore a failed post across an off/on consent change', async () =>
   await pending
   await flushTelemetry()
   expect(post).toHaveBeenCalledOnce()
+})
+
+
+it('aggregates changing workload sizes without creating a series per size', async () => {
+  start()
+  setTelemetryEnabled(true)
+  for (let i = 1; i <= 1000; i++) recordSample('agents', 'transcript.events', i)
+  await flushTelemetry()
+  const metrics = posted.flat().filter((r) => r.kind === 'metric')
+  expect(metrics).toHaveLength(1)
+  expect(metrics[0]).toMatchObject({ name: 'transcript.events', unit: '1', value: { count: 1000, max: 1000 } })
+})
+
+it('publishes operation context before work and immediately clears it when consent is revoked', () => {
+  start()
+  setTelemetryEnabled(true)
+  const contexts: unknown[] = []
+  const off = onTelemetryActivity(() => contexts.push(currentActivity()))
+  const span = startInteraction('agents', { name: 'agents.session.open' })
+  expect(contexts[0]).toMatchObject({ operation: 'agents.session.open', traceId: span.traceId })
+  setTelemetryEnabled(false)
+  expect(contexts.at(-1)).toBeNull()
+  off()
+})
+
+it('does not emit a span begun before an off/on consent change', async () => {
+  start()
+  setTelemetryEnabled(true)
+  const span = startInteraction('agents', { name: 'agents.session.open' })
+  setTelemetryEnabled(false)
+  setTelemetryEnabled(true)
+  span.end()
+  await flushTelemetry()
+  expect(posted).toEqual([])
+})
+
+it('keeps slow work linked to its original interaction and bounds detailed samples', async () => {
+  start()
+  setTelemetryEnabled(true)
+  const span = startInteraction('agents', { name: 'agents.session.open' })
+  let now = 0
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+  for (let i = 0; i < 100; i++) measure('agents', 'transcript.project', () => { now += 200 })
+  clock.mockRestore()
+  span.end()
+  await flushTelemetry()
+  const slow = posted.flat().filter((r) => r.kind === 'span' && r.name === 'transcript.project')
+  expect(slow).toHaveLength(20)
+  expect(slow[0]).toMatchObject({ traceId: span.traceId, parentSpanId: span.spanId, durationMs: 200 })
+  expect(posted.flat().find((r) => r.kind === 'metric' && r.name === 'transcript.project')).toMatchObject({ value: { count: 100 } })
+})
+
+
+it('summarizes repeated work per interaction without treating the frame monitor as work', async () => {
+  start()
+  setTelemetryEnabled(true)
+  const span = startInteraction('agents', { name: 'agents.session.open' })
+  for (let i = 0; i < 10; i++) recordSample('agents', 'agents.snapshot.load', 1)
+  for (let i = 0; i < 100; i++) recordDuration('core', 'ui.frame.gap', 16)
+  span.end()
+  await flushTelemetry()
+  const summary = posted.flat().filter((r) => r.kind === 'event' && r.name === 'ui.interaction.work')
+  expect(summary).toHaveLength(1)
+  expect(summary[0]).toMatchObject({ attrs: { traceId: span.traceId, operation: 'agents.snapshot.load', calls: 10 } })
 })

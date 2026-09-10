@@ -413,3 +413,12 @@ states rather than throwing.
 Device presentation preferences include theme, style pack, keybindings, and layout. Node preferences
 include operational settings and setup state. Draft text remains client-local and is not treated as
 successful server state. Secret fields are never persisted in renderer storage.
+
+### Processing and responsiveness telemetry
+
+Shared work hooks cover JSON decoding, query-cache serialization/restoration, markdown, row
+reconciliation/mounting, highlighting, diff preparation, tree backlog, and terminal write completion.
+The kit calls a host-installed callback in `kit/lib/workTelemetry.ts`; it never imports the collector.
+The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
+preload bridge, so it observes the same consent and interaction state as the application.
+[Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.

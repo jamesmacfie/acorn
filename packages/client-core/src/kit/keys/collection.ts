@@ -17,7 +17,7 @@
 // The node handles intents and never reads a key. Anything it does not handle returns false and
 // bubbles to its ancestors and then to the region.
 
-import { onCleanup, type JSX } from 'solid-js'
+import { createMemo, onCleanup, type JSX } from 'solid-js'
 import { setActiveItem } from './collectionState'
 import {
   COLLECTION_INTENTS, createCollectionIntents, createTypeAhead, PAGE, type CollectionItem,
@@ -116,11 +116,13 @@ export function createCollection(options: CollectionOptions): Collection {
     },
     onItem: (key) => elements.get(key) === document.activeElement,
   })
-  const active = keys.active
+  // Every row reads this for its tab stop. Resolve the fallback once per change, not once per row.
+  const active = createMemo(keys.active)
 
   // By position, not by the key itself: a key is a branch name or a file path, and a DOM id may not
   // hold half of what those contain.
-  const index = (key: string) => options.items().findIndex((item) => item.key === key)
+  const positions = createMemo(() => new Map(options.items().map((item, index) => [item.key, index])))
+  const index = (key: string) => positions().get(key) ?? -1
   const itemId = (key: string) => options.itemId?.(key) ?? `${options.id()}-item-${index(key)}`
 
   // Type-ahead is typing, not a chord, so it stays a keydown on the container rather than a binding:

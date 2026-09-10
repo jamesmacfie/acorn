@@ -671,3 +671,12 @@ is worse than none.
 Two release gates are owed to a person, and no script closes them: the smoke checklist
 ([docs/testing.md](./testing.md) § The smoke checklist), run against the DMG on a machine that never
 had the Electron build, and a developer soak window. Nothing ships to a person until both pass.
+
+### Active renderer responsiveness
+
+The optional `reportResponsiveness` platform capability sends `renderer-pulse` over the authenticated
+helper socket. The renderer owns the consent/visibility/focus decision and supplies only its current
+operation name, owner and trace IDs. The helper owns a watchdog per socket; it removes that state on
+socket close and clears its timer when the server closes. This deliberately runs outside the
+renderer so an unresolved render span is not the only evidence of a permanent UI stall.
+[Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns thresholds, exclusions, and interpretation.

@@ -4,7 +4,7 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { isHandlerRef, sanitizeProps } from '@acorn/protocol/tree/props.ts'
-import { measure } from '../../infra/telemetry/emitter'
+import { measure, recordDuration, recordSample, telemetryEnabled } from '../../infra/telemetry/emitter'
 import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
@@ -48,6 +48,7 @@ export function createTreeState(input: TreeStateInput) {
 
   const log = createLogger('plugins', input.pluginId)
   const refuse = (reason: string): void => {
+    recordSample(input.pluginId, 'tree.batch.refused', 1)
     input.onRefused?.(reason)
     log.warn(`${input.pluginId}: ${reason}`)
   }
@@ -221,6 +222,8 @@ export function createTreeState(input: TreeStateInput) {
   // bundle sending faster than the screen redraws, which is the case the throttle exists for.
   let queued: TreeMutation[] = []
   let handle = 0
+  let queuedAt = 0
+  let batches = 0
   const flush = (): void => {
     handle = 0
     const ops = queued
@@ -230,9 +233,17 @@ export function createTreeState(input: TreeStateInput) {
     // remote pane is animating is well past the ten-a-second line a span has to stay under
     // (docs/telemetry.md § Hot seams are metrics), and what the number answers is "whose tree is
     // making the shell drop frames".
+    if (queuedAt) recordDuration(input.pluginId, 'tree.queue.wait', performance.now() - queuedAt)
+    recordSample(input.pluginId, 'tree.batch.operations', ops.length)
+    recordSample(input.pluginId, 'tree.batch.merged', batches)
+    batches = 0
+    queuedAt = 0
     measure(input.pluginId, 'tree.apply', () => apply(ops))
+    recordSample(input.pluginId, 'tree.nodes', parents.size)
   }
   const detachBatch = input.transport.onBatch((ops) => {
+    if (!queued.length && telemetryEnabled()) queuedAt = performance.now()
+    batches++
     queued.push(...ops)
     if (handle) return
     handle = scheduler.schedule(flush)

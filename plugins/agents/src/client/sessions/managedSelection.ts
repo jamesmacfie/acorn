@@ -1,3 +1,4 @@
+import { markAgentSelection, startAgentView } from './agentTelemetry'
 import { createSignal } from 'solid-js'
 import { clientEvents, consumePaneIntent, dispatchLayout, registerNoticeTargetHandler } from '@acorn/plugin-api/client'
 import { AGENT_PANE_ID } from '../paneContribution'
@@ -18,7 +19,9 @@ export const selectedManagedSubagent = (sessionId: string): string | undefined =
 // showing, and the sidebar row for that subagent is the one drawn as selected. Absent means the
 // session's own stream.
 export function selectManagedSubagent(sessionId: string, subagentId: string): void {
+  const view = selectedManagedSubagent(sessionId) !== subagentId ? startAgentView('agents.subagent.open') : null
   setSelectedSubagentBySession((current) => ({ ...current, [sessionId]: subagentId }))
+  view?.ready()
 }
 
 /** Back out of a subagent's run to the session's own stream. */
@@ -32,6 +35,7 @@ export function clearManagedSubagent(sessionId: string): void {
 }
 
 export function selectManagedSession(taskId: string, sessionId: string): void {
+  if (selectedManagedSession(taskId) !== sessionId) markAgentSelection(sessionId)
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
 }
 

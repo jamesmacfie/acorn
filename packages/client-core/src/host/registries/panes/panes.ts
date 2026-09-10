@@ -6,7 +6,7 @@ import { suppliedLayout } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { paneModel } from './paneModels'
-import { startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
+import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
@@ -101,7 +101,10 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
  * host asked for it.
  */
 function MeasuredRegion(props: { span: SpanHandle; children: JSX.Element }): JSX.Element {
-  onMount(() => props.span.end())
+  onMount(() => {
+    recordSample('core', 'pane.region.mount', 1)
+    props.span.end()
+  })
   return props.children
 }
 

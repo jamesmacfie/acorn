@@ -1,4 +1,6 @@
 /* @refresh reload */
+import { reportResponsiveness } from '@acorn/client-core/infra/platform/index.ts'
+import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry/responsiveness.ts'
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
@@ -29,6 +31,8 @@ const log = createLogger('renderer')
 // somewhere to put its record (docs/telemetry.md § The renderer). Wiring is not collecting: the
 // emitter stays off until `App.tsx` reads `telemetry.enabled` off the node and says otherwise.
 startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
+const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
+window.addEventListener('pagehide', stopResponsiveness, { once: true })
 
 // The two failures nothing in the app catches. Before this the renderer had neither handler, so an
 // error thrown outside a component's boundary was a line in a devtools console nobody had open.
@@ -164,10 +168,12 @@ render(
     // query started against node A cannot resolve into node B's cache (activeNode.ts's invariant).
     <Show when={activeCacheId()} keyed>
       {(nodeId) => {
-        const { client, persister } = clientFor(nodeId)
+        const { client, persister, hydrated } = clientFor(nodeId)
         return (
           <PersistQueryClientProvider
             client={client}
+            onSuccess={hydrated}
+            onError={hydrated}
             persistOptions={{
               persister,
               maxAge: PERSISTED_QUERY_MAX_AGE_MS,

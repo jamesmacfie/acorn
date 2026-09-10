@@ -33,6 +33,8 @@ import type {
 } from '@acorn/protocol/telemetry.ts'
 import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/contributionErrors'
+import { setWorkTelemetry } from '../../kit/lib/workTelemetry'
+import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
 
 /** Same numbers as the node's collector, for the same reasons: enough that a burst survives one
@@ -44,6 +46,7 @@ const MAX_SAMPLES = 20_000
  *  value varies per call would otherwise mint one series per call, which is the cardinality failure
  *  the vocabulary rule exists to prevent (docs/telemetry.md § The attribute vocabulary). */
 const MAX_SERIES = 200
+let slowSamples = 0
 
 export type TelemetryPoster = (records: readonly TelemetryRecord[]) => Promise<void>
 
@@ -70,7 +73,7 @@ type EmitterState = {
   runtime: PostedTelemetryRuntime
   enabled: boolean
   queue: TelemetryQueue
-  histograms: Map<string, { owner: string; seam: string; attrs: TelemetryAttrs; histogram: Histogram }>
+  histograms: Map<string, { owner: string; seam: string; attrs: TelemetryAttrs; histogram: Histogram; unit: string }>
   post: TelemetryPoster | null
   timer: ReturnType<typeof setInterval> | null
   posting: boolean
@@ -106,7 +109,10 @@ export const telemetryEnabled = (): boolean => state.enabled
 export function setTelemetryEnabled(on: boolean): void {
   if (state.enabled === on) return
   state.generation += 1
+  slowSamples = 0
+  if (!on) { activity = null; clearInteractionWork() }
   state.enabled = on
+  notifyActivity()
   if (on) return arm()
   disarm()
   state.queue.take()
@@ -200,16 +206,39 @@ export function startInteraction(owner: string, input: SpanInput): SpanHandle {
   if (!telemetryEnabled()) return INERT
   const span = startSpan(owner, { ...input, traceId: input.traceId ?? newTraceId() })
   state.trace = { traceId: span.traceId, spanId: span.spanId }
+  beginInteractionWork(span.spanId)
+  activity = { owner, operation: input.name, traceId: span.traceId, spanId: span.spanId }
+  notifyActivity()
   return {
     traceId: span.traceId,
     spanId: span.spanId,
     end: (status, attrs) => {
+      for (const [operation, calls] of takeInteractionWork(span.spanId)) {
+        emitEvent(owner, 'ui.interaction.work', { traceId: span.traceId, spanId: span.spanId, operation, calls })
+      }
       span.end(status, attrs)
       // Only if it is still ours. A second interaction that opened over this one owns the trace now,
       // and clearing it here would orphan every request the newer one is about to make.
-      if (state.trace?.spanId === span.spanId) state.trace = null
+      if (state.trace?.spanId === span.spanId) {
+        state.trace = null
+        activity = null
+        notifyActivity()
+      }
     },
   }
+}
+
+export type TelemetryActivity = { owner: string; operation: string; traceId: string; spanId: string }
+let activity: TelemetryActivity | null = null
+const activityListeners = new Set<() => void>()
+export const currentActivity = (): TelemetryActivity | null => state.enabled ? activity : null
+/** Hosts forward only bounded operation names and correlation IDs, never span attributes. */
+export const onTelemetryActivity = (listener: () => void): (() => void) => {
+  activityListeners.add(listener)
+  return () => { activityListeners.delete(listener) }
+}
+function notifyActivity(): void {
+  for (const listener of activityListeners) safely(listener)
 }
 
 // ── The emit verbs ────────────────────────────────────────────────────────────────────────────────
@@ -264,6 +293,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   const spanId = newSpanId()
   const started = Date.now()
   const from = performance.now()
+  const generation = state.generation
   let ended = false
   return {
     traceId,
@@ -271,6 +301,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
     end: (status = 'ok', attrs) => {
       if (ended) return
       ended = true
+      if (generation !== state.generation) return
       emitSpan(owner, {
         traceId,
         spanId,
@@ -297,8 +328,13 @@ function labelsOf(attrs: TelemetryAttrs | undefined): string {
 
 /** One sample into a histogram, aggregated over the flush window. What a seam past about ten a
  *  second uses instead of a span (docs/telemetry.md § Hot seams are metrics). */
-export function recordDuration(owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void {
-  if (!telemetryEnabled()) return
+export const recordDuration = (owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void =>
+  recordSample(owner, seam, ms, 'ms', attrs)
+
+/** Workload values are samples, never labels: one series for every transcript size. */
+export function recordSample(owner: string, seam: string, ms: number, unit = '1', attrs?: TelemetryAttrs): void {
+  if (!telemetryEnabled() || !Number.isFinite(ms) || ms < 0) return
+  recordInteractionWork(state.trace?.spanId, seam)
   safely(() => {
     // Keyed by owner, seam and attributes together, which is the node's key for the node's reason: a
     // histogram describes one label set, and merging two of them under whichever arrived first
@@ -306,18 +342,18 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
     // phase and its `tui.key` carries a reason, so this is the difference between four rows and one
     // wrong one.
     const labels = labelsOf(attrs)
-    let key = `${owner}\u0000${seam}\u0000${labels}`
+    let key = `${owner}\u0000${seam}\u0000${unit}\u0000${labels}`
     let slot = state.histograms.get(key)
     if (!slot && labels && state.histograms.size >= MAX_SERIES) {
       // At the cap a sample keeps its count and loses its labels rather than being dropped: the
       // totals stay exact, memory stays bounded, and the truncation counter says it happened.
       state.truncated += 1
       attrs = undefined
-      key = `${owner}\u0000${seam}\u0000`
+      key = `${owner}\u0000${seam}\u0000${unit}\u0000`
       slot = state.histograms.get(key)
     }
     if (!slot) {
-      slot = { owner, seam, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
+      slot = { owner, seam, unit, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
       state.histograms.set(key, slot)
     }
     const h = slot.histogram
@@ -333,16 +369,35 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
 export function measure<T>(owner: string, seam: string, run: () => T, attrs?: TelemetryAttrs): T {
   if (!telemetryEnabled()) return run()
   const from = performance.now()
-  const finish = () => recordDuration(owner, seam, performance.now() - from, attrs)
+  const started = Date.now()
+  const trace = currentTrace()
+  const generation = state.generation
+  const finish = (status: 'ok' | 'error' = 'ok') => {
+    if (generation !== state.generation) return
+    const durationMs = performance.now() - from
+    recordDuration(owner, seam, durationMs, attrs)
+    // Detailed exemplars are bounded; the histogram still counts every call, including fast ones.
+    if (durationMs >= 100 && slowSamples < 20) {
+      slowSamples++
+      emitSpan(owner, {
+        traceId: trace?.traceId ?? newTraceId(), spanId: newSpanId(),
+        ...(trace ? { parentSpanId: trace.spanId } : {}),
+        name: seam, start: started, durationMs, status, attrs: { ...attrs, slow: true },
+      })
+    }
+  }
   let result: T
   try {
     result = run()
   } catch (error) {
-    finish()
+    finish('error')
     throw error
   }
-  // `finally` rather than `then`, so a rejection is still counted.
-  if (result instanceof Promise) return result.finally(finish) as T
+  // Both outcomes are counted; a rejection also marks a slow exemplar as failed.
+  if (result instanceof Promise) return result.then(
+    (value) => { finish(); return value },
+    (error: unknown) => { finish('error'); throw error },
+  ) as T
   finish()
   return result
 }
@@ -363,7 +418,7 @@ function foldHistograms(): void {
       name: slot.seam,
       type: 'histogram',
       value: { count: h.count, sum: h.sum, min: h.min, max: h.max, p50: percentile(0.5), p95: percentile(0.95) },
-      unit: 'ms',
+      unit: slot.unit,
       attrs: cleanAttrs(slot.attrs, slot.owner),
     })
   }
@@ -379,6 +434,7 @@ function foldHistograms(): void {
 export async function flushTelemetry(): Promise<void> {
   if (!state.enabled || state.posting) return
   safely(foldHistograms)
+  slowSamples = 0
   const dropped = state.queue.takeDropped()
   if (dropped > 0) {
     state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: cleanAttrs({}, 'core') })
@@ -429,6 +485,11 @@ export type StartTelemetryOptions = {
 /** Called once from the client composition root, before anything renders. Collection still waits on
  *  `setTelemetryEnabled`, which the preference drives. */
 export function startClientTelemetry(options: StartTelemetryOptions): void {
+  setWorkTelemetry((name, run, sizes) => {
+    if (!telemetryEnabled()) return run()
+    for (const [key, value] of Object.entries(sizes ?? {})) recordSample('core', `${name}.${key}`, value)
+    return measure('core', name, run)
+  })
   state.runtime = options.runtime
   state.post = options.post
   // A contribution that throws while rendering, reported through the seam `kit/` has for it
@@ -447,6 +508,9 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
 
 /** Test seam: forget the poster, the queue and the open trace. */
 export function _resetClientTelemetry(): void {
+  clearInteractionWork()
+  setWorkTelemetry(null)
+  activity = null
   setContributionErrorHandler(null)
   disarm()
   state.generation += 1
@@ -466,6 +530,8 @@ export function _resetClientTelemetry(): void {
  *  (node-core/server/telemetry/collector.ts). One vocabulary across both halves, so an author who
  *  learned one does not get the other backwards. */
 export type PluginTelemetry = {
+  observe(name: string, value: number, unit?: string, attrs?: TelemetryAttrs): void
+  startInteraction(name: string, attrs?: TelemetryAttrs): SpanHandle
   event(name: string, attrs?: TelemetryAttrs): void
   count(name: string, value?: number, attrs?: TelemetryAttrs): void
   gauge(name: string, value: number, attrs?: TelemetryAttrs): void
@@ -490,6 +556,8 @@ export type PluginTelemetry = {
  * binding (host/frames/frameTelemetry.ts).
  */
 export const telemetryFor = (owner: string): PluginTelemetry => ({
+  observe: (name, value, unit, attrs) => recordSample(owner, name, value, unit, attrs),
+  startInteraction: (name, attrs) => startInteraction(owner, { name, attrs }),
   event: (name, attrs) => emitEvent(owner, name, attrs),
   count: (name, value = 1, attrs) => emitMetric(owner, { name, type: 'count', value, ...(attrs ? { attrs } : {}) }),
   gauge: (name, value, attrs) => emitMetric(owner, { name, type: 'gauge', value, ...(attrs ? { attrs } : {}) }),

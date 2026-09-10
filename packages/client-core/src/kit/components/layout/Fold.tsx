@@ -1,4 +1,4 @@
-import { createSignal, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, Show, type JSX } from 'solid-js'
 
 // A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
 // with its own localStorage closure across three different mechanisms, two of them missing
@@ -50,6 +50,9 @@ export function Fold(props: {
 }) {
   const [local, setLocal] = createSignal(readOpen(props.persistKey, props.defaultOpen ?? false))
   const open = () => (props.onOpenChange ? props.open ?? false : local())
+  // Closed transcripts can hold thousands of nested cards. Build them on first open, then retain
+  // them so closing a section does not discard drafts, selection, or a child's own disclosure state.
+  const visited = createMemo((previous) => previous || open(), false)
 
   return (
     <details
@@ -76,7 +79,7 @@ export function Fold(props: {
           </span>
         </Show>
       </summary>
-      {props.children}
+      <Show when={visited()}>{(_shown) => props.children}</Show>
     </details>
   )
 }

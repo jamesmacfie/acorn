@@ -38,11 +38,14 @@ async function tokenize(lang: string, code: string): Promise<HighlightLines> {
 const post = (message: HighlightResponse) => (self as unknown as Worker).postMessage(message)
 
 self.onmessage = (event: MessageEvent<HighlightRequest>) => {
-  const { id, lang, code } = event.data
+  const { id, lang, code, sentAt } = event.data
+  const started = sentAt === undefined ? 0 : performance.now()
+  const queueMs = sentAt === undefined ? undefined : Math.max(0, performance.timeOrigin + started - sentAt)
+  const timing = () => sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started }
   void tokenize(lang, code).then(
-    (lines) => post({ id, ok: true, lines }),
+    (lines) => post({ id, ok: true, lines, ...timing() }),
     // A grammar that fails to load or a pattern the engine rejects takes out one request, not the
     // worker: the client falls back to plain text for that document and the next one still tries.
-    (error: unknown) => post({ id, ok: false, error: String((error as Error)?.message ?? error) }),
+    (error: unknown) => post({ id, ok: false, error: String((error as Error)?.message ?? error), ...timing() }),
   )
 }

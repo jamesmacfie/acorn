@@ -1,3 +1,4 @@
+import { claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { Alert, EmptyState, Text } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
@@ -56,7 +57,10 @@ export default function AgentConversation(props: AgentConversationProps & {
   createEffect(on(sessionId, (id) => {
     setError('')
     if (!id) return
-    void managedAgentStore.loadSnapshot(id).catch((caught: unknown) => {
+    const view = claimAgentSelection(id)
+    onCleanup(view.dispose)
+    void managedAgentStore.loadSnapshot(id).then(() => view.ready()).catch((caught: unknown) => {
+      view.fail()
       if (sessionId() !== id) return
       setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
     })

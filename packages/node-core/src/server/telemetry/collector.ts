@@ -1,3 +1,4 @@
+import { startRuntimePressure } from './runtimePressure'
 // The node's telemetry collector: where every record is built, held, and handed to whoever asked
 // for it. docs/telemetry.md owns the behaviour; this comment covers the two shape decisions.
 //
@@ -585,14 +586,22 @@ function tick(): void {
   } else flushTelemetry()
 }
 
+let stopPressure: (() => void) | null = null
 function arm(): void {
   if (state.timer) return
+  stopPressure = startRuntimePressure({
+    enabled: telemetryEnabled,
+    duration: (name, value) => recordDuration('core', name, value),
+    gauge: (name, value, unit) => emitMetric('core', { name, value, unit, type: 'gauge' }),
+  })
   state.timer = setInterval(tick, FLUSH_EVERY_MS)
   // Unref'd like the scheduler's timers: a node with nothing left to do must be allowed to exit.
   state.timer.unref?.()
 }
 
 function disarm(): void {
+  stopPressure?.()
+  stopPressure = null
   if (!state.timer) return
   clearInterval(state.timer)
   state.timer = null

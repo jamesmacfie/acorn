@@ -30,6 +30,8 @@ import {
 } from '@acorn/custody/plugins/pluginRequests.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
 
+import { createRendererWatchdog } from './rendererWatchdog'
+
 const log = createLogger('helper')
 
 // The renderer's projection of the custody stack, over one loopback WebSocket. This is the Tauri half
@@ -89,6 +91,9 @@ const toFetchRequest = (wire: WireFetchRequest): unknown => {
 export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string }): Promise<HelperServer> {
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
+  const watchdogs = new Map<WebSocket, ReturnType<typeof createRendererWatchdog>>()
+  const watchdogTimer = setInterval(() => { for (const watchdog of watchdogs.values()) watchdog.tick() }, 1000)
+  watchdogTimer.unref()
 
   // Which node the renderer is actually looking at. The broker opens a socket to every paired node and
   // pushes every frame here, and the renderer drops whatever is not the active node on arrival
@@ -136,6 +141,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
 
   const handlers: Record<HelperMethod, (params: unknown) => unknown | Promise<unknown>> = {
+    'renderer-pulse': () => undefined,
     'node-fetch': async (raw) => {
       const { nodeId, request } = z.object({ nodeId: z.string().min(1), request: z.unknown() }).parse(raw)
       addressed = nodeId
@@ -328,6 +334,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       return reply({ ok: false, error: `The desktop helper does not know '${String(request.method)}'.` })
     }
     try {
+      if (request.method === 'renderer-pulse') watchdogs.get(socket)?.receive(request.params)
       reply({ ok: true, value: (await handlers[request.method](request.params)) ?? null })
     } catch (error) {
       reply({ ok: false, error: error instanceof Error ? error.message : String(error) })
@@ -335,6 +342,8 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   }
 
   const http = createServer((_request, response) => response.writeHead(426).end())
+  http.on('close', () => { clearInterval(watchdogTimer); watchdogs.clear() })
+  http.on('error', () => clearInterval(watchdogTimer))
   const wss = new WebSocketServer({ noServer: true })
 
   http.on('upgrade', (request, socket, head) => {
@@ -346,7 +355,8 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     }
     wss.handleUpgrade(request, socket, head, (ws) => {
       sockets.add(ws)
-      ws.on('close', () => sockets.delete(ws))
+      watchdogs.set(ws, createRendererWatchdog())
+      ws.on('close', () => { sockets.delete(ws); watchdogs.delete(ws) })
       ws.on('message', (data) => {
         let parsed: unknown
         try {

@@ -1,3 +1,4 @@
+import { agentTelemetry, startAgentView } from '../sessions/agentTelemetry'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
@@ -37,6 +38,8 @@ type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task
 // rather than a layout: a layout is a pane's arrangement and this is a source's
 // (docs/panes.md § Layout model).
 export default function AgentCenter() {
+  const view = startAgentView('agents.center.open')
+  onCleanup(view.dispose)
   const navigate = useNavigate()
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
@@ -57,6 +60,10 @@ export default function AgentCenter() {
   }
   const [query, setQuery] = createSignal('')
   const [scope, setScope] = createSignal<'workspace' | 'fleet'>('workspace')
+  // Resource sources run immediately, so the archive filter must exist before its resource.
+  const [providerFilter, setProviderFilter] = createSignal('')
+  const [stateFilter, setStateFilter] = createSignal<'all' | 'active' | 'attention' | 'archived'>('all')
+  const [error, setError] = createSignal('')
   const fleetScope = () => scope() === 'fleet' && nodes().length > 1
   const [searchResults] = createResource(
     () => {
@@ -97,10 +104,6 @@ export default function AgentCenter() {
     fleetScope,
   )
 
-  const [providerFilter, setProviderFilter] = createSignal('')
-  const [stateFilter, setStateFilter] = createSignal<'all' | 'active' | 'attention' | 'archived'>('all')
-  const [error, setError] = createSignal('')
-
   onMount(() => {
     onCleanup(managedAgentStore.activate())
   })
@@ -113,7 +116,7 @@ export default function AgentCenter() {
 
   // Rows, in whichever scope is selected. Both branches produce the same shape, so the filters, counts,
   // sort, and open below are written once.
-  const rows = createMemo<AgentRow[]>(() => {
+  const rows = createMemo<AgentRow[]>(() => agentTelemetry.measure('agents.center.rows', () => {
     if (fleetScope()) {
       // Per node, because a task id is only meaningful on its own node (docs/architecture-overview.md § Fleet semantics:
       // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
@@ -138,10 +141,10 @@ export default function AgentCenter() {
         : managedAgentStore.sessions().filter((session) => !session.archivedAt && workspaceTaskIds().has(session.taskId))
     const active = activeNodeId() ?? ''
     return sessions.map((session) => ({ session, nodeId: active, nodeLabel: '', task: taskById().get(session.taskId) }))
-  })
+  }))
 
   const sourceSessions = createMemo(() => rows().map((row) => row.session))
-  const shown = createMemo(() => {
+  const shown = createMemo(() => agentTelemetry.measure('agents.center.filter', () => {
     const needle = fleetScope() ? query().trim().toLowerCase() : ''
     return rows().filter(({ session, task }) => {
       if (providerFilter() && session.providerId !== providerFilter()) return false
@@ -154,6 +157,11 @@ export default function AgentCenter() {
     }).sort((a, b) =>
       Number(needsAttention(b.session)) - Number(needsAttention(a.session)) || b.session.updatedAt - a.session.updatedAt,
     )
+  }))
+  createEffect(() => {
+    agentTelemetry.observe('agents.center.rows_count', shown().length)
+    if (tasks.isError || workspaces.isError || workspaceSessions.error || providers.error) view.fail()
+    else if (!tasks.isPending && !workspaces.isPending && !workspaceSessions.loading && !providers.loading) view.ready()
   })
   const unavailable = () => (fleetScope() ? fleetSessions().unavailable : [])
   // Two nodes may hold the same session id, so a row's key names both (docs/architecture-overview.md

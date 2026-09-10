@@ -2,7 +2,7 @@ import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { nodeTransport } from '../platform'
-import { currentTrace, startSpan } from '../telemetry/emitter'
+import { currentTrace, measure, recordSample, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
 import { nodeState } from './fleet'
 
@@ -128,7 +128,7 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     const res = await deliver(path, options, method, requestId, headers)
     // A 4xx is an error for the span even though it is a perfectly good answer, because the
     // question a span list is read to answer is "which of these went wrong".
-    span?.end(res.ok ? 'ok' : 'error', { status: res.status })
+    span?.end(res.ok ? 'ok' : 'error', { status: res.status, responseBytes: res.body.byteLength })
     return res
   } catch (error) {
     // Nothing came back at all: no node picked, the node offline, or the broker's own timeout.
@@ -266,7 +266,8 @@ type ReadOptions = { signal?: AbortSignal; nodeId?: string; owner?: string }
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId, ...(options.owner ? { owner: options.owner } : {}) })
   if (!res.ok) raise(res, `${url} ${res.status}`)
-  return parseJson<T>(res)
+  recordSample(options.owner ?? 'core', 'api.response.bytes', res.body.byteLength, 'byte', { route: apiRouteAttr(url) })
+  return measure(options.owner ?? 'core', 'api.decode', () => parseJson<T>(res), { route: apiRouteAttr(url) })
 }
 
 // The one non-JSON read: a download. Under app:// a route builder's URL resolves against the protocol

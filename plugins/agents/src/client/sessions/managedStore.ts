@@ -1,3 +1,4 @@
+import { agentTelemetry } from './agentTelemetry'
 import { batch, createEffect, createRoot, createSignal } from 'solid-js'
 import { activeNodeId, createLogger, describeError, fromManagedSession, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { wsOnAgentFrame } from './wsChannel'
@@ -49,6 +50,7 @@ const byRecent = (a: AgentSession, b: AgentSession): number =>
   b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
 
 function upsertSession(session: AgentSession): void {
+  agentTelemetry.observe('agents.session.update', 1)
   if (deletedSessionIds.has(session.id)) return
   setSessions((current) => {
     const found = current.some((item) => item.id === session.id)
@@ -154,6 +156,7 @@ function seatEvent(events: AgentEventRecord[], event: AgentEventRecord): boolean
 }
 
 function appendEvent(event: AgentEventRecord): void {
+  agentTelemetry.observe('agents.event.append', 1)
   if (deletedSessionIds.has(event.sessionId)) return
   let duplicate = false
   setSnapshots((current) => {
@@ -303,7 +306,9 @@ export const managedAgentStore = {
    */
   loadTask(taskId: string): Promise<AgentSession[]> {
     const held = taskLoads.get(taskId)
-    if (held && Date.now() - held.at < TASK_LOAD_WINDOW_MS) return held.run
+    const cached = held && Date.now() - held.at < TASK_LOAD_WINDOW_MS
+    agentTelemetry.observe('agents.roster.load', 1, '1', { cache: cached ? 'hit' : 'miss' })
+    if (cached) return held.run
     // An async body rather than a `.then` chain on the call, so a caller that hands this store a
     // broken API gets a rejection like any other failure instead of a synchronous throw.
     const run: Promise<AgentSession[]> = (async () => {
@@ -330,16 +335,18 @@ export const managedAgentStore = {
   },
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
     const held = snapshotLoads.get(sessionId)
+    agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: held ? 'inflight' : 'miss' })
     if (held) return held
     const run: Promise<AgentSessionSnapshot> = (async () => {
       const incoming = await managedAgentApi.snapshot(sessionId)
       if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
       let snapshot = incoming
       setSnapshots((current) => {
-        snapshot = mergeManagedSnapshot(current[sessionId], incoming)
+        snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(current[sessionId], incoming))
         return { ...current, [sessionId]: snapshot }
       })
-      indexEvents(sessionId, snapshot.events)
+      agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)
+      agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
       upsertSession(snapshot.session)
       return snapshot
     })().finally(() => {

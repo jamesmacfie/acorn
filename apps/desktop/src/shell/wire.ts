@@ -11,6 +11,7 @@ export const HELPER_PROTOCOL = 1
 // more than the bytes a fire-and-forget notification saves, and a reply is what lets a caller see
 // "this build cannot tunnel" instead of silence.
 export type HelperMethod =
+  | 'renderer-pulse'
   | 'node-fetch'
   | 'node-abort'
   | 'node-send'

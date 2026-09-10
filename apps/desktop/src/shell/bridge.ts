@@ -13,6 +13,8 @@ import {
 import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 
+import type { ResponsivenessPulse } from '@acorn/client-core/infra/telemetry/responsiveness.ts'
+
 const log = createLogger('helper')
 
 // The window's initialization script: it assembles the object the platform seam reads and installs
@@ -37,6 +39,7 @@ const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
 const statusListeners = new Set<(status: unknown) => void>()
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
+let liveSocket: WebSocket | null = null
 
 // One socket, opened on first use and reopened if it drops. Calls made before it is up wait on the
 // same promise rather than failing, which is what lets the bridge be installed synchronously while
@@ -48,7 +51,7 @@ const connect = (): Promise<WebSocket> => {
         // The secret rides in the query string because a browser cannot set headers on a WebSocket
         // handshake. It is the gate; the helper checks the Origin too, but only as a second lock.
         const ws = new WebSocket(`ws://127.0.0.1:${port}/helper?secret=${encodeURIComponent(secret)}`)
-        ws.onopen = () => resolve(ws)
+        ws.onopen = () => { liveSocket = ws; resolve(ws) }
         ws.onerror = () => reject(new Error('acorn could not reach its desktop helper.'))
         ws.onclose = () => {
           // Every in-flight call is answered rather than left hanging: a query that never settles
@@ -57,6 +60,7 @@ const connect = (): Promise<WebSocket> => {
             pending.delete(id)
             call.reject(new Error('The connection to the desktop helper closed.'))
           }
+          liveSocket = null
           socket = null
         }
         // Terminal output arrives as bytes rather than as a JSON push (./wire.ts § The binary push),
@@ -174,6 +178,10 @@ const toWireBody = (body: unknown): WireFetchBody | undefined => {
 }
 
 const acorn = {
+  // No async boundary: the context leaves before the renderer starts synchronous work.
+  reportResponsiveness: (params: ResponsivenessPulse) => {
+    if (liveSocket?.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ id: nextId++, method: 'renderer-pulse', params }))
+  },
   desktop: true,
   // Rust writes this into the page before any script runs, because the seam reads it synchronously
   // and every other way of asking is a round trip. Sniffing the user agent would be a guess about

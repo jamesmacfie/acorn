@@ -14,10 +14,12 @@ export type HighlightLines = HighlightTok[][]
 
 export type HighlightRequest = {
   id: number
+  /** Epoch timestamp only when diagnostics are on; timeOrigin + now is comparable across workers. */
+  sentAt?: number
   /** A shiki grammar name (highlight/shiki.ts), already resolved from the path by the caller. */
   lang: string
   /** A whole document, newline-separated, never a single line: see worker.ts for why. */
   code: string
 }
 
-export type HighlightResponse = { id: number; ok: true; lines: HighlightLines } | { id: number; ok: false; error: string }
+export type HighlightResponse = ({ id: number; ok: true; lines: HighlightLines } | { id: number; ok: false; error: string }) & { queueMs?: number; executionMs?: number }
