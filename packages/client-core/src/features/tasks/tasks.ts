@@ -5,6 +5,7 @@ import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
 import { markPageChange } from './pageChange'
+import { startRenderTransition } from '../../infra/telemetry/emitter'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
@@ -78,6 +79,16 @@ export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLay
 export const activeLayout = (): TaskLayout => taskLayouts()[activeTaskId() ?? ''] ?? defaultLayout()
 
 export function dispatchLayout(taskId: string, action: LayoutAction): void {
+  // Resizing can fire on every pointer move. The other actions are deliberate transitions and run
+  // under the click/command that caused them, so one render span can explain a slow pane change
+  // without turning a drag into a telemetry stream.
+  if (action.type !== 'resize') {
+    startRenderTransition('core', 'layout', {
+      action: action.type,
+      ...(action.type === 'replace' ? { panes: action.layout.panes.length } : {}),
+      ...('pane' in action ? { 'pane.id': action.pane } : {}),
+    })
+  }
   setTaskLayouts((prev) => {
     const cur = prev[taskId] ?? defaultLayout()
     const next = applyLayoutAction(cur, action)

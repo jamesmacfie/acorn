@@ -1,4 +1,4 @@
-import { markAgentSelection, startAgentView } from './agentTelemetry'
+import { agentTelemetry, markAgentSelection, startAgentView } from './agentTelemetry'
 import { createSignal } from 'solid-js'
 import { clientEvents, consumePaneIntent, dispatchLayout, registerNoticeTargetHandler } from '@acorn/plugin-api/client'
 import { AGENT_PANE_ID } from '../paneContribution'
@@ -35,7 +35,10 @@ export function clearManagedSubagent(sessionId: string): void {
 }
 
 export function selectManagedSession(taskId: string, sessionId: string): void {
-  if (selectedManagedSession(taskId) !== sessionId) markAgentSelection(sessionId)
+  if (selectedManagedSession(taskId) !== sessionId) {
+    markAgentSelection(sessionId)
+    agentTelemetry.startRenderTransition('agents.session.select')
+  }
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
 }
 

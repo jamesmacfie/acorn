@@ -5,6 +5,10 @@ vi.mock('@acorn/plugin-api/client', () => ({
   consumePaneIntent: () => undefined,
   dispatchLayout: () => undefined,
   registerNoticeTargetHandler: () => () => undefined,
+  telemetryFor: () => ({
+    startInteraction: () => ({ traceId: '', spanId: '', end: () => undefined }),
+    startRenderTransition: () => ({ update: () => undefined, cancel: () => undefined }),
+  }),
 }))
 
 // The module only wants the pane's id from here; the real file drags in the whole store.

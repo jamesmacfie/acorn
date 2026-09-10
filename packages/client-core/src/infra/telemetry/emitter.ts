@@ -56,6 +56,12 @@ export type SpanHandle = {
   readonly spanId: string
   end(status?: 'ok' | 'error', attrs?: TelemetryAttrs): void
 }
+export type RenderTransitionHandle = {
+  /** Add bounded context learned after the transition began. Later values win. */
+  update(attrs: TelemetryAttrs): void
+  /** End a transition whose owner was disposed before the browser reached a paint opportunity. */
+  cancel(): void
+}
 export type ErrorInput = {
   name: string
   message?: string
@@ -316,6 +322,83 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   }
 }
 
+// ── Render transitions ───────────────────────────────────────────────────────────────────────────
+
+const INERT_RENDER: RenderTransitionHandle = { update: () => {}, cancel: () => {} }
+
+const nextRenderFrame = (run: () => void): ReturnType<typeof setTimeout> | number => {
+  // The terminal client and bare-Node tests share this emitter and have no animation frames.
+  if (typeof requestAnimationFrame !== 'function') return setTimeout(run, 0)
+  return requestAnimationFrame(() => run())
+}
+
+/**
+ * Attribute one deliberate state transition across the browser work it causes.
+ *
+ * This is intentionally opt-in rather than a global observer: a caller starts it immediately before
+ * a signal write, and one span ends after the next two frame opportunities. The span records where
+ * its elapsed time went without observing the DOM, walking components, or emitting per-component
+ * records. It only runs under an open interaction, so background store updates do not mint traces.
+ */
+export function startRenderTransition(
+  owner: string,
+  operation: string,
+  initialAttrs: TelemetryAttrs = {},
+): RenderTransitionHandle {
+  if (!telemetryEnabled() || !currentTrace()) return INERT_RENDER
+  const span = startSpan(owner, { name: 'ui.render', attrs: { operation } })
+  const started = performance.now()
+  let attrs = { ...initialAttrs }
+  let ended = false
+  let phase: 'turn' | 'frame' | 'paint' = 'turn'
+  let turnMs = 0
+  let frameWaitMs = 0
+  let paintWaitMs = 0
+  let phaseStarted = started
+
+  const finish = (outcome: 'ready' | 'cancelled' | 'timeout') => {
+    if (ended) return
+    ended = true
+    clearTimeout(deadline)
+    span.end(outcome === 'timeout' ? 'error' : 'ok', {
+      ...attrs,
+      operation,
+      outcome,
+      'phase.turn_ms': turnMs,
+      'phase.frame_wait_ms': frameWaitMs,
+      'phase.paint_wait_ms': paintWaitMs,
+      ...(outcome === 'timeout' ? { phase } : {}),
+    })
+  }
+  const deadline = setTimeout(() => finish('timeout'), 30_000)
+
+  // Scheduled before the caller performs its write. The callback therefore cannot run until the
+  // write and Solid's synchronous reactive propagation have returned to the microtask checkpoint.
+  queueMicrotask(() => {
+    if (ended) return
+    const now = performance.now()
+    turnMs = now - started
+    phase = 'frame'
+    phaseStarted = now
+    nextRenderFrame(() => {
+      if (ended) return
+      const frameAt = performance.now()
+      frameWaitMs = frameAt - phaseStarted
+      phase = 'paint'
+      phaseStarted = frameAt
+      nextRenderFrame(() => {
+        paintWaitMs = performance.now() - phaseStarted
+        finish('ready')
+      })
+    })
+  })
+
+  return {
+    update: (next) => { attrs = { ...attrs, ...next } },
+    cancel: () => finish('cancelled'),
+  }
+}
+
 /** One histogram per owner, seam and label set, so two samples share a row only when all three
  *  match. Sorted, because two call sites can build the same attributes in a different order and a
  *  metrics backend counts those as one series. Empty for the common case of none. */
@@ -526,9 +609,9 @@ export function _resetClientTelemetry(): void {
 
 // ── The owner-bound projection ────────────────────────────────────────────────────────────────────
 
-/** What a compiled client plugin holds, and the same six verbs the node's `ctx.telemetry` has
- *  (node-core/server/telemetry/collector.ts). One vocabulary across both halves, so an author who
- *  learned one does not get the other backwards. */
+/** What a compiled client plugin holds: the node's telemetry verbs plus the renderer-only transition
+ *  probe. The shared verbs keep one vocabulary across both halves; the extra verb names browser work
+ *  that does not exist on the node. */
 export type PluginTelemetry = {
   observe(name: string, value: number, unit?: string, attrs?: TelemetryAttrs): void
   startInteraction(name: string, attrs?: TelemetryAttrs): SpanHandle
@@ -541,6 +624,8 @@ export type PluginTelemetry = {
   /** For work whose start and end do not fit one closure. `end` is idempotent, and the span hangs
    *  under whatever interaction is open. */
   startSpan(name: string, options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string }): SpanHandle
+  /** One opt-in span from a state write through the next paint opportunity. Inert outside an interaction. */
+  startRenderTransition(operation: string, attrs?: TelemetryAttrs): RenderTransitionHandle
 }
 
 /**
@@ -564,4 +649,5 @@ export const telemetryFor = (owner: string): PluginTelemetry => ({
   error: (error) => emitError(owner, error),
   measure: (name, run, attrs) => measure(owner, name, run, attrs),
   startSpan: (name, options) => startSpan(owner, { name, ...options }),
+  startRenderTransition: (operation, attrs) => startRenderTransition(owner, operation, attrs),
 })

@@ -697,8 +697,14 @@ import { createLogger } from '@acorn/plugin-api/node'      // or '@acorn/plugin-
 import { telemetryFor } from '@acorn/plugin-api/client'
 
 const log = createLogger('github', 'github')               // tag, then your plugin id
-const telemetry = telemetryFor('github')                   // the same six verbs, client-side
+const telemetry = telemetryFor('github')                   // the same core verbs, client-side
 ```
+
+The client projection also has `startRenderTransition(operation, attrs?)`. Call it immediately
+before a deliberate signal write when the browser work caused by that write is part of a user
+interaction. It emits one `ui.render` child span through two frame opportunities and is inert when
+there is no open interaction; do not put it on streaming updates, pointer moves, or component bodies.
+Attributes stay content-free and scalar, with workload sizes as numbers.
 
 `createLogger` takes the tag you were already writing by hand, so `[github] pruned 3 rows` reads
 the same and gains an owner. `describeError(error).message` beside it turns a caught `unknown` into

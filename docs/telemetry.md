@@ -465,6 +465,7 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | histogram `ws.inbound.<channel prefix>` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | span `command`, owner from `ownerId`; opens an interaction |
 | Every page change | `features/tasks/pageChange.ts` | span `nav.change`, ended on the second animation frame; opens an interaction |
+| Opted-in state transitions | `infra/telemetry/emitter.ts` `startRenderTransition` | one `ui.render` child span with current-turn, first-frame and paint-frame durations; only under an open interaction |
 | Every pane region | `host/registries/panes/panes.ts` `drawLayout` | span `pane.region`, from the host asking for the region to the child's mount |
 | Every pane model build | `host/registries/panes/paneModels.ts` | span `pane.model`; a cache hit is not timed |
 | Every plugin frame boot | `host/frames/PluginFrame.tsx` | span `frame.boot`, ended on the frame's first message; an error record on the ten-second deadline |
@@ -549,6 +550,7 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Question | Hooks |
 | --- | --- |
 | Did the renderer stop responding? | `ui.event_loop.delay`, `ui.frame.gap`, and `ui.stall` in the focused, visible renderer. `ui.hang.suspected` and `ui.hang.recovered` come independently from the desktop helper. |
+| Which browser phase held the interaction? | `ui.render` carries `phase.turn_ms`, `phase.frame_wait_ms`, and `phase.paint_wait_ms`. Navigation, non-resize pane-layout actions, managed-agent session selection, and snapshot display opt in. Snapshot display adds event, turn, and request counts. |
 | Which agent view was opening? | `agents.center.open`, `agents.sidebar.open`, and `agents.session.open` span loading through two animation frames after readiness. Outcomes are `ready`, `error`, `cancelled`, or `timeout` (30 seconds). Initial selection begins before its signal write; `agents.subagent.open` covers selecting an already-loaded child transcript. |
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
@@ -565,6 +567,13 @@ original interaction, capped at 20 exemplars per flush. Histograms retain every 
 that cap. These are inclusive operation timings, not CPU profiles; overlapping/nested durations must
 not be added together. The ambient renderer interaction remains an approximation for concurrent
 background work, while slow spans capture their parent at the start of the measured operation.
+
+`ui.render` is deliberately smaller than a profiler. It creates one span for a deliberate state
+transition and no global observer: the current-turn duration runs from immediately before the signal
+write to the next microtask checkpoint, the frame wait runs from there to the next animation frame,
+and the paint wait is the following frame. It does not walk the DOM or instrument component mounts.
+Outside an open interaction it is inert, and pane resizing is excluded because it fires on every
+pointer move. Callers may attach bounded numeric workload counts, never source or transcript content.
 
 The desktop responsiveness pulse crosses the platform seam and the authenticated helper socket once
 per second while the window is focused and visible, and immediately when the interaction changes.

@@ -14,6 +14,7 @@ import {
   setTelemetryEnabled,
   startClientTelemetry,
   startInteraction,
+  startRenderTransition,
   telemetryEnabled,
 } from './emitter'
 
@@ -89,6 +90,53 @@ describe('the interaction trace', () => {
     const [batch] = posted
     const span = batch.find((record) => record.kind === 'span')
     expect(span?.kind === 'span' && span.traceId).toBe(interaction.traceId)
+  })
+
+  it('attributes one render transition across the current turn and two frame opportunities', async () => {
+    vi.useFakeTimers()
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const interaction = startInteraction('agents', { name: 'agents.session.open' })
+    const render = startRenderTransition('agents', 'agents.session.select', { 'snapshot.events': 120 })
+    render.update({ 'snapshot.items': 45 })
+
+    await Promise.resolve()
+    expect(frames).toHaveLength(1)
+    vi.advanceTimersByTime(8)
+    frames.shift()!(8)
+    vi.advanceTimersByTime(13)
+    frames.shift()!(21)
+    interaction.end()
+    await flushTelemetry()
+
+    const span = posted[0].find((record) => record.kind === 'span' && record.name === 'ui.render')
+    expect(span?.kind).toBe('span')
+    if (span?.kind !== 'span') return
+    expect(span.parentSpanId).toBe(interaction.spanId)
+    expect(span.attrs).toMatchObject({
+      operation: 'agents.session.select',
+      outcome: 'ready',
+      'snapshot.events': 120,
+      'snapshot.items': 45,
+      'phase.turn_ms': 0,
+      'phase.frame_wait_ms': 8,
+      'phase.paint_wait_ms': 13,
+    })
+  })
+
+  it('does not schedule render work without an open interaction', async () => {
+    vi.useFakeTimers()
+    const frame = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', frame)
+    startRenderTransition('core', 'background.refresh')
+    await Promise.resolve()
+    vi.runAllTimers()
+    expect(frame).not.toHaveBeenCalled()
+    await flushTelemetry()
+    expect(posted).toEqual([])
   })
 })
 

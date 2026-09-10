@@ -262,7 +262,7 @@ export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMe
 // import, and posts a `telemetry` message over the bridge instead, which the host stamps from the
 // binding.
 export { telemetryFor } from '@acorn/client-core/infra/telemetry/emitter.ts'
-export type { PluginTelemetry, SpanHandle } from '@acorn/client-core/infra/telemetry/emitter.ts'
+export type { PluginTelemetry, RenderTransitionHandle, SpanHandle } from '@acorn/client-core/infra/telemetry/emitter.ts'
 export { createLogger, describeError } from '@acorn/client-core/infra/telemetry/logger.ts'
 export type { Logger } from '@acorn/client-core/infra/telemetry/logger.ts'
 

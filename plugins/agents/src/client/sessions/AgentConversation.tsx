@@ -1,4 +1,4 @@
-import { claimAgentSelection } from './agentTelemetry'
+import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { Alert, EmptyState, Text } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
@@ -50,6 +50,20 @@ export default function AgentConversation(props: AgentConversationProps & {
   // same row; `loadSnapshot` upserts what it fetched.
   const session = createMemo(() => stored() ?? snapshot()?.session)
   const previousAutomaticContext = createMemo(() => latestAutomaticTaskContext(snapshot()?.turns ?? []))
+
+  // The selection write above tells us whether switching sessions blocked the current JavaScript
+  // turn. This second opt-in point starts when the chosen snapshot becomes renderable and adds only
+  // counts already held by the store; it never walks the transcript DOM or copies its content.
+  let measuredSnapshot = ''
+  createEffect(on(snapshot, (next) => {
+    if (!next || next.session.id === measuredSnapshot) return
+    measuredSnapshot = next.session.id
+    agentTelemetry.startRenderTransition('agents.snapshot.show', {
+      'snapshot.events': next.events.length,
+      'snapshot.turns': next.turns.length,
+      'snapshot.requests': next.requests.length,
+    })
+  }))
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
