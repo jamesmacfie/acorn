@@ -120,6 +120,35 @@ export type AcornBridge = {
     /** Replace the active claim set with a subset of this surface's manifest declaration. */
     claim(chords: readonly string[]): void
   }
+  /**
+   * Say what your frame is doing: the same six verbs acorn's own plugins have on the node.
+   *
+   * Every one is fire and forget. Nothing returns a promise, nothing throws, and nothing tells you
+   * whether the reader has collection turned on, which is off by default. The owner on each record
+   * is stamped by the host from this frame's binding, so there is no plugin id to pass and no way
+   * to file one under another plugin's name.
+   *
+   * Each call is one bridge message against the port's budget of 1,000 per 10 seconds, so emit per
+   * action rather than per frame of a render loop.
+   */
+  telemetry: {
+    event(name: string, attrs?: PluginTelemetryAttrs): void
+    count(name: string, value?: number, attrs?: PluginTelemetryAttrs): void
+    gauge(name: string, value: number, attrs?: PluginTelemetryAttrs): void
+    error(error: { name: string; message?: string; attrs?: PluginTelemetryAttrs }): void
+    /** Time one call and hand back its own result untouched. Promise-aware, timed to settlement. */
+    measure<T>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T
+    /** For work whose start and end do not fit one closure. `end` is idempotent. */
+    startSpan(name: string, attrs?: PluginTelemetryAttrs): { end(status?: 'ok' | 'error'): void }
+  }
+  /** A log line with your plugin id already on it. It prints to your frame's own console as well,
+   * so it says something whether or not the reader is collecting. */
+  log: {
+    debug(message: string, attrs?: PluginTelemetryAttrs): void
+    info(message: string, attrs?: PluginTelemetryAttrs): void
+    warn(message: string, attrs?: PluginTelemetryAttrs): void
+    error(message: string, attrs?: PluginTelemetryAttrs): void
+  }
   /** Fires on every appearance change and once on connect. The tokens are already applied to `:root`
    * by the time it runs; this is for anything you draw yourself that has to be repainted. */
   onAppearance(listener: (appearance: { theme: string; style: string }) => void): () => void
@@ -217,6 +246,10 @@ export type TreeMount = {
     openOverlay<TResult = unknown>(overlayId: string, input?: unknown): Promise<TResult | null>
   }
 }
+
+/** What a telemetry attribute may be: a scalar, and nothing else. An object would be a place for a
+ * request body to hide, and no sink can index one. */
+export type PluginTelemetryAttrs = Record<string, string | number | boolean | null>
 
 /** What `api.getBytes` resolves to. `filename` is whatever the route's `Content-Disposition` named, or
  * null when it named nothing. */

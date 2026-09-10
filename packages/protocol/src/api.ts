@@ -9,6 +9,7 @@ import type {
 import type { ExtensionPointKind, HookMode } from './extensionPoints.ts'
 import type { Cadence } from './schedules.ts'
 import type { NodeAttachment } from './node.ts'
+import type { TelemetryRecord } from './telemetry.ts'
 
 // The one error envelope every route returns, defined in ./errors.ts and re-exported here because
 // `ApiError` is the name 250-odd call sites know. See docs/api-reference.md § Errors.
@@ -262,6 +263,38 @@ export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/sta
 
 
 export const prefsRoute = '/v2/core/prefs'
+// Where every runtime that is not the node posts its telemetry (docs/telemetry.md § Other runtimes).
+// Device-only, because a record admitted here reaches every sink, and a sink can send it off the
+// machine.
+export const coreTelemetryRoute = '/v2/core/telemetry'
+// What Settings → Telemetry draws: counters, never records (docs/telemetry.md § What the page
+// shows). Device-only, like the route above, and for a smaller reason: it names which plugins are
+// reading the stream, which is a fact about this machine's installation.
+export const coreTelemetrySummaryRoute = '/v2/core/telemetry/summary'
+
+/** The node's own account of what it has collected since it started.
+ *
+ *  Counters rather than a window over the ring. The ring holds 5,000 records and a sink may have
+ *  drained it a second ago, so a page built on the ring would answer "what is being collected" with
+ *  whatever happened in the last five seconds. */
+export type TelemetrySummary = {
+  /** The `telemetry.enabled` preference, as the collector last read it. */
+  enabled: boolean
+  /** The preference on and at least one sink subscribed, which is what it takes to build a record. */
+  collecting: boolean
+  /** When this node's collector started, in epoch milliseconds. Every count below is since then. */
+  since: number
+  /** When a batch last went to the sinks, or null when none has. */
+  lastFlushAt: number | null
+  /** Records the ring dropped at its cap, and attributes cut at theirs. */
+  dropped: number
+  truncated: number
+  /** Who is reading the stream, by plugin id. `core` is the node's own, such as the `ACORN_PERF`
+   *  printer. */
+  sinks: string[]
+  /** One row per owner and kind, so the page can say what each plugin is producing. */
+  records: Array<{ owner: string; kind: TelemetryRecord['kind']; count: number }>
+}
 // Settings → Plugins (docs/plugins.md § Activation). Per node, since which plugins a node runs
 // decides which routes exist and which SQLite files open. `running` and `disabled` answer different
 // questions: a toggle takes effect at the node's next start, so the page shows the gap between saving

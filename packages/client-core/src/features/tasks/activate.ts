@@ -1,5 +1,6 @@
 import type { Task } from '../../infra/queries'
 import { markTaskRead } from '../notifications/notifications'
+import { markPageChange } from './pageChange'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './taskLayout'
 import { defaultPaneForTask, taskPathFromSources } from '../../host/registries/sources/sources'
@@ -15,6 +16,9 @@ export const pathForTask = (t: Task): string => taskPathFromSources(t) ?? taskPa
 // lives once. `options.pane` forces a pane, such as a Linear promote landing on its ticket; otherwise
 // the task's saved layout is restored and only the first activation picks a default.
 export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void {
+  // Before the two signal writes, so the `nav.change` span covers both of them and says the task it
+  // is going to rather than the source it is leaving (./pageChange.ts).
+  markPageChange('core', { to: 'task', 'task.id': t.id, ...(options?.pane ? { 'pane.id': options.pane } : {}) })
   setSelectedSource(null)
   setActiveTaskId(t.id)
   markTaskRead(t.id) // viewing acknowledges its notices (docs/terminal-and-agents.md)

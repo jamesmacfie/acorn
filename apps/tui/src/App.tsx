@@ -1,7 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
-import { tasksOptions } from '@acorn/client-core/infra/queries.ts'
+import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
+import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { telemetryOn } from '@acorn/client-core/features/settings/telemetrySetting.ts'
+import { emitBootSpans } from './boot'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
@@ -91,6 +94,25 @@ function TaskArg(props: { id?: string; onMissing?: (id: string) => void; childre
   return props.children
 }
 
+/** The one telemetry switch, read off the node and handed to the emitter, which is the desktop's
+ *  arrangement in `apps/desktop/src/client/App.tsx` (docs/telemetry.md § The switch).
+ *
+ *  Under the provider rather than beside it, because it reads a query. It draws nothing: the effect
+ *  is the whole of it, and a component is how this host gets a reactive scope with the client in it.
+ *
+ *  The boot spans go out here too. They describe a stretch of time that was over before the switch
+ *  was known, so the marks are held and turned into spans the first time the answer is yes
+ *  (./boot.ts § emitBootSpans). */
+function Telemetry() {
+  const prefs = createQuery(() => prefsOptions(true))
+  createEffect(() => {
+    const on = telemetryOn(prefs.data)
+    setTelemetryEnabled(on)
+    if (on) emitBootSpans()
+  })
+  return null
+}
+
 export function App(props: {
   client: QueryClient
   nodeId: string
@@ -101,6 +123,7 @@ export function App(props: {
 }) {
   return (
     <QueryClientProvider client={props.client}>
+      <Telemetry />
       <TaskArg id={props.task} onMissing={props.onNoTask}>
         <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} />
       </TaskArg>

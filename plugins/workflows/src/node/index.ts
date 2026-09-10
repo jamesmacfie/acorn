@@ -4,7 +4,7 @@ import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { buildHeadlessArgv, buildSessionEnv, describeError, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
@@ -88,6 +88,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       })
       const runner = new WorkflowRunner(store, {
         hooks: ctx.hooks,
+        telemetry: ctx.telemetry,
         runStep: async (taskId, def, opts) => {
           // `opts.profileId`, never `def.profileId`: the runner has already resolved "the workflow
           // default" and both paths below have to name the same harness. Reading the def here is what
@@ -466,7 +467,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // green-to-red flip starts a trigger sweep within a round trip instead of at the next tick. The
       // schedule below stays as the backstop for a node whose github half is absent.
       ctx.events.on('plugin:github:checks-changed', () => {
-        void runner.pollTriggers().catch((error) => console.warn('[workflows] trigger sweep after checks-changed failed:', error))
+        void runner.pollTriggers().catch((error: unknown) => ctx.log.warn(`trigger sweep after checks-changed failed: ${describeError(error).message}`))
       })
       ctx.schedules.register({
         scheduleId: 'triggers',

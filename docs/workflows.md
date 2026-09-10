@@ -120,6 +120,24 @@ Retry is a device action. A task-confined caller, meaning an agent inside the ru
 because it could otherwise loop a failed step past the rail that stopped it. The budget rule holds
 either way: a retry's usage adds to the run's persisted sum and the same rail fires again.
 
+### What a run reports
+
+A run raises a `workflow.run` span and each of its steps a `workflow.step` span, both through
+`ctx.telemetry`, both owned by this plugin, and all of them in one trace, so a slow step is found
+from the run rather than from a list of unrelated spans
+([telemetry.md](./telemetry.md) § Ambient attribution). The run span carries the run id, the trigger
+and the step count; a step span carries the run id and the step id. Nothing carries a prompt, a
+result or a handoff note.
+
+The run span opens where the row is written in `start` and closes in `finishRun`, so it measures
+what the owner would call the run's duration. A step's span brackets its own status changes rather
+than the `execute` call, because a step settles at a dozen places in `execute` and two of them never
+run it at all. A step waiting at a gate keeps its span open, which is right: waiting for a person is
+part of how long the step took.
+
+A run still going when the process exits reports no span. Nothing measured how long it took, and a
+span invented on the next boot would say otherwise.
+
 ### Fan-out, and where a file comes from
 
 A step that fans out into parallel branches creates each branch as a child task under the workflow's

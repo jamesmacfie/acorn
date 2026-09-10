@@ -16,6 +16,9 @@ import {
 import { readJson, writeJson } from './apiClient'
 import { activeNodeId } from './activeNode'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('fleet')
 
 const [nodePlugins, setNodePlugins] = createSignal<NodePluginState | null>(null)
 
@@ -36,7 +39,7 @@ export async function refreshNodePlugins(nodeId?: string): Promise<NodePluginSta
     if (!nodeId || nodeId === activeNodeId()) setNodePlugins(state)
     return state
   } catch (error) {
-    console.warn('[fleet] could not read the node plugin list:', error)
+    log.warn('could not read the node plugin list', error)
     return null
   }
 }

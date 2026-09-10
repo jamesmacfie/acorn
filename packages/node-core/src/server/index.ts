@@ -18,6 +18,7 @@ import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins/plugins'
 import { dashboards } from './routes/dashboards'
 import { schedules } from './routes/schedules'
+import { telemetry } from './routes/telemetry'
 import { harness } from './routes/plugins/harness'
 import { agentTools, agentToolsCatalog } from './routes/plugins/agentTools'
 import { taskContext } from './routes/projects/taskContext'
@@ -118,6 +119,12 @@ export function createApp() {
     // roster of what this machine can spend, and no task-scoped child has any use for it.
     .use(`${CORE_NAMESPACE}/models`, requireDevice)
     .use(`${CORE_NAMESPACE}/models/*`, requireDevice)
+    // Telemetry another runtime collected. Device-only for a different reason from the rest of this
+    // group: it is a write, not a read. Everything admitted here reaches every subscribed sink, and a
+    // sink can post it off the machine, so a task-scoped agent must not be able to put words in one
+    // (docs/telemetry.md § Other runtimes).
+    .use(`${CORE_NAMESPACE}/telemetry`, requireDevice)
+    .use(`${CORE_NAMESPACE}/telemetry/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // /history: the measure series a stat's trend is drawn from
@@ -140,6 +147,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/agent-tools`, agentToolsCatalog) // static tool catalog for the permissions settings page
     .route(`${CORE_NAMESPACE}/integrations`, integrations) // connect/disconnect/status for third-party providers
     .route(`${CORE_NAMESPACE}/models`, models) // /backends: the connections and installed CLIs a Generate control can spend
+    .route(`${CORE_NAMESPACE}/telemetry`, telemetry) // the batch route every other runtime posts to (docs/telemetry.md)
     // Provider-owned routes projected from the integration registry. Mounted at the plugin namespace
     // root rather than a core one, because the projection already prefixes each router with its
     // provider id (server/integrations/providerRoutes.ts).

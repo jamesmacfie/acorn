@@ -133,6 +133,11 @@ export default {
    * @param {import('acorn-plugin-types').NodePluginContext} ctx
    */
   init(ctx) {
+    // A stderr line with your plugin id on it, and a telemetry log record when the owner has
+    // collection on. Prefer it to \`console\`: the id is bound by the host, the message is scrubbed,
+    // and a sink can see it. \`ctx.telemetry\` beside it carries events, counts, gauges and spans.
+    ctx.log.info('starting')
+
     // The portable carrier. A Hono instance cannot cross a process boundary; a
     // (Request, PluginRequestContext) => Response function can. The host strips the mount, so
     // /v2/p/${id}/greeting arrives here as /greeting.

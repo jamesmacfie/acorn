@@ -1,6 +1,6 @@
 import { For, Show, type JSX } from 'solid-js'
 import type { Task } from '../../infra/queries'
-import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
+import { paneAvailable, paneContribution, paneContributions, paneRegistry, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodeState } from '../../infra/node/fleet'
 import { freshnessOf, type Freshness } from '../../infra/node/freshness'
@@ -142,7 +142,7 @@ export default function TaskPaneHost(props: {
                     >✕</Button>
                   </Show>
                 </div>
-                <ContributionBoundary contributionId={pane.id}>
+                <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
                   <pane.component task={props.task} />
                 </ContributionBoundary>
               </div>

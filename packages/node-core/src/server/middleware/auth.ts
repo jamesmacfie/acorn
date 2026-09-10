@@ -23,7 +23,12 @@ export type Principal = {
 // `requestId` is set by requestIdMiddleware (server/respond.ts) before anything else, and read by
 // every error envelope. It is not optional in practice; a bare test Context is the only way to see
 // it missing, which respondError reports as 'unknown'.
-export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string } }
+//
+// `trace` is set by the same middleware and only while telemetry is collecting, which is why it is
+// the one optional variable here. It carries the request's own span so an error raised inside the
+// request lands in the same trace rather than starting a second one (docs/telemetry.md § Traces).
+export type TraceRef = { traceId: string; spanId: string }
+export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string; trace?: TraceRef } }
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
 // internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,

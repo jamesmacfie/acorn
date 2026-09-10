@@ -21,6 +21,7 @@ client: InAppTarget
 client: InputCommand
 client: IntegrationFlowContribution
 client: ItemRowTarget
+client: Logger
 client: ModelPick
 client: PaneContribution
 client: PaneIntent
@@ -30,6 +31,7 @@ client: PersistedSliceKeys
 client: PersistedStateSlice
 client: PickedFile
 client: PluginRefResolution
+client: PluginTelemetry
 client: PrefKeys
 client: PreviewState
 client: PreviewViews
@@ -54,6 +56,7 @@ client: SettingCommand
 client: ShellSlotContribution
 client: SourceContribution
 client: SourceRouteContribution
+client: SpanHandle
 client: Task
 client: TaskLayout
 client: TaskRowTarget
@@ -91,12 +94,14 @@ client: contextSnapshot
 client: createCredentialForm
 client: createDeviceFlow
 client: createFleetQuery
+client: createLogger
 client: createOverlayPalette
 client: createProject
 client: createTask
 client: createWorkspace
 client: debounce
 client: defaultDeliveryContext
+client: describeError
 client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
@@ -196,6 +201,7 @@ client: taskBridge
 client: taskStatus
 client: tasksKey
 client: tasksOptions
+client: telemetryFor
 client: termFontSize
 client: toast
 client: token
@@ -249,6 +255,7 @@ node: HookVerdict
 node: InternalEnvFactory
 node: Launcher
 node: LayoutRecipe
+node: Logger
 node: ManifestHarness
 node: ManifestHarnessSpawn
 node: McpCommands
@@ -268,6 +275,7 @@ node: PluginHookPoint
 node: PluginHookRegistry
 node: PluginProviderResourceRequest
 node: PluginRequestContext
+node: PluginTelemetry
 node: PrefService
 node: Principal
 node: ProfileDef
@@ -287,6 +295,7 @@ node: RunTarget
 node: SecretService
 node: SecretUnavailableError
 node: SessionTaskInfo
+node: SpanHandle
 node: StoredConnection
 node: StreamEvent
 node: TASK_CREATED
@@ -296,6 +305,11 @@ node: TaskConcern
 node: TaskCreatedHook
 node: TaskRef
 node: TaskSessionsBridge
+node: TelemetryAttrs
+node: TelemetryBatch
+node: TelemetryRecord
+node: TelemetryService
+node: TelemetrySink
 node: ToolContext
 node: ToolError
 node: agentProfileRegistry
@@ -309,7 +323,9 @@ node: codexJsonAdapter
 node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability
+node: createLogger
 node: defaultBudgets
+node: describeError
 node: encodeCached
 node: envFlags
 node: extensionPointId
@@ -354,6 +370,7 @@ node: respondError
 node: routeCapability
 node: routeCapabilityFor
 node: runHeadless
+node: scrub
 node: serveThenRevalidate
 node: serverName
 node: setRouteTestCapability
@@ -451,6 +468,7 @@ ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
 ui/sdk: PluginByteResponse
 ui/sdk: PluginFrameContext
+ui/sdk: PluginTelemetryAttrs
 ui/sdk: RemoteNode
 ui/sdk: RemoteRoot
 ui/sdk: TreeMount

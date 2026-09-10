@@ -181,6 +181,18 @@ Nothing imports `electron`, a flat ban that covers manifests too.
 The composition-root suites under `apps/node/test/integration/` are the durable check: they boot
 every plugin's `node/index.ts` in a plain Node process, which is the runtime that has to boot.
 
+**Every runtime logs through a logger.** `console.*` is a shrinking baseline under
+`packages/node-core/src`, `apps/node/src`, `packages/custody/src` and `apps/desktop/src/helper`,
+which use the node's logger, and under `packages/client-core/src`, `apps/desktop/src/client`,
+`apps/desktop/src/shell` and `apps/tui/src`, which use the client's. What survives in either
+baseline is not a log line: a handshake JSON a launcher parses off stdout, a pairing banner a person
+reads, the plugin frame's own console inside its iframe. A line written through `console.error`
+carries nothing but the prefix its author typed, where one written through `createLogger` carries an
+owner, passes a scrubber, and reaches every subscribed sink
+([telemetry.md](./telemetry.md) § Logging). A source scan rather than a graph edge, since `console`
+is a global. Tests are exempt: thirty-one of them spy on `console.warn` and `console.error`, which
+is how the logger's own output is asserted.
+
 **The custody stack stays shell-free.** `@acorn/custody` is the broker, the fleet, the device
 tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by
 its `src/index.ts`. It names no shell binding and the encryption is injected rather than imported, so

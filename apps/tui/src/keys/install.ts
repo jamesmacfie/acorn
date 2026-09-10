@@ -29,6 +29,7 @@ import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHo
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
+import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import {
   crossParent, focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
   movePane, moveStop, onFocusMove, scopeDepth, walkSteps,
@@ -65,15 +66,22 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
   return merged
 }
 
-// ── The trace ─────────────────────────────────────────────────────────────────────────────────
+// ── The trace, and the key histogram ──────────────────────────────────────────────────────────
 //
 // One line per key, behind `ACORN_TUI_KEYS_TRACE`, because "the keys stopped working" is a report
-// nobody can act on and this turns it into a log (docs/tui.md § Keys and focus).
+// nobody can act on and this turns it into a log (docs/tui.md § Keys and focus). And one histogram
+// sample per key, always, because a key press is far past ten a second under a held arrow and the
+// question a reader asks about it is a distribution rather than a list
+// (docs/telemetry.md § Hot seams are metrics).
 //
 // A `key:after` intercept rather than a layer: it runs once per key after dispatch has finished, so
 // it can say what answered and why without claiming the key. The hyphenated `key-after` is not a
 // hook name and registers nothing, silently. Registered without `release`, which is how the engine
 // spells "presses only" — with it, every keystroke would log twice.
+//
+// One intercept for both readers rather than two. The step counter is a take-and-reset, so two
+// intercepts reading it would give whichever ran second a zero, and which ran second would be the
+// engine's registration order rather than anything either file said.
 //
 // Through an appending stream rather than `appendFileSync`, because the second thing this flag is for
 // is measuring, and a synchronous `open`, `write` and `close` on the loop that draws is a trace that
@@ -135,10 +143,28 @@ const openLog = (): WriteStream | null => {
   return log
 }
 
-function installTrace(engine: TuiKeymap): void {
-  const file = openLog()
-  if (!file) return
+function installKeyIntercepts(engine: TuiKeymap): void {
+  const file = process.env.ACORN_TUI_KEYS_TRACE ? openLog() : null
+  // When the key arrived, for the histogram below. A module-level `let` rather than a map keyed by
+  // the event: dispatch is synchronous, so the `key:after` that reads this is always the one for the
+  // `key` that wrote it.
+  let pressedAt = 0
+  onCleanup(engine.intercept('key', () => {
+    if (telemetryEnabled()) pressedAt = performance.now()
+  }))
   onCleanup(engine.intercept('key:after', (ctx) => {
+    // Taken once and shared, so the trace line and the histogram describe the same key press.
+    const steps = walkSteps.take()
+    if (telemetryEnabled()) {
+      // `reason` is the engine's seven-value enum, which is a label a person can group by. The step
+      // count is a second seam rather than a label on this one, because a count that varies per
+      // press would mint a series per press. Its unit reads as milliseconds because the emitter's
+      // fold writes one; it is renderables visited, and it is only ever collected under the
+      // developer flag that turns the counter on (./regions.ts § The step counter).
+      recordDuration('core', 'tui.key', performance.now() - pressedAt, { reason: ctx.reason })
+      if (walkSteps.counting()) recordDuration('core', 'tui.key.steps', steps, { reason: ctx.reason })
+    }
+    if (!file) return
     // The store, which is the only answer there is: the line used to carry an `agree` field beside
     // this, for the renderer's own idea of focus, and a disagreement was the commonest bug this app
     // had. There is nothing left to disagree (./regions.ts § The one owner).
@@ -154,7 +180,7 @@ function installTrace(engine: TuiKeymap): void {
       // How many renderables the walks behind this key visited. The number the phase 9 work is
       // about: a key press should cost the depth of the focus tree and not the size of the region
       // (./regions.ts § The step counter).
-      `steps=${walkSteps.take()}`,
+      `steps=${steps}`,
     ]
     file.write(`${stamp(new Date())} ${fields.join(' ')}\n`)
   }))
@@ -368,8 +394,8 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
     ],
   })
 
-  // Last, so the intercept sees a fully built engine, and only when asked for.
-  if (process.env.ACORN_TUI_KEYS_TRACE) installTrace(engine)
+  // Last, so the intercepts see a fully built engine.
+  installKeyIntercepts(engine)
 
   return engine
 }

@@ -24,6 +24,8 @@ import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
+import type { PluginTelemetry } from '../telemetry/collector'
+import type { Logger } from '../telemetry/logger'
 
 // Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.
 export type PluginEventChannel = `plugin:${string}:${string}`
@@ -416,6 +418,14 @@ export type NodePluginContext = {
   core: CoreServices
   // Tell connected clients something changed. See PluginBroadcast above for why this isn't an event bus.
   events: PluginBroadcast
+  // Both tiers, and no permission: measuring your own work is not reading anybody else's. Every verb
+  // files under this plugin, because the host closed over the id rather than taking one
+  // (../telemetry/collector.ts, docs/plugin-authoring.md § Telemetry and logging).
+  telemetry: PluginTelemetry
+  // Both tiers. A stderr line prefixed with this plugin's id, exactly as `console.error` gave you,
+  // and a log record with the owner bound when telemetry is on. That attribution is the whole reason
+  // this member came back after being removed on 2026-08-27 (docs/plugins.md § Activation).
+  log: Logger
 }
 
 // What a plugin compiled into this binary is handed: everything above, plus the six seams that cannot

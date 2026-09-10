@@ -8,6 +8,9 @@ import type { Env } from '../bindings'
 import { readCollection } from '../collections/registry'
 import { type AppDatabase, schema } from '../db'
 import { appendSample, hourBucket } from './history'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('dashboards')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards.md § Sampling and retention for what a pass does.
@@ -90,7 +93,7 @@ export async function runSamplePass(
         unavailable = `${query.pluginId} unavailable`
         // One line for the author. The run row gets the short form, because it is a settings list,
         // not a log.
-        console.warn(`[dashboards] ${panel.id} skipped: ${query.pluginId}:${query.collectionId}:`, error)
+        log.warn(`${panel.id} skipped: ${query.pluginId}:${query.collectionId}: ${describeError(error).message}`)
         break
       }
     }

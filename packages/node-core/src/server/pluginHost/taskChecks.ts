@@ -3,6 +3,9 @@
 // callback.
 import type { TaskArchiveConcern } from '@acorn/protocol/terminal.ts'
 import type { TaskRef } from '../core'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('task-check')
 
 /** How long one check may take before the fan-out gives up on it (docs/plugins.md § Task checks). */
 export const CHECK_TIMEOUT_MS = 2_000
@@ -145,16 +148,16 @@ function runOne(check: RegisteredTaskCheck, task: TaskRef): Promise<WireTaskConc
     const timer = setTimeout(() => {
       if (settled) return
       controller.abort()
-      console.warn(`[task-check] ${check.pluginId}:${check.id} did not answer within ${CHECK_TIMEOUT_MS}ms`)
+      log.warn(`${check.pluginId}:${check.id} did not answer within ${CHECK_TIMEOUT_MS}ms`)
       finish(null)
     }, CHECK_TIMEOUT_MS)
     Promise.resolve(check.check(task, controller.signal)).then((answer) => {
       if (answer === null || answer === undefined) return finish(null)
       const concern = sanitizeConcern(check.pluginId, check.id, answer, check.apply !== undefined)
-      if (!concern) console.warn(`[task-check] ${check.pluginId}:${check.id} returned an unusable concern:`, answer)
+      if (!concern) log.warn(`${check.pluginId}:${check.id} returned an unusable concern`)
       finish(concern)
     }).catch((error) => {
-      console.warn(`[task-check] ${check.pluginId}:${check.id} failed:`, error)
+      log.warn(`${check.pluginId}:${check.id} failed: ${describeError(error).message}`)
       finish(null)
     })
   })
@@ -193,11 +196,11 @@ export async function applyTaskChecks(task: TaskRef, ids: readonly string[]): Pr
     })
     try {
       if (await Promise.race([check.apply(task, controller.signal).then(() => 'done' as const), deadline]) === 'timeout') {
-        console.warn(`[task-check] ${check.pluginId}:${check.id} cleanup did not finish within ${APPLY_TIMEOUT_MS}ms`)
+        log.warn(`${check.pluginId}:${check.id} cleanup did not finish within ${APPLY_TIMEOUT_MS}ms`)
         failures.push(check.pluginId)
       }
     } catch (error) {
-      console.warn(`[task-check] ${check.pluginId}:${check.id} cleanup failed:`, error)
+      log.warn(`${check.pluginId}:${check.id} cleanup failed: ${describeError(error).message}`)
       failures.push(check.pluginId)
     } finally {
       clearTimeout(timer)

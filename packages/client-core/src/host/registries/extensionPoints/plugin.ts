@@ -161,13 +161,16 @@ const declaredProvider = (entry: object): string | undefined =>
 function makeContext(name: string, record: (disposable: Disposable) => void): CompiledClientPluginContext {
   // Structural rather than `Registry<T>`, because the pane registry accepts a wider entry than it
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
-  const own = <T extends { id: string }>(registry: { register: (entry: T) => Disposable }): ClientContributionPoint<T> => ({
+  // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
+  // contributed an entry and the seams that build a telemetry record can name it
+  // (kit/lib/registry.ts § the owner side-map).
+  const own = <T extends { id: string }>(registry: { register: (entry: T, owner?: string) => Disposable }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)
       if (provider !== undefined && provider !== name) {
         throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
       }
-      record(registry.register(entry))
+      record(registry.register(entry, name))
     },
   })
   const sources = own(sourceRegistry)
@@ -176,12 +179,12 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // the reason a content link's `providerId` is stamped rather than read: a command that could name
   // its owner could name another contributor's group as its parent (../commands/graph.ts).
   const ownCommand: ClientContributionPoint<ContributedCommand> = {
-    register: (entry) => record(commandRegistry.register(stampCommandOwner(entry, name))),
+    register: (entry) => record(commandRegistry.register(stampCommandOwner(entry, name), name)),
   }
   const ownIntegrationFlow: ClientContributionPoint<IntegrationFlowContribution> = {
     register: (entry) => {
       if (entry.id !== name) throw new Error(`Plugin '${name}' registered integration flow '${entry.id}'`)
-      record(integrationFlowRegistry.register(entry))
+      record(integrationFlowRegistry.register(entry, name))
     },
   }
   // Not `own`. The entry arrives without the two fields the host binds, so the provider check has
@@ -196,17 +199,17 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
         id: qualifiedExtensionPointId(name, entry.id),
         ownerId: name,
         max: entry.max ?? 1,
-      }))
+      }, name))
     },
   }
   const ownExtension: ClientContributionPoint<CompiledExtension> = {
     register: (entry) => {
-      record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }))
+      record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }, name))
     },
   }
   const ownCollection: ClientContributionPoint<CollectionRegistration> = {
     register: (entry) => {
-      record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }))
+      record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }, name))
     },
   }
   return {

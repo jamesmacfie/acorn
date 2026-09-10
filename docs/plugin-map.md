@@ -73,12 +73,13 @@ Your plugin exports a `NodePlugin`: a `name`, an `init`, and optionally `ready`,
 | `storage` | `open()` returns your own SQLite handle. Absent unless you declared migrations |
 | `core` | Core services: see the table below |
 | `events` | Tell connected clients something changed. Read the events section before you assume this is a bus |
+| `telemetry` | Spans, events, counts, gauges and errors about your own work, with your id bound by the host. No permission ([telemetry.md](./telemetry.md)) |
+| `log` | A stderr line prefixed with your id, and a log record with the owner bound when telemetry is on |
 
 Two node contributions have no `ctx` member, on purpose: **node actions** (which of your chrome actions
 a person may put on a timer, plus its risk tier) and **managed-agent harnesses**. Both are declared in
 the manifest — a command whose verb is `runNodeAction`, and `contributions.harnesses` — and the host
-registers them on your behalf. Use `console` for logging, prefixed with your plugin id; there is no
-`ctx.log`.
+registers them on your behalf.
 
 `ctx.core` is how you consume core capability without deep-importing whichever core module holds the
 helper:
@@ -95,6 +96,7 @@ helper:
 | `prefs` | One `(userId, key)` row of core's preferences table |
 | `identity` | Which owner this node is bound to. Read-only |
 | `projects` | Project identity, scope resolution, importer writes, mapped folders |
+| `telemetry` | Subscribe to every record this node collects, from every owner. Behind the `telemetry` token, and the trust prompt draws it high ([security.md](./security.md) § Telemetry sinks) |
 
 Two things to know about `core`. What it hands back for a core entity is a projection, never the
 database row: `projects` answers with `ProjectRef`, `tasks` answers with `TaskRef` carrying six fields.
@@ -129,6 +131,14 @@ Your plugin exports a `ClientPlugin`: a `name`, an `init`, and optionally `activ
 | `contentLinks` | A recogniser that turns an external URL into an in-app destination |
 | `contribute` | Register into a registry another PLUGIN published, with the same ownership check |
 | `capabilities` | `provide`, `get`, `require`, `ids`, the same four verbs as the node's. Not the platform gate — that is `requires` on a contribution |
+
+There is no `telemetry` or `log` member here, unlike the node's context: a client context is
+contribution points and nothing else. Import `telemetryFor('<your id>')` and
+`createLogger(tag, '<your id>')` from `@acorn/plugin-api/client` instead. Same six verbs as the
+node's `ctx.telemetry`, same records, and the id is an argument because `init` is the only place
+your own name is in hand ([telemetry.md](./telemetry.md) § Writing telemetry from a plugin). A
+sandboxed frame gets neither and posts over the bridge instead
+([plugin-authoring.md](./plugin-authoring.md) § Telemetry from a frame).
 
 Two rules the host enforces here. A contribution that names a `providerId` must name your own plugin,
 so you cannot register under a stranger's provider by typo. And `register` returns nothing, because the

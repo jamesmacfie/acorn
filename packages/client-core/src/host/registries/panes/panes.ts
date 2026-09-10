@@ -1,4 +1,4 @@
-import { createComponent, lazy, Suspense, type Component } from 'solid-js'
+import { createComponent, lazy, onMount, Suspense, type Component, type JSX } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
@@ -6,7 +6,11 @@ import { suppliedLayout } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { paneModel } from './paneModels'
+import { startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('pane')
 
 export type PaneId = string
 
@@ -88,9 +92,22 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 // than no badge. Making it reactive means either a QueryObserver subscription per pane per render
 // inside the host's `<For>`, or each pane publishing a signal it does not currently have.
 
+/**
+ * Ends a `pane.region` span once its region has actually drawn something.
+ *
+ * Inside the region's own `Suspense` rather than around it, which is what makes the span measure to
+ * content: Solid holds effects created under a suspended boundary until it resolves, so a region
+ * waiting on a `lazy()` import or a resource ends its span when the reader can see it, not when the
+ * host asked for it.
+ */
+function MeasuredRegion(props: { span: SpanHandle; children: JSX.Element }): JSX.Element {
+  onMount(() => props.span.end())
+  return props.children
+}
+
 /** Turn a declared layout into the component every consumer of this registry already expects. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- as PaneRegistration above
-function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
+function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneContribution {
   if (!isPaneLayout(entry.layout)) throw new Error(`pane '${entry.id}' names an unknown layout '${entry.layout}'`)
   const problem = regionProblem(entry.layout, Object.keys(entry.regions))
   // At registration rather than at render: a pane missing a region is a programming error, and finding
@@ -112,22 +129,36 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
       const regions: Record<string, Region> = {}
       // A getter, so the model is looked up when a region renders rather than when the pane is built,
       // and a pane that switches task hands its regions the new task's model without remounting them.
-      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task)) : undefined)
+      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task), owner ?? 'core') : undefined)
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
         // renders as an empty string. On the DOM that is an empty text node nobody sees; a cell host
         // refuses it, because a run of text there must have a `text` parent, and the mount fails
         // (docs/tui.md). One boundary per region rather than one per pane, so a
         // slow region does not blank the ones beside it.
-        regions[name] = () => createComponent(Suspense, {
-          fallback: null,
-          get children() {
-            return createComponent(Region, {
-              get task() { return props.task },
-              get model() { return model() },
-            })
-          },
-        })
+        regions[name] = () => {
+          // Opened here, where the host asks for the region, and ended when the region's content
+          // mounts. A region that suspends is the case worth measuring: everything between those two
+          // moments is a rectangle the reader is looking at with nothing in it.
+          const span = startSpan(owner ?? 'core', {
+            name: 'pane.region',
+            attrs: { seam: 'pane.region', 'pane.id': entry.id, 'pane.region': name },
+          })
+          return createComponent(Suspense, {
+            fallback: null,
+            get children() {
+              return createComponent(MeasuredRegion, {
+                span,
+                get children() {
+                  return createComponent(Region, {
+                    get task() { return props.task },
+                    get model() { return model() },
+                  })
+                },
+              })
+            },
+          })
+        }
       }
       // The layout is a `lazy` too, and a pending one renders as an empty string for the same
       // reason a region does, so it gets the same boundary.
@@ -146,8 +177,8 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
 
 /** The registry, plus the one thing it does beyond holding entries: it draws a declared layout. */
 class PaneRegistry extends Registry<PaneContribution> {
-  override register(entry: PaneRegistration): Disposable {
-    return super.register('regions' in entry ? drawLayout(entry) : entry)
+  override register(entry: PaneRegistration, owner?: string): Disposable {
+    return super.register('regions' in entry ? drawLayout(entry, owner) : entry, owner)
   }
 }
 
@@ -174,7 +205,7 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
     } catch (error) {
       // A pane that throws on the way to warming a cache must not take the rail's pointer handler
       // with it. Nothing is missing afterwards; the pane fetches on mount as it always did.
-      console.error(`pane '${pane.id}' failed to prefetch`, error)
+      log.error(`'${pane.id}' failed to prefetch`, error, { 'pane.id': pane.id })
     }
   }
 }

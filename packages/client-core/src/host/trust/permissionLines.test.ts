@@ -45,6 +45,17 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('names what a telemetry sink can see, because it is every owner and not just this plugin', () => {
+    // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
+    // no token, because a plugin measuring its own work reads nobody else's
+    // (docs/security.md § Telemetry sinks).
+    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [] } }))
+    expect(texts(lines)).toEqual([
+      'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',
+    ])
+    expect(lines.every((line) => line.high)).toBe(true)
+  })
+
   it('names the executable configuration carried by the config grant', () => {
     expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [] } })))).toEqual([
       'Read every project’s build, dev and database scripts',

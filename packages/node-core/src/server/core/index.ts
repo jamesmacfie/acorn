@@ -10,6 +10,7 @@ import * as proc from './proc'
 import { SecretService } from './secrets'
 import { createTaskService, type TaskService } from './tasks'
 import { createProjectService, type ProjectService } from './projectRefs'
+import { createTelemetryService, type TelemetryService } from './telemetry'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -70,6 +71,9 @@ export type CoreServices = {
   // Narrow project identity for plugins: scope resolution, importer writes, and all mapped project
   // folders. The returned ProjectRef never exposes core config or the core SQLite handle.
   projects: ProjectService
+  // Read this node's telemetry stream. The only read-everything facet on this object, which is why
+  // its token draws high in the trust prompt (./telemetry.ts, docs/telemetry.md § Writing a sink).
+  telemetry: TelemetryService
 }
 
 export function createCoreServices(options: {
@@ -92,6 +96,7 @@ export function createCoreServices(options: {
     prefs: createPrefService(options.db),
     identity: createIdentityService(options.activeIdentity),
     projects: createProjectService(options.db),
+    telemetry: createTelemetryService(),
   }
 }
 
@@ -107,6 +112,7 @@ export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '.
 export type { TaskRef } from '../worktrees/taskWorktree'
 export type { ContextService } from './context'
 export type { PrefService } from './prefs'
+export type { TelemetryService, TelemetrySink } from './telemetry'
 export type { GenerateTextRequest, ModelService } from './models'
 export { SecretUnavailableError, redact } from './secrets'
 export type { ProcResult, ProcSpec } from './proc'

@@ -15,6 +15,7 @@ const SecuritySettings = lazy(() => import('@acorn/client-core/features/settings
 const SchedulesSettings = lazy(() => import('@acorn/client-core/features/settings/SchedulesSettings.tsx'))
 const RunsSettings = lazy(() => import('@acorn/client-core/features/settings/RunsSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/features/settings/StyleGallery.tsx'))
+const TelemetrySettings = lazy(() => import('@acorn/client-core/features/settings/TelemetrySettings.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
   {
@@ -54,6 +55,9 @@ export const settingsPageContributions: SettingsContribution[] = [
   // plugin's, because the list is merged from every plugin that declared a run source and no one of
   // them owns it (@acorn/protocol/runs.ts).
   { id: 'runs', label: 'Runs', group: 'general', order: 96, component: () => <RunsSettings /> },
+  // Beside Security, and the same argument: both answer "what does this machine disclose", and
+  // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
+  { id: 'telemetry', label: 'Telemetry', group: 'general', order: 92, component: () => <TelemetrySettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]

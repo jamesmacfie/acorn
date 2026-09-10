@@ -37,6 +37,9 @@ import { readJson, writeJson } from '../../infra/node/apiClient'
 import { wsOnStatus } from '../../infra/node/wsClient'
 import { onPluginPush } from '../plugins/pluginChannel'
 import { ownsTaskOrigin } from './ownership'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugin-chrome')
 
 // Reads a plugin's descriptor routes (badges, rail items, collections, agent context). The manifest's
 // routes were confined to `/v2/p/<id>/` at parse time, but this arrives as a roster row, so the path is
@@ -164,8 +167,11 @@ const opt = (value: unknown): boolean => value === undefined || str(value)
 const stringRecord = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value)
   && Object.values(value).every((entry) => typeof entry === 'string')
 
+// The row goes to the console and never into the record: it is a plugin's own data, and an
+// attribute is a scalar (docs/telemetry.md § The attribute vocabulary). The logger drops a
+// non-scalar second argument for exactly that reason, and the devtools console still expands it.
 const drop = (pluginId: string, what: string, row: unknown): void =>
-  console.warn(`[plugin-chrome] ${pluginId} returned an unusable ${what}:`, row)
+  log.warn(`${pluginId} returned an unusable ${what}`, row, { 'plugin.id': pluginId })
 
 const railLink = (value: unknown): NonNullable<NonNullable<PluginRailItem['task']>['link']> | undefined => {
   if (!value || typeof value !== 'object') return undefined

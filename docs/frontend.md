@@ -371,6 +371,39 @@ once a chunk with that name is built and no longer fetched at startup, the check
 is deleted, so a fix cannot quietly regress a month later. **Both lists are empty**, and a test in each
 package asserts that they are: a name added back has to argue for itself.
 
+## Telemetry
+
+The renderer collects the same five record kinds the node does and posts them to the node in
+batches. [telemetry.md](./telemetry.md) owns the model, the switch and the seam list; what belongs
+here is the two things the renderer had to invent, because neither has an equivalent on the node.
+
+**An interaction is the trace.** There is no async context in a browser, so a command or a page
+change writes the open span into a module variable
+(`packages/client-core/src/infra/telemetry/emitter.ts`) and `apiClient.send()` reads it. One click
+is one trace across both processes: the command span, the `api.request` span under it, and the
+node's `http.request` span under that. Work that continues after the span ends gets no parent, which
+is the price of not having an async context and is smaller than the price of polyfilling one.
+
+**A page change is a signal write.** Routes mount a no-op component and `App.tsx` draws from
+`selectedSource()` and `activeTaskId()`, so there is no navigation event to time. `nav.change` starts
+in `features/tasks/pageChange.ts` where the signal is written and ends on the second
+`requestAnimationFrame`, the same pattern the boot marks use. Two writes in one change collapse into
+one span, because opening a task writes both signals and two spans would report one click as two
+navigations. A pane region that is still fetching at that frame has its own span, `pane.region`,
+which runs from the host asking for the region to the child's `onMount`, so a suspended region is
+measured to content rather than to the empty rectangle.
+
+**An owner without a field for one.** Eight contribution types carry no plugin id, so `Registry` in
+`kit/lib/registry.ts` keeps one in a side-map and `ownerOf(id)` answers for the seams. The three
+registration passes that know the owner fill it: `host/chrome/chromeRegister.ts`,
+`host/frames/register.ts` and `makeContext` in `host/registries/extensionPoints/plugin.ts`. Core
+registers without one and reads as `core`.
+
+`kit/` may import `kit/` and the highlighter and nothing else, so the error boundary in there cannot
+reach the emitter. `kit/lib/contributionErrors.ts` is the seam it reports through, and the client's
+telemetry start-up installs the handler, the same trade `host/frames/broker.ts` makes with its
+services.
+
 ## Restore and persistence
 
 Launch restore proceeds in this order: fleet membership and Node records, active Node, selection and

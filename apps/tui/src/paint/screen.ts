@@ -30,6 +30,11 @@ import { paint } from './paint'
 /** Where the frame goes. */
 export type Sink = (text: string) => void
 
+/** How long the three halves of one frame took, in milliseconds. Reported rather than recorded here,
+ *  because this module writes cells and knows nothing about telemetry: the renderer turns these into
+ *  the `tui.frame` histogram (../renderer.ts, docs/tui.md § What the terminal client reports). */
+export type FramePhases = { layoutMs: number; paintMs: number; flushMs: number }
+
 export type Screen = {
   /** The node to mount the app under. Sized to the terminal, so the tree has something to be 100% of. */
   root: Renderable
@@ -60,6 +65,10 @@ export function openScreen(options: {
   write?: Sink
   /** A root of the caller's own, for a test that built one by hand. */
   root?: Renderable
+  /** Told how long each half of every frame took. Four `performance.now()` reads on the paint path,
+   *  about 160 ns against a 5 ms frame budget, which is why it is unconditional rather than gated:
+   *  a gate here would be a branch of its own and a second code path to keep right. */
+  onPhases?: (phases: FramePhases) => void
 }): Screen {
   let cols = Math.max(0, Math.trunc(options.cols))
   let rows = Math.max(0, Math.trunc(options.rows))
@@ -79,12 +88,18 @@ export function openScreen(options: {
   sizeRoot()
 
   const frame = (): Flush => {
+    const t0 = performance.now()
     clearBuffer(back)
     layoutTree(root, cols, rows)
+    const t1 = performance.now()
     paint(root, back)
+    const t2 = performance.now()
     const written = flush(front, back, erase)
     erase = false
     if (written.text !== '') write(written.text)
+    // After the write, because the bytes reaching the terminal are the flush as a person means it.
+    const t3 = performance.now()
+    options.onPhases?.({ layoutMs: t1 - t0, paintMs: t2 - t1, flushMs: t3 - t2 })
     // Swap rather than copy: the frame just written becomes what is on screen, and the buffer it
     // replaces is the one the next frame paints into after it is cleared.
     const drawn = back

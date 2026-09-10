@@ -26,7 +26,7 @@ export function TaskSlotHost(props: { slot: TaskSlotId; taskId: string }) {
   return (
     <For each={contributions()}>
       {(contribution) => (
-        <ContributionBoundary contributionId={contribution.id} quiet>
+        <ContributionBoundary contributionId={contribution.id} owner={uiSlotRegistry.ownerOf(contribution.id)} quiet>
           <Dynamic component={contribution.component} taskId={props.taskId} />
         </ContributionBoundary>
       )}
@@ -41,7 +41,7 @@ export function SlotHost(props: { slot: UiSlotId; context: UiSlotContext }) {
   return (
     <For each={contributions()}>
       {(contribution) => (
-        <ContributionBoundary contributionId={contribution.id} quiet={props.slot === 'topbar.right'}>
+        <ContributionBoundary contributionId={contribution.id} owner={uiSlotRegistry.ownerOf(contribution.id)} quiet={props.slot === 'topbar.right'}>
           <Dynamic component={contribution.component} context={props.context} />
         </ContributionBoundary>
       )}

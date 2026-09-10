@@ -30,6 +30,9 @@ import { setKeymap } from '../../kit/keys/keymapHost'
 import { intentKeys, toKeymapKey } from '../../kit/keys/keymap'
 import type { Intent } from '../../kit/keys/intents'
 import { moveRegion, movePane } from './focusRegions'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('commands')
 
 // The engine and the intent binder live in `host.ts`, which the kit may import; this module reads the
 // command and keybinding registries and so may not be imported from `ui/`.
@@ -128,7 +131,7 @@ export function installKeymap(root: HTMLElement, context: ScopeContext): void {
       desc: commandTitle(command),
       group: command.category,
       enabled: () => commandAvailable(command),
-      run: () => { void executeCommand(command.id).catch((error) => console.error(`[command:${command.id}]`, error)) },
+      run: () => { void executeCommand(command.id).catch((error) => log.error(command.id, error, { 'command.id': command.id })) },
     }))
     const bindings = context.bindings().flatMap((binding): Binding<HTMLElement, HtmlKeymapEvent>[] => {
       const key = binding.chord && toKeymapKey(binding.chord)

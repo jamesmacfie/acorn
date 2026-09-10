@@ -6,6 +6,9 @@ import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, Plu
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('plugins')
 
 // This device's decisions about which plugin bundles it will run. See docs/plugins.md and
 // docs/security.md, "Third-party plugin bundles", for the key, the storage, and what "gained" means
@@ -261,7 +264,7 @@ export class PluginTrustStore {
       // An unrecognised shape says nothing about what it held. Moved aside rather than left for the
       // next write to overwrite. This is the only copy of every decision the owner has made, and "we
       // could not read it" must not become "it is gone".
-      console.warn('[plugins] plugin-trust.json is unreadable; every plugin will ask again')
+      log.warn('plugin-trust.json is unreadable; every plugin will ask again')
       this.quarantine()
       return
     }
@@ -273,7 +276,7 @@ export class PluginTrustStore {
       else dropped++
     }
     if (dropped) {
-      console.warn(`[plugins] ${dropped} plugin trust record(s) could not be read; those bundles will ask again`)
+      log.warn(`${dropped} plugin trust record(s) could not be read; those bundles will ask again`, { dropped })
     }
     // Same per-row stance, same direction of failure. A grant this code cannot read does not exist,
     // so the plugin it covered goes back to prompting per hash.
@@ -290,10 +293,10 @@ export class PluginTrustStore {
     const path = join(this.userDataDir, TRUST_FILE)
     try {
       renameSync(path, `${path}.corrupt`)
-      console.warn(`[plugins] the previous file was kept as ${TRUST_FILE}.corrupt`)
+      log.warn(`the previous file was kept as ${TRUST_FILE}.corrupt`)
     } catch (error) {
       // Best effort. A read-only or vanished directory is not a reason to fail the boot.
-      console.warn('[plugins] could not set the unreadable trust file aside:', error)
+      log.warn(`could not set the unreadable trust file aside: ${describeError(error).message}`)
     }
   }
 

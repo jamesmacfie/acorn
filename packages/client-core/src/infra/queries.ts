@@ -9,7 +9,7 @@ import { readJson } from './node/apiClient'
 import { activeNodeId } from './node/activeNode'
 import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
 import { setPref } from '../features/settings/savePref'
-import { integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type { Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
@@ -96,6 +96,20 @@ export const prefsOptions = (enabled: boolean) => ({
   // preferences live outside that cache, so project them at read time as well or a just-saved shortcut
   // can disappear from every consumer until the node-backed query refetches.
   select: (prefs: Record<string, string>): Record<string, string> => mergePrefs(prefs),
+})
+
+// What Settings → Telemetry draws under the switch: counters from the node's collector, per owner
+// and kind, plus who is subscribed (docs/telemetry.md § What the page shows).
+//
+// It refetches every five seconds while the page is open, which is the collector's own flush
+// window. Counts that move while you watch are the evidence the switch is doing something, and a
+// page that needed a reload to show that would be a page nobody believes.
+export const telemetrySummaryKey = ['telemetry-summary'] as const
+export const telemetrySummaryOptions = (enabled: boolean) => ({
+  queryKey: telemetrySummaryKey,
+  enabled,
+  refetchInterval: 5_000,
+  queryFn: async ({ signal }: QueryContext): Promise<TelemetrySummary> => readJson<TelemetrySummary>(coreTelemetrySummaryRoute, { signal }),
 })
 
 // Connected integrations (gates the Sources rail + settings list). Includes the synthesized GitHub

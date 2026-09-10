@@ -16,6 +16,8 @@ import type {
   PluginBridgeAppearance,
   PluginBridgeMessage,
   PluginBridgeReply,
+  PluginBridgeTelemetryAttrs,
+  PluginBridgeTelemetryRecord,
   PluginFrameContext,
   PluginWebviewBlocked,
   PluginWebviewNavigated,
@@ -77,6 +79,11 @@ export type AcornBridgeApi = {
     options?: { signal?: AbortSignal },
   ): Promise<T>
 }
+
+/** What a telemetry attribute may be: a scalar, and nothing else. An object here would be a place
+ *  for a request body to hide, and no sink's column model can index one
+ *  (docs/telemetry.md § The attribute vocabulary). */
+export type PluginTelemetryAttrs = PluginBridgeTelemetryAttrs
 
 /** What `getBytes` resolves to. `filename` is whatever the route's `Content-Disposition` named, or null
  * when it named nothing; a caller that needs a name owns the fallback. */
@@ -156,6 +163,37 @@ export type AcornBridge = {
   keys: {
     /** Replace the active claim set with a subset of this surface's manifest declaration. */
     claim(chords: readonly string[]): void
+  }
+  /**
+   * Say what your frame is doing, in the six verbs the node half's `ctx.telemetry` has
+   * (docs/plugin-authoring.md § Telemetry from a frame).
+   *
+   * Every one is fire and forget: nothing here returns a promise, nothing throws, and nothing tells
+   * you whether the owner has collection on. That is the one rule telemetry has, that it never
+   * fails the thing it describes. The owner on each record is stamped by the host from this frame's
+   * binding, so you cannot file one under another plugin's name and do not pass an id.
+   *
+   * Each call is one bridge message and counts against the port's budget of 1,000 messages per 10
+   * seconds, so emit per action rather than per frame of a render loop.
+   */
+  telemetry: {
+    event(name: string, attrs?: PluginTelemetryAttrs): void
+    count(name: string, value?: number, attrs?: PluginTelemetryAttrs): void
+    gauge(name: string, value: number, attrs?: PluginTelemetryAttrs): void
+    error(error: { name: string; message?: string; attrs?: PluginTelemetryAttrs }): void
+    /** Time one call and hand back its own result untouched. Promise-aware, and timed to
+     * settlement. The span reaches the host finished, with the duration measured in here. */
+    measure<T>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T
+    /** For work whose start and end do not fit one closure. `end` is idempotent. */
+    startSpan(name: string, attrs?: PluginTelemetryAttrs): { end(status?: 'ok' | 'error'): void }
+  }
+  /** A log line with your plugin id already on it, the frame's half of the node's `ctx.log`. It
+   * goes to this frame's own console as well, which is the one a plugin author has open. */
+  log: {
+    debug(message: string, attrs?: PluginTelemetryAttrs): void
+    info(message: string, attrs?: PluginTelemetryAttrs): void
+    warn(message: string, attrs?: PluginTelemetryAttrs): void
+    error(message: string, attrs?: PluginTelemetryAttrs): void
   }
   /** Called on every appearance change, and once on connect. The tokens are already applied to `:root`
    * by the time this fires; the callback is for anything a plugin draws itself, such as a canvas or a
@@ -330,6 +368,39 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const call = <T>(method: string, path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> =>
       request<T>({ kind: 'api', method, path, ...(body === undefined ? {} : { body }) }, options?.signal)
 
+    // No id, no reply, no throw. `postMessage` can still fail on a closed port, and a plugin that
+    // measured itself into a crash would be the one bug telemetry is not allowed to have.
+    const emit = (record: PluginBridgeTelemetryRecord): void => {
+      try {
+        port.postMessage({ kind: 'telemetry', record })
+      } catch {
+        // The port is gone, which means the surface is gone. There is nobody to tell.
+      }
+    }
+
+    const span = (name: string, attrs?: PluginTelemetryAttrs) => {
+      const from = Date.now()
+      let ended = false
+      return {
+        end: (status: 'ok' | 'error' = 'ok') => {
+          if (ended) return
+          ended = true
+          emit({ type: 'span', name, durationMs: Date.now() - from, status, ...(attrs ? { attrs } : {}) })
+        },
+      }
+    }
+
+    // Printed as well as sent, for the reason the node's logger prints: collection is off unless
+    // the owner turned it on, and a log verb that is silent by default is a verb nobody reaches for
+    // twice. This frame's console is the one its author has open.
+    const line = (level: 'debug' | 'info' | 'warn' | 'error', message: string, attrs?: PluginTelemetryAttrs): void => {
+      const text = attrs ? `${message} ${Object.entries(attrs).map(([key, value]) => `${key}=${String(value)}`).join(' ')}` : message
+      if (level === 'error') console.error(text)
+      else if (level === 'warn') console.warn(text)
+      else console.log(text)
+      emit({ type: 'log', level, message, ...(attrs ? { attrs } : {}) })
+    }
+
     const onEvent = (channel: string, listener: (payload: unknown) => void): (() => void) => {
       const set = listeners.get(channel) ?? new Set()
       set.add(listener)
@@ -398,6 +469,34 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         reload: async () => void (await request({ kind: 'webview', op: 'reload' })),
         onNavigated: (listener) => onEvent('webview:navigated', listener as (payload: unknown) => void),
         onBlocked: (listener) => onEvent('webview:blocked', listener as (payload: unknown) => void),
+      },
+      telemetry: {
+        event: (name, attrs) => emit({ type: 'event', name, ...(attrs ? { attrs } : {}) }),
+        count: (name, value = 1, attrs) => emit({ type: 'count', name, value, ...(attrs ? { attrs } : {}) }),
+        gauge: (name, value, attrs) => emit({ type: 'gauge', name, value, ...(attrs ? { attrs } : {}) }),
+        error: (error) => emit({ type: 'error', name: error.name, ...(error.message === undefined ? {} : { message: error.message }), ...(error.attrs ? { attrs: error.attrs } : {}) }),
+        measure: <T,>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T => {
+          const timing = span(name, attrs)
+          let result: T
+          try {
+            result = run()
+          } catch (error) {
+            timing.end('error')
+            throw error
+          }
+          // `finally` and not `then`, so a rejected promise is still timed, and the value is handed
+          // back untouched either way.
+          if (result instanceof Promise) return result.finally(() => timing.end()) as T
+          timing.end()
+          return result
+        },
+        startSpan: span,
+      },
+      log: {
+        debug: (message, attrs) => line('debug', message, attrs),
+        info: (message, attrs) => line('info', message, attrs),
+        warn: (message, attrs) => line('warn', message, attrs),
+        error: (message, attrs) => line('error', message, attrs),
       },
       keys: {
         claim(chords) {

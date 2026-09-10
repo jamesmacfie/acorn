@@ -152,6 +152,18 @@ returned in API responses, client persistence, logs, events, or error envelopes.
 read only by the GitHub plugin's credential accessor. The HTTP client is device-principal-only and
 does not expose encrypted request material to internal callers.
 
+**A Sentry DSN is a credential, and it is the only one the exporter asks for.** `sentry-telemetry`
+stores it through the connection seam, so it is encrypted at rest with `SESSION_ENC_KEY`, submitted
+write-only, and lent back to the plugin for the length of one flush through
+`ctx.providers.withConnection`. The manifest declares `secrets: false`, which is Rollbar's and
+Linear's posture and is accurate: the plugin never calls `ctx.core.secrets`, because core resolves
+the row inside its own secret scope. The DSN authenticates ingestion into one project and can read
+nothing, which is why an organisation token is not asked for: release health and source-map upload
+would need one, and both are out of scope
+([integrations.md](./integrations.md) § Sentry). The exporter puts the DSN in the request's
+`X-Sentry-Auth` header and in the envelope's own header, and nowhere in a payload; the connection's
+label is host and project, never the key.
+
 Child environments are built by the process broker. They do not inherit `SESSION_ENC_KEY`, GitHub
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.
@@ -782,6 +794,31 @@ prompt. Keep identity, executable config and writes split (`projects:read` / `pr
 same grant as a plugin that only wants to label a row, and neither silently gains the scripts acorn
 will execute.
 
+##### Telemetry sinks
+
+`ctx.telemetry` and `ctx.log` are on every node context with no grant at all, and that is deliberate:
+a plugin measuring its own work reads nobody else's, the host binds the owner rather than taking one,
+and the records go nowhere unless the owner turned telemetry on and something subscribed.
+
+Reading the stream is the opposite, and it is the one facet on `ctx.core` that returns other
+packages' data by design. A sink registered through `ctx.core.telemetry.onBatch` sees every record
+from every owner: core's request timings and route patterns, another plugin's schedule and hook
+runs, and the log lines of packages the owner installed for a completely different reason. So it is
+its own `telemetry` token, and the trust prompt draws it **high**, with a sentence that says whose
+records they are rather than "read telemetry".
+
+Three things bound what a sink can learn ([telemetry.md](./telemetry.md) § What never leaves the
+machine). Attributes are allowlisted scalars chosen at each seam, so there is no field a body, a
+diff or a query could arrive in. Names are patterns and ids ride as attributes, so a route reads as
+`/v2/core/tasks/:id`. And every message passes a scrubber that strips control characters, collapses
+the owner's home directory and the data root, and replaces credential-shaped runs. A boundary that
+already withholds a message keeps withholding it: `onServerError` sends a name and a code because
+drivers embed bound values in `err.message`, and its record carries the same and no more.
+
+What this is not is a barrier. It is rung 1, like every facet above: a loaded bundle shares the
+process and can read `core.sqlite` whatever its manifest says. The token makes the ask visible and
+reviewable, which is what rung 1 buys.
+
 #### Rung 2 — Out of process (the future hard boundary)
 
 The acorn-native design already exists as a pattern: the MCP server is a stdio child that calls
@@ -1007,6 +1044,7 @@ here as the checklist reviewers should hold PRs against:
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
 | Project config scripts (`setup_script`, `dev_script`, …) | Readable through `core.projects.config()` and writable via the core config route; the Node executes them | Separate `projects:config` read grant; config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Rung 1 (node facet); phase 3 (frames); rung 2 (node half) |
 | Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
+| Every other owner's telemetry | A sink sees core's request timings and every plugin's spans, logs and error names | Its own `telemetry` token, drawn high; allowlisted scalar attributes; route patterns rather than URLs; a scrubber on every message; off unless the owner turned it on | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
 | Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
 | A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |

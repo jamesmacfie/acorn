@@ -4,6 +4,8 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { isHandlerRef, sanitizeProps } from '@acorn/protocol/tree/props.ts'
+import { measure } from '../../infra/telemetry/emitter'
+import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
 // The half of the remote tree host that is arithmetic rather than drawing: the store, the pre-flight
@@ -44,9 +46,10 @@ export function createTreeState(input: TreeStateInput) {
   // without subscribing to anything. It is also how depth is bounded without walking the store.
   const parents = new Map<string, string | null>()
 
+  const log = createLogger('plugins', input.pluginId)
   const refuse = (reason: string): void => {
     input.onRefused?.(reason)
-    console.warn(`[plugins] ${input.pluginId}: ${reason}`)
+    log.warn(`${input.pluginId}: ${reason}`)
   }
 
   /**
@@ -222,7 +225,12 @@ export function createTreeState(input: TreeStateInput) {
     handle = 0
     const ops = queued
     queued = []
-    if (ops.length) apply(ops)
+    if (!ops.length) return
+    // A histogram, owned by the plugin whose tree this is. One coalesced batch per frame while a
+    // remote pane is animating is well past the ten-a-second line a span has to stay under
+    // (docs/telemetry.md § Hot seams are metrics), and what the number answers is "whose tree is
+    // making the shell drop frames".
+    measure(input.pluginId, 'tree.apply', () => apply(ops))
   }
   const detachBatch = input.transport.onBatch((ops) => {
     queued.push(...ops)

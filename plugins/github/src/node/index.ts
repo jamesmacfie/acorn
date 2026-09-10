@@ -51,7 +51,7 @@ export const githubPlugin = (): NodePlugin => {
       // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Runs
       // before any route registers, matching where the composition root used to call it.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)
-      if (removedPulls) console.log(`[github] pruned ${removedPulls} orphaned mirrored pull request(s)`)
+      if (removedPulls) ctx.log.info(`pruned ${removedPulls} orphaned mirrored pull requests`)
 
       // Registers the provider in both the connection and integration registries. Required:
       // connectProvider looks github up in the connection registry, so without it the device-flow

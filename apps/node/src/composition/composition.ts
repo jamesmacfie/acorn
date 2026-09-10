@@ -12,7 +12,12 @@ import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/node/index.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
 import { nodePlugins, type NodePluginDeps } from './plugins'
+
+const pluginLog = createLogger('plugins')
+const storageLog = createLogger('storage')
+const reconcileLog = createLogger('node:reconcile')
 
 // Both Node hosts assemble the same graph here (docs/node-distribution.md § Runtime). The desktop
 // app supervises it rather than owning a second implementation. This lives in apps/node to keep the
@@ -99,15 +104,15 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
     const bundled = reconcileBundledPlugins(dataDir, bundledRoot)
     preserved.push(...bundled.preserved)
     if (bundled.installed.length || bundled.updated.length) {
-      console.log(`[plugins] bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
+      pluginLog.info(`bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
     }
     // Tombstoned outside the package directory so a later app update cannot restore it
     // (docs/plugins.md § Loaded plugins).
     if (bundled.removed.length) {
-      console.log(`[plugins] bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
+      pluginLog.info(`bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
     }
     for (const failure of bundled.failures) {
-      console.error(`[plugins] bundled ${failure.id} was not reconciled: ${failure.reason}`)
+      pluginLog.error(`bundled ${failure.id} was not reconciled: ${failure.reason}`)
     }
   }
 
@@ -116,11 +121,11 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
   // row is what freezes the package.
   const frozen = [...new Set([...preserved, ...userManagedPluginIds(dataDir)])].sort()
   if (frozen.length === 0) return
-  console.log(`[plugins] NOT taking app updates (installed by the owner on this node): ${frozen.join(', ')}`)
+  pluginLog.info(`NOT taking app updates (installed by the owner on this node): ${frozen.join(', ')}`)
   if (development) {
     // Development only (docs/plugins.md § Loaded plugins): for a user this row is correct and
     // permanent, an owner install must never be replaced by a bundled copy.
-    console.log(`[plugins] an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
+    pluginLog.info(`an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
   }
 }
 
@@ -139,31 +144,31 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
     db,
     dataDir,
     githubMirror ? [{ plugin: 'github', counts: () => githubMirror.footprint() }] : [],
-  ).catch((error) => console.warn('[storage] footprint failed:', error))
+  ).catch((error) => storageLog.warn(`footprint failed: ${describeError(error).message}`))
 
   try {
     await reconcileTmux()
     mark('reconcile.tmux')
   } catch (error) {
-    console.warn('[node:reconcile] tmux reconcile failed:', error)
+    reconcileLog.warn(`tmux reconcile failed: ${describeError(error).message}`)
   }
   try {
     await reconcileWorktrees(db)
     mark('reconcile.worktrees')
   } catch (error) {
-    console.warn('[node:reconcile] worktree reconcile failed:', error)
+    reconcileLog.warn(`worktree reconcile failed: ${describeError(error).message}`)
   }
   try {
     await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
     mark('reconcile.workflow')
   } catch (error) {
-    console.warn('[node:reconcile] workflow reconcile failed:', error)
+    reconcileLog.warn(`workflow reconcile failed: ${describeError(error).message}`)
   }
   try {
     await capabilities.require(AGENTS_RUNTIME).reconcile()
     mark('reconcile.agents')
   } catch (error) {
-    console.warn('[node:reconcile] managed agents reconcile failed:', error)
+    reconcileLog.warn(`managed agents reconcile failed: ${describeError(error).message}`)
   }
 }
 

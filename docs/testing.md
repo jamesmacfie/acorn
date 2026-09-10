@@ -165,6 +165,16 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
   boundaries.test.ts` § plugin tests holds the shrinking budget for that);
+- four arch rules read source text rather than the import graph, because what they police is a
+  global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
+  each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
+  against a handful of strings the predicate must still recognise, so a regex that stopped matching
+  fails instead of passing vacuously. The client's rule scans `packages/client-core/src`,
+  `apps/desktop/src/client`, `apps/desktop/src/shell` and `apps/tui/src`; the node's scans
+  `packages/node-core/src`, `apps/node/src`, `packages/custody/src` and `apps/desktop/src/helper`,
+  which is where the desktop helper's lines go; the plugins' rule scans `plugins/*/src` and its
+  baseline is empty rather than shrinking, because the exceptions the other two allow are arguments
+  no plugin can make ([telemetry.md](./telemetry.md) § Logging);
 - architecture tests scan the package graph for forbidden imports, undeclared dependencies, cycles,
   shell-binding leakage, protocol impurity, non-contract plugin edges, and route files that cast a
   request body instead of parsing it;

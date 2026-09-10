@@ -20,6 +20,7 @@ lived in `docs/future/performance/` while it ran and were deleted when it closed
 | The renderer's startup budget and its denylist | [frontend.md](./frontend.md) § Startup budget |
 | The window opening before the node, and what the shell draws meanwhile | [frontend.md](./frontend.md) § Painting before the node, [shell.md](./shell.md) § The shell process |
 | Boot marks, the request line, and the git and SQLite histograms | [local-development.md](./local-development.md) § Timing a cold start |
+| The collector those histograms fold into, and the record model behind them | [telemetry.md](./telemetry.md) |
 | The node's boot order, and the login-shell probe leaving it | [node-distribution.md](./node-distribution.md) § Boot order |
 | Concurrent plugin `init`, and what a plugin may assume about its neighbours | [plugins.md](./plugins.md) § Activation |
 | Bundled-plugin trust and the idempotent cache writes | [security.md](./security.md) § Third-party plugin bundles |
@@ -34,6 +35,7 @@ lived in `docs/future/performance/` while it ran and were deleted when it closed
 | The transcript store, the usage fold, and the markdown that redraws its open block | [managed-agents.md](./managed-agents.md) § The transcript store, [ui-design.md](./ui-design.md) § How the kit is built |
 | Pane models, hover prefetch, and the deletion of `keepAlive` | [panes.md](./panes.md) |
 | Per-path diff hydration | [diff-rendering.md](./diff-rendering.md) § Parsing and highlighting |
+| The node's one async-local store, and what reads it | [telemetry.md](./telemetry.md) § Ambient attribution |
 
 ## What was decided
 
@@ -2123,3 +2125,34 @@ the exclusions in `queryPersistence.ts` are doing their job: no patch bodies and
   fewer event objects per session: four phases traded memory for time and none of them weighed it.
 - **The immutable-asset saving.** A dev build serves `no-store` by design, so it needs `pnpm dist` and
   a second launch.
+
+### 2026-09-11 — the node's async-local store
+
+Not a phase of this programme. The telemetry programme's phase 2 added the codebase's first
+`AsyncLocalStorage`, and the decision to adopt it was gated on measuring what it costs
+([telemetry.md](./telemetry.md) § Ambient attribution). The number belongs here, with the rest.
+
+Machine: this developer's M-series macOS laptop, Node 24.11.0. A throwaway vitest file in
+`packages/node-core`, since deleted: a Hono app with the real `requestIdMiddleware` over a route
+that awaits six times and runs five prepared statements against an in-memory SQLite database.
+20,000 requests per line after 4,000 warm-up, repeated three times.
+
+| Line | p50 | p95 |
+| --- | --- | --- |
+| The request, telemetry off | 0.0570 ms | 0.0670 ms |
+| The request, telemetry on | 0.0638 ms | 0.0721 ms |
+| The handler alone, no store | 0.0524 ms | 0.0580 ms |
+| The handler alone, inside the store | 0.0527 ms | 0.0579 ms |
+
+**Entering the store costs 0.3 to 0.7 microseconds per request**, which is 0.6% to 1.3% of this
+fixture's 53-microsecond handler and 0.5% of the request line with telemetry on. The gate was 5%, so
+the store is adopted for every seam rather than for plugin dispatches alone.
+
+Reading it, `AsyncLocalStorage.getStore()`, costs **8.3 nanoseconds** inside a store and 7.8 outside
+it, over 20 million calls. That is why `storage/sqlite.ts` asks per statement rather than per
+prepare.
+
+Two things this does not measure. The fixture is a 57-microsecond request and a real one is
+milliseconds, so 0.3 microseconds is a smaller fraction in the app than it is here. And the 12% the
+"telemetry on" line costs over "telemetry off" is the whole of the collector, shipped in phase 0:
+the request span, the SQL histograms, and the trace ids. Only the 0.3 microseconds is this phase's.

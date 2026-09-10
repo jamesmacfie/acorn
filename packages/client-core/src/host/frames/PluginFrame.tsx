@@ -6,6 +6,8 @@ import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { watchAppearance } from '../../kit/tokens/appearance'
 import { FRAME_TOKENS } from '../../kit/tokens/tokenAxes'
+import { emitError, startSpan } from '../../infra/telemetry/emitter'
+import { createLogger } from '../../infra/telemetry/logger'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction } from './broker'
 import { createFrameServices, type PluginFrameProps } from './frameServices'
 
@@ -51,6 +53,8 @@ const currentTokens = (): Record<string, string> => {
 // calls the bridge (a purely static frame) will show the placeholder wrongly until it is rebuilt. Every
 // package in this repo is rebuilt by scripts/build-plugin.mjs; an installed third-party copy is not.
 const HANDSHAKE_DEADLINE_MS = 10_000
+
+const log = createLogger('plugins')
 
 export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
@@ -128,13 +132,29 @@ export default function PluginFrame(props: PluginFrameProps) {
     const target = frame.contentWindow
     if (!target) return
     const channel = new MessageChannel()
+    // How long this plugin's UI took to say anything, owned by the plugin. It ends on the first
+    // message, so what it measures is the whole of "the reader clicked and something appeared":
+    // fetching the bundle out of the cache, evaluating it, and the SDK's first call back.
+    const boot = startSpan(props.binding.pluginId, {
+      name: 'frame.boot',
+      attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface, 'plugin.target': props.binding.target },
+    })
     // Armed before the port is transferred and cleared by the frame's first message. A controller-only
     // frame is exempt: it has no rectangle for a placeholder to occupy, and replacing its iframe would
     // remove the very thing the host is driving.
     const deadline = props.controllerOnly
       ? null
       : setTimeout(() => {
-        console.warn(`[plugins] ${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
+        log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
+        // An error record and not only a span, because this is the failure a person reports as
+        // "the pane is blank" and there is nothing else in the app that names the plugin.
+        boot.end('error', { 'error.name': 'FrameNeverConnected' })
+        emitError(props.binding.pluginId, {
+          name: 'FrameNeverConnected',
+          message: `surface '${props.binding.surface}' did not connect within ${HANDSHAKE_DEADLINE_MS}ms`,
+          handled: true,
+          attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
+        })
         setSilent(true)
       }, HANDSHAKE_DEADLINE_MS)
     const bridge = createFrameBridge({
@@ -143,10 +163,11 @@ export default function PluginFrame(props: PluginFrameProps) {
       services: services(),
       context: context(),
       onMisbehaving: (reason) => {
-        console.warn(`[plugins] ${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
+        log.warn(`${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
         setMisbehaving(reason)
       },
       onConnected: () => {
+        boot.end()
         if (deadline !== null) clearTimeout(deadline)
       },
     })
@@ -180,6 +201,9 @@ export default function PluginFrame(props: PluginFrameProps) {
     })
     onCleanup(() => {
       port = null
+      // Idempotent: a frame that already connected ended this on its first message. A frame torn
+      // down mid-handshake is the case worth recording, and it did not boot.
+      boot.end('error', { 'error.name': 'FrameTornDown' })
       if (deadline !== null) clearTimeout(deadline)
       unwebview?.()
       unaction()

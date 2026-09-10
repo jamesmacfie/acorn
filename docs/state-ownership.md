@@ -10,6 +10,20 @@ notes, memories, integrations, provider mirrors, terminal metadata, managed sess
 Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
 and audit records.
 
+Whether this node collects telemetry at all is node-owned too: one preference row,
+`telemetry.enabled`, off unless it reads `'1'` ([telemetry.md](./telemetry.md) § The switch). It
+belongs to the node rather than to a device because the collector runs whether or not a client is
+attached, and because a schedule firing at 3 AM is exactly the thing worth a record. Settings →
+Telemetry is the switch, and it writes this row like any other node preference. Turning it off in
+one window stops every client paired with that node, which is what the promise has to mean: the
+renderer reads the same row and turns its own emitter off with it.
+
+What that page draws under the switch is owned by nothing and stored nowhere. The counts, the sink
+list and the drop total live in the collector's memory and start again with the process, which is
+why they are a route the page polls rather than state anything persists
+([telemetry.md](./telemetry.md) § What the page shows). A history would need a table, and the
+programme refused one.
+
 It is also authoritative for what the owner *composes* about those resources — a task's pane layout,
 a task's open editor files, a repo's PR filters, a task's context selection, the dashboard panels a
 person built over plugin collections — held as per-user preferences (`GET|PUT /v2/core/prefs`). These

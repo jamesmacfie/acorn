@@ -4,6 +4,7 @@
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
+import { markPageChange } from './pageChange'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
@@ -25,6 +26,10 @@ export const selectedSource = (): string | null => {
   return selected === UNSET_SOURCE ? defaultSourceId() ?? null : selected
 }
 export function setSelectedSource(source: string | null): void {
+  // The source's own plugin owns the span, so "which rail source is slow to draw" is one query
+  // rather than a bisect. A null source is the clearing half of opening a task, and
+  // `markPageChange` folds it into the task's own change.
+  if (source) markPageChange(sourceRegistry.ownerOf(source) ?? 'core', { to: 'source', 'source.id': source })
   setSelectedSourceState(source)
 }
 

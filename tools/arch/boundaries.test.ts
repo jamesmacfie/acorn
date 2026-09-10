@@ -286,6 +286,119 @@ describe('architecture boundaries', () => {
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
   })
 
+  it('the renderer and the other client runtimes log through the logger, not console (shrinking baseline)', () => {
+    // The renderer's half of the same rule. Its 66 call sites moved on 2026-09-11, and a line
+    // written through `createLogger` reaches every sink and says who wrote it
+    // (docs/telemetry.md § The renderer).
+    //
+    // The terminal client is scanned with it, because it runs client-core in process and writes
+    // through the same logger. The desktop helper and `packages/custody` are the other rule's,
+    // below: they are Node processes and their lines go to stderr through the node's logger.
+    const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
+    const callsConsole = (source: string): boolean =>
+      CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    // Baseline, not an allowlist: entries may only be removed. Six files, all deliberate.
+    const CONSOLE_BASELINE = [
+      // IS the logger.
+      'packages/client-core/src/infra/telemetry/logger.ts',
+      // Runs inside the plugin's own iframe, not in the shell. It is bundled into every plugin by
+      // scripts/build-plugin.mjs, it has no API client and no telemetry emitter to reach, and its
+      // console is the one a plugin author opens on their own frame.
+      'packages/client-core/src/host/frames/sdk.ts',
+      // `kit/` may import `kit/` and the highlighter and nothing else, which is the design-system
+      // contract the rule above this one holds. One line, in the diff hydrator.
+      'packages/client-core/src/kit/diff/hydration.ts',
+      // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
+      // a log line (docs/tui.md § What the terminal client reports).
+      //
+      // A person answering a pairing prompt, before the renderer exists.
+      'apps/tui/src/node/pair.ts',
+      // The same prompt's instructions, for a running node this device holds no token for.
+      'apps/tui/src/node/open.ts',
+      // "Open the data folder" in a terminal is the path itself, printed on the way out because the
+      // renderer owns the screen until then.
+      'apps/tui/src/platform.ts',
+    ]
+    const SCANNED = ['packages/client-core/src', 'apps/desktop/src/client', 'apps/desktop/src/shell', 'apps/tui/src']
+    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
+      .filter((file) => !isTestCode(file))
+    expect(files.length).toBeGreaterThan(300) // anti-vacuity: the walker found the renderer
+    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([...CONSOLE_BASELINE].sort())
+    // And the logger itself must still be the file doing it, or it has been hollowed out.
+    expect(callsConsole(readFileSync(join(ROOT, 'packages/client-core/src/infra/telemetry/logger.ts'), 'utf8'))).toBe(true)
+  })
+
+  it('the node logs through the logger, not console (shrinking baseline)', () => {
+    // A log line written through `console.error` carries nothing but the prefix the author typed:
+    // no owner, no scrubbing, and no way for a sink to see it. `createLogger` gives all three
+    // (docs/telemetry.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
+    // keeps them moved; the renderer and the other runtimes follow in phases 1 and 3.
+    //
+    // A source scan and not a graph edge: `console` is a global, so there is no import to trace.
+    // Comments are stripped, or the logger's own comments about `console.error` would fail it.
+    // Tests are exempt: thirty-one of them spy on `console.warn` and `console.error`, which is
+    // exactly how the logger's output is asserted.
+    //
+    // The node's own 81 sites moved on 2026-09-10; the helper's and the custody stack's 25 followed
+    // in phase 3.
+    const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
+    const callsConsole = (source: string): boolean =>
+      CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    // Baseline, not an allowlist: entries may only be removed. Three files, all deliberate.
+    const CONSOLE_BASELINE = [
+      // IS the logger, plus the `ACORN_PERF=1` printer beside it.
+      'packages/node-core/src/server/telemetry/logger.ts',
+      // Writes two things that are not log lines: the handshake JSON a launcher parses off stdout
+      // and the lifecycle tests read, and the pairing banner a person at this terminal is here to
+      // read. Its own log lines already go through the logger.
+      'apps/node/src/entries/standalone.ts',
+      // The desktop helper's stdout is the line protocol Rust parses. Those two writes are the
+      // handshake, not log lines; everything else in the file goes through the logger
+      // (docs/shell.md § The shell process).
+      'apps/desktop/src/helper/helperMain.ts',
+    ]
+    // The helper and the custody stack are here rather than with the renderer's rule: they are Node
+    // processes, they already depend on node-core, and their lines belong on stderr
+    // (docs/shell.md § What the helper reports).
+    const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
+    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
+      .filter((file) => !isTestCode(file))
+    expect(files.length).toBeGreaterThan(150) // anti-vacuity: the walker found the node
+    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([...CONSOLE_BASELINE].sort())
+    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
+    expect(callsConsole("console.warn(`[hooks] ${id} failed:`, error)")).toBe(true)
+    expect(callsConsole("if (x) console.log('hi')")).toBe(true)
+    expect(callsConsole('console\n  .error(x)')).toBe(true)
+    expect(callsConsole("// a bare `console.error` carries no owner")).toBe(false)
+    expect(callsConsole("log.error('unhandled error')")).toBe(false)
+    // And the logger itself must still be the file doing it, or it has been hollowed out.
+    expect(callsConsole(readFileSync(join(ROOT, 'packages/node-core/src/server/telemetry/logger.ts'), 'utf8'))).toBe(true)
+  })
+
+  it('plugins log through their own logger, not console (empty baseline)', () => {
+    // The third console rule, and the strictest, because a plugin has no reason to be an exception.
+    // A plugin's line goes through `ctx.log` where a context is in reach, and through
+    // `createLogger(tag, '<plugin id>')` from `@acorn/plugin-api` where one is not: a module-level
+    // engine, a route factory, a driver (docs/plugin-authoring.md § Telemetry and logging).
+    //
+    // The baseline is empty and stays empty. Thirteen sites moved on 2026-09-11, and the arguments
+    // the other two rules make for their entries, that stdout is a wire, that the file is the
+    // logger, that `kit/` may import nothing, are true of no file under `plugins/`.
+    const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
+    const callsConsole = (source: string): boolean =>
+      CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    const files = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((entry) => walk(join(ROOT, 'plugins', entry.name, 'src')))
+      .filter((file) => !isTestCode(file))
+    expect(files.length).toBeGreaterThan(300) // anti-vacuity: the walker found the plugins
+    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([])
+    // Anti-vacuity: a field named `console` is not a call, and used to be three lines in browser's
+    // driver that the predicate must keep ignoring.
+    expect(callsConsole('session.console.push(text)')).toBe(false)
+    expect(callsConsole("console.warn('[github] pruned 3 rows')")).toBe(true)
+  })
+
   it('a loaded plugin that draws a tree writes no DOM and ships no stylesheet', () => {
     // The tree path's whole premise: the plugin names acorn's components and the host draws them
     // (docs/plugins.md § The tree contract). A raw element or a class in one of these directories is
@@ -296,7 +409,7 @@ describe('architecture boundaries', () => {
     // with the JSX preset pointed at the remote adapter, so a shell component pulled onto its graph is
     // compiled into a tree of its own rather than into a document, and the result is neither. This is
     // the one check the client tier does not share: a compiled pane is *supposed* to import the barrel.
-    const TREE_DIRS = ['plugins/http/src/tree', 'plugins/database/src/tree', 'plugins/linear/src/tree', 'plugins/rollbar/src/tree']
+    const TREE_DIRS = ['plugins/http/src/tree', 'plugins/database/src/tree', 'plugins/linear/src/tree', 'plugins/rollbar/src/tree', 'plugins/sentry-telemetry/src/tree']
     const offences: string[] = []
     let scanned = 0
     for (const dir of TREE_DIRS) {

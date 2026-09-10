@@ -1,9 +1,11 @@
 import { createSignal } from 'solid-js'
-import { QueryClient } from '@tanstack/solid-query'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/solid-query'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { del, get, set } from 'idb-keyval'
 import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { fleetBridge, nodeTransport } from '../platform'
+import { emitError } from '../telemetry/emitter'
+import { createLogger, describeError } from '../telemetry/logger'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture-overview.md § Client state and fleet behavior,
@@ -27,6 +29,57 @@ import { fleetBridge, nodeTransport } from '../platform'
 // The invariant that makes it safe is in activeNode.ts: only the active node's provider is mounted,
 // and `setActiveNode` runs before the swap.
 const CACHE_KEY_PREFIX = 'acorn-cache:'
+
+const log = createLogger('fleet')
+
+/**
+ * The prefix of a query or mutation key, as the one attribute a failure record carries.
+ *
+ * The first two segments and no more. A key is `['tasks', nodeId, taskId, …]`, so the whole thing
+ * would be a row per task in whatever a sink draws, and the first segment alone cannot tell two of
+ * one plugin's reads apart. A non-string segment is dropped rather than stringified, because that
+ * is where an id or a filter object sits.
+ */
+const keyPrefix = (key: readonly unknown[]): string =>
+  key.slice(0, 2).filter((part) => typeof part === 'string').join('.') || 'unknown'
+
+/**
+ * Every failed read and every failed write on one node, as a handled error record.
+ *
+ * Here rather than at each call site because this is the choke point: every query and every
+ * mutation in the app runs through one of these two caches, and the alternative is a `catch` on
+ * several hundred `createQuery` calls that nobody would keep up to date.
+ *
+ * Handled, always. The UI has already dealt with these: a failed read leaves the last-known data on
+ * screen with a stale badge, and a failed write surfaces a notice and keeps the draft
+ * (docs/ui-design.md § Connection and staleness vocabulary). What the record adds is a count.
+ */
+const failureCaches = () => ({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      const described = describeError(error)
+      emitError('core', {
+        ...described,
+        handled: true,
+        attrs: { seam: 'query', 'query.key': keyPrefix(query.queryKey), 'error.name': described.name },
+      })
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      const described = describeError(error)
+      emitError('core', {
+        ...described,
+        handled: true,
+        attrs: {
+          seam: 'mutation',
+          'query.key': mutation.options.mutationKey ? keyPrefix(mutation.options.mutationKey) : 'unkeyed',
+          'error.name': described.name,
+        },
+      })
+    },
+  }),
+})
 
 // The partition used when there is no broker: a renderer served by a node (`dev:node` in a browser),
 // where the origin is the node and no nodeId is known. A named constant rather than `''` so the
@@ -70,7 +123,7 @@ function subscribeStatuses(): void {
     // file read.
     if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
     chased.add(status.nodeId)
-    void refreshFleet().catch((error: unknown) => console.warn('[fleet] could not re-read membership:', error))
+    void refreshFleet().catch((error: unknown) => log.warn('could not re-read membership', error))
   })
 }
 
@@ -117,6 +170,7 @@ export function clientFor(nodeId: string): NodeCache {
   if (existing) return existing
   const cache: NodeCache = {
     client: new QueryClient({
+      ...failureCaches(),
       // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
       // active query. Queries that need fresher data override this. gcTime has to outlive a session so
       // persisted entries survive a reload (docs/caching.md § Renderer query cache).
@@ -169,7 +223,7 @@ export function dropNode(nodeId: string): void {
   void del(cacheKeyFor(nodeId)).catch((error: unknown) => {
     // A snapshot that could not be deleted only matters if the same nodeId comes back, which needs a
     // re-pair. Say so rather than failing the removal the owner asked for.
-    console.warn(`[fleet] could not delete the persisted cache for ${nodeId}:`, error)
+    log.warn(`could not delete the persisted cache for ${nodeId}`, error)
   })
 }
 

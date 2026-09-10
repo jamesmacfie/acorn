@@ -5,6 +5,9 @@ import { readJson } from '../../infra/node/apiClient'
 import { nodes, nodeState } from '../../infra/node/fleet'
 import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './host'
 import { resolveActiveBundles, type ActiveBundle, type BundleCandidate } from '../trust/resolveBundles'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugins')
 
 // Getting third-party plugin bundles from every node in the fleet onto this device, and asking the
 // owner about each one before anything runs it (docs/plugins.md § Loaded plugins: the client half;
@@ -88,7 +91,7 @@ const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | nul
   try {
     return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
   } catch (error) {
-    console.warn(`[plugins] could not read the plugin roster on ${nodeId}:`, error)
+    log.warn(`could not read the plugin roster on ${nodeId}`, error)
     return null
   }
 }
@@ -120,7 +123,7 @@ export async function syncPluginDistribution(options: { repin?: boolean } = {}):
       if (!client || cached.has(client.hash)) continue
       const result = await cachePluginBundle({ nodeId, pluginId: row.name, hash: client.hash, version: row.installed!.version })
       if ('hash' in result) cached.add(result.hash)
-      else console.warn(`[plugins] ${row.name} from ${nodeId} was not cached: ${result.error}`)
+      else log.warn(`${row.name} from ${nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
     }
   }
 

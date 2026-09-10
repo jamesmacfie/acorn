@@ -113,6 +113,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         dataDir,
         core,
         hooks: ctx.hooks,
+        telemetry: ctx.telemetry,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
         // Read per call, never captured. Creating a task's worktree consults that owner's per-repo

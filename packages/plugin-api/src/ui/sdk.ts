@@ -11,6 +11,10 @@ export type { AcornBridge } from '@acorn/client-core/host/frames/sdk.ts'
 // What `api.getBytes` resolves to. Named because an author annotating the variable they decoded an
 // image out of has nowhere else to reach for it.
 export type { PluginByteResponse } from '@acorn/client-core/host/frames/sdk.ts'
+// What `bridge.telemetry` and `bridge.log` accept as attributes: scalars, and nothing else. Named
+// because an author who builds an attribute map in one function and emits it in another has nowhere
+// else to reach for the type (docs/plugin-authoring.md § Telemetry from a frame).
+export type { PluginTelemetryAttrs } from '@acorn/client-core/host/frames/sdk.ts'
 // The context the host hands a frame on connect. Kept rather than pruned: the four things that name it
 // today are all host-side, and a frame that wants to type the context it was given has nowhere else to go.
 export type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'

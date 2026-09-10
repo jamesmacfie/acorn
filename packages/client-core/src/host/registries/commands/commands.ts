@@ -1,6 +1,7 @@
 import { DEFAULT_COMMAND_SCOPE, type CommandScope, type CommandSearchItem, type CommandSettingOption } from '@acorn/protocol/commands.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
+import { startInteraction } from '../../../infra/telemetry/emitter'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
 import { presentCommand } from './presenter'
 
@@ -156,6 +157,11 @@ export type ContributedCommand = WithoutOwner<CommandContribution>
 
 export const commandRegistry = new Registry<CommandContribution>('command')
 
+/** The span name for one command run (docs/telemetry.md § The renderer). A constant rather than a
+ *  literal because `scripts/icon-census.mjs` reads `name: '…'` as a Lucide icon name, and `command`
+ *  is one: spelling it inline would put an icon nobody draws in the startup chunk. */
+const COMMAND_SPAN = 'command'
+
 export const commandTitle = (command: CommandContribution): string =>
   typeof command.title === 'function' ? command.title() : command.title
 export const commandHint = (command: CommandContribution): string | undefined =>
@@ -225,10 +231,25 @@ export function executeCommand(id: string, context?: CommandExecutionContext): P
     presentCommand(command.id)
     return Promise.resolve({ effect: 'stay' })
   }
+  // One command is one interaction, so every request the command makes hangs under this span and the
+  // node's own request spans join the same trace (docs/telemetry.md § Traces). The owner is the
+  // registry's stamp, never the contributor's word, so `command` rows group by the package that
+  // really contributed the row.
+  const span = startInteraction(command.ownerId ?? 'core', {
+    name: COMMAND_SPAN,
+    attrs: { seam: COMMAND_SPAN, 'command.id': command.id, 'command.category': command.category },
+  })
   try {
     return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT))
-      .then((outcome) => outcome ?? COMMAND_CLOSED)
+      .then((outcome) => {
+        span.end('ok')
+        return outcome ?? COMMAND_CLOSED
+      }, (error: unknown) => {
+        span.end('error')
+        throw error
+      })
   } catch (error) {
+    span.end('error')
     return Promise.reject(error)
   }
 }

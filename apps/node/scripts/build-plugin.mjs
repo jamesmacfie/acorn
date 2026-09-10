@@ -96,7 +96,9 @@ try {
 if (!apiMajor) throw new Error(`${API_VERSION_SOURCE} exported no PLUGIN_API_MAJOR`)
 
 // A temporary entry inside apps/node so Vite resolves the workspace package exactly as the app does.
-const entryDir = join(NODE_APP, '.plugin-build')
+// One directory per plugin id, because the cleanup below removes the directory whole: two builds
+// running at once used to share `.plugin-build`, and the first to finish deleted the other's entry.
+const entryDir = join(NODE_APP, '.plugin-build', id)
 const entryFile = join(entryDir, `${id}.js`)
 mkdirSync(entryDir, { recursive: true })
 writeFileSync(entryFile, `import { ${spec.factory} } from '${spec.entry}'\nexport default ${spec.factory}()\n`)

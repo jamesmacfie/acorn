@@ -1,3 +1,6 @@
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('will')
 export type Concern = {
   id: string
   feature: string
@@ -66,7 +69,7 @@ export async function collectConcerns<K extends WillEventKind>(kind: K, payload:
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
-      console.warn(`[will:${kind}] dropped slow concern handler: ${entry.feature}`)
+      log.warn(`${kind}: dropped slow concern handler ${entry.feature}`, undefined, { 'will.kind': kind, 'will.feature': entry.feature })
       resolve([])
     }, timeoutMs)
     // `Promise.try`-shaped. `Promise.resolve(entry.run(...))` evaluates the call first, so a handler
@@ -80,7 +83,7 @@ export async function collectConcerns<K extends WillEventKind>(kind: K, payload:
       if (settled) return
       settled = true
       clearTimeout(timer)
-      console.error(`[will:${kind}] ${entry.feature}`, error)
+      log.error(`${kind}: ${entry.feature}`, error, { 'will.kind': kind, 'will.feature': entry.feature })
       resolve([])
     })
   })

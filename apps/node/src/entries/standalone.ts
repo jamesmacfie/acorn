@@ -22,6 +22,23 @@ import { buildPluginStateBridge, effectiveDisabled } from '../composition/plugin
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
 
+// This file is the one place under `apps/node/src` that still calls `console.log`, and it is in the
+// console rule's baseline on purpose (tools/arch/boundaries.test.ts). Two things it writes are not
+// log lines: the handshake JSON, which a launcher parses off stdout and the lifecycle tests read,
+// and the pairing banner, which is what a person standing at this terminal is here to read.
+// Everything else in the file goes through the logger like the rest of the node.
+import { installCrashHandlers } from '../composition/crash'
+import { createLogger, installPerfSink } from '@acorn/node-core/server/telemetry/logger.ts'
+import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry/collector.ts'
+import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry/scrub.ts'
+
+// Before anything can throw. A crash during boot is otherwise a silent death with no record
+// (../composition/crash.ts).
+installCrashHandlers()
+
+const log = createLogger('node')
+const pluginLog = createLogger('plugins')
+
 // ACORN_DATA_DIR names the data root (docs/data-layer.md § Data root); service/runtime.ts's
 // internalApiEnv hands this node's own child processes the same variable, so one spelling of "which
 // root" covers the whole process tree. Opening it takes the root's exclusive lock, which is why a
@@ -49,7 +66,7 @@ const development = process.env.NODE_ENV !== 'production'
 // is the right answer for a service-managed node. Only a developer needs
 // `ACORN_BUNDLED_PLUGINS_DIR` set.
 if (development && !bundledRoot) {
-  console.log('[plugins] ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
+  pluginLog.info('ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
 }
 reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
@@ -67,6 +84,18 @@ const internalEnv: InternalEnvFactory = (claims) => ({
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
+// Before the plugins, so one that declares the `telemetry` token can subscribe from its own init,
+// exactly as in the supervised root (../composition/runtime.ts, docs/telemetry.md § The switch).
+setTelemetryDataRoot(root.dir)
+startTelemetry({
+  node: root.nodeId,
+  version: NODE_PROTOCOL_VERSION.toString(),
+  readPref: async () => {
+    const userId = runtime.ACTIVE_IDENTITY.get()
+    return userId ? await core.prefs.read(userId, TELEMETRY_PREF_KEY) : null
+  },
+})
+installPerfSink()
 
 // Same plugin list, through the same builder, as the desktop-supervised root
 // (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.
@@ -142,7 +171,7 @@ let stopping = false
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (stopping) return
   stopping = true
-  console.log(`[node] ${signal} — draining`)
+  log.info(`${signal} — draining`)
   const outcome = await drainNode({
     listener: () => closeListener(listener.server),
     reconciliation: async () => await reconcileTask,
@@ -155,7 +184,9 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     sqlite: async () => runtime.DB.close(),
     dataRoot: async () => root.release(),
   })
-  if (outcome === 'timeout') console.warn('[node] drain exceeded its deadline; exiting anyway')
+  if (outcome === 'timeout') log.warn('drain exceeded its deadline; exiting anyway')
+  // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms.
+  stopTelemetry()
   process.exit(0)
 }
 

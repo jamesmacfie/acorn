@@ -43,6 +43,7 @@
     "@acorn/plugin-model-providers": "workspace:*",
     "@acorn/plugin-nodes-file": "workspace:*",
     "@acorn/plugin-rollbar": "workspace:*",
+    "@acorn/plugin-sentry-telemetry": "workspace:*",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

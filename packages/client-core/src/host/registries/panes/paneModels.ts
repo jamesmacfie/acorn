@@ -18,6 +18,7 @@
 // because a compiled plugin's regions are components in the shell's realm with no module of their
 // own to share.
 import { createRoot } from 'solid-js'
+import { startSpan } from '../../../infra/telemetry/emitter'
 import { onScopeEvicted } from '../shell/scopeEviction'
 
 type Held = { taskId: string; model: unknown; dispose: () => void }
@@ -33,14 +34,25 @@ const held = new Map<string, Held>()
  *
  * `build` runs inside the new root, so everything it creates is disposed together. It is called at
  * most once per (pane, task); a later call with the same task returns what it returned.
+ *
+ * The `pane.model` span covers the build and nothing else. A cache hit is not timed, because a pane
+ * whose model is already there did no work, and averaging the hits in would hide the build that
+ * takes a second (docs/telemetry.md § The admission rule for a span).
  */
-export function paneModel<M>(paneId: string, taskId: string, build: () => M): M {
+export function paneModel<M>(paneId: string, taskId: string, build: () => M, owner = 'core'): M {
   const entry = held.get(paneId)
   if (entry && entry.taskId === taskId) return entry.model as M
   entry?.dispose()
-  const next = createRoot((dispose) => ({ taskId, model: build(), dispose }))
-  held.set(paneId, next)
-  return next.model as M
+  const span = startSpan(owner, { name: 'pane.model', attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId } })
+  try {
+    const next = createRoot((dispose) => ({ taskId, model: build(), dispose }))
+    held.set(paneId, next)
+    span.end()
+    return next.model as M
+  } catch (error) {
+    span.end('error')
+    throw error
+  }
 }
 
 onScopeEvicted((event) => {

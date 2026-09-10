@@ -33,6 +33,9 @@ import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFa
 import type { FrameBinding } from './broker'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugins')
 
 // Turning accepted manifests into shell contributions (docs/plugins.md § Frame contribution kind).
 //
@@ -163,7 +166,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
       // Recorded as well as logged: on its own the warn was invisible, so the author saw a pane that
       // didn't exist and nothing to explain it. This also reaches the attention inbox through
       // node/pluginFailures.ts.
-      console.warn(`[plugins] ${pluginId} could not contribute ${surface.target} '${surface.id}':`, error)
+      log.warn(`${pluginId} could not contribute ${surface.target} '${surface.id}'`, error, { 'plugin.id': pluginId })
       recordSurfaceFailure(pluginId, surface.id, error)
     }
   }
@@ -182,7 +185,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
         hash,
       }))
     } catch (error) {
-      console.warn(`[plugins] ${pluginId} could not contribute extension '${entry.id}':`, error)
+      log.warn(`${pluginId} could not contribute extension '${entry.id}'`, error, { 'plugin.id': pluginId })
       recordSurfaceFailure(pluginId, entry.id, error)
     }
   }
@@ -190,6 +193,12 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
 }
 
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
+  // Every registration in this function goes through `own`, so the plugin id reaches each registry's
+  // owner side-map and the seams that build a telemetry record can name whose rectangle it was
+  // (kit/lib/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
+  // and for the same reason: this is the pass that knows the owner, and a manifest cannot state one.
+  const own = <T extends { id: string }>(registry: { register(entry: T, owner?: string): Disposable }, entry: T): Disposable =>
+    registry.register(entry, pluginId)
   /**
    * The bundle entry this surface's one region names, as a contribution ready to mount, or `null` when
    * the region is `frame` and the body is the plugin's own rectangle.
@@ -213,7 +222,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
     case 'inline':
       throw new Error(`inline surface '${surface.id}' is placed by another plugin's point, not registered here`)
     case 'webview':
-      return paneRegistry.register({
+      return own(paneRegistry, {
         id: surface.id,
         label: surface.label,
         glyph: surface.glyph,
@@ -312,7 +321,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           if (!route.path.split('/').includes(`:${route.item}`)) {
             throw new Error(`route '${route.path}' does not capture '${route.item}'`)
           }
-          return projectSurfaceRegistry.register({
+          return own(projectSurfaceRegistry, {
             id: surface.id,
             path: route.path,
             item: route.item,
@@ -366,7 +375,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         if (surface.providerId && surface.providerId !== pluginId) {
           throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
         }
-        return paneRegistry.register({
+        return own(paneRegistry, {
           id: surface.id,
           label: surface.label,
           glyph: surface.glyph,
@@ -408,7 +417,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         throw new Error(`coreSlot surface '${surface.id}' names an unknown core surface '${surface.coreSlot}'`)
       }
       const slot = surface.coreSlot
-      return exclusiveSlotRegistry.register({
+      return own(exclusiveSlotRegistry, {
         id: `plugin:${pluginId}:${surface.id}`,
         pluginId,
         slot,
@@ -426,7 +435,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
       }
       const panelTree = singleRegionTree(surface)
-      return refPanelRegistry.register({
+      return own(refPanelRegistry, {
         id: surface.id,
         providerId: pluginId,
         // The same per-node gate the task pane above carries: the panel's frame talks to routes on the
@@ -459,7 +468,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       const open = (): boolean => pluginOverlayOpen(pluginId, surface.id)
       const closeId = `plugin.${pluginId}.overlay-close.${surface.id}`
       const disposables = [
-        commandRegistry.register({
+        own(commandRegistry, {
           id: closeId,
           title: `Close ${surface.label}`,
           category: 'action',
@@ -472,7 +481,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         // overlay is up the focus is normally inside the iframe. Those keydowns never reach the shell's
         // window; they cross the bridge and resolve against this registry (PluginFrame's `keydown`
         // service). `typing-exempt` is the one scope both paths agree on.
-        keybindingRegistry.register({
+        own(keybindingRegistry, {
           id: closeId,
           command: closeId,
           description: `Close ${surface.label}`,
@@ -487,7 +496,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             state: () => loadedPluginStateOnNode(frameNode(), pluginId),
           },
         }),
-        uiSlotRegistry.register({
+        own(uiSlotRegistry, {
           id: surface.id,
           slot: 'overlay',
           order: surface.order,
@@ -510,7 +519,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // manifest parser refuses a settings surface that names no layout, so this is a declaration
       // either way rather than a default.
       const settingsTree = singleRegionTree(surface)
-      return settingsRegistry.register({
+      return own(settingsRegistry, {
         id: surface.id,
         label: surface.label,
         group: surface.group ?? 'general',
@@ -521,7 +530,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       })
     }
     case 'importer':
-      return projectImporterRegistry.register({
+      return own(projectImporterRegistry, {
         id: surface.id,
         label: surface.label,
         glyph: surface.glyph,

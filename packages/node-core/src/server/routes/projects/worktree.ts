@@ -17,6 +17,9 @@ import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { isTaskConfined, mayActOnTask } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
+import { createLogger, describeError } from '../../telemetry/logger'
+
+const log = createLogger('worktree')
 
 // The PTY-coupled half of archive, and nothing else. Deliberately the exact dep bundle
 // server/storage/archive.ts's archiveTask already takes, so filling this slot is a pass-through in the plugin
@@ -146,7 +149,7 @@ export const worktree = new Hono<AppEnv>()
     let task = await loadTask(db, taskId)
     if (!task) return c.json({ ok: true })
     // Best-effort and independent of worktree setup: seeds PR/ticket context into curatable notes.
-    await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => console.warn('[worktree] task-created hook failed:', error))
+    await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => log.warn(`task-created hook failed: ${describeError(error).message}`))
     const project = await projectForTask(db, task)
     if (!project || !task.branch || !project.path) return c.json({ ok: true })
     const { script, trigger } = await projectSetup(db, project.id)
@@ -157,7 +160,7 @@ export const worktree = new Hono<AppEnv>()
     if (!isDir(project.path)) return c.json({ ok: true })
     // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
     // is only to get the setup script in early. The surface that actually needs the cwd will say so.
-    await resolveTaskCwd(db, task, project.path, null).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
+    await resolveTaskCwd(db, task, project.path, null).catch((e) => log.warn(`pre-create skipped: ${describeError(e).message}`))
     broadcastWorktreeStatusChanged({ taskId }) // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })

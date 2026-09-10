@@ -30,6 +30,9 @@ import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
 import { Alert } from '../../kit/components/primitives'
 import { Rectangle } from '../../kit/components/content/Rectangle'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('document-surface')
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/editor.md.
@@ -188,7 +191,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // document.
     void flush()
       .then(() => executeCommand(binding.command))
-      .catch((cause: unknown) => console.error(`[command:${binding.command}]`, cause))
+      .catch((cause: unknown) => log.error(`command ${binding.command} failed`, cause, { 'command.id': binding.command }))
     return true
   }
 
@@ -256,7 +259,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       try {
         const body = await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
         if (typeof body?.text !== 'string') {
-          console.warn(`[document-surface] ${props.pluginId} returned an unusable document:`, body)
+          log.warn(`${props.pluginId} returned an unusable document`, body, { 'plugin.id': props.pluginId })
           return setError('This plugin returned an unreadable document.')
         }
         // Refused whole rather than trimmed: a truncated document in an editor that will save it back is

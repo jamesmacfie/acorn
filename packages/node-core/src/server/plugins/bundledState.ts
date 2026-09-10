@@ -3,6 +3,9 @@ import { join, resolve } from 'node:path'
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { z } from 'zod'
 import { PLUGIN_DB_DIR } from './storage'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('plugins')
 
 // Visible rather than dot-prefixed, because dot names in this directory are reserved for installer
 // staging and debris sweeps. The manifest id grammar forbids dots, so this cannot collide with a
@@ -31,7 +34,7 @@ const readState = (dataRoot: string): BundledPluginState => {
   try {
     const parsed = stateSchema.safeParse(JSON.parse(readFileSync(bundledPluginStatePath(dataRoot), 'utf8')))
     if (parsed.success) return parsed.data
-    console.warn('[plugins] bundled plugin state is unreadable; preserving packages already on disk')
+    log.warn('bundled plugin state is unreadable; preserving packages already on disk')
   } catch {
     // First launch, before the app has reconciled any bundled package.
   }

@@ -7,6 +7,10 @@
 //
 // The rest of the interlock (`disposed`, `recovering`) stays in index.ts: those are ordering flags
 // around the shell's own lifecycle events.
+//
+// It also reports, because a node dying under the helper is a silent event today and the count in
+// the window is the number that decides what happens next (docs/shell.md § What the helper reports).
+import { emitError, emitEvent } from '@acorn/node-core/server/telemetry/collector.ts'
 
 // Five backoffs for five permitted crashes: 1s, 2s, 4s, 8s, 16s. The sixth crash inside the window
 // gives up.
@@ -26,7 +30,21 @@ export type CrashDecision =
 export function recordCrash(times: number[], now: number): CrashDecision {
   times.push(now)
   while (times[0] != null && times[0] < now - CRASH_WINDOW_MS) times.shift()
-  if (times.length > MAX_CRASHES_PER_WINDOW) return { retry: false }
+  if (times.length > MAX_CRASHES_PER_WINDOW) {
+    // A fatal error rather than an event, because this is the end of the app's ability to recover on
+    // its own: the recovery screen goes up and nothing restarts until the owner says so. `handled`
+    // is true because acorn does have an answer for it, and it is not the process dying
+    // (docs/shell.md § What the helper reports).
+    emitError('core', {
+      name: 'CrashBudgetExhausted',
+      message: `the background service crashed ${times.length} times in ${CRASH_WINDOW_MS / 60_000} minutes`,
+      level: 'fatal',
+      handled: true,
+      attrs: { seam: 'node.crash', crashes: times.length },
+    })
+    return { retry: false }
+  }
+  emitEvent('core', 'node.crash', { crashes: times.length, 'window.ms': CRASH_WINDOW_MS })
   // Clamped, so a crash count beyond the table still yields the longest backoff rather than `undefined`.
   return { retry: true, delayMs: CRASH_BACKOFF_MS[Math.min(times.length - 1, CRASH_BACKOFF_MS.length - 1)]! }
 }

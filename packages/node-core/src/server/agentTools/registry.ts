@@ -90,6 +90,10 @@ class AgentToolRegistry {
   list(): readonly AgentToolContribution[] {
     return this.#registrations.map((r) => r.tool)
   }
+
+  ownerOf(name: string): string {
+    return this.#registrations.find((r) => r.tool.name === name)?.owner ?? 'core'
+  }
 }
 
 const registry = new AgentToolRegistry()
@@ -97,3 +101,6 @@ const registry = new AgentToolRegistry()
 export const registerAgentTool = (owner: string, tool: AgentToolContribution): void => registry.register(owner, tool)
 export const removeAgentTools = (owner: string): void => registry.remove(owner)
 export const agentToolContributions = (): readonly AgentToolContribution[] => registry.list()
+/** Who contributed the tool of this name, for the `tool.call` span. `core` for a name nobody
+ *  registered, which is also what a caller with no match gets from `list()`. */
+export const agentToolOwner = (name: string): string => registry.ownerOf(name)

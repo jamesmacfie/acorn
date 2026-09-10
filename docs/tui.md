@@ -1187,6 +1187,57 @@ trace that measures itself.
 
 This is the first thing to turn on when somebody says the keys stopped working.
 
+## What the terminal client reports
+
+Off by default, and on it is the same five record kinds every other runtime builds.
+[telemetry.md](./telemetry.md) owns the model, the switch and the collector; this section is what
+this host adds to it and the two things about a terminal that shape how.
+
+**Its stderr is the screen.** A log line written while the renderer owns the terminal scrolls the
+frame and the shell reads as garbage until the next full repaint, so `apps/tui/src/main.tsx` replaces
+`console.log`, `warn`, `error`, `info` and `debug` for the life of the run and prints what it caught
+on the way out, after `renderer.destroy()` has handed the terminal back. The logger writes through
+those same five, so a line written with `createLogger` still becomes a record and its printed half is
+still held. That is the arrangement, not an accident: the record is what leaves, and the print is
+what waits.
+
+**A batch leaves the ordinary way.** The emitter is client-core's, the one the desktop renderer uses,
+started from `main.tsx` with `runtime: 'tui'` and client-core's own poster. The poster goes through
+the API client, which on this host is the platform seam, so a batch rides the broker with the device
+token and the pinned certificate like every other request. Nothing about the transport is this
+host's.
+
+| Seam | Where | What it emits |
+| --- | --- | --- |
+| Every frame | `apps/tui/src/renderer.ts`, from `paint/screen.ts` | histogram `tui.frame`, four series told apart by `phase`: `total`, `layout`, `paint` and `flush` |
+| Every key press | `apps/tui/src/keys/install.ts` | histogram `tui.key` with the dispatcher's `reason`; histogram `tui.key.steps` when the step counter is on |
+| The boot account | `apps/tui/src/boot.ts` | span `tui.boot` with a `tui.boot.mark` child per mark |
+| Everything client-core already reports | see [telemetry.md](./telemetry.md) § Renderer seams | requests, commands, page changes, pane regions, trees, notices, contribution errors |
+
+A frame is a histogram and never a span, because a held arrow key draws far past ten a second
+(telemetry.md § Hot seams are metrics). The split costs four `performance.now()` reads on the paint
+path, about 160 nanoseconds against a 5 millisecond frame budget, and it is unconditional so there is
+one code path rather than two. `phase` is a label rather than four seam names, so "which third is
+slow" is a filter.
+
+`tui.key.steps` is how many renderables the focus store's walks visited answering one key, the same
+number the trace line ends with (§ Seeing what the keys did). It is collected only with
+`ACORN_TUI_KEYS_TRACE` on, because the counter is off without it, and its unit reads as milliseconds
+because the emitter's fold writes one. It is a developer's own measurement rather than something an
+ordinary run sends anywhere.
+
+The boot marks are turned into spans after the fact. The switch is a preference on the node and the
+answer arrives a round trip after the shell has drawn, so a span emitted where the mark was taken
+would always be built with collection off and dropped. `apps/tui/src/boot.ts` holds the marks anyway,
+for the `[acorn:boot]` account it prints on the way out, and `App.tsx` turns them into one trace the
+first time the preference reads yes.
+
+Three files print to the terminal and are not log lines: the pairing banner and its instructions in
+`apps/tui/src/node/pair.ts` and `apps/tui/src/node/open.ts`, which a person is sitting there to read
+before any renderer exists, and the data-root path in `apps/tui/src/platform.ts`, which is what "open
+the data folder" means where there is no file manager. `tools/arch/boundaries.test.ts` holds those
+three as a baseline that may only shrink.
+
 ### The invariants
 
 Eleven sentences about the keyboard, each one a test rather than a scenario. A scenario pins one

@@ -1,4 +1,5 @@
-import type { CoreServices, InternalEnvFactory, PluginDatabase, PluginHookRegistry, SecretService } from '@acorn/plugin-api/node'
+import type { CoreServices, InternalEnvFactory, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
+import { createLogger, describeError } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -24,6 +25,12 @@ type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & Age
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
+
+// Three tags, one owner: the engine's own lines, the memory hand-off, and the webhook queue. The
+// tag is what the reader greps for and the owner is what a sink files it under.
+const log = createLogger('agents', 'agents')
+const memoryLog = createLogger('agents:memory', 'agents')
+const webhookLog = createLogger('agents:webhook', 'agents')
 
 export { agentTurnInputText } from './runtimeContext'
 
@@ -62,6 +69,10 @@ export type AgentRuntimeOptions = {
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
   hooks?: Pick<PluginHookRegistry, 'run'>
+  /** `ctx.telemetry`, so a provider start and an agent turn are spans owned by this plugin
+   *  (docs/managed-agents.md § What a session reports). Optional so a test can build an engine with
+   *  no host around it. */
+  telemetry?: PluginTelemetry
 }
 
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
@@ -91,6 +102,11 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
   protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
+  protected readonly telemetry?: PluginTelemetry
+  // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
+  // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
+  // process died in the middle of reports nothing, which is the honest answer.
+  protected readonly turnSpans = new Map<string, SpanHandle>()
   protected readonly live = new Map<string, LiveSession>()
   // A newly persisted session is visible to the client before its provider finishes starting. Hold
   // the driver's early `ready` fact until product initialization (including saved defaults) is done,
@@ -125,6 +141,7 @@ export class ManagedAgentEngine {
     this.terminalHandoffRunning = options.terminalHandoffRunning
     this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
+    this.telemetry = options.telemetry
     this.store = new AgentStore(options.db, options.core)
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
@@ -199,6 +216,7 @@ export class ManagedAgentEngine {
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     await this.providerEvents.flushAll()
     await this.webhooks.stop()
+    this.turnSpans.clear()
     this.listeners.clear()
     this.eventMaterializer.clear()
     this.providerCache = null
@@ -257,6 +275,13 @@ export class ManagedAgentEngine {
     // drive another task's tools or read the owner's provider credentials.
     const sessionEnv = this.internalEnv({ scope: 'task', taskId: session.taskId, sessionId: session.id })
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    // The session's span covers starting the provider, not the session's whole life. A session
+    // lives for hours and outlives the process, and a span nobody can close is not a measurement;
+    // spawning or reconnecting the child is the part something waited on
+    // (docs/telemetry.md § The admission rule for a span).
+    const span = this.telemetry?.startSpan('agent.session', {
+      attrs: { seam: 'agent.session', 'session.id': session.id, provider: session.providerId, reconnect: live.reconnectAttempt > 0 },
+    })
     live.startPromise = driver.start({
       session,
       cwd,
@@ -272,9 +297,11 @@ export class ManagedAgentEngine {
       if (this.stopped || live.stopping) throw new Error('The managed agent runtime is shutting down.')
       live.handle = handle
       live.reconnectAttempt = 0
+      span?.end('ok')
       void this.pump()
       return live
     } catch (error) {
+      span?.end('error')
       this.live.delete(session.id)
       if (this.stopped || live.stopping) throw error
       await this.record(session.id, null, {
@@ -314,10 +341,11 @@ export class ManagedAgentEngine {
     await this.record(sessionId, turnId, event)
     if (event.type === 'turn_completed' || event.type === 'error') {
       if (live) live.activeTurnId = null
+      if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
       if (event.type === 'turn_completed' && turnId && this.onCompletedTurn) {
         void this.completedTurnTranscript(sessionId, turnId)
           .then(({ taskId, transcript }) => this.onCompletedTurn!(taskId, transcript))
-          .catch((error) => console.warn('[agents:memory] completed-turn extraction failed:', error))
+          .catch((error: unknown) => memoryLog.warn(`completed-turn extraction failed: ${describeError(error).message}`))
       }
       void this.pump()
     }
@@ -333,6 +361,7 @@ export class ManagedAgentEngine {
     )
     await this.store.interruptActiveTurn(sessionId, message)
     await this.store.expirePendingRequests(sessionId)
+    if (live.activeTurnId) this.endTurnSpan(live.activeTurnId, 'interrupted')
     live.activeTurnId = null
     live.handle = null
     const attempt = live.reconnectAttempt++
@@ -406,6 +435,7 @@ export class ManagedAgentEngine {
           providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
           this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
           await this.store.startTurn(item.turn.id)
+          this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
           await this.record(item.session.id, item.turn.id, { type: 'user_message', text: agentTurnInputText(item.turn) })
           const attachments = Object.fromEntries((await Promise.all(
             [...new Set(item.turn.input.flatMap((part) =>
@@ -440,6 +470,9 @@ export class ManagedAgentEngine {
                   'Safe transient provider failure.',
                   this.mintedSecrets,
                 )
+                // The same turn id starts again, so its first attempt's span has to close here or
+                // the next attempt would replace an open handle in the map.
+                this.endTurnSpan(item.turn.id, 'requeued')
                 await this.store.requeueTransientTurn(item.turn.id, message)
                 await this.record(item.session.id, item.turn.id, {
                   type: 'diagnostic',
@@ -523,10 +556,10 @@ export class ManagedAgentEngine {
     this.publish?.(frame)
     for (const listener of this.listeners) listener(frame)
     void this.webhooks.accept(frame).catch((error) => {
-      console.warn('[agents:webhook] failed to queue delivery:', error)
+      webhookLog.warn(`failed to queue delivery: ${describeError(error).message}`)
     })
     void this.announce(frame).catch((error) => {
-      console.warn('[agents] failed to announce a session edge:', error)
+      log.warn(`failed to announce a session edge: ${describeError(error).message}`)
     })
   }
 
@@ -545,6 +578,24 @@ export class ManagedAgentEngine {
     if (until === 'attention') return !['none', 'unread'].includes(snapshot.session.attention)
     if (until === 'stopped') return ['stopped', 'failed', 'archived'].includes(snapshot.session.runtimeState)
     return snapshot.events.some((event) => event.event.type === 'turn_completed' || event.event.type === 'error')
+  }
+
+  /** A turn's span, opened where the turn is dispatched to a provider. Not where it was enqueued:
+   *  a turn can sit in the queue behind the concurrency limit for minutes, and "how long did the
+   *  agent take" is not "how long was the node busy". */
+  protected beginTurnSpan(turnId: string, sessionId: string, providerId: string, source: string): void {
+    const span = this.telemetry?.startSpan('agent.turn', {
+      attrs: { seam: 'agent.turn', 'turn.id': turnId, 'session.id': sessionId, provider: providerId, source },
+    })
+    if (span) this.turnSpans.set(turnId, span)
+  }
+
+  /** Close it, from whichever of the four ways a turn stops being active got there first. `end` is
+   *  idempotent, so a race between a provider closing and its last event arriving costs nothing. */
+  protected endTurnSpan(turnId: string, outcome: 'completed' | 'error' | 'interrupted' | 'requeued'): void {
+    const span = this.turnSpans.get(turnId)
+    this.turnSpans.delete(turnId)
+    span?.end(outcome === 'completed' ? 'ok' : 'error', { outcome })
   }
 
   protected completedTurnTranscript(sessionId: string, turnId: string): Promise<{ taskId: string; transcript: string }> {

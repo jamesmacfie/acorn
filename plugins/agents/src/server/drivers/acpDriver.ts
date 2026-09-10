@@ -14,13 +14,16 @@ import { randomUUID } from 'node:crypto'
 import { Readable, Writable } from 'node:stream'
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import { AGENT_TOOL_PASSTHROUGH, brokerEnv } from '@acorn/plugin-api/node'
+import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
 import type { AgentInputPart, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { normalizeAcpConfig, normalizeAcpPermission, normalizeAcpUpdate } from './acpNormalizer'
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { providerStderrNotice } from './diagnostics'
+
+// Same tag as codexDriver's: both are this plugin talking about a provider child process.
+const log = createLogger('agents:provider', 'agents')
 
 const DRIVER_VERSION = 'acp-1'
 
@@ -196,7 +199,7 @@ export class AcpDriver implements AgentDriver {
     // a permanent row in the reader's conversation on every spawn, saying only how many bytes it could
     // not show them. The content stays unlogged either way (docs/security.md, credential handling).
     child.stderr.on('data', (chunk: Buffer) => {
-      if (chunk.byteLength) console.warn(`[agents:provider] ${providerStderrNotice(label, chunk.byteLength)}`)
+      if (chunk.byteLength) log.warn(providerStderrNotice(label, chunk.byteLength))
     })
     child.on('error', (error) => void options.onClosed(error))
     child.on('exit', (code) => void options.onClosed(

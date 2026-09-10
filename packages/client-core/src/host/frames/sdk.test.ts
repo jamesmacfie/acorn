@@ -551,3 +551,85 @@ describe('mountFrame', () => {
     expect(root().textContent).toBe('acorn: no window to receive the bridge on')
   })
 })
+
+describe('telemetry and log', () => {
+  it('posts one message per verb, with no id and nothing to await', async () => {
+    // Fire and forget by design: telemetry never fails the thing it describes, so there is no
+    // reply for the host to send and nothing a frame could do with one
+    // (docs/plugin-authoring.md § Telemetry from a frame).
+    host(() => undefined)
+    const acorn = await handshake()
+    acorn.telemetry.event('cache-miss', { resource: 'issues' })
+    acorn.telemetry.count('items-synced', 12)
+    acorn.telemetry.gauge('queue-depth', 3)
+    acorn.telemetry.error({ name: 'UpstreamError', message: 'rate limited' })
+    await new Promise((r) => setTimeout(r, 0))
+
+    const records = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record)
+    expect(records).toEqual([
+      { type: 'event', name: 'cache-miss', attrs: { resource: 'issues' } },
+      { type: 'count', name: 'items-synced', value: 12 },
+      { type: 'gauge', name: 'queue-depth', value: 3 },
+      { type: 'error', name: 'UpstreamError', message: 'rate limited' },
+    ])
+    expect(sent.filter((message) => message.kind === 'telemetry').every((message) => message.id === undefined)).toBe(true)
+  })
+
+  it('hands back what a measured call returned, and times a promise to settlement', async () => {
+    host(() => undefined)
+    const acorn = await handshake()
+    expect(acorn.telemetry.measure('add', () => 41 + 1)).toBe(42)
+
+    let release = (): void => {}
+    const pending = acorn.telemetry.measure('fetch', () => new Promise<string>((resolve) => (release = () => resolve('done'))))
+    // Nothing is sent while the promise is open: a span that reported before its work finished
+    // would be timing the call rather than the work.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(1)
+    release()
+    expect(await pending).toBe('done')
+    await new Promise((r) => setTimeout(r, 0))
+
+    const spans = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record as { type: string; name: string; status: string })
+    expect(spans.map((span) => [span.type, span.name, span.status])).toEqual([['span', 'add', 'ok'], ['span', 'fetch', 'ok']])
+  })
+
+  it('marks a span that threw, and rethrows', async () => {
+    host(() => undefined)
+    const acorn = await handshake()
+    expect(() => acorn.telemetry.measure('boom', () => {
+      throw new Error('no')
+    })).toThrow('no')
+    await new Promise((r) => setTimeout(r, 0))
+    const span = sent.find((message) => message.kind === 'telemetry')?.record as { status: string }
+    expect(span.status).toBe('error')
+  })
+
+  it('ends a hand-held span once, however many times it is asked', async () => {
+    host(() => undefined)
+    const acorn = await handshake()
+    const span = acorn.telemetry.startSpan('reindex', { pages: 4 })
+    span.end('error')
+    span.end()
+    await new Promise((r) => setTimeout(r, 0))
+    const records = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record as { name: string; status: string; attrs: unknown })
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({ name: 'reindex', status: 'error', attrs: { pages: 4 } })
+  })
+
+  it('prints a log line as well as sending it, because collection is off by default', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      host(() => undefined)
+      const acorn = await handshake()
+      acorn.log.warn('upstream is slow', { retryAfter: 30 })
+      expect(warn).toHaveBeenCalledWith('upstream is slow retryAfter=30')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(sent.find((message) => message.kind === 'telemetry')?.record).toEqual({
+        type: 'log', level: 'warn', message: 'upstream is slow', attrs: { retryAfter: 30 },
+      })
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})

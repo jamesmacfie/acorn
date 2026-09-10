@@ -20,7 +20,9 @@ import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
-import { dumpPerf } from '@acorn/node-core/server/perf.ts'
+import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry/collector.ts'
+import { createLogger, describeError, installPerfSink } from '@acorn/node-core/server/telemetry/logger.ts'
+import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry/scrub.ts'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'
 
 export type ServiceRuntime = {
@@ -36,9 +38,17 @@ type RuntimeOptions = {
   stateChanged(state: ServiceState, detail?: string): void
 }
 
+// Two tags rather than one, so the lines keep the `[service:boot]` and `[service:stop]` prefixes a
+// person greps for and docs/local-development.md § Timing a cold start names.
+const bootLog = createLogger('service:boot')
+const stopLog = createLogger('service:stop')
+
 // The node's cold-start account, one line per step, and unconditional: a node that took eleven seconds
 // to bind should say so without anyone having asked for it. Per-request timing is the opposite and sits
-// behind ACORN_PERF=1 (node-core server/perf.ts).
+// behind ACORN_PERF=1 (node-core server/telemetry/collector.ts).
+//
+// On stderr, like every other line the node writes. Stdout is a wire in the standalone entry and in
+// the helper, and the desktop boot test reads the helper's `[helper:boot]` lines rather than these.
 //
 // Two numbers per line, because both questions get asked. `+Nms` is the offset from the first line, so
 // a person can read the shape of a boot down the column; `(Nms)` is this step alone, so the one step
@@ -52,7 +62,7 @@ function bootTimer(): (label: string) => void {
   return (label) => {
     const now = process.hrtime.bigint()
     const ms = (from: bigint) => (Number(now - from) / 1e6).toFixed(0)
-    console.log(`[service:boot] ${label} +${ms(started)}ms (${ms(previous)}ms)`)
+    bootLog.info(`${label} +${ms(started)}ms (${ms(previous)}ms)`)
     previous = now
   }
 }
@@ -152,12 +162,13 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       },
       dataRoot: async () => dataRoot.release(),
     })
-    if (outcome === 'timeout') console.warn('[service:stop] drain exceeded its deadline; exiting anyway')
+    if (outcome === 'timeout') stopLog.warn('drain exceeded its deadline; exiting anyway')
     stateChanged('stopped')
     mark('teardown')
-    // Whatever ACORN_PERF=1 collected, on the way out. A drain is the last chance to print it, and a
-    // node that was killed rather than drained still has `kill -USR2` (node-core server/perf.ts).
-    dumpPerf('drain')
+    // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms. A node that was
+    // killed rather than drained still has `kill -USR2`
+    // (node-core server/telemetry/collector.ts).
+    stopTelemetry()
   }
 
   try {
@@ -190,6 +201,20 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // rather than by the module, so a process that starts the service more than once (the tests do)
     // gets a clean graph each time instead of "capability already provided".
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
+    // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
+    // `init` and see the boot it was loaded during. The preference is read on the collector's own
+    // timer rather than here: `PUT /v2/core/prefs` writes the table directly and cannot notify, so a
+    // switch flipped in Settings is seen within five seconds (docs/telemetry.md § The switch).
+    setTelemetryDataRoot(config.dataDir)
+    startTelemetry({
+      node: dataRoot.nodeId,
+      version: config.version ?? '0',
+      readPref: async () => {
+        const userId = runtime.ACTIVE_IDENTITY.get()
+        return userId ? await core.prefs.read(userId, TELEMETRY_PREF_KEY) : null
+      },
+    })
+    installPerfSink()
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/pluginHost/host.ts).
     const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
@@ -207,7 +232,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       { capabilities, core, env: runtime, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded, mark },
     )
     disposePlugins = plugins.dispose
-    if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
+    if (plugins.skipped.length) bootLog.info(`plugins disabled for this node: ${plugins.skipped.join(', ')}`)
     pluginStateCapability = capabilities.provide(
       PLUGIN_STATE,
       buildPluginStateBridge({
@@ -237,7 +262,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
 
     stateChanged('reconciling')
     if (process.env.NODE_ENV !== 'test') {
-      void refreshAcornMcpRegistrations().catch((error) => console.warn('[service:boot] MCP re-register failed:', error))
+      void refreshAcornMcpRegistrations().catch((error) => bootLog.warn(`MCP re-register failed: ${describeError(error).message}`))
     }
     reconcileTask = (async () => {
       try {

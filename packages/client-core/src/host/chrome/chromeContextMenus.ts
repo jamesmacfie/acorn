@@ -76,5 +76,5 @@ export function registerPluginContextMenu(
   descriptor: PluginContextMenuDescriptor,
   binding: PluginContextMenuBinding,
 ): Disposable {
-  return contextMenuRegistry.register(pluginContextMenuItem(pluginId, descriptor, binding))
+  return contextMenuRegistry.register(pluginContextMenuItem(pluginId, descriptor, binding), pluginId)
 }

@@ -116,6 +116,13 @@ only. For more information, see the plugin API section in [the plugins doc](./pl
 6. Device-only, task-scope, provider-scope, and route-specific gates.
 7. Core and plugin routers.
 
+`traceparent` is read, when the node is collecting telemetry, and it is the only header the request
+middleware reads besides `x-request-id` and the two credentials. A well-formed one makes the
+request's span a child of the caller's; anything else is ignored and the request starts its own
+trace. The parser takes exactly the W3C form and the raw header never reaches a log line, because it
+is attacker input like any other ([telemetry.md](./telemetry.md) § Traces). `x-request-id` is
+unchanged.
+
 `Idempotency-Key` is optional for most mutations and required by agent session creation, agent-turn
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
 reuse with a different body returns `idempotency_conflict`. Internal callers have no device replay
@@ -203,9 +210,26 @@ be denied. For more information, see approval-mediated install and teaching the 
 | `POST` | `/v2/core/integrations/:id/test` | Test provider connectivity |
 | `DELETE` | `/v2/core/integrations/:id` | Disconnect and cascade provider data |
 | `GET` | `/v2/core/models/backends` | List the model backends this owner can generate with |
+| `POST` | `/v2/core/telemetry` | Take a batch of records another runtime collected |
+| `GET` | `/v2/core/telemetry/summary` | Counts of what this node has collected since it started |
 
 Integration administration is restricted to device and Node service principals. Secret values are
 write-only.
+
+`POST /v2/core/telemetry` is device-only, and it is the one door into the node's collector for a
+runtime that is not the node: the renderer today, the terminal client and the desktop helper next
+([telemetry.md](./telemetry.md) § Other runtimes). The body is `{ runtime, records }`, capped at one
+mebibyte and refused whole if any record is malformed. `runtime` names the sender and cannot say
+`node`, because the collector stamps that on its own records and a batch that could claim it would
+be indistinguishable from one at a sink. The answer is `202` with `{ accepted }`, which is `0` when
+the preference is off or no sink is subscribed; that is not an error, and the sender stops on its
+own when it next reads the preference.
+
+`GET /v2/core/telemetry/summary` is the other half of that router and is device-only for the same
+reason: it names which plugins are subscribed as sinks. It answers counters rather than records,
+per owner and kind since the node started, plus the drop and truncation totals, the last flush, and
+the sink list. Settings → Telemetry is the one caller
+([telemetry.md](./telemetry.md) § What the page shows).
 
 `GET /v2/core/models/backends` is device-only, and answers `backends` plus `missing`. A backend is a
 connected model provider or an agent CLI installed on this machine, projected to an id, a label and a

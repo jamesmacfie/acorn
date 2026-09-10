@@ -3,6 +3,9 @@ import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('client-event')
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
@@ -103,7 +106,7 @@ class ClientEventBus {
       try {
         ;(listener as Listener<ClientEventMap[K]>)(payload)
       } catch (error) {
-        console.error(`[client-event:${kind}]`, error)
+        log.error(String(kind), error, { 'event.kind': String(kind) })
       }
     }
   }

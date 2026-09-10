@@ -10,6 +10,10 @@ import {
   type WireFetchBody,
   type WireFetchRequest,
 } from './wire'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+
+const log = createLogger('helper')
 
 // The window's initialization script: it assembles the object the platform seam reads and installs
 // it before any page script runs. The seam (`packages/client-core/src/infra/platform/index.ts`) is the only
@@ -94,11 +98,25 @@ const receiveBytes = (frame: Uint8Array): void => {
   for (const cb of byteListeners) cb(tagged.id, tagged.payload)
 }
 
+// A histogram and not a span. Every node read the renderer makes crosses this socket, so it is far
+// past ten a second while a person is scrolling, and the span that describes the same round trip is
+// already `api.request` one layer up (docs/telemetry.md § Renderer seams). What this adds is the
+// helper's own leg of it: a slow `bridge.call` with a fast node says the broker is the problem.
+//
+// `method` is the label, which is a fixed vocabulary of about thirty names rather than a per-call
+// value, so it is one series each and nothing near the 200 the window holds.
 const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   const ws = await connect()
   const id = nextId++
+  const from = telemetryEnabled() ? performance.now() : 0
+  const done = (): void => {
+    if (from !== 0) recordDuration('core', 'bridge.call', performance.now() - from, { 'helper.method': method })
+  }
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (value: unknown) => void, reject })
+    pending.set(id, {
+      resolve: (value: unknown) => { done(); resolve(value as T) },
+      reject: (error: Error) => { done(); reject(error) },
+    })
     ws.send(JSON.stringify({ id, method, params: params ?? null }))
   })
 }
@@ -106,7 +124,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
 // Fire-and-forget from the seam's point of view: the reply still comes back, and a rejection is logged
 // rather than thrown, because nobody is awaiting `nodeAbort` or `tunnelClose`.
 const tell = (method: HelperMethod, params?: unknown): void => {
-  void call(method, params).catch((error: unknown) => console.warn(`[helper] ${method} failed:`, error))
+  void call(method, params).catch((error: unknown) => log.warn(`${method} failed`, error, { 'helper.method': method }))
 }
 
 const subscribe = <T>(set: Set<T>, cb: T): (() => void) => {

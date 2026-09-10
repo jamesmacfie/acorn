@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type PluginHookRegistry, type StreamEvent } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type PluginHookRegistry, type PluginTelemetry, type SpanHandle, type StreamEvent } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type {
   StepHandlerContext,
@@ -84,6 +84,10 @@ export type RunnerDeps = {
   createChildTask?(parentTaskId: string, seed: FanOutTaskSeed): Promise<string>
   cancelChildTask?(taskId: string): Promise<void>
   authorizeRepoConfig?(taskId: string): Promise<void>
+  /** `ctx.telemetry`, so a run and its steps are spans owned by this plugin
+   *  (docs/workflows.md § What a run reports). Optional, because a test builds a runner with no
+   *  host around it, and absent means the spans are not raised. */
+  telemetry?: PluginTelemetry
 }
 
 
@@ -213,6 +217,11 @@ export class WorkflowRunner {
   // and the note store's write-then-rename is not safe against itself: the loser's temporary file is
   // gone by the time it renames. A chain rather than a lock because a handoff write is tiny.
   #handoffs: Promise<unknown> = Promise.resolve()
+  // Open spans, by run id and by step id. In memory, like `#activeRuns` and for the same reason: a
+  // run only ever ticks inside the node that owns it. A run still going when the process exits
+  // reports no span, which is the honest answer, since nothing measured how long it took.
+  readonly #runSpans = new Map<string, SpanHandle>()
+  readonly #stepSpans = new Map<string, SpanHandle>()
 
   // Abort every in-flight step, for teardown. This is not cancel: cancelling a run is a user action
   // that writes 'cancelled' and stays visible on the next launch, while this is the process going
@@ -229,6 +238,8 @@ export class WorkflowRunner {
     this.#activeRuns.clear()
     this.#pendingTicks.clear()
     this.#startingSteps.clear()
+    this.#runSpans.clear()
+    this.#stepSpans.clear()
   }
   readonly #headless = new Semaphore(MAX_CONCURRENT_HEADLESS)
 
@@ -352,6 +363,12 @@ export class WorkflowRunner {
       updatedAt: at,
     })
     this.deps.runChanged?.(runId, 'running')
+    // Unattended work with its own trace: nobody is waiting on the HTTP request that started this,
+    // and every step and every agent turn under it hangs off this span.
+    const span = this.deps.telemetry?.startSpan('workflow.run', {
+      attrs: { seam: 'workflow.run', 'run.id': runId, trigger: opts?.trigger ?? def.trigger ?? 'manual', steps: def.steps.length },
+    })
+    if (span) this.#runSpans.set(runId, span)
     for (const [idx, step] of def.steps.entries()) {
       await this.db.insert(schema.workflowSteps).values({
         id: randomUUID(),
@@ -819,6 +836,9 @@ export class WorkflowRunner {
     const current = await this.run(run.id)
     if (!current || TERMINAL_RUN.has(current.status)) return
     await this.setRun(run.id, { status, error: error ?? null })
+    const span = this.#runSpans.get(run.id)
+    this.#runSpans.delete(run.id)
+    span?.end(status === 'done' ? 'ok' : 'error', { status })
     this.deps.runChanged?.(run.id, status)
     await this.queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve()).catch(() => undefined)
     await this.deps.onRunTerminal?.(run.taskId, run.id).catch(() => undefined)
@@ -878,8 +898,34 @@ export class WorkflowRunner {
       : await this.db.select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
         .from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
     await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: now() }).where(eq(schema.workflowSteps.id, stepId))
-    if (before && before.status !== patch.status) this.deps.stepChanged?.(before.runId, stepId, patch.status!)
+    if (before && before.status !== patch.status) {
+      this.#markStepSpan(before.runId, stepId, patch.status!)
+      this.deps.stepChanged?.(before.runId, stepId, patch.status!)
+    }
     this.changed()
+  }
+
+  /** Open a step's span when it starts running and close it when it settles.
+   *
+   *  Here rather than in `execute`, because `execute` returns at a dozen places and two of those
+   *  settle a step without running it. Every status a step ever takes is written through `setStep`,
+   *  so this sees the whole life of one and nothing else has to remember. A step that waits at a
+   *  gate keeps its span open, which is right: waiting for a person is part of how long the step
+   *  took. */
+  #markStepSpan(runId: string, stepId: string, status: string): void {
+    if (status === 'running') {
+      const span = this.deps.telemetry?.startSpan('workflow.step', {
+        traceId: this.#runSpans.get(runId)?.traceId,
+        parentSpanId: this.#runSpans.get(runId)?.spanId,
+        attrs: { seam: 'workflow.step', 'run.id': runId, 'step.id': stepId },
+      })
+      if (span) this.#stepSpans.set(stepId, span)
+      return
+    }
+    if (!TERMINAL_STEP.has(status)) return
+    const span = this.#stepSpans.get(stepId)
+    this.#stepSpans.delete(stepId)
+    span?.end(status === 'done' || status === 'skipped' ? 'ok' : 'error', { status })
   }
 
   private changed(): void {

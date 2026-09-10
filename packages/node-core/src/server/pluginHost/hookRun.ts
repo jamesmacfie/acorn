@@ -12,6 +12,9 @@
 import type { Env } from '../bindings'
 import type { HookPayload } from '@acorn/protocol/extensionPoints.ts'
 import { dispatchPluginRoute } from './dispatch'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('hooks')
 
 export async function runPluginHookRoute(
   env: Env,
@@ -22,7 +25,7 @@ export async function runPluginHookRoute(
 ): Promise<unknown> {
   const response = await dispatchPluginRoute(env, pluginId, route, { method: 'POST', body: JSON.stringify(payload) }, signal)
   if (!response.ok) {
-    console.warn(`[hooks] ${pluginId} answered ${response.status} from ${route}`)
+    log.warn(`${pluginId} answered ${response.status} from ${route}`)
     return null
   }
   return await response.json().catch(() => null)

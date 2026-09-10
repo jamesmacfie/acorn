@@ -189,6 +189,33 @@ export type PluginBridgeWebviewRequest =
 export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
 export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
+// One telemetry record from inside a frame (docs/telemetry.md, docs/plugin-authoring.md § Telemetry
+// from a frame).
+//
+// A frame has no `ctx`, so this is the whole of its telemetry API. It carries the five record kinds
+// the model already has, minus everything the host is the only side able to state: no `owner`, which
+// the host stamps from the binding, no `runtime`, and no trace or span id, which the host mints so a
+// frame's span hangs under whatever interaction opened it.
+//
+// A span arrives finished, with a duration the frame measured, because the two ends of one span
+// would otherwise be two messages the rate window could split.
+export type PluginBridgeTelemetryRecord =
+  | { type: 'event'; name: string; attrs?: PluginBridgeTelemetryAttrs }
+  | { type: 'count' | 'gauge'; name: string; value: number; attrs?: PluginBridgeTelemetryAttrs }
+  | { type: 'span'; name: string; durationMs: number; status?: 'ok' | 'error'; attrs?: PluginBridgeTelemetryAttrs }
+  | { type: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; message: string; attrs?: PluginBridgeTelemetryAttrs }
+  | { type: 'error'; name: string; message?: string; attrs?: PluginBridgeTelemetryAttrs }
+
+/** Scalars only, the same rule every attribute map in the model follows: an object is where a request
+ *  body hides, and no sink's column model can index one anyway. The host drops anything else. */
+export type PluginBridgeTelemetryAttrs = Record<string, string | number | boolean | null>
+
+// No id and no reply, like `connected` and `keydown`. Telemetry never fails the thing it describes,
+// so there is no outcome for the frame to await and nothing it could do with one. The message still
+// counts against the port's rate window, which is what stops a frame emitting in a loop: it kills
+// itself long before the collector notices.
+export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTelemetryRecord }
+
 // The acknowledgement. The SDK posts it the moment `connect()` resolves, and it is the only message
 // a frame is required to send: the host starts a deadline when it transfers the port and shows a
 // labelled placeholder if nothing ever comes back, because a bundle that throws at module scope
@@ -209,6 +236,7 @@ export type PluginBridgeRequest =
   | PluginBridgeWebviewRequest
   | PluginBridgeCancelRequest
   | PluginBridgeKeydown
+  | PluginBridgeTelemetry
   | PluginBridgeConnected
 
 // ── Host → frame ──────────────────────────────────────────────────────────────────────────────────

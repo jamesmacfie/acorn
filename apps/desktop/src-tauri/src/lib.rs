@@ -1,5 +1,6 @@
 mod app_scheme;
 mod commands;
+mod crash;
 mod helper;
 mod keychain;
 mod menu;
@@ -218,6 +219,11 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     for dir in [&data_dir, &user_data_dir] {
         std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     }
+
+    // The earliest point both roots exist, which is what the hook needs to know. A panic before this
+    // is inside Tauri's own start-up, where there is no window, no helper and nothing to report to
+    // (src/crash.rs).
+    crash::install(&user_data_dir, app.package_info().version.to_string());
 
     let staging = if packaged { path.resource_dir().map_err(|e| e.to_string())?.join("helper") } else { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../dist/helper") };
     let node = if packaged { bundled_node() } else { bundled_node_for_host() };

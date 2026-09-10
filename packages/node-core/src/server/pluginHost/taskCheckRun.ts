@@ -14,6 +14,9 @@ import type { PluginTaskCheckDescriptor } from '@acorn/protocol/plugin/contract.
 import type { TaskRef } from '../core'
 import { dispatchPluginRoute } from './dispatch'
 import type { TaskConcern } from './taskChecks'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('task-check')
 
 /** The task rides as a query parameter minted here, so a plugin route cannot see a task the host did
  *  not name. The rule `scopedContextPath` follows on the client for agent-context captures. */
@@ -30,7 +33,7 @@ export async function runPluginTaskCheck(
 ): Promise<TaskConcern | null> {
   const response = await dispatchPluginRoute(env, pluginId, scopedPath(descriptor.check, task.id), { method: 'GET' }, signal)
   if (!response.ok) {
-    console.warn(`[task-check] ${pluginId}:${descriptor.id} answered ${response.status} from ${descriptor.check}`)
+    log.warn(`${pluginId}:${descriptor.id} answered ${response.status} from ${descriptor.check}`)
     return null
   }
   const body = await response.json().catch(() => null) as { concern?: unknown } | null

@@ -3,6 +3,9 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
 import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from '../custody/deviceTokenStore'
+import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('fleet')
 
 // Fleet membership, its storage split, and the local-node singleton invariant. See docs/shell.md,
 // "Fleet membership".
@@ -99,7 +102,7 @@ export class FleetStore {
       if (parsed.success) return parsed.data.nodes
       // An unparseable file is not one to guess at. Starting from an empty fleet costs the owner a
       // re-pair, where half-reading it could point a pinned connection at the wrong fingerprint.
-      console.warn('[fleet] fleet.json is unreadable; starting from an empty fleet')
+      log.warn('fleet.json is unreadable; starting from an empty fleet')
     } catch {
       // No file yet, so this is a first launch.
     }

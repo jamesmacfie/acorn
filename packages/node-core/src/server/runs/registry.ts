@@ -1,6 +1,9 @@
 import { runsResponseSchema, type RunRow } from '@acorn/protocol/runs.ts'
 import type { Env } from '../bindings'
 import { dispatchPluginRoute } from '../pluginHost/dispatch'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('runs')
 
 // The unified run list's node half (@acorn/protocol/runs.ts explains why this is a registry and what
 // would justify a core table instead).
@@ -65,7 +68,7 @@ export async function readRuns(env: Env): Promise<{ runs: RunRow[]; failed: stri
       // Provenance is the host's. A row never names its own source, even when the source is right.
       return parsed.data.runs.map((run) => ({ ...run, pluginId: source.pluginId }))
     } catch (error) {
-      console.warn(`[runs] ${source.pluginId} could not answer:`, error)
+      log.warn(`${source.pluginId} could not answer: ${describeError(error).message}`)
       failed.push(source.pluginId)
       return []
     } finally {

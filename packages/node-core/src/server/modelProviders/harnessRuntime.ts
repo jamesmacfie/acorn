@@ -23,6 +23,9 @@ import { runHeadless } from '../headless'
 import { profileAvailable, resolveCommand, type ProfileDef } from '../profiles'
 import { DEFAULT_TIMEOUT_MS, validateInput } from './runtime'
 import type { GenerateTextInput, GenerateTextResult } from './types'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('harness-generate')
 
 // Two at a time, per profile and in total for that profile. Four Generate dialogs opened at once
 // should not put four agent CLIs on the machine, and a CLI start costs far more than an HTTP request
@@ -117,7 +120,7 @@ export async function generateTextForHarness(
       // The stderr tail goes to the log and never to the client, which is the flatten rule in
       // docs/integrations.md § Provider boundaries. A CLI's stderr can quote a config file or a path,
       // and a failed generate is not the place to find out what else.
-      console.warn(`[harness-generate] ${profile.id} ${run.status} in ${Date.now() - started}ms: ${run.stderrTail.trim().slice(-500)}`)
+      log.warn(`${profile.id} ${run.status} in ${Date.now() - started}ms: ${run.stderrTail.trim().slice(-500)}`)
       throw new ProviderOperationError('provider_unavailable', 502)
     }
     return {

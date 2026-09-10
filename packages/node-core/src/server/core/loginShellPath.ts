@@ -8,6 +8,9 @@
 //
 // See docs/node-distribution.md § Boot order, and core/proc.ts for the one place that waits.
 import { execFile } from 'node:child_process'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('service:boot')
 
 // Long enough for a slow profile, short enough that a broken shell cannot wedge the first spawn
 // forever. Unchanged from when the probe ran in front of the whole boot.
@@ -57,6 +60,6 @@ async function readLoginShellPath(): Promise<void> {
     })
     if (path) process.env.PATH = path
   } catch (error) {
-    console.warn('[service:boot] login-shell PATH probe failed; keeping inherited PATH:', error)
+    log.warn(`login-shell PATH probe failed; keeping inherited PATH: ${describeError(error).message}`)
   }
 }
