@@ -1,5 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { format, parseArgs } from 'node:util'
+import { parseArgs } from 'node:util'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { bootMark, heldLines, holdLine, printBootMarks } from './boot'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
@@ -17,27 +19,9 @@ import { openTerminalRenderer, type Renderer } from './renderer'
 // The shell is whole (docs/tui.md § The screen): a rail of tasks, a pane strip, a palette, a footer
 // that says what the keyboard will do, and the same twelve client plugins the desktop registers.
 
-// This host's cold-start account, held rather than printed. stderr is the file the renderer draws on,
-// so a timing line written while it owns the terminal reads as the shell going to garbage — the same
-// reason Node's own warnings are held below. Every mark is kept and printed on the way out, after
-// `renderer.destroy()` has handed the terminal back.
-//
-// Unconditional, unlike the desktop helper's: these lines only appear once the shell has already
-// exited, where there is nothing left to interrupt, and a person who ran `acorn` and waited two seconds
-// for a rail has earned the account of where they went
-// (docs/local-development.md § Timing a cold start).
-const bootStarted = process.hrtime.bigint()
-const bootMarks: { label: string; at: number }[] = []
-const bootMark = (label: string): void => {
-  bootMarks.push({ label, at: Number(process.hrtime.bigint() - bootStarted) / 1e6 })
-}
-const printBootMarks = (): void => {
-  let previous = 0
-  for (const { label, at } of bootMarks) {
-    console.error(`[acorn:boot] ${label} +${at.toFixed(0)}ms (${(at - previous).toFixed(0)}ms)`)
-    previous = at
-  }
-}
+// The boot account and the held lines are `./boot.ts`, which says why they are held and how they
+// also become spans.
+const log = createLogger('acorn')
 
 const { values } = parseArgs({
   options: {
@@ -52,18 +36,15 @@ const { values } = parseArgs({
 // soon as the child is spawned, and the shell draws from the persisted cache while it boots
 // (./node/open.ts, docs/performance.md § Every host draws first).
 const opened = await openNode(values.node).catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error))
+  log.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
 // The node: attached to, or spawned and still booting.
 bootMark('node open')
 
 let leaving = false
-// What this process wants to say and cannot, because stderr is the file the renderer draws on and a
-// line written there garbles the shell until the next full repaint. Printed on the way out, beside the
-// boot account. `opened.held` — a started child's stderr — is held the same way, in `supervise.ts`,
-// and read at print time because it grows for the life of the run.
-const heldLines: string[] = []
+// `opened.held` — a started child's stderr — is held the same way this process's own lines are, in
+// `supervise.ts`, and read at print time because it grows for the life of the run (./boot.ts).
 const platform = installPlatform(opened, () => void quit())
 
 // Nothing that reaches the node may be imported before the seam exists: an import is evaluated once,
@@ -78,6 +59,17 @@ const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/rel
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
 const { createEffect, createRoot } = await import('solid-js')
 const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
+const { startClientTelemetry } = await import('@acorn/client-core/infra/telemetry/emitter.ts')
+const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/post.ts')
+
+// This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
+// off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
+// arrangement the desktop's composition root has (docs/telemetry.md § The switch).
+//
+// The poster is client-core's, unchanged. A batch leaves over the ordinary API client, which on this
+// host is the platform seam installed above, so the terminal client needed no transport of its own —
+// only a different `runtime` on the batch (docs/tui.md § What the terminal client reports).
+startClientTelemetry({ runtime: 'tui', post: postTelemetryBatch('tui') })
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
@@ -150,16 +142,18 @@ const renderer: Renderer = openTerminalRenderer()
 // moment something is shredding it.
 //
 // Held, not dropped: the lines go out with the boot account once `renderer.destroy()` has the terminal
-// back, the same way Node's own warnings and a started node's stderr already do. `format` rather than
-// `String`, so an Error still prints its stack and `%s` still means what the caller meant.
+// back, the same way Node's own warnings and a started node's stderr already do (./boot.ts § holdLine).
+//
+// The logger is held by this too, and that is the arrangement rather than an accident. A line written
+// through `createLogger` still reaches the emitter and still becomes a record; what the hold catches
+// is the `console.error` the logger writes underneath, which is the half that would draw on the
+// screen (docs/telemetry.md § Logging, docs/tui.md § What the terminal client reports).
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
 const realConsole = new Map(CONSOLE_METHODS.map((name) => [name, console[name].bind(console)]))
 const releaseConsole = (): void => {
   for (const name of CONSOLE_METHODS) console[name] = realConsole.get(name)!
 }
-for (const name of CONSOLE_METHODS) {
-  console[name] = (...args: unknown[]) => { heldLines.push(format(...args)) }
-}
+for (const name of CONSOLE_METHODS) console[name] = holdLine
 bootMark('renderer created')
 // Time to first draw: the renderer's own first `frame` event, which is the moment the first cells
 // reached the terminal with nothing drawn over them.
@@ -241,12 +235,14 @@ async function quit(code = 0): Promise<never> {
   releaseConsole()
   // The terminal is ours again, so everything held while the screen was busy can go out: the boot
   // account, then a started node's own stderr, then whatever this file and every console call wanted
-  // to say, then Node's warnings. `releaseConsole` first, because the lines below are console calls
-  // themselves and a held console would file them back into the list it is reading.
-  printBootMarks()
-  for (const line of opened.held ?? []) console.error(`[node] ${line}`)
-  for (const line of heldLines) console.error(line)
-  for (const warning of heldWarnings) console.error(warning)
+  // to say, then Node's warnings. Through the real `console.error` captured at install time rather
+  // than through the logger, because a held console would file these back into the list it is
+  // reading, and because a boot account is not a log line.
+  const write = realConsole.get('error')!
+  printBootMarks(write)
+  for (const line of opened.held ?? []) write(`[node] ${line}`)
+  for (const line of heldLines()) write(line)
+  for (const warning of heldWarnings) write(warning)
   await platform.dispose()
   process.exit(code)
 }
@@ -272,7 +268,7 @@ if (opened.starting) {
     () => setNodeStarting(false),
     (error: unknown) => {
       setNodeStarting(false)
-      heldLines.push(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+      log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
       void quit(1)
     },
   )
@@ -290,7 +286,7 @@ await render(
       supervised={opened.supervised}
       {...(values.task ? { task: values.task } : {})}
       onNoTask={(id) => {
-        heldLines.push(`No task ${id} on this node.`)
+        log.warn(`No task ${id} on this node.`)
         // Not from here. A warm cache answers the tasks query on the first tick, so this callback can
         // fire inside `render()` — and `renderer.destroy()` from inside a render pass throws, which
         // took the exit path with it and printed nothing at all. Let the frame finish, then leave.

@@ -1,8 +1,10 @@
 // The process broker. See docs/security.md § Process, path, and configuration controls for the
 // guarantee this gives every caller and the incidents that led to it.
 import { spawn } from 'node:child_process'
+import { basename } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 import { childEnv } from '../taskEnv'
+import { emitEvent, measure } from '../telemetry/collector'
 import { spawnsReady } from './loginShellPath'
 
 // Per stream, not combined: matches the cap plugins/http already enforces on command variables.
@@ -76,6 +78,17 @@ export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: N
   return { ...out, ...spec.env }
 }
 
+// Every spawn, as one histogram, and one event for each of the two ways a spawn ends badly without
+// throwing. `git.ts` times its own spawns as well, because "how long does git take" and "how long
+// does this node spend starting children" are different questions and the git one is the one a
+// reader asks first.
+//
+// The label is the binary's base name, never the path a caller composed: a metric name and its
+// labels have to be patterns, and `/opt/homebrew/bin/docker` and `/usr/local/bin/docker` are the
+// same fact about the same tool (docs/telemetry.md § The attribute vocabulary). The owner comes off
+// the ambient context, so a spawn under a plugin's route is that plugin's.
+const procLabel = (file: string): string => basename(file)
+
 // Never rejects on a non-zero exit: the exit code is data, and every current call site branches on it
 // anyway. Only a programming error (bad spec) can throw.
 export async function runProcess(spec: ProcSpec): Promise<ProcResult> {
@@ -83,7 +96,15 @@ export async function runProcess(spec: ProcSpec): Promise<ProcResult> {
   // front of it, so this is where a spawn pays for it: once, and only if it arrives first
   // (core/loginShellPath.ts). `spec.timeoutMs` covers the command, not the wait, which is why the
   // probe carries its own five-second ceiling.
+  //
+  // Outside the histogram below, deliberately. The first spawn of a boot can wait five seconds
+  // here, and one sample of five seconds would describe every spawn after it.
   await spawnsReady()
+  const label = procLabel(spec.file)
+  return measure('core', 'proc.spawn', () => spawnProcess(spec, label), { file: label })
+}
+
+function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
   const maxOutputBytes = spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
   return new Promise((resolve) => {
     // Detached, so its own process group, so the kill below reaps grandchildren too. A `sh -c` wrapper
@@ -195,6 +216,10 @@ export async function runProcess(spec: ProcSpec): Promise<ProcResult> {
       // grandchild that traps TERM. The timer is unref'd, so letting it run costs nothing and cannot hold
       // the process open.
       spec.signal?.removeEventListener('abort', abort)
+      // Events rather than attributes on the histogram: both are rare, both are worth seeing one at
+      // a time, and neither belongs in a distribution.
+      if (timedOut) emitEvent('core', 'proc.timeout', { seam: 'proc.spawn', file: label, 'timeout.ms': spec.timeoutMs ?? DEFAULT_TIMEOUT_MS })
+      if (truncated) emitEvent('core', 'proc.truncated', { seam: 'proc.spawn', file: label, 'max.bytes': maxOutputBytes })
       resolve({
         ...result,
         stdout: decode(buffers.out),

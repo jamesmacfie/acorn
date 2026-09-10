@@ -20,6 +20,7 @@ const CORE = {
   models: marker('models'),
   prefs: marker('prefs'),
   identity: marker('identity'),
+  telemetry: marker('telemetry'),
   projects: {
     byId: marker('byId'), byGithub: marker('byGithub'), checkouts: marker('checkouts'), externalProjects,
     config: marker('config'), assertConfigTrusted: marker('assertConfigTrusted'), setup: marker('setup'),
@@ -54,7 +55,7 @@ describe('scopeCore', () => {
   })
 
   it('covers every simple facet name', () => {
-    const all = ['fs', 'git', 'tasks', 'context', 'models', 'prefs', 'identity']
+    const all = ['fs', 'git', 'tasks', 'context', 'models', 'prefs', 'identity', 'telemetry']
     expect(keys(scoped({ core: all }))).toEqual([...all].sort())
   })
 

@@ -131,9 +131,21 @@ while using the app:
 | `acorn` | nothing | `[acorn:boot]` on exit for node open, App imported, tasks read, renderer created, first draw. Held rather than printed live, because stderr is the file the renderer draws on while it owns the terminal — a line written mid-session reads as the shell going to garbage. Printed after `renderer.destroy()`, beside the held Node warnings |
 
 The node's histograms count what it does over and over with nothing else counting it: `git status` and
-`git diff` spawns, and SQLite statements grouped by their first two words. They print at drain, and
-`kill -USR2 <pid>` dumps and clears them mid-session, so a second dump describes the interval rather
-than all time. `packages/node-core/src/server/perf.ts` owns both.
+`git diff` spawns as `git.<subcommand>`, and SQLite statements as `sql.<verb>`. They print at drain,
+and `kill -USR2 <pid>` dumps and clears them mid-session, so a second dump describes the interval
+rather than all time.
+
+`ACORN_PERF=1` is a printer over the telemetry collector rather than a mechanism of its own, so the
+switch also turns collection on with no sink and no preference
+(`packages/node-core/src/server/telemetry/collector.ts`, [telemetry.md](./telemetry.md) § The
+switch). The request line is printed where the request ends rather than from the collector's flush,
+because a developer watching a dev server wants it when the request finishes and not in a burst five
+seconds later.
+
+Every other line the node writes goes to **stderr** through `createLogger`, including the
+`[service:boot]` marks, which used to be on stdout. Stdout is a wire: the standalone entry prints
+its handshake JSON there. Two things are still written to stdout on purpose, both from
+`apps/node/src/entries/standalone.ts`: that handshake, and the pairing banner.
 
 Reading a desktop cold start end to end means putting three of these together: Rust spawns the helper,
 the helper's `[helper:boot] ready line` is the whole of what Rust waited for, and the renderer's clock

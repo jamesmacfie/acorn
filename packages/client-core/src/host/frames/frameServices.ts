@@ -12,6 +12,9 @@ import { activeTaskId } from '../../features/tasks/tasks'
 import type { FrameBinding, FrameServices } from './broker'
 import { isSubscribable } from './channels'
 import { onPluginFrame } from '../plugins/pluginChannel'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('commands')
 
 // The fourteen host effects a plugin frame's bridge is allowed to cause (docs/plugins.md).
 //
@@ -90,6 +93,9 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         // Pinned. The frame named a path and nothing else; which node it reaches is the host's to decide,
         // so there is no argument a plugin could pass to address a different one.
         nodeId: props.binding.nodeId,
+        // Stamped by the host, like the node id beside it: this is the one door a plugin's request
+        // comes through, so its `api.request` span says which plugin was waiting.
+        owner: props.binding.pluginId,
         signal,
         ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
       })
@@ -104,6 +110,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         method,
         // Pinned, exactly as above: the frame named a path and nothing else.
         nodeId: props.binding.nodeId,
+        owner: props.binding.pluginId,
         signal,
         ...(body === undefined
           ? {}
@@ -209,7 +216,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       )
       if (!frameBinding) return
       void executeCommand(frameBinding.command).catch((error) => {
-        console.error(`[command:${frameBinding.command}]`, error)
+        log.error(frameBinding.command, error, { 'command.id': frameBinding.command })
       })
     },
   }

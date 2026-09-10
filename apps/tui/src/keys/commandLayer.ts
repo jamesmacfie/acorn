@@ -24,6 +24,9 @@ import {
 import type { TuiKeymap } from './install'
 import { scopeDepth } from './regions'
 import { COMMAND } from './tiers'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('commands')
 
 export type CommandScope = {
   prefs: () => KeybindingPrefs
@@ -95,7 +98,7 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         name: command.id,
         desc: commandTitle(command),
         group: command.category,
-        run: () => { void executeCommand(command.id).catch((error) => console.error(`[command:${command.id}]`, error)) },
+        run: () => { void executeCommand(command.id).catch((error: unknown) => log.error(`${command.id} failed`, error, { 'command.id': command.id })) },
       }))
     const runnable = new Set(commands.map((command) => command.name))
     const bindings = resolveKeybindings(keybindingRegistry.entries(), scope.prefs())

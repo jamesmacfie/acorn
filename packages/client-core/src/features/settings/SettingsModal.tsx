@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../../infra/queries'
-import { settingsContributions } from '../../host/registries/shell/settings'
+import { settingsContributions, settingsRegistry } from '../../host/registries/shell/settings'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { Dynamic } from 'solid-js/web'
@@ -63,7 +63,7 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
           <Button variant="bare" onPress={props.onClose} title="Close" label="Close">✕</Button>
           <Show when={activePage()}>
             {(page) => (
-              <ContributionBoundary contributionId={`settings:${page().id}`}>
+              <ContributionBoundary contributionId={`settings:${page().id}`} owner={settingsRegistry.ownerOf(page().id)}>
                 <div class="overlay-title">{activeWorkspace()?.name ?? page().title ?? page().label}</div>
                 <Dynamic
                   component={page().component}

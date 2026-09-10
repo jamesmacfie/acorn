@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Env } from '../bindings'
 import { getDb } from '../db'
 import { forEachConnection, listProviderConnections } from '../integrations/connections'
+import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { createExternalItemStore } from '../integrations/itemStore'
 import { runProviderResource } from '../integrations/resourceRuntime'
@@ -15,8 +16,19 @@ const assertProviderAccess = (principal: Principal): void => {
   }
 }
 
+// Two ownership questions, because two registries answer them.
+//
+// A mirrored resource and the external-item store only exist on an *integration* provider, so those
+// two ask the narrower registry. Reading a connection and spending its credential belong to the
+// connection contribution, which every provider has, so those ask the wider one. Asking the narrow
+// registry there would refuse a plugin the use of its own credential whenever it mirrors nothing:
+// the model providers and the Sentry exporter are both in that position.
 const assertOwnedProvider = (pluginId: string, providerId: string): void => {
   integrationProviderRegistry.assertOwnedBy(providerId, pluginId)
+}
+
+const assertOwnedCredential = (pluginId: string, providerId: string): void => {
+  connectionProviderRegistry.assertOwnedBy(providerId, pluginId)
 }
 
 // The one construction site for fetch-handler request context. The methods close over host-owned
@@ -41,12 +53,12 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
     },
     connections: async (providerId) => {
       assertProviderAccess(principal)
-      assertOwnedProvider(pluginId, providerId)
+      assertOwnedCredential(pluginId, providerId)
       return listProviderConnections(getDb(env), principal.userId, providerId)
     },
     withConnections: async (providerId, visit) => {
       assertProviderAccess(principal)
-      assertOwnedProvider(pluginId, providerId)
+      assertOwnedCredential(pluginId, providerId)
       return forEachConnection(getDb(env), principal.userId, providerId, env.SECRETS, visit)
     },
     items: (providerId) => {

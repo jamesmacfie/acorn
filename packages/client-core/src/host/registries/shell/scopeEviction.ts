@@ -1,3 +1,5 @@
+import { createLogger } from '../../../infra/telemetry/logger'
+
 // Per-scope state eviction: how a module-level signal learns that a task was archived, a workspace
 // was removed, or the active node changed underneath it (docs/state.md § Scope rules).
 //
@@ -7,6 +9,8 @@
 // The lazy-import property is a feature, not a hole: a state module that has not been imported has
 // not registered, and has also not accumulated any state, so there is nothing for it to evict.
 // Registration and the thing needing eviction come into existence together.
+const log = createLogger('scope-eviction')
+
 export type ScopeEviction =
   // A task was archived. Anything keyed by taskId should drop that key.
   | { scope: 'task'; taskId: string }
@@ -37,7 +41,7 @@ export function evictScope(eviction: ScopeEviction): void {
     try {
       listener(eviction)
     } catch (error) {
-      console.error('[scope-eviction] evictor failed:', error)
+      log.error('evictor failed', error)
     }
   }
 }

@@ -2,8 +2,8 @@
 
 acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
 registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
-and are trusted like the rest of the app. Linear, rollbar, model-providers and nodes-file remain in the workspace as
-source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
+and are trusted like the rest of the app. Database, http, linear, model-providers, nodes-file, rollbar and sentry-telemetry remain in the
+workspace as source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
 [extensibility.md](./extensibility.md) covers why the two tiers exist and what the line between

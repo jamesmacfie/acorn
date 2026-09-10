@@ -1,5 +1,8 @@
 import { nodeIdFromStorageKey } from './persistedState'
 import { PrefKeys } from './prefKeys'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('prefs')
 
 const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.themeFollowSystem,
@@ -126,7 +129,7 @@ export async function drainMigratedPrefs(
       drained[key] = value
       store.removeItem(`${PREFIX}${key}`)
     } catch (error) {
-      console.warn(`[prefs] could not hand ${key} to the node`, error)
+      log.warn(`could not hand ${key} to the node`, error, { 'pref.key': key })
     }
   }
   return drained

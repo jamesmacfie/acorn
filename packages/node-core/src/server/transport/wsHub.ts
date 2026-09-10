@@ -9,7 +9,12 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { encodeIdFrame, WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
+import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { claimUpgrade } from './upgradeClaim'
+import { emitEvent, measure } from '../telemetry/collector'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('ws')
 
 // A sink is one connection's outlet for a session's ServerMsg frames. terminal.ts adds and removes it
 // from a session's subscriber set on attach/detach and calls it to push output.
@@ -143,6 +148,17 @@ function watchDrain(conn: Conn): void {
 // is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed something
 // and the broker sees no gap. Later sheds in the same congested window consume no sequence number at
 // all, because one "you are behind" is the whole message.
+// Serialising and writing one frame, as a histogram per channel. At sixty frames a second across
+// every attached socket this is a metric and could never be a span
+// (docs/telemetry.md § Hot seams are metrics), and it is where the performance programme's
+// re-escaping cost showed up.
+//
+// The channel is `<owner>:<verb>`, so the prefix is the label and a plugin's own channel names the
+// plugin as owner. Terminal output is not counted here: it takes the binary path below, which
+// exists precisely so those bytes are never serialised.
+const channelPrefix = (channel: string): string => channel.split(':', 1)[0]
+const frameOwner = (channel: string): string => parsePluginChannel(channel)?.pluginId ?? 'core'
+
 function sendFrame(conn: Conn, frame: WsServerFrame): void {
   if (conn.ws.readyState !== conn.ws.OPEN) {
     // Nobody will read this socket's sequence again. Kept incrementing so the counter still describes
@@ -163,12 +179,18 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
       if (conn.shedding) return
       conn.shedding = true
       conn.seq += 1
+      // One event per congested window, not per shed frame, because the socket falls silent after
+      // this until it drains and one "you are behind" is the whole message.
+      emitEvent(frameOwner(frame.channel), 'ws.shed', { seam: 'ws.frame', channel: channelPrefix(frame.channel) })
       conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame))
       return
     }
   }
   conn.seq += 1
-  conn.ws.send(JSON.stringify({ ...frame, seq: conn.seq } satisfies WsServerWireFrame))
+  const seq = conn.seq
+  measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...frame, seq } satisfies WsServerWireFrame)), {
+    channel: channelPrefix(frame.channel),
+  })
 }
 
 // Terminal output, as one binary frame instead of an escaped JSON string.
@@ -233,7 +255,7 @@ export function wsBroadcast(frame: WsServerFrame): void {
     try {
       listener(frame)
     } catch (error) {
-      console.warn('[ws] a node-side event listener threw:', error)
+      log.warn(`a node-side event listener threw: ${describeError(error).message}`)
     }
   }
 }

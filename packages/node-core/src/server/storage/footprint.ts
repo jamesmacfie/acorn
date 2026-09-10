@@ -5,6 +5,9 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { PLUGIN_DB_DIR } from '../plugins/storage'
 import { resolveDatabasePath } from './paths'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('storage')
 
 async function fileBytes(path: string): Promise<number> {
   try {
@@ -62,11 +65,11 @@ export async function logStorageFootprint(
   ]
   for (const contributor of contributors) {
     const counts = await contributor.counts().catch((error: unknown) => {
-      console.warn(`[storage] ${contributor.plugin} footprint failed:`, error)
+      log.warn(`${contributor.plugin} footprint failed: ${describeError(error).message}`)
       return null
     })
     // `null` is the failure above, and is not rendered as zeros.
     if (counts) parts.push(`${contributor.plugin} ${Object.entries(counts).map(([key, value]) => `${key}=${value}`).join(' ')}`)
   }
-  console.log(`[storage] ${parts.join(' ')}`)
+  log.info(parts.join(' '))
 }

@@ -7,6 +7,7 @@ import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { adoptLegacyCustody } from '@acorn/custody/custody/legacyCustody.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
 import { HELPER_PROTOCOL } from '../shell/wire'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
 
 // The desktop helper process: the whole custody stack, running under the bundled Node runtime with
 // Rust as its supervisor. See docs/shell.md, "The shell process".
@@ -25,6 +26,11 @@ import { HELPER_PROTOCOL } from '../shell/wire'
 
 // Every line Rust is meant to read carries this key. Everything else on stdout is a log.
 const TAG = 'acorn-helper'
+
+// Everything this file says that is not for Rust. The node's logger rather than the renderer's,
+// because it writes to stderr and stdout here is a wire (docs/telemetry.md § Logging). The two
+// `console.log` calls below stay console calls: they are the handshake protocol, not log lines.
+const log = createLogger('helper')
 
 const handshakeSchema = z.strictObject({
   protocol: z.literal(HELPER_PROTOCOL),
@@ -157,7 +163,7 @@ const stop = async (code: number): Promise<never> => {
     await running?.server.close()
     await running?.helper.dispose()
   } catch (error) {
-    console.error('[helper] shutdown failed:', error)
+    log.error(`shutdown failed: ${describeError(error).message}`)
   }
   process.exit(code)
 }
@@ -188,7 +194,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     // The owner's answer to the recovery screen. Forgive the spent budget and try once more.
     await (await booted).helper.retry()
   }).catch((error: unknown) => {
-    console.error('[helper] failed:', error)
+    log.error(`failed: ${describeError(error).message}`)
     void stop(1)
   })
 })

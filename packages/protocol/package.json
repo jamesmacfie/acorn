@@ -44,6 +44,7 @@
     "./runs.ts": "./src/runs.ts",
     "./schedules.ts": "./src/schedules.ts",
     "./serviceProtocol.ts": "./src/serviceProtocol.ts",
+    "./telemetry.ts": "./src/telemetry.ts",
     "./terminal.ts": "./src/terminal.ts",
     "./themeTokens.ts": "./src/themeTokens.ts",
     "./toolPermissions.ts": "./src/toolPermissions.ts",

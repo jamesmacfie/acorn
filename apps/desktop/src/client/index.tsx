@@ -17,8 +17,51 @@ import { watchTaskChanges } from '@acorn/client-core/features/tasks/watchTaskCha
 import { watchConnectionChanges } from '@acorn/client-core/features/integrations/watchConnectionChanges.ts'
 import { watchProjectChanges } from '@acorn/client-core/features/projects/watchProjectChanges.ts'
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
+import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
 
 const noop = () => null
+
+const log = createLogger('renderer')
+
+// The renderer's telemetry, wired before anything renders so a seam that fires during boot has
+// somewhere to put its record (docs/telemetry.md § The renderer). Wiring is not collecting: the
+// emitter stays off until `App.tsx` reads `telemetry.enabled` off the node and says otherwise.
+startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
+
+// The two failures nothing in the app catches. Before this the renderer had neither handler, so an
+// error thrown outside a component's boundary was a line in a devtools console nobody had open.
+//
+// Fatal and unhandled, with the stack, which is the one place a client record carries one: an
+// uncaught error with no stack is not worth sending anywhere (docs/telemetry.md § What never leaves
+// the machine).
+window.addEventListener('error', (event) => {
+  emitError('core', {
+    name: event.error instanceof Error ? event.error.name || 'Error' : 'Error',
+    message: event.message,
+    ...(event.error instanceof Error && event.error.stack ? { stack: event.error.stack } : {}),
+    level: 'fatal',
+    handled: false,
+    attrs: { seam: 'window.error' },
+  })
+})
+window.addEventListener('unhandledrejection', (event) => {
+  const reason: unknown = event.reason
+  emitError('core', {
+    name: reason instanceof Error ? reason.name || 'Error' : 'Error',
+    message: reason instanceof Error ? reason.message : String(reason),
+    ...(reason instanceof Error && reason.stack ? { stack: reason.stack } : {}),
+    level: 'fatal',
+    handled: false,
+    attrs: { seam: 'window.unhandledrejection' },
+  })
+})
+
+// The last chance a window gets. `pagehide` rather than `beforeunload`, because a webview being
+// closed does not always fire the latter, and the post is fire-and-forget either way: whatever does
+// not make it out is a batch the queue has already dropped.
+window.addEventListener('pagehide', () => void flushTelemetry())
 
 // The renderer's half of a cold-start timeline. `performance.mark` always, because it costs nothing and
 // puts the same labels in the devtools performance panel; the console line only when asked, because this
@@ -41,7 +84,7 @@ const bootPerf = (() => {
 })()
 const bootMark = (label: string): void => {
   performance.mark(`acorn:${label}`)
-  if (bootPerf) console.log(`[renderer:boot] ${label} +${performance.now().toFixed(0)}ms`)
+  if (bootPerf) log.info(`${label} +${performance.now().toFixed(0)}ms`)
 }
 bootMark('script start')
 

@@ -5,6 +5,9 @@
 // importable in the Node-only client-core suite (docs/frontend.md § Registries and plugins).
 import { clampMarkerPriority, type RailMarker } from '../../../features/tabs/railMarkers'
 import { Registry } from '../../../kit/lib/registry'
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('rail-markers')
 
 export type RailMarkerTarget =
   | { kind: 'task'; id: string }
@@ -58,7 +61,7 @@ export function markersFor(target: RailMarkerTarget): RailMarker[] {
         markers.push({ ...marker, id: `${contribution.id}:${marker.id}`, priority: clampMarkerPriority(marker.priority) })
       }
     } catch (error) {
-      console.warn(`[rail-markers] contribution '${contribution.id}' failed`, error)
+      log.warn(`contribution '${contribution.id}' failed`, error, { 'contribution.id': contribution.id })
     }
   }
   return markers

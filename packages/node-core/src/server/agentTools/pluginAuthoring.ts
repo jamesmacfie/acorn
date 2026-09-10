@@ -79,6 +79,9 @@ const BRIDGE_KINDS = {
   document: 'the host editor of a document-over-frame pane (see documentOps); denied from every other surface',
   webview: 'controller verbs for a webview surface (see webviewOps); you cannot read the page or type into it',
   cancel: 'abandon an in-flight request by id',
+  telemetry: 'one telemetry record about your own frame: an event, a count, a gauge, a finished span, a log line '
+    + 'or an error, as `{ kind: "telemetry", record }`. No id and no reply, and the host stamps the owner from '
+    + 'the binding, so you never pass a plugin id. Counts against the same message budget as everything else',
   keydown: 'forward a chord this frame did not claim back to the shell',
   connected: 'the ack. Post it (or anything) or the host replaces the frame after 10s',
 } satisfies Record<PluginBridgeRequest['kind'], string>
@@ -235,7 +238,11 @@ merges every plugin's into one list — register it if you own work that starts,
 not otherwise, never every call you make. \`ctx.extensionPoints\` is the node's many-to-many seam —
 \`open\` a point in your own namespace, \`contribute\` into anyone's — and the rule is a capability when
 there is one right answer, a point when there are many.
-There is no \`ctx.log\`; use \`console\`, prefixed with your plugin id.
+\`ctx.log\` and \`ctx.telemetry\` are on both tiers and need no permission: a log line, an event, a count,
+a gauge, a span, an error, each stamped with your plugin id by the host. Reading what everyone else
+collects is the other direction and is a token, \`permissions.node.core: ["telemetry"]\`, which gives you
+\`ctx.core.telemetry.onBatch\` and which the trust prompt draws high. A frame emits its own records over
+the bridge's \`telemetry\` verb instead, because a frame has no \`ctx\`.
 
 ## The loop — you cannot install anything, so ask
 

@@ -21,9 +21,9 @@ const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])
 
-// Measured at 963,940 B on 2026-09-04, and rounded up by about 3% so an unrelated comment does not
-// turn the build red — the same rule every ceiling here has had. The history, because each step moved
-// it for a different reason (docs/performance.md § The eager closure, and the new ceiling):
+// Measured at 1,095,346 B on 2026-09-11, and rounded up by about 3% so an unrelated comment does not
+// turn the build red, which is the rule every ceiling here has had. The history, because each step
+// moved it for a different reason (docs/performance.md § The eager closure, and the new ceiling):
 //
 //   1,114,282 B  the performance programme's phase 0, its first measurement.
 //   1,024,422 B  its phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this
@@ -37,7 +37,26 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 //     963,940 B  the terminal rewrite. The painter is ours now, so it is in this bundle instead of
 //                being a 6 MB native library outside it: `../src/renderer.ts`, `../src/tree/`
 //                and `../src/keyEvent.ts` together are about 98 KB of the closure, and that is
-//                nearly the whole of the rise.
+//                nearly the whole of the rise. The ceiling was set at 995,000 B here.
+//   1,044,911 B  and then it drifted past that one too, by 49,911 B, over the week between
+//                2026-09-04 and 2026-09-11. Nobody raised it, because a build that is already red
+//                is a build people stop reading. Measured on 2026-09-11 with the telemetry
+//                programme stashed, which is how the split below is known.
+//   1,095,346 B  the telemetry programme, +50,435 B. Two thirds of it is real: client-core's
+//                emitter (14.2 KB), the logger (2.4 KB) and the log and span call sites spread
+//                across about forty chunks. The other third, 15.9 KB, is the node's collector and
+//                logger arriving through `@acorn/custody`, which this client imports for the
+//                broker, the plugin cache and the token store. That third collects nothing here:
+//                the terminal client reports through client-core's emitter, and the node collector
+//                it also carries has no sink and no preference reader. It is dead weight the
+//                helper needs and this client does not, written down in
+//                docs/telemetry.md § The terminal client, the helper, and the shell.
+//
+// Getting that 15.9 KB back means custody taking a logger through its surface instead of importing
+// one. That is a new seam in a package eight files wide, for 1.5% of a graph this size, and it was
+// judged not worth it on 2026-09-11. The honest reading of the two rises above is that a ceiling
+// nobody can reach stops being a ceiling: the number below is what the graph measures, and the next
+// person to move it should have to explain why, the way these entries do.
 //
 // Dropping dead dependencies moved none of this and was never going to. Every bare import is left to
 // the runtime by `../vite.config.ts`, so a package that is only ever imported weighs nothing here
@@ -46,7 +65,7 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 // What is left is the chrome, the client-core it draws with, and the painter, which is what the first
 // frame is made of. There is no registry in it and nothing here is waiting to be made lazy: the next
 // honest saving is a smaller kit, not a later import.
-const CEILING = 995_000
+const CEILING = 1_130_000
 
 // The same list the desktop's check holds, for the same reason: a chunk with one of these names in a
 // startup graph is a lazy surface that leaked into the eager one. Written twice rather than shared,

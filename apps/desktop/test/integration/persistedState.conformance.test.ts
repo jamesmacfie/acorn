@@ -11,6 +11,7 @@ import { dockerPrefsSlice } from '@acorn/plugin-docker/testkit/client'
 import { editorOpenFilesSlice } from '@acorn/plugin-editor/testkit/client'
 import { prFiltersSlice } from '@acorn/plugin-github/testkit/client'
 import { agentToolFoldSlice } from '@acorn/plugin-agents/testkit/client'
+import { changeViewSlice } from '@acorn/plugin-changes/testkit/client'
 
 // The plugin slices are enumerated here rather than read from persistedStateRegistry because this
 // Node-only conformance suite does not load SolidJS modules. The completeness check keeps the persisted
@@ -21,6 +22,7 @@ const pluginSlices: readonly PersistedStateSlice<unknown>[] = [
   contextSelectionSlice,
   dockerPrefsSlice,
   agentToolFoldSlice,
+  changeViewSlice,
 ] as readonly PersistedStateSlice<unknown>[]
 
 const slices: readonly PersistedStateSlice<unknown>[] = [

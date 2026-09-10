@@ -1,0 +1,235 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
+import {
+  _resetClientTelemetry,
+  currentTraceparent,
+  emitEvent,
+  flushTelemetry,
+  measure,
+  recordDuration,
+  setTelemetryEnabled,
+  startClientTelemetry,
+  startInteraction,
+  telemetryEnabled,
+} from './emitter'
+
+let posted: TelemetryRecord[][]
+
+const start = (post: (records: readonly TelemetryRecord[]) => Promise<void> = async (records) => void posted.push([...records])) => {
+  startClientTelemetry({ runtime: 'renderer', post })
+}
+
+beforeEach(() => {
+  _resetClientTelemetry()
+  posted = []
+})
+afterEach(() => {
+  _resetClientTelemetry()
+  vi.useRealTimers()
+})
+
+describe('with the switch off', () => {
+  it('builds nothing at all', async () => {
+    start()
+    expect(telemetryEnabled()).toBe(false)
+    emitEvent('core', 'nav.change')
+    await flushTelemetry()
+    expect(posted).toEqual([])
+  })
+
+  it('hands an inert span back, so a caller writes the same two lines either way', () => {
+    start()
+    const span = startInteraction('core', { name: 'command' })
+    expect(span.traceId).toBe('')
+    span.end()
+    expect(currentTraceparent()).toBeUndefined()
+  })
+
+  it('runs the measured call and returns its own result untouched', () => {
+    start()
+    expect(measure('core', 'ws.inbound', () => 41 + 1)).toBe(42)
+  })
+})
+
+describe('the interaction trace', () => {
+  beforeEach(() => {
+    start()
+    setTelemetryEnabled(true)
+  })
+
+  it('is a W3C traceparent while an interaction is open, and nothing after', () => {
+    expect(currentTraceparent()).toBeUndefined()
+    const span = startInteraction('core', { name: 'command' })
+    const header = currentTraceparent()
+    expect(header).toBeDefined()
+    const parsed = parseTraceparent(header)
+    expect(parsed).toEqual({ traceId: span.traceId, parentSpanId: span.spanId, sampled: true })
+    span.end()
+    expect(currentTraceparent()).toBeUndefined()
+  })
+
+  it('leaves the newer interaction in charge when an older one ends under it', () => {
+    // Two clicks in quick succession. Ending the first must not orphan the requests the second is
+    // about to make.
+    const first = startInteraction('core', { name: 'command' })
+    const second = startInteraction('core', { name: 'nav.change' })
+    first.end()
+    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(second.spanId)
+  })
+
+  it('hangs a plain span under the open interaction', async () => {
+    const interaction = startInteraction('core', { name: 'command' })
+    emitEvent('agents', 'cache-miss')
+    interaction.end()
+    await flushTelemetry()
+    const [batch] = posted
+    const span = batch.find((record) => record.kind === 'span')
+    expect(span?.kind === 'span' && span.traceId).toBe(interaction.traceId)
+  })
+})
+
+describe('flushing', () => {
+  it('posts once the queue reaches five hundred records', async () => {
+    start()
+    setTelemetryEnabled(true)
+    for (let index = 0; index < 500; index += 1) emitEvent('core', 'cache-miss')
+    // Scheduled on a microtask, never run where the record was emitted: a slow poster must not add
+    // its own latency to the click it is describing.
+    expect(posted).toEqual([])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(posted).toHaveLength(1)
+    expect(posted[0]).toHaveLength(500)
+  })
+
+  it('posts on the five-second tick', async () => {
+    vi.useFakeTimers()
+    start()
+    setTelemetryEnabled(true)
+    emitEvent('core', 'cache-miss')
+    expect(posted).toEqual([])
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(posted).toHaveLength(1)
+  })
+
+  it('keeps the records when the post fails, so an offline node costs nothing', async () => {
+    let attempts = 0
+    start(async () => {
+      attempts += 1
+      if (attempts === 1) throw new Error('node offline')
+      posted.push([])
+    })
+    setTelemetryEnabled(true)
+    emitEvent('core', 'cache-miss')
+    await flushTelemetry()
+    expect(posted).toEqual([])
+    // Still held, and the next flush sends the same record.
+    await flushTelemetry()
+    expect(attempts).toBe(2)
+  })
+
+  it('stamps the runtime on every record and refuses one an emitter set', async () => {
+    start()
+    setTelemetryEnabled(true)
+    emitEvent('agents', 'cache-miss', { runtime: 'node', owner: 'github', route: '/v2/core/tasks' })
+    await flushTelemetry()
+    const [only] = posted[0]
+    expect(only.attrs).toEqual({ route: '/v2/core/tasks', owner: 'agents', runtime: 'renderer' })
+  })
+
+  it('throws away what it holds when the switch goes off', async () => {
+    start()
+    setTelemetryEnabled(true)
+    emitEvent('core', 'cache-miss')
+    setTelemetryEnabled(false)
+    await flushTelemetry()
+    expect(posted).toEqual([])
+  })
+})
+
+describe('histograms', () => {
+  it('folds a hot seam into one record per window', async () => {
+    start()
+    setTelemetryEnabled(true)
+    for (let index = 0; index < 50; index += 1) measure('terminal', 'ws.inbound.term', () => index)
+    await flushTelemetry()
+    const [only] = posted[0]
+    expect(only.kind).toBe('metric')
+    expect(only.kind === 'metric' && only.name).toBe('ws.inbound.term')
+    expect(only.kind === 'metric' && typeof only.value === 'object' && only.value.count).toBe(50)
+    expect(only.attrs.owner).toBe('terminal')
+  })
+
+  it('keeps a row per label set, so a varying label does not report one value for every series', async () => {
+    // The bug this replaced merged by owner and seam alone and kept the first sample's attributes,
+    // so `tui.frame` reported the layout timings under every phase's name
+    // (docs/telemetry.md § Hot seams are metrics).
+    start()
+    setTelemetryEnabled(true)
+    for (const phase of ['layout', 'paint', 'flush']) {
+      for (let index = 0; index < 4; index += 1) recordDuration('core', 'tui.frame', index + 1, { phase })
+    }
+    await flushTelemetry()
+    const rows = posted[0].filter((record) => record.kind === 'metric')
+    expect(rows.map((row) => row.attrs.phase).sort()).toEqual(['flush', 'layout', 'paint'])
+    for (const row of rows) expect(row.kind === 'metric' && typeof row.value === 'object' && row.value.count).toBe(4)
+  })
+
+  it('sorts the label set, so two call sites in a different order are one row', async () => {
+    start()
+    setTelemetryEnabled(true)
+    recordDuration('core', 'bridge.call', 1, { method: 'GET', 'node.id': 'n1' })
+    recordDuration('core', 'bridge.call', 3, { 'node.id': 'n1', method: 'GET' })
+    await flushTelemetry()
+    const rows = posted[0].filter((record) => record.kind === 'metric')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].kind === 'metric' && typeof rows[0].value === 'object' && rows[0].value.count).toBe(2)
+  })
+
+  it('past 200 series a sample keeps its count, loses its labels, and says so', async () => {
+    start()
+    setTelemetryEnabled(true)
+    for (let index = 0; index < 250; index += 1) recordDuration('core', 'tree.apply', 1, { 'tree.id': `t${index}` })
+    await flushTelemetry()
+    const rows = posted[0].filter((record) => record.kind === 'metric')
+    // 200 labelled rows, the unlabelled row the overflow folded into, and the truncation count.
+    const labelled = rows.filter((row) => typeof row.attrs['tree.id'] === 'string')
+    expect(labelled).toHaveLength(200)
+    const overflow = rows.find((row) => row.name === 'tree.apply' && row.attrs['tree.id'] === undefined)
+    expect(overflow?.kind === 'metric' && typeof overflow.value === 'object' && overflow.value.count).toBe(50)
+    const truncated = rows.find((row) => row.name === 'telemetry.truncated')
+    expect(truncated?.kind === 'metric' && truncated.value).toBe(50)
+    // The totals stay exact whatever the cap did to the labels.
+    const counted = rows
+      .filter((row) => row.name === 'tree.apply')
+      .reduce((total, row) => total + (row.kind === 'metric' && typeof row.value === 'object' ? row.value.count : 0), 0)
+    expect(counted).toBe(250)
+  })
+})
+
+
+it('does not resurrect an ended interaction when overlapping work finishes', () => {
+  start()
+  setTelemetryEnabled(true)
+  const first = startInteraction('core', { name: 'first' })
+  const second = startInteraction('core', { name: 'second' })
+  first.end()
+  second.end()
+  expect(currentTraceparent()).toBeUndefined()
+})
+
+it('does not restore a failed post across an off/on consent change', async () => {
+  let reject!: (error: Error) => void
+  const post = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+  start(post)
+  setTelemetryEnabled(true)
+  emitEvent('core', 'before-off')
+  const pending = flushTelemetry()
+  setTelemetryEnabled(false)
+  setTelemetryEnabled(true)
+  reject(new Error('offline'))
+  await pending
+  await flushTelemetry()
+  expect(post).toHaveBeenCalledOnce()
+})

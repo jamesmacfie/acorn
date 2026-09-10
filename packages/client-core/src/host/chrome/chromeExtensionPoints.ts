@@ -169,14 +169,14 @@ export const registerPluginExtensionPoint = (
   pluginId: string,
   descriptor: PluginExtensionPointDescriptor,
   binding: PluginExtensionBinding,
-): Disposable => extensionPointRegistry.register(pluginExtensionPoint(pluginId, descriptor, binding))
+): Disposable => extensionPointRegistry.register(pluginExtensionPoint(pluginId, descriptor, binding), pluginId)
 
 /** Validate, bind and register one contribution. */
 export const registerPluginExtension = (
   pluginId: string,
   descriptor: PluginExtensionDescriptor,
   binding: PluginExtensionBinding,
-): Disposable => extensionRegistry.register(pluginExtension(pluginId, descriptor, binding))
+): Disposable => extensionRegistry.register(pluginExtension(pluginId, descriptor, binding), pluginId)
 
 /** Every kind this shell can draw, for the developer view's own header. Derived rather than typed out,
  *  so a kind added to the protocol shows up here without a second edit. */

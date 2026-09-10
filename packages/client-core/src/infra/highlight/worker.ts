@@ -5,6 +5,9 @@
 import { getHighlighter } from './shiki'
 import { langFor } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('highlight')
 
 /** Tokenize a whole document. `path` only picks the grammar; `code` is newline-separated source. */
 export type TokenizeDocument = (path: string, code: string) => Promise<HighlightLines>
@@ -32,7 +35,7 @@ const kill = (why: string) => {
   if (state !== 'dead') {
     // Logs loudly: see docs/diff-rendering.md § Syntax highlighting for the silent failure this
     // replaces.
-    console.error(`[highlight] worker unavailable, falling back to the main thread: ${why}`)
+    log.error(`worker unavailable, falling back to the main thread: ${why}`)
   }
   state = 'dead'
   worker?.terminate()

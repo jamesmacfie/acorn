@@ -253,6 +253,19 @@ export { rowHeight, termFontSize } from '@acorn/client-core/kit/lib/metrics.ts'
 // vocabulary is not the kit's, and this is the one translation between them.
 export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/kit/lib/displayMeta.ts'
 
+// ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
+// The client half of what `ctx.telemetry` and `ctx.log` are on the node, and the id is an argument
+// here because a compiled client plugin's context is contribution points and nothing else: `init`
+// is the one place its own id is in hand (docs/plugin-authoring.md § Telemetry and logging).
+//
+// Not on ./ui, because none of it draws. A sandboxed frame gets neither: it has no host module to
+// import, and posts a `telemetry` message over the bridge instead, which the host stamps from the
+// binding.
+export { telemetryFor } from '@acorn/client-core/infra/telemetry/emitter.ts'
+export type { PluginTelemetry, SpanHandle } from '@acorn/client-core/infra/telemetry/emitter.ts'
+export { createLogger, describeError } from '@acorn/client-core/infra/telemetry/logger.ts'
+export type { Logger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
 // ── Small helpers ─────────────────────────────────────────────────────────────────────────────
 export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/highlight/shiki.ts'
 export { debounce } from '@acorn/client-core/kit/lib/debounce.ts'

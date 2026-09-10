@@ -23,6 +23,9 @@ import { activateScopedStateEviction } from './scopedEviction'
 import { shellSlotContributions } from './slotContributions'
 import { coreSourceContributions } from './sourceContributions'
 import { ensurePluginChannel } from '@acorn/client-core/host/plugins/pluginChannel.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('client:boot')
 
 // The one WS prefix core claims on every loaded plugin's behalf, since a loaded plugin cannot claim one
 // itself (plugins/pluginChannel.ts). Claimed here with core's own three so the set is fixed at boot and
@@ -57,7 +60,7 @@ activateScopedStateEviction()
 // anything renders, and in the shell rather than in the plugin that wrote them: a loaded plugin's
 // frame has its own storage area and could not reach these (persistence/legacyStorage.ts).
 const swept = purgeRetiredLocalStorage()
-if (swept.length) console.log(`[client:boot] removed ${swept.length} retired local key(s)`)
+if (swept.length) log.info(`removed ${swept.length} retired local key(s)`)
 
 // The first activation runs with nothing disabled, and that is not a placeholder: the list belongs to
 // a node, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is called
@@ -68,7 +71,7 @@ if (swept.length) console.log(`[client:boot] removed ${swept.length} retired loc
 // so the worst case of registering everything first is a contribution that disappears a moment later;
 // the worst case of waiting is a shell that will not paint because a node is slow to answer.
 const activated = initClientPlugins(clientPlugins)
-if (activated.skipped.length) console.log(`[client:boot] plugins disabled: ${activated.skipped.join(', ')}`)
+if (activated.skipped.length) log.info(`plugins disabled: ${activated.skipped.join(', ')}`)
 
 // Re-run the host with whatever the active node reports. This is the client-side disable: the host
 // takes each plugin's previous contributions back before re-registering, so one call replaces a
@@ -89,5 +92,5 @@ export async function applyNodePlugins(nodeId?: string): Promise<void> {
   if (state) applied = target
   const disabled = disabledNodePlugins()
   const result = initClientPlugins(clientPlugins, { disabled })
-  if (result.skipped.length) console.log(`[client] plugins disabled by this node: ${result.skipped.join(', ')}`)
+  if (result.skipped.length) log.info(`plugins disabled by this node: ${result.skipped.join(', ')}`)
 }

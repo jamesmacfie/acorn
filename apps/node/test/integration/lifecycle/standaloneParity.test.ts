@@ -69,15 +69,18 @@ describe('plugin-state parity', () => {
     // standalone node, which has nothing to replace it with, used to say nothing at all while a
     // `build:plugin` output outlived every later build. The row itself is the fact, so it is read
     // directly.
+    //
+    // Read off `console.error`, not `console.log`: every line the node writes goes to stderr
+    // through the logger now, because stdout is a wire (docs/telemetry.md § Logging).
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
     const lines: string[] = []
-    const log = console.log
-    console.log = (...args: unknown[]) => void lines.push(args.join(' '))
+    const write = console.error
+    console.error = (...args: unknown[]) => void lines.push(args.join(' '))
     try {
       markPluginUserManaged(dataRoot, 'rollbar')
       reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: undefined, development: true })
     } finally {
-      console.log = log
+      console.error = write
       rmSync(dataRoot, { recursive: true, force: true })
     }
     expect(lines.join('\n')).toContain('NOT taking app updates (installed by the owner on this node): rollbar')

@@ -7,6 +7,9 @@ import { startNode } from './node/supervise'
 import { dataRootDir } from './node/paths'
 import { createPluginCustody } from './plugins/custody'
 import { setTerminalBadge, showInTerminal } from './kit/notify'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('fleet')
 
 // The platform seam, from a Node process.
 //
@@ -130,7 +133,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await broker
           .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v2/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
-          .catch((error: unknown) => console.warn(`[fleet] could not revoke this device on ${nodeId}:`, error))
+          .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}`, error, { 'node.id': nodeId }))
       }
       broker.remove(nodeId)
       fleet.forget(nodeId)

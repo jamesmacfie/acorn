@@ -7,6 +7,8 @@ import {
   registerHookPoint,
   runHook,
 } from './hooks'
+import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
+import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../telemetry/collector'
 
 // The chain rules (docs/plugins.md § Hooks, docs/plugins.md § Hooks). Every one of
 // them is a decision about what happens when somebody else's code is between a plugin and something it
@@ -180,5 +182,62 @@ describe('the chain', () => {
     await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toMatchObject({ ok: true })
     clearHooks('changes')
     expect(hookHandlersFor('changes:before-push')).toEqual([])
+  })
+})
+
+describe('the hook.run span', () => {
+  const settle = async () => {
+    for (let index = 0; index < 5; index += 1) await Promise.resolve()
+  }
+
+  afterEach(() => {
+    resetTelemetryForTest()
+    clearHooks('changes')
+    clearHooks('memory')
+  })
+
+  it('files one span per handler, under the handler\'s own plugin', async () => {
+    resetTelemetryForTest()
+    const seen: TelemetryRecord[] = []
+    startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
+    onTelemetryBatch((batch) => seen.push(...batch.records))
+    await settle()
+
+    point()
+    handler('memory', 'transform', async (payload) => ({ payload: { ...payload, branch: 'renamed' } }))
+    handler('changes', 'veto', async () => ({ ok: true }))
+    await runHook('changes:before-push', { branch: 'main' })
+    await settle()
+    flushTelemetry()
+
+    const spans = seen.filter((record): record is TelemetrySpan => record.kind === 'span' && record.name === 'hook.run')
+    expect(spans.map((span) => [span.attrs.owner, span.attrs['hook.handler'], span.attrs['hook.outcome']]).sort()).toEqual([
+      ['changes', 'changes:h', 'ok'],
+      ['memory', 'memory:h', 'ok'],
+    ])
+    // The owner is stamped from the registration, never read off the handler's answer, the same
+    // rule the verdict's `by` follows.
+    expect(spans.every((span) => span.attrs['hook.point'] === 'changes:before-push')).toBe(true)
+  })
+
+  it('marks a handler that threw as an error', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    resetTelemetryForTest()
+    const seen: TelemetryRecord[] = []
+    startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
+    onTelemetryBatch((batch) => seen.push(...batch.records))
+    await settle()
+
+    point()
+    handler('memory', 'transform', async () => {
+      throw new Error('handler exploded')
+    })
+    await runHook('changes:before-push', { branch: 'main' })
+    await settle()
+    flushTelemetry()
+
+    const span = seen.find((record): record is TelemetrySpan => record.kind === 'span')!
+    expect(span).toMatchObject({ status: 'error', attrs: { owner: 'memory', 'hook.outcome': 'failed' } })
+    vi.restoreAllMocks()
   })
 })

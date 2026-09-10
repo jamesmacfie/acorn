@@ -5,6 +5,9 @@ import { Line } from './kit/cells'
 import { boxBorder, spaceLines } from './kit/roles'
 import { ScrollViewport } from './kit/scrolling'
 import { focusWithin } from './keys/regions'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('pane')
 
 // A frame with its name in the top border, lit while the keys are inside it.
 //
@@ -101,7 +104,7 @@ export function Panel(props: {
 export function PanelBody(props: { name: string; children: JSX.Element }) {
   return (
     <ErrorBoundary fallback={(error: unknown) => {
-      console.error(`[pane ${props.name}]`, error)
+      log.error(`the ${props.name} pane threw while rendering`, error, { 'pane.name': props.name })
       return <Line role="muted" wrap>{error instanceof Error ? error.message : String(error)}</Line>
     }}>
       <Suspense fallback={<Line role="muted">Loading…</Line>}>{props.children}</Suspense>

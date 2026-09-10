@@ -103,7 +103,10 @@ describe('portable provider routes', () => {
 
     const response = await probe.fetch(new Request('http://acorn.test/'), {} as Env)
     expect(response.status).toBe(403)
-    expect(await response.text()).toContain(`Plugin '${OWNER}' cannot use integration provider '${FOREIGN_PROVIDER}'`)
+    // The connection registry answers this one, not the integration registry: reading a connection
+    // and spending its credential belong to the connection contribution, which a provider that
+    // mirrors nothing still has (../pluginHost/requestContext.ts).
+    expect(await response.text()).toContain(`Plugin '${OWNER}' cannot use connection provider '${FOREIGN_PROVIDER}'`)
   })
 
   it('returns the same resource result as the built-in portable core', async () => {

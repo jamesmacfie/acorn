@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '../../../shared/api'
 import { filesResource, prResource } from '../../resourceKeys'
 import { ghError, ghGraphQL } from '../../githubApi'
-import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, createLogger, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from '../mirror/prMirror'
 import { announcePrSynced } from './pullRefresh'
@@ -20,6 +20,10 @@ import { syncState } from '../../../node/schema'
 // Not on the serve-then-revalidate engine (docs/caching.md). A multi-item prefetch has no single
 // response resource to hand back stale, so this always blocks. It shares the engine's TTL
 // (PULLS_STALE_AFTER_MS) and owns the per-item freshness gate below.
+// A route module with no `ctx` in reach, so the owner is stated here rather than bound by the host
+// (docs/plugin-authoring.md § Telemetry and logging).
+const log = createLogger('github', 'github')
+
 const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
@@ -83,7 +87,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
     }
     // Partial alias errors are tolerated (mirror the PRs that did resolve); a fully-missing
     // repository payload is a hard failure.
-    if (json.errors?.length) console.error('pullsBatch GraphQL errors', JSON.stringify(json.errors))
+    if (json.errors?.length) log.error(`pullsBatch GraphQL errors: ${json.errors.map((e) => e.message).join('; ')}`)
     const repository = json.data?.repository
     if (!repository) return respondError(c, 502, 'graphql', json.errors?.map((e) => e.message))
     await Promise.all(

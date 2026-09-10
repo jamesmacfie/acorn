@@ -25,6 +25,8 @@ import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/s
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { isNormalizedChord } from '@acorn/protocol/keybindings.ts'
+import { emitEvent, recordDuration } from '../../infra/telemetry/emitter'
+import { recordFrameTelemetry } from './frameTelemetry'
 import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 
 // What the frame is, as the host decided it. Nothing here is ever read from a message.
@@ -121,6 +123,13 @@ export type FrameServices = {
 const MAX_IN_FLIGHT = 100
 const MAX_PER_WINDOW = 1000
 const WINDOW_MS = 10_000
+
+// The message kinds a histogram is kept for. Closed, because the kind arrives from the frame and a
+// seam name built from attacker-controlled text is an unbounded map: anything else lands in `other`
+// and the switch below answers it with `unknown bridge message`.
+const MEASURED_KINDS: ReadonlySet<string> = new Set([
+  'api', 'api.bytes', 'subscribe', 'state.get', 'state.set', 'ui', 'document', 'webview', 'cancel', 'keydown', 'telemetry',
+])
 
 // A navigation is a person's act, so one per second is generous: a real reader clicks one link and then
 // reads what opened. This is the cap on how fast a focused frame can push the reader around, because the
@@ -223,6 +232,16 @@ export function createFrameBridge(input: {
     if (++windowCount > MAX_PER_WINDOW) return `more than ${MAX_PER_WINDOW} bridge messages in ${WINDOW_MS / 1000}s`
     if (inFlight.size >= MAX_IN_FLIGHT) return `more than ${MAX_IN_FLIGHT} requests in flight`
     return null
+  }
+
+  /** The rate limiter tripping, as a record. An event and not an error: the host is working exactly
+   *  as designed, and what the owner wants to know is which plugin keeps hitting the ceiling. */
+  const reportOverBudget = (reason: string): void => {
+    emitEvent(binding.pluginId, 'bridge.overbudget', {
+      seam: 'bridge.message',
+      'plugin.surface': binding.surface,
+      'bridge.limit': reason.startsWith('more than ' + MAX_IN_FLIGHT) ? 'in-flight' : 'rate',
+    })
   }
 
   const handleApi = async (id: number, data: Record<string, unknown>): Promise<void> => {
@@ -563,47 +582,80 @@ export function createFrameBridge(input: {
       input.onConnected?.()
     }
     const budget = overBudget()
-    if (budget) return kill(budget)
+    if (budget) {
+      reportOverBudget(budget)
+      return kill(budget)
+    }
+    // A histogram and never a span: a frame doing real work sends a handful of messages per
+    // interaction, and one drawing a chart sends thousands (docs/telemetry.md § Hot seams are
+    // metrics). The kind is in the seam name rather than an attribute, because a histogram is
+    // keyed by seam and `api` and `state.set` are different questions.
+    const kind = MEASURED_KINDS.has(data.kind) ? data.kind : 'other'
+    const from = performance.now()
+    // Synchronous only. The handlers below that return a promise reply on their own schedule, and
+    // measuring to the reply would be measuring the node rather than the bridge, which
+    // `api.request` already does.
+    //
+    // No attributes. A histogram is keyed by owner and seam, and the collector keeps the first
+    // sample's attributes for the whole window, so anything that varies between samples would
+    // report one frame's value for all of them.
+    const measured = <T>(run: () => T): T => {
+      try {
+        return run()
+      } finally {
+        recordDuration(binding.pluginId, `bridge.message.${kind}`, performance.now() - from)
+      }
+    }
     if (data.kind === 'keydown') {
-      if (typeof data.chord === 'string' && isNormalizedChord(data.chord)) services.keydown(data.chord)
-      return
+      return measured(() => {
+        if (typeof data.chord === 'string' && isNormalizedChord(data.chord)) services.keydown(data.chord)
+      })
+    }
+    // Like `keydown` and `connected`, this one has no id and gets no reply: telemetry never fails
+    // the thing it describes, so there is no outcome to await (./frameTelemetry.ts). The owner is
+    // the binding's, never the message's, which is what stops a frame filing a record under another
+    // plugin's name.
+    if (data.kind === 'telemetry') {
+      return measured(() => recordFrameTelemetry(binding.pluginId, data.record))
     }
     const shape = requestShape(data)
     if (!shape) return
-    switch (shape.kind) {
-      case 'api':
-        void handleApi(shape.id, data)
-        return
-      case 'api.bytes':
-        void handleApiBytes(shape.id, data)
-        return
-      case 'subscribe':
-        handleSubscribe(shape.id, data)
-        return
-      case 'state.get':
-      case 'state.set':
-        void handleState(shape.id, shape.kind, data)
-        return
-      case 'ui':
-        handleUi(shape.id, data)
-        return
-      case 'document':
-        void handleDocument(shape.id, data)
-        return
-      case 'webview':
-        void handleWebview(shape.id, data)
-        return
-      case 'cancel': {
-        const target = data.target
-        if (typeof target === 'number') {
-          inFlight.get(target)?.abort()
-          inFlight.delete(target)
+    return measured(() => {
+      switch (shape.kind) {
+        case 'api':
+          void handleApi(shape.id, data)
+          return
+        case 'api.bytes':
+          void handleApiBytes(shape.id, data)
+          return
+        case 'subscribe':
+          handleSubscribe(shape.id, data)
+          return
+        case 'state.get':
+        case 'state.set':
+          void handleState(shape.id, shape.kind, data)
+          return
+        case 'ui':
+          handleUi(shape.id, data)
+          return
+        case 'document':
+          void handleDocument(shape.id, data)
+          return
+        case 'webview':
+          void handleWebview(shape.id, data)
+          return
+        case 'cancel': {
+          const target = data.target
+          if (typeof target === 'number') {
+            inFlight.get(target)?.abort()
+            inFlight.delete(target)
+          }
+          return
         }
-        return
+        default:
+          post(failed(shape.id, 'bad_request', `unknown bridge message ${shape.kind}`))
       }
-      default:
-        post(failed(shape.id, 'bad_request', `unknown bridge message ${shape.kind}`))
-    }
+    })
   }
 
   port.start?.()

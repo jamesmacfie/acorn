@@ -6,7 +6,7 @@ import { entityKind } from 'drizzle-orm/entity'
 import { createTableRelationsHelpers, extractTablesRelationalConfig } from 'drizzle-orm/relations'
 import { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core/db'
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core/dialect'
-import { PERF, recordDuration } from '../perf'
+import { recordDuration, telemetryEnabled } from '../telemetry/collector'
 
 // SQLite through the runtime's own `node:sqlite`, shaped like the slice of better-sqlite3 that
 // Drizzle's driver and this package call.
@@ -79,26 +79,35 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
   return wrapped
 }
 
-// Every statement, timed by its first two words, behind `ACORN_PERF=1`. This loop is synchronous and
-// shared with terminal emulation and git spawns, and the performance programme refused to split it into
-// threads without numbers (docs/performance.md § Splitting the node), so this is where
-// the numbers come from.
+// Every statement, as a histogram per verb. This loop is synchronous and shared with terminal
+// emulation and git spawns, and the performance programme refused to split it into threads without
+// numbers (docs/performance.md § Splitting the node), so this is where the numbers come from.
 //
-// The whole statement text is not the key: bound parameters are out of it already, but a hundred
-// distinct `SELECT`s would be a hundred histograms nobody reads. The verb and the word after it is a
-// coarse grouping and a deliberate one — it answers "is this node's time going into reads, writes or
-// transactions", which is the question worth asking before anyone tunes a statement. Finding the
-// statement itself is what the request duration and a debugger are for.
-const sqlSeam = (sql: string): string => `sqlite ${sql.trim().split(/\s+/, 2).join(' ').toLowerCase()}`
+// The statement text is not the key: bound parameters are out of it already, but a hundred distinct
+// `SELECT`s would be a hundred histograms nobody reads, and a metric name has to be a pattern
+// (docs/telemetry.md § The attribute vocabulary). The verb alone answers the question worth asking
+// before anyone tunes a statement — is this node's time going into reads, writes or transactions.
+// Finding the statement itself is what the request duration and a debugger are for.
+//
+// A histogram and not a span: this is the hottest seam in the node by a wide margin
+// (docs/telemetry.md § Hot seams are metrics). The owner is `'core'` here and resolved against the
+// ambient context inside `recordDuration`, which is the only way a statement eleven frames below a
+// plugin's route can name that plugin (../telemetry/context.ts). Reading the context costs about 8
+// nanoseconds, so a statement can afford to ask.
+const sqlSeam = (sql: string): string => `sql.${sql.trim().split(/\s+/, 1)[0]?.toLowerCase() || 'unknown'}`
 
 const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
   const seam = sqlSeam(sql)
   const time = <T>(run: () => T): T => {
+    // Read per call rather than per prepare. Statements are prepared once and reused for the life of
+    // the process, so a switch that can be flipped while the node runs cannot be resolved at prepare
+    // time any more: a statement prepared before a sink subscribed would never be timed.
+    if (!telemetryEnabled()) return run()
     const started = process.hrtime.bigint()
     try {
       return run()
     } finally {
-      recordDuration(seam, Number(process.hrtime.bigint() - started) / 1e6)
+      recordDuration('core', seam, Number(process.hrtime.bigint() - started) / 1e6)
     }
   }
   const timedStatement: SqliteStatement = {
@@ -150,9 +159,10 @@ export function openSqlite(path: string, options: { readonly?: boolean } = {}): 
   }
 
   return {
-    // `prepare` is where the timing wrapper goes on, not `openSqlite`, so a node with the switch off
-    // hands out exactly the statement it always did.
-    prepare: (sql) => (PERF ? timeStatement(wrapStatement(db.prepare(sql)), sql) : wrapStatement(db.prepare(sql))),
+    // `prepare` is where the timing wrapper goes on, not `openSqlite`. It goes on unconditionally
+    // now, because the switch is no longer a constant read at boot: the wrapper costs one boolean
+    // read and one call frame per statement while nothing is collecting.
+    prepare: (sql) => timeStatement(wrapStatement(db.prepare(sql)), sql),
     exec: (sql) => db.exec(sql),
     // better-sqlite3 had a `.pragma()` helper and `node:sqlite` does not. Every caller sets a value
     // and ignores the result, so this covers it.

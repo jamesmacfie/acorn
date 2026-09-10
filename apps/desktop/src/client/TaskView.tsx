@@ -28,6 +28,9 @@ import { defaultSourceId } from '@acorn/client-core/host/registries/sources/sour
 import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import '@acorn/client-core/features/tasks/task-view.css'
 import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('tasks')
 
 // The two task-scoped groups this view owns in the command graph. Core's, like every command below,
 // so they may hold core's children and no plugin's (docs/command-palette-and-shortcuts.md).
@@ -220,7 +223,7 @@ export default function TaskView(props: {
           return
         }
         // Archived either way (`ok` is true), but the owner ticked something that did not happen.
-        if (result.cleanupFailed?.length) console.warn('[tasks] cleanup failed for:', result.cleanupFailed.join(', '))
+        if (result.cleanupFailed?.length) log.warn(`cleanup failed for: ${result.cleanupFailed.join(', ')}`)
         setPendingChecks([])
       } else {
         await archiveTask(archivedTaskId)

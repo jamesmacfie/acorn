@@ -1,6 +1,9 @@
 import { fleetBridge } from '../platform'
 import { activeNodeId } from './activeNode'
 import { nodes } from './fleet'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('tunnel')
 
 // Rewrite a loopback URL resolved by a node so it is reachable from this machine
 // (docs/shell.md § Host-owned webviews).
@@ -49,14 +52,14 @@ export async function tunnelUrl(taskId: string, url: string | null): Promise<str
   if (!target) return url
   const bridge = fleetBridge()
   if (!bridge) {
-    console.warn('[tunnel] this build cannot tunnel, so a remote loopback preview is unavailable')
+    log.warn('this build cannot tunnel, so a remote loopback preview is unavailable')
     return null
   }
   try {
     const { port } = await bridge.tunnelOpen({ nodeId, taskId, port: target.port })
     return `http://127.0.0.1:${port}${target.rest}`
   } catch (error) {
-    console.warn('[tunnel] could not open a preview tunnel:', error)
+    log.warn('could not open a preview tunnel', error)
     return null
   }
 }

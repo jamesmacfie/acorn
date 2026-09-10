@@ -471,16 +471,41 @@ privilege for cooperative code, not a sandbox** — a loaded bundle shares the n
 `import('node:fs')` and ignore `ctx` entirely. Gating is by omission: an undeclared facet is absent,
 so the first call is a `TypeError` the author sees immediately.
 
-- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, plus `projects:read`,
-  `projects:config`, `projects:write`. The project grants nest — `config` and `write` each imply
-  `read` — and they are split because `checkouts()` returns where every codebase on the machine
-  lives, and `config()` returns shell commands the node executes. An unknown token is skipped, not
-  rejected: a manifest naming a facet from a newer build should lose that one grant.
+- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`, plus
+  `projects:read`, `projects:config`, `projects:write`. The project grants nest — `config` and
+  `write` each imply `read` — and they are split because `checkouts()` returns where every codebase
+  on the machine lives, and `config()` returns shell commands the node executes. An unknown token is
+  skipped, not rejected: a manifest naming a facet from a newer build should lose that one grant.
 - `capabilities`: capability ids this plugin may `get`/`require`. `provide` is never filtered —
   exporting a capability is a contribution, not an access grant.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
 - `net`: intended egress hosts. Pure disclosure today.
+
+**`telemetry` is the one grant that hands you other packages' data.** It gives you
+`ctx.core.telemetry.onBatch`, and a sink sees every record this node collects from every owner:
+core's request timings, another plugin's schedule and hook runs, and the log lines of packages the
+owner installed for a different reason. The trust prompt says exactly that, and draws it high:
+"Read this node's telemetry: request timings, schedule and hook runs, logs, and error names from
+every plugin". Writing telemetry about your own work needs nothing (§ Telemetry and logging).
+
+```json
+{ "permissions": { "node": { "core": ["telemetry"] } } }
+```
+
+```js
+export function init(ctx) {
+  ctx.core.telemetry.onBatch((batch) => queue.push(batch))
+}
+```
+
+Return quickly. The collector calls sinks on a timer, awaits none of them and contains a throw, so
+buffering, retry and sampling are yours ([telemetry.md](./telemetry.md) § Writing a sink).
+
+A telemetry sink can check `ctx.core.telemetry.enabled()` before retrying a queued export. It reports
+the collector’s node consent, updated within five seconds, and needs the same `telemetry` permission
+as `onBatch`. Do not read `telemetry.enabled` through `ctx.core.prefs`: those keys are scoped to the
+plugin’s own namespace.
 
 **`models` is one token, and it does not choose what gets spent.** The trust prompt reads "Generate
 text with your model providers and installed agent CLIs", because the list your picker draws holds
@@ -602,8 +627,103 @@ whose verb is `runNodeAction`, and `contributions.harnesses` — and the host re
 through a shape a plugin never sees. They were on the authoring context until 2026-08-27; every seam a
 plugin could not usefully call was one more member to read past.
 
-**There is no `ctx.log`.** Use `console`, prefixed with your plugin id. The prefixed logger that used to
-be here was interchangeable with `console` at every call site, so nobody reached for it.
+### Telemetry and logging
+
+`ctx.log` is a logger with your plugin id already bound:
+
+```js
+export function init(ctx) {
+  ctx.log.info('refresh scheduled', { every: 300 })
+  ctx.log.warn('upstream rate limited', { retryAfter: 30 })
+}
+```
+
+Each call writes a stderr line prefixed with your id, as `console.error` did, and when the owner has
+telemetry on it also becomes a log record with `owner: <your id>`. Attributes are scalars; an object
+is refused at the type level. Messages pass a scrubber.
+
+This member was removed on 2026-08-27 for being interchangeable with `console`, and it is back
+because it is not any more: the attribution, the sinks and the scrubbing are all things a
+hand-prefixed `console.error` cannot give you.
+
+`ctx.telemetry` carries the small verbs:
+
+```js
+ctx.telemetry.event('cache-miss', { resource: 'issues' })
+ctx.telemetry.count('items-synced', items.length)
+ctx.telemetry.gauge('queue-depth', queue.length)
+ctx.telemetry.error({ name: 'UpstreamError', message: reason, handled: true })
+```
+
+To time your own work:
+
+```js
+const result = await ctx.telemetry.measure('fetch-issues', () => fetchIssues(connection))
+```
+
+`measure` hands back the wrapped value untouched and records a histogram sample. It is promise-aware
+and times to settlement. For work whose start and end do not fit one closure:
+
+```js
+const span = ctx.telemetry.startSpan('reindex', { attrs: { pages: total } })
+try {
+  await reindex()
+  span.end('ok')
+} catch (error) {
+  span.end('error')
+  throw error
+}
+```
+
+Neither member needs a permission, because measuring your own work reads nobody else's. The owner on
+every record is bound by the host from your plugin id, so you cannot file one under another
+package's name, and an `owner` attribute you set is dropped.
+
+Every verb is a no-op when the owner has telemetry off, and every verb is wrapped so a full buffer
+or a throwing sink cannot reach your code. You get a lot for free without calling any of them: the
+host already times and stamps your routes, your schedules, your hook handlers and every dispatch it
+makes on your behalf.
+
+Reading the stream is a different thing and a real grant. See § Permissions.
+
+#### When there is no `ctx` in reach
+
+Two places have no context to bind: a module that runs before or beside `init`, such as a route
+factory or an engine, and your client half, whose context is contribution points and nothing else.
+Both state the id instead of having it bound:
+
+```ts
+import { createLogger } from '@acorn/plugin-api/node'      // or '@acorn/plugin-api/client'
+import { telemetryFor } from '@acorn/plugin-api/client'
+
+const log = createLogger('github', 'github')               // tag, then your plugin id
+const telemetry = telemetryFor('github')                   // the same six verbs, client-side
+```
+
+`createLogger` takes the tag you were already writing by hand, so `[github] pruned 3 rows` reads
+the same and gains an owner. `describeError(error).message` beside it turns a caught `unknown` into
+one scrubbed line, because a logger takes scalars and not objects.
+
+This is the compiled tier's bargain: your code is in acorn's own process, so the id is a convention
+here rather than a wall. A loaded plugin's node half has `ctx.log` and does not need either.
+
+#### In tests
+
+`makeTestNodeContext` from `@acorn/plugin-api/testkit` records what your plugin emitted, so a test
+asserts on telemetry with no sink of its own:
+
+```ts
+const ctx = makeTestNodeContext({ plugin: { name: 'github' } })
+ctx.telemetry.startSpan('reindex').end('error')
+expect(ctx.recorded.filter((record) => record.kind === 'span')).toMatchObject([{ name: 'reindex', status: 'error' }])
+ctx.cleanup()
+```
+
+`ctx.recorded` is every record the node built since the context was made, newest last, flushed on
+read so an assertion sees what the line above it did. A span appears once it has ended, and the
+attributes it ended with are merged into the ones it opened with. `attrs.owner` says whose a record
+is: the recorder is an ordinary sink, so it sees the host's records about your plugin as well as
+your own. `cleanup()` drops it with the rest of your registrations.
 
 ## The client half
 
@@ -783,8 +903,35 @@ does this for you and a hand-written frame must not forget it. `{ kind: 'select'
 selection after the one that opened the pane, and `{ kind: 'surfaceAction', command }` is a command
 the host resolved on your behalf.
 
+Three messages carry no id and get no reply: `{ kind: 'connected' }`, `{ kind: 'keydown', chord }`,
+and `{ kind: 'telemetry', record }`. The host acts on them and says nothing back.
+
 Two budgets apply to the port, and tripping either kills it and swaps in a "plugin misbehaving"
-placeholder: 100 requests in flight, and 1000 messages per 10 seconds.
+placeholder: 100 requests in flight, and 1000 messages per 10 seconds. Telemetry counts against
+them like everything else, which is deliberate: a frame that emits in a render loop loses its port
+before it floods the collector.
+
+#### Telemetry from a frame
+
+Your frame reports through the same six verbs your node half has, plus a log line:
+
+```js
+bridge.telemetry.event('cache-miss', { resource: 'issues' })
+bridge.telemetry.count('rows-drawn', rows.length)
+const chart = await bridge.telemetry.measure('draw-chart', () => draw(rows))
+bridge.log.warn('upstream is slow', { retryAfter: 30 })
+```
+
+Nothing here returns a promise, throws, or tells you whether the reader has collection on, which is
+off by default. That is the one rule telemetry has, that it never fails the thing it describes. A
+log line also prints to your frame's own console, so it says something either way.
+
+You never pass a plugin id. The host stamps the owner from your frame's binding, mints the trace
+and span ids, and drops a record it cannot read rather than answering it
+([telemetry.md](./telemetry.md) § A frame's own records). A hand-written frame sends the message
+itself: `{ kind: 'telemetry', record: { type: 'event', name: 'cache-miss' } }`, where `type` is one
+of `event`, `count`, `gauge`, `span`, `log` or `error`, attributes are scalars, and a span carries
+`durationMs` because it arrives finished.
 
 ### What the bridge carries
 
@@ -802,6 +949,7 @@ messages by hand:
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |
+| `telemetry.event` / `count` / `gauge` / `error` / `measure` / `startSpan`, and `log.debug` / `info` / `warn` / `error` | One record about your own frame, on the wire kind `telemetry`. No id, no reply, and no plugin id to pass: the host stamps the owner from the binding. See § Telemetry from a frame. |
 
 ## Storage and migrations
 

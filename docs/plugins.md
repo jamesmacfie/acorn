@@ -237,6 +237,13 @@ This was one type with per-member comments until 2026-08-31, and the comments we
 which tier got what. Reaching for a compiled-only member from a loaded plugin compiled fine and failed at
 run time as "not a function", which is a bad way to learn a rule. It is a `tsc` error now.
 
+Two members are on both tiers and gated by neither: `ctx.telemetry` and `ctx.log`. They are also
+the two the host's revocation pass deliberately skips, so a context left over from a reload keeps
+logging under its own name rather than throwing. A logger that throws would break the one rule
+telemetry has, which is that it never fails the thing it describes
+([telemetry.md](./telemetry.md) § Never fail what you measure). Reading the stream is the separate
+`telemetry` facet on `ctx.core`, and that one is a token.
+
 `packages/plugin-types/src/public.ts` — the declarations acorn publishes as `acorn-plugin-types` — is the
 published twin of the loaded type, and `contract.test.ts` holds the two equal member for member. Adding a
 member to one and not the other fails that test, which is what stops the hand-written copy from quietly
@@ -382,10 +389,13 @@ plugin context, every plugin forged one — `{ routes: { register: undefined }, 
 NodePluginContext` — and a forgery cannot fail when the host's context changes, so those tests stayed
 green against a shape that no longer existed.
 
-`makeTestNodeContext({ plugin, permissions?, migrations? })` is therefore not a mock. It calls the
+`makeTestNodeContext({ plugin, permissions?, migrations?, userId? })` is therefore not a mock. It calls the
 same `server/pluginHost/context.ts` the host calls at boot, over a temp data root, so which tier a test
 gets — `routes.register` present or absent, core scoped or whole, storage bound or missing — is the
 host's decision and not the test's. Its `cleanup()` runs the host's own registration rollback.
+`userId` binds the machine identity, because a context built with nothing seeded has had no boot to
+mint one and `ctx.core.identity.active()` answers null without it. Pass it where the plugin reads
+the owner off `ctx` rather than off a request: an agent tool, a workflow step, a telemetry sink.
 `makeTestRequestContext` does the same for a loaded plugin's fetch handler: the real
 `PluginRequestContext`, with canned answers allowed on top for the provider calls a test cannot make
 for real. Alongside them: `makeTestDb`/`makeTestPluginDb`, `testEnv`, `testGate`,
@@ -459,9 +469,14 @@ and managed-agent harnesses. Both come from the manifest — a command whose ver
 `server/pluginHost/types.ts` keeps deliberately off the authoring type. They sat on `NodePluginContext`
 until 2026-08-27, reading as members an author should reach for, and across 21 plugins nobody ever did.
 
-There is no `ctx.log` either. Two plugins used it and four reached past it for `console`, which is
-interchangeable with it at every call site, so the seam bought no attribution and cost a member. Prefix
-your own messages.
+`ctx.log` came back on 2026-09-10, and the reason it went is the reason it is back. It was removed
+because it was interchangeable with `console` at every call site: two plugins used it, four reached
+past it, and the seam bought no attribution. It is not interchangeable now. A line written through
+`ctx.log` carries the plugin id the host bound, reaches every subscribed telemetry sink, and passes
+the scrubber on the way, and none of that is true of a `console.error` with a hand-typed prefix
+([telemetry.md](./telemetry.md) § Logging). `ctx.telemetry` arrived beside it, for spans, counts,
+gauges and errors about the plugin's own work. Neither needs a permission: measuring your own work
+reads nobody else's.
 
 The host supplies `CoreServices` for confined filesystem access, Git, processes, secrets, tasks,
 repositories, task context, model generation, preferences, and the machine identity. Plugins do not
@@ -544,7 +559,11 @@ Three things differ, and all three follow from the code not being ours:
   `projects:read` for identity, checkout paths and workspace external-project mappings scoped to
   connection providers registered by that loaded plugin,
   `projects:config` for executable build/dev/database
-  configuration, and `projects:write` for creating or updating project references. The `prefs` facet
+  configuration, and `projects:write` for creating or updating project references. The `telemetry`
+facet is the read side of the telemetry seam and the one grant that returns other packages' data:
+a sink sees every record from every owner, so the trust prompt draws it high
+([security.md](./security.md) § Telemetry sinks). Writing telemetry needs no grant at all. The
+`prefs` facet
   is projected into `plugin:<id>:*`, the same namespace used by that plugin's frame `state.get` and
   `state.set` verbs; this is the supported Node-half↔frame state channel. Values are capped at 1 MiB
   from either side.
@@ -914,6 +933,13 @@ makes that class of bug a compile error now: it derives the wire union, the auth
 (`sdk.ts`) and the host-facing surface (`PluginFrame.tsx`, through `FrameServices`) from one verb list,
 with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
 either surface, or gains a surface row the wire does not carry.
+
+Three verbs are named in that file as asking nothing of the services bag: `cancel`, which makes the
+broker drop its own record of an in-flight request, `connected`, which is the frame's evidence that
+it evaluated, and `telemetry`, which the broker emits through the emitter it already holds for its
+own histograms ([telemetry.md](./telemetry.md) § A frame's own records). A record is not an effect
+on the shell, so routing it through `FrameServices` would mean threading an implementation through
+`PluginFrame.tsx` and the worker path to buy nothing.
 
 ### Binary bridge calls
 
@@ -3335,6 +3361,9 @@ already draws what you want.
    If it needs tables of its own, declare the chain (§ Data ownership) — do not open a database.
 3. Add a narrow `contract/` export, capability, or client registry entry when collaboration is
    needed; `ctx.events` if the renderer needs telling.
+   Name each `permissions.node.core` token the contribution needs in the manifest, including
+   `telemetry` if it reads the telemetry stream. A token nobody declared is a facet absent from
+   `ctx.core` and a `TypeError` on first call.
 4. Register the Node/client entry in the appropriate composition list (named below).
 5. Add package-local tests and, for rendered behavior, desktop e2e coverage.
 6. Regenerate the golden lists (below) and read the diff before you commit it.

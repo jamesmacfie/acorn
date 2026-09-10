@@ -135,7 +135,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
   const core = {
     fs: {}, git: {}, tasks: {}, context: {}, models: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
     projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
-    secrets: {}, proc: {},
+    secrets: {}, proc: {}, telemetry: { onBatch: () => ({ dispose: () => {} }) },
   } as unknown as CoreServices
   const scope = (token: string) =>
     scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [] }, 'p', { idsForOwner: () => [] })
@@ -186,6 +186,22 @@ describe('the two doors', () => {
     // name fails the first thing a new plugin author's agent does.
     const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/features/settings/PluginsSettings.tsx')
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
+  })
+
+  it('names the telemetry token, the two ctx members, and the frame verb', () => {
+    // What a plugin author asks first about telemetry: can I write one, what does reading cost, and
+    // what does a frame do instead (docs/plugin-authoring.md § Telemetry and logging). The token
+    // itself is derived from NODE_CORE_FACETS, so this is about the guide saying what it grants.
+    const guide = renderPluginAuthoring()
+    expect(guide).toContain('`ctx.log`')
+    expect(guide).toContain('`ctx.telemetry`')
+    expect(guide).toContain('`ctx.core.telemetry.onBatch`')
+    expect(guide).toContain('permissions.node.core: ["telemetry"]')
+    // The line that used to be here said there is no `ctx.log` and to use `console`. It was true
+    // until 2026-09-10 and is the kind of stale instruction an agent follows for a whole session.
+    expect(guide).not.toContain('There is no `ctx.log`')
+    expect(pluginAuthoringVocabulary().permissions.core).toContain('telemetry')
+    expect(Object.keys(pluginAuthoringVocabulary().bridge.kinds)).toContain('telemetry')
   })
 
   it('tells the agent the things about the loop it cannot derive', () => {

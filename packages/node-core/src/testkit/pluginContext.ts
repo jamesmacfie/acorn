@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import type { Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
 import { createCoreServices, SecretService, type CoreServices } from '../server/core'
@@ -15,6 +16,7 @@ import type { AppEnv, Principal } from '../server/middleware/auth'
 import { CapabilityRegistry } from '../server/pluginHost/capabilities'
 import { buildPluginContext } from '../server/pluginHost/context'
 import { clearRegistrations } from '../server/pluginHost/host'
+import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
 import type { CompiledNodePluginContext, NodePlugin, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
 import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } from './db'
@@ -39,12 +41,16 @@ export type TestNodeContextOptions = {
   // suits every workspace plugin's suite. Pass it for a chain that lives somewhere else.
   migrations?: string
   dataDir?: string
+  // Who this node is bound to, for `ctx.core.identity.active()`. Null by default, because a context
+  // built with nothing seeded has had no boot to mint one. Pass it where the plugin reads the owner
+  // off `ctx` rather than off a request: an agent tool, a workflow step, a telemetry sink.
+  userId?: string
 }
 
 // The context, plus the handles a test needs to set the world up around it. Flat rather than
 // `{ ctx, db, ... }` so `ctx.storage.open()` and `ctx.db` read the same way. If the context grows
-// a member named `db`, `env` or `cleanup`, this intersection stops compiling and one of the two names
-// has to move.
+// a member named `db`, `env`, `recorded` or `cleanup`, this intersection stops compiling and one of
+// the two names has to move.
 export type TestNodeContext = CompiledNodePluginContext & {
   // Core's tables, migrated, in a temp directory. For seeding the workspaces/tasks/integrations rows a
   // route or a service reads back.
@@ -54,6 +60,13 @@ export type TestNodeContext = CompiledNodePluginContext & {
   env: Env
   dataDir: string
   encryptionKey: string
+  // Every record this node built since the context was made, newest last: what `ctx.telemetry` and
+  // `ctx.log` produced, and what the host produced on this plugin's behalf. Read `attrs.owner` to
+  // tell those apart, because a sink sees every owner and this is one.
+  //
+  // Reading it flushes first, so an assertion runs against what the emit verb just did rather than
+  // against whatever the five-second timer last handed over.
+  readonly recorded: readonly TelemetryRecord[]
   // Undoes everything the plugin registered, through the host's own rollback. Then closes core's
   // database, the plugin's if it was opened, and removes the temp directories. Call it in a finally or
   // an afterEach: the route, tool and provider registries are process-wide module singletons, so a
@@ -67,7 +80,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), `acorn-testkit-${name}-`))
   const permissions = options.permissions ? { ...NO_PERMISSIONS, ...options.permissions } : undefined
   const secrets = new SecretService(TEST_ENCRYPTION_KEY)
-  const services: CoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore() })
+  const services: CoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null) })
 
   // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/pluginHost/host.ts): one
   // file named for the plugin id under the data root, migrated with the plugin's own chain on first open.
@@ -88,6 +101,15 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   // (server/pluginHost/context.ts). Without this, a test whose plugin claims a channel prefix or registers
   // a schedule leaves it claimed for the whole file.
   const undos: (() => void)[] = []
+
+  // The recorder, which is a sink like any other: nothing in the collector is test-specific
+  // (../server/telemetry/collector.ts, docs/plugin-authoring.md § In tests). The preference is
+  // stated rather than read, because a test has no `telemetry.enabled` row and building nothing is
+  // not what a test asking about telemetry wants. It stays on for the process, which costs a
+  // record per emit and is the same bargain `startTelemetry` makes.
+  const records: TelemetryRecord[] = []
+  setTelemetryPref(true)
+  const recorder = onTelemetryBatch((batch) => records.push(...batch.records), name)
 
   const env = testEnv({ DB: core.db, SECRETS: secrets })
   const ctx = buildPluginContext({
@@ -111,7 +133,14 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     env,
     dataDir,
     encryptionKey: TEST_ENCRYPTION_KEY,
+    // A getter, because the collector hands records to sinks on its own timer and at its record
+    // cap. Flushing on read is what lets a test emit and assert on the next line.
+    get recorded() {
+      flushTelemetry()
+      return records
+    },
     cleanup: () => {
+      recorder.dispose()
       clearRegistrations(name)
       // Newest first, like the host's own rollback: the last claim on a slot is the one currently held.
       for (const undo of undos.reverse()) undo()

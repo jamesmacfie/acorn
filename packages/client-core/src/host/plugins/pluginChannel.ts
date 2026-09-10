@@ -8,6 +8,7 @@ import { parsePluginChannel, PLUGIN_CHANNEL_PREFIX } from '@acorn/protocol/plugi
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import { registerWsChannel, type Disposable } from '../../infra/node/wsChannels'
 import { wsConnect } from '../../infra/node/wsClient'
+import { measure } from '../../infra/telemetry/emitter'
 
 // Caps chrome at two passes a second per plugin. A plugin sampling every 2s never touches the limit.
 const COALESCE_MS = 500
@@ -44,12 +45,17 @@ const route = (frame: WsServerFrame): void => {
   const parsed = parsePluginChannel(frame.channel)
   // The node refuses to send a malformed plugin channel, so this is version skew or a forgery. Drop it.
   if (!parsed) return
-  const listeners = frameListeners.get(frame.channel)
-  if (listeners?.size) {
-    const { channel: _channel, ...payload } = frame
-    for (const listener of [...listeners]) listener(payload)
-  }
-  nudge(parsed.pluginId)
+  // Owned by the plugin whose channel it is, and a histogram rather than a span: a plugin sampling
+  // twice a second is the polite case and nothing stops a chattier one
+  // (docs/telemetry.md § Hot seams are metrics).
+  measure(parsed.pluginId, 'plugin.frame', () => {
+    const listeners = frameListeners.get(frame.channel)
+    if (listeners?.size) {
+      const { channel: _channel, ...payload } = frame
+      for (const listener of [...listeners]) listener(payload)
+    }
+    nudge(parsed.pluginId)
+  })
 }
 
 /** Claim the prefix. Idempotent, and called from the client composition root so the claim lands at

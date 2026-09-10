@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { schema } from '../server/db'
+import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../server/telemetry/collector'
 import { makeTestNodeContext, makeTestRequestContext } from './pluginContext'
 
 // The testkit's own suite: what it asserts is that a test context and the boot context are the
@@ -24,6 +26,79 @@ describe('makeTestNodeContext', () => {
       expect(ctx.storage.open).toBeTypeOf('function')
     } finally {
       ctx.cleanup()
+    }
+  })
+
+  it('binds telemetry and the logger to the plugin, on both tiers and with no grant', async () => {
+    resetTelemetryForTest()
+    const seen: TelemetryRecord[] = []
+    startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
+    onTelemetryBatch((batch) => seen.push(...batch.records))
+    for (let index = 0; index < 5; index += 1) await Promise.resolve()
+
+    const builtIn = makeTestNodeContext({ plugin })
+    const loaded = makeTestNodeContext({ plugin, permissions: {} })
+    try {
+      for (const ctx of [builtIn, loaded]) {
+        expect(ctx.telemetry.event).toBeTypeOf('function')
+        expect(ctx.log.info).toBeTypeOf('function')
+      }
+      builtIn.telemetry.event('cache-miss')
+      flushTelemetry()
+      // The owner is closed over by the host, so a plugin cannot file under another's name.
+      expect(seen.filter((record) => record.kind === 'event').map((record) => record.attrs.owner)).toEqual(['testkit-probe'])
+    } finally {
+      loaded.cleanup()
+      builtIn.cleanup()
+      resetTelemetryForTest()
+    }
+  })
+
+  it('records what the plugin emitted, with no sink of the test\'s own', () => {
+    // The recorder is the reason a plugin test does not stand up the collector by hand: three
+    // suites used to (docs/plugin-authoring.md § In tests).
+    const ctx = makeTestNodeContext({ plugin })
+    try {
+      ctx.telemetry.measure('reindex', () => 41 + 1)
+      ctx.log.warn('upstream rate limited', { retryAfter: 30 })
+      ctx.telemetry.startSpan('sweep').end('error')
+
+      const spans = ctx.recorded.filter((record) => record.kind === 'span')
+      expect(spans.map((span) => [span.name, span.status])).toEqual([['sweep', 'error']])
+      const logs = ctx.recorded.filter((record) => record.kind === 'log')
+      expect(logs[0]).toMatchObject({ level: 'warn', logger: 'testkit-probe', body: 'upstream rate limited' })
+      expect(logs[0].attrs).toMatchObject({ owner: 'testkit-probe', retryAfter: 30 })
+      // `measure` is a histogram and not a span, which is the model's rule for a hot seam: it
+      // arrives folded, on the flush that reading `recorded` performs.
+      const histogram = ctx.recorded.find((record) => record.kind === 'metric' && record.name === 'reindex')
+      expect(histogram).toMatchObject({ type: 'histogram', attrs: { owner: 'testkit-probe' } })
+    } finally {
+      ctx.cleanup()
+    }
+  })
+
+  it('stops recording once the context is cleaned up', () => {
+    const ctx = makeTestNodeContext({ plugin })
+    ctx.telemetry.event('before')
+    const seen = [...ctx.recorded]
+    ctx.cleanup()
+    // The sink went with the rest of this plugin's registrations, so a stray emit afterwards
+    // reaches nothing (server/pluginHost/host.ts § clearRegistrations).
+    ctx.telemetry.event('after')
+    expect(seen.map((record) => record.kind === 'event' && record.name)).toEqual(['before'])
+    expect(ctx.recorded).toHaveLength(seen.length)
+  })
+
+  it('gives the telemetry read facet only to a plugin that asked for the token', () => {
+    const without = makeTestNodeContext({ plugin, permissions: {} })
+    const with_ = makeTestNodeContext({ plugin, permissions: { core: ['telemetry'] } })
+    try {
+      // Reading the stream is every owner's records, which is why it is a token where writing is not.
+      expect(without.core.telemetry).toBeUndefined()
+      expect(with_.core.telemetry.onBatch).toBeTypeOf('function')
+    } finally {
+      with_.cleanup()
+      without.cleanup()
     }
   })
 

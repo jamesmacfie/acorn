@@ -6,6 +6,9 @@ import {
 } from '@acorn/custody/plugins/pluginRequests.ts'
 import type { PluginCustody } from '@acorn/client-core/infra/platform/index.ts'
 import { configDir } from '../node/paths'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+
+const log = createLogger('plugins')
 
 // Custody of third-party plugin bundles, from a terminal (docs/tui.md § Custody).
 //
@@ -62,7 +65,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       // A node running a newer manifest schema than this build. The decision is exact and the snapshot
       // is not, so it is recorded `partial` and never becomes the baseline of a later "what changed"
       // diff (docs/security.md § The dev grant).
-      console.warn(`[plugins] the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`)
+      log.warn(`the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`, undefined, { 'plugin.id': decision.pluginId })
       store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },
     devGrant: async (raw) => {

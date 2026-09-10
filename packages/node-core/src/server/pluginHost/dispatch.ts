@@ -17,6 +17,7 @@ import type { Env } from '../bindings'
 import type { Principal } from '../middleware/auth'
 import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routeRegistry'
 import { buildPluginRequestContext } from './requestContext'
+import { runWithTelemetry, startSpan } from '../telemetry/collector'
 
 /** A base only the URL parser sees. Nothing is sent anywhere, so the origin exists purely to turn a
  *  path into a `URL`, and `.invalid` is the reserved TLD that guarantees it can never resolve. */
@@ -66,12 +67,28 @@ export async function dispatchPluginRoute(
   // same string a client would have sent.
   const forwarded = new URL(url)
   forwarded.pathname = url.pathname.slice(match.mount.length) || '/'
-  return match.fetch(
-    new Request(forwarded, {
-      method: init.method,
-      ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
-      signal,
-    }),
-    buildPluginRequestContext(env, principal, pluginId),
-  )
+  // The one seam where the host calls a plugin's route with no HTTP request behind it, so the
+  // request middleware's span cannot cover it. `path` is the declared route, which is a pattern the
+  // manifest wrote down rather than a URL a caller composed (docs/telemetry.md § Node seams).
+  const span = startSpan(pluginId, { name: 'plugin.dispatch', attrs: { seam: 'plugin.dispatch', method: init.method, path } })
+  try {
+    // Entered for the same reason the request middleware enters it: the handler is about to run
+    // arbitrary plugin code, and the git spawns and SQL statements it makes are this plugin's
+    // (../telemetry/context.ts).
+    const response = await runWithTelemetry({ traceId: span.traceId, spanId: span.spanId, owner: pluginId }, () =>
+      match.fetch(
+        new Request(forwarded, {
+          method: init.method,
+          ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
+          signal,
+        }),
+        buildPluginRequestContext(env, principal, pluginId),
+      ),
+    )
+    span.end(response.ok ? 'ok' : 'error', { status: response.status })
+    return response
+  } catch (error) {
+    span.end('error')
+    throw error
+  }
 }

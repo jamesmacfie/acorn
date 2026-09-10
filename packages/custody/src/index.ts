@@ -9,6 +9,10 @@ import { PluginCache } from './plugins/pluginCache'
 import { PluginTrustStore } from './plugins/pluginTrustStore'
 import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
 import { ServiceHost } from './supervision/serviceHost'
+import { startHelperTelemetry } from './telemetry'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('service-host')
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
 // cache and trust store, the preview tunnels, and the supervised node service. Nothing here imports a
@@ -96,12 +100,12 @@ export function createHelper(options: HelperOptions): Helper {
 
   const service = new ServiceHost(options.serviceEntry, options.service, {
     stateChanged: (state: ServiceState, detail?: string) => {
-      console.log(`[service-host] ${state}${detail ? `: ${detail}` : ''}`)
+      log.info(`${state}${detail ? `: ${detail}` : ''}`, { 'service.state': state })
       if (state === 'failed' && detail) lastFailure = detail
     },
     unexpectedExit: (code) => {
       if (!booted || disposed) return
-      console.error(`[service-host] service exited unexpectedly with code ${code}`)
+      log.error(`service exited unexpectedly with code ${code}`, { 'exit.code': code ?? -1 })
       // Only if the service did not already say why. Its own message beats an exit code.
       lastFailure ??= `the background service exited with code ${code}`
       void recover()
@@ -139,6 +143,12 @@ export function createHelper(options: HelperOptions): Helper {
   pluginCache.sweep()
   helperMark('plugin-cache sweep')
   const pluginTrust = new PluginTrustStore(userDataDir)
+
+  // What this process reports, and where the Rust shell's last words go (./telemetry.ts). Built here
+  // because the broker is what a batch leaves over and the local node is what it leaves for; started
+  // before the node so a boot mark taken during `start()` is already recorded when the switch turns
+  // out to be on.
+  const telemetry = startHelperTelemetry({ broker, userDataDir, version })
   // These bytes ship with this process. Cache and acknowledge them locally before the renderer asks
   // for plugin state, so a node cannot turn the "bundled" label into auto-trust for arbitrary remote
   // bytes. `trustsBundledClientPlugins` owns the one condition.
@@ -168,6 +178,9 @@ export function createHelper(options: HelperOptions): Helper {
       token: started.deviceToken,
       ...(node.certPem ? { certPem: node.certPem } : {}),
     })
+    // Every adoption, not only the first: a crash restart mints a new endpoint, certificate and
+    // token, and the telemetry poster asks this node for the switch and posts its batches to it.
+    telemetry.setNode(started.nodeId)
   }
 
   // Start the service and persist whatever token it ended up using. Reused on every start, including
@@ -234,9 +247,9 @@ export function createHelper(options: HelperOptions): Helper {
       await wait(decision.delayMs)
       await start()
       options.onNodeReplaced?.()
-      console.log('[service-host] background service recovered')
+      log.info('background service recovered')
     } catch (error) {
-      console.error('[service-host] recovery failed:', error)
+      log.error(`recovery failed: ${describeError(error).message}`)
       // A rejected `start()` never spawned a child, so no state event carried a reason. This is the
       // taken-port and locked-data-root case, the one worth naming on the screen.
       lastFailure ??= error instanceof Error ? error.message : String(error)
@@ -262,7 +275,7 @@ export function createHelper(options: HelperOptions): Helper {
     // `recovering` check.
     startInBackground: () => {
       void start().catch((error: unknown) => {
-        console.error('[service-host] the background service did not start:', error)
+        log.error(`the background service did not start: ${describeError(error).message}`)
         lastFailure ??= error instanceof Error ? error.message : String(error)
         void recover()
       })
@@ -282,6 +295,7 @@ export function createHelper(options: HelperOptions): Helper {
     dispose: async () => {
       if (disposed) return
       disposed = true
+      telemetry.dispose()
       await service.stop()
       tunnels.dispose()
       broker.dispose()

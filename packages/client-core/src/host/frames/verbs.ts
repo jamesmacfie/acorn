@@ -78,6 +78,10 @@ type AuthorSurface = {
   'document:read': AcornBridge['document']['read']
   'document:write': AcornBridge['document']['write']
   'document:flush': AcornBridge['document']['flush']
+  // One wire verb, two author members: `bridge.telemetry` and `bridge.log` both post a
+  // `telemetry` message, because a log line is one of the five record kinds. The pair is named
+  // after the node's two `ctx` members so an author who learned one half knows the other.
+  telemetry: AcornBridge['telemetry']
   'webview:navigate': AcornBridge['webview']['navigate']
   'webview:back': AcornBridge['webview']['back']
   'webview:forward': AcornBridge['webview']['forward']
@@ -114,10 +118,12 @@ type HostSurface = {
   keydown: FrameServices['keydown']
 }
 
-// Two wire verbs ask nothing of the host's services bag. `cancel` makes the broker drop its own record of
-// an in-flight request rather than asking the host to undo anything; `connected` is consumed by the broker
-// as evidence the frame evaluated, which it reports through `onConnected` rather than through a service.
-type HostHandledVerb = Exclude<FrameVerb, 'cancel' | 'connected'>
+// Three wire verbs ask nothing of the host's services bag. `cancel` makes the broker drop its own record
+// of an in-flight request rather than asking the host to undo anything; `connected` is consumed by the
+// broker as evidence the frame evaluated, which it reports through `onConnected` rather than through a
+// service; `telemetry` is emitted by the broker through the emitter it already holds for its own
+// histograms (frames/frameTelemetry.ts), because a record is not an effect on the shell.
+type HostHandledVerb = Exclude<FrameVerb, 'cancel' | 'connected' | 'telemetry'>
 
 // ── The coverage checks ───────────────────────────────────────────────────────────────────────────
 

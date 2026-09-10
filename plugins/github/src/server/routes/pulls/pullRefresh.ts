@@ -1,11 +1,15 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { chunkRowsByColumnBudget, type CoreServices, type PluginDatabase, type RefreshResult, type RouteResult } from '@acorn/plugin-api/node'
+import { chunkRowsByColumnBudget, type CoreServices, createLogger, type PluginDatabase, type RefreshResult, type RouteResult } from '@acorn/plugin-api/node'
 import { pullsResource } from '../../resourceKeys'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from '../mirror/prMirror'
 import { deletePullMirrorStatements } from '../../mirrorRetention'
 import { pullRequests, syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
+
+// A module with no `ctx` in reach, so the owner is stated here (docs/plugin-authoring.md §
+// Telemetry and logging).
+const log = createLogger('github', 'github')
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -145,7 +149,7 @@ async function fetchPullComposite(
   const result = await ghGraphQLResult<{ repository?: { pullRequest?: GqlPull | null } }>(res)
   if (!result.ok) {
     if (result.kind === 'graphql') {
-      console.error('pullDetail GraphQL errors', JSON.stringify(result.messages))
+      log.error(`pullDetail GraphQL errors: ${result.messages.join('; ')}`)
       return { ok: false, failure: { error: 'graphql', status: 502, detail: result.messages } }
     }
     return { ok: false, failure: result.failure }

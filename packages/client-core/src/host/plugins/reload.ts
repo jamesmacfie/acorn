@@ -12,6 +12,9 @@ import { refreshNodePlugins } from '../../infra/node/nodePlugins'
 import { wsOnPluginsChanged } from '../../infra/node/wsClient'
 import { syncPluginDistribution } from './distribution'
 import { syncPluginContributions } from './syncContributions'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugins')
 
 /** Re-read the roster, re-resolve which bundle wins per plugin, and re-register every contribution.
  *
@@ -47,10 +50,10 @@ export function watchPluginChanges(): () => void {
       for (const node of arrived) asked.add(node.nodeId)
       void syncPluginDistribution()
         .then(syncPluginContributions)
-        .catch((error: unknown) => console.warn("[plugins] could not read the fleet's plugins:", error))
+        .catch((error: unknown) => log.warn("could not read the fleet's plugins", error))
     })
   })
   return wsOnPluginsChanged(() => {
-    void reconcilePluginChange().catch((error) => console.warn('[plugins] could not reconcile a plugin change:', error))
+    void reconcilePluginChange().catch((error) => log.warn('could not reconcile a plugin change', error))
   })
 }

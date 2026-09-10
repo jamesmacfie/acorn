@@ -35,6 +35,24 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+### What a session reports
+
+Starting a provider raises an `agent.session` span and dispatching a turn raises an `agent.turn`
+span, both through `ctx.telemetry` and both owned by this plugin
+([telemetry.md](./telemetry.md) § Ambient attribution). The session span carries the session id, the
+provider and whether this was a reconnect; the turn span carries the turn id, the session id, the
+provider and the turn's source. Neither carries a prompt, a result or a transcript.
+
+The session span covers spawning or reconnecting the provider child and nothing more. A session
+lives for hours and outlives the process, so a span over its whole life is one nobody can close;
+what something waited on is the start.
+
+The turn span opens where the pump dispatches the turn, not where it was enqueued: a turn can sit
+behind the concurrency limit for minutes, and "how long did the agent take" is not "how long was the
+node busy". It closes on whichever of the four endings comes first, which is a completed turn, an
+error, a provider that closed underneath it, or a safe-transient retry putting the same turn back in
+the queue. A turn the process died in the middle of reports nothing.
+
 ## Harnesses
 
 A harness is one agent acorn can manage. A driver adapts its protocol into the common session and
@@ -282,6 +300,9 @@ it fails for any reason a selection can break, not only for the one it was writt
   `AgentToolCallCard` resolves the setting once and passes `defaultOpen` and `onOpenChange` to whichever
   renderer draws the call, so a contributed renderer honours the setting and trains the carry-forward
   mode without reading the preference itself.
+- On the desktop, a closed disclosure defers its contents until first opened. Opening a task's
+  Agent pane therefore does not render hidden tool output or the nested transcript of a completed
+  subagent. Once opened, those contents stay mounted across toggles so their local state survives.
 - **The card body is a slot.** Three things can draw it, in order: a compiled plugin's renderer that
   matched the call, then a loaded plugin's remote tree that declared the call's tool name, then the
   built-in card. A compiled renderer wins because it draws in the transcript's own realm and costs

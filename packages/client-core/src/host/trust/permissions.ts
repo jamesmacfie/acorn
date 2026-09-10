@@ -38,6 +38,11 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   models: { text: 'Generate text with your model providers and installed agent CLIs', icon: 'sparkles' },
   prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },
   identity: { text: 'Read the node owner identity', icon: 'user-round' },
+  // High for the same reason the three below are: it reads something the plugin did not produce.
+  // A sink sees every record from every owner — core's request timings, another plugin's schedule
+  // runs, and the log lines of packages the owner installed for a different reason
+  // (docs/security.md § Telemetry sinks). Writing telemetry needs no grant and gets no line.
+  telemetry: { text: 'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin', icon: 'activity', high: true },
   // The three that hand over where code lives on disk, and the reason `high` exists.
   'projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
   'projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },

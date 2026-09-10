@@ -22,7 +22,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [telemetry/](./telemetry/README.md) | Opt-in spans, logs, events, metrics, and errors with an owner on every record; a logger replacing `console`; a `telemetry` sink token; a Sentry exporter plugin as the first sink. Six phases. | Proposal, 2026-09-10. Phase 0 in progress. |
 
 ## The single files
 
@@ -328,3 +327,11 @@ a tree of closed-kit components, shipped and deleted 2026-08-30. Its behaviour l
 Cooperative extension points and Hooks,
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and typing,
 [shell.md](../shell.md) § The plugin worker, and [security.md](../security.md) § Rung 0.
+
+
+`telemetry/` shipped all six phases and was reviewed and deleted on 2026-09-11.
+[telemetry.md](../telemetry.md) owns the collector, runtime seams, consent, exporter, deliberate
+limits and verification gap for a live Sentry project. [plugin-authoring.md](../plugin-authoring.md)
+owns the author API, [integrations.md](../integrations.md) the DSN connection, and
+[performance.md](../performance.md) the measured async-context cost. Runtime-specific details live
+in [frontend.md](../frontend.md), [tui.md](../tui.md) and [shell.md](../shell.md).

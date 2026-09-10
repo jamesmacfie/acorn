@@ -86,7 +86,7 @@ export function registerPluginTheme(pluginId: string, descriptor: PluginThemeDes
   // The label carries the plugin id because the picker is one flat list holding the built-in twelve
   // and every plugin's themes: two packages offering a "Nightfall" would otherwise be indistinguishable
   // at the only place a user chooses between them.
-  const entry = themeRegistry.register({ id, label: `${descriptor.label} (${pluginId})` })
+  const entry = themeRegistry.register({ id, label: `${descriptor.label} (${pluginId})` }, pluginId)
   blocks.set(id, css)
   flush()
   return {

@@ -33,6 +33,12 @@ import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
 import { declareEmits } from './emits'
 import type { CompiledNodePluginContext, HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
+import { createLogger, describeError } from '../telemetry/logger'
+import { clearTelemetrySinks } from '../telemetry/collector'
+
+const harnessLog = createLogger('harness')
+// One logger per plugin, minted where the name is known, so a line still reads `[plugin:<id>] …`.
+const pluginLog = (name: string) => createLogger(`plugin:${name}`, name)
 
 // Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
 // singletons with no duplicate guard, and schedules, which live in the composition root's scheduler.
@@ -308,7 +314,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       } else {
         const resolved = binding?.dir ? resolveInRoot(binding.dir, descriptor.spawn.entry!) : null
         if (!resolved) {
-          console.warn(`[plugin:${name}] harness '${descriptor.id}' declares an entry outside its package; skipped`)
+          pluginLog(name).warn(`harness '${descriptor.id}' declares an entry outside its package; skipped`)
           continue
         }
         spawn = {
@@ -322,7 +328,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       const probe = (path: string) => async (signal: AbortSignal): Promise<unknown> => {
         const response = await dispatchPluginRoute(requireEnv(name), name, path, { method: 'GET' }, signal)
         if (!response.ok) {
-          console.warn(`[harness] ${name}:${descriptor.id} answered ${response.status} from ${path}`)
+          harnessLog.warn(`${name}:${descriptor.id} answered ${response.status} from ${path}`)
           return null
         }
         return await response.json().catch(() => null)
@@ -360,12 +366,12 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // what it opened, and record why. Boot continues, which is the difference between "one installed
   // plugin is broken" and "this node does not start".
   const contain = async (plugin: NodePlugin, phase: 'init' | 'ready', error: unknown): Promise<void> => {
-    console.error(`[plugin:${plugin.name}] ${phase} failed; the plugin is disabled for this boot:`, error)
+    pluginLog(plugin.name).error(`${phase} failed; the plugin is disabled for this boot: ${describeError(error).message}`)
     clearRegistrations(plugin.name)
     try {
       await plugin.dispose?.()
     } catch (disposeError) {
-      console.warn(`[plugin:${plugin.name}] dispose after a failed ${phase} also failed:`, disposeError)
+      pluginLog(plugin.name).warn(`dispose after a failed ${phase} also failed: ${describeError(disposeError).message}`)
     }
     // Including the database it opened before it threw. A contained failure that left a WAL handle on
     // the data root is the lock leak initPlugins' dispose contract exists to prevent.
@@ -601,7 +607,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         // Already closed by a dispose the failing init got far enough to arrange.
       }
       const message = error instanceof Error ? error.message : String(error)
-      console.error(`[plugin:${name}] reload init failed; the previous instance is still serving:`, error)
+      pluginLog(name).error(`reload init failed; the previous instance is still serving: ${describeError(error).message}`)
       markFailed(name, 'init', message)
       return { ok: false, error: message }
     }
@@ -616,7 +622,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       try {
         await previous.dispose?.()
       } catch (error) {
-        console.warn(`[plugin:${name}] dispose during reload failed:`, error)
+        pluginLog(name).warn(`dispose during reload failed: ${describeError(error).message}`)
       }
     }
     closeStorage(name)
@@ -633,7 +639,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // throwing, the failure a dev loop produces. Narrowing this window further would mean a
       // validate-only pass in six registries.
       const message = error instanceof Error ? error.message : String(error)
-      console.error(`[plugin:${name}] reload could not register the new instance's contributions:`, error)
+      pluginLog(name).error(`reload could not register the new instance's contributions: ${describeError(error).message}`)
       clearRegistrations(name)
       for (const undo of candidateUndos.reverse()) undo()
       closeStorage(name)
@@ -688,6 +694,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
 // registrations in the same process-wide registries, and its cleanup() calls this.
 export function clearRegistrations(name: string): void {
   removePluginRoutes(name)
+  // A sink is a closure over the instance being rolled back, and the collector holds it by
+  // reference on a timer, so a survivor would keep feeding a disposed plugin every record this node
+  // collects (../telemetry/collector.ts).
+  clearTelemetrySinks(name)
   // The WS hub's two module-singleton slots have no duplicate guard, so a stale handler closed over a
   // disposed engine keeps claiming the prefix silently.
   for (const undo of undoRegistrations.get(name) ?? []) undo()
@@ -732,7 +742,7 @@ async function disposeStarted(started: readonly NodePlugin[], closeStorage: (nam
     try {
       await plugin.dispose?.()
     } catch (error) {
-      console.warn(`[plugin:${plugin.name}] dispose failed:`, error)
+      pluginLog(plugin.name).warn(`dispose failed: ${describeError(error).message}`)
     }
     closeStorage(plugin.name)
   }

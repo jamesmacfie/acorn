@@ -14,6 +14,7 @@ import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { decodeIdFrame, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
+import { measure } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
@@ -136,9 +137,16 @@ function connect(): void {
 
 function dispatch(raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
-  // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
-  // narrows the rest.
-  routeWsFrame(raw as WsServerFrame)
+  const frame = raw as WsServerFrame
+  // A histogram and never a span. Terminal output alone is hundreds of frames a second while an
+  // agent is writing, so this is one record every five seconds however hot the socket is
+  // (docs/telemetry.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
+  // `plugin:machine-stats:sample` are different questions and one channel per session is not.
+  measure('core', `ws.inbound.${frame.channel.split(':')[0]}`, () => {
+    // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
+    // narrows the rest.
+    routeWsFrame(frame)
+  })
 }
 
 // This file's own two prefixes (docs/api-reference.md § WebSocket). `term:` frames carry a per-session

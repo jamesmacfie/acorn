@@ -5,6 +5,9 @@
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
 import { matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/registry'
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('context-menu')
 
 export type { ContextMenuLocation }
 
@@ -101,7 +104,7 @@ export function runContextMenuItem<L extends ContextMenuLocation>(
   try {
     item.run(target)
   } catch (error) {
-    console.warn(`[context-menu] '${item.id}' failed on ${target.location} '${target.id}':`, error)
+    log.warn(`'${item.id}' failed on ${target.location} '${target.id}'`, error, { 'menu.item': item.id })
   }
 }
 

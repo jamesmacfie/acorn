@@ -13,6 +13,7 @@ import { pluginRowTarget } from '../../host/plugins/rowTargets'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 import { showNotification } from '../../infra/platform'
 import { wsOnNotice } from '../../infra/node/wsClient'
+import { emitEvent } from '../../infra/telemetry/emitter'
 import { activeTaskId } from '../tasks/tasks'
 import { edgesBetween, snapshotKey, type Edge, type Snapshot } from './attention'
 import { dropNoticesForTask, pushNotice, type Notice } from './notifications'
@@ -100,6 +101,10 @@ export function deliverNotice(input: Omit<Notice, 'id' | 'read'>, context: Deliv
   const seen = context.focused() && context.activeTaskId() === input.taskId
   const notice = pushNotice({ ...input, read: seen })
   if (!seen) for (const sink of sinks) sink(notice)
+  // The kind and whether it landed already read, and nothing else. The title is the one field on a
+  // notice that can carry a person's own words, and a record never quotes the work it describes
+  // (docs/telemetry.md § What never leaves the machine).
+  emitEvent('core', 'notice.delivered', { seam: 'notice.delivered', 'notice.kind': notice.kind, 'notice.seen': seen })
   return notice
 }
 

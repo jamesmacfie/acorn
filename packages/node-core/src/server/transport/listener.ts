@@ -15,6 +15,10 @@ import { attachTunnel, disposeTunnel, type TunnelDeps } from './tunnel'
 import { isUpgradeClaimed } from './upgradeClaim'
 import { declaredTunnelPorts } from './tunnelPorts'
 import type { Env } from '../bindings'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('server')
+const nodeLog = createLogger('node')
 
 // Dev data root: the repo-local apps/node/.acorn (gitignored). It belongs to apps/node because the node
 // owns SQLite, blobs and the node identity (../storage/paths.ts). Only valid while running from a checkout:
@@ -141,7 +145,7 @@ export function startListener(
         // The remembered port belongs to someone else now. An ephemeral port is still a correct endpoint,
         // since the client is told where we bound rather than assuming, so this is a retry.
         retried = true
-        console.warn(`[server] port ${requested} is taken; binding an ephemeral port instead`)
+        log.warn(`port ${requested} is taken; binding an ephemeral port instead`)
         server.listen(0, bindHost, onListening)
         return
       }
@@ -154,8 +158,8 @@ export function startListener(
       allowedHosts.add(`127.0.0.1:${address.port}`)
       for (const host of advertised) allowedHosts.add(`${host}:${address.port}`)
       root.recordPort(address.port)
-      console.log(`acorn server on https://127.0.0.1:${address.port}`)
-      for (const host of advertised) console.log(`acorn server also answering to https://${host}:${address.port}`)
+      log.info(`listening on https://127.0.0.1:${address.port}`)
+      for (const host of advertised) log.info(`also answering to https://${host}:${address.port}`)
       server.off('error', onError) // listening, later runtime errors are not listen failures
       // Loopback, even when advertising: this origin is handed to child processes, which validate the
       // certificate fully against its IP:127.0.0.1 SAN. The address a remote client uses is the one the
@@ -216,7 +220,7 @@ export async function drainWithDeadline(
         await step()
       } catch (error) {
         // A failed step is not a reason to skip the rest: the root lock still has to come off.
-        console.warn(`[node] ${label} teardown failed:`, error)
+        nodeLog.warn(`${label} teardown failed: ${describeError(error).message}`)
       }
     }
     return 'drained'

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, invalidateWorktreeStatus, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, invalidateWorktreeStatus, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -27,6 +27,10 @@ import {
 import { fileURLToPath } from 'node:url'
 import type { RunSessionGlue } from './runChannel'
 import { TerminalDisplay } from './terminalDisplay'
+
+// This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
+// rather than bound by the host (docs/plugin-authoring.md § Telemetry and logging).
+const log = createLogger('terminal', 'terminal')
 
 // PTYs live in the node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload, since the PTY is in the service,
@@ -231,7 +235,7 @@ async function markExited(id: string, exitCode: number | null) {
       .set({ status: 'exited', exitCode, exitedAt: Date.now() })
       .where(eq(terminalSessions.id, id))
   } catch (error) {
-    console.warn('[terminal] could not record session exit', id, error)
+    log.warn(`could not record the exit of session ${id}: ${describeError(error).message}`)
   }
 }
 
@@ -501,7 +505,7 @@ export async function reconcileTmux() {
         await deleteRow(row.id)
       }
     } catch (e) {
-      console.warn('[terminal] tmux reconcile failed for session', row.id, e)
+      log.warn(`tmux reconcile failed for session ${row.id}: ${describeError(e).message}`)
     }
   }
   // This runs after the window, so the client's initial term:list has already fired. Ping it to

@@ -16,6 +16,9 @@ import {
   type CommandRouteScope,
 } from './chromeData'
 import { runChromeAction } from './actions'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugin-chrome')
 
 // Turns `contributions.commands` into command-registry contributions, one per kind.
 //
@@ -136,7 +139,7 @@ export function usablePluginCommands(
   }
   return honoured.filter((descriptor) => {
     if (!orphaned(descriptor)) return true
-    console.warn(`[plugin-chrome] ${pluginId} command '${descriptor.id}' names a parent this device will not honour.`)
+    log.warn(`${pluginId} command '${descriptor.id}' names a parent this device will not honour`, undefined, { 'plugin.id': pluginId })
     return false
   })
 }

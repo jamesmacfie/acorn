@@ -2,8 +2,11 @@ import { createSignal, For, Show } from 'solid-js'
 import { createDismissable } from '../../../kit/lib/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
+import { createLogger } from '../../../infra/telemetry/logger'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
+
+const log = createLogger('will')
 
 type Prompt = {
   title: string
@@ -50,7 +53,7 @@ export function WillConfirmationHost() {
       try {
         concern.onDecision?.(confirmed, ticked)
       } catch (error) {
-        console.error(`[will] ${concern.feature} onDecision failed:`, error)
+        log.error(`${concern.feature} onDecision failed`, error, { 'will.feature': concern.feature })
       }
     }
     setChecks({})

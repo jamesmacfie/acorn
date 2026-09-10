@@ -1,6 +1,8 @@
 import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
+import { formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { nodeTransport } from '../platform'
+import { currentTrace, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
 import { nodeState } from './fleet'
 
@@ -54,6 +56,12 @@ type SendOptions = {
   // which is less than one model call is allowed to take, so a caller that knows it is slow has to say
   // so. Unset keeps the broker's default.
   timeoutMs?: number
+  // Who this request is for. `core` unless a plugin's frame asked for it, in which case the host
+  // passes the plugin id (host/frames/frameServices.ts) so the span says whose request was slow.
+  owner?: string
+  // Set by the telemetry poster alone. A span per batch would be a batch per span, and the two would
+  // chase each other for as long as the owner left telemetry on (../telemetry/post.ts).
+  unmeasured?: boolean
 }
 
 // GET and HEAD are the reads, everything else changes something on the node. Defaults to GET, matching
@@ -70,8 +78,73 @@ const isWritable = (nodeId: string): boolean => {
   return state !== 'offline' && state !== 'revoked'
 }
 
-// The one place a request leaves the renderer.
+/**
+ * A route pattern for the span's `route` attribute, at the coarsest useful grain.
+ *
+ * The renderer does not have the node's route table, so it cannot know that `/v2/core/tasks/abc` is
+ * `/v2/core/tasks/:id`, and sending the raw path would put a row per task in a vendor's transaction
+ * list. The namespace is the part the renderer does know and the part worth grouping by: core's
+ * tasks, or one plugin's sessions. The matched pattern is on the node's own `http.request` span,
+ * which is this span's child (docs/telemetry.md § Traces).
+ */
+export function apiRouteAttr(path: string): string {
+  const segments = path.split('?')[0].split('/').filter(Boolean)
+  // `/v2/p/<plugin>/<first>` keeps four, so two plugins read apart and so does one plugin's two
+  // routers. Everything else keeps three, which is `/v2/core/<first>`.
+  const keep = segments[0] === 'v2' && segments[1] === 'p' ? 4 : 3
+  return `/${segments.slice(0, keep).join('/')}`
+}
+
+/**
+ * The one place a request leaves the renderer.
+ *
+ * Two things happen here that `deliver` below does not know about: the request is named, so a
+ * failure a person reports is findable in the node's log, and it becomes a span. The span is what
+ * carries `traceparent`, which makes the node's own `http.request` span a child of this one and a
+ * click one trace end to end (docs/telemetry.md § Traces).
+ */
 async function send(path: string, options: SendOptions = {}): Promise<ApiResponse> {
+  const method = options.method ?? 'GET'
+  // Minted here rather than in the broker branch below, so the same-origin path carries one too and
+  // so it can go out as a header. The node honours a caller-supplied `x-request-id` that matches its
+  // grammar, which is what ties a failure a person reports to a line in that node's log.
+  const requestId = nextRequestId()
+  // The span, and the `traceparent` that makes the node's request span its child. Inert when
+  // telemetry is off, which is a boolean read and an object nobody allocates.
+  const trace = currentTrace()
+  const span = options.unmeasured
+    ? null
+    : startSpan(options.owner ?? 'core', {
+      name: 'api.request',
+      ...(trace ? { traceId: trace.traceId, parentSpanId: trace.spanId } : {}),
+      attrs: { seam: 'api.request', method, route: apiRouteAttr(path) },
+    })
+  const headers: Record<string, string> = {
+    ...options.headers,
+    'x-request-id': requestId,
+    ...(span?.traceId ? { traceparent: formatTraceparent(span.traceId, span.spanId) } : {}),
+  }
+  try {
+    const res = await deliver(path, options, method, requestId, headers)
+    // A 4xx is an error for the span even though it is a perfectly good answer, because the
+    // question a span list is read to answer is "which of these went wrong".
+    span?.end(res.ok ? 'ok' : 'error', { status: res.status })
+    return res
+  } catch (error) {
+    // Nothing came back at all: no node picked, the node offline, or the broker's own timeout.
+    // `status` is 0, which is what `ApiError` uses for the same three.
+    span?.end('error', { status: 0 })
+    throw error
+  }
+}
+
+async function deliver(
+  path: string,
+  options: SendOptions,
+  method: string,
+  requestId: string,
+  headers: Record<string, string>,
+): Promise<ApiResponse> {
   const transport = nodeTransport()
   const nodeId = options.nodeId ?? activeNodeId()
 
@@ -89,8 +162,8 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     // that stubs global fetch. Same-origin, so whatever auth that origin accepts applies. There is no
     // device token on this path.
     const res = await fetch(path, {
-      method: options.method ?? 'GET',
-      headers: options.headers,
+      method,
+      headers,
       body: bodyForFetch(asNodeBody(options.body)),
       signal: options.signal,
     })
@@ -107,13 +180,12 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   //
   // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where writes still work, and
   // `incompatible` gets its own message from the route it fails on.
-  if (isMutation(options.method) && !isWritable(nodeId)) {
+  if (isMutation(method) && !isWritable(nodeId)) {
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
       retryable: true,
     })
   }
 
-  const requestId = nextRequestId()
   // Abort is forwarded explicitly, because an AbortSignal cannot cross contextBridge. Main holds the
   // controller and the renderer names the request to cancel.
   const onAbort = () => transport.abort(requestId)
@@ -122,8 +194,8 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     const res = await transport.fetch(nodeId, {
       requestId,
       path,
-      method: options.method ?? 'GET',
-      headers: options.headers ?? {},
+      method,
+      headers,
       ...(asNodeBody(options.body) ? { body: asNodeBody(options.body)! } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     })
@@ -187,12 +259,12 @@ const raise = (res: ApiResponse, fallback: string): never => {
   })
 }
 
-type ReadOptions = { signal?: AbortSignal; nodeId?: string }
+type ReadOptions = { signal?: AbortSignal; nodeId?: string; owner?: string }
 
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
 // does not know about (docs/api-reference.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
-  const res = await send(url, { signal: options.signal, nodeId: options.nodeId })
+  const res = await send(url, { signal: options.signal, nodeId: options.nodeId, ...(options.owner ? { owner: options.owner } : {}) })
   if (!res.ok) raise(res, `${url} ${res.status}`)
   return parseJson<T>(res)
 }
@@ -275,6 +347,9 @@ export type WriteInit = {
   signal?: AbortSignal
   nodeId?: string
   timeoutMs?: number
+  // Both as on `SendOptions` above: who the request is for, and the poster's own opt-out.
+  owner?: string
+  unmeasured?: boolean
 }
 
 // JSON POST. Throws the structured error code on failure, such as `merge_failed`, so callers branch.

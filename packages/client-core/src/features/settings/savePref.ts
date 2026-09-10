@@ -4,6 +4,9 @@ import { writeJson } from '../../infra/node/apiClient'
 import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../../infra/persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../../infra/persistence/persistedState'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('prefs')
 
 // The active node, which is apiClient's default target, not a home node. What survives in this store
 // after the device migration all describes one node's resources: a task's pane layout, its open files,
@@ -37,7 +40,7 @@ export async function savePref(
     key === slice.key || (slice.scope !== 'app' && key.startsWith(`${slice.key}:`)),
   )
   if (descriptor?.maxBytes != null && utf8Bytes(value) > descriptor.maxBytes) {
-    if (options.surfaceFailure === false) console.error(`[prefs:${key}] value exceeds ${descriptor.maxBytes} bytes`)
+    if (options.surfaceFailure === false) log.error(`${key}: value exceeds ${descriptor.maxBytes} bytes`, undefined, { 'pref.key': key })
     else pushBackgroundError('', `Could not save ${descriptor.id}`, `Persisted value exceeds ${descriptor.maxBytes} bytes.`)
     return false
   }
@@ -87,7 +90,7 @@ export async function savePref(
         return next
       })
     }
-    if (options.surfaceFailure === false) console.error(`[prefs:${key}]`, error)
+    if (options.surfaceFailure === false) log.error(key, error, { 'pref.key': key })
     else pushBackgroundError('', `Could not save ${key}`, error instanceof Error ? error.message : String(error))
     return false
   } finally {

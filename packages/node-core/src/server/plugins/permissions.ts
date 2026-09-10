@@ -36,6 +36,12 @@ const SIMPLE_FACETS = {
   context: 'context',
   models: 'models',
   identity: 'identity',
+  // The one read-everything grant. A sink sees every record from every owner, which is why it is a
+  // token at all and why the trust prompt draws it high
+  // (../core/telemetry.ts, docs/security.md § Telemetry sinks). Writing telemetry needs nothing:
+  // `ctx.telemetry` and `ctx.log` are on both tiers unconditionally, because a plugin measuring its
+  // own work is not reading anybody else's.
+  telemetry: 'telemetry',
 } as const satisfies Record<string, keyof CoreServices>
 
 // The whole `permissions.node.core` vocabulary, exported as one list so the agent-facing authoring

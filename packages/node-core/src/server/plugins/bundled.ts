@@ -9,6 +9,9 @@ import {
   markPluginUserManaged,
   readBundledPluginState,
 } from './bundledState'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('plugins')
 
 export type BundledPluginReconcileResult = {
   installed: string[]
@@ -155,7 +158,7 @@ export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): 
           markBundledPluginInstalled(dataRoot, id, manifest.version, fingerprint, state?.installedAt)
           // Loud, like the loader's built-in-shadowing line. "The version running is not the one
           // you built" is the hardest thing to work out later.
-          console.warn(`[plugins] ${id}: replaced a dev build in ${target} with the bundled package from ${source}`)
+          log.warn(`${id}: replaced a dev build in ${target} with the bundled package from ${source}`)
           result.updated.push(id)
           continue
         }

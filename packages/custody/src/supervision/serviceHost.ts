@@ -13,6 +13,9 @@ import {
   type ServiceStartResult,
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('service-host')
 
 export type ServiceHostEvents = {
   stateChanged?(state: ServiceState, detail?: string): void
@@ -62,7 +65,7 @@ export class ServiceHost {
         try {
           child.send(message)
         } catch (error) {
-          console.warn('[service-host] send failed; the service channel is gone:', error)
+          log.warn(`send failed; the service channel is gone: ${describeError(error).message}`)
         }
       },
       subscribe: (listener) => {
@@ -114,7 +117,7 @@ export class ServiceHost {
     try {
       await this.peer?.request('service.stop', {}, 15_000)
     } catch (error) {
-      console.warn('[service-host] graceful stop failed:', error)
+      log.warn(`graceful stop failed: ${describeError(error).message}`)
     }
     this.disposeConnection('Service stopped')
     this.terminate(child)

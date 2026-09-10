@@ -1,4 +1,5 @@
 import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
+import { TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
 
 // The complete renderer preference vocabulary. Features import this object instead of spelling
 // storage keys so a preference rename or migration has one reviewable boundary.
@@ -104,6 +105,10 @@ export const PrefKeys = {
   // The device's, like `theme`: a sound on this machine is not a fact about the node, and the other
   // client paired with the same node may not even be able to make one.
   notifications: 'notifications',
+  // Whether this node collects telemetry at all (docs/telemetry.md § The switch). The node's, and
+  // emphatically not the device's: the collector lives on the node, it re-reads this row on its own
+  // five-second tick, and every runtime paired with that node stops collecting when it goes off.
+  telemetry: TELEMETRY_PREF_KEY,
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]

@@ -5,6 +5,9 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('plugins')
 
 // The content-addressed store of plugin client bundles a node handed over. See docs/security.md,
 // "Third-party plugin bundles", for why the hash is trusted and the claim is not.
@@ -119,7 +122,7 @@ export class PluginCache {
         headers: {},
       })
     } catch (error) {
-      console.warn(`[plugins] could not fetch ${pluginId} from ${nodeId}:`, error)
+      log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, { 'plugin.id': pluginId, 'node.id': nodeId })
       return { error: 'unreachable' }
     }
     if (response.status !== 200) return { error: response.status === 404 ? 'not-found' : 'unreachable' }
@@ -129,7 +132,7 @@ export class PluginCache {
     if (hash !== claim.hash) {
       // Loud, and refused. The one failure in this file that is a security event rather than an
       // operational one, and the owner sees it as a blocked row rather than a silent absence.
-      console.error(`[plugins] ${pluginId} from ${nodeId} does not match the hash it advertised; refusing the bundle`)
+      log.error(`${pluginId} from ${nodeId} does not match the hash it advertised; refusing the bundle`, { 'plugin.id': pluginId, 'node.id': nodeId })
       return { error: 'hash-mismatch' }
     }
 
@@ -208,7 +211,7 @@ export class PluginCache {
       const parsed = indexSchema.safeParse(JSON.parse(readFileSync(join(this.dir, INDEX_FILE), 'utf8')))
       // Same stance as fleet.json. An unparseable index is not one to guess at: starting empty costs
       // a re-download and a re-prompt, both safe, where half-reading it would not be.
-      if (!parsed.success) console.warn('[plugins] the bundle cache index is unreadable; starting from an empty cache')
+      if (!parsed.success) log.warn('the bundle cache index is unreadable; starting from an empty cache')
       this.#entries = parsed.success ? parsed.data.entries : {}
     } catch {
       this.#entries = {} // first launch

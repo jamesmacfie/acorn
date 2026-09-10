@@ -11,6 +11,9 @@ import {
   type PersistedStateSlice,
   type RestorePhase,
 } from './persistedState'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('persisted-state')
 
 const PHASES: readonly RestorePhase[] = ['workspace', 'view', 'panes']
 const WRITE_THROTTLE_MS = 500
@@ -20,7 +23,7 @@ const parseStored = <T>(slice: PersistedStateSlice<T>, scopeId: string, raw: unk
   try {
     return slice.codec.parse(raw)
   } catch (error) {
-    console.warn(`[persisted-state:${slice.id}] invalid value`, error)
+    log.warn(`${slice.id}: invalid value`, error, { 'slice.id': slice.id })
     return slice.empty(scopeId)
   }
 }
@@ -39,7 +42,7 @@ export function restorePersistedSlices(
         try {
           slice.binding!.hydrate(scopeId, parseStored(slice, scopeId, raw))
         } catch (error) {
-          console.warn(`[persisted-state:${slice.id}] hydrate failed`, error)
+          log.warn(`${slice.id}: hydrate failed`, error, { 'slice.id': slice.id })
         }
       }
     }
@@ -69,7 +72,7 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     const key = storageKeyFor(slice, scopeId)
     if (lastStored.get(key) === raw) return
     if (slice.maxBytes != null && utf8Bytes(raw) > slice.maxBytes) {
-      if (slice.id === 'core.notices') console.error(`[persisted-state:${slice.id}] value exceeds ${slice.maxBytes} bytes`)
+      if (slice.id === 'core.notices') log.error(`${slice.id}: value exceeds ${slice.maxBytes} bytes`, undefined, { 'slice.id': slice.id })
       else pushBackgroundError('', `Could not save ${slice.id}`, `Persisted value exceeds ${slice.maxBytes} bytes.`)
       return
     }

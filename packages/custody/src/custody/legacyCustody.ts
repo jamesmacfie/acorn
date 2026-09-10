@@ -2,6 +2,9 @@ import { createDecipheriv, pbkdf2Sync } from 'node:crypto'
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deviceTokens, type TokenCipher } from './deviceTokenStore'
+import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('custody')
 
 // One-time adoption of the custody root an Electron build left behind. See docs/shell.md, "Keys and
 // custody".
@@ -78,8 +81,9 @@ export function adoptLegacyCustody(userDataDir: string, cipher: TokenCipher, leg
     tokens.write(scope, token)
     adopted += 1
   }
-  console.log(
-    `[custody] adopted ${legacy.userDataDir}: ${adopted} device token(s)` +
-      (lost ? `; ${lost} could not be decrypted and those nodes will ask to be paired again` : ''),
+  log.info(
+    `adopted ${legacy.userDataDir}: ${adopted} device token(s)`
+      + (lost ? `; ${lost} could not be decrypted and those nodes will ask to be paired again` : ''),
+    { adopted, lost },
   )
 }

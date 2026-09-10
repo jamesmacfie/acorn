@@ -37,6 +37,9 @@ const HOLES = {
   tasks: ['runConfig'],
   projects: ['config', 'setup'],
   proc: ['ProcessError'],
+  // One member of the batch, because a record's shape lives in `@acorn/protocol/telemetry.ts` and
+  // a loaded plugin cannot import protocol. The two `ctx` members beside it are compared in full.
+  telemetry: ['records'],
 } as const
 
 // Two shapes the published types leave as type parameters rather than describing: a stored connection
@@ -57,10 +60,10 @@ type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 // `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
 // one exception, and not a tier one: its big facets are compared one at a time below.
 type LoadedContext = Omit<NodePluginContext, 'core'> & {
-  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git'>>
+  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
 }
 type PublishedContext = Omit<Published.NodePluginContext<Real[0], Real[1]>, 'core'> & {
-  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git'>>
+  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
 }
 
 const _context: Mutual<Hole<LoadedContext, (typeof HOLES.context)[number]>, Hole<PublishedContext, (typeof HOLES.context)[number]>> = [true, true]
@@ -76,24 +79,29 @@ const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[
 const _tasks: Mutual<Hole<CoreServices['tasks'], (typeof HOLES.tasks)[number]>, Hole<Published.CoreServices['tasks'], (typeof HOLES.tasks)[number]>> = [true, true]
 const _projects: Mutual<Hole<CoreServices['projects'], (typeof HOLES.projects)[number]>, Hole<Published.CoreServices['projects'], (typeof HOLES.projects)[number]>> = [true, true]
 const _request: Mutual<PluginRequestContext, Published.PluginRequestContext<Real[0], Real[1]>> = [true, true]
+// The sink contract, compared apart from the batch's `records`, whose element type is protocol's
+// and therefore opaque on the published side.
+type BatchOf<T> = T extends { onBatch(sink: (batch: infer B) => void): unknown } ? B : never
+const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'>, Hole<BatchOf<Published.CoreTelemetryService>, 'records'>> = [true, true]
 // One capability whose shape is written out here rather than left opaque, because a plugin outside this
 // repository is the whole reason it exists (`agents.draftAttachments`). The row it hands back is
 // protocol's `AgentAttachment`, so this is what stops the published copy drifting from the real one.
 const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _draftAttachment]
+void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
   expect(HOLES.context).toHaveLength(4)
-  expect(Object.values(HOLES).flat()).toHaveLength(8)
-  // Nine of the context's thirteen members are compared in full, `core` facet by facet above, and
+  expect(Object.values(HOLES).flat()).toHaveLength(9)
+  // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
     'name', 'routes', 'schedules', 'collections', 'taskChecks',
     'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
+    'telemetry', 'log',
   ]
-  expect(published.length - HOLES.context.length).toBe(10)
+  expect(published.length - HOLES.context.length).toBe(12)
 })
 
 it('names every capability the first-party plugins publish', () => {

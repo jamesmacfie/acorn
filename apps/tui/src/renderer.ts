@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
-import { openScreen, type Screen, type Sink } from './paint/screen'
+import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { openScreen, type FramePhases, type Screen, type Sink } from './paint/screen'
 import { onFrame } from './tree/frames'
 import { pressAt, wheelAt } from './tree/hit'
 import { openTerminal } from './input/terminal'
@@ -52,6 +53,25 @@ export type Renderer = {
   destroy: () => void
 }
 
+// ── tui.frame ──
+//
+// A paint is far past ten a second under a held key, so it is a histogram and never a span
+// (docs/telemetry.md § Hot seams are metrics). Four series under one name: the whole frame, and the
+// three halves of it, told apart by `phase` rather than by four seam names, so "which third is
+// slow" is a filter and not a second query (docs/tui.md § What the terminal client reports).
+//
+// Nothing here is synchronous work on the paint path. `recordDuration` is a boolean read, a map
+// lookup and four numbers; the batch leaves on the emitter's own timer and never inside `frame()`.
+
+const recordFrame = (phases: FramePhases): void => {
+  if (!telemetryEnabled()) return
+  const { layoutMs, paintMs, flushMs } = phases
+  recordDuration('core', 'tui.frame', layoutMs + paintMs + flushMs, { phase: 'total' })
+  recordDuration('core', 'tui.frame', layoutMs, { phase: 'layout' })
+  recordDuration('core', 'tui.frame', paintMs, { phase: 'paint' })
+  recordDuration('core', 'tui.frame', flushMs, { phase: 'flush' })
+}
+
 export function openRenderer(options: {
   cols: number
   rows: number
@@ -68,6 +88,7 @@ export function openRenderer(options: {
     cols: options.cols,
     rows: options.rows,
     ...(options.write ? { write: options.write } : {}),
+    onPhases: recordFrame,
   })
   let destroyed = false
 

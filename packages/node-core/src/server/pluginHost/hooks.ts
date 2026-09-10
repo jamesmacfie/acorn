@@ -22,6 +22,10 @@ import {
   type HookVerdict,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { Disposable } from './capabilities'
+import { emitSpan, newSpanId, newTraceId, runWithTelemetry, telemetryEnabled } from '../telemetry/collector'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('hooks')
 
 /** How much of a handler's own text reaches the owner's UI. Display-only, capped by the node, the same
  *  treatment a task check's message gets on its way to the archive dialog. */
@@ -187,8 +191,30 @@ export const hookHandlers = (): (HookHandlerRegistration & { matched: boolean; l
     })
     .sort((a, b) => a.id.localeCompare(b.id))
 
-const note = (handler: HookHandlerRegistration, started: number, outcome: HookRunRecord['outcome'], detail?: string): void => {
-  lastRun.set(handler.id, { at: Date.now(), ms: Date.now() - started, outcome, ...(detail ? { detail } : {}) })
+// One handler's turn in the chain: when it started, and the ids its span and everything it does
+// inside it share. A chain is one trace, not one per handler, because three handlers answering one
+// question are one thing that happened (docs/telemetry.md § Traces). Empty ids when nothing is
+// collecting, so a chain costs no allocation it will not use.
+type HookRun = { started: number; traceId: string; spanId: string }
+const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, spanId: traceId ? newSpanId() : '' })
+
+// The developer view's record of one handler, and its span. Both from the same three facts, because
+// `note` was already a span in all but name: a start, an end and a closed outcome set. The owner is
+// the handler's plugin, stamped from the registration and never read off the handler's answer, the
+// same rule the verdict's `by` follows.
+const note = (handler: HookHandlerRegistration, run: HookRun, outcome: HookRunRecord['outcome'], detail?: string): void => {
+  const at = Date.now()
+  lastRun.set(handler.id, { at, ms: at - run.started, outcome, ...(detail ? { detail } : {}) })
+  if (!telemetryEnabled()) return
+  emitSpan(handler.pluginId, {
+    traceId: run.traceId,
+    spanId: run.spanId,
+    name: 'hook.run',
+    start: run.started,
+    durationMs: at - run.started,
+    status: outcome === 'failed' || outcome === 'timeout' ? 'error' : 'ok',
+    attrs: { seam: 'hook.run', 'hook.point': handler.point, 'hook.handler': handler.id, 'hook.outcome': outcome },
+  })
 }
 
 const displayText = (value: unknown): string | undefined =>
@@ -205,6 +231,7 @@ const displayText = (value: unknown): string | undefined =>
  */
 async function callOne(
   handler: HookHandlerRegistration,
+  run: HookRun,
   payload: HookPayload,
   timeoutMs: number,
 ): Promise<unknown | 'timeout' | null> {
@@ -217,9 +244,13 @@ async function callOne(
     }, timeoutMs)
   })
   try {
-    return await Promise.race([handler.call(payload, controller.signal), deadline])
+    // The handler runs inside its own span, so whatever it spawns or queries is filed under its
+    // plugin and lands in the chain's trace (../telemetry/context.ts).
+    const answer = runWithTelemetry({ traceId: run.traceId, spanId: run.spanId, owner: handler.pluginId }, () =>
+      handler.call(payload, controller.signal))
+    return await Promise.race([answer, deadline])
   } catch (error) {
-    console.warn(`[hooks] ${handler.id} on '${handler.point}' failed:`, error)
+    log.warn(`${handler.id} on '${handler.point}' failed: ${describeError(error).message}`)
     return null
   } finally {
     clearTimeout(timer)
@@ -253,17 +284,21 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
   if (!matchesHookPayload(point.payload, payload)) {
     // The owner's own bug, not a plugin's, so it is loud. Running the chain with a payload that does not
     // match the declaration would hand strangers' handlers a shape the trust prompt never described.
-    console.warn(`[hooks] '${pointId}' was run with a payload its own declaration does not describe`)
+    log.warn(`'${pointId}' was run with a payload its own declaration does not describe`)
     return { ok: true, payload }
   }
 
   const chain = hookHandlersFor(pointId)
+  // One trace for the whole chain, minted here because nothing asked for this from outside: a hook
+  // point is reached from inside some other piece of work, and its handlers are one answer to one
+  // question.
+  const traceId = telemetryEnabled() ? newTraceId() : ''
   // Fired and forgotten, deliberately: an observer's answer is not read, and awaiting one would give it
   // the power over timing that `observe` exists to withhold.
   for (const handler of chain.filter((entry) => entry.mode === 'observe')) {
-    const started = Date.now()
-    void callOne(handler, payload, point.timeoutMs).then((answer) => {
-      note(handler, started, answer === 'timeout' ? 'timeout' : answer === null ? 'failed' : 'ok')
+    const run = beginRun(traceId)
+    void callOne(handler, run, payload, point.timeoutMs).then((answer) => {
+      note(handler, run, answer === 'timeout' ? 'timeout' : answer === null ? 'failed' : 'ok')
     })
   }
 
@@ -271,31 +306,31 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
   const reasons: { reason: string; by: string }[] = []
   for (const handler of chain) {
     if (handler.mode === 'observe') continue
-    const started = Date.now()
-    const answer = await callOne(handler, current, point.timeoutMs)
+    const run = beginRun(traceId)
+    const answer = await callOne(handler, run, current, point.timeoutMs)
     if (answer === null) {
-      note(handler, started, 'failed')
+      note(handler, run, 'failed')
       continue
     }
     if (handler.mode === 'transform') {
       if (answer === 'timeout') {
-        note(handler, started, 'timeout')
+        note(handler, run, 'timeout')
         continue
       }
       const next = (answer as { payload?: unknown })?.payload
       if (matchesHookPayload(point.payload, next)) {
         current = next as T
-        note(handler, started, 'ok')
+        note(handler, run, 'ok')
       } else {
         // Recorded rather than refused: a transform that answers with the wrong shape has said nothing,
         // and the author needs the developer view to tell them so.
-        note(handler, started, 'skipped', 'answered with a payload the point does not declare')
+        note(handler, run, 'skipped', 'answered with a payload the point does not declare')
       }
       continue
     }
     // veto
     if (answer === 'timeout') {
-      note(handler, started, 'timeout')
+      note(handler, run, 'timeout')
       if (point.onTimeout === 'deny') {
         reasons.push({ reason: `${handler.pluginId} did not answer in time`, by: handler.pluginId })
         if (!point.collect) break
@@ -304,7 +339,7 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
     }
     const verdict = answer as { ok?: unknown; reason?: unknown }
     if (verdict?.ok === false) {
-      note(handler, started, 'vetoed', displayText(verdict.reason))
+      note(handler, run, 'vetoed', displayText(verdict.reason))
       reasons.push({
         reason: displayText(verdict.reason) ?? `${handler.pluginId} stopped this`,
         // Stamped by the host from the registration, never read off the answer: a handler that could
@@ -313,7 +348,7 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
       })
       if (!point.collect) break
     } else {
-      note(handler, started, 'ok')
+      note(handler, run, 'ok')
     }
   }
 

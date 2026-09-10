@@ -10,6 +10,9 @@ import {
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../infra/node/apiClient'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('tasks')
 
 // plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
 // here as literals because client-core is a shared library and may not import a plugin, which the
@@ -58,7 +61,7 @@ export const taskBridge = (): TaskBridge => {
       archiveConcerns: (id) => readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
         .then((body) => body?.concerns ?? [])
         .catch((error) => {
-          console.warn('[tasks] archive concerns unavailable:', error)
+          log.warn('archive concerns unavailable', error)
           return []
         }),
       onCreated: (id) => post<{ ok: boolean }>(taskOnCreatedRoute(id)).then(() => undefined),

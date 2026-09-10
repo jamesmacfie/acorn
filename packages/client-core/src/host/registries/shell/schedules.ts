@@ -1,5 +1,8 @@
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { Registry } from '../../../kit/lib/registry'
+import { createLogger } from '../../../infra/telemetry/logger'
+
+const log = createLogger('schedule')
 
 // Periodic work in the renderer. The same word as the node's `ctx.schedules` for the same idea, and
 // deliberately not the same shape: a node cadence is budgeted and floored at 300s because it runs with
@@ -18,7 +21,7 @@ export const clientScheduleRegistry = new Registry<ClientScheduleContribution>('
 export function startClientSchedules(): () => void {
   const disposers = clientScheduleRegistry.entries().filter((entry) => hasHostCapability(entry.requires)).map((entry) => {
     const refresh = () => {
-      if (!document.hidden) void Promise.resolve(entry.run()).catch((error) => console.error(`[schedule:${entry.id}]`, error))
+      if (!document.hidden) void Promise.resolve(entry.run()).catch((error) => log.error(entry.id, error, { 'schedule.id': entry.id }))
     }
     refresh()
     const timer = window.setInterval(refresh, entry.intervalMs)

@@ -28,6 +28,9 @@ import {
   putSchema,
   type PluginsState,
 } from '@acorn/custody/plugins/pluginRequests.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('helper')
 
 // The renderer's projection of the custody stack, over one loopback WebSocket. This is the Tauri half
 // of what Electron's `nodeBrokerIpc.ts` and `pluginIpc.ts` were: same
@@ -256,7 +259,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await helper.broker
           .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v2/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
-          .catch((error: unknown) => console.warn(`[fleet] could not revoke this device on ${nodeId}:`, error))
+          .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}: ${describeError(error).message}`, { 'node.id': nodeId }))
       }
       helper.broker.remove(nodeId)
       helper.fleet.forget(nodeId)
@@ -304,9 +307,9 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       if (!helper.pluginCache.has(decision.hash)) throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
       const disclosure = disclosureSchema.safeParse(raw)
       if (disclosure.success) return helper.pluginTrust.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
-      console.warn(
-        `[plugins] the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record:`,
-        disclosure.error.message,
+      log.warn(
+        `the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record: ${disclosure.error.message}`,
+        { 'plugin.id': decision.pluginId },
       )
       helper.pluginTrust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },

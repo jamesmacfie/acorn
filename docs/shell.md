@@ -132,6 +132,66 @@ The supervised child and the standalone node consume the same `apps/node/src/com
 graph and the same reconciliation and drain plan. The shell supplies supervision and native adapters;
 it does not assemble a parallel plugin graph.
 
+## What the helper reports
+
+Off by default, and on it is the same five record kinds every other runtime builds.
+[telemetry.md](./telemetry.md) owns the model, the switch and the collector; this section is what the
+helper and the Rust shell add to it.
+
+The helper uses the node's own collector (`packages/node-core/src/server/telemetry/collector.ts`)
+rather than the renderer's emitter. It is a Node process that already depends on `@acorn/node-core`,
+its logger writes to stderr, which is what a process whose stdout is a wire needs, and reusing the
+renderer's would put a package that draws on the helper's graph. The terminal client goes the other
+way for the same kind of reason: it runs client-core in process
+([tui.md](./tui.md) § What the terminal client reports).
+
+| Seam | Where | What it emits |
+| --- | --- | --- |
+| The boot account | `packages/custody/src/bootMarks.ts` | span `helper.boot` with a `helper.boot.mark` child per mark |
+| Every request to a node | `packages/custody/src/broker/nodeBroker.ts` | histogram `broker.request` with the node id and the method |
+| The socket's health | the same file | events `broker.reconnect`, `broker.degraded`, `broker.shed` and `broker.missed-pong`, each with the node id |
+| A node that died | `packages/custody/src/supervision/crashBudget.ts` | event `node.crash` with the count in the window; a fatal error when the budget is spent |
+| Every bridge call | `apps/desktop/src/shell/bridge.ts` | histogram `bridge.call` with the helper method, from the renderer |
+| Console lines | everywhere under `packages/custody/src` and `apps/desktop/src/helper` | log records through `createLogger(tag)` |
+
+`bridge.call` is the renderer's record and not the helper's: the bridge runs in the window. It
+measures the helper's leg of a round trip the renderer's `api.request` span already covers end to
+end, so a slow `bridge.call` beside a fast node says the broker is where the time went.
+
+### The switch, over the wire
+
+Collection needs the `telemetry.enabled` preference and a sink together, and the helper has no
+database to read the preference out of. So `packages/custody/src/telemetry.ts` asks the local node
+for it over the broker: once a minute while it is off, and every five seconds once it is on, because
+that is the collector's own flush tick and it re-reads the preference on each one. A switch flipped
+in Settings reaches the helper within a minute.
+
+The sink is registered when the answer is yes and dropped when it is no, so a helper nobody is
+collecting from has no flush timer at all. A batch that fails to post is kept and prepended to the
+next attempt, capped at 500 records: a node restarting is the case the queue exists for, and it is
+also the case that produces the records worth keeping.
+
+The boot marks become spans after the fact, for the same reason the terminal client's do: the answer
+arrives after the boot is over. They are held either way, because `ACORN_PERF=1` prints them
+([local-development.md](./local-development.md) § Timing a cold start).
+
+### What the shell reports
+
+One thing, and it arrives a launch late. A panic hook runs while the process is dying: it can write
+a file and nothing else, and the helper is this process's child and is going with it. So
+`apps/desktop/src-tauri/src/crash.rs` installs `std::panic::set_hook` as soon as `boot` has resolved
+the two roots, and a panic writes `shell-crash.json` into the custody root with the message, the
+file and line, the thread and the app version.
+
+The helper reads that file on its next boot, posts it as one fatal error with `runtime: shell`, and
+deletes it. Its own batch, because the node re-stamps the runtime from the batch onto every record in
+it, and only the helper can speak for the shell. The file is deleted whether or not the post
+succeeded: a record kept until a post happens to work is a record re-read on every boot for the life
+of the install.
+
+The file is the telemetry error record's own shape, minus the `kind` the reader adds. That is
+deliberate. A crash reporter in the shell, a native dialog offering to send it, reads the same file.
+
 ## Renderer origin and protocol handler
 
 The renderer loads from `app://acorn` and the node serves no assets.

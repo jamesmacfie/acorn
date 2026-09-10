@@ -2,6 +2,9 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type Server, type Socket } from 'node:net'
 import { WebSocket } from 'ws'
 import { pinnedTlsOptions } from '../broker/nodeBroker'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('tunnel')
 
 export type TunnelKey = { nodeId: string; taskId: string; port: number }
 
@@ -131,7 +134,7 @@ export class PreviewTunnels {
       if (!node?.certPem || !node.fingerprint) {
         // No pinned certificate, no tunnel. Every other path to a node goes through the pinned
         // agent, and a raw byte pipe is the last place to make an exception.
-        console.warn(`[tunnel] ${id}: no pinned certificate for this node; refusing`)
+        log.warn(`${id}: no pinned certificate for this node; refusing`, { 'tunnel.id': id })
         socket.destroy()
         return
       }
@@ -147,7 +150,7 @@ export class PreviewTunnels {
     server.on('error', (error) => {
       // A dead listener left in the map would make a later open() hand back a port nothing is
       // listening on.
-      console.warn(`[tunnel] listener for ${id} failed:`, error)
+      log.warn(`listener for ${id} failed: ${describeError(error).message}`, { 'tunnel.id': id })
       this.closeEntry(id)
     })
     this.entries.set(id, { server, port, sockets, idle: null, secret })
@@ -182,7 +185,7 @@ export class PreviewTunnels {
     const refuse = (reason: string): void => {
       clearTimeout(timer)
       socket.off('data', onData)
-      console.warn(`[tunnel] ${id}: ${reason}; refusing`)
+      log.warn(`${id}: ${reason}; refusing`, { 'tunnel.id': id })
       socket.destroy()
     }
     const timer = setTimeout(() => refuse('no request head within the deadline'), HEAD_TIMEOUT_MS)
@@ -284,7 +287,7 @@ export class PreviewTunnels {
     ws.on('error', (error) => {
       // A refused upgrade is the normal failure here, from an undeclared port or a dev server that
       // is not running. Silence would leave the preview pane blank with no explanation.
-      console.warn(`[tunnel] ${id}:`, error.message)
+      log.warn(`${id}: ${error.message}`, { 'tunnel.id': id })
       closeBoth()
     })
     socket.on('close', closeBoth)

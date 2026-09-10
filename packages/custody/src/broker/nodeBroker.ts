@@ -11,6 +11,14 @@ import {
   type NodeRecord,
   type NodeStatus,
 } from '@acorn/protocol/broker.ts'
+import { emitEvent, measure, telemetryEnabled } from '@acorn/node-core/server/telemetry/collector.ts'
+import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+
+// What the broker reports, and it is health rather than traffic (docs/shell.md § What the helper
+// reports). `broker.request` is a histogram because a renderer's reads run far past ten a second;
+// the four events are the moments a person would want a timestamp for, and each carries the node id
+// so a fleet view of slow or flapping nodes is a query rather than a bisect.
+const log = createLogger('broker')
 
 // The connection broker. See docs/shell.md, "Connection broker", for what it owns per node. It has
 // no shell binding, so it can be unit-tested against a real TLS server.
@@ -210,7 +218,7 @@ export class NodeBroker {
       controller.abort()
     }, request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     try {
-      const response = await nodeRequest({
+      const response = await measure('core', 'broker.request', () => nodeRequest({
         // `new URL(path, endpoint)` with a path validated to start with '/' cannot escape the
         // endpoint's origin, so a renderer cannot aim a request at another host.
         url: new URL(request.path, connection.node.endpoint),
@@ -223,7 +231,7 @@ export class NodeBroker {
         body: request.body,
         agent: connection.agent,
         signal: controller.signal,
-      })
+      }), { 'node.id': nodeId, method: request.method ?? 'GET' })
       this.noteHttpResult(connection, response)
       return response
     } catch (error) {
@@ -320,7 +328,8 @@ export class NodeBroker {
       // Checked before sending, so the count covers pings that already had a full interval to be
       // answered. Incrementing first would condemn the socket on a ping that never had its chance.
       if (connection.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
-        console.warn(`[broker] ${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`)
+        log.warn(`${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`, { 'node.id': connection.node.nodeId })
+        emitEvent('core', 'broker.missed-pong', { 'node.id': connection.node.nodeId, missed: connection.missedPongs })
         ws.terminate()
         return
       }
@@ -371,11 +380,12 @@ export class NodeBroker {
       // to treat it as a reconnect and refetch.
       if (connection.seq !== 0 && seq !== connection.seq + 1) {
         if (!shed) {
-          console.warn(`[broker] frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`)
+          log.warn(`frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
           connection.ws?.close()
           return
         }
-        console.warn(`[broker] ${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`)
+        log.warn(`${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
+        emitEvent('core', 'broker.shed', { 'node.id': connection.node.nodeId, missing: seq - connection.seq - 1 })
       }
       connection.seq = seq
     }
@@ -390,6 +400,9 @@ export class NodeBroker {
     // Jitter so several nodes coming back from a laptop sleep do not reconnect in lockstep.
     const delay = base * (1 + (Math.random() * 2 - 1) * JITTER)
     connection.attempt += 1
+    if (telemetryEnabled()) {
+      emitEvent('core', 'broker.reconnect', { 'node.id': connection.node.nodeId, attempt: connection.attempt, 'delay.ms': Math.round(delay) })
+    }
     connection.reconnectTimer = setTimeout(() => {
       connection.reconnectTimer = null
       // Re-probed, not just re-opened. A node that upgrades restarts, which drops the socket, so
@@ -450,6 +463,11 @@ export class NodeBroker {
     if (connection.state === state && connection.error?.code === error?.code) return
     connection.state = state
     connection.error = state === 'online' ? undefined : error
+    // `degraded` is the one state worth an event of its own: the socket is down and HTTP still
+    // works, so nothing in the app is broken and nothing in the app says so either. The other four
+    // are already visible — `online` is the absence of a problem, and `offline`, `revoked` and
+    // `incompatible` all reach a person as a screen.
+    if (state === 'degraded') emitEvent('core', 'broker.degraded', { 'node.id': connection.node.nodeId })
     this.events.status(this.statusOf(connection))
   }
 

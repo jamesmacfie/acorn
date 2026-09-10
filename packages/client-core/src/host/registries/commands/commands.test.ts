@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import type { Disposable } from '../../../kit/lib/registry'
+import {
+  _resetClientTelemetry,
+  flushTelemetry,
+  setTelemetryEnabled,
+  startClientTelemetry,
+} from '../../../infra/telemetry/emitter'
 import {
   COMMAND_CLOSED,
   commandAvailable,
@@ -196,5 +203,65 @@ describe('the union', () => {
     disposable.dispose()
     expect(commandRegistry.get('cmd.one')).toBeUndefined()
     expect(commandRegistry.get('cmd.two')).toBeUndefined()
+  })
+})
+
+describe('the command span', () => {
+  let posted: TelemetryRecord[]
+  const collecting = () => {
+    posted = []
+    startClientTelemetry({ runtime: 'renderer', post: async (records) => void posted.push(...records) })
+    setTelemetryEnabled(true)
+  }
+  const spans = () => posted.filter((record) => record.kind === 'span' && record.name === 'command')
+
+  afterEach(() => _resetClientTelemetry())
+
+  it('names the command and the owner the registry stamped', async () => {
+    collecting()
+    register(stampCommandOwner(leaf('cmd.spanned'), 'workflows') as CommandContribution)
+    await executeCommand('cmd.spanned')
+    await flushTelemetry()
+    const [span] = spans()
+    expect(span.attrs).toMatchObject({ 'command.id': 'cmd.spanned', owner: 'workflows', runtime: 'renderer' })
+    expect(span.kind === 'span' && span.status).toBe('ok')
+  })
+
+  it('files a core command under core', async () => {
+    collecting()
+    register(leaf('cmd.core'))
+    await executeCommand('cmd.core')
+    await flushTelemetry()
+    expect(spans()[0]?.attrs.owner).toBe('core')
+  })
+
+  it('takes its status from the outcome, so a command that threw reads as one', async () => {
+    collecting()
+    register(leaf('cmd.throws', { run: () => { throw new Error('nope') } }))
+    await expect(executeCommand('cmd.throws')).rejects.toThrow('nope')
+    await flushTelemetry()
+    const [span] = spans()
+    expect(span.kind === 'span' && span.status).toBe('error')
+  })
+
+  it('waits for a command that returns a promise', async () => {
+    collecting()
+    let settle = () => {}
+    register(leaf('cmd.slow', { run: () => new Promise<void>((resolve) => { settle = resolve }) }))
+    const running = executeCommand('cmd.slow')
+    await flushTelemetry()
+    // Nothing yet: the command has not finished, so there is no duration to report.
+    expect(spans()).toEqual([])
+    settle()
+    await running
+    await flushTelemetry()
+    expect(spans()).toHaveLength(1)
+  })
+
+  it('records nothing for a command that does not exist', async () => {
+    collecting()
+    await executeCommand('cmd.absent')
+    await flushTelemetry()
+    expect(spans()).toEqual([])
   })
 })

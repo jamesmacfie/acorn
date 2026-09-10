@@ -42,6 +42,9 @@ import { contentLinkRegistry } from '../registries/panes/contentLinks'
 import { refResolverRegistry } from '../registries/panes/refResolvers'
 import { registerNoticeTargetHandler } from '../../features/notifications/notifications'
 import { setSelectedSource } from '../../features/tasks/tasks'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('plugin-chrome')
 
 // Turning accepted manifests into native shell contributions: the descriptor half of what
 // plugins/frames/register.ts does for rectangles (docs/plugins.md).
@@ -113,13 +116,20 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   const installed = row.installed!
   const contributions = installed.contributions
   const disposables: Disposable[] = []
+  // Every registration below goes through this rather than calling `registry.register` directly, so
+  // the plugin id lands in each registry's owner side-map and the seams that build a telemetry
+  // record can name whose contribution it was (kit/lib/registry.ts § the owner side-map). A
+  // descriptor cannot state an owner and this is the pass that knows one, which is the same rule
+  // `stampCommandOwner` follows for a command's parent.
+  const own = <T extends { id: string }>(registry: { register(entry: T, owner?: string): Disposable }, entry: T): Disposable =>
+    registry.register(entry, pluginId)
   const add = (what: string, id: string, register: () => Disposable): void => {
     try {
       disposables.push(register())
     } catch (error) {
       // A duplicate id is the expected failure: contribution ids are un-namespaced by design, so a
       // third-party descriptor can collide with a first-party source or slot.
-      console.warn(`[plugin-chrome] ${pluginId} could not contribute ${what} '${id}':`, error)
+      log.warn(`${pluginId} could not contribute ${what} '${id}'`, error, { 'plugin.id': pluginId })
     }
   }
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
@@ -132,11 +142,11 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // able to than `icon`. `add` already warns on a collision with a core mark, and core wins.
   if (installed.icon) {
     const { d, color } = installed.icon
-    add('icon', pluginId, () => brandMarkRegistry.register({ id: pluginId, d, color }))
+    add('icon', pluginId, () => own(brandMarkRegistry, { id: pluginId, d, color }))
   }
   for (const [key, mark] of Object.entries(installed.icons ?? {})) {
     const id = `${pluginId}/${key}`
-    add('icon', id, () => brandMarkRegistry.register({ id, d: mark.d, color: mark.color }))
+    add('icon', id, () => own(brandMarkRegistry, { id, d: mark.d, color: mark.color }))
   }
 
   const frames = contributions.frames ?? []
@@ -169,18 +179,18 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   ], commandBinding)
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
-    add('command', descriptor.id, () => commandRegistry.register(pluginCommand(pluginId, descriptor, commandBinding)))
+    add('command', descriptor.id, () => own(commandRegistry, pluginCommand(pluginId, descriptor, commandBinding)))
   }
 
   for (const descriptor of contributions.keybindings ?? []) {
     const command = commandById.get(descriptor.command)
     if (!command || !isPluginShortcutChord(descriptor.defaultChord)) {
-      console.warn(`[plugin-chrome] ${pluginId} ignored an invalid keybinding for '${descriptor.command}'.`)
+      log.warn(`${pluginId} ignored an invalid keybinding for '${descriptor.command}'`, undefined, { 'plugin.id': pluginId })
       continue
     }
     if (descriptor.when === 'surface' && (!descriptor.surface || !surfaceIds.has(descriptor.surface))) continue
     const id = qualifiedPluginCommandId(pluginId, descriptor.command)
-    add('keybinding', id, () => keybindingRegistry.register({
+    add('keybinding', id, () => own(keybindingRegistry, {
       id,
       command: id,
       description: command.title,
@@ -205,7 +215,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // than trusted.
     const pane = descriptor.openPane
     if (pane !== undefined && !taskPanes.has(pane)) {
-      console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${pane}'.`)
+      log.warn(`${pluginId} content link '${descriptor.id}' names an undeclared pane '${pane}'`, undefined, { 'plugin.id': pluginId })
       continue
     }
     add('content link', descriptor.id, () => {
@@ -213,7 +223,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       if (!pattern.captures.includes(descriptor.item)) {
         throw new Error(`item '${descriptor.item}' is not captured by its pattern`)
       }
-      return contentLinkRegistry.register({
+      return own(contentLinkRegistry, {
         id: descriptor.id,
         // Stamped from the plugin id, never read off the descriptor. It's what makes the plugin's own
         // reference panel reachable from one of its links, and a manifest that could state it could
@@ -238,9 +248,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // declared, or a roster row could point core's first-open at somebody else's pane.
     const defaultPane = descriptor.defaultPane && taskPanes.has(descriptor.defaultPane) ? descriptor.defaultPane : undefined
     if (descriptor.defaultPane && !defaultPane) {
-      console.warn(`[plugin-chrome] ${pluginId} source '${descriptor.id}' names an undeclared pane '${descriptor.defaultPane}'.`)
+      log.warn(`${pluginId} source '${descriptor.id}' names an undeclared pane '${descriptor.defaultPane}'`, undefined, { 'plugin.id': pluginId })
     }
-    add('source', descriptor.id, () => sourceRegistry.register({
+    add('source', descriptor.id, () => own(sourceRegistry, {
       id: descriptor.id,
       label: descriptor.label,
       glyph: descriptor.glyph,
@@ -277,14 +287,14 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // A slot name this client doesn't know is skipped rather than mapped to a default. A roster row is
     // bytes a node sent, and a newer node's `topbar.left` must not silently become the footer.
     if (descriptor.slot === 'footer') {
-      add('slot', descriptor.id, () => uiSlotRegistry.register({
+      add('slot', descriptor.id, () => own(uiSlotRegistry, {
         id: descriptor.id,
         slot: 'task.footer',
         order: 500,
         component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
       }))
     } else if (descriptor.slot === 'topbar') {
-      add('slot', descriptor.id, () => uiSlotRegistry.register({
+      add('slot', descriptor.id, () => own(uiSlotRegistry, {
         id: descriptor.id,
         // The topbar's right end, the app's status bar and the only topbar slot with a host. Order 500
         // puts plugin chips after the notification bell (10) and before the account menu, which isn't a
@@ -295,7 +305,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
         component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
       }))
     } else {
-      console.warn(`[plugin-chrome] ${pluginId} slot '${descriptor.id}' names an unknown slot '${descriptor.slot}'.`)
+      log.warn(`${pluginId} slot '${descriptor.id}' names an unknown slot '${descriptor.slot}'`, undefined, { 'plugin.id': pluginId })
     }
   }
 
@@ -304,7 +314,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // declared surfaces are in scope. Same check a command and a source's empty state get: a row that
     // parses and can only toast is worse for an author than one that's refused.
     if (!contextFreeActionUsable(pluginId, surfaces, descriptor.action)) {
-      console.warn(`[plugin-chrome] ${pluginId} context menu '${descriptor.id}' has an action this device cannot honour.`)
+      log.warn(`${pluginId} context menu '${descriptor.id}' has an action this device cannot honour`, undefined, { 'plugin.id': pluginId })
       continue
     }
     add('context menu', descriptor.id, () => registerPluginContextMenu(pluginId, descriptor, {
@@ -328,7 +338,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // owner registered in code, a remote slot is a node in the owner's own tree, and a hook draws
     // nothing: none of the three names a surface, so there is nothing here to hold them to.
     if (descriptor.surface !== undefined && !surfaceIds.has(descriptor.surface)) {
-      console.warn(`[plugin-chrome] ${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'.`)
+      log.warn(`${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'`, undefined, { 'plugin.id': pluginId })
       continue
     }
     add('extension point', descriptor.id, () => registerPluginExtensionPoint(pluginId, descriptor, pointBinding))
@@ -341,7 +351,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // Same check a command and a context-menu row get. The point owner never sees this failure: a
     // contribution the device can't honour simply never delivers.
     if (descriptor.onSelect && !contextFreeActionUsable(pluginId, surfaces, descriptor.onSelect)) {
-      console.warn(`[plugin-chrome] ${pluginId} extension '${descriptor.id}' has an action this device cannot honour.`)
+      log.warn(`${pluginId} extension '${descriptor.id}' has an action this device cannot honour`, undefined, { 'plugin.id': pluginId })
       continue
     }
     note(descriptor.refresh)
@@ -359,7 +369,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.attention ?? []) {
     note(descriptor.refresh)
-    add('attention', descriptor.id, () => attentionRegistry.register({
+    add('attention', descriptor.id, () => own(attentionRegistry, {
       id: descriptor.id,
       order: descriptor.order,
       // Addressed per node by the inbox's fan-out, never against the ambient active node. A node that
@@ -376,7 +386,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.nodeStats ?? []) {
     note(descriptor.refresh)
-    add('nodeStat', descriptor.id, () => nodeStatRegistry.register({
+    add('nodeStat', descriptor.id, () => own(nodeStatRegistry, {
       id: descriptor.id,
       order: descriptor.order,
       label: descriptor.label,
@@ -389,7 +399,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   for (const descriptor of contributions.collections ?? []) {
     note(descriptor.refresh)
     const declared = new Set((descriptor.params ?? []).map((param) => param.id))
-    add('collection', descriptor.id, () => collectionRegistry.register({
+    add('collection', descriptor.id, () => own(collectionRegistry, {
       // The registry id is the host's, minted from the plugin id, the same stamp `ctx.collections`
       // applies on the compiled side, so a placement addressing `(pluginId, collectionId)` resolves the
       // same contribution whichever feeder supplied it.
@@ -420,7 +430,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     const source = `${pluginId}:${descriptor.id}`
     // No `revision`. It's synchronous and a descriptor answers across a fetch, so there's no number to
     // return in time; the invalidation ping the rest of the chrome rides covers the same freshness.
-    add('agent context', descriptor.id, () => agentContextRegistry.register({
+    add('agent context', descriptor.id, () => own(agentContextRegistry, {
       id: descriptor.id,
       source,
       label: descriptor.label,
@@ -450,7 +460,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // `providerId` is the plugin id and nothing else. The descriptor can't state one, because a resolver
     // claiming another provider's name is how a plugin would get its own rows rendered as that
     // provider's items.
-    add('ref resolver', descriptor.id, () => refResolverRegistry.register({
+    add('ref resolver', descriptor.id, () => own(refResolverRegistry, {
       id: descriptor.id,
       providerId: pluginId,
       kind: descriptor.kind,

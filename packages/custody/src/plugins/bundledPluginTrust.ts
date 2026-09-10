@@ -5,6 +5,9 @@ import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { readPluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
 import type { PluginCache } from './pluginCache'
 import type { PluginTrustStore } from './pluginTrustStore'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('plugins')
 
 const packageDirectories = (root: string): string[] => {
   try {
@@ -70,7 +73,7 @@ export function trustBundledClientPlugins(
       })
       accepted.push(id)
     } catch (error) {
-      console.error(`[plugins] bundled client for ${id} could not be trusted:`, error)
+      log.error(`bundled client for ${id} could not be trusted: ${describeError(error).message}`, { 'plugin.id': id })
     }
   }
   return accepted

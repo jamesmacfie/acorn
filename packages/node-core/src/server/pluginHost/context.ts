@@ -36,6 +36,9 @@ import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
 import { broadcastNotice, broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorktreeStatusChanged } from '../notify'
 import { buildPluginRequestContext } from './requestContext'
+import { telemetryFor } from '../telemetry/collector'
+import { telemetryServiceFor } from '../core/telemetry'
+import { createLogger } from '../telemetry/logger'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
 // plugin from a built-in: its presence means "contain its failures" and "shape its context from the
@@ -130,6 +133,17 @@ const revokers = new WeakMap<NodePluginContext, () => void>()
 export function revokePluginContext(ctx: NodePluginContext): void {
   revokers.get(ctx)?.()
 }
+
+/**
+ * Bind the telemetry read facet to the plugin holding this context.
+ *
+ * `scopeCore` grants the facet by name and hands over the one every caller shares, so without this
+ * every sink would be filed under `core` and Settings could not say which plugin is reading the
+ * stream. Absent for a plugin whose manifest never asked for the token, and absent means absent:
+ * the whole point of gating by omission is that an ungranted facet is not there to call.
+ */
+const withOwnedTelemetry = (core: CoreServices, plugin: string): CoreServices =>
+  core.telemetry ? { ...core, telemetry: telemetryServiceFor(plugin) } : core
 
 export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
   const plugin = options.plugin
@@ -331,7 +345,19 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // Both tiers, from the one option the caller derived. `undefined as never` for a plugin that owns no
     // tables, matching routes.register above.
     storage: options.storage ?? (undefined as never),
-    core: permissions ? scopeCore(options.core, permissions, plugin) : options.core,
+    // The read facet is bound to this plugin too, wherever it is present: a sink registered through
+    // it is filed under the plugin's id, so Settings can say who is reading the stream and a
+    // rollback can drop this plugin's subscriptions (../core/telemetry.ts).
+    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin),
+    // Owner-bound like every registration above, and here the binding is the whole feature: a record
+    // this plugin emits says `owner: <plugin>` because the host closed over the id, not because the
+    // plugin passed one. An `owner` attribute set by the emitter is dropped by the collector for the
+    // same reason (../telemetry/collector.ts § cleanAttrs).
+    //
+    // Both tiers and no grant. Writing telemetry about your own work reads nothing; the read side is
+    // `ctx.core.telemetry` and it is a token (../plugins/permissions.ts).
+    telemetry: telemetryFor(plugin),
+    log: createLogger(plugin, plugin),
     // The broadcast surface, projected rather than re-implemented: these are server/notify.ts and
     // server/transport/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
     // `streams` return disposers, which the host records like any other contribution.
@@ -436,6 +462,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       return undefined as R
     }
 
+  // `telemetry` and `log` are deliberately absent from this list. A revoked context throws from
+  // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
+  // it never fails the thing it describes (docs/telemetry.md § Never fail what you measure). A
+  // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
   for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.

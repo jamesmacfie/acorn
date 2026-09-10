@@ -62,6 +62,37 @@ export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // store, it states the methods it calls (plugins/github/src/server/routes/prMirror.ts §
 // PatchBlobStore).
 
+// ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
+// The objects arrive on `ctx.telemetry`, `ctx.log` and `ctx.core.telemetry`; the types are here
+// because a plugin that passes one into a module of its own needs a parameter type to name
+// (docs/telemetry.md, docs/plugin-authoring.md § Telemetry and logging). `TelemetrySink` is what a
+// plugin holding the `telemetry` token writes.
+export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-core/server/telemetry/collector.ts'
+// The one value in this block, for a compiled plugin's module-level code with no `ctx` in reach: a
+// PTY engine, a route factory, a driver. Pass your own plugin id as the owner and the tag you
+// already had in the string you were prefixing, so `[github] pruned 3 rows` keeps reading the same
+// and gains an owner. A loaded plugin uses `ctx.log`, which binds the id for it.
+//
+// `describeError` beside it because a logger takes scalars: it turns a caught `unknown` into a name
+// and a scrubbed one-line message, which is what goes in the line.
+export { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+export type { Logger } from '@acorn/node-core/server/telemetry/logger.ts'
+// The rule from docs/telemetry.md § What never leaves the machine, as a function, for the one
+// plugin shape that needs it: a sink, which is the last thing a record passes through before the
+// network. Core scrubs at the ingest door, so a sink is re-checking rather than cleaning, and a
+// span name or a metric name is the part core takes on trust as a pattern.
+//
+// Exported rather than copied because there are already two copies of these token patterns in this
+// repository and the header of each says a change belongs in both. A third, inside a plugin whose
+// whole job is egress, is the copy that would rot unnoticed.
+export { scrub } from '@acorn/node-core/server/telemetry/scrub.ts'
+export type { TelemetryService } from '@acorn/node-core/server/core/telemetry.ts'
+export type {
+  TelemetryAttrs,
+  TelemetryBatch,
+  TelemetryRecord,
+} from '@acorn/protocol/telemetry.ts'
+
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
 // The handle type only. See docs/data-layer.md and docs/plugins.md § Data ownership for
 // `ctx.storage.open()` and how a plugin declares its migrations.

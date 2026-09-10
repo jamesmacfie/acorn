@@ -4,6 +4,9 @@ import type { AppDatabase } from './db'
 import type { DeviceService } from './auth/deviceTokens'
 import { recordAudit } from './audit'
 import { readNodeAttachment, recordEnrollmentFailure, recordNodeAttachment } from './storage/dataRoot'
+import { createLogger } from './telemetry/logger'
+
+const log = createLogger('enrollment')
 
 // Unattended enrollment: the node introduces itself to a control plane that provisioned it
 // (docs/node-enrollment.md).
@@ -110,7 +113,7 @@ export async function enrollNode(deps: EnrollmentDeps): Promise<EnrollmentOutcom
   if (!token && !controlPlane) return { kind: 'skipped', reason: 'unconfigured' }
 
   const fail = (reason: string): EnrollmentOutcome => {
-    console.warn(`[enrollment] ${reason}`)
+    log.warn(reason)
     recordEnrollmentFailure(deps.dataDir, reason)
     recordAudit(deps.db, { actor: 'system', action: 'node.enrolled', details: { ok: false, reason } })
     return { kind: 'failed', reason }
@@ -162,7 +165,7 @@ export async function enrollNode(deps: EnrollmentDeps): Promise<EnrollmentOutcom
         subject: device.device.id,
         details: { ok: true, controlPlaneUrl: checked.url.toString(), enrollmentTokenId: enrollmentTokenId(token) },
       })
-      console.log(`[enrollment] attached to ${checked.url.host}`)
+      log.info(`attached to ${checked.url.host}`)
       return { kind: 'enrolled', controlPlaneUrl: checked.url.toString() }
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error)

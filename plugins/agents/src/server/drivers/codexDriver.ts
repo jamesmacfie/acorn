@@ -1,4 +1,4 @@
-import { AGENT_TOOL_PASSTHROUGH, brokerEnv } from '@acorn/plugin-api/node'
+import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
 import { execFile } from 'node:child_process'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -20,6 +20,10 @@ import {
   codexReasoningOptions,
   codexSkillsFromResponse,
 } from './codexConfiguration'
+
+// The node's log, tagged as the provider's side of this plugin (docs/plugin-authoring.md §
+// Telemetry and logging). A module with no `ctx` in reach, so the owner is stated here.
+const log = createLogger('agents:provider', 'agents')
 
 const execFileAsync = promisify(execFile)
 const DRIVER_VERSION = 'codex-app-server-v2'
@@ -175,9 +179,7 @@ export class CodexAgentDriver implements AgentDriver {
       onRequest: onServerRequest,
       // The node's log rather than the transcript: a byte count the reader cannot act on is not part of
       // the conversation.
-      onStderr: (line) => console.warn(
-        `[agents:provider] ${providerStderrNotice('Codex app-server', Buffer.byteLength(line, 'utf8'))}`,
-      ),
+      onStderr: (line) => log.warn(providerStderrNotice('Codex app-server', Buffer.byteLength(line, 'utf8'))),
       onClosed: (error) => void options.onClosed(error),
     })
 

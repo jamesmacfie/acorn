@@ -1,5 +1,8 @@
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('device-token')
 
 // Device-token custody. See docs/architecture-overview.md, "How the client talks to nodes". The
 // renderer never holds a token, so the credential lives here and only here.
@@ -59,7 +62,7 @@ export function deviceTokens(userDataDir: string, cipher: TokenCipher): DeviceTo
         // Without a keychain the token is not remembered. The node issues a new one next launch, or
         // the owner re-pairs a remote node. Writing plaintext to "make it work" would be worse than
         // an extra device row.
-        console.warn('[device-token] no encryption available; the device token will not be remembered across launches')
+        log.warn('no encryption available; the device token will not be remembered across launches')
         return
       }
       const path = tokenPath(userDataDir, scope)

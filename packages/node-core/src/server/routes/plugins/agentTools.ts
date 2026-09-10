@@ -3,6 +3,7 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
   agentToolContributions,
+  agentToolOwner,
   isToolPermitted,
   parseToolPerms,
   TOOL_PERMS_PREF_KEY,
@@ -15,6 +16,7 @@ import type { AppEnv } from '../../middleware/auth'
 import { mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { runHook } from '../../pluginHost/hooks'
+import { startSpan } from '../../telemetry/collector'
 import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
@@ -92,10 +94,18 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // decision this hook exists for is about the verb.
   const verdict = await runHook('core:before-tool-call', { taskId: ctx.taskId, tool: tool.name, sessionId: ctx.sessionId ?? '' })
   if (!verdict.ok) return respondError(c, STATUS['needs-trust'], 'needs-trust', [`${verdict.by}: ${verdict.reason}`])
+  // Started after every gate, so the span measures the tool and not the permission check in front
+  // of it, and named for the plugin that contributed the tool rather than the one whose route this
+  // is: an agent tool is arbitrary work an agent asked for, and the question is whose work was slow.
+  // The arguments never ride along, for the reason the hook above does not see them either.
+  const span = startSpan(agentToolOwner(tool.name), { name: 'tool.call', attrs: { seam: 'tool.call', tool: tool.name, risk: tool.risk } })
   try {
-    return c.json((await tool.handler(parsed.data, ctx)) ?? null)
+    const answer = c.json((await tool.handler(parsed.data, ctx)) ?? null)
+    span.end('ok', { outcome: 'ok' })
+    return answer
   } catch (error) {
     const kind: ToolError['kind'] = error instanceof ToolError ? error.kind : 'failed'
+    span.end('error', { outcome: kind })
     return respondError(c, STATUS[kind], kind, [error instanceof Error ? error.message : 'tool call failed'])
   }
 }

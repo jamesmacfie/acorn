@@ -20,6 +20,9 @@ import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('plugins')
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
 // (docs/plugins.md). The ceiling is here rather than only in the
@@ -465,7 +468,7 @@ export async function loadExternalPlugins(
     // confusing thing a support thread can fail to mention.
     const shadowsBuiltin = builtins.has(manifest.id)
     if (shadowsBuiltin) {
-      console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in`)
+      log.warn(`${manifest.id}: loading from ${dir} INSTEAD of the built-in`)
     }
     const storage: PluginStorage = {
       open: () => {
@@ -496,6 +499,6 @@ export async function loadExternalPlugins(
     }
   }
 
-  for (const failure of failures) console.error(`[plugins] ${failure.id}: ${failure.reason}`)
+  for (const failure of failures) log.error(`${failure.id}: ${failure.reason}`)
   return { loaded: orderByRequires(loaded), installed, failures: stamped(failures) }
 }

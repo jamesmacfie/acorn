@@ -11,6 +11,8 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { WS_PATH } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { ensureCert } from '@acorn/node-core/server/transport/tls.ts'
+import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry } from '@acorn/node-core/server/telemetry/collector.ts'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { NodeBroker } from './nodeBroker'
 
 // Drives the real broker against a real http/https server. The pin in particular cannot be
@@ -450,6 +452,39 @@ describe('broker WebSocket', () => {
     // is picked up rather than left needing a relaunch.
     await waitFor(() => statuses.some((s) => s.state !== 'online'), 'the node to stop reading online', 8_000)
     await waitFor(() => connections >= 2, 'a reconnect after the silence', 8_000)
+  })
+
+  it('reports a peer that stopped answering as an event a sink can read', async () => {
+    // The broker's half of the helper's health reporting (docs/shell.md § What the helper reports).
+    // The collector is driven directly here rather than through `startHelperTelemetry`, because
+    // what is under test is that the seam fires, not how the batch leaves.
+    const batches: TelemetryRecord[] = []
+    startTelemetry({ node: 'test', version: '0' })
+    const sink = onTelemetryBatch((batch) => batches.push(...batch.records))
+    setTelemetryPref(true)
+    try {
+      const { origin, server } = await listen(false)
+      const wss = new WebSocketServer({ server, path: WS_PATH, autoPong: false })
+      wss.on('connection', () => {})
+      const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+      brokers.push(broker)
+      broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+      await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
+      await waitFor(() => statuses.some((s) => s.state !== 'online'), 'the node to stop reading online', 8_000)
+      flushTelemetry()
+
+      const missed = batches.find((record) => record.kind === 'event' && record.name === 'broker.missed-pong')
+      expect(missed, 'no broker.missed-pong event').toBeDefined()
+      expect(missed?.attrs['node.id']).toBe('n1')
+      // And the reconnect that follows it, so a flapping node reads as a sequence rather than a
+      // single moment.
+      expect(batches.some((record) => record.kind === 'event' && record.name === 'broker.reconnect')).toBe(true)
+    } finally {
+      sink.dispose()
+      setTelemetryPref(false)
+      startTelemetry({ node: 'test', version: '0' })
+    }
   })
 
   it('keeps a socket that answers its pings', async () => {

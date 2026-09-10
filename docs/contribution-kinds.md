@@ -86,6 +86,8 @@ Run by the node, with or without a client attached.
 | Storage | Both | `ctx.storage` | One host-opened, host-migrated SQLite file per plugin |
 | Core services | Both | `ctx.core` | Path confinement, git, the process broker, credentials, the core read models |
 | Broadcasts | Both | `ctx.events` | The WebSocket hub. A loaded plugin sends on `plugin:<id>:*` only, and hears core events by manifest grant |
+| Telemetry | Both | `ctx.telemetry` | Spans, events, counts, gauges and errors about this plugin's own work, with the owner bound by the host ([telemetry.md](./telemetry.md)). No permission, because measuring your own work reads nobody else's. Reading the stream is the separate `telemetry` core token |
+| Logging | Both | `ctx.log` | A stderr line prefixed with the plugin id, and a log record with the owner bound when telemetry is on ([telemetry.md](./telemetry.md) § Logging) |
 
 ## The slot vocabulary
 

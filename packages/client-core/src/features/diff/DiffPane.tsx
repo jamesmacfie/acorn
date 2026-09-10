@@ -47,6 +47,9 @@ import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
 import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../../kit/diff/virtualization'
+import { createLogger } from '../../infra/telemetry/logger'
+
+const log = createLogger('diff')
 
 // The diff shell: every changed file's diff stacked in one virtualized list, in unified or split
 // mode, with find, a sticky file header, per-file collapse, gap expansion, and an inline comment
@@ -233,7 +236,7 @@ export function DiffPane(props: {
       // The gap goes back to being a gap. A read can fail for reasons the row cannot fix (the file
       // moved out from under a working-tree diff), and a rejection here would otherwise escape the
       // row's click handler entirely.
-      console.error('diff gap expansion failed', error)
+      log.error('gap expansion failed', error)
     }
   }
 

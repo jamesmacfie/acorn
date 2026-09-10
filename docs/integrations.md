@@ -21,6 +21,14 @@ for resource execution and connection enumeration. The runtime verifies that the
 belongs to the calling plugin and keeps SQLite and the secret service behind host calls;
 `withConnections` lends each decrypted credential only for the duration of the provider callback.
 
+Two registries answer two different ownership questions there. A mirrored resource and the
+external-item store exist only on an integration provider, so `resource()` and `items()` ask the
+integration registry. Reading a connection and spending its credential belong to the connection
+contribution, which every provider has, so `connections()` and `withConnections()` ask the connection
+registry. Asking the narrower one for a credential would refuse a plugin the use of its own
+connection whenever it mirrors nothing, which is the position both the model providers and the
+Sentry exporter are in.
+
 The runtime's fourth member, `items(providerId)`, hands a route the provider's slice of core's
 external-item cache, the same store a mirrored resource receives on `ProviderResourceContext.items`.
 It exists for the one read `resource()` cannot express: resolution that spans connections, where an
@@ -256,6 +264,42 @@ row — Rollbar's and Linear's tokens are lent to the route by core and never tr
 action, route or verb, because the verb that runs is the static one the manifest declared. Creating
 a task from a Rollbar item is not what picking one means. Promotion stays the deliberate act it is
 on the rail. Commenting and issue mutation stay in the issue surface.
+
+## Sentry
+
+Two plugins carry the Sentry mark in Settings, and that is deliberate.
+
+`sentry-telemetry` is the one that exists. It is a **sink**, not an integration: it reads this node's
+own telemetry and posts it to Sentry as envelopes, so an error becomes an issue, a span becomes a
+transaction, a log record becomes a structured log, a metric becomes a trace metric, and a
+`schedule.run` span becomes a cron check-in ([telemetry.md](./telemetry.md) § Writing a sink). It
+mirrors nothing, browses nothing and promotes nothing, so it registers a
+`ConnectionProviderContribution` rather than an integration one, and its only surface is a settings
+page.
+
+`sentry` is the id held back for the plugin that reads Sentry issues into the rail, with the Rollbar
+shape: mirrored items, a task pane, a source and promotion.
+[future/integration-ideas.md](./future/integration-ideas.md) lists it and nothing is built.
+
+The two are separate because they need different credentials and disclose different things. The
+exporter needs a DSN, which authenticates ingestion into one project and can read nothing. The
+integration needs an organisation token, which reads the owner's whole Sentry account. One plugin
+holding both would ask for the wider credential to do the narrower job.
+
+The connection is `kind: 'observability'`, `authKind: 'api-key'`, one row, three fields: the DSN as a
+password, and `environment` and `release` as text. `validate` parses the DSN into a public key, a
+host, an optional sub-path and a numeric project id, then posts an envelope with a header and no
+items to prove the host answers. Sentry stores nothing for one of those, so a connection test costs
+the owner no quota and leaves no invented event in their issue list. `normalize` labels the row
+`Sentry · <host>/<project>` and puts the two text fields in `config`, which is non-secret and
+provider-owned. Pointing at a staging project is a second row with a different `environment` rather
+than a mode on this one, and `maxConnections` is 1 because the exporter spends the first usable row:
+a second would receive nothing and say so nowhere.
+
+The exporter reads the DSN back through `ctx.providers.withConnection`, once per flush, which is what
+makes disconnecting stop the export inside one five-second window instead of at the next restart.
+[security.md](./security.md) § Credential handling has the posture, and
+[telemetry.md](./telemetry.md) § The first sink has what the exporter does with a batch.
 
 ## Model providers
 

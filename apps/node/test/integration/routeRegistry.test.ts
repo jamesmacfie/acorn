@@ -78,6 +78,8 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['POST', '/v2/core/tasks/:id/renderer-tools/:name'],
   ['GET', '/v2/core/agent-tools'],
   ['GET', '/v2/core/integrations'],
+  ['POST', '/v2/core/telemetry'], // the batch route every runtime that is not the node posts to
+  ['GET', '/v2/core/telemetry/summary'], // what Settings → Telemetry draws (docs/telemetry.md)
 ]
 
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;

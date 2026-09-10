@@ -16,6 +16,9 @@ import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch,
 import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('worktrees')
 
 // Set once by registerTerminalChannel, where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
@@ -164,7 +167,7 @@ function noticeHead(taskId: string, projectId: string, branch: string | null, he
 export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
   try {
     const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
-    if (missing.length) console.warn(`[worktrees] ${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
+    if (missing.length) log.warn(`${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
   } catch {
     // best-effort: never block startup on status
   }
@@ -281,7 +284,7 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
     const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId)
     return resolve(cwd)
   } catch (e) {
-    console.warn('[worktrees] no usable worktree for task', taskId, '-', e instanceof Error ? e.message : e)
+    log.warn(`no usable worktree for task ${taskId} - ${describeError(e).message}`)
     return null
   }
 }
@@ -306,9 +309,9 @@ export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'pro
     const cfg = loadRepoConfig(checkout, homedir(), {})
     if (!cfg.copy.length) return
     const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
-    for (const w of res.warnings) console.warn(`[worktrees] ${w}`)
+    for (const w of res.warnings) log.warn(w)
   } catch (e) {
-    console.warn('[worktrees] copy failed:', e)
+    log.warn(`copy failed: ${describeError(e).message}`)
   }
 }
 

@@ -8,6 +8,11 @@ import {
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
 import { startServiceRuntime, type ServiceRuntime } from '../composition/runtime'
+import { installCrashHandlers } from '../composition/crash'
+
+// Here rather than in startServiceRuntime, which boots three times in one process in its own test.
+// Process-level handlers belong to the process (../composition/crash.ts).
+installCrashHandlers()
 
 const send = process.send?.bind(process)
 if (!send) throw new Error('The acorn service must be spawned with an IPC channel (stdio: [..., "ipc"])')
