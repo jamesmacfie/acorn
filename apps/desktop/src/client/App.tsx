@@ -1,11 +1,11 @@
 // The desktop's own chrome, and why it is here rather than in client-core: it is the arrangement, not
 // the parts. Topbar, rail, routing and the overlay slots are what this composition root decides, and
 // docs/future/client-plugins/ replaces that arrangement with declared slots rather than moving it.
-import { createEffect, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
-import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
+import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks/taskLookup.ts'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
@@ -52,6 +52,8 @@ import { SourceSurface } from '@acorn/client-core/host/registries/sources/Source
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
 import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
+import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { telemetryOn } from '@acorn/client-core/features/settings/telemetrySetting.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -290,8 +292,26 @@ export default function App() {
   // without the task fallback the workspace and project pickers went blank the moment you opened a
   // task, and the per-workspace view memory below never saw a workspace change.
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
-  const activeWorkspace = () => workspaceForProject(workspaces.data, contextProjectId())
+  // A memo, and one that holds its last answer, for two reasons that both belong to the transition
+  // effect below.
+  //
+  // `on` re-fires on identity, not on value, so keying it on a plain derivation re-planned the whole
+  // workspace change on every tasks, projects or params tick.
+  //
+  // And the derivation reports nothing for a beat in ordinary use: while the workspaces query is
+  // cold, and between a task path and its task row landing. `on` would record that nothing as the
+  // workspace we were leaving, and the guard below then dropped the next real switch, which is one
+  // way the last view fails to come back. Holding the last known workspace also stops the topbar
+  // pickers and the rail's scope blinking through the same gap.
+  const activeWorkspace = createMemo<Workspace | null>((previous) =>
+    workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null)
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+
+  // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
+  // switch). An effect rather than a call at boot, because the preference arrives after the first
+  // paint and can change while the app is open: the node's collector re-reads its own copy every
+  // five seconds, and this is the renderer's half of the same promise.
+  createEffect(() => setTelemetryEnabled(telemetryOn(prefs.data)))
 
   // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
   // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
