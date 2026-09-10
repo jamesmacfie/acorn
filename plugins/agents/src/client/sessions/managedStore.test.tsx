@@ -6,7 +6,8 @@
 // project runs `.tsx` under jsdom with the browser build (plugins/vitest.shared.ts). Same split
 // `toolFoldPrefs` already uses, and the reason its two files sit beside each other.
 import { describe, expect, it, vi } from 'vitest'
-import { createSignal } from 'solid-js'
+import { createEffect, createRoot, createSignal } from 'solid-js'
+import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
 
@@ -31,7 +32,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   nodeState: () => testNodeState(),
 }))
 
-const { activateManagedAgentNotifications } = await import('./managedStore')
+const { activateManagedAgentNotifications, managedAgentStore } = await import('./managedStore')
 
 // Solid queues effects, so a signal write reaches the store one macrotask later.
 const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0))
@@ -68,5 +69,37 @@ describe('priming the managed-session roster', () => {
     setTestNodeId('node-b')
     await settle()
     expect(sessionCalls).toHaveLength(2)
+  })
+})
+
+const rosterRow = (id: string, updatedAt: number): AgentSession => ({
+  id,
+  taskId: 't1',
+  title: id,
+  config: {},
+  createdAt: 1,
+  updatedAt,
+  lastEventSeq: 0,
+  lastReadSeq: 0,
+  attention: 'none',
+  controller: 'acorn',
+  runtimeState: 'ready',
+  subagents: [],
+} as unknown as AgentSession)
+
+describe('a page of sessions', () => {
+  it('publishes the whole page once, not once per row', async () => {
+    const lengths: number[] = []
+    createRoot(() => createEffect(() => lengths.push(managedAgentStore.sessions().length)))
+    await settle()
+
+    managedAgentStore.upsertSessions([rosterRow('s1', 3), rosterRow('s2', 2), rosterRow('s3', 1)])
+    await settle()
+
+    // The number that matters is how many times the roster published, not what it holds. Agent Center
+    // rebuilds and re-sorts its list on every publish, so a page walked row by row cost one rebuild
+    // per session in the workspace.
+    expect(lengths).toEqual([0, 3])
+    expect(managedAgentStore.sessions().map((session) => session.id)).toEqual(['s1', 's2', 's3'])
   })
 })

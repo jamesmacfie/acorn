@@ -71,15 +71,15 @@ export default function AgentCenter() {
     async (activeId) => {
       if (!activeId) return []
       const page = await managedAgentApi.sessions({ workspaceId: activeId, archived: false })
-      page.sessions.forEach(managedAgentStore.upsertSession)
+      managedAgentStore.upsertSessions(page.sessions)
       return page.sessions
     },
   )
+  // Asked for only when the archived filter is chosen. This used to load on every visit and every
+  // workspace switch, which is a second full session page fetched to fill a list nobody had opened.
   const [archived] = createResource(
-    workspaceId,
-    async (activeId) => activeId
-      ? (await managedAgentApi.sessions({ workspaceId: activeId, archived: true })).sessions
-      : [],
+    () => (stateFilter() === 'archived' ? workspaceId() || null : null),
+    async (activeId) => (await managedAgentApi.sessions({ workspaceId: activeId, archived: true })).sessions,
   )
 
   // The fleet halves. Sessions and tasks are two fan-outs because a row needs both: the session comes from
@@ -159,6 +159,10 @@ export default function AgentCenter() {
   // Two nodes may hold the same session id, so a row's key names both (docs/architecture-overview.md
   // § Fleet semantics).
   const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
+  // Key to row. `Rows` runs its body once per row, and the body below reads its own row about a dozen
+  // times: as a `find` per read that is a scan of the list per field, and a session frame lands about
+  // 25 times a second while an agent is working (../sessions/managedStore.ts § the transcript store).
+  const shownByKey = createMemo(() => new Map(shown().map((row) => [rowKey(row), row])))
 
   // Two targets on one row, because a workflow session has two homes and neither is the obvious one:
   // the body opens the session, this opens the run it belongs to. Row ignores a click that landed on a
@@ -294,12 +298,12 @@ export default function AgentCenter() {
                 ariaLabel="Managed sessions"
                 items={shown().map((row) => ({ key: rowKey(row), label: row.session.title }))}
                 onActivate={(key) => {
-                  const row = shown().find((candidate) => rowKey(candidate) === key)
+                  const row = shownByKey().get(key)
                   if (row) open(row)
                 }}
               >
                 {(item, itemProps) => {
-                  const row = () => shown().find((candidate) => rowKey(candidate) === item.key)
+                  const row = () => shownByKey().get(item.key)
                   return (
                     <Show when={row()}>
                       {(narrowed) => {

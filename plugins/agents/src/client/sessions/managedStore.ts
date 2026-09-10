@@ -1,5 +1,5 @@
-import { createEffect, createRoot, createSignal } from 'solid-js'
-import { activeNodeId, fromManagedSession, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import { batch, createEffect, createRoot, createSignal } from 'solid-js'
+import { activeNodeId, createLogger, describeError, fromManagedSession, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { wsOnAgentFrame } from './wsChannel'
 import type {
   AgentEventRecord,
@@ -13,6 +13,10 @@ import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'
 import { clearComposerDraft, clearComposerDrafts } from '../composer/composerState'
+
+// This plugin's client half has no `ctx.log`: a client context is contribution points and nothing
+// else, so the tag and the owner are stated here (docs/plugin-authoring.md § Telemetry and logging).
+const log = createLogger('agents', 'agents')
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
@@ -63,6 +67,42 @@ function upsertSession(session: AgentSession): void {
   // own events and re-broadcasts the row after every one, so the client reads a state instead of
   // guessing one per event — which is why a ten-step workflow used to raise ten "completed" rows.
   observeAttention([fromManagedSession(session, activeNodeId() ?? '')])
+}
+
+/**
+ * A page of sessions in one update, instead of one update per row.
+ *
+ * Every loader below reads a page and then walked it a row at a time. Each row re-sorted the roster
+ * and notified, so a workspace with forty sessions cost forty update cycles, and the Agents rail
+ * rebuilds its whole list on each one. The per-row merge rule is `newestManagedSession`, the same one
+ * `upsertSession` applies, so the two cannot drift.
+ */
+function upsertSessions(incoming: readonly AgentSession[]): void {
+  const wanted = incoming.filter((session) => !deletedSessionIds.has(session.id))
+  if (!wanted.length) return
+  batch(() => {
+    setSessions((current) => {
+      const merged = new Map(current.map((item) => [item.id, item]))
+      for (const session of wanted) {
+        const held = merged.get(session.id)
+        merged.set(session.id, held ? newestManagedSession(held, session) : session)
+      }
+      return [...merged.values()].sort(byRecent)
+    })
+    setSnapshots((current) => {
+      let next: Record<string, AgentSessionSnapshot> | undefined
+      for (const session of wanted) {
+        const snapshot = current[session.id]
+        if (!snapshot) continue
+        next ??= { ...current }
+        next[session.id] = { ...snapshot, session: newestManagedSession(snapshot.session, session) }
+      }
+      return next ?? current
+    })
+    // One call with the whole page, which is the shape this verb takes anyway: it diffs what it is
+    // given against what it last saw, so a page is one diff rather than one per row.
+    observeAttention(wanted.map((session) => fromManagedSession(session, activeNodeId() ?? '')))
+  })
 }
 
 function removeSession(sessionId: string): void {
@@ -268,7 +308,7 @@ export const managedAgentStore = {
     // broken API gets a rejection like any other failure instead of a synchronous throw.
     const run: Promise<AgentSession[]> = (async () => {
       const page = await managedAgentApi.sessions({ taskId, archived: false })
-      for (const session of page.sessions) upsertSession(session)
+      upsertSessions(page.sessions)
       return page.sessions
     })().catch((error: unknown) => {
       // A failed read is never remembered: the next caller has to be able to try again.
@@ -280,12 +320,12 @@ export const managedAgentStore = {
   },
   async loadAttention(): Promise<AgentSession[]> {
     const page = await managedAgentApi.sessions({ attention: true, archived: false })
-    for (const session of page.sessions) upsertSession(session)
+    upsertSessions(page.sessions)
     return page.sessions
   },
   async loadAll(archived = false): Promise<AgentSession[]> {
     const page = await managedAgentApi.sessions({ archived })
-    for (const session of page.sessions) upsertSession(session)
+    upsertSessions(page.sessions)
     return page.sessions
   },
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
@@ -311,6 +351,7 @@ export const managedAgentStore = {
     return run
   },
   upsertSession,
+  upsertSessions,
   removeSession,
   // Drop every node-scoped entry. Called on a node switch (apps/desktop's scopedEviction.ts): sessions,
   // snapshots and session ids are all minted by one node, and two nodes may hold the same UUID
@@ -359,7 +400,7 @@ export function activateManagedAgentNotifications(): void {
       if (!nodeId || nodeId === primed || nodeState(nodeId) === 'offline') return
       primed = nodeId
       managedAgentStore.loadAll().catch((error: unknown) => {
-        console.warn('[agents] could not prime the managed-session roster:', error)
+        log.warn(`could not prime the managed-session roster: ${describeError(error).message}`)
       })
     })
   })
