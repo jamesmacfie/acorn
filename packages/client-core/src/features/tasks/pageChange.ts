@@ -1,5 +1,11 @@
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
-import { startInteraction, telemetryEnabled, type SpanHandle } from '../../infra/telemetry/emitter'
+import {
+  startInteraction,
+  startRenderTransition,
+  telemetryEnabled,
+  type RenderTransitionHandle,
+  type SpanHandle,
+} from '../../infra/telemetry/emitter'
 
 // The `nav.change` span: how long it takes between asking for a different page and seeing one
 // (docs/frontend.md § Telemetry).
@@ -15,7 +21,7 @@ import { startInteraction, telemetryEnabled, type SpanHandle } from '../../infra
 // second frame, and `pane.region` is what measures it to content.
 
 /** The change in flight, or null between them. */
-let open: { span: SpanHandle; attrs: TelemetryAttrs } | null = null
+let open: { span: SpanHandle; render: RenderTransitionHandle; attrs: TelemetryAttrs } | null = null
 
 const nextFrame = (run: () => void): void => {
   // A bare-Node suite has no frames. Nothing reaches here with telemetry off, and the fallback is
@@ -36,10 +42,12 @@ export function markPageChange(owner: string, attrs: TelemetryAttrs): void {
   if (!telemetryEnabled()) return
   if (open) {
     open.attrs = { ...open.attrs, ...attrs }
+    open.render.update(attrs)
     return
   }
   const span = startInteraction(owner, { name: 'nav.change', attrs: { seam: 'nav.change' } })
-  const change = { span, attrs: { seam: 'nav.change', ...attrs } }
+  const render = startRenderTransition(owner, 'navigation', attrs)
+  const change = { span, render, attrs: { seam: 'nav.change', ...attrs } }
   open = change
   nextFrame(() => nextFrame(() => {
     open = null
@@ -49,5 +57,6 @@ export function markPageChange(owner: string, attrs: TelemetryAttrs): void {
 
 /** Test seam: forget a change that is still waiting for its second frame. */
 export const _resetPageChange = (): void => {
+  open?.render.cancel()
   open = null
 }

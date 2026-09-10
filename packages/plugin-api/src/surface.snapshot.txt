@@ -50,6 +50,7 @@ client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
 client: RemoteContribution
+client: RenderTransitionHandle
 client: SaveRequest
 client: SearchCommand
 client: SettingCommand
