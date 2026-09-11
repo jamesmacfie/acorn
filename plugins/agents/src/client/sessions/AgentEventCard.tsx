@@ -327,6 +327,9 @@ export default function AgentEventCard(props: {
             <Card pad="sm">
               <Stack gap="row">
                 <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
+                <Show when={askedQuestions(asked(), props.request).length} fallback={
+                  <Text emphasis="muted">No answer</Text>
+                }>
                 <For each={askedQuestions(asked(), props.request)}>
                   {(entry) => (
                     <Stack gap="row">
@@ -355,6 +358,7 @@ export default function AgentEventCard(props: {
                     </Stack>
                   )}
                 </For>
+                </Show>
               </Stack>
             </Card>
             </Show>

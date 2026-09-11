@@ -58,6 +58,25 @@ describe('what the agent asked, and what it was not told', () => {
     expect(entry.alternatives).toHaveLength(3)
   })
 
+  it('leaves out a free-text box nobody typed in', () => {
+    // What Claude pairs with every choice: an "Other" field whose prompt is its own placeholder text.
+    const withOther = asked([
+      { id: 'pick', prompt: 'Which drink?', options: [{ id: 'tea', label: 'Tea' }] },
+      { id: 'pick_custom', prompt: 'Other: type your own answer (optional).' },
+    ])
+    expect(askedQuestions(withOther, row({ answers: { pick: 'Tea' } })).map((entry) => entry.prompt))
+      .toEqual(['Which drink?'])
+    // Unless they used it, in which case it is the answer.
+    expect(askedQuestions(withOther, row({ answers: { pick_custom: 'Earl Grey' } })))
+      .toContainEqual({ prompt: 'Other: type your own answer (optional).', chosen: ['Earl Grey'], alternatives: [] })
+  })
+
+  it('keeps a skipped choice, because which options went unanswered still reads', () => {
+    const [entry] = askedQuestions(question, row({ optionId: 'decline' }))
+    expect(entry.chosen).toEqual([])
+    expect(entry.alternatives).toHaveLength(3)
+  })
+
   it('keeps a secret answer out of the transcript', () => {
     const secret = asked([{ id: 'token', prompt: 'Which token?', secret: true }])
     expect(askedQuestions(secret, row({ answers: { token: 'sk-live-4242' } }))).toEqual([{
