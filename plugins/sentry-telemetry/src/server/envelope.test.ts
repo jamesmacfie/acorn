@@ -1,6 +1,6 @@
 import type { TelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { describe, expect, it } from 'vitest'
-import { buildEnvelopes, groupSpans, monitorSlug, probeEnvelope, serializeEnvelope, traceKept, type EnvelopeOptions } from './envelope'
+import { buildEnvelopes, groupSpans, monitorSlug, probeEnvelope, sentrySpans, serializeEnvelope, traceKept, type EnvelopeOptions } from './envelope'
 import { DEFAULT_SETTINGS } from '../shared/settings'
 
 const TRACE = 'a'.repeat(32)
@@ -21,7 +21,9 @@ const options = (overrides: Partial<EnvelopeOptions> = {}): EnvelopeOptions => {
   }
 }
 
-const span = (over: Partial<Extract<TelemetryRecord, { kind: 'span' }>> = {}): TelemetryRecord => ({
+const span = (
+  over: Partial<Extract<TelemetryRecord, { kind: 'span' }>> = {},
+): Extract<TelemetryRecord, { kind: 'span' }> => ({
   kind: 'span',
   traceId: TRACE,
   spanId: hex16('1'),
@@ -149,6 +151,25 @@ describe('spans', () => {
     const run = span({ name: 'schedule.run', attrs: { owner: 'core', 'schedule.key': 'core:audit-prune' } })
     const envelopes = buildEnvelopes(batchOf([span(), run]), options({ settings }))
     expect(envelopes.map((envelope) => envelope.category)).toEqual(['monitor', 'monitor'])
+  })
+
+  it('drops routine request-only traces but keeps slow, failed, and interaction request spans', () => {
+    const routineApi = span({ spanId: hex16('1'), name: 'api.request', durationMs: 80 })
+    const routineHttp = span({ spanId: hex16('2'), name: 'http.request', durationMs: 20 })
+    const slowApi = span({ traceId: OTHER_TRACE, spanId: hex16('3'), name: 'api.request', durationMs: 1_001 })
+    const failedHttp = span({ traceId: 'c'.repeat(32), spanId: hex16('4'), status: 'error', durationMs: 5 })
+    const command = span({ traceId: 'd'.repeat(32), spanId: hex16('5'), name: 'command' })
+    const commandRequest = span({ traceId: command.traceId, spanId: hex16('6'), name: 'api.request', durationMs: 5 })
+
+    expect(sentrySpans([routineApi, routineHttp, slowApi, failedHttp, command, commandRequest] as never))
+      .toEqual([slowApi, failedHttp, command, commandRequest])
+  })
+
+  it('never exports successful telemetry and preference request spans', () => {
+    const telemetry = span({ name: 'http.request', durationMs: 5_000, attrs: { route: '/v2/core/telemetry' } })
+    const prefs = span({ spanId: hex16('2'), name: 'http.request', durationMs: 5_000, attrs: { route: '/v2/core/prefs' } })
+    const failed = span({ spanId: hex16('3'), name: 'http.request', status: 'error', attrs: { route: '/v2/core/telemetry' } })
+    expect(sentrySpans([telemetry, prefs, failed] as never)).toEqual([failed])
   })
 })
 
@@ -299,6 +320,17 @@ describe('logs and events', () => {
     const event: TelemetryRecord = { kind: 'event', at: 5, name: 'ws.shed', attrs: { channel: 'tasks' } }
     const [envelope] = buildEnvelopes(batchOf([event]), options())
     expect((payloadOf(envelope).items as Array<Record<string, unknown>>)[0]).toMatchObject({ level: 'info', body: 'ws.shed' })
+  })
+
+  it('keeps interaction work as an error breadcrumb without exporting a standalone log', () => {
+    const work: TelemetryRecord = { kind: 'event', at: 4, name: 'ui.interaction.work', attrs: { operation: 'cache.write', calls: 7 } }
+    expect(buildEnvelopes(batchOf([work]), options())).toEqual([])
+
+    const failure: TelemetryRecord = {
+      kind: 'error', at: 5, name: 'RangeError', message: 'stack', level: 'error', handled: true, attrs: {},
+    }
+    const [envelope] = buildEnvelopes(batchOf([work, failure]), options())
+    expect(payloadOf(envelope).breadcrumbs.values[0]).toMatchObject({ category: 'ui.interaction.work' })
   })
 })
 

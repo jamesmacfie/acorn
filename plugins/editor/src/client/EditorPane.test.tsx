@@ -208,6 +208,29 @@ describe('the editor pane', () => {
     expect(read).toHaveBeenCalledTimes(1)
   })
 
+  it('discards a remembered-file read when navigation unmounts the pane', async () => {
+    editorOpen(taskId, 'a.ts', false)
+    let releaseRead!: (content: string) => void
+    read.mockImplementationOnce(() => new Promise<string>((resolve) => { releaseRead = resolve }))
+
+    const first = mount()
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1))
+    first.unmount()
+
+    // A new mount must own a new read. Sharing the old mount's in-flight promise would let that
+    // invisible mount build CodeMirror state and syntax extensions after navigation had removed it.
+    const second = mount(true)
+    try {
+      await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2), { timeout: 200 })
+    } finally {
+      releaseRead('const stale = true\n')
+    }
+
+    const reopened = await editor(second.host)
+    await showing(() => reopened, 'const a = 1')
+    expect(reopened.state.doc.toString()).not.toContain('stale')
+  })
+
   it('asks for the checkout path once per task, however often the pane is opened', async () => {
     const first = mount()
     await editor(first.host)

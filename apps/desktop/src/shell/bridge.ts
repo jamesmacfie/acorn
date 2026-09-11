@@ -169,7 +169,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
       reject: (error: Error, receipt, helper) => {
         const receivedMs = performance.now() - from
         if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
-        if (receipt && receivedMs >= 250) {
+        if (receipt && receivedMs >= 1_000) {
           const deliveryMs = helper ? Math.max(0, receipt.receivedAt - helper.repliedAt) : -1
           log.info(`slow bridge error id=${id} method=${method}${context} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
         }
@@ -180,7 +180,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   })
   const continuationMs = performance.now() - completion.resolvedAt
   const totalMs = completion.receivedMs + continuationMs
-  if (totalMs >= 250) {
+  if (totalMs >= 1_000) {
     const deliveryMs = completion.helper
       ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt)
       : -1
@@ -270,7 +270,7 @@ const acorn = {
     const decodeFrom = performance.now()
     const decoded = decodeBytes(response.body)
     const decodeMs = performance.now() - decodeFrom
-    if (decodeMs >= 50) log.info(`slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`)
+    if (decodeMs >= 250) log.info(`slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`)
     return { status: response.status, headers: response.headers, body: decoded }
   },
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),

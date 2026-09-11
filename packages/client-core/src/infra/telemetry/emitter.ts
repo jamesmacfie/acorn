@@ -646,6 +646,7 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
     emitError(owner ?? 'core', {
       name: error instanceof Error ? error.name || 'Error' : 'Error',
       message: error instanceof Error ? error.message : String(error),
+      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
       handled: true,
       attrs: { seam: 'contribution.render', 'contribution.id': contributionId },
     })

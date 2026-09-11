@@ -124,6 +124,28 @@ export function traceKept(traceId: string, sampleRate: number): boolean {
 /** The span a schedule run produces, which becomes a cron check-in rather than a transaction. */
 const SCHEDULE_SPAN = 'schedule.run'
 
+// Request spans are the largest source of Sentry volume. In particular, the telemetry poster and
+// preference watcher make thousands of tiny requests whose successful traces only describe the
+// machinery that is exporting the traces. Keep the complete trace when an interaction or another
+// meaningful span is present in this batch; otherwise retain only slow and failed request
+// exemplars. Acorn's collector still holds the full stream for local and other sinks.
+const REQUEST_SPANS = new Set(['api.request', 'http.request'])
+const SENTRY_INTERNAL_ROUTES = new Set(['/v2/core/telemetry', '/v2/core/prefs'])
+const slowRequestMs = (span: Span): number => span.name === 'api.request' ? 1_000 : 250
+
+export function sentrySpans(spans: Span[]): Span[] {
+  const meaningfulTraces = new Set(
+    spans.filter((span) => !REQUEST_SPANS.has(span.name) && span.name !== SCHEDULE_SPAN).map((span) => span.traceId),
+  )
+  return spans.filter((span) => {
+    if (!REQUEST_SPANS.has(span.name)) return true
+    if (span.status === 'error') return true
+    if (SENTRY_INTERNAL_ROUTES.has(String(span.attrs.route ?? ''))) return false
+    if (meaningfulTraces.has(span.traceId)) return true
+    return span.durationMs >= slowRequestMs(span)
+  })
+}
+
 /**
  * Group a batch's spans into the transactions they belong to.
  *
@@ -479,7 +501,8 @@ export function buildEnvelopes(batch: TelemetryBatch, options: EnvelopeOptions):
 
   if (kinds.span) {
     const checkIns = spans.filter((span) => span.name === SCHEDULE_SPAN)
-    const traced = spans.filter((span) => span.name !== SCHEDULE_SPAN && traceKept(span.traceId, options.settings.sampleRate))
+    const traced = sentrySpans(spans)
+      .filter((span) => span.name !== SCHEDULE_SPAN && traceKept(span.traceId, options.settings.sampleRate))
     for (const { root, children } of groupSpans(traced)) {
       envelopes.push(transactionEnvelope(root, children, batch, options))
     }
@@ -497,6 +520,10 @@ export function buildEnvelopes(batch: TelemetryBatch, options: EnvelopeOptions):
     // Also a log line, not only a breadcrumb: a breadcrumb is only ever seen next to an error, and
     // an event that never preceded one would otherwise leave no trace at all.
     for (const event of events) {
+      // These bounded work summaries exist to explain an error or hang and remain available as
+      // breadcrumbs above. Sending each one as an info log as well multiplies every interaction by
+      // up to five log rows without adding another diagnostic view.
+      if (event.name === 'ui.interaction.work') continue
       entries.push({ at: event.at, level: 'info', body: event.name, attrs: event.attrs })
     }
   }

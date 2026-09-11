@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
+import { reportContributionError } from '../../kit/lib/contributionErrors'
 import {
   _resetClientTelemetry,
   currentTraceparent,
@@ -55,6 +56,20 @@ describe('with the switch off', () => {
   it('runs the measured call and returns its own result untouched', () => {
     start()
     expect(measure('core', 'ws.inbound', () => 41 + 1)).toBe(42)
+  })
+})
+
+it('keeps the stack for a contribution rendering error', async () => {
+  start()
+  setTelemetryEnabled(true)
+  const error = new RangeError('recursive contribution')
+  reportContributionError({ contributionId: 'palette.commands', owner: 'agents', error })
+  await flushTelemetry()
+  expect(posted.flat().find((record) => record.kind === 'error')).toMatchObject({
+    name: 'RangeError',
+    message: 'recursive contribution',
+    stack: error.stack,
+    attrs: { 'contribution.id': 'palette.commands', owner: 'agents' },
   })
 })
 

@@ -142,7 +142,8 @@ open session's `•••` actions from the region that draws them and disposes 
 palette). That is the shape for anything needing a selection the palette cannot name: the surface that
 holds the selection owns the registration, so the rows exist exactly while they can work, and the
 dialogs they open have somewhere to draw. It is not a licence to mirror a whole toolbar — stopping an
-agent is still absent.
+agent is still absent. Registry mutation is deliberately non-tracking: a reactive owner may reconcile
+this roster without subscribing to the registry signal it writes and recursively re-registering itself.
 
 ## Global commands
 
@@ -468,7 +469,10 @@ binding carries a matcher that reproduces its scope: an open task for `task`, th
 `pane`, and off a text field for everything but `global`. The layers that do take an element are the
 ones a rectangle of the tree owns: a `tabs` pane's Cmd+1 through Cmd+9 at priority 30, above the
 global chord that switches tasks, and a collection's intents at priority 40. Both are `focus-within`,
-so they are live only while focus is inside them.
+so they are live only while focus is inside them. Solid may mount lazy or suspense content in a
+detached subtree before committing it; an element-bound layer waits for that target to join the
+document and cancels the wait if its owner unmounts first. A staged pane therefore neither registers
+against a destroyed target nor loses its keys when it becomes visible.
 
 Escape is the exception the engine cannot express. An open overlay answers its own Escape, and
 `kit/lib/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`

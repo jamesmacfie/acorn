@@ -294,7 +294,7 @@ What a batch becomes:
 | A span with no parent, plus every span beneath it in the batch | one `transaction` with a flat `spans[]` |
 | A span whose parent is in another batch | its own `transaction`, still naming `parent_span_id`, and Sentry stitches the two by trace id |
 | A `schedule.run` span | two `check_in` items, `in_progress` then `ok` or `error`, sharing one id |
-| A log, and an event | entries in one batched `log` item |
+| A log, and an event other than `ui.interaction.work` | entries in one batched `log` item |
 | An event, again | a breadcrumb on the error that followed it |
 | A metric | entries in one batched `trace_metric` item; a histogram goes as `p50`, `p95` and `max` gauges plus a `count` counter |
 | An error | an `event` with `exception.values[0]` and, when stacks are on, parsed frames |
@@ -310,6 +310,18 @@ per check-in, plus one for the batched logs and one for the batched metrics.
 root is the persistence this programme refuses, under another name. A span whose parent has already
 gone out becomes a transaction of its own with the parent named, which is what an SDK does anyway
 when a trace crosses a process.
+
+**Routine requests are sampled by value before trace sampling.** A request trace stays complete when
+the same batch contains a command, navigation, render, or other meaningful span. A failed request is
+always retained. Outside those traces, Sentry keeps renderer requests taking at least one second and
+node requests taking at least 250 ms. Successful `/v2/core/telemetry` and `/v2/core/prefs` spans are
+never exported: those routes describe the reporting machinery itself and were the overwhelming
+majority of stored spans. The collector still exposes the complete stream to local and other sinks.
+The configured trace sample rate is applied after this gate.
+
+`ui.interaction.work` remains a breadcrumb on a later error, where its bounded operation counts help
+explain the failure. It is not also sent as a standalone info log, which avoids multiplying every
+interaction into several log rows.
 
 **The exporter is the last gate before the network.** Core scrubs every log body, error message,
 stack and string attribute at the ingest door, so this pass is a check rather than a clean-up, and
@@ -467,7 +479,7 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Seam | Where | What it emits |
 | --- | --- | --- |
 | Every request that leaves the renderer | `infra/node/apiClient.ts` `send()` | span `api.request` with method, route namespace and status; sets `traceparent` and `x-request-id` |
-| Slow renderer-helper calls | `apps/desktop/src/shell/bridge.ts` `call()` | one console and telemetry log above 250 ms, splitting helper handling, delivery queue, JSON parse and promise-continuation time; node fetches name their coarse API route and request id; body decoding logs above 50 ms |
+| Slow renderer-helper calls | `apps/desktop/src/shell/bridge.ts` `call()` | a `bridge.call` histogram for every call and a console diagnostic above one second, splitting helper handling, delivery queue, JSON parse and promise-continuation time; node fetches name their coarse API route and request id; body decoding logs above 250 ms |
 | Every failed query and mutation | `infra/node/fleet.ts` `clientFor` | a handled error, with the first two segments of the key |
 | Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | histogram `ws.inbound.<channel prefix>` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | span `command`, owner from `ownerId`; opens an interaction |
@@ -481,7 +493,7 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Every bridge message | `host/frames/broker.ts` | histogram `bridge.message.<kind>`; event `bridge.overbudget` when the rate limiter trips |
 | Every remote tree apply | `host/tree/treeState.ts` | histogram `tree.apply`, owned by the plugin whose tree it is |
 | Every plugin channel frame | `host/plugins/pluginChannel.ts` | histogram `plugin.frame` |
-| Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error naming the contribution and its owner |
+| Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
 | Uncaught error, unhandled rejection | `apps/desktop/src/client/index.tsx` | a fatal, unhandled error with its stack |
 | Console lines | everywhere under `packages/client-core/src`, `apps/desktop/src/client` and `apps/desktop/src/shell` | log records through `createLogger(tag)` |
@@ -564,7 +576,7 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
-| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, and `diff.hydrator.reset` cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor. |
+| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, and `diff.hydrator.reset` cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
 | Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
 | Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |
