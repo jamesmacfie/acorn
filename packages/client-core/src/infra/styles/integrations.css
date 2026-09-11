@@ -158,14 +158,15 @@
 .integration-map-target { flex: 1; min-width: 0; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .integration-add-icon { font-size: var(--fs-lg); line-height: 1; transition: transform 0.18s ease; }
 
-/* The panel that "comes down" from the Add button. Animated via max-height so it slides. */
+/* Provider forms have variable height. The Settings pane owns scrolling; capping this panel
+   clips longer forms and makes their submit button unreachable. */
 .integration-add-panel {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height 0.2s ease, opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 }
-.integration-add-panel.open { max-height: 320px; opacity: 1; }
+.integration-add-panel.open { max-height: none; opacity: 1; }
 .integration-add-inner {
   display: flex;
   flex-direction: column;
