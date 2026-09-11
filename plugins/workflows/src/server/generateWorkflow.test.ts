@@ -364,6 +364,7 @@ describe('the workspace examples', () => {
 describe('the user prompt', () => {
   it('carries the description and the draft it replaces', () => {
     const text = buildGenerateUserPrompt({
+      mode: 'overwrite',
       description: 'Two agents look at one issue at once, a third writes it up.',
       name: 'Investigate',
       inputs: [{ name: 'issue', description: 'The issue', required: true }],
@@ -375,13 +376,38 @@ describe('the user prompt', () => {
   })
 
   it('says nothing about a draft with no name and no inputs', () => {
-    const text = buildGenerateUserPrompt({ description: 'Anything.' })
+    const text = buildGenerateUserPrompt({ mode: 'overwrite', description: 'Anything.' })
     expect(text).not.toContain('It replaces a draft')
   })
 
   it('holds the description to the shared cap', () => {
-    const text = buildGenerateUserPrompt({ description: 'z'.repeat(20_000) })
+    const text = buildGenerateUserPrompt({ mode: 'overwrite', description: 'z'.repeat(20_000) })
     expect(text).not.toContain('z'.repeat(8_001))
+  })
+
+  it('gives edit mode the current graph, preservation rules, and no protected values', () => {
+    const current: WorkflowDef = {
+      name: 'Deploy',
+      trigger: 'schedule:nightly',
+      tools: { maxRisk: 'execute', allow: ['deploy'] },
+      steps: [{
+        name: 'ship',
+        kind: 'http:request',
+        prompt: 'Deploy the release.',
+        model: 'private-model',
+        configOptions: { reasoning: 'high' },
+        requiresRun: 'release',
+        with: { method: 'POST', url: 'https://example.com/deploy', auth: 'secret-auth', headers: { Authorization: 'Bearer secret' } },
+      }],
+    }
+    const text = buildGenerateUserPrompt({ mode: 'edit', description: 'Add an approval before deployment.', currentDef: current })
+    expect(text).toContain('Add an approval before deployment.')
+    expect(text).toContain('"name": "ship"')
+    expect(text).toContain('"url": "https://example.com/deploy"')
+    expect(text).toContain('Keep every name, step, prompt, edge, input')
+    for (const hidden of ['schedule:nightly', 'private-model', '"configOptions"', '"requiresRun"', 'secret-auth', 'Bearer secret']) {
+      expect(text).not.toContain(hidden)
+    }
   })
 })
 

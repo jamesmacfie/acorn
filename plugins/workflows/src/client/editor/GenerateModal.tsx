@@ -17,11 +17,12 @@ import {
   type WorkflowGenerateRequest,
   type WorkflowGenerateResult,
 } from '../../shared/api'
+import type { WorkflowDef } from '../../shared/workflowContracts'
 import { workflowApi } from '../workflowsClient'
 
-// Describe a workflow, get the whole definition (docs/workflows.md § Authoring). The prompt, the
-// grounding and the repair pass all live on the node; this collects three things and shows what
-// came back.
+// Describe a workflow or changes to one, get the whole definition (docs/workflows.md § Authoring).
+// The prompt, grounding and repair pass all live on the node; this collects the instruction and
+// model choice, then shows what came back.
 //
 // Kit nodes only, so the terminal host draws the same dialog. `ModelBackendPicker` is two
 // `Select`s, which is why it needs no counterpart there.
@@ -55,9 +56,10 @@ export function generateReason(error: unknown, backend?: Pick<ModelBackend, 'kin
 
 export default function GenerateModal(props: {
   backends: ModelBackend[]
-  /** Everything the request carries that this dialog does not ask for: the workspace to read worked
-   *  examples from, the definition to leave out of them, and the draft's name and inputs. */
-  context: Omit<WorkflowGenerateRequest, 'backendId' | 'modelId' | 'description'>
+  mode: WorkflowGenerateRequest['mode']
+  /** The workspace supplies examples, `defId` excludes this row from them, and `draft` is either
+   *  reduced to overwrite hints or supplied as the edit source. */
+  context: { workspaceId: string; defId?: string; draft: WorkflowDef }
   onDismiss: () => void
   onGenerated: (result: WorkflowGenerateResult) => void
 }) {
@@ -98,12 +100,22 @@ export default function GenerateModal(props: {
     setSeconds(0)
     ticker = setInterval(() => setSeconds((n) => n + 1), 1000)
     try {
-      props.onGenerated(await workflowApi.generateDef({
-        ...props.context,
+      const common = {
         backendId: backendId(),
         ...(modelId() ? { modelId: modelId() } : {}),
         description: description().trim(),
-      }))
+        workspaceId: props.context.workspaceId,
+        ...(props.context.defId ? { defId: props.context.defId } : {}),
+      }
+      const request: WorkflowGenerateRequest = props.mode === 'edit'
+        ? { ...common, mode: 'edit', currentDef: props.context.draft }
+        : {
+            ...common,
+            mode: 'overwrite',
+            name: props.context.draft.name,
+            ...(props.context.draft.inputs ? { inputs: props.context.draft.inputs } : {}),
+          }
+      props.onGenerated(await workflowApi.generateDef(request))
     } catch (failure) {
       setError(generateReason(failure, props.backends.find((backend) => backend.id === backendId())))
     } finally {
@@ -113,22 +125,26 @@ export default function GenerateModal(props: {
   }
 
   return (
-    <Modal title="Generate a workflow" onDismiss={dismiss} size="md">
+    <Modal title={props.mode === 'edit' ? 'Edit workflow with AI' : 'Overwrite workflow with AI'} onDismiss={dismiss} size="md">
       <Modal.Body>
         <Textarea
-          label="Description"
+          label={props.mode === 'edit' ? 'Requested edits' : 'Description'}
           rows={8}
           maxLength={GENERATE_MAX_DESCRIPTION_CHARS}
           assist={false}
           disabled={busy()}
-          placeholder="Say what should happen, what runs at the same time, and where you want to approve before it goes on."
+          placeholder={props.mode === 'edit'
+            ? 'Describe what to add, remove, or change. Anything you do not mention will be kept.'
+            : 'Say what should happen, what runs at the same time, and where you want to approve before it goes on.'}
           value={description()}
           // Typed, because the terminal host's `Textarea` declares `ref` as `unknown`.
           ref={(el: HTMLTextAreaElement) => queueMicrotask(() => el.focus())}
           onInput={(value: string) => setDescription(value)}
         />
         <Text emphasis="muted" wrap>
-          It replaces the whole draft. One Undo puts back what is there now.
+          {props.mode === 'edit'
+            ? 'The model edits the current workflow and keeps unrelated parts. One Undo puts back what is there now.'
+            : 'It replaces the whole draft. One Undo puts back what is there now.'}
         </Text>
         <ModelBackendPicker
           backends={props.backends}
@@ -149,7 +165,7 @@ export default function GenerateModal(props: {
       <Modal.Actions>
         <Button variant="bare" disabled={busy()} onPress={dismiss}>Cancel</Button>
         <Button variant="solid" busy={busy()} disabled={busy() || !description().trim()} onPress={() => void generate()}>
-          Generate
+          {props.mode === 'edit' ? 'Edit workflow' : 'Overwrite'}
         </Button>
       </Modal.Actions>
     </Modal>

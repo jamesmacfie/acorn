@@ -1,5 +1,5 @@
-// Generating a definition from a description (docs/workflows.md § Authoring): the wire types, and
-// the one cap both halves read.
+// Generating or editing a definition with AI (docs/workflows.md § Authoring): the wire types, and
+// the one instruction cap both halves read.
 //
 // Here rather than beside the prompt for the reason the changes plugin keeps
 // `COMMIT_MESSAGE_MAX_PROMPT_CHARS` in its own `shared/api.ts`: the modal's textarea and the route's
@@ -8,7 +8,7 @@
 
 import type { WorkflowDef, WorkflowInput } from './workflowContracts'
 
-/** How much description the modal takes and the route accepts.
+/** How much description or edit instruction the modal takes and the route accepts.
  *
  *  Twice the changes plugin's diff budget and eight times the database plugin's prompt budget,
  *  because this one is the whole brief for a graph rather than a sentence about one query. A reader
@@ -19,18 +19,25 @@ export const GENERATE_MAX_DESCRIPTION_CHARS = 8_000
  *
  *  `backendId` and `modelId` are the pair every generate in the repo sends, so the same picker
  *  serves all three. `workspaceId` is what the workspace's own definitions are read from, and
- *  `defId` is the one they are read without: a definition is a poor worked example of itself.
- *  `name` and `inputs` are the draft being replaced, which the model is told to keep where they
- *  still fit. */
-export type WorkflowGenerateRequest = {
+ *  `defId` is the one they are read without: a definition is a poor worked example of itself. The
+ *  mode-specific fields distinguish replacement hints from the definition an edit transforms. */
+type WorkflowGenerateRequestBase = {
   backendId: string
   modelId?: string
   description: string
   workspaceId: string
   defId?: string
-  name?: string
-  inputs?: WorkflowInput[]
 }
+
+/** Generate a replacement from a brief, or transform the definition already in the editor.
+ *
+ *  The modes are a discriminated union because an edit without the current definition would quietly
+ *  behave like an overwrite. Conversely, an overwrite carries only the name and inputs that the old
+ *  generate path has always treated as hints; it does not send the rest of the draft to the model. */
+export type WorkflowGenerateRequest = WorkflowGenerateRequestBase & (
+  | { mode: 'overwrite'; name?: string; inputs?: WorkflowInput[] }
+  | { mode: 'edit'; currentDef: WorkflowDef }
+)
 
 /** Why the definition that came back is not the definition being applied.
  *

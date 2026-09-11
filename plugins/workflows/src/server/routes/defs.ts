@@ -28,7 +28,7 @@ export type WorkflowDefsBridge = {
   remove(id: string): Promise<{ ok: boolean }>
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
   saveToRepo(id: string, opts: { taskId?: string; keepRow: boolean }): Promise<{ path?: string; notFound?: boolean; error?: string }>
-  // Writes a whole definition from a description through the picked backend
+  // Writes a whole definition from a description or edits the current one through the picked backend
   // (docs/workflows.md § Authoring). `error` is a reply nothing could be read out of, which is the
   // one failure with no definition to apply. A provider failure throws ProviderOperationError,
   // because its status is the one the caller has to see.
@@ -46,26 +46,40 @@ export const setWorkflowDefsBridge = (bridge: WorkflowDefsBridge | null): void =
 // Structural only, as the start body is: a name and a list of steps. The rest is the catalog's
 // answer, and the bridge runs the real validator before it writes.
 const defSchema = z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough()
+// Edit mode reads every current step before the model is called, so its input needs the same minimum
+// shape the editor's JSON Apply accepts. Empty stays valid: asking AI to fill an empty saved draft is
+// a useful edit.
+const editableDefSchema = z.object({
+  name: z.string().min(1),
+  steps: z.array(z.object({ name: z.string().min(1) }).passthrough()),
+}).passthrough()
 const createBody = z.object({ workspaceId: z.string().min(1), projectId: z.string().min(1).optional(), def: defSchema })
 const updateBody = z.object({ def: defSchema, revision: z.number().int().nonnegative() })
 const validateBody = z.object({ def: defSchema, projectId: z.string().min(1).optional() })
 const saveBody = z.object({ taskId: z.string().min(1).optional(), keepRow: z.boolean().optional() })
 // The description is bounded against the same constant the modal's textarea reads, so the field a
 // person types into and the field the route accepts cannot drift (../../shared/api.ts).
-const generateBody = z.object({
+const generateCommon = {
   backendId: z.string().min(1),
   modelId: z.string().min(1).optional(),
   description: z.string().min(1).max(GENERATE_MAX_DESCRIPTION_CHARS),
   workspaceId: z.string().min(1),
   defId: z.string().min(1).optional(),
-  name: z.string().optional(),
-  inputs: z.array(z.object({
-    name: z.string(),
-    description: z.string().optional(),
-    required: z.boolean().optional(),
-    default: z.string().optional(),
-  })).optional(),
-})
+}
+const generateBody = z.discriminatedUnion('mode', [
+  z.object({
+    ...generateCommon,
+    mode: z.literal('overwrite'),
+    name: z.string().optional(),
+    inputs: z.array(z.object({
+      name: z.string(),
+      description: z.string().optional(),
+      required: z.boolean().optional(),
+      default: z.string().optional(),
+    })).optional(),
+  }),
+  z.object({ ...generateCommon, mode: z.literal('edit'), currentDef: editableDefSchema }),
+])
 
 // These handlers answer 400, 404 and 409 off the bridge's own result, so they resolve the capability
 // themselves rather than going through viaBridge. The 503 promise it makes is kept here.
@@ -113,7 +127,10 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
     if (!parsed) return respondError(c, 400, 'bad_request')
     return withBridge(c, async (bridge) => {
       try {
-        const answer = await bridge.generate({ ...parsed, userId: ownerId(c) })
+        // The route validates the definition's outer shape. Its steps remain `unknown` to Zod
+        // because the catalog, not a closed schema, owns contributed step fields; the bridge runs
+        // the real workflow parser and validator after generation.
+        const answer = await bridge.generate({ ...(parsed as WorkflowGenerateRequest), userId: ownerId(c) })
         // Nothing came back that could be read as a definition. The message says which of the four
         // ways it failed, so it rides in the body rather than leaving the reader a bare code.
         if ('error' in answer) return respondError(c, 422, 'model_answer_unusable', [answer.error])

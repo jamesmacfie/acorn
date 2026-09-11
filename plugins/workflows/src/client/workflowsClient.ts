@@ -44,7 +44,8 @@ export const workflowAllRunsRoute = '/v2/p/workflows/runs'
 export const workflowDefsRoute = '/v2/p/workflows/defs'
 export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
-// A whole definition written from a description (docs/workflows.md § Authoring).
+// A whole definition written from a description or edited from the current graph
+// (docs/workflows.md § Authoring).
 export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // What the owner can generate with — a stored key, or an agent CLI installed on this machine — for
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key

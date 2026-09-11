@@ -13,14 +13,15 @@
 // prompt's list IS the grounding list, and a kind in the catalog but missing from the prompt is one
 // the model can never use and grounding will never strip. When it will not fit it degrades in place.
 //
-// The per-request half — the description, the draft's name, its inputs — goes in the user prompt, so
-// the system prompt is byte-identical across the first call, the repair call, and the next generate.
-// A provider that caches prefixes then hits.
+// The per-request half — the instruction and either replacement hints or the current definition —
+// goes in the user prompt, so the system prompt is byte-identical across the first call, the repair
+// call, and the next generate. A provider that caches prefixes then hits.
 
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type { WorkflowGenerateNote } from '../shared/api'
 import { GENERATE_MAX_DESCRIPTION_CHARS } from '../shared/api'
 import type { StepField, StepFieldOption, WorkflowCatalog, WorkflowDef, WorkflowInput } from '../shared/workflowContracts'
+import { definitionForPrompt } from './editWorkflow'
 import { validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './workflowValidation'
 
 /** How much the model may write back. A definition with six well-written prompts is a big document,
@@ -752,21 +753,6 @@ const SECTION_EXAMPLES = [
  *  kept out of its own examples. */
 export type WorkflowExample = { id: string; def: WorkflowDef }
 
-// A contributed kind's `with` is where a literal credential plausibly sits, and neither key teaches
-// anything about the shape of a graph.
-const SCRUBBED_WITH_KEYS = ['headers', 'auth']
-
-/** An example as the prompt shows it: no credentials, and none of the loader's own bookkeeping. `id`
- *  and `source` ride on a definition read from a file, and a model shown one starts writing them. */
-function exampleForPrompt(def: WorkflowDef): WorkflowDef {
-  const { id: _id, source: _source, ...rest } = def as WorkflowDef & { id?: unknown; source?: unknown }
-  return {
-    ...rest,
-    steps: def.steps.map((step) =>
-      step.with ? { ...step, with: Object.fromEntries(Object.entries(step.with).filter(([key]) => !SCRUBBED_WITH_KEYS.includes(key))) } : step),
-  }
-}
-
 /** How much one definition teaches, highest first.
  *
  *  A fan-in outranks everything, because a step reading two parallel branches is the thing this
@@ -799,7 +785,7 @@ export function selectExamples(args: {
   const candidates = args.examples
     .filter((example) => example.id !== args.excludeId && (example.def.steps?.length ?? 0) >= 2)
     .filter((example) => !validateWorkflow(example.def, args.validation).length)
-    .map((example) => ({ id: example.id, def: exampleForPrompt(example.def) }))
+    .map((example) => ({ id: example.id, def: definitionForPrompt(example.def) }))
     .map((example) => ({ example, text: JSON.stringify(example.def, null, 2), score: teachingScore(example.def) }))
     .sort((a, b) => b.score - a.score || a.text.length - b.text.length || a.example.id.localeCompare(b.example.id))
 
@@ -886,12 +872,33 @@ export function buildGenerateSystemPrompt(args: {
 const inputLine = (input: WorkflowInput): string =>
   `- \`${input.name}\`${input.required ? ', required' : ''}${input.description ? `. ${input.description}` : ''}`
 
-/** The user prompt: the description, and the draft it replaces.
+/** The user prompt: either a brief for a replacement, or a request applied to the current graph.
  *
- *  The draft's name and inputs are context rather than instruction. A generation replaces the whole
- *  draft, so keeping a name somebody already typed, and an input a new definition still uses, is the
- *  difference between a replacement and a reset. */
-export function buildGenerateUserPrompt(args: { description: string; name?: string; inputs?: readonly WorkflowInput[] }): string {
+ *  Overwrite keeps the old name-and-input hint contract. Edit carries the model-visible projection
+ *  of the current definition and makes preservation explicit; protected values are restored after
+ *  the reply is grounded. */
+export function buildGenerateUserPrompt(args:
+  | { mode: 'overwrite'; description: string; name?: string; inputs?: readonly WorkflowInput[] }
+  | { mode: 'edit'; description: string; currentDef: WorkflowDef },
+): string {
+  if (args.mode === 'edit') {
+    return [
+      'Edit the current workflow according to this request:',
+      '',
+      args.description.trim().slice(0, GENERATE_MAX_DESCRIPTION_CHARS),
+      '',
+      'Here is the current workflow:',
+      '',
+      JSON.stringify(definitionForPrompt(args.currentDef), null, 2),
+      '',
+      'Return the whole edited definition, not a patch. Keep every name, step, prompt, edge, input,',
+      'policy, budget and setting that the request does not need to change. Some protected settings',
+      'have been omitted; keep the step names and kinds for unaffected steps so acorn can restore them.',
+      '',
+      'Answer with the JSON object and nothing else.',
+    ].join('\n')
+  }
+
   const lines = ['Write the workflow definition for this description.', '', args.description.trim().slice(0, GENERATE_MAX_DESCRIPTION_CHARS)]
   const name = args.name?.trim()
   const inputs = (args.inputs ?? []).filter((input) => input.name?.trim())

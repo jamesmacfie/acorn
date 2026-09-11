@@ -297,7 +297,7 @@ describe('workflow definition routes', () => {
   // and `/defs/generate` has to be declared before `/defs/:id` or the parameter swallows the literal
   // and a generate reads a definition called "generate" instead.
   describe('generate', () => {
-    const body = { backendId: 'c1', modelId: 'm', description: 'two agents and a synthesiser', workspaceId: 'w1', defId: 'def1' }
+    const body = { mode: 'overwrite', backendId: 'c1', modelId: 'm', description: 'two agents and a synthesiser', workspaceId: 'w1', defId: 'def1' }
 
     it('reaches the bridge with the owner rather than the /defs/:id read', async () => {
       let seen: unknown
@@ -317,6 +317,15 @@ describe('workflow definition routes', () => {
       const res = await app.fetch(req('/api/defs/generate', 'POST', body), {} as Env)
       expect(res.status).toBe(422)
       expect(await res.text()).toContain('did not answer with JSON')
+    })
+
+    it('requires the current definition for edit mode', async () => {
+      setWorkflowDefsBridge(fakeDefs())
+      const app = asDevice()
+      const withoutCurrent = { ...body, mode: 'edit' }
+      expect((await app.fetch(req('/api/defs/generate', 'POST', withoutCurrent), {} as Env)).status).toBe(400)
+      expect((await app.fetch(req('/api/defs/generate', 'POST', { ...withoutCurrent, currentDef: { name: 'Broken', steps: [null] } }), {} as Env)).status).toBe(400)
+      expect((await app.fetch(req('/api/defs/generate', 'POST', { ...withoutCurrent, currentDef: row.def }), {} as Env)).status).toBe(200)
     })
 
     it('answers a provider failure with the provider status', async () => {
