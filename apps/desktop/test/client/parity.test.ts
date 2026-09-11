@@ -154,4 +154,14 @@ describe('docs/ui-design.md § Parity — the shell chords', () => {
     // the ledger above stops covering what the app actually does.
     expect(taskView).toContain('pane.defaultChord')
   })
+
+  it('holds a non-null task row until the task view has disposed', () => {
+    // Archiving removes the row from the live query before Solid has finished disposing TaskView.
+    // Its command matchers remain callable during that teardown, so the view reads a memo that keeps
+    // the last row. It stays keyed by id so an ordinary metadata refresh does not remount every pane.
+    expect(app).toContain('activeTask() ?? previous ?? null')
+    expect(app).toContain('<Show keyed when={activeTaskId()}>')
+    expect(app).toContain('task={taskForView()!}')
+    expect(app).not.toContain('task={activeTask()!}')
+  })
 })

@@ -288,6 +288,12 @@ export default function App() {
   // carries no node, so the workspace the shell is showing is whichever one the active node has for
   // this repo.
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
+  // TaskView registers callbacks with the keymap, whose layer can still be evaluated while Solid is
+  // disposing the view. Keep the last row available for that teardown tick after an archive removes
+  // it from the query. Rendering still gates on `activeTask()` below, so a missing row is never shown.
+  // Retaining the row instead of keying on the whole object also avoids remounting every pane when a
+  // refetch changes task metadata without changing which task is open.
+  const taskForView = createMemo<Task | null>((previous) => activeTask() ?? previous ?? null)
   // Which project the shell is "in". The generic task route (`/t/:taskId`) carries no projectId, so
   // without the task fallback the workspace and project pickers went blank the moment you opened a
   // task, and the per-workspace view memory below never saw a workspace change.
@@ -525,13 +531,12 @@ export default function App() {
           {(source) => <SourceSurface source={source()} />}
         </Match>
         <Match when={!selectedSource() && activeTask()}>
-          {/* Key the task surface by id so changing tasks disposes the old task scope before the new
-              one mounts. Read activeTask directly rather than a Match accessor, which can go stale
-              while this branch is being disposed. */}
+          {/* Key by identity so task metadata refreshes do not remount its panes. `taskForView` holds
+              the last non-null row until this keyed scope and its command matchers have disposed. */}
           <Show keyed when={activeTaskId()}>
             {(_taskId) => (
               <TaskView
-                task={activeTask()!}
+                task={taskForView()!}
                 terminalOpen={termOpen()}
                 onToggleTerminal={() => void toggleTerm()}
                 onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
