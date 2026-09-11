@@ -21,8 +21,9 @@ import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
-import { dedupeBranch, slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
+import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
+import { defaultBranchForTask } from '../tasks/defaultBranch'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { registerKeybindings } from '../../host/registries/commands/keybindings'
 import { confirmWillEvent } from '../../host/registries/shell/willPhase'
@@ -101,12 +102,8 @@ export default function TabRail() {
   const selectedProject = () => projects.data?.find((project) => project.id === newProject())
   const branchesInProject = (projectId: string) =>
     (query.data ?? []).filter((task) => task.projectId === projectId).flatMap((task) => task.branch ? [task.branch] : [])
-  // Prefix first, then de-dupe: existing branches are already prefixed, so the suffix has to be
-  // chosen against the final name (`me/fix`, `me/fix-2`), not the bare slug.
-  const defaultBranch = (title: string) => {
-    const slug = withBranchPrefix(branchPrefix(), slugifyBranch(title))
-    return slug ? dedupeBranch(slug, branchesInProject(newProject())) : ''
-  }
+  const defaultBranch = (title: string) =>
+    defaultBranchForTask(title, branchPrefix(), branchesInProject(newProject()))
   const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
   // What the icon picker shows while no icon is chosen: the same default the rail row would derive.
   const draftFallbackIcon = () => {
