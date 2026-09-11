@@ -12,6 +12,7 @@ import {
   Link,
   ListColumn,
   ListDetail,
+  Menu,
   Modal,
   ModalActions,
   ModalBody,
@@ -22,7 +23,7 @@ import {
   ToolbarSpacer,
 } from '@acorn/plugin-api/ui'
 import { workflowsSurfacePath } from '../surfacePath'
-import type { WorkflowGenerateNote, WorkflowGenerateResult } from '../../shared/api'
+import type { WorkflowGenerateNote, WorkflowGenerateRequest, WorkflowGenerateResult } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { workflowApi } from '../workflowsClient'
 import {
@@ -124,20 +125,25 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // and answers 400 without one, which reads as the model having failed rather than as a list that
   // has not arrived. The workspaces query resolves long before a description is typed.
   const canGenerate = () => !store.readOnly() && !!workspaceId() && (backends()?.length ?? 0) > 0
-  const [generating, setGenerating] = createSignal(false)
+  const [generationMode, setGenerationMode] = createSignal<WorkflowGenerateRequest['mode'] | null>(null)
   const [notes, setNotes] = createSignal<WorkflowGenerateNote[]>([])
+  // A row loaded from the node is saved even when its graph is empty. `dirty` also covers a future
+  // editor-owned draft before it has a row: once there is work to preserve, Generate becomes the
+  // choice between replacing it and editing it.
+  const hasCurrentWorkflow = () => !!store.ref() || store.dirty()
 
   // Through the same door the JSON tab's Apply uses, so a whole generated definition is one entry on
   // the undo stack rather than none or a dozen.
   const applyGenerated = (result: WorkflowGenerateResult): void => {
-    setGenerating(false)
+    const mode = generationMode()
+    setGenerationMode(null)
     const refused = store.applyText(toJson(result.def))
     if (refused) {
       store.setMessage(refused)
       return
     }
     setNotes(result.notes)
-    toast('Workflow generated.')
+    toast(mode === 'edit' ? 'Workflow edited.' : 'Workflow generated.')
   }
 
   // Two steps, because saving to the repository is a decision about where this definition lives from
@@ -200,7 +206,27 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       actions={(
         <>
           <Show when={canGenerate()}>
-            <Button size="sm" disabled={store.busy()} onPress={() => setGenerating(true)}>Generate</Button>
+            <Show
+              when={hasCurrentWorkflow()}
+              fallback={<Button size="sm" disabled={store.busy()} onPress={() => setGenerationMode('overwrite')}>Generate</Button>}
+            >
+              <Menu
+                ariaLabel="Generate workflow"
+                placement="bottom-end"
+                trigger={({ open, toggle }) => (
+                  <Button size="sm" disabled={store.busy()} opens="menu" expanded={open()} onPress={toggle}>
+                    Generate <Icon name="chevron-down" />
+                  </Button>
+                )}
+              >
+                {(menu) => (
+                  <>
+                    <Menu.Item context={menu} onSelect={() => setGenerationMode('overwrite')}>Overwrite</Menu.Item>
+                    <Menu.Item context={menu} onSelect={() => setGenerationMode('edit')}>Edit</Menu.Item>
+                  </>
+                )}
+              </Menu>
+            </Show>
           </Show>
           <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
           <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
@@ -271,20 +297,20 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           </ModalActions>
         </Modal>
       </Show>
-      <Show when={generating()}>
+      <Show when={generationMode()}>{(mode) => (
         <GenerateModal
+          mode={mode()}
           backends={backends() ?? []}
           context={{
             workspaceId: workspaceId(),
             // Only a row can be an example of itself: the worked examples the node picks are rows.
             ...(store.ref()?.source === 'database' ? { defId: store.ref()?.id } : {}),
-            name: draft().def.name,
-            ...(draft().def.inputs ? { inputs: draft().def.inputs } : {}),
+            draft: draft().def,
           }}
-          onDismiss={() => setGenerating(false)}
+          onDismiss={() => setGenerationMode(null)}
           onGenerated={applyGenerated}
         />
-      </Show>
+      )}</Show>
       {/* Above the list rather than in a toast: a list of things that were changed is not something
           to read in three seconds. What the definition still gets wrong is the footer's job. */}
       <Show when={notes().length}>

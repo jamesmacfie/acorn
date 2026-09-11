@@ -89,14 +89,19 @@ const type = (value: string): void => {
   field.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-/** Open the dialog, describe something, and press its Generate. */
-const generate = async (): Promise<void> => {
+const chooseGeneration = async (choice: 'Overwrite' | 'Edit'): Promise<void> => {
   await press('Generate')
+  await press(choice, document)
+}
+
+/** Open the overwrite dialog, describe something, and submit it. */
+const generate = async (): Promise<void> => {
+  await chooseGeneration('Overwrite')
   type('Two agents look at one issue at once and a third reads both.')
   await settle()
   const open = dialog()
   if (!open) throw new Error('the dialog did not open')
-  await press('Generate', open)
+  await press('Overwrite', open)
 }
 
 beforeEach(() => {
@@ -127,10 +132,13 @@ describe('the Generate button', () => {
     expect(button('Generate')).toBeUndefined()
   })
 
-  it('is drawn beside Undo when there is a backend to spend', async () => {
+  it('is a dropdown beside Undo when there is a saved workflow to preserve', async () => {
     await mount('db:abc')
     const labels = buttons().map((el) => el.textContent?.trim())
     expect(labels.indexOf('Generate')).toBe(labels.indexOf('Undo') - 1)
+    await press('Generate')
+    expect(button('Overwrite', document)).toBeDefined()
+    expect(button('Edit', document)).toBeDefined()
   })
 })
 
@@ -161,6 +169,7 @@ describe('applying a generated definition', () => {
       modelId: 'opus',
       workspaceId: 'w1',
       defId: 'abc',
+      mode: 'overwrite',
       name: 'Ship it',
       description: 'Two agents look at one issue at once and a third reads both.',
     }))
@@ -212,11 +221,33 @@ describe('applying a generated definition', () => {
 
   it('closes on Escape before anything has been asked for', async () => {
     await mount('db:abc')
-    await press('Generate')
+    await chooseGeneration('Overwrite')
     expect(dialog()).not.toBeNull()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await settle()
     expect(dialog()).toBeNull()
+  })
+
+  it('sends the current workflow for an edit and applies the result as one undo entry', async () => {
+    await mount('db:abc')
+    await chooseGeneration('Edit')
+    expect(dialog()?.querySelector('textarea')?.getAttribute('aria-label')).toBe('Requested edits')
+    type('Add a second independent review before the final step.')
+    const open = dialog()
+    if (!open) throw new Error('the dialog did not open')
+    await press('Edit workflow', open)
+
+    expect(generateDef).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'edit',
+      currentDef: original,
+      description: 'Add a second independent review before the final step.',
+    }))
+    expect(host.textContent).toContain('synthesise')
+    expect(toasts).toEqual(['Workflow edited.'])
+
+    await press('Undo')
+    expect(host.textContent).toContain('plan')
+    expect(button('Undo')?.disabled).toBe(true)
   })
 
   it('keeps the draft and says why when the model answer is unusable', async () => {

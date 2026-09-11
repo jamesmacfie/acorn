@@ -26,6 +26,7 @@
 // so it returns the parse error for the route to answer 422 with.
 import type { WorkflowGenerateNote, WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
 import type { WorkflowCatalog, WorkflowDef } from '../shared/workflowContracts'
+import { definitionForPrompt, restoreProtectedDefinition } from './editWorkflow'
 import {
   buildGenerateSystemPrompt,
   buildGenerateUserPrompt,
@@ -61,14 +62,20 @@ type Answer = { def: WorkflowDef; notes: WorkflowGenerateNote[]; problems: strin
  *
  *  Parsing and grounding each report their own changes, and the reader wants one list, so the two
  *  are concatenated here rather than at every call site. */
-function readAnswer(text: string, catalog: WorkflowCatalog, validation: WorkflowValidationCatalog): Answer | { error: string } {
+function readAnswer(
+  text: string,
+  catalog: WorkflowCatalog,
+  validation: WorkflowValidationCatalog,
+  currentDef?: WorkflowDef,
+): Answer | { error: string } {
   const parsed = parseGeneratedWorkflow(text)
   if ('error' in parsed) return parsed
   const grounded = groundWorkflow(parsed.def, catalog)
+  const def = currentDef ? restoreProtectedDefinition(currentDef, grounded.def) : grounded.def
   return {
-    def: grounded.def,
+    def,
     notes: [...parsed.notes, ...grounded.notes],
-    problems: validateWorkflow(grounded.def, validation),
+    problems: validateWorkflow(def, validation),
   }
 }
 
@@ -87,6 +94,7 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
     ...(request.defId ? { excludeId: request.defId } : {}),
   })
   const userPrompt = buildGenerateUserPrompt(request)
+  const currentDef = request.mode === 'edit' ? request.currentDef : undefined
   const ask = (prompt: string) =>
     args.generateText({
       backendId: request.backendId,
@@ -94,13 +102,18 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
     })
 
   const first = await ask(userPrompt)
-  const answer = readAnswer(first.text, catalog, validation)
+  const answer = readAnswer(first.text, catalog, validation, currentDef)
   if ('error' in answer) return answer
   const kept = { ...answer, repaired: false, providerId: first.providerId, modelId: first.modelId }
   if (!answer.problems.length) return kept
 
-  const second = await ask(buildRepairUserPrompt({ userPrompt, def: answer.def, notes: answer.notes, problems: answer.problems }))
-  const repair = readAnswer(second.text, catalog, validation)
+  const second = await ask(buildRepairUserPrompt({
+    userPrompt,
+    def: currentDef ? definitionForPrompt(answer.def) : answer.def,
+    notes: answer.notes,
+    problems: answer.problems,
+  }))
+  const repair = readAnswer(second.text, catalog, validation, currentDef)
   if ('error' in repair) return kept
   // The repair pass's notes alone. A note describes a change made to the reply it came in, and this
   // reply was read through the same pipeline, so anything the model put back is reported again and

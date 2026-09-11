@@ -43,7 +43,7 @@ const answers = (...texts: string[]) => {
 
 const run = (generateText: ReturnType<typeof answers>, over: Partial<{ description: string; modelId: string }> = {}) =>
   generateWorkflowRequest({
-    request: { backendId: 'c1', modelId: 'claude-opus', description: 'two agents and a synthesiser', workspaceId: 'w1', ...over },
+    request: { mode: 'overwrite', backendId: 'c1', modelId: 'claude-opus', description: 'two agents and a synthesiser', workspaceId: 'w1', ...over },
     catalog,
     validation,
     generateText,
@@ -70,10 +70,41 @@ describe('generateWorkflowRequest', () => {
     })
   })
 
+  it('asks for an edit with the current graph and restores protected settings in the answer', async () => {
+    const current: WorkflowDef = {
+      name: 'Investigate',
+      trigger: 'schedule:nightly',
+      tools: { maxRisk: 'execute', allow: ['pnpm test'] },
+      steps: [{ ...clean.steps[0]!, model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]!],
+    }
+    const changed: WorkflowDef = {
+      name: 'Investigate',
+      tools: { maxRisk: 'read' },
+      steps: [{ ...clean.steps[0]!, prompt: 'Inspect the issue from two angles.' }, clean.steps[1]!],
+    }
+    const generateText = answers(reply(changed))
+    const result = await generateWorkflowRequest({
+      request: { mode: 'edit', backendId: 'c1', description: 'Strengthen the investigation prompt.', workspaceId: 'w1', currentDef: current },
+      catalog,
+      validation,
+      generateText,
+    })
+    expect(promptOf(generateText, 0)).toContain('Strengthen the investigation prompt.')
+    expect(promptOf(generateText, 0)).toContain('"name": "look"')
+    expect(promptOf(generateText, 0)).not.toContain('private-model')
+    expect(result).toMatchObject({
+      def: {
+        trigger: 'schedule:nightly',
+        tools: { maxRisk: 'read', allow: ['pnpm test'] },
+        steps: [{ prompt: 'Inspect the issue from two angles.', model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]],
+      },
+    })
+  })
+
   it('leaves modelId out when none was asked for, so the backend picks its default', async () => {
     const generateText = answers(reply(clean))
     await generateWorkflowRequest({
-      request: { backendId: 'c1', description: 'anything', workspaceId: 'w1' },
+      request: { mode: 'overwrite', backendId: 'c1', description: 'anything', workspaceId: 'w1' },
       catalog,
       validation,
       generateText,

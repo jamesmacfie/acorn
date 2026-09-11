@@ -245,13 +245,25 @@ select per option that harness advertises through `GET /v2/p/agents/providers`, 
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
 never restates the model list.
 
-### Generating one from a description
+### Generating and editing with AI
 
-**Generate** on the editor toolbar takes a description and answers with the whole definition, which
-replaces the draft. The dialog asks for three things: what you want to happen, which connected model
-provider writes it, and which of that provider's models. The draft's current name and its declared
-inputs go along as context, with the model asked to keep each of them where it still fits what you
-described. The description box takes up to 8,000 characters, which is enough to paste an issue in.
+**Generate** on the editor toolbar is a menu once there is a saved workflow or an unsaved draft with
+changes. **Overwrite** keeps the original generation behaviour: its description answers with a whole
+new definition that replaces the draft. **Edit** takes an instruction and the current definition,
+and asks the model for the whole definition with only the requested changes. A new empty draft keeps
+the direct **Generate** button, which opens overwrite.
+
+Both dialogs ask which connected model provider writes the answer and which of that provider's
+models it uses. Overwrite sends the draft's current name and declared inputs as hints, with the model
+asked to keep each where it still fits. Edit sends the graph itself and explicitly tells the model to
+preserve every step, prompt, edge, input, policy, budget, and setting the request does not need to
+change. The instruction box takes up to 8,000 characters, which is enough to paste an issue in.
+
+The edit projection does not send provider choices, execution targets, tool allowlists, triggers, or
+the `headers` and `auth` fields of contributed step configuration to the model. After the answer is
+grounded, those values are restored onto each surviving step with the same name and kind. Deleting,
+renaming, or changing the kind of a step deliberately breaks that identity and does not carry its
+protected configuration onto the replacement.
 
 What the model is told about acorn is assembled at request time, not written down. The step kinds
 with the fields each one describes, the policies and the agent profiles all come out of the same
@@ -284,9 +296,9 @@ through being built, and **Run** is what refuses to start one. The alert above t
 describes the answer that was applied and only that one. When the repair is the one kept, a note
 about the first draft would be about a definition nobody ever sees.
 
-Applying goes through the same door the JSON tab's **Apply** uses, so the whole generated definition
-is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved: **Save** and
-**Run** are still yours to press.
+Applying either answer goes through the same door the JSON tab's **Apply** uses, so the whole
+definition is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved:
+**Save** and **Run** are still yours to press.
 
 The button is not drawn at all in two cases. One is an owner with nothing to generate with, meaning no
 model provider connected and no agent CLI installed either
