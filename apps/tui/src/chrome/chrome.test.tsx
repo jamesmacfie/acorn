@@ -163,19 +163,19 @@ describe('the shell', () => {
     await screen.press('k', { ctrl: true })
     const open = await screen.frame()
     expect(open).toContain('Commands')
-    expect(open).toContain('Switch workspace')
+    expect(open).toContain('tasks, workspaces, projects and nodes')
 
     // The field owns the typing, and the list narrows to what matches.
     await screen.press('q')
     const filtered = await screen.frame()
     expect(filtered).toContain('Quit')
-    expect(filtered).not.toContain('Switch workspace')
+    expect(filtered).not.toContain('tasks, workspaces, projects and nodes')
 
     await screen.press('ESCAPE')
     const closed = await screen.frame()
     screen.done()
 
-    expect(closed).not.toContain('Switch workspace')
+    expect(closed).not.toContain('tasks, workspaces, projects and nodes')
     expect(closed).toContain('Reviews')
     // Back where they were, which is what the DOM palette's `prevFocus` does with an element.
     expect(caretRow(closed)).toBe(before)
@@ -188,6 +188,9 @@ describe('the shell', () => {
     for (const letter of 'fixture') await screen.press(letter)
     expect(await screen.frame()).toContain('Fixture group')
 
+    // A root search deliberately flattens descendants ahead of their parent group. Move past the
+    // five matching children to enter the group itself.
+    for (let row = 0; row < 5; row += 1) await screen.press('ARROW_DOWN')
     await screen.press('RETURN')
     const inside = await screen.frame()
     expect(inside).toContain('Stay open and say so')
@@ -199,7 +202,7 @@ describe('the shell', () => {
     await screen.press('ESCAPE')
     const back = await screen.frame()
     expect(back).toContain('Fixture group')
-    expect(back).not.toContain('Close the palette')
+    expect(back).toContain('│ fixture')
 
     await screen.press('ESCAPE')
     const closed = await screen.frame()
@@ -225,6 +228,7 @@ describe('the shell', () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     await screen.press('k', { ctrl: true })
     for (const letter of 'fixture') await screen.press(letter)
+    for (let row = 0; row < 5; row += 1) await screen.press('ARROW_DOWN')
     await screen.press('RETURN')
 
     // The group's five children, in the order they declared: stay, close, search, input, setting.

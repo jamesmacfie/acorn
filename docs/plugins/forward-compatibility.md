@@ -137,6 +137,7 @@ sequence gap still require a re-read.
 | `plugin:agents:sessions-changed` | task, session, present, archived | `agents.sessions` |
 | `plugin:github:repos-changed` | none | user-scoped repositories from `github.mirror` |
 | `plugin:github:pulls-changed` | repository scope | GitHub mirror routes |
+| `plugin:github:checks-changed` | repository, pull, current head | GitHub mirror routes |
 | `plugin:github:pr-synced` | repository, pull, current head | GitHub mirror routes |
 | `plugin:browser:captures-changed` | task | `browser.captures` |
 | `plugin:changes:review-notes-changed` | task, total count, unsent count | task-confined review-note routes |

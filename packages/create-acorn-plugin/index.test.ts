@@ -258,7 +258,7 @@ it('type-checks the complete documented plugin example outside the workspace', (
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-})
+}, 20_000)
 
 // The one flag the CLI has, exercised through the CLI. Every other test here calls `scaffoldFiles`
 // directly, which skips the argv reading entirely — so the flag could have stopped being read and

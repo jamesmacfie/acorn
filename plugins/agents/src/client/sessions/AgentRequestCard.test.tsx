@@ -47,13 +47,15 @@ afterEach(() => {
   posted.length = 0
 })
 
-const draw = (multiple: boolean) => {
+const drawRequest = (value: AgentRequest) => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <AgentRequestCard request={request(multiple)} />, host)
+  const dispose = render(() => <AgentRequestCard request={value} />, host)
   hosts.push(() => { dispose(); host.remove() })
   return host
 }
+
+const draw = (multiple: boolean) => drawRequest(request(multiple))
 
 const submit = async (host: HTMLElement) => {
   const button = [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('Submit'))
@@ -90,5 +92,16 @@ describe('answering a question that takes more than one answer', () => {
     select!.dispatchEvent(new Event('change', { bubbles: true }))
     await submit(host)
     expect(posted).toEqual([{ answers: { checks: 'Test' } }])
+  })
+
+  it('keeps a secret free-text answer out of view while it is typed', () => {
+    const host = drawRequest({
+      ...request(false),
+      payload: {
+        options: [],
+        questions: [{ id: 'token', prompt: 'Paste the token', secret: true }],
+      },
+    })
+    expect(host.querySelector('input[type="password"]')).not.toBeNull()
   })
 })

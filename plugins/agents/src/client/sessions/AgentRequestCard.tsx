@@ -41,6 +41,7 @@ export default function AgentRequestCard(props: {
       header?: string
       prompt: string
       multiple?: boolean
+      secret?: boolean
       options?: Array<{ id: string; label: string }>
     }>
     : []
@@ -76,6 +77,7 @@ export default function AgentRequestCard(props: {
                 when={question.options?.length}
                 fallback={
                   <Input
+                    type={question.secret ? 'password' : 'text'}
                     value={typed(question.id)}
                     onInput={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
                   />

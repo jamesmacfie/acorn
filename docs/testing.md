@@ -37,6 +37,8 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   `TaskSlotHost`, `RefPanelHost`, `ContextMenuHost`, `TaskPaneHost`, `ExtensionPointHost`, and
   `ExclusiveSlotHost`. Hosts rather than individual panes, because ordering, capability gating,
   arbitration and the error boundaries all live in the hosts and every plugin's UI rides on them. It
+  shares `vitest.browser.setup.ts` with plugin host suites; that setup installs jsdom's isolated
+  storage over Node 24's otherwise-undefined process-level `localStorage` property. It
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;

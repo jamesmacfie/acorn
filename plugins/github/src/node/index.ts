@@ -31,8 +31,9 @@ export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
     required: false,
-    // What other plugins may hear from this one (docs/plugins.md § Hearing another plugin,
-    // subscriptions.md § The cross-plugin grant). workflows hears `checks-changed`.
+    // What other plugins may hear from this one
+    // (docs/plugins/forward-compatibility.md § Hearing another plugin). workflows hears
+    // `checks-changed`.
     emits: [
       { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
       { verb: 'pr-synced', description: 'A pull request’s mirror was committed or invalidated' },

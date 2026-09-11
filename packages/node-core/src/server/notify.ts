@@ -142,23 +142,23 @@ export function broadcastHeadChanged(event: HeadChangedEvent): void {
   wsBroadcast({ channel: 'head:changed', ...event })
 }
 
-// A declared run target started or stopped (core-events.md § Run target state). Emitted by the terminal
-// plugin, which holds the process, through `ctx.events.send`; this helper is the core-side twin so the
-// two never spell the frame differently.
+// A declared run target started or stopped (docs/api-reference.md § WebSocket). Emitted by the
+// terminal plugin, which holds the process, through `ctx.events.send`; this helper is the core-side
+// twin so the two never spell the frame differently.
 export function broadcastRunTargetChanged(event: RunTargetChangedEvent): void {
   wsBroadcast({ channel: 'run:changed', ...event })
 }
 
-// A managed agent session finished a turn or asked for attention (core-events.md § Agent session
-// state). Same two kinds as the agents webhook service, on purpose: there is one reduction of the
-// session stream to human-scale edges, and it is deployed.
+// A managed agent session finished a turn or asked for attention (docs/api-reference.md §
+// WebSocket). Same two kinds as the agents webhook service, on purpose: there is one reduction of
+// the session stream to human-scale edges, and it is deployed.
 export function broadcastAgentSessionChanged(event: AgentSessionChangedEvent): void {
   wsBroadcast({ channel: 'agent-session:changed', ...event })
 }
 
-// A project row or its config moved (core-events.md § Project changed). Preview reads browser rules
-// and the preview mode, terminal reads run targets, changes reads the branch prefix, and until this
-// existed none of them heard a write; onboarding hand-invalidated its own cache after creating one.
+// A project row or its config moved (docs/api-reference.md § WebSocket). Preview reads browser
+// rules and the preview mode, terminal reads run targets, changes reads the branch prefix, and until
+// this existed none of them heard a write; onboarding hand-invalidated its own cache after creating one.
 export function broadcastProjectChanged(event: ProjectChangedEvent): void {
   wsBroadcast({ channel: 'project:changed', ...event })
 }

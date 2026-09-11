@@ -34,6 +34,11 @@
       "workflows"
     ],
     "tools": [
+      "agent_cancel",
+      "agent_prompt",
+      "agent_read",
+      "agent_spawn",
+      "agent_wait",
       "browser_click",
       "browser_console",
       "browser_fill",

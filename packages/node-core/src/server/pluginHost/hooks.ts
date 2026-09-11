@@ -4,10 +4,11 @@
 // declares the moment and what is allowed at it, contributors register a handler, and this module runs
 // the chain and hands the owner a verdict.
 //
-// A hook is not an event (docs/future/events.md). An event has already happened, fans out, and carries
-// no answer; a hook runs before, in order, with a return value, a timeout and a validated payload. The
-// two contracts stay different on purpose: a producer that declares no `emits` has said no to
-// listeners, and an owner that declares no hook has said no to interceptors.
+// A hook is not an event (docs/plugins/node-side-extension-points.md § Hooks). An event has already
+// happened, fans out, and carries no answer; a hook runs before, in order, with a return value, a
+// timeout and a validated payload. The two contracts stay different on purpose: a producer that
+// declares no `emits` has said no to listeners, and an owner that declares no hook has said no to
+// interceptors.
 //
 // Two carriers, one chain, the same rule the route registry follows: a built-in contributes a function
 // and a loaded plugin contributes a route, the host wraps both in the same `call` closure at
