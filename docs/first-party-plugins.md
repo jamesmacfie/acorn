@@ -171,15 +171,16 @@ Ordered by how strong the first-party claim is.
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. Every one of its five surfaces is a host layout filled with kit nodes and it ships no stylesheet, so nothing about how it draws itself keeps it here: what does is `GITHUB_MIRROR` having a consumer. | D |
 | **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability, one settings page, a rail source with a `list-detail` pair of regions, the project surface at `/p/:projectId/x/workflows/:id` that its editor draws in, the `workflows` task pane its runs are watched in, the gate attention source, and the `workflow-run` notice target every bell row about a run lands on. All of it is kit-pure and ships no stylesheet. Opens the three extension points other plugins add step kinds, policies, and triggers through, and answers the catalog those kinds describe themselves into. Its editor's **Generate** consumes `core.models` the way changes and database do, and reads the same catalog to teach the model, so a contributed step kind is generatable with no change here. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
+| **editor** | Owns the `editor:pty:*` WS channel that carries the `$EDITOR` mode, and contributes the persisted open-file slice. Its file tree is also a dynamic multi-document surface, while the loaded-plugin `document` layout describes one host-owned document at a time. The shared `ui/editor` contract still owns desktop CodeMirror behavior and the terminal's read-only/`$EDITOR` behavior; extraction must extend that contract instead of moving either implementation into plugin code. | A, E |
 
 ### First-party only by history
 
-These use nothing a loaded plugin could not be given. They are in the binary because they were
-written before the loader existed.
-
-| Plugin | What it uses | Portable? |
-| --- | --- | --- |
-| **editor** | A code pane with two editing modes — CodeMirror 6, or the reader's own `$EDITOR` in a throwaway PTY on one device preference (`docs/editor.md § Editing in your own editor`) — with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, its own `editor:pty:*` WS channel, `EDITOR`/`SEARCH`. Both surfaces are host layouts filled with kit nodes and it ships no stylesheet. | **One blocker, and it is the editor's size rather than a question.** It was Monaco's: a single-file Monaco frame measured 7.93 MiB against the 8.00 MiB cap with no editor UI in it, and its four language-service workers, another 14.58 MiB, could not be delivered at all, because a plugin origin serves one file and the frame CSP has no `worker-src`. CodeMirror is a few hundred kilobytes and needs no workers, so the arithmetic is worth re-running before this row is believed again. Neither capability has an outside consumer. |
+There are none at present. The editor was the last entry, and the 2026-09-11 reassessment moved it
+to the table above for concrete reasons A and E. Its standalone pane is no longer a size blocker:
+`pnpm --filter @acorn/node measure:editor-bundle` produces 1,271,605 raw bytes (265,587 gzip), well
+under the 8 MiB client-bundle ceiling. `EDITOR` and `SEARCH` have no consumers outside the editor's
+own route adapters; an eventual extraction should delete those two private indirections rather than
+turn them into cross-realm capabilities.
 
 **http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
 it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
@@ -308,14 +309,14 @@ plugin can be: a manifest with two egress hosts and an empty `contributions`, an
 half.
 
 **nodes-file** — smaller than model-providers, and the only plugin here that contributes nodes rather
-than data. One registration through `ctx.providers.nodes`, a manifest that grants it nothing at all
-(`core: []`, `secrets: false`, `exec: false`, `net: []`), no routes, no tables, no client half. It reads
-nodes out of a JSON file named by `ACORN_NODES_FILE` and does nothing when that is unset. Build it with
+than data. One registration through `ctx.providers.nodes`, no core, secret, process, or network
+grants, one read-write file grant resolved from `ACORN_NODES_FILE`, and no routes, tables, or client
+half. It does nothing when that variable is unset. Build it with
 `pnpm --filter @acorn/node build:plugin nodes-file`.
 
 Read it for the acceptance argument rather than the feature: a first-party control-plane plugin gets no
-host privilege a third party lacks ([plugins.md](./plugins.md) § Node providers), and this is what
-"no privilege" looks like written down. It is not in the bundled roster, so a shipped install has no
+host privilege a third party lacks ([plugins.md](./plugins.md) § Node providers), and this is what a
+narrow explicit resource grant looks like written down. It is not in the bundled roster, so a shipped install has no
 node providers at all.
 
 **rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,

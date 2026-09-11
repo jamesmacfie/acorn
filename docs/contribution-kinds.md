@@ -15,8 +15,8 @@ Read [extensibility.md](./extensibility.md) first for why there are two tiers at
 - **Both** — a loaded plugin declares it in `acorn-plugin.json` and a compiled plugin registers it
   through a context member. The two feeders build the same registration and nothing downstream can
   tell them apart.
-- **Compiled** — first-party only, because the contribution is a live object: a component in the
-  host's realm, a stream, a function another plugin calls in-process.
+- **Compiled** — first-party only, because the contribution is a live host object that has no
+  structured-clone RPC contract, such as a component or stream.
 - **Loaded** — declared in a manifest only. There are none: every manifest descriptor has a context
   twin, because the host synthesises the registration through the same seam.
 

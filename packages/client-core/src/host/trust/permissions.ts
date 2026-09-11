@@ -6,9 +6,8 @@ import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from '../frames/scopes'
 
-// What a plugin's declared permissions read as in the trust prompt (PluginTrustDialog.tsx): a `node`
-// group (declared, unenforced) and an `api`/`events` group (enforced by plugins/frames/scopes.ts),
-// kept apart per docs/security.md § Design rules, rule 6.
+// What a plugin's permissions read as in the trust prompt (PluginTrustDialog.tsx). Node grants are
+// enforced by the isolated worker and host RPC; API/events are enforced by the client broker.
 //
 // A plain module rather than exports on the dialog, so a node-env suite can import it. A .tsx does not
 // parse under plain Node with no Solid plugin.
@@ -73,6 +72,14 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
       : []),
     ...(permissions.node.exec ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })] : []),
     ...permissions.node.net.map((host) => line(`node.net:${host}`, { text: `Reach ${host}`, icon: 'globe' })),
+    ...(permissions.node.env ?? []).map((name) =>
+      line(`node.env:${name}`, { text: `Read the node environment value ${name}`, icon: 'key-round', high: true })),
+    ...(permissions.node.files ?? []).map(({ env, access }) =>
+      line(`node.file:${env}:${access}`, {
+        text: `${access === 'read-write' ? 'Read and write' : 'Read'} the local file configured by ${env}`,
+        icon: 'file-text',
+        high: true,
+      })),
     ...core,
     ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, { text: `Use capability ${id}`, icon: 'puzzle' })),
     ...(ignored ? [ignoredLine('node.ignored', ignored, 'node permission')] : []),

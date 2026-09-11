@@ -58,8 +58,9 @@ Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `pr
 `events.channel`, or `events.streams`. Those members belong to the compiled context.
 
 Core returns projections such as `TaskRef`, not database rows. A manifest grants each core facet
-explicitly. Context permissions guide cooperative node code; they do not isolate an in-process plugin
-from Node builtins. For the trust boundary, see [Security](./security.md).
+explicitly. The host sends that owner-bound projection over RPC to a permission-scoped worker; direct
+database and unrestricted Node builtin access are unavailable. For the trust boundary, see
+[Security](./security.md).
 
 ## The client API
 

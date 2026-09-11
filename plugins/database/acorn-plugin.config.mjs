@@ -58,7 +58,14 @@ export default {
   permissions: {
     api: ['core.tasks:read'],
     events: [],
-    node: { core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'], capabilities: [], secrets: false, exec: true, net: [] },
+    node: {
+      core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'],
+      capabilities: [],
+      secrets: false,
+      exec: true,
+      net: [],
+      env: ['DATABASE_URL'],
+    },
   },
   contributions: {
     frames: [{

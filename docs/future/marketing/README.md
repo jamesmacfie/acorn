@@ -57,9 +57,10 @@ wait for it.
 
 The internal docs are unusually honest and the public docs must not launder that away:
 
-- The node half is **disclosed, not contained**. Surfaces rendering `permissions.node` or
-  `permissions.net` must say "declared", never "enforced". Only `permissions.api` — the six
-  grantable frame scopes — is genuinely enforced, by `frames/scopes.ts`.
+- The node half runs in a permission-scoped worker realm. Surfaces render understood
+  `permissions.node`, including network, environment, and file resources, as **enforced**.
+  Scheduled/check intent remains **declared**. `permissions.api` is enforced separately by the
+  frame broker.
 - There is no signing, no registry, no review, and no deprecation program. If discovery ever
   exists it will be explicitly unreviewed; trust is enforced on the user's devices.
 - The compatibility promise is exactly the `PLUGIN_API_MAJOR` promise (`4` at the time of writing,

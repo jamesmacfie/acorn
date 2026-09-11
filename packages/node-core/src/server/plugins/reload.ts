@@ -1,13 +1,14 @@
 // Reloading one loaded plugin's node half in a running process (docs/plugins.md § The dev loop).
 //
 // The split with server/pluginHost/host.ts matches the boot path. This half does the disk work: re-scan,
-// re-import past Node's module cache, re-resolve the manifest's migrations chain. The host owns the
+// start a fresh worker realm with a fresh module graph, re-resolve the manifest's migrations chain. The host owns the
 // lifecycle, candidate-then-commit, and containment, so a reload gets the containment a boot gets.
 //
 // Loaded plugins only. A built-in is compiled into this binary, so there is no second copy on disk
 // to swap in.
 import { broadcastPluginsChanged } from '../notify'
 import { loadExternalPlugins } from './loader'
+import { disposeUnstartedPlugin } from './isolation'
 import type { PluginHostResult } from '../pluginHost/host'
 import type { PluginReloadResult } from '@acorn/protocol/api.ts'
 
@@ -31,9 +32,10 @@ export function createPluginReloader(options: {
       // The whole install directory, not just this package. `loadExternalPlugins` is the one place
       // that reads a manifest, confines a migrations chain, and checks an id against its bundle, so
       // duplicating a quarter of it here would be a second loader to keep in step. Only `id` is
-      // re-evaluated.
+      // considered.
       const { loaded, failures } = await loadExternalPlugins(options.dataDir, { builtins: options.builtins, reimport: [id] })
       const entry = loaded.find((candidate) => candidate.manifest.id === id)
+      for (const candidate of loaded) if (candidate !== entry) disposeUnstartedPlugin(candidate.plugin)
       if (!entry) {
         // The loader's own sentence when it has one, such as a bundle that threw on import, because
         // that names what the author has to fix.
@@ -54,7 +56,7 @@ export function createPluginReloader(options: {
           collections: entry.manifest.contributions.collections,
           commands: entry.manifest.contributions.commands,
           taskChecks: entry.manifest.contributions.taskChecks,
-        auditActions: entry.manifest.contributions.auditActions,
+          auditActions: entry.manifest.contributions.auditActions,
           harnesses: entry.manifest.contributions.harnesses,
           dir: entry.dir,
         },

@@ -1,7 +1,5 @@
 # docs/future: the design record for work not yet built
 
-[Documentation review follow-up](./doc-review.md) records application work found during the docs review.
-
 This folder holds designs, analyses, and sequenced plans for work that has not shipped, plus the
 refusals that keep it from being re-argued. Behaviour that has shipped is never described here; it
 moves to an owning doc under `docs/` and the future file either shrinks to a pointer or is deleted,
@@ -21,7 +19,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
-| [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
+| [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 
@@ -48,9 +46,8 @@ compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 bec
 annotation point, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
 beside them; nothing in it waits any more. Events and sandbox are independent of all of that and of
-each other. Ecosystem's rung-2 containment is the one design restated in more than one place (its
-`blockers.md`, sandbox's `phases.md`, `docs/security.md § The containment ladder`); the security
-doc owns it and the others point.
+each other. Ecosystem's shipped rung-2 containment is recorded in `blockers.md` and sandbox's
+`phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
 

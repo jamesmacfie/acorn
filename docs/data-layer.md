@@ -286,10 +286,12 @@ Every chain starts from a single baseline migration that creates the schema. The
 `(owner, name)` model and its one-way data migrations were squashed away with it, so a database
 written before that baseline cannot be upgraded. Start from a fresh data root.
 
-Native SQLite access is centralized, and both plugin tiers reach it the same way. `ctx.storage.open()`
-returns a migrated handle whose filename the host bound to the plugin id. Only the source of the
-chain differs: a loaded plugin's manifest names a directory confined to its package, and a built-in
-declares `migrationsModule: import.meta.url` on its `NodePlugin` so the host walks from there.
+Native SQLite access is centralized, and both plugin tiers reach it through `ctx.storage.open()`.
+The filename is bound to the plugin id. A loaded plugin opens that handle inside its isolated worker,
+whose filesystem grant names only that database, WAL, and SHM paths; a built-in opens it in the host.
+Only the source of the chain differs: a loaded plugin's manifest names a directory confined to its
+package, and a built-in declares `migrationsModule: import.meta.url` on its `NodePlugin` so the host
+walks from there.
 `packages/node-core/src/server/plugins/migrations.ts` covers all three runtime layouts.
 
 A built-in's chain lives in one of three places depending on how the node was run: a source checkout
@@ -304,13 +306,21 @@ package root, so a missing chain fails rather than silently adopting an ancestor
 plugin skips the walk entirely: its manifest names the directory, already confined to its package,
 and `pluginMigrationsChain` only validates that a Drizzle chain exists there.
 
-The host opens each file lazily on first use, hands out one handle per boot, and closes it
-immediately after that plugin's `dispose()`, so a plugin's dispose is about the resources the plugin
-itself owns and a plugin whose only resource was the database needs no dispose at all. Both tiers use
-`CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
+The host opens a built-in's file lazily on first use. For a loaded plugin with migrations, the loader
+privately prepares the three exact SQLite paths before starting the worker so it can grant files
+without granting the shared `plugins/` directory; the worker still opens the database lazily on first
+use. Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
+dispose is about the resources the plugin itself owns and a plugin whose only resource was the database
+needs no dispose at all. Both tiers use `CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
 happens when a loaded plugin's chain grows between versions, where the update applies at the next
 boot against a database that already has rows, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.
+
+Before applying anything, the loaded-plugin path compares every row already recorded in
+`__drizzle_migrations` with the corresponding journal entry: its timestamp, its position, and the
+SHA-256 of the SQL file. Editing applied SQL, reordering the journal, or removing an applied entry
+fails the plugin with an error that says to restore the original chain and add a new migration. The
+comparison happens on the same handle before Drizzle migrates, so the database is preserved unchanged.
 
 Drizzle-kit cannot model a virtual table, so a plugin that wants FTS5 search
 (`plugins/agents.sqlite`'s `agent_events_fts`, `plugins/memory.sqlite`'s `memories_fts`) writes the

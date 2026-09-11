@@ -24,9 +24,9 @@ import { syncPluginContributions } from '../plugins/syncContributions'
 // A plain module rather than two memos inside the dialog, for the reason frames/layouts.ts gives:
 // the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
 // structurally untestable, and the two things here are the ones worth pinning. The tier split is a
-// security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the UI bridge holds,
-// `Declared` is a disclosure the plugin can ignore entirely, and the three lists may never be merged,
-// because a strong claim must not lend credibility to a weaker one sitting beside it. And `decide` is
+// security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the client broker and
+// isolated Node worker hold; `Declared` describes plugin-authored scheduled/check behavior, and the
+// three lists may never be merged. And `decide` is
 // where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
 
 export type TierKey = 'enforced' | 'declared' | 'web'
@@ -59,6 +59,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       key: 'enforced',
       now: [
         ...uiPermissionLines(installed.permissions, request.row.name),
+        ...nodePermissionLines(installed.permissions),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
         // plugin id the host read the manifest under, the same value every other namespace is minted
@@ -74,6 +75,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       was: previous
         ? [
           ...uiPermissionLines(previous.permissions, request.row.name),
+          ...nodePermissionLines(previous.permissions),
           ...keyClaimPermissionLines(previous.keyClaims ?? []),
           ...extensionPermissionLines(previous.extensions ?? []),
           ...harnessPermissionLines(previous.harnesses ?? []),
@@ -86,7 +88,6 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       // hold the cadence and the route confinement, but what runs is the plugin's own node code, and a
       // claim about that can never be stronger than the group it is in.
       now: [
-        ...nodePermissionLines(installed.permissions),
         ...schedulePermissionLines(scheduleGrants(installed.contributions)),
         // Beside the schedules and for the same reason: the host holds the route confinement and the
         // deadline, but what runs on archive is the plugin's own node code.
@@ -94,7 +95,6 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       ],
       was: previous
         ? [
-          ...nodePermissionLines(previous.permissions),
           ...schedulePermissionLines(previous.schedules ?? []),
           ...taskCheckPermissionLines(previous.taskChecks ?? []),
         ]

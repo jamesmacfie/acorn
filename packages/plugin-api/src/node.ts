@@ -58,9 +58,9 @@ export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 export { portableCarrier } from '@acorn/node-core/server/pluginHost/portable.ts'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
-// `Env`, core's runtime bindings, is not here. A plugin reads its env off `ctx`. Where it needs a
-// store, it states the methods it calls (plugins/github/src/server/routes/prMirror.ts §
-// PatchBlobStore).
+// `Env`, core's runtime bindings, is not here. A loaded plugin may inherit only environment names
+// declared in its manifest; host bindings never enter its RPC context. Where it needs a store, it
+// states the methods it calls (plugins/github/src/server/routes/prMirror.ts § PatchBlobStore).
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The objects arrive on `ctx.telemetry`, `ctx.log` and `ctx.core.telemetry`; the types are here

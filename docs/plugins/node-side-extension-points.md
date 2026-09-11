@@ -253,8 +253,9 @@ about it.
 
 The reference implementation is `plugins/nodes-file`, which reads Nodes out of a JSON file named by
 `ACORN_NODES_FILE`. It is not a toy: it is the seam's only consumer until a cloud plugin exists, it is
-what the tests run against, and it is deliberately a loaded plugin whose manifest grants it nothing at
-all. Build it into a data root with `pnpm --filter @acorn/node build:plugin nodes-file`; it is not in
+what the tests run against, and it is deliberately a loaded plugin whose only resource grant is
+read-write access to the file named by that variable. Build it into a data root with
+`pnpm --filter @acorn/node build:plugin nodes-file`; it is not in
 the bundled roster, so a shipped install has no node providers and Settings → Nodes draws no
 provider section.
 
@@ -267,7 +268,7 @@ nobody outside exercises is one nobody notices breaking.
 
 The way to check it is to diff what the plugin imports and what its manifest grants against what
 `create-acorn-plugin` scaffolds. `plugins/nodes-file` is the standing worked example — one
-registration, `core: []`, `secrets: false`, `exec: false`, `net: []`.
+registration, no core, secret, process, or network grants, and one environment-configured file grant.
 
 ## Replacing a core surface
 

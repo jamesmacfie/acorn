@@ -12,13 +12,13 @@ import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { confineExistingFile, resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
 import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
+import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { createLogger } from '../telemetry/logger'
 
@@ -119,18 +119,6 @@ export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlu
 // Owned by the installer, which is the only thing that writes there; re-exported under the name the
 // loader has always used.
 export { pluginInstallRoot as pluginInstallDir } from './installer'
-
-// Structural, not `instanceof`: the bundle was compiled separately, so its classes are its own even
-// though it shares this realm, and an identity check would reject a perfectly good plugin.
-function asNodePlugin(mod: unknown): NodePlugin | null {
-  const candidate = (mod as { default?: unknown } | null)?.default
-  if (!candidate || typeof candidate !== 'object') return null
-  const shape = candidate as Partial<NodePlugin>
-  if (typeof shape.name !== 'string' || typeof shape.init !== 'function') return null
-  if (shape.ready !== undefined && typeof shape.ready !== 'function') return null
-  if (shape.dispose !== undefined && typeof shape.dispose !== 'function') return null
-  return candidate as NodePlugin
-}
 
 // Identity plus content, so a file that was replaced between two scans is re-read and one that was
 // not is not. Phase 5 made `scanInstalled` a per-request call from the roster route, and sha256 over
@@ -276,9 +264,6 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
   return { installed, failures: stamped(failures) }
 }
 
-// Bumped per re-import so two reloads inside one millisecond still get distinct URLs.
-let importGeneration = 0
-
 // ── Declared dependencies ─────────────────────────────────────────────────────────────────────────
 //
 // `requires.plugins` in the manifest (@acorn/protocol/plugin/contract.ts). Two things come out of it, and
@@ -326,7 +311,10 @@ function resolveRequires(
 
 function dropPlugin(loaded: LoadedPlugin[], installed: InstalledPlugin[], id: string): void {
   const loadedAt = loaded.findIndex((entry) => entry.manifest.id === id)
-  if (loadedAt >= 0) loaded.splice(loadedAt, 1)
+  if (loadedAt >= 0) {
+    disposeUnstartedPlugin(loaded[loadedAt].plugin)
+    loaded.splice(loadedAt, 1)
+  }
   const installedAt = installed.findIndex((entry) => entry.manifest.id === id)
   if (installedAt >= 0) installed.splice(installedAt, 1)
 }
@@ -362,13 +350,11 @@ export async function loadExternalPlugins(
   dataRoot: string,
   options: {
     builtins: readonly string[]
-    /** Plugin ids whose entry module must be evaluated again rather than served from Node's module
-     * cache (server/plugins/reload.ts). Empty at boot, one id on a reload
-     * (docs/plugins.md § The dev loop, "Only the entry module is re-evaluated"). */
+    /** Retained for callers from the pre-isolation loader. Every isolated realm has a fresh module
+     * cache, so a load now re-evaluates the package's complete dependency graph. */
     reimport?: readonly string[]
   },
 ): Promise<PluginLoadResult> {
-  const reimport = new Set(options.reimport ?? [])
   // Boot is the one moment nothing is mid-install, so it is where an interrupted one gets cleaned up.
   sweepDebris(dataRoot)
 
@@ -437,29 +423,20 @@ export async function loadExternalPlugins(
       continue
     }
 
-    let mod: unknown
+    let plugin: NodePlugin
     try {
-      // pathToFileURL, never the bare path: `import('C:\\...')` is not a valid specifier on Windows.
-      const url = pathToFileURL(entrypoint)
-      // Node caches an ES module permanently by resolved URL (docs/plugins.md § The dev loop, "Only
-      // the entry module is re-evaluated"). See the `reimport` option above for what this does and
-      // does not invalidate.
-      if (reimport.has(manifest.id)) url.searchParams.set('load', `${Date.now()}-${(importGeneration += 1)}`)
-      mod = await import(url.href)
+      plugin = await isolateNodePlugin({
+        entrypoint,
+        pluginDir: dir,
+        plugin: manifest.id,
+        dataRoot,
+        migrationsFolder,
+        permissions: manifest.permissions.node,
+      })
     } catch (error) {
-      failures.push({ id: manifest.id, dir, reason: `could not import ${manifest.node}: ${String(error)}` })
-      continue
-    }
-
-    const plugin = asNodePlugin(mod)
-    if (!plugin) {
-      failures.push({ id: manifest.id, dir, reason: 'node entrypoint must default-export { name, init, ready?, dispose? } from an ESM bundle' })
-      continue
-    }
-    // The host binds every namespace from the manifest id. A mismatch means the package is
-    // internally inconsistent, and picking a winner silently is how squatting starts.
-    if (plugin.name !== manifest.id) {
-      failures.push({ id: manifest.id, dir, reason: `bundle declares name '${plugin.name}' but the manifest id is '${manifest.id}'` })
+      const code = error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
+      const resource = error instanceof Error && 'resource' in error ? ` (${String((error as Error & { resource?: unknown }).resource)})` : ''
+      failures.push({ id: manifest.id, dir, reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}` })
       continue
     }
 

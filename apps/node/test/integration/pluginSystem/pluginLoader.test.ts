@@ -202,7 +202,10 @@ describe('loading rollbar from disk', () => {
       // import is broken rather than client-only, so its UI is not distributed either.
       expect(installed).toEqual([])
       expect(failures).toHaveLength(1)
-      expect(failures[0]).toMatchObject({ id: 'rollbar', reason: expect.stringContaining(`could not import ${manifest.node}`) })
+      expect(failures[0]).toMatchObject({
+        id: 'rollbar',
+        reason: expect.stringContaining(`could not import isolated node entrypoint ${manifest.node}`),
+      })
 
       // And the whole point: what the owner is told. The route is parse, call, respond over this
       // (docs/plugins.md § Loaded plugins covers why a load failure used to read as a permanently

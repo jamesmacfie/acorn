@@ -40,6 +40,7 @@ export default defineConfig({
         service: resolve(__dirname, 'src/entries/service.ts'),
         mcp: resolve(__dirname, 'src/entries/mcp.ts'),
         standalone: resolve(__dirname, 'src/entries/standalone.ts'),
+        'plugin-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/nodePluginWorker.ts'),
       },
       // node: builtins are listed explicitly as well as caught by the predicate, so a bare
       // `import 'path'` with no node: prefix can never be bundled either.
