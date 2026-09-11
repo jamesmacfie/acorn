@@ -23,8 +23,8 @@ than one model call is allowed to take, so a caller that knows its route is slow
 on the request and the broker uses that instead. It is the exception: the default is what everything
 else runs on, and a route that needs more than half a minute usually wants an event rather than a
 longer wait. Workflow generation is the only route that asks, at 150 seconds for two model calls
-([workflows.md](./workflows.md) § Generating one from a description). A renderer served by the node
-itself, under `dev:node`, never goes through the broker and has no such cap.
+([workflows.md](./workflows.md) § Generating one from a description). A direct HTTP caller does not pass through the broker. `pnpm dev:node` starts the API service only;
+it serves no renderer assets.
 
 All responses carry `X-Request-Id`. Errors use:
 
@@ -92,13 +92,11 @@ it cannot say why, and reports "this is not an acorn node" about something that 
 `strictObject` until 2026-08-15, so the first field any future node added would have broken every
 older client in exactly that way.
 
-The rules are this blunt this early because the client and node ship together, so any wire change is
-safe and none of this costs anything. Once a node is a download (`docs/future/bundle.md`), old nodes
-exist forever and that freedom is gone. There is deliberately no response-schema validation, no
-OpenAPI, and no codegen. For more information, see wire validation in
-[the architecture overview](./architecture-overview.md). There is no protocol export snapshot either.
-The plugin API has one because its authors are outside the repo, and the protocol's consumers are all
-inside it until standalone nodes ship.
+Standalone Nodes can upgrade independently of their clients. Keep wire changes additive within a
+protocol major and test compatibility at the probe and reconnect boundaries. The protocol has no
+export snapshot, OpenAPI document, or generated client. Route modules and protocol types own the
+request and response shapes. For more information, see
+[Node distribution](./node-distribution.md).
 
 The plugin bridge takes the same posture for the same reason. Frame-SDK verbs ship inside plugin
 bundles while the broker ships in the shell, so within a `PLUGIN_API_MAJOR` bridge verbs are additive
@@ -217,7 +215,7 @@ Integration administration is restricted to device and Node service principals. 
 write-only.
 
 `POST /v2/core/telemetry` is device-only, and it is the one door into the node's collector for a
-runtime that is not the node: the renderer today, the terminal client and the desktop helper next
+runtime outside the node, including the desktop renderer, terminal client, desktop helper, and Rust shell
 ([telemetry.md](./telemetry.md) § Other runtimes). The body is `{ runtime, records }`, capped at one
 mebibyte and refused whole if any record is malformed. `runtime` names the sender and cannot say
 `node`, because the collector stamps that on its own records and a batch that could claim it would

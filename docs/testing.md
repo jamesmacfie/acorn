@@ -311,7 +311,7 @@ see, not the code to read:
     with sensible spacing, overflow, and empty state.
 14. Force a render throw in a plugin's `coreSlot` replacement; the surface falls back to core's own
     implementation rather than going blank.
-15. Select a plugin-contributed theme; the terminal and Monaco pick up the right light or dark
+15. Select a plugin-contributed theme; the terminal and CodeMirror pick up the right light or dark
     self-description. Disable the plugin; the fallback to Light or Dark happens without the stored
     preference being rewritten.
 16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
@@ -621,7 +621,7 @@ and no API key at all. Run them with the keys disconnected first.
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
-`solarized-light` and `catppuccin-latte` tell xterm and Monaco they are dark while rendering light.
+`solarized-light` and `catppuccin-latte` tell xterm and CodeMirror they are dark while rendering light.
 The fix is two lines and changes shipped visual behaviour for users of those two themes; it belongs
 in its own change with its own note.
 

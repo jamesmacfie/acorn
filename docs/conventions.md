@@ -1,15 +1,10 @@
 # Conventions: how things are named, stated once
 
-This is the naming rulebook for the repo. It exists so a reader can guess where a file lives and what
-it holds without opening it, and so a reviewer has something to point at instead of a preference.
+Use these conventions to place and name files. Architecture tests enforce the rules listed in
+[What a test enforces](#what-a-test-enforces). Exceptions below identify remaining migration work.
 
-Most of these rules already hold everywhere. Where the tree does not match, the rule is still the
-rule and a **Not yet everywhere** line names the exception. The reorganisation that produced this
-file closed most of them on 2026-08-30; what is left below is what it did not reach. Clear one and
-delete its line.
-
-A few of these rules are held by a test rather than by review. [What a test enforces](#what-a-test-enforces)
-at the end says which, and why the rest are not worth automating.
+Documentation uses topic subfolders for long references. Keep a landing page at a referenced path,
+link to the owning topic, and add each page to [Documentation](./README.md).
 
 ## Files
 

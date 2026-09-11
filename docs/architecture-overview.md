@@ -1,14 +1,22 @@
 # Architecture overview
 
-acorn is a client for one or more local Node services. The client owns presentation and
-fleet membership. A Node owns the data and execution environment for the projects assigned to
-it. There is no shared database or cross-Node transaction.
+acorn has desktop and terminal clients that connect to a fleet of local or remote Node services.
+Each Node owns its data and execution environment. Clients own presentation and fleet membership.
+Nodes do not share a database or participate in cross-Node transactions.
 
-There are two clients over the same Node API, and a third is designed rather than built. The desktop
-app is the one this file spends most of its length on. `acorn` is the terminal client, which boots the
-same `@acorn/client-core` under Node and draws the same panes in cells
-([tui.md](./tui.md)); it collapses the renderer and the helper into one process and is otherwise the
-same graph. A browser client is [future/remote.md](./future/remote.md)'s.
+The core owns runtime lifecycle, authentication, transport, storage access, and plugin registration.
+Plugins provide product functionality through declared contributions. They listen to events and call
+capabilities through the plugin API rather than importing core implementations.
+
+The desktop renderer and terminal client share `@acorn/client-core`, layouts, and UI component contracts.
+Use the shared kit to support both hosts from one UI implementation. Desktop-only frames, webviews,
+and platform operations need a host requirement or a terminal fallback. Sharing the kit does not make
+those operations portable.
+
+The desktop keeps its renderer, Rust shell, and Node helper in separate processes. The terminal client
+combines presentation and custody in one process while preserving their module boundaries.
+For the terminal runtime, see [Terminal client](./tui.md). The browser client remains a
+[design proposal](./future/remote.md).
 
 ## Runtime topology
 

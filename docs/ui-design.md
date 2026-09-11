@@ -207,7 +207,7 @@ show a dark-mode user a white flash on boot.
 
 Some tokens are read from JavaScript instead of CSS, because a canvas cannot read a stylesheet.
 `--bg`, `--bg-subtle`, `--bg-hover`, `--bg-selected`, `--text`, `--text-muted`, and `--text-faint` are
-read with `getComputedStyle` by the xterm and Monaco bridges; `--term-fs` is read the same way by
+read with `getComputedStyle` by the xterm and CodeMirror bridges; `--term-fs` is read the same way by
 `TerminalSurface`, because xterm measures its cell width from the font. These are `BRIDGE_TOKENS` in
 `kit/tokens/tokenAxes.ts`, and the test asserts they exist, because renaming one breaks the terminal or the
 editor with no type error anywhere. `--font-mono` cannot be repointed by a style pack for the same
@@ -1014,7 +1014,7 @@ moved. This is what the kit holds for it:
 - **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`
   the same way.
 - **The tree protocol names nothing about the DOM.** The same mutations apply to a retained tree of
-  any kind ([docs/plugins.md § The tree contract](./plugins.md#the-tree-contract)).
+  any kind ([docs/plugins.md § The tree contract](plugins/descriptors.md#the-tree-contract)).
 - **Rectangles are the only DOM-only thing**, and `kind="pty"` and `kind="editor"` are native there.
   A `pty` rectangle is filled through `attachPty`, which takes the channel rather than handing back a
   box: an xterm on the DOM, `@xterm/headless` in cells, one source in the plugin
