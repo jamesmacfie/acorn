@@ -13,20 +13,23 @@ export function parseRollbarRailItemId(value: string): RollbarRailTarget | null 
   return parts && { integrationId: parts[0], identifier: parts[1] }
 }
 
+type RollbarSeverity = Pick<PluginRailItem, 'icon' | 'severity'>
+
+const rollbarSeverity = (level: string): RollbarSeverity => {
+  if (level === 'error' || level === 'critical') return { icon: 'circle-x', severity: 'danger' }
+  if (level === 'warning' || level === 'warn') return { icon: 'triangle-alert', severity: 'warn' }
+  return { icon: 'info', severity: 'info' }
+}
+
 export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
-  // Positional, and never filtered: see linear/shared/rail.ts. The host lays these out as columns,
-  // and an empty cell is what keeps the Nth fact under the Nth fact of every other row.
-  const facts = [
-    `#${item.identifier}`,
-    item.level,
-    item.environment,
-    item.integrationLabel,
-  ]
   return {
     id: rollbarRailItemId(item),
     title: item.title,
-    fields: facts,
-    badge: `${item.totalOccurrences} occurrence${item.totalOccurrences === 1 ? '' : 's'}`,
+    // One reserved track keeps short and long Rollbar ids aligned; the flexible title gets the rest.
+    fields: [`#${item.identifier}`],
+    fieldsFirst: true,
+    ...rollbarSeverity(item.level),
+    badge: String(item.totalOccurrences),
     task: {
       origin: 'rollbar',
       title: item.title.slice(0, 120),

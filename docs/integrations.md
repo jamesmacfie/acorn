@@ -198,6 +198,11 @@ involved; the task pane is the linked-items view. Payloads are normalized throug
 allowlist before persistence or rendering. List, detail, occurrence history, and occurrence detail
 have independent freshness.
 
+The source row spends its narrow width on severity, identity, frequency and the error itself: a
+semantic error/warning/info icon, one fixed-width `#id` field, the numeric occurrence badge, and an
+ellipsised title. Environment and connection remain in the item detail and promotion seed; repeating
+them in every source row crowds out the error name.
+
 A Rollbar credential is a project access token, so a connection is one project. Its project source
 therefore makes no outbound call: it returns the single project recorded on the connection when the
 token was validated. It is declared rather than omitted because Rollbar's rail scopes on the

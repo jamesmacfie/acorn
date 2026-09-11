@@ -297,6 +297,13 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-row-field { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ui-row-trailing { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); }
+/* A source may put fixed-width facts before its flexible, ellipsised title without changing the DOM's
+   title-first reading order. Leading and trailing content stay pinned to their usual edges. */
+.ui-row[data-meta-first] { --row-field-w: calc(var(--space-11) + var(--space-10)); }
+.ui-row[data-meta-first] .ui-row-leading { order: 1; }
+.ui-row[data-meta-first] .ui-row-meta { order: 2; }
+.ui-row[data-meta-first] .ui-row-body { order: 3; }
+.ui-row[data-meta-first] .ui-row-trailing { order: 4; }
 
 /* ── Modal ──────────────────────────────────────────────────────────────────────────────────
    .overlay / .overlay-backdrop / .overlay-title / .overlay-body stay in overlays.css. Modal

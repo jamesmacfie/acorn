@@ -11,7 +11,7 @@ import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from '@ac
 import { runChromeAction } from '@acorn/client-core/host/chrome/actions.ts'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
 import type { SourcePanel } from '@acorn/client-core/host/chrome/sourcePanel.ts'
-import { Alert, Badge, EmptyState, Row, Rows } from '../kit/showing'
+import { Alert, Badge, EmptyState, Icon, Row, Rows } from '../kit/showing'
 import { Input } from '../kit/asking'
 import { Line } from '../kit/cells'
 import { bindKeys } from '../keys/install'
@@ -43,6 +43,9 @@ import { STOP } from '../keys/tiers'
  *  cells they are joined, because a column of aligned tracks in twenty-two cells is one fact wide. */
 const secondary = (item: PluginRailItem): string =>
   (item.fields?.length ? item.fields.join(' · ') : item.subtitle ?? '')
+
+const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
+  severity === 'info' ? 'accent' : severity
 
 function SourceList(props: { pluginId: string; descriptor: PluginSourceDescriptor }) {
   const params = useParams<{ projectId: string }>()
@@ -172,6 +175,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
                 // The DOM reserves a track per field and lines the Nth up down the list; twenty-two
                 // cells has room for one fact, so they are joined above and given their own line here.
                 variant={secondary(entry.item) ? 'stacked' : 'default'}
+                leading={<Show when={entry.item.icon}>{(name) => <Icon name={name()} tone={iconTone(entry.item.severity)} />}</Show>}
                 meta={<Show when={secondary(entry.item)}>{(text) => <Line role="muted">{text()}</Line>}</Show>}
                 trailing={<Show when={entry.item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
               >
