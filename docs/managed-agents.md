@@ -414,15 +414,20 @@ it fails for any reason a selection can break, not only for the one it was writt
   so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
-- A question stays in the transcript after it is answered. The card above the stream is the one that
-  takes the answer, and it leaves with the question; the thread keeps a card of its own showing what
-  was asked, what the reader said, and, folded beneath, the options they passed over, which nothing
-  else records. It draws from the request row rather than from its own event, because the answer and
-  whether one is still coming both live on the row and keep changing after the event is written. A
-  permission is deliberately not kept: it is a decision about one tool call, that call already has a
-  card, and a busy session would bury itself under them. An answer to a question the harness marked
-  secret reads as "Answer hidden", since the transcript is durable and searchable in a way the card
-  above the stream was not.
+- Anything the agent is blocked on is drawn in the transcript at the point it asked, and that one card
+  has two states. While it is blocking, it is the control that answers it: a dropdown, a column of
+  checkboxes for a question that takes several answers, a free-text box, or a row of buttons for a
+  permission. The reader answers where they are already reading, and the thread keeps the interruption
+  in the order it happened. Once it is answered the same seat holds the record: what was asked, what
+  was said, and, folded beneath, the options they passed over, which nothing else records.
+- What happens after the answer differs by kind. A question stays. A permission goes, because it is a
+  decision about one tool call, that call already has a card of its own, and a busy session would bury
+  itself under them. Both draw from the request row rather than from their own event, because whether
+  anybody has answered yet and what they said both live on the row and keep changing long after the
+  event is written. An answer to a question the harness marked secret reads as "Answer hidden", since
+  the thread is durable and searchable in a way a prompt answered and gone was not.
+- The task sidebar keeps its own "Needs you" list, which is the way to reach a blocked session the
+  reader is not looking at. Picking a row opens that session and brings its card into view.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
   did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
   while the subagent is working and collapsed if it had already settled when the card was first drawn,
