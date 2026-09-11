@@ -96,8 +96,9 @@ describe('connect', () => {
     // host draws a placeholder instead of a blank rectangle.
     host(() => undefined)
     await handshake()
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(sent).toEqual([{ kind: 'connected' }])
+    // MessagePort delivery is asynchronous and can miss a single event-loop turn under the full
+    // suite's process load. Wait for the contract rather than treating one zero-delay timer as it.
+    await vi.waitFor(() => expect(sent).toEqual([{ kind: 'connected' }]))
   })
 })
 

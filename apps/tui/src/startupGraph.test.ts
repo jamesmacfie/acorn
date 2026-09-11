@@ -70,7 +70,7 @@ describe('check-startup-graph', () => {
     chunk('big-bbbb.js', 'x'.repeat(1_500_000))
     const { code, output } = run(dist)
     expect(code).toBe(1)
-    expect(output).toContain('over its 995000B ceiling')
+    expect(output).toContain('over its 1130000B ceiling')
   })
 
   it('refuses to guess when there is no single App chunk to walk from', () => {

@@ -151,7 +151,15 @@ describe('the permission facets are the ones scopeCore honours', () => {
   })
 
   it('names the permissions.node blocks the schema declares', () => {
-    expect(pluginAuthoringVocabulary().permissions.node).toEqual(['core', 'capabilities', 'secrets', 'exec', 'net'])
+    expect(pluginAuthoringVocabulary().permissions.node).toEqual([
+      'core',
+      'capabilities',
+      'secrets',
+      'exec',
+      'net',
+      'env',
+      'files',
+    ])
   })
 })
 

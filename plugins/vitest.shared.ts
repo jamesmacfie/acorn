@@ -20,6 +20,7 @@
 // `vite-plugin-solid` and `jsdom` are root devDependencies rather than each plugin's, because this
 // file belongs to no package: resolution walks up from `plugins/` and finds one copy for all of them.
 import solid from 'vite-plugin-solid'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 // Plugin suites spawn real agent processes, PTYs, git and HTTP listeners, and `turbo run test` starts
@@ -55,6 +56,11 @@ export default defineConfig({
           name: 'hosts',
           environment: 'jsdom',
           include: ['src/**/*.test.tsx'],
+          // Node 24 exposes a flagged `localStorage` global as `undefined`. That property wins over
+          // jsdom's browser storage unless the host project installs the browser value explicitly.
+          // Use one setup file for every plugin UI suite instead of teaching each feature test about
+          // the Node runtime that happens to launch Vitest.
+          setupFiles: [fileURLToPath(new URL('../vitest.browser.setup.ts', import.meta.url))],
           // `@solidjs/router` ships `.jsx` source and no build. Externalized, Node is handed a file
           // extension it has no loader for; inlined, vite-plugin-solid compiles it like any other
           // source in the graph. A plugin panel reaches it through the host chrome it draws inside, so
