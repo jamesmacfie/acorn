@@ -1,22 +1,23 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentNormalizedEvent, AgentPlanEntry, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, saveFile, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Icon, Inline, Menu, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, Inline, Menu, Row, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
 import { selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
+import { askedQuestions, askWasAbandoned } from './requestAnswers'
 
-// One event of a session, as a card in the transcript's `Timeline`. Eleven kinds, and the tool call
-// is the twelfth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
+// One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
+// is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
 
 // Both of these build their whole string in one call, so the card can read the event through a getter
 // rather than freezing a copy of it. See the note on Show's children below.
@@ -83,6 +84,8 @@ export default function AgentEventCard(props: {
   /** The session's own model, which a subagent card shows when the harness never named the child's. */
   sessionModel?: string
   turn?: AgentTurn
+  /** The live row behind a `request` event: what it was answered with, and whether it still can be. */
+  request?: AgentRequest
 }) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
@@ -287,6 +290,55 @@ export default function AgentEventCard(props: {
             >
               {artifact().title}
             </Row>
+          )
+        }}
+      </Show>
+      {/*
+        A question the agent asked, after it was answered. The card above the stream is the one that
+        takes the answer and it leaves with the question; this is what the thread keeps, and the fold is
+        the part nothing else records: what the reader could have said and did not.
+      */}
+      <Show when={event().type === 'request'}>
+        {(_shown) => {
+          const asked = () => event() as Extract<ReturnType<typeof event>, { type: 'request' }>
+          const waiting = () => !askWasAbandoned(props.request)
+            && props.request?.status !== 'resolved'
+          return (
+            <Card pad="sm">
+              <Stack gap="row">
+                <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
+                <For each={askedQuestions(asked(), props.request)}>
+                  {(entry) => (
+                    <Stack gap="row">
+                      <Show when={entry.prompt !== asked().title}>
+                        <Text emphasis="muted" wrap>{entry.prompt}</Text>
+                      </Show>
+                      <Show
+                        when={entry.chosen.length}
+                        fallback={
+                          <Text emphasis="muted">{waiting() ? 'Waiting for an answer' : 'No answer'}</Text>
+                        }
+                      >
+                        <Text wrap>{entry.chosen.join(', ')}</Text>
+                      </Show>
+                      <Show when={entry.alternatives.length}>
+                        <Fold label="Options not chosen" level="sub">
+                          <Stack gap="row">
+                            <For each={entry.alternatives}>
+                              {(option) => (
+                                <Text emphasis="muted" wrap>
+                                  {option.description ? `${option.label} · ${option.description}` : option.label}
+                                </Text>
+                              )}
+                            </For>
+                          </Stack>
+                        </Fold>
+                      </Show>
+                    </Stack>
+                  )}
+                </For>
+              </Stack>
+            </Card>
           )
         }}
       </Show>

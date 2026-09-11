@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { AcpDriver } from './acpDriver'
+import type { AgentDriverStartOptions } from './types'
+import { AcpDriver, clientFor, type PendingRequest } from './acpDriver'
 import { harnessCapabilities } from './harness'
 
 const sessionWithRef = (providerSessionRef: string): AgentSession => ({
@@ -133,5 +134,92 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     // The baseline is what the protocol defines and the shared normalizer maps, so it holds for every
     // ACP harness whether or not that harness declares anything.
     expect(harnessCapabilities(undefined)).toContain('permissions')
+  })
+})
+
+// The parked-request path, driven without a child process. `clientFor` is everything the agent calls
+// back into, and both kinds of question park in the same map and leave it by different doors.
+describe('the generic ACP driver parks a question until somebody answers it', () => {
+  const elicitation = {
+    mode: 'form' as const,
+    sessionId: 'acp-session',
+    message: 'Which one?',
+    requestedSchema: {
+      type: 'object' as const,
+      properties: { pick: { type: 'string', enum: ['first', 'second'] } },
+    },
+  }
+
+  const parked = () => {
+    const events: AgentNormalizedEvent[] = []
+    const pending = new Map<string, PendingRequest>()
+    const options = { onEvent: async (event: AgentNormalizedEvent) => { events.push(event) } }
+    return { events, pending, client: clientFor(options as AgentDriverStartOptions, 'Stub', pending, () => false) }
+  }
+
+  it('asks the session, then answers the agent with the value behind the label', async () => {
+    const { events, pending, client } = parked()
+    const response = client.unstable_createElicitation!(elicitation)
+    const [requestId] = [...pending.keys()]
+    pending.get(requestId)!.resolve({ answers: { pick: 'second' } })
+    expect(await response).toEqual({ action: 'accept', content: { pick: 'second' } })
+    expect(events[0]).toMatchObject({ type: 'request', kind: 'question', requestId, title: 'Which one?' })
+  })
+
+  it('cancels a question the turn left behind rather than answering it empty', async () => {
+    const { pending, client } = parked()
+    const response = client.unstable_createElicitation!(elicitation)
+    for (const request of pending.values()) request.drain()
+    expect(await response).toEqual({ action: 'cancel' })
+  })
+
+  it('still answers a permission in the permission protocol', async () => {
+    const { pending, client } = parked()
+    const response = client.requestPermission({
+      sessionId: 'acp-session',
+      toolCall: { toolCallId: 'tool-1', title: 'Run the tests' },
+      options: [{ optionId: 'allow', name: 'Allow once', kind: 'allow_once' }],
+    })
+    const [requestId] = [...pending.keys()]
+    pending.get(requestId)!.resolve({ optionId: 'allow' })
+    expect(await response).toEqual({ outcome: { outcome: 'selected', optionId: 'allow' } })
+  })
+})
+
+// The failure this prevents is a session nobody can use: the ACP request is never answered, so the
+// agent's own promise never settles, and the durable row sits in "Needs you" with nothing behind it.
+describe('a question the agent stopped waiting for is released with the turn', () => {
+  it('answers it and tells the session, rather than leaving it parked', async () => {
+    const events: AgentNormalizedEvent[] = []
+    const handle = await new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: {
+        entry: () => fileURLToPath(new URL('./__fixtures__/inquisitiveAcpAgent.mjs', import.meta.url)),
+      },
+    }).start({
+      session: sessionWithRef(''),
+      cwd: process.cwd(),
+      env: {},
+      noProviderExecutionHistory: false,
+      onEvent: (event) => { events.push(event) },
+      onClosed: () => {},
+    })
+
+    try {
+      await handle.sendTurn({ turn: {} as never, input: [{ type: 'text', text: 'go' }], attachments: {} })
+      const asked = events.filter((event) => event.type === 'request')
+      expect(asked).toHaveLength(1)
+      expect(events).toContainEqual({
+        type: 'request_resolved',
+        requestId: asked[0].type === 'request' ? asked[0].requestId : '',
+        resolution: { cancelled: true },
+      })
+      // And the session can take another turn.
+      expect(handle.ready).toBe(true)
+    } finally {
+      await handle.stop()
+    }
   })
 })

@@ -7,6 +7,7 @@ import {
   type Agent,
   type Client,
   type ContentBlock,
+  type CreateElicitationResponse,
   type RequestPermissionResponse,
   type SessionConfigOption,
 } from '@agentclientprotocol/sdk'
@@ -15,9 +16,15 @@ import { Readable, Writable } from 'node:stream'
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
-import type { AgentInputPart, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
-import { normalizeAcpConfig, normalizeAcpPermission, normalizeAcpUpdate } from './acpNormalizer'
+import {
+  acpElicitationResponse,
+  normalizeAcpConfig,
+  normalizeAcpElicitation,
+  normalizeAcpPermission,
+  normalizeAcpUpdate,
+} from './acpNormalizer'
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { providerStderrNotice } from './diagnostics'
@@ -31,8 +38,16 @@ const DRIVER_VERSION = 'acp-1'
 // the session reference is dead, which is the one load failure worth recovering from.
 const ACP_RESOURCE_NOT_FOUND = -32002
 
-type PendingPermission = {
-  resolve(response: RequestPermissionResponse): void
+// One parked question, whatever kind it was. Each entry carries its own way back to its own corner of
+// the protocol, so the resolve path below does not have to know a permission from a form.
+export type PendingRequest = {
+  resolve(resolution: unknown): void
+  drain(): void
+}
+
+const drain = (pending: Map<string, PendingRequest>): void => {
+  for (const request of pending.values()) request.drain()
+  pending.clear()
 }
 
 type Launch = {
@@ -80,17 +95,62 @@ function acpPrompt(
   })
 }
 
-function clientFor(
+// Parked before the session hears about it, deliberately: announcing runs as far as SQLite and the
+// websocket, and a reader who answered inside that window would find an empty map. If the announcement
+// fails the entry has to go, or it is a question nobody can ever answer.
+const announce = async (
+  pending: Map<string, PendingRequest>,
+  requestId: string,
+  options: AgentDriverStartOptions,
+  event: AgentNormalizedEvent,
+): Promise<void> => {
+  try {
+    await options.onEvent(event)
+  } catch (error) {
+    pending.delete(requestId)
+    throw error
+  }
+}
+
+// Exported for its own test: everything here is a pure function of `options` and `pending`, and driving
+// it directly is how the parked-request path is covered without spawning a child.
+export function clientFor(
   options: AgentDriverStartOptions,
   label: string,
-  pending: Map<string, PendingPermission>,
+  pending: Map<string, PendingRequest>,
   replaying: () => boolean,
 ): Client {
   return {
     async requestPermission(params) {
       const requestId = randomUUID()
-      const response = new Promise<RequestPermissionResponse>((resolve) => pending.set(requestId, { resolve }))
-      await options.onEvent(normalizeAcpPermission(requestId, params))
+      const response = new Promise<RequestPermissionResponse>((resolve) => pending.set(requestId, {
+        resolve: (resolution) => {
+          const row = typeof resolution === 'object' && resolution != null ? resolution as Record<string, unknown> : {}
+          const optionId = typeof row.optionId === 'string' ? row.optionId : null
+          resolve(optionId ? { outcome: { outcome: 'selected', optionId } } : { outcome: { outcome: 'cancelled' } })
+        },
+        drain: () => resolve({ outcome: { outcome: 'cancelled' } }),
+      }))
+      await announce(pending, requestId, options, normalizeAcpPermission(requestId, params))
+      return response
+    },
+    // Claude Code's AskUserQuestion and any MCP server's own form both arrive here. A url-mode
+    // elicitation cannot: we advertise `form` alone, and an agent honours what the client declared.
+    async unstable_createElicitation(params) {
+      // A form is the only mode acorn advertises, and a form with no fields has no card. Both are
+      // declined here rather than parked, because a parked request nobody can answer is a "Needs you"
+      // that never goes away.
+      if (params.mode !== 'form') return { action: 'decline' }
+      const event = normalizeAcpElicitation(randomUUID(), params)
+      if (event.type !== 'request' || !event.questions?.length) return { action: 'decline' }
+      const requestId = event.requestId
+      const response = new Promise<CreateElicitationResponse>((resolve) => pending.set(requestId, {
+        resolve: (resolution) => resolve(acpElicitationResponse(params, resolution)),
+        // Not `decline`. The turn is over, so the tool call that asked should end with it rather than
+        // run on with an empty answer.
+        drain: () => resolve({ action: 'cancel' }),
+      }))
+      await announce(pending, requestId, options, event)
       return response
     },
     async sessionUpdate(params) {
@@ -206,7 +266,7 @@ export class AcpDriver implements AgentDriver {
       code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`),
     ))
 
-    const pending = new Map<string, PendingPermission>()
+    const pending = new Map<string, PendingRequest>()
     let replaying = options.session.providerSessionRef != null
     let agent!: Agent
     const stream = ndJsonStream(
@@ -221,12 +281,17 @@ export class AcpDriver implements AgentDriver {
     const initialized = await agent.initialize({
       protocolVersion: 1,
       clientInfo: { name: 'acorn', version: '0.1.0' },
-      // acorn declines everything ACP offers the client side. See docs/managed-agents.md § Harnesses
-      // for what each one buys and why it is parked.
+      // acorn declines every client capability but one. See docs/managed-agents.md § Harnesses for
+      // what each buys and why it is parked.
+      //
+      // Form elicitation is the exception, and declaring it is what lets an agent ask a question at
+      // all: Claude Code's adapter disallows its own AskUserQuestion tool outright when this is
+      // absent, and auto-declines anything an MCP server asks. `{}` is how the protocol spells yes.
       clientCapabilities: {
         fs: { readTextFile: false, writeTextFile: false },
         terminal: false,
         session: { configOptions: {} },
+        elicitation: { form: {} },
       },
     })
     const supportsLoad = initialized.agentCapabilities?.loadSession === true && typeof agent.loadSession === 'function'
@@ -290,6 +355,17 @@ export class AcpDriver implements AgentDriver {
         return (await agent.prompt({ sessionId: providerSessionRef, prompt: blocks })).stopReason
       } finally {
         active = false
+        // Whatever is still parked here is dead. No cancellation signal reaches an elicitation handler,
+        // so this is the only place that hears about a question the agent gave up on, and without it
+        // the ACP request is never answered and the durable row sits in "Needs you" for good.
+        for (const [requestId, request] of [...pending]) {
+          request.drain()
+          pending.delete(requestId)
+          // Swallowed: a failed write must not replace the turn's own outcome on the way out.
+          try {
+            await options.onEvent({ type: 'request_resolved', requestId, resolution: { cancelled: true } })
+          } catch { /* the turn's own result is the one worth reporting */ }
+        }
       }
     }
     return {
@@ -329,18 +405,13 @@ export class AcpDriver implements AgentDriver {
       async cancel() {
         if (!providerSessionRef || !active) return
         await agent.cancel({ sessionId: providerSessionRef })
-        for (const request of pending.values()) request.resolve({ outcome: { outcome: 'cancelled' } })
-        pending.clear()
+        drain(pending)
       },
       async resolveRequest(providerRequestId, resolution) {
         const request = pending.get(providerRequestId)
-        if (!request) throw new Error(`The ${label} permission request is no longer pending.`)
+        if (!request) throw new Error(`The ${label} request is no longer pending.`)
         pending.delete(providerRequestId)
-        const row = typeof resolution === 'object' && resolution != null ? resolution as Record<string, unknown> : {}
-        const optionId = typeof row.optionId === 'string' ? row.optionId : null
-        request.resolve(optionId
-          ? { outcome: { outcome: 'selected', optionId } }
-          : { outcome: { outcome: 'cancelled' } })
+        request.resolve(resolution)
       },
       async setConfig(optionId, value) {
         if (!providerSessionRef || !agent.setSessionConfigOption) return
@@ -355,8 +426,7 @@ export class AcpDriver implements AgentDriver {
       },
       async stop() {
         stopped = true
-        for (const request of pending.values()) request.resolve({ outcome: { outcome: 'cancelled' } })
-        pending.clear()
+        drain(pending)
         if (providerSessionRef && agent.closeSession) {
           await Promise.resolve(agent.closeSession({ sessionId: providerSessionRef })).catch(() => undefined)
         }

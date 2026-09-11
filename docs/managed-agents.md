@@ -175,13 +175,33 @@ cost, so its cost stays absent rather than being invented from a price table, an
 reads as an object or an array. A prose answer leaves the structured field empty, which is what a
 caller that asked for a shape should see.
 
-**What ACP offers the client side is declined.** The driver answers no to `fs`, `terminal`, and
-`mcpServers` at `initialize`. Each is worth adopting on its own merits and none of them blocks, or is
-blocked by, harness contributions. `fs` would make the agent ask acorn to read and write files, which
-is one audit point and the precondition for the agent and the worktree living on different machines.
-`terminal` would put agent-run commands through acorn's process lifecycle and into the task's
-terminal surfaces. `mcpServers` would replace per-CLI config-file registration with per-session MCP
-carrying the task-scoped internal token.
+**What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
+answers no to `fs`, `terminal`, and `mcpServers` at `initialize`. Each is worth adopting on its own
+merits and none of them blocks, or is blocked by, harness contributions. `fs` would make the agent ask
+acorn to read and write files, which is one audit point and the precondition for the agent and the
+worktree living on different machines. `terminal` would put agent-run commands through acorn's process
+lifecycle and into the task's terminal surfaces. `mcpServers` would replace per-CLI config-file
+registration with per-session MCP carrying the task-scoped internal token.
+
+**Form elicitation is declared, and it is what lets an agent ask a question at all.** Declining it is
+not neutral: Claude Code's adapter puts its own `AskUserQuestion` tool in `disallowedTools` whenever
+the client did not advertise `elicitation.form`, and auto-declines anything an MCP server asks. So an
+agent that should have asked guessed instead, for as long as the capability was absent. The driver
+declares `form` alone. A url-mode elicitation would hand a person a link to open, which is a different
+surface and a different consent question, so it stays undeclared and never arrives.
+
+One schema property becomes one question (`server/drivers/acpNormalizer.ts`), and nothing in that
+mapping knows a vendor's field names, so any ACP agent's form maps the same way. Claude pairs every
+choice with a free-text box, which lands as its own question titled "Other". An answer travels back as
+the option's own value behind the label a person picked, because the card answers with labels and
+Codex numbers its options positionally. A question is answered in the same card, by the same route,
+and against the same durable row as a permission (§ Client surfaces).
+
+**A question the agent stopped waiting for is released with its turn.** No cancellation signal reaches
+an elicitation handler, so a turn can end with a question still parked: the ACP request would never be
+answered, the agent's own call would never settle, and the durable row would sit in the reader's
+"Needs you" for good. The driver drains whatever is still parked when `session/prompt` returns,
+answering each with `cancel` and recording a `request_resolved`, which is what releases the row.
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
@@ -394,6 +414,15 @@ it fails for any reason a selection can break, not only for the one it was writt
   so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
+- A question stays in the transcript after it is answered. The card above the stream is the one that
+  takes the answer, and it leaves with the question; the thread keeps a card of its own showing what
+  was asked, what the reader said, and, folded beneath, the options they passed over, which nothing
+  else records. It draws from the request row rather than from its own event, because the answer and
+  whether one is still coming both live on the row and keep changing after the event is written. A
+  permission is deliberately not kept: it is a decision about one tool call, that call already has a
+  card, and a busy session would bury itself under them. An answer to a question the harness marked
+  secret reads as "Answer hidden", since the transcript is durable and searchable in a way the card
+  above the stream was not.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
   did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
   while the subagent is working and collapsed if it had already settled when the card was first drawn,
