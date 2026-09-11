@@ -5,56 +5,14 @@
 // session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
-import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
+import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
 export { managedProviderForProfile }
-
-function promptWithResultContract(prompt: string, schema: object | undefined): string {
-  if (!schema) return prompt
-  return [
-    prompt,
-    'Complete the task, then end your final response with exactly one fenced `json` block matching this result schema.',
-    'Do not put commentary inside that JSON block.',
-    JSON.stringify(schema),
-  ].join('\n\n')
-}
-
-function assistantResult(events: AgentEventRecord[]): string | null {
-  let text = ''
-  for (const record of events) {
-    if (record.event.type !== 'assistant_message') continue
-    text = record.event.append ? text + record.event.text : record.event.text
-  }
-  return text.trim() || null
-}
-
-function parseStructuredResult(text: string, schema: object | undefined): unknown | null {
-  if (!schema) return null
-  const candidates = [
-    ...[...text.matchAll(/```json\s*([\s\S]*?)```/gi)].map((match) => match[1]?.trim() ?? ''),
-    text.trim(),
-  ]
-  const firstBrace = text.indexOf('{')
-  const lastBrace = text.lastIndexOf('}')
-  if (firstBrace >= 0 && lastBrace > firstBrace) candidates.push(text.slice(firstBrace, lastBrace + 1))
-  const firstBracket = text.indexOf('[')
-  const lastBracket = text.lastIndexOf(']')
-  if (firstBracket >= 0 && lastBracket > firstBracket) candidates.push(text.slice(firstBracket, lastBracket + 1))
-  for (const candidate of candidates) {
-    if (!candidate) continue
-    try {
-      return JSON.parse(candidate) as unknown
-    } catch {
-      // Try the next bounded representation. The provider stays responsible for satisfying the
-      // advertised schema; acorn rejects output that isn't JSON instead of guessing.
-    }
-  }
-  return null
-}
 
 function turnEvents(snapshot: AgentSessionSnapshot, turnId: string): StreamEvent[] {
   return snapshot.events

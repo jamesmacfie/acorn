@@ -76,7 +76,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
   ): Promise<AgentSession> {
-    if (input.kind !== 'interactive') return this.createSession(input, idempotencyKey)
+    if (input.kind !== 'interactive' && input.kind !== 'delegated') return this.createSession(input, idempotencyKey)
     const reserved = await this.reserveSession(input, idempotencyKey)
     if (reserved.created) void this.startCreatedSession(reserved.session).catch(() => undefined)
     return reserved.session
@@ -135,6 +135,14 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
             message: `Your saved defaults could not be read for this session: ${error instanceof Error ? error.message : 'unknown error'}`,
           })
         })
+      }
+      if (session.kind === 'delegated') {
+        const requested = session.config.requestedConfigOptions
+        if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
+          const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>
+            typeof entry[1] === 'string'))
+          await this.applyRequestedConfig(session.id, values)
+        }
       }
       await this.completeSessionReadiness(session.id)
       return this.store.requireSession(session.id)
@@ -490,8 +498,22 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     options: { remember?: boolean } = {},
   ): Promise<AgentSession> {
     const before = await this.store.requireSession(sessionId)
+    let persistedPatch = patch
     if (patch.config) {
       assertBoundedJson('Agent session configuration', patch.config, MAX_AGENT_CONFIG_BYTES)
+      // toolCeiling is authorization state written when the session is created. The general config
+      // patch route may update provider options, but it may neither add, widen, nor remove that field.
+      const clientConfig = { ...patch.config }
+      delete clientConfig.toolCeiling
+      persistedPatch = {
+        ...patch,
+        config: {
+          ...clientConfig,
+          ...(Object.prototype.hasOwnProperty.call(before.config, 'toolCeiling')
+            ? { toolCeiling: before.config.toolCeiling }
+            : {}),
+        },
+      }
       const previousOptions = Array.isArray(before.config.configOptions)
         ? before.config.configOptions as Array<{ id?: unknown; currentValue?: unknown }>
         : []
@@ -551,7 +573,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       }
       if (patch.archived) await this.stopLive(sessionId)
     }
-    const session = await this.store.patchSession(sessionId, patch)
+    const session = await this.store.patchSession(sessionId, persistedPatch)
     this.emit({ channel: 'agent:session', session })
     return session
   }
@@ -680,10 +702,32 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const initial = await this.store.snapshot(sessionId, afterSeq)
     if (this.conditionMet(initial, until)) return initial
     if (timeoutMs === 0) return initial
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
+    return new Promise((resolve, reject) => {
+      let settled = false
+      const finish = (snapshot: AgentSessionSnapshot) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
         off()
-        void this.store.snapshot(sessionId, afterSeq).then(resolve)
+        resolve(snapshot)
+      }
+      const fail = (error: unknown) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        off()
+        reject(error)
+      }
+      const check = () => {
+        void this.store.snapshot(sessionId, afterSeq).then((snapshot) => {
+          if (this.conditionMet(snapshot, until)) finish(snapshot)
+        }, fail)
+      }
+      const timeout = setTimeout(() => {
+        if (settled) return
+        settled = true
+        off()
+        void this.store.snapshot(sessionId, afterSeq).then(resolve, reject)
       }, timeoutMs)
       const off = this.subscribe((frame) => {
         if (
@@ -693,13 +737,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           || (frame.channel === 'agent:request' && frame.request.sessionId !== sessionId)
           || frame.channel === 'agent:deleted'
         ) return
-        void this.store.snapshot(sessionId, afterSeq).then((snapshot) => {
-          if (!this.conditionMet(snapshot, until)) return
-          clearTimeout(timeout)
-          off()
-          resolve(snapshot)
-        })
+        check()
       })
+      // Close the gap between the initial read and listener registration. An event committed in that
+      // window has already been broadcast, so no later frame would otherwise wake this wait.
+      check()
     })
   }
 

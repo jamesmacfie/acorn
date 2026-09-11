@@ -60,7 +60,7 @@ const snapshot = {
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     snapshot: async () => snapshot,
-    sessions: async () => ({ sessions: [session], nextCursor: null }),
+    sessions: async () => ({ sessions: [session], delegations: [], nextCursor: null }),
   },
 }))
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))

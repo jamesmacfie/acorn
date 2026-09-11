@@ -15,8 +15,8 @@ Session state changes and their event records are committed together. Once a tur
 events, a restart never silently resubmits it. Reconciliation marks interrupted work and leaves an
 explicit state for the owner to inspect.
 
-A session names what started it. `kind` is `interactive`, `workflow`, or `imported`, and a workflow
-session's `config` carries `workflowRunId` and `workflowStepId`. Both are read, in three places: the
+A session names what started it. `kind` is `interactive`, `workflow`, `delegated`, or `imported`, and
+a workflow session's `config` carries `workflowRunId` and `workflowStepId`. Both are read, in three places: the
 pane's header draws a chip, "Workflow: <name> · <step>", that opens the run pane at that node
 ([workflows.md](./workflows.md) § The run pane); the sidebar row for such a session carries the
 workflow glyph beside its provider mark; and the row in Agent Center carries a **Run** chip that opens
@@ -170,9 +170,10 @@ are not stored by the model-provider plugin. Plan usage is per harness: the buil
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
-## Subagents
+## Provider-native subagents
 
-Both managed harnesses can delegate to a subagent, and a subagent is **not** a session. It cannot be
+Both managed harnesses can use their provider's native subagent feature, and such a subagent is
+**not** a session. It cannot be
 addressed, sent a turn, forked, or handed to a terminal, so making it a session row would be a lie in
 every table that reads one. It is a projection instead: each session's row carries a `subagents`
 roster, folded from that session's own `subagent` events by `recordEvent`, in the same transaction as
@@ -220,11 +221,48 @@ Both routing tables are pinned against real captures in
 `plugins/agents/src/server/drivers/__fixtures__/`, not hand-written shapes: an extension field can only
 be tested against what the harness actually sent.
 
+## Managed delegation
+
+Managed delegation is distinct from provider-native subagents. A terminal or managed session calls
+the execute-tier orchestration tools to create an addressable `delegated` managed session, queue more
+turns, wait, read bounded output, or cancel work. The child uses the same provider drivers, durable
+turn queue, event ledger, restart reconciliation, request handling, and concurrency dispatcher as an
+interactive session.
+
+The `agent_spawns` table is the ownership and provisioning ledger. It records the root and direct
+owner, child task and session IDs, depth, isolation, call idempotency key, and one of `creating`,
+`provisioned`, or `failed`. It does not copy the child's runtime state. Once provisioning succeeds,
+the child session owns readiness, work, attention, and terminal status.
+
+Shared isolation keeps the child on the caller's task. Worktree isolation reserves a stable child
+task ID before crossing into core, then creates the task, delegated session, and initial turn with
+spawn-derived idempotency keys. Startup reconciliation resumes any `creating` worktree row from the
+last durable boundary. A permanent failure keeps the row and any child task or session that already
+exists, so recovery never deletes a checkout that might contain work.
+
+The Node may bind its listener before the post-startup recovery pass finishes. Every orchestration
+tool waits for that pass, so a retried call cannot race recovery of its own spawn row or an
+interrupted child turn.
+
+A managed child records `parentSessionId` and the parent's active `parentTurnId`. A terminal-owned
+child uses only the spawn ledger for authority and exposes a bounded terminal label and profile for
+display. The session list projects that lineage beside its session page. The Agent pane nests managed
+children below an available managed parent, labels terminal-owned children without inventing a
+parent row, shows depth and isolation, and links a selected child back to its managed parent.
+Provider-native subagent rows keep their original place under the provider session.
+
+Only a direct owner can address a child. A child may create one more level, but a third level is
+refused. Each root admits at most 12 live delegated sessions in the reservation transaction, counting
+rows still being created. The child inherits the intersection of the parent's signed tool ceiling
+and any narrower ceiling requested at spawn. General session configuration updates cannot widen or
+remove that persisted ceiling.
+
 ## Client surfaces
 
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
 roster, with a header region of its own so the count stays put while the list scrolls; the detail
-column is the open session. The roster is sessions and their subagents, and nothing else: it used to
+column is the open session. The roster is managed sessions, delegated children, and provider-native
+subagents, and nothing else: it used to
 carry a third group merging this task's terminals with a run's workflow steps, and both halves have a
 better home — the terminal drawer, and the Workflows pane. Nothing in the plugin lays anything out and nothing in it ships a
 stylesheet: every surface here is a tree of kit nodes, so the same source draws in the shell today and

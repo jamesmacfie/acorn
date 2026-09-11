@@ -7,6 +7,7 @@
 // node launcher. Outside a task session, or with acorn not running, tools/list is empty
 // and a call returns a structured 'no-active-task' or 'acorn-not-running' result, never a protocol
 // error, because a plain terminal loads this server too.
+import { randomUUID } from 'node:crypto'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
@@ -40,7 +41,15 @@ export function buildServer(): Server {
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (!TASK_ID) return NO_TASK
-    const res = await apiSend('POST', `/v2/core/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`, req.params.arguments ?? {})
+    // One id for the logical MCP call. apiCall may retry the loopback request after a node restart;
+    // keeping generation outside that retry loop lets handlers use it as their idempotency key.
+    const callId = randomUUID()
+    const res = await apiSend(
+      'POST',
+      `/v2/core/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`,
+      req.params.arguments ?? {},
+      { callId },
+    )
     if (!res.ok) return text({ status: res.kind, detail: res.detail })
     return text(res.data)
   })

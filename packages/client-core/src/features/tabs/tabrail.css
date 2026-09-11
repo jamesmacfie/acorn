@@ -19,6 +19,16 @@
 .tabrail-item {
   position: relative;
 }
+.tabrail-item[data-task-depth] {
+  padding-inline-start: calc(var(--task-depth) * 5px);
+}
+.tabrail-item[data-task-depth]::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc((var(--task-depth) - 0.5) * 5px);
+  border-inline-start: var(--divider);
+}
 
 .tabrail-tab {
   width: 100%;

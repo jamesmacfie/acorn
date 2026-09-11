@@ -343,6 +343,89 @@ describe('managed agent runtime conformance', () => {
     expect((await runtime.wait(result.session.id, 0, 'ready', 2_000)).session.runtimeState).toBe('ready')
   })
 
+  it('acknowledges a delegated session and its first turn while the provider keeps connecting', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new DeferredStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const session = await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'delegated',
+      config: { toolCeiling: { allow: ['agent_read'] } },
+    })
+    await driver.entered
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Report without waiting for startup.' }],
+      source: 'delegation',
+      effectivePolicy: {},
+      idempotencyKey: 'delegated-first-turn',
+    })
+
+    expect(session.runtimeState).toBe('creating')
+    expect(turn).toMatchObject({ source: 'delegation', status: 'queued' })
+    driver.release()
+    expect((await runtime.wait(session.id, 0, 'ready', 2_000)).session.runtimeState).toBe('ready')
+  })
+
+  it('does not miss a condition committed between the initial wait snapshot and subscription', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'delegated',
+      config: {},
+    }, descriptor('fake'))
+    const turn = await runtime.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Finish during the wait setup window.' }],
+      source: 'delegation',
+      effectivePolicy: {},
+      idempotencyKey: 'wait-setup-race',
+    })
+    const snapshot = runtime.store.snapshot.bind(runtime.store)
+    let firstRead = true
+    runtime.store.snapshot = async (...args) => {
+      const result = await snapshot(...args)
+      if (firstRead) {
+        firstRead = false
+        await runtime!.store.recordEvent(session.id, turn.id, {
+          type: 'turn_completed',
+          stopReason: 'end_turn',
+        })
+      }
+      return result
+    }
+
+    const result = await Promise.race([
+      runtime.wait(session.id, 0, 'turn_completed', 1_000),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 100)),
+    ])
+
+    expect(result).not.toBeNull()
+    expect(result?.events.some((record) => record.event.type === 'turn_completed')).toBe(true)
+  })
+
   it('settles an acknowledged interactive session when provider startup fails', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
@@ -856,6 +939,64 @@ describe('managed agent runtime conformance', () => {
 
     const snapshot = await runtime.wait(live.id, 0, 'turn_completed', 2_000)
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('completed')
+  })
+
+  it('reconciles an active turn and continues a durable queued turn after restart', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const beforeRestart = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const session = await beforeRestart.store.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'delegated',
+      config: {},
+    }, descriptor('fake'))
+    const active = await beforeRestart.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Was active before restart.' }],
+      source: 'delegation',
+      effectivePolicy: {},
+      idempotencyKey: 'restart-active',
+    })
+    await beforeRestart.store.startTurn(active.id)
+    await beforeRestart.store.recordEvent(session.id, active.id, {
+      type: 'diagnostic',
+      level: 'warning',
+      message: 'Preserve me.',
+    })
+    await beforeRestart.store.recordEvent(session.id, active.id, { type: 'session_state', state: 'working' })
+    const queued = await beforeRestart.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Continue after restart.' }],
+      source: 'delegation',
+      effectivePolicy: {},
+      idempotencyKey: 'restart-queued',
+    })
+
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    await runtime.reconcile()
+    const snapshot = await runtime.wait(session.id, 2, 'turn_completed', 2_000)
+
+    expect(snapshot.turns.find((turn) => turn.id === active.id)?.status).toBe('interrupted')
+    expect(snapshot.turns.find((turn) => turn.id === queued.id)?.status).toBe('completed')
+    expect((await runtime.store.eventsForTurn(active.id)).some((record) =>
+      record.event.type === 'diagnostic' && record.event.message === 'Preserve me.')).toBe(true)
   })
 
   it('gates dispatch on the stored concurrency limits and drains when they are raised', async () => {

@@ -16,7 +16,7 @@ vi.mock('./managedClient', () => ({
   managedAgentApi: {
     sessions: async (query: { archived?: boolean } = {}) => {
       sessionCalls.push(query)
-      return { sessions: [], nextCursor: null }
+      return { sessions: [], delegations: [], nextCursor: null }
     },
   },
 }))

@@ -49,14 +49,14 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | --- | --- |
 | [features.md](./features.md) | The shipped product surfaces, one line each. |
 | [workspaces-and-tasks.md](./workspaces-and-tasks.md) | The product model: workspaces, projects, tasks, and worktrees. |
-| [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, approvals, artifacts, and usage. |
+| [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, managed delegation, approvals, artifacts, and usage. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
-| [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, and the MCP projection. |
+| [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
 | [dashboards.md](./dashboards.md) | User-composed panels over typed record collections. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
-| [workflows.md](./workflows.md) | Orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
+| [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
 | [notes-and-memory.md](./notes-and-memory.md) | Task notes and the memory proposals loop. |
 | [http-client.md](./http-client.md) | The HTTP request pane and the outbound-request gap. |
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |

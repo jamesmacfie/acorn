@@ -79,4 +79,34 @@ describe('the snapshot a client reads', () => {
     const page = await store.eventPage(session.id)
     expect(page.events.filter((event) => event.event.type === 'usage')).toHaveLength(58)
   })
+
+  it('projects delegation visibility onto the bounded session list', async () => {
+    const session = await store.createSession({
+      taskId: randomUUID(),
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'delegated',
+      config: {},
+    }, PROVIDER)
+    const projectSessionList = async (page: Awaited<ReturnType<AgentStore['listSessions']>>) => ({
+      ...page,
+      delegations: [{
+        sessionId: session.id,
+        depth: 1,
+        isolation: 'shared' as const,
+        owner: { kind: 'managed' as const, parentSessionId: 'parent-1' },
+      }],
+    })
+
+    const listed = await managedAgentsBridge(
+      { store } as unknown as ManagedAgentRuntime,
+      { projectSessionList },
+    ).listSessions({ taskId: session.taskId })
+    expect(listed.delegations).toEqual([{
+      sessionId: session.id,
+      depth: 1,
+      isolation: 'shared',
+      owner: { kind: 'managed', parentSessionId: 'parent-1' },
+    }])
+  })
 })

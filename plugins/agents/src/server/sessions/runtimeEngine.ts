@@ -8,23 +8,24 @@ import type {
   AgentSessionSnapshot,
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
+import { defaultAgentConcurrency } from '../../shared/concurrency'
+import { readAgentConcurrency } from '../concurrencyStore'
 import { agentDriverRegistry, type AgentDriverRegistry } from '../drivers/registry'
-import type { AgentDriverSession } from '../drivers/types'
-import type { AgentDriver } from '../drivers/types'
 import { safeProviderMessage } from '../drivers/diagnostics'
+import type { AgentDriver } from '../drivers/types'
+import type { AgentDriverSession } from '../drivers/types'
+import { AgentWebhookService, webhookEventKind } from '../webhookService'
 import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
-import { readAgentConcurrency } from '../concurrencyStore'
 import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
-import { AgentWebhookService, webhookEventKind } from '../webhookService'
-import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
-
-type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
-import { defaultAgentConcurrency } from '../../shared/concurrency'
+
+type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
 
 // Three tags, one owner: the engine's own lines, the memory hand-off, and the webhook queue. The
 // tag is what the reader greps for and the owner is what a sink files it under.
@@ -83,6 +84,13 @@ const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
 const secretEnvironmentValues = (env: Record<string, string>): string[] =>
   Object.entries(env).flatMap(([key, value]) =>
     /(?:TOKEN|SECRET|PASSWORD|AUTH|COOKIE|KEY)/i.test(key) && value ? [value] : [])
+
+const persistedToolCeiling = (config: Record<string, unknown>) => {
+  if (!Object.prototype.hasOwnProperty.call(config, 'toolCeiling')) return undefined
+  // A corrupt or unrecognized persisted ceiling must remove every tool, never become an unlimited
+  // token. Absence remains the ordinary interactive-session behavior: no additional ceiling.
+  return parseToolCeiling(config.toolCeiling) ?? { allow: [] }
+}
 
 export class ManagedAgentEngine {
   readonly store: AgentStore
@@ -273,7 +281,14 @@ export class ManagedAgentEngine {
     const noProviderExecutionHistory = !(await this.store.hasProviderExecutionHistory(session.id))
     // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
     // drive another task's tools or read the owner's provider credentials.
-    const sessionEnv = this.internalEnv({ scope: 'task', taskId: session.taskId, sessionId: session.id })
+    const sessionEnv = this.internalEnv({
+      scope: 'task',
+      taskId: session.taskId,
+      sessionId: session.id,
+      // The session row is the authority across restarts. Workflow creation and later delegation
+      // persist the effective intersection here before any provider process is started.
+      toolCeiling: persistedToolCeiling(session.config),
+    })
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     // The session's span covers starting the provider, not the session's whole life. A session
     // lives for hours and outlives the process, and a span nobody can close is not a measurement;

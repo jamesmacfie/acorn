@@ -190,7 +190,8 @@ the only lifetime controls. Two scopes exist: `service`, for the node's own loop
 firing schedule, the measure sampler, notes seeding), minted in-process and never placed in a
 child's environment; and `task`, for everything handed to a child process, PTYs, agent sessions,
 workflow steps, the MCP server. A `task`-scoped token carries the task id it was minted for, and
-route handlers compare that id against the task named in the URL before acting.
+route handlers compare that id against the task named in the URL before acting. It may also carry a
+session id and a server-computed tool ceiling. Both claims are covered by the signature.
 
 Minting a token is not exposed on `CoreServices`: any plugin could then request a token for any
 scope, which defeats the point of scoping them at all. Instead the composition root builds a scoped
@@ -198,7 +199,15 @@ credential factory and hands it to the plugins that spawn children, terminal and
 constructor dependency. The factory closes over the signing key and the listener's own address,
 neither of which exists until every plugin's `init` has run, so only the composition root can build
 it, and only after the fact. A plugin calls it once per child with the scope that child needs, for
-example `{ scope: 'task', taskId, sessionId }` for one managed-agent session.
+example `{ scope: 'task', taskId, sessionId, toolCeiling }` for one managed-agent session. Workflow
+and delegated sessions persist the ceiling in their session configuration before the runtime mints
+the token. Later general configuration updates retain that field rather than accepting a wider value.
+
+The agent-tool route reads session identity and tool limits only from the verified principal. The
+`x-acorn-session-id` and `x-acorn-tool-ceiling` headers are transport metadata and grant no authority.
+Session-required orchestration tools disappear from `tools/list` without a signed session claim. A
+per-call UUID is transport metadata too, but it is used only after the signed owner and tool name
+scope it as an idempotency key.
 
 The node-owner identity is opaque, explicit, and persisted at first boot. It is independent of
 provider connections, and internal auth fails closed if it is unset. A task-scoped token cannot use
@@ -931,6 +940,16 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   rather than left implicit, so the next tier added has to say which it is. The node and the settings
   page read the same constant, so an untouched tier draws as off in Settings → Agent tools and is
   denied on the wire.
+- **Delegation authority is direct and fail-closed.** The Agents plugin records each spawn's signed
+  owner task and session before it creates a child. Prompt, wait, read, and cancel require that exact
+  owner and child pair. Missing, foreign, sibling, ancestor, descendant, and cross-task identifiers
+  all return the same `not_found` result. A managed child cannot approve its own permission or
+  question request through the orchestration tools.
+- **Tool ceilings only narrow.** A delegated child receives the intersection of its parent's signed
+  ceiling and an optional requested ceiling. A workflow-owned managed session cannot spawn a child,
+  because workflow budget accounting does not include delegated descendants. The execute permission,
+  depth-two limit, 12-live-descendant limit, and managed runtime concurrency ceilings remain separate
+  gates.
 - **Broadcast hygiene.** `ctx.events.status()` is content-free by design; keep every
   third-party-reachable broadcast content-free or plugin-self-scoped so one plugin's events can
   never carry another's data to a subscribed frame (phase-3 bridge filters by declared channel;

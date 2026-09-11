@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, createMemo, For, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
@@ -14,6 +14,7 @@ import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
+import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
 
 // The left column: three framed panels, read down the screen.
 //
@@ -86,7 +87,21 @@ function TaskList(props: { model: ShellModel }) {
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
   // them (../kit/showing.tsx § keyedRows).
-  const rows = keyedRows(() => props.model.tasks(), (task) => ({ key: task.id, task }))
+  const hierarchy = createMemo(() => taskHierarchy(props.model.tasks()))
+  const depthByTask = createMemo(() => new Map(
+    hierarchy().map((entry) => [entry.task.id, entry.depth]),
+  ))
+  // Cache against the original task row, not the hierarchy wrapper. `taskHierarchy` returns fresh
+  // wrappers when the roster changes, while TanStack preserves every unchanged task object. The
+  // getter keeps depth correct when a parent appears or disappears without rebuilding the child row.
+  const rows = keyedRows(
+    () => hierarchy().map((entry) => entry.task),
+    (task) => ({
+      key: task.id,
+      task,
+      get depth() { return depthByTask().get(task.id) ?? 0 },
+    }),
+  )
 
   return (
     <Rows
@@ -108,7 +123,7 @@ function TaskList(props: { model: ShellModel }) {
           selected={!selectedSource() && row.task.id === activeTaskId()}
           trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} />}
         >
-          {row.task.title}
+          {row.depth ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}` : row.task.title}
         </Row>
       )}
     </Rows>

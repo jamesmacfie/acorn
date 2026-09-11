@@ -24,8 +24,8 @@ export type AgentAttentionReason =
 
 export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
-export type AgentSessionKind = 'interactive' | 'workflow' | 'imported'
-export type AgentTurnSource = 'interactive' | 'workflow' | 'automation' | 'import'
+export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'automation' | 'import'
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'
@@ -326,8 +326,24 @@ export type AgentSessionSnapshot = {
   requests: AgentRequest[]
 }
 
+/** Display-only delegation lineage projected by the Agents plugin for sessions in a list page.
+ *
+ * The managed parent id is useful navigation within the same task. A terminal owner is deliberately
+ * represented by a label and profile only: its authority id is neither needed nor exposed to the
+ * renderer.
+ */
+export type AgentSessionDelegation = {
+  sessionId: string
+  depth: number
+  isolation: 'shared' | 'worktree'
+  owner:
+    | { kind: 'managed'; parentSessionId: string }
+    | { kind: 'terminal'; label: string; profileId: string | null }
+}
+
 export type AgentSessionList = {
   sessions: AgentSession[]
+  delegations: AgentSessionDelegation[]
   nextCursor: string | null
 }
 

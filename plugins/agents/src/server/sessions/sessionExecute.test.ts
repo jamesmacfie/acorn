@@ -3,7 +3,9 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestNodeContext, schema, type TestNodeContext } from '@acorn/plugin-api/testkit'
+import type { InternalEnvFactory } from '@acorn/plugin-api/node'
 import type { AgentConfigOption, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from '../drivers/types'
 import { AgentDriverRegistry } from '../drivers/registry'
 import { ManagedAgentRuntime } from './runtime'
@@ -95,6 +97,7 @@ describe('agents.sessionExecute config options', () => {
   let runtime: ManagedAgentRuntime
   let driver: ConfigDriver
   let taskId: string
+  let mintedClaims: Parameters<InternalEnvFactory>[0][]
 
   beforeEach(async () => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
@@ -134,11 +137,15 @@ describe('agents.sessionExecute config options', () => {
     driver = new ConfigDriver()
     const registry = new AgentDriverRegistry()
     registry.registerNative('claude', () => driver)
+    mintedClaims = []
     runtime = new ManagedAgentRuntime({
       db: ctx.storage.open(),
       dataDir: ctx.dataDir,
       core: ctx.core,
-      internalEnv: () => ({}),
+      internalEnv: (claims) => {
+        mintedClaims.push(claims)
+        return {}
+      },
       secrets: ctx.env.SECRETS,
       currentUserId: () => null,
       registry,
@@ -150,12 +157,13 @@ describe('agents.sessionExecute config options', () => {
     ctx.cleanup()
   })
 
-  const execute = (configOptions?: Record<string, string>) => createSessionExecute(runtime)({
+  const execute = (configOptions?: Record<string, string>, tools?: ToolCeiling) => createSessionExecute(runtime)({
     taskId,
     profileId: 'claude-code',
     title: 'Workflow: synthesise',
     prompt: 'Write one answer.',
     configOptions,
+    tools,
     runId: 'run-1',
     stepId: 'step-1',
   })
@@ -173,6 +181,23 @@ describe('agents.sessionExecute config options', () => {
     const policy = driver.turns[0]!.turn.effectivePolicy
     expect(policy.model).toBe('opus')
     expect(policy.effort).toBe('high')
+  })
+
+  it('mints the managed session token from its persisted tool ceiling', async () => {
+    const tools = { allow: ['task_current'], maxRisk: 'read' as const }
+    const result = await execute(undefined, tools)
+    const session = await runtime.store.requireSession(result!.agentSessionId!)
+
+    expect(session.config.toolCeiling).toEqual(tools)
+    expect(mintedClaims).toContainEqual({
+      scope: 'task',
+      taskId,
+      sessionId: session.id,
+      toolCeiling: tools,
+    })
+
+    const patched = await runtime.patchSession(session.id, { config: { toolCeiling: { maxRisk: 'execute' } } })
+    expect(patched.config.toolCeiling).toEqual(tools)
   })
 
   it('drops a value the provider does not offer and says so in the transcript', async () => {

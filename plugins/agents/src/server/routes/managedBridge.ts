@@ -8,6 +8,7 @@ import type { AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
 import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import type { AgentDelegationService } from '../delegation/service'
 import type { ManagedAgentsBridge } from './managed'
 
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
@@ -47,7 +48,10 @@ const toRunStatus = (state: AgentRuntimeState): RunStatus => {
   return 'running'
 }
 
-export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgentsBridge {
+export function managedAgentsBridge(
+  runtime: ManagedAgentRuntime,
+  delegation?: Pick<AgentDelegationService, 'projectSessionList'>,
+): ManagedAgentsBridge {
   // Not wrapped in `guarded`. These answer the router's authorization question, and bridgeFailure would
   // turn a "not found" into a thrown BridgeError(404), skipping the comparison the guard needs to make.
   const taskIdForSession = async (sessionId: string) => (await runtime.store.getSession(sessionId))?.taskId ?? null
@@ -97,7 +101,10 @@ export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgents
     createSession: (input, idempotencyKey) => guarded(() => runtime.acceptSession(input, idempotencyKey)),
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),
-    listSessions: (filter) => guarded(() => runtime.store.listSessions(filter)),
+    listSessions: (filter) => guarded(async () => {
+      const page = await runtime.store.listSessions(filter)
+      return delegation ? delegation.projectSessionList(page) : page
+    }),
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
     // `store.snapshot` still answers workflow execution and the wait route with every row
     // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).

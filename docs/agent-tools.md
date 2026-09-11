@@ -12,6 +12,7 @@ type AgentToolContribution = {
   description: string
   risk: 'read' | 'write' | 'execute'
   input: ZodSchema
+  requiresSession?: boolean
   execute(input, context): Promise<unknown>
 }
 ```
@@ -107,6 +108,44 @@ matters more than it looks. Adding an execute tool used to grant it to everyone 
 shown to the owner; now it is inert until someone turns the tier on in Settings → Agent tools. The
 node's `isToolPermitted` and the settings page read the same constant, so what the page draws is what
 the wire enforces.
+
+## Managed-session orchestration
+
+The Agents plugin contributes five execute-tier tools for agent-driven delegation. They operate on
+managed sessions through `ManagedAgentRuntime`; they do not create workflow runs or mutate workflow
+definitions.
+
+| Tool | Input | Result |
+| --- | --- | --- |
+| `agent_spawn` | `title`, `prompt`, optional `profileId`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
+| `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Durable turn ID, queue state and ordinal, session state, and cursor |
+| `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether the condition matched or timed out, plus state, attention, and the latest sequence |
+| `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
+| `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and resulting session state |
+
+`agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
+isolation creates a selectable child task, but the managed session remains the execution authority.
+The caller can prompt, wait for, read, or cancel only a direct child recorded in the Agents plugin's
+spawn ledger. A missing, foreign, sibling, ancestor, descendant, or cross-task ID returns
+`not_found`.
+
+These contributions set `requiresSession`, so the registry hides them unless authentication supplies
+a signed task and session claim. A transport `x-acorn-session-id` header cannot satisfy that gate.
+The MCP proxy assigns one `x-acorn-tool-call-id` to each logical call and keeps it across a loopback
+retry. Spawn, prompt, and cancel scope that ID to the signed owner and operation so a retry cannot
+create a second resource.
+
+The owner must enable the execute tier or the individual tools. The server also intersects a child's
+requested tool ceiling with the signed parent's ceiling and persists the result in the child session.
+A workflow-owned managed session cannot see `agent_spawn`, because delegated descendants are not
+charged to workflow budgets. Delegation depth is capped at two, and each root can have at most 12
+live descendants. Managed runtime workspace and provider concurrency limits still apply.
+
+If a turn declares `resultSchema`, the Agents plugin adds the result contract to the prompt and
+validates the returned JSON against that schema. `agent_read` reports a diagnostic instead of
+returning malformed structured output. Reads page the durable event sequence, fold assistant deltas,
+omit verbose tool and attachment payloads, cap individual text items at 16 KiB, and cap projected
+text at 64 KiB per response. Waits last at most 30 seconds and a timeout does not cancel the child.
 
 ## Context sections
 

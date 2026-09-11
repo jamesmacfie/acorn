@@ -610,7 +610,7 @@ export type CoreTaskService = {
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   /** Ask core to create a task rather than writing core-owned rows. The worktree is not created here. */
-  createChild(parentTaskId: string, seed: ChildTaskSeed): Promise<string>
+  createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>
   cancel(taskId: string): Promise<void>
 }
 

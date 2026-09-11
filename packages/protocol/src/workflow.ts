@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export type { ToolRisk }
 export type ToolCeiling = { allow?: string[]; maxRisk?: ToolRisk }
-const toolCeilingSchema = z.object({
+export const toolCeilingSchema = z.object({
   allow: z.array(z.string()).optional(),
   maxRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
@@ -13,6 +13,12 @@ export const RISK_ORDER: Record<ToolRisk, number> = { read: 0, write: 1, execute
 export function normalizeToolCeiling(ceiling: ToolCeiling | undefined): ToolCeiling {
   const allow = ceiling?.allow ? [...new Set(ceiling.allow.map((value) => value.trim()).filter(Boolean))] : undefined
   return { ...(allow ? { allow } : {}), ...(ceiling?.maxRisk ? { maxRisk: ceiling.maxRisk } : {}) }
+}
+
+/** Parse an untrusted persisted or transport value into the one normalized ceiling shape. */
+export function parseToolCeiling(value: unknown): ToolCeiling | undefined {
+  const parsed = toolCeilingSchema.safeParse(value)
+  return parsed.success ? normalizeToolCeiling(parsed.data) : undefined
 }
 
 export function riskWithinCeiling(risk: ToolRisk, ceiling: ToolCeiling | undefined): boolean {

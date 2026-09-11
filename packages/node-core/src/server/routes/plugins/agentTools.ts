@@ -17,9 +17,15 @@ import { mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { runHook } from '../../pluginHost/hooks'
 import { startSpan } from '../../telemetry/collector'
-import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
+import { isToolWithinCeiling } from '@acorn/protocol/workflow.ts'
 
-const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
+const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = {
+  not_found: 404,
+  bad_request: 400,
+  conflict: 409,
+  'needs-trust': 409,
+  failed: 500,
+}
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>
 
 async function loadPerms(c: Context<AppEnv>) {
@@ -32,12 +38,15 @@ async function loadPerms(c: Context<AppEnv>) {
 }
 
 function toolContext(c: Context<AppEnv>): ToolContext {
-  return { taskId: c.req.param('id')!, userLogin: ownerId(c), sessionId: c.req.header('x-acorn-session-id') }
-}
-
-function workflowCeiling(c: Context<AppEnv>): ToolCeiling | undefined {
-  const raw = c.req.header('x-acorn-tool-ceiling')
-  return raw ? (decodeToolCeiling(raw) ?? { allow: [] }) : undefined
+  const principal = c.get('principal')
+  const rawCallId = c.req.header('x-acorn-tool-call-id')?.trim()
+  return {
+    taskId: c.req.param('id')!,
+    userLogin: ownerId(c),
+    sessionId: principal?.sessionId,
+    callId: rawCallId && rawCallId.length <= 200 ? rawCallId : undefined,
+    toolCeiling: principal?.toolCeiling,
+  }
 }
 
 function contributions(): readonly AgentToolContribution[] | null {
@@ -53,6 +62,16 @@ async function available(tool: AgentToolContribution, ctx: ToolContext, cache: A
     cache.set(tool.when, result)
   }
   return result
+}
+
+function hasRequiredSession(c: Context<AppEnv>, tool: AgentToolContribution): boolean {
+  if (!tool.requiresSession) return true
+  const principal = c.get('principal')
+  return principal?.kind === 'internal'
+    && principal.scope === 'task'
+    && !!principal.taskId
+    && principal.taskId === c.req.param('id')
+    && !!principal.sessionId
 }
 
 // Match the high-level MCP SDK's schema projection: draft-07 for argument-bearing tools, and its exact
@@ -83,8 +102,10 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
   if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
   const perms = await loadPerms(c)
-  if (!isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, workflowCeiling(c))) return respondError(c, 404, 'not_found')
   const ctx = toolContext(c)
+  if (!hasRequiredSession(c, tool) || !isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, ctx.toolCeiling)) {
+    return respondError(c, 404, 'not_found')
+  }
   if (!(await available(tool, ctx, new Map()))) return respondError(c, 404, 'not_found')
   const parsed = tool.input.safeParse(await c.req.json().catch(() => ({})))
   if (!parsed.success) return respondError(c, 400, 'bad_request', [parsed.error.message])
@@ -122,10 +143,14 @@ export const agentTools = new Hono<AppEnv>()
     const perms = await loadPerms(c)
     const ctx = toolContext(c)
     const availability: AvailabilityCache = new Map()
-    const ceiling = workflowCeiling(c)
     const tools = []
     for (const tool of registry) {
-      if (!isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, ceiling) || !(await available(tool, ctx, availability))) continue
+      if (
+        !hasRequiredSession(c, tool)
+        || !isToolPermitted(tool, perms)
+        || !isToolWithinCeiling(tool, ctx.toolCeiling)
+        || !(await available(tool, ctx, availability))
+      ) continue
       tools.push({ name: tool.name, description: tool.description, risk: tool.risk, inputSchema: mcpInputSchema(tool.input) })
     }
     return c.json({ tools })

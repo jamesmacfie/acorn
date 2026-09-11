@@ -82,6 +82,61 @@ describe('createChild project inheritance', () => {
       projectId: 'project-plain', branch: null, parentId: 'plain-parent', status: 'active',
     })
   })
+
+  it('replays a stable intended id without duplicating the row or changing its deduped branch', async () => {
+    const at = Date.now()
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-git', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
+    await t.db.insert(schema.projects).values({
+      id: 'project-git', name: 'app', path: '/tmp/acorn-app', workspaceId: 'workspace-git', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: at, updatedAt: at,
+    })
+    await t.db.insert(schema.tasks).values([
+      {
+        id: 'git-parent', title: 'Parent', origin: 'local', projectId: 'project-git', branch: 'parent',
+        worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: at, updatedAt: at,
+      },
+      {
+        id: 'collision', title: 'Existing', origin: 'local', projectId: 'project-git', branch: 'inspect-tests',
+        worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: at, updatedAt: at,
+      },
+    ])
+    const tasks = createTaskService(t.db)
+    const seed = { title: 'Inspect tests', branch: 'inspect-tests' }
+
+    expect(await tasks.createChild('git-parent', seed, 'stable-child')).toBe('stable-child')
+    expect(await tasks.createChild('git-parent', seed, 'stable-child')).toBe('stable-child')
+
+    const children = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'stable-child'))
+    expect(children).toHaveLength(1)
+    expect(children[0]).toMatchObject({
+      parentId: 'git-parent',
+      projectId: 'project-git',
+      branch: 'inspect-tests-2',
+      worktreePath: null,
+    })
+  })
+
+  it('rejects reuse of an intended id by another parent or seed', async () => {
+    const at = Date.now()
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-conflict', name: 'Conflict', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
+    await t.db.insert(schema.projects).values({
+      id: 'project-conflict', name: 'app', path: '/tmp/acorn-conflict', workspaceId: 'workspace-conflict', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: at, updatedAt: at,
+    })
+    await t.db.insert(schema.tasks).values([
+      { id: 'parent-a', title: 'A', origin: 'local', projectId: 'project-conflict', branch: 'a', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: at, updatedAt: at },
+      { id: 'parent-b', title: 'B', origin: 'local', projectId: 'project-conflict', branch: 'b', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: at, updatedAt: at },
+    ])
+    const tasks = createTaskService(t.db)
+    await tasks.createChild('parent-a', { title: 'Child', branch: 'child' }, 'claimed-child')
+
+    await expect(tasks.createChild('parent-b', { title: 'Child', branch: 'child' }, 'claimed-child'))
+      .rejects.toThrow(/different parent or seed/)
+    await expect(tasks.createChild('parent-a', { title: 'Different', branch: 'different' }, 'claimed-child'))
+      .rejects.toThrow(/different parent or seed/)
+  })
 })
 
 describe('adoptPullNumbers project matching', () => {

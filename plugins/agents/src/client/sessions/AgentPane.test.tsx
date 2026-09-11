@@ -13,6 +13,7 @@ const runForSession = vi.fn()
 const openPane = vi.fn()
 const registerCommands = vi.fn()
 const disposeCommands = vi.fn()
+const openManagedParent = vi.fn()
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -34,8 +35,10 @@ const session = (over: Partial<AgentSession>): AgentSession => ({
   lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 1, updatedAt: 1, ...over,
 } as AgentSession)
 
-const modelFor = (current: AgentSession): AgentPaneModel => ({
+const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel => ({
   selected: () => current,
+  selectedManagedParent: () => parent,
+  openManagedParent,
   sessionActions: () => [],
   providers: () => [],
   creating: () => false,
@@ -46,10 +49,10 @@ const modelFor = (current: AgentSession): AgentPaneModel => ({
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (current: AgentSession): void => {
+const mount = (current: AgentSession, parent?: AgentSession): void => {
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current)} />, host)
+  dispose = render(() => <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />, host)
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -80,6 +83,24 @@ describe('the workflow chip', () => {
     await settle()
     expect(chip()).toBeNull()
     expect(runForSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('managed delegation parent navigation', () => {
+  it('names an available managed parent and returns to it', async () => {
+    mount(session({ id: 'child', kind: 'delegated' }), session({ id: 'parent', title: 'Parent session' }))
+    await settle()
+    const parentChip = [...host.querySelectorAll('.ui-chip')]
+      .find((item) => item.textContent?.includes('Parent: Parent session')) as HTMLElement
+    expect(parentChip).toBeTruthy()
+    parentChip.click()
+    expect(openManagedParent).toHaveBeenCalledOnce()
+  })
+
+  it('does not invent navigation when the managed parent is missing', async () => {
+    mount(session({ id: 'orphan', kind: 'delegated' }))
+    await settle()
+    expect(host.textContent).not.toContain('Parent:')
   })
 })
 

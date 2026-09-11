@@ -26,6 +26,37 @@ describe('machine identity binding', () => {
     expect(await response.json()).toMatchObject({ principal: { kind: 'internal', userId: 'bob' } })
   })
 
+  it('projects signed session and tool-ceiling claims onto the principal', async () => {
+    const response = await app.fetch(
+      new Request('http://acorn.test/', {
+        headers: {
+          'x-acorn-internal': mintInternalToken('internal', {
+            scope: 'task',
+            taskId: 'task-1',
+            sessionId: 'session-1',
+            toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
+          }),
+        },
+      }),
+      {
+        INTERNAL_TOKEN: 'internal',
+        ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
+        ...testSecretEnv(ENC_KEY),
+      } as unknown as Env,
+    )
+
+    expect(await response.json()).toEqual({
+      principal: {
+        kind: 'internal',
+        userId: 'bob',
+        scope: 'task',
+        taskId: 'task-1',
+        sessionId: 'session-1',
+        toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
+      },
+    })
+  })
+
   it('fails closed for internal traffic when no identity is bound', async () => {
     const response = await app.fetch(
       new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),

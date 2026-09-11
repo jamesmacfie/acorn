@@ -28,6 +28,7 @@ export function buildPluginDeps({ capabilities, core, internalEnv, reconciled }:
   return {
     agents: {
       internalEnv,
+      reconciled,
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
     },
     notes: { internalEnv },

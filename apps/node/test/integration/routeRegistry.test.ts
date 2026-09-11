@@ -120,7 +120,7 @@ describe('assembled routes', () => {
         // agents is `required` too, so it initializes here as well, the same treatment as terminal
         // below: the deps are inert because this suite asserts the mount table and nothing it
         // exercises starts a provider child.
-        agents: { internalEnv: () => ({}) },
+        agents: { internalEnv: () => ({}), reconciled: Promise.resolve() },
         notes: { internalEnv: () => ({}) },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
         // composition-root deps are inert stubs: this suite asserts the mount table, and nothing it
