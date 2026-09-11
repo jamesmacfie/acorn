@@ -4,7 +4,7 @@ export const agentTelemetry = telemetryFor('agents')
 
 /** One opening, ending after loaded content has had a paint opportunity, including cached views. */
 export function startAgentView(name: string) {
-  const span = agentTelemetry.startInteraction(name)
+  const span = agentTelemetry.startOperation(name)
   if (!span.traceId) return { ready: () => {}, fail: () => {}, dispose: () => {} }
   let done = false
   let scheduled = false

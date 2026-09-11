@@ -6,7 +6,7 @@ vi.mock('@acorn/plugin-api/client', () => ({
   dispatchLayout: () => undefined,
   registerNoticeTargetHandler: () => () => undefined,
   telemetryFor: () => ({
-    startInteraction: () => ({ traceId: '', spanId: '', end: () => undefined }),
+    startOperation: () => ({ traceId: '', spanId: '', end: () => undefined }),
     startRenderTransition: () => ({ update: () => undefined, cancel: () => undefined }),
   }),
 }))

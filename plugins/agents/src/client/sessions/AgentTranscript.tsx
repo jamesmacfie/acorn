@@ -69,6 +69,27 @@ export default function AgentTranscript(props: {
     const view = focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId()
     return props.viewKeyPrefix ? `${props.viewKeyPrefix}:${view}` : view
   })
+  // Initial rows are one batch: aggregate their factory time and the wall time to the next
+  // microtask, then stay out of the 25 Hz streaming path. This is deliberately a turn-scoped probe,
+  // not one record per card.
+  let measuringInitialCards = true
+  queueMicrotask(() => { measuringInitialCards = false })
+  const renderCard = (item: () => ReturnType<typeof items>[number]) => {
+    const draw = () => (
+      <Timeline.Turn>
+        <AgentEventCard
+          item={item()}
+          taskId={props.taskId}
+          sessionId={sessionId()}
+          sessionModel={sessionModel()}
+          turn={turnsById().get(item().turnId ?? '')}
+        />
+      </Timeline.Turn>
+    )
+    return measuringInitialCards
+      ? agentTelemetry.measureRenderBatch('agents.transcript.cards', draw, { 'items.visible': items().length })
+      : draw()
+  }
 
   return (
     <>
@@ -128,17 +149,7 @@ export default function AgentTranscript(props: {
               createAgentToolFoldSetting for why it is not resolved per card. */}
           <AgentToolFoldContext.Provider value={foldSetting}>
             <Index each={items()}>
-              {(item) => (
-                <Timeline.Turn>
-                  <AgentEventCard
-                    item={item()}
-                    taskId={props.taskId}
-                    sessionId={sessionId()}
-                    sessionModel={sessionModel()}
-                    turn={turnsById().get(item().turnId ?? '')}
-                  />
-                </Timeline.Turn>
-              )}
+              {(item) => renderCard(item)}
             </Index>
           </AgentToolFoldContext.Provider>
         </Timeline>
