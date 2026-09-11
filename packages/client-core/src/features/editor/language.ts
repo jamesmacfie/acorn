@@ -21,6 +21,15 @@ import { StreamLanguage } from '@codemirror/language'
 import type { Extension } from '@codemirror/state'
 import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
 
+// CodeMirror keeps a syntax tree in the editor state. On WebKit a sufficiently large generated file
+// can spend tens of seconds building that tree and eventually exhaust the JavaScript stack, blocking
+// unrelated task and agent requests behind it. The document remains fully editable without a grammar,
+// so large documents trade highlighting for a responsive window.
+export const MAX_HIGHLIGHT_CHARACTERS = 256 * 1024
+
+export const shouldHighlightDocument = (characters: number): boolean =>
+  characters <= MAX_HIGHLIGHT_CHARACTERS
+
 const CODEMIRROR: Record<LanguageId, () => Promise<Extension>> = {
   // No grammar is a real answer here, not a missing one: plain text highlights as plain text, and it
   // is the one entry that fetches nothing.

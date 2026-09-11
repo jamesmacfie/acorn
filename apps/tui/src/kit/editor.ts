@@ -31,6 +31,10 @@ import type { EditorViewState } from '@acorn/client-core/features/editor/viewSta
  *  here in the way `plaintext` is a real answer on the DOM, not a missing one. */
 export const languageForPath = (_path: string): Promise<Extension> => Promise.resolve([])
 
+/** This host has no syntax tree at any size. Kept beside `languageForPath` so a compiled editor pane
+ *  can make the same guard decision without importing the DOM host's grammar table. */
+export const shouldHighlightDocument = (_characters: number): boolean => false
+
 /** The palette is already the terminal's: OpenTUI paints from the same theme tokens the rest of this
  *  host reads (./roles.ts), and there is no second stylesheet to hand a colour list to. */
 export const editorTheme = (): Extension => []

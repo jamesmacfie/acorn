@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { LANGUAGE_IDS } from '@acorn/protocol/languageIds.ts'
-import { languageFor, languageForPath } from './language'
+import { languageFor, languageForPath, MAX_HIGHLIGHT_CHARACTERS, shouldHighlightDocument } from './language'
 
 // `tsc` proves the map is total over the vocabulary; it cannot prove the packs on the other side of
 // it still export what this file imports. A renamed export from a grammar package is a runtime
@@ -48,5 +48,10 @@ describe('the language map', () => {
       const line = SOURCE.split('\n').find((text) => text.trim().startsWith(dialect))
       expect(line, dialect).toContain("@codemirror/lang-javascript")
     }
+  })
+
+  it('keeps syntax parsing off documents large enough to block the renderer', () => {
+    expect(shouldHighlightDocument(MAX_HIGHLIGHT_CHARACTERS)).toBe(true)
+    expect(shouldHighlightDocument(MAX_HIGHLIGHT_CHARACTERS + 1)).toBe(false)
   })
 })

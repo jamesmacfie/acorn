@@ -26,7 +26,7 @@ import {
   type PluginCompletionRequest,
   type PluginDocumentBody,
 } from './documentModel'
-import { languageFor } from './language'
+import { languageFor, shouldHighlightDocument } from './language'
 import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
 import { Alert } from '../../kit/components/primitives'
@@ -277,7 +277,10 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       setReady(true) // renders the host div synchronously
       if (!host) return
 
-      const grammar = await language
+      const highlighted = shouldHighlightDocument(text.length)
+      if (!highlighted) recordSample(props.pluginId, 'editor.syntax.skipped', text.length, 'character', { reason: 'document-size' })
+      const loadedGrammar = await language
+      const grammar = highlighted ? loadedGrammar : []
       if (disposed || !host) return
       const autocomplete = completions()
       const state = measure(props.pluginId, 'editor.state.create', () => EditorState.create({

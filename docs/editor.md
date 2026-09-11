@@ -74,6 +74,11 @@ What changed, and why:
   file. The four JavaScript dialects share one package, so opening a `.tsx` file after a `.ts` one
   costs no request. Measured after the split: the chunk is 60,861 bytes and a `.ts` file fetches two
   more chunks, 110,946 bytes ([performance.md](./performance.md) § 2026-09-03).
+- **Large documents stay editable without a syntax tree.** Above 256 Ki characters both the editor
+  pane and host-owned document surfaces omit the grammar extension. This keeps a generated or
+  minified file from blocking WebKit's main thread while CodeMirror builds its tree; one
+  `editor.syntax.skipped` sample records the decision with the document size. An ordinary-sized
+  document whose grammar throws is retried as plain text instead of rejecting through the window.
 - **View state stopped being opaque**, which is the one place the design got *better* rather than
   merely equivalent — see § View state below.
 - **The `ui/editor` entrypoint survives, and is no longer node-hostile.** It exists to keep the
