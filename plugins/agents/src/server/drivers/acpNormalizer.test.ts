@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
-import { normalizeAcpUpdate } from './acpNormalizer'
+import { acpElicitationResponse, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
 import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
 import { buildConversationItems } from '../../client/sessions/conversationItems'
@@ -221,5 +221,145 @@ describe('the captured fan-out as a transcript', () => {
     // Every tool the two subagents ran, nested: three for one, four for the other, plus each spawn call.
     expect(cards.map((card) => card.children?.length)).toEqual([4, 5])
     expect(items.some((item) => item.event.type === 'tool')).toBe(false)
+  })
+})
+
+// The form an agent sends when it wants an answer rather than a permission. Shaped exactly as Claude
+// Code's adapter builds it: a choice per question, a free-text box beside each one, nothing required.
+const askUserQuestion = {
+  mode: 'form' as const,
+  sessionId: 'acp-session',
+  toolCallId: 'toolu_1',
+  message: 'Which package manager should I use?',
+  requestedSchema: {
+    type: 'object' as const,
+    properties: {
+      question_0: {
+        type: 'string',
+        title: 'Package manager',
+        oneOf: [
+          { const: 'pnpm', title: 'pnpm — what the repo already uses' },
+          { const: 'npm', title: 'npm' },
+        ],
+      },
+      question_0_custom: {
+        type: 'string',
+        title: 'Other',
+        description: 'Type your own answer instead of choosing an option above (optional).',
+      },
+    },
+  },
+}
+
+describe('an ACP form elicitation becomes a question', () => {
+  it('turns one property into one question, options and all', () => {
+    const event = normalizeAcpElicitation('request-1', askUserQuestion)
+    expect(event).toMatchObject({
+      type: 'request',
+      requestId: 'request-1',
+      kind: 'question',
+      title: 'Which package manager should I use?',
+      options: [{ id: 'decline', label: 'Skip' }],
+    })
+    const questions = event.type === 'request' ? event.questions ?? [] : []
+    expect(questions).toHaveLength(2)
+    // One question and no description, so the header would only repeat the prompt.
+    expect(questions[0]).toEqual({
+      id: 'question_0',
+      prompt: 'Package manager',
+      options: [
+        { id: 'pnpm', label: 'pnpm — what the repo already uses' },
+        { id: 'npm', label: 'npm' },
+      ],
+    })
+    // The free-text box beside it is a question of its own, with nothing to pick.
+    expect(questions[1].options).toBeUndefined()
+  })
+
+  it('names the header only when the property carries a prompt of its own', () => {
+    const event = normalizeAcpElicitation('request-2', {
+      mode: 'form',
+      sessionId: 'acp-session',
+      message: 'Please answer the following questions.',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          question_0: {
+            type: 'string',
+            title: 'Auth',
+            description: 'Which sign-in method do you want?',
+            enum: ['OAuth', 'Magic link'],
+          },
+        },
+      },
+    })
+    const [question] = event.type === 'request' ? event.questions ?? [] : []
+    expect(question).toEqual({
+      id: 'question_0',
+      header: 'Auth',
+      prompt: 'Which sign-in method do you want?',
+      options: [{ id: 'OAuth', label: 'OAuth' }, { id: 'Magic link', label: 'Magic link' }],
+    })
+  })
+
+  it('marks a multi-select question so the card can take more than one answer', () => {
+    const event = normalizeAcpElicitation('request-3', {
+      mode: 'form',
+      sessionId: 'acp-session',
+      message: 'Which checks should run?',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          question_0: {
+            type: 'array',
+            items: { anyOf: [{ const: 'lint', title: 'Lint' }, { const: 'test', title: 'Test' }] },
+          },
+        },
+      },
+    })
+    const [question] = event.type === 'request' ? event.questions ?? [] : []
+    expect(question.multiple).toBe(true)
+    expect(question.options).toEqual([{ id: 'lint', label: 'Lint' }, { id: 'test', label: 'Test' }])
+  })
+})
+
+describe('an answer goes back in the shape the agent asked for', () => {
+  it('sends the option value behind the label a person picked', () => {
+    // The card answers with labels, and this label is the flattened "value — description" one.
+    expect(acpElicitationResponse(askUserQuestion, {
+      answers: { question_0: 'pnpm — what the repo already uses', question_0_custom: '' },
+    })).toEqual({ action: 'accept', content: { question_0: 'pnpm' } })
+  })
+
+  it('keeps a multi-select an array and a free-text answer a string', () => {
+    const request = {
+      mode: 'form' as const,
+      sessionId: 'acp-session',
+      message: 'Which checks should run?',
+      requestedSchema: {
+        type: 'object' as const,
+        properties: {
+          checks: { type: 'array', items: { enum: ['lint', 'test'] } },
+          why: { type: 'string' },
+          count: { type: 'integer' },
+          rerun: { type: 'boolean' },
+        },
+      },
+    }
+    expect(acpElicitationResponse(request, {
+      answers: { checks: ['lint', 'test'], why: 'the build is red', count: '3', rerun: 'Yes' },
+    })).toEqual({
+      action: 'accept',
+      content: { checks: ['lint', 'test'], why: 'the build is red', count: 3, rerun: true },
+    })
+  })
+
+  it('declines on Skip and cancels on a drained turn', () => {
+    expect(acpElicitationResponse(askUserQuestion, { optionId: 'decline' })).toEqual({ action: 'decline' })
+    expect(acpElicitationResponse(askUserQuestion, { optionId: 'cancel' })).toEqual({ action: 'cancel' })
+  })
+
+  it('leaves an unanswered question out rather than sending an empty one', () => {
+    expect(acpElicitationResponse(askUserQuestion, { answers: {} })).toEqual({ action: 'accept', content: {} })
   })
 })

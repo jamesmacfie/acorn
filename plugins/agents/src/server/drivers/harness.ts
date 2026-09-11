@@ -67,6 +67,10 @@ const ACP_BASELINE: readonly AgentCapability[] = [
   'tool_calls',
   'plans',
   'permissions',
+  // Both, because the generic driver answers ACP's form elicitation (./acpDriver.ts). A harness that
+  // never asks a question simply never sends one.
+  'questions',
+  'elicitations',
   'commands',
   'usage',
   'file_changes',

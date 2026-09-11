@@ -2,7 +2,7 @@ import { agentTelemetry } from './agentTelemetry'
 import { createMemo, For, Index, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
-import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
@@ -40,6 +40,11 @@ export default function AgentTranscript(props: {
   // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
   // of turns, twenty-five times a second.
   const turnsById = createMemo(() => new Map(props.snapshot.turns.map((turn) => [turn.id, turn])))
+  // Same reason, and the same key the strip above resolves by. A question's card in the thread draws
+  // from the row rather than from its own event, because the answer, and whether one is still coming,
+  // live on the row and keep changing after the event is written.
+  const requestsById = createMemo(() =>
+    new Map(props.snapshot.requests.map((request) => [request.providerRequestId, request])))
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
   // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
   // the card's own children as its top level, which the projection already built as a tree.
@@ -83,6 +88,9 @@ export default function AgentTranscript(props: {
           sessionId={sessionId()}
           sessionModel={sessionModel()}
           turn={turnsById().get(item().turnId ?? '')}
+          request={item().event.type === 'request'
+            ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId)
+            : undefined}
         />
       </Timeline.Turn>
     )

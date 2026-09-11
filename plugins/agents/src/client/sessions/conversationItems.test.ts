@@ -237,3 +237,30 @@ describe('a subagent\u2019s run on its own', () => {
       .toEqual(['tool', 'assistant_message'])
   })
 })
+
+describe('what a request leaves in the thread', () => {
+  const items = () => buildConversationItems([
+    event(1, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+    event(2, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
+    event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
+  ])
+
+  it('keeps the question and drops the permission', () => {
+    const visible = visibleConversationItems(items())
+    expect(visible).toHaveLength(1)
+    expect(visible[0].event).toMatchObject({ type: 'request', requestId: 'ask-1' })
+  })
+
+  it('draws no card for the answer itself, which belongs to the question it answered', () => {
+    expect(visibleConversationItems(items()).some((item) => item.event.type === 'request_resolved')).toBe(false)
+  })
+
+  it('seats the question where it was asked, so the thread reads in order', () => {
+    const ordered = visibleConversationItems(buildConversationItems([
+      event(1, { type: 'assistant_message', text: 'Before' }),
+      event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+      event(3, { type: 'assistant_message', text: 'After' }),
+    ]))
+    expect(ordered.map((item) => item.event.type)).toEqual(['assistant_message', 'request', 'assistant_message'])
+  })
+})

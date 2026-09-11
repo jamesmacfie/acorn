@@ -19,8 +19,8 @@ export type AgentConversationItem = {
   children?: AgentConversationItem[]
 }
 
-// Which events are worth a card. `session_state`, `session_metadata`, `request` and `request_resolved`
-// are all projected elsewhere: state into the pane header, requests into the strip above the list.
+// Which events are worth a card. `session_state`, `session_metadata` and `request_resolved` are all
+// projected elsewhere: state into the pane header, and a resolution onto the request card it answers.
 // Exported because the transcript and a subagent card render from the same tree and have to agree.
 const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'user_message',
@@ -29,6 +29,7 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'tool',
   'subagent',
   'plan',
+  'request',
   'usage',
   'file_change',
   'terminal',
@@ -38,8 +39,14 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'diagnostic',
 ])
 
+// A question the agent asked belongs in the thread: it interrupted the conversation, and what it was
+// told is part of the record. A permission does not. It is a decision about one tool call, the tool
+// call already has a card, and a busy session would bury itself under them.
+const belongsInThread = (event: AgentNormalizedEvent): boolean =>
+  event.type !== 'request' || event.kind === 'question' || event.kind === 'elicitation'
+
 export const visibleConversationItems = (items: AgentConversationItem[]): AgentConversationItem[] =>
-  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type))
+  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event))
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (

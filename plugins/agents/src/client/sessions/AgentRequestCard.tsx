@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { Alert, Button, Card, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn above the transcript
@@ -10,7 +10,23 @@ export default function AgentRequestCard(props: {
   focused?: boolean
   onResolved?: () => void
 }) {
-  const [answers, setAnswers] = createSignal<Record<string, string>>({})
+  // Answers are the option's label rather than its id, because that is what both harnesses record as
+  // what the person said: Codex numbers its options positionally, so an id would reach the agent as "0".
+  const [answers, setAnswers] = createSignal<Record<string, string | string[]>>({})
+  const typed = (id: string): string => {
+    const answer = answers()[id]
+    return typeof answer === 'string' ? answer : ''
+  }
+  const ticked = (id: string): string[] => {
+    const answer = answers()[id]
+    return Array.isArray(answer) ? answer : []
+  }
+  const tick = (id: string, label: string, on: boolean): void => {
+    setAnswers((current) => {
+      const chosen = ticked(id)
+      return { ...current, [id]: on ? [...chosen, label] : chosen.filter((value) => value !== label) }
+    })
+  }
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const payload = () => props.request.payload
@@ -18,7 +34,13 @@ export default function AgentRequestCard(props: {
     ? payload().options as Array<{ id: string; label: string; kind?: string }>
     : []
   const questions = () => Array.isArray(payload().questions)
-    ? payload().questions as Array<{ id: string; header?: string; prompt: string; options?: Array<{ id: string; label: string }> }>
+    ? payload().questions as Array<{
+      id: string
+      header?: string
+      prompt: string
+      multiple?: boolean
+      options?: Array<{ id: string; label: string }>
+    }>
     : []
 
   async function resolve(resolution: unknown) {
@@ -52,20 +74,37 @@ export default function AgentRequestCard(props: {
                 when={question.options?.length}
                 fallback={
                   <Input
-                    value={answers()[question.id] ?? ''}
+                    value={typed(question.id)}
                     onInput={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
                   />
                 }
               >
-                <Select
-                  label={question.prompt}
-                  value={answers()[question.id] ?? ''}
-                  onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
-                  options={[
-                    { value: '', label: 'Choose…' },
-                    ...(question.options ?? []).map((option) => ({ value: option.label, label: option.label })),
-                  ]}
-                />
+                <Show
+                  when={question.multiple}
+                  fallback={
+                    <Select
+                      label={question.prompt}
+                      value={typed(question.id)}
+                      onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
+                      options={[
+                        { value: '', label: 'Choose…' },
+                        ...(question.options ?? []).map((option) => ({ value: option.label, label: option.label })),
+                      ]}
+                    />
+                  }
+                >
+                  <Stack gap="row">
+                    <For each={question.options ?? []}>
+                      {(option) => (
+                        <Checkbox
+                          label={option.label}
+                          checked={ticked(question.id).includes(option.label)}
+                          onChange={(on) => tick(question.id, option.label, on)}
+                        />
+                      )}
+                    </For>
+                  </Stack>
+                </Show>
               </Show>
             </Field>
           )}
