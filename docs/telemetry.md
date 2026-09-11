@@ -467,7 +467,7 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Seam | Where | What it emits |
 | --- | --- | --- |
 | Every request that leaves the renderer | `infra/node/apiClient.ts` `send()` | span `api.request` with method, route namespace and status; sets `traceparent` and `x-request-id` |
-| Slow renderer-helper calls | `apps/desktop/src/shell/bridge.ts` `call()` | one console and telemetry log above 250 ms, splitting helper handling, delivery queue, JSON parse and promise-continuation time; body decoding logs above 50 ms |
+| Slow renderer-helper calls | `apps/desktop/src/shell/bridge.ts` `call()` | one console and telemetry log above 250 ms, splitting helper handling, delivery queue, JSON parse and promise-continuation time; node fetches name their coarse API route and request id; body decoding logs above 50 ms |
 | Every failed query and mutation | `infra/node/fleet.ts` `clientFor` | a handled error, with the first two segments of the key |
 | Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | histogram `ws.inbound.<channel prefix>` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | span `command`, owner from `ownerId`; opens an interaction |
