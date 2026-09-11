@@ -260,8 +260,8 @@ export default function PluginsSettings() {
         <Button submit disabled={busy() || !spec().trim()}>Install</Button>
       </form>
       <p class="muted plugin-install-hint">
-        A plugin's server code runs with the same access as acorn itself. This device asks again, showing
-        what the plugin declared, before any of its interface code runs here.
+        A plugin's server code runs in an isolated, permission-scoped realm. This device asks again,
+        showing its enforced grants, before any of its interface code runs here.
       </p>
       {/* A folder is symlinked, not copied, so it is the one install whose bytes keep changing after
           the fact (docs/security.md § Installing from a folder). */}

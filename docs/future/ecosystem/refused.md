@@ -7,12 +7,11 @@ each entry names where it is argued in full. First collected 2026-08-30.
 One of this folder's refusals was overturned and is kept as an entry, at the bottom, because how it
 was overturned is the useful part.
 
-## No discovery surface before containment
+## No discovery surface before containment — **CONDITION CLEARED**
 
-A stranger's plugin found through discovery would make the install prompt the whole security model,
-and the node half is disclosed rather than contained. Shipping discovery first would turn an honest,
-documented weakness into a liability. This is the reason the work plan is ordered the way it is, and
-it stays refused until rung 2 of the containment ladder ships
+Rung 2 now isolates loaded node halves in permission-scoped worker realms. The containment condition
+is therefore cleared; discovery remains refused for the independent package-signing condition below.
+The ordering did its job: there was no interval in which discovery exposed uncontained node halves
 ([blockers.md](./blockers.md) § 1, § 2).
 
 ## No plugin auto-update before signing

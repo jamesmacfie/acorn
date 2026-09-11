@@ -93,6 +93,7 @@ import { handle } from '../server/routes.js'
 // Relative imports and `node:` builtins only — this directory has no node_modules.
 export default {
   name: 'hello-acorn',
+  /** @param {import('acorn-plugin-types').NodePluginContext} ctx */
   init(ctx) {
     // The portable carrier. The mount is stripped, so `/v2/p/hello-acorn/greeting`
     // arrives here as `/greeting`.
@@ -104,6 +105,11 @@ export default {
 ### `server/routes.js`
 
 ```js
+/**
+ * @param {Request} request
+ * @param {import('acorn-plugin-types').PluginRequestContext} context
+ * @param {import('acorn-plugin-types').CoreServices} core
+ */
 export async function handle(request, context, core) {
   const { pathname, searchParams } = new URL(request.url)
 
@@ -240,15 +246,17 @@ The complete example uses a frame. The default scaffold provides a tree with its
 ## Updating a plugin, and the data underneath it
 
 Keep the plugin ID stable and append schema migrations. Do not edit or reorder a migration that
-has shipped. The loader checks for a journal but does not verify that applied SQL remains unchanged.
+has shipped. Before applying anything new, the loader hashes the current SQL and compares the applied
+prefix, journal order, and timestamps with the database's migration ledger. Restore the original chain
+and append a new migration if that check fails.
 
 The installer rejects a lower version unless the caller explicitly requests a downgrade. That override
 does not reverse migrations. To recover a failed update, restore a compatible database backup or
 reinstall with `purgeData` if discarding the plugin's data is acceptable. Uninstall keeps data by default.
 
 Development reload can roll back registrations after failed initialization. It cannot undo a migration
-that already ran. Reload re-evaluates the entry module; restart the Node after editing an imported
-module. For details, see [The dev loop](../plugins/activation.md#the-dev-loop).
+that already ran. Reload starts a fresh worker realm and re-evaluates the complete node dependency
+graph. For details, see [The dev loop](../plugins/activation.md#the-dev-loop).
 
 Agent install and update requests go through `plugin_request` and device approval. A development grant
 changes the client trust loop; it does not make schema rollback available.

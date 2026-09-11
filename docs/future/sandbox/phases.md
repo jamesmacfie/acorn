@@ -91,22 +91,22 @@ resolved-policy view can be demoed with execution target still `host`.
 above the managed ceiling; with no managed layer, the resolver does not execute and behavior is
 byte-for-byte the un-governed path. Audit rows reach the configured OTLP endpoint.
 
-## Phase 5 — Plugin containment rung 2
+## Phase 5 — Plugin containment rung 2 — **shipped**
 
-The design is owned by `docs/security.md § The containment ladder`, rung 2, and the same work is
-gate 1 in [ecosystem/blockers.md](../ecosystem/blockers.md) and phase 2 in
-[ecosystem/work-plan.md](../ecosystem/work-plan.md). It is listed here, not restated, because it is a
-launch requirement for the enterprise offering rather than a follow-up: it is the first question a
-security review asks. [enterprise-policy.md](./enterprise-policy.md) § The plugin containment rung
-says what the managed layer adds on top.
+The shipped boundary is owned by `docs/security.md § The containment ladder`, rung 2, and recorded
+as the closed gate in [ecosystem/blockers.md](../ecosystem/blockers.md). It remains listed here
+because it is a launch requirement for the enterprise offering: it is the first question a security
+review asks. [enterprise-policy.md](./enterprise-policy.md) § The plugin containment rung says what
+the managed layer adds on top.
 
-- [ ] Run each loaded plugin's node half as a child process holding a plugin-scoped internal token
-      whose scope is its manifest, enforced in the auth middleware
-      (`packages/node-core/src/server/middleware/auth.ts`).
-- [ ] Under a managed policy, refuse to load a plugin that cannot run out of process.
+- [x] Run each loaded plugin's node half in a permission-scoped worker realm with an owner-bound,
+      manifest-shaped RPC context and exact filesystem grants.
+- [x] Refuse to load a plugin when its isolated realm cannot start or its manifest-shaped
+      dependencies cannot be satisfied.
 
 **Acceptance.** A loaded plugin's node half cannot open `core.sqlite` or another plugin's database;
-the enforcement is server-side, not cooperative.
+the loader test proves both ESM-import and `process.getBuiltinModule` attempts fail. Moving the
+same RPC contract to an OS-confined child remains rung 3, not unfinished rung-2 work.
 
 ## Dependency order
 
@@ -118,7 +118,6 @@ Phase 1 ──▶ Phase 2
 Phase 4 ──▶ Phase 5 ┘
 ```
 
-Phases 1 and 2 are shipped, so phases 3 through 5 no longer build on a boundary an agent walks
-around. Phases 3 and 4 are independent of each other. Phase 5 depends on phase 4's managed layer for its
-enforcement switch. The enterprise offering needs 1, 4, and 5 at minimum; 3 is the security
+Phases 1, 2, and 5 are shipped, so phases 3 and 4 no longer build on a boundary an agent walks
+around. Phases 3 and 4 are independent of each other. The enterprise offering needs 1, 4, and 5 at minimum; 3 is the security
 centerpiece but a policy-only deployment on the `host` target is a coherent first sale.

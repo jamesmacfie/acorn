@@ -137,8 +137,8 @@ describe('trustTiers', () => {
   })
 
   it('keeps the enforced, declared and web claims in three separate lists', () => {
-    // They may never be rendered as one: `Enforced` is checked by the UI bridge, `Declared` is the
-    // plugin's own description of code that shares the node's process, and `Web pages` reaches the
+    // They may never be rendered as one: `Enforced` is checked by the UI bridge and Node worker,
+    // `Declared` describes plugin-authored unattended behavior, and `Web pages` reaches the
     // live internet. A reader who cannot tell them apart is being misled about the first one.
     const tiers = trustTiers(request({
       permissions: permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: true, exec: false, net: [] } }),
@@ -151,8 +151,8 @@ describe('trustTiers', () => {
       },
     }))
     expect(tiers.map((tier) => tier.key)).toEqual(['enforced', 'declared', 'web'])
-    expect(keysIn(tiers, 'enforced')).toEqual(['core.tasks:read', 'keys:board-web:meta+shift+b'])
-    expect(keysIn(tiers, 'declared')).toEqual(['node.secrets', 'node.core:git'])
+    expect(keysIn(tiers, 'enforced')).toEqual(['core.tasks:read', 'node.secrets', 'node.core:git', 'keys:board-web:meta+shift+b'])
+    expect(keysIn(tiers, 'declared')).toEqual([])
     expect(keysIn(tiers, 'web')).toEqual(['webview:board-web:board.example'])
   })
 

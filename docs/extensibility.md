@@ -271,24 +271,18 @@ exploitable in a dramatic way. All three were the same mistake.
 
 If you are adding a plugin surface, assume this is the failure you are about to make.
 
-## The node half is disclosed, not contained
+## The node half is isolated
 
-A loaded plugin's server code runs **in the Node's process** and can do anything the Node can. Its
-declared `permissions.node` block shapes the context it receives, which is real least-privilege for
-cooperative code and makes the trust prompt truthful for the honest majority — but it is not a
-boundary, because that code can ignore the context entirely.
+A loaded plugin's server code runs in a dedicated permission-scoped worker realm. Its
+`permissions.node` block shapes the owner-bound context sent over RPC and the worker's network and
+child-process grants. The worker can read its package and, when it owns migrations, its exact SQLite
+files; it cannot directly load `node:sqlite`, open core or peer databases, create raw sockets, load
+native addons, or start nested workers.
 
-Every surface that renders those permissions says *declared*, not *enforced*. The trust prompt
-defines the word in its legend, and that legend carries one sentence that must not be softened:
-"This plugin's server code runs with the same access as acorn itself." The UI half genuinely is
-contained, and keeping the two lists visually separate is deliberate — a strong claim must not lend
-credibility to a weaker one sitting next to it.
-
-The route to a real boundary is written down in `security.md` § Node-half plugin security: move
-loaded plugins out of process, under the platform's own permission model, with the context becoming
-authorized calls rather than an object. Nothing shipped forecloses it, and a few decisions exist
-only to keep it buildable — the fetch-shaped route handler is the main one, because a live server
-object cannot cross a process boundary and a request/response function can.
+Every surface renders those host and runtime grants as *enforced*. Plugin-authored schedule and task
+check behavior stays *declared*: acorn controls when and where it executes, but cannot verify intent.
+The route to an OS adversarial and crash boundary remains rung 3 in `security.md`; the current worker
+boundary deliberately preserves the public plugin API, including its synchronous registration seams.
 
 ## Bundled plugins: shipped, but loaded
 
@@ -386,7 +380,8 @@ Roughly in order of how much they matter:
    fleet (`docs/plugins.md § Node providers`). Both seams exist and both are inert unless configured.
    The rule they were built under is the one this document's "unexercised seams rot" section predicts:
    a first-party control-plane plugin gets no host privilege a third party lacks, and the reference
-   provider (`plugins/nodes-file`) is deliberately a loaded plugin whose manifest grants it nothing, so
+   provider (`plugins/nodes-file`) is deliberately a loaded plugin whose manifest grants only its
+   environment-configured inventory file, so
    the seam has a consumer before it has a business behind it.
 6. **Web and mobile**, analysed in `future/remote.md`. The plugin work quietly prepared for it —
    the sandbox is standard web platform, and the client's platform-specific access sits behind one

@@ -11,12 +11,11 @@ Already shipped and removed from this plan: the agent-authored dev loop (authori
 reload, approval-mediated install, dev trust grant, agent enablement — `docs/plugin-authoring.md`,
 `docs/plugins.md`), plugin themes and the new chrome/extension vocabulary, and the node-first
 preconditions (the client↔node version contract in `docs/api-reference.md § Versioning`, the
-platform seam, node-side compositions in `docs/state-ownership.md`).
+platform seam, node-side compositions in `docs/state-ownership.md`). Rung-2 node-half isolation
+has also shipped and remains below as a numbered record because other documents cite the phase.
 
-The ordering principle for what remains: fix the front door for authors first (additive,
-independently useful), put containment before discovery so acorn never has a window where
-strangers can find plugins whose node halves run uncontained, and keep distribution last because
-everything before it makes distribution worth having.
+The ordering principle has held: the authoring front door and containment shipped before discovery.
+Distribution remains last because package signing and release delivery make discovery worth having.
 
 ## What is actually waiting on something (2026-08-16)
 
@@ -27,9 +26,6 @@ we start phase N" is almost always "now, and the real question is what else stop
 
 Startable today, in any order:
 
-- **Phase 2's first sub-step** — process supervision and lifecycle, reusing the reload path's
-  candidate-then-commit shape. Nothing gates it, it is independently useful, and it is the critical
-  path for anything discovery-shaped.
 - **Phase 3's remaining backlog** — the typed-collection contract, the panel grid and cross-source
   mapping all shipped (owning doc: `docs/dashboards.md`). What is left is the deliverables in
   `docs/future/dashboards/` — new placements, dynamic collections, board-drag write-back —
@@ -40,8 +36,8 @@ Startable today, in any order:
   Windows build: `ensureCert` shells out to `openssl`, stock Windows has none, and it fails at first
   boot with the node refusing to start.
 
-Gated, and it is the only item on the list: **discovery** — hard on phase 2, and it has a recorded
-stance without a design.
+Gated, and it is the only item on the list: **discovery** — rung 2 is no longer the blocker, but
+plugin-package signing still is, and discovery has a recorded stance without a design.
 
 **The one thing effort cannot route around.** macOS is stuck in two separate places on a single
 purchase. A downloaded node tarball containing `.node` binaries is quarantined by Gatekeeper
@@ -69,17 +65,14 @@ symlinked folder is not hash-pinned and never will be.
 
 Phases 2–4 do not renumber.
 
-## Phase 2 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
+## Phase 2 — rung-2 containment — **shipped**
 
-One child process per plugin node half, plugin-scoped token, fs jail, ctx-as-RPC. The six design
-rules that keep this a refactor are already enforced; the work is still the long pole of the whole
-program. Sub-steps worth staging: process supervision and lifecycle first (the reload path's
-candidate-then-commit semantics are the shape to reuse), then the RPC ctx, then the fs/network
-jail. Dev-mode plugins inherit the containment when it lands, which retroactively strengthens the
-dev trust grant.
-
-Deliverable: "declared" becomes "enforced" for plugin node halves; the permission UI's language
-can finally strengthen.
+Each loaded plugin node half runs in a fresh permission-scoped worker realm, with an owner-bound,
+manifest-shaped context over RPC and exact filesystem grants. Candidate-then-commit reload now swaps
+realms, not only entry modules. The trust UI renders node grants as enforced. The shipped worker
+design deliberately replaces the proposed child process because per-worker permission flags preserve
+the synchronous public contract; `docs/security.md § Rung 2 — Isolated Node realm` owns the result
+and records that OS sandboxing and crash isolation remain rung 3.
 
 ## Phase 3 — dashboards (owning doc: `docs/dashboards.md`)
 
@@ -103,8 +96,8 @@ In order:
    instead of a tarball ritual. The first three are startable today; macOS is the one item behind the
    Apple Developer Program purchase, which the app's own auto-update is also behind.
 3. **Discovery** — an unreviewed listing over signed packages, honest about being unreviewed,
-   riding the shipped per-(plugin, hash) trust and permission-diff consent. Hard-gated on phase 2;
-   do not ship discovery over uncontained node halves.
+   riding the shipped per-(plugin, hash) trust, permission-diff consent, and isolated node realms.
+   It remains hard-gated on plugin-package signing.
 
 Deliverable: a stranger finds a plugin, installs it from the listing onto a desktop or remote
 node, and the trust story told in the prompt is true.

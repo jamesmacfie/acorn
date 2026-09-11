@@ -70,10 +70,11 @@ shape — "make my acorn look like X / build me a pane for Y" as a one-session a
 one human approval, iterating without prompts, distributed later through signed per-hash consent — is
 the pitch no neighbour can copy without rebuilding their security model. That is also why the ordering
 in `work-plan.md` puts containment before discovery: the differentiator is the boundary, so shipping
-discovery over uncontained node halves would be spending it.
+discovery over uncontained node halves would have spent it.
 
-The loop is live and the front door is open (`npm create acorn-plugin`, `acorn-plugin-sdk`). Rung 2
-(`blockers.md § 1`) is what lets strangers join.
+The loop, front door, and rung-2 isolated node realm are live (`npm create acorn-plugin`,
+`acorn-plugin-sdk`; `blockers.md § 1`). Package signing is now the remaining gate before strangers
+join through discovery.
 
 ## What this stance implies for "only where security needs it" first-party plugins
 

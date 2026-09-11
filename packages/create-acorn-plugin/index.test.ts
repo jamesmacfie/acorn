@@ -18,6 +18,17 @@ const REPO = join(PACKAGES, '..')
 // network. Both are pnpm-shaped paths, which is the one thing about this test that is not portable.
 const CLI = join(HERE, 'index.mjs')
 
+const documentedExample = (heading: string, language: string): string => {
+  const source = readFileSync(join(REPO, 'docs/plugin-authoring/installing-a-hand-written-package.md'), 'utf8')
+  const marker = `### \`${heading}\``
+  const section = source.indexOf(marker)
+  const open = source.indexOf(`\`\`\`${language}\n`, section)
+  const start = open + language.length + 4
+  const end = source.indexOf('\n```', start)
+  if (section < 0 || open < 0 || end < 0) throw new Error(`Could not find documented ${heading} example`)
+  return `${source.slice(start, end)}\n`
+}
+
 /** Run the scaffolder the way a person does, in a fresh directory, and read back what it wrote. */
 function runCli(...args: string[]): { dir: string; manifest: Record<string, unknown> } {
   const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
@@ -30,7 +41,7 @@ function runCli(...args: string[]): { dir: string; manifest: Record<string, unkn
 const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
 const NODE_TYPES = (() => {
   const store = join(REPO, 'node_modules', '.pnpm')
-  const entry = readdirSync(store).find((name) => /^@types\+node@/.test(name))
+  const entry = readdirSync(store).find((name) => name.startsWith('@types+node@'))
   if (!entry) throw new Error('@types/node is not in the pnpm store')
   return join(store, entry, 'node_modules')
 })()
@@ -191,6 +202,58 @@ it("type-checks its node half against the published declarations, from outside t
     } catch (error) {
       // tsc reports on stdout, so the default message ("Command failed") says nothing at all.
       throw new Error(String((error as { stdout?: Buffer }).stdout ?? error))
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+it('type-checks the complete documented plugin example outside the workspace', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'documented-plugin-'))
+  try {
+    const files = {
+      'acorn-plugin.json': documentedExample('acorn-plugin.json', 'json'),
+      'node/index.js': documentedExample('node/index.js', 'js'),
+      'server/routes.js': documentedExample('server/routes.js', 'js'),
+      'client.js': documentedExample('client.js', 'js'),
+    }
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+
+    const manifest = JSON.parse(files['acorn-plugin.json'])
+    const parsed = parsePluginManifest(manifest)
+    expect(parsed.ok ? null : parsed.reason).toBe(null)
+
+    const types = join(dir, 'node_modules', 'acorn-plugin-types')
+    mkdirSync(join(types, 'dist'), { recursive: true })
+    copyFileSync(join(PACKAGES, 'plugin-types', 'src', 'public.ts'), join(types, 'dist', 'index.d.ts'))
+    copyFileSync(join(PACKAGES, 'plugin-types', 'package.json'), join(types, 'package.json'))
+    cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2023',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        lib: ['ES2023', 'DOM'],
+        types: ['node'],
+        allowJs: true,
+        checkJs: true,
+        noEmit: true,
+        strict: true,
+        skipLibCheck: false,
+      },
+      include: ['node', 'server'],
+    }))
+
+    try {
+      execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
+      execFileSync(process.execPath, ['--check', join(dir, 'client.js')], { stdio: 'pipe' })
+    } catch (error) {
+      throw new Error(String((error as { stdout?: Buffer; stderr?: Buffer }).stdout
+        ?? (error as { stderr?: Buffer }).stderr
+        ?? error))
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

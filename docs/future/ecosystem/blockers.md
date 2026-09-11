@@ -1,44 +1,25 @@
 # The gates, and what answers each
 
-From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16. The session found four
-gates; **two are now gone**. The reload gate went first — a loaded plugin hot-swaps in place
+From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16 and updated after rung 2
+shipped. The session found four gates; **three are now gone**. The reload gate went first — a loaded plugin hot-swaps in place
 (`docs/plugins.md § Reloading one plugin without a restart`). The authoring/install gate went on
 2026-08-16, and its closing note is kept below because the argument it settles keeps coming back.
 Each remaining gate is a deliberate decision with recorded rationale — not a gap someone forgot —
 which means each is reversed by a decision plus its designed answer, not by rearchitecture.
 Ordered by how hard they gate the end goal.
 
-## 1. The node half is disclosed, not contained
+## 1. The node half is contained — **CLOSED**
 
-**What.** A loaded plugin's node bundle runs in-process inside the Node. `permissions.node` shapes
-the `ctx` the host hands it — undeclared facets are absent, `secrets`/`exec` default off — but the
-bundle shares the process and can `import('node:fs')`, open `core.sqlite`, or monkeypatch globals.
-`docs/security.md § Node-half plugin security` says this plainly, and every permission UI is
-required to say *declared*, never *enforced*.
+Each loaded node half now runs in its own permission-scoped worker realm. The host sends only an
+owner-bound, manifest-shaped RPC context; the worker may read its package and, when needed, write its
+own exact SQLite paths. Direct `node:sqlite`, raw sockets, nested workers, native addons, and
+undeclared child processes are refused. Reload keeps candidate-then-commit semantics across fresh
+realms. The permission UI consequently renders these grants as *enforced*.
 
-**Why it gates everything marketplace-shaped.** For plugins the user authored (the shipped dev
-loop, `docs/plugin-authoring.md`), disclosure is the accepted deal — the human entered dev mode
-for that plugin on that node. For a stranger's plugin found through discovery, disclosure-only
-means the install prompt *is* the security model. That is bb's trade, refused on the record.
-Shipping discovery before containment converts an honest, documented weakness into a liability.
-
-**The designed answer.** `docs/security.md § The containment ladder`, rung 2: one child process
-per plugin, a plugin-scoped token, a `--permission` fs jail, `ctx` becomes RPC. Rung 3 adds OS
-sandboxing for network egress. Six design rules already enforced today were chosen specifically so
-rung 2 stays a refactor: fetch-shaped route handlers, async-only ctx, structured-clone-safe
-capabilities, no general secret read path, and friends. The reload path's candidate-then-commit
-lifecycle is the supervision shape to reuse. This is the single biggest lift in the whole program
-and the hard precondition for gate 2's discovery half.
-
-**There is a down payment on it, made for the client half.** The terminal client runs a loaded
-plugin's tree in a `node:worker_threads` realm under `--permission`, and shipping it settled three of
-rung 2's open questions the cheap way (`docs/security.md § Rung 0 — The client sandbox`): the flag set
-applies per realm rather than per process, so the host needs no grants of its own; a bundle can be
-loaded by path with nothing else on the filesystem readable; and the network hole Node's permission
-model leaves is closable with a `module.registerHooks` deny list rather than only with rung 3's OS
-sandbox. What is left for rung 2 is the part this did not touch: turning `ctx` into authorised calls
-over the boundary, and the plugin-scoped token behind them. The lift is smaller than it was, and none
-of it is guesswork any more.
+The acceptance test installs two hostile fixtures that try both ESM import and
+`process.getBuiltinModule` paths to open `core.sqlite` and another plugin's database. Neither obtains
+`DatabaseSync`. `docs/security.md § Rung 2 — Isolated Node realm` owns the boundary and its honest
+limit: it is strong application-level isolation, not an OS adversarial sandbox or crash boundary.
 
 ## 2. No signing, no discovery
 
@@ -56,8 +37,8 @@ already know about" does not, and safely cannot yet.
 **The designed answer.** Partial. Signing has a named direction (sigstore-style attestation) but
 no design doc. Discovery has a stance (unreviewed, honest about it) but no design. The
 update-consent flow it would ride — per-(plugin, hash) device trust with a permission diff on
-update — is shipped. Work plan: design signing first, then discovery as a listing over signed
-packages, and only after rung 2.
+update — is shipped, as is rung 2. Work plan: design signing first, then discovery as a listing
+over signed packages.
 
 ## 3. External authors cannot install on a build they have — **CLOSED 2026-08-16**
 
@@ -71,9 +52,9 @@ offers a native folder picker when the target node is this machine.
 **Kept because the argument recurs.** The decision was a trust-boundary one, not a config flag, and
 `docs/security.md § Installing from a folder` holds it in full. The short form: a folder install is the
 owner naming bytes already theirs, and anyone who can rewrite that directory can already rewrite the
-install root beside it, so the symlink grants no new authority; the node half is uncontained for every
-source alike, which is gate 1's problem and not this one's; and the client half is untouched because
-device consent is keyed on the hash of the bytes that arrive, so an in-place edit re-prompts by itself.
+install root beside it, so the symlink grants no new authority; every source gets the same isolated
+node realm; and the client half is untouched because device consent is keyed on the hash of the bytes
+that arrive, so an in-place edit re-prompts by itself.
 
 **What it costs, and must keep saying.** A symlinked folder cannot be pinned. The lockfile records
 `archiveSha256: null` and empty `entrypoints`, a test holds that, and the install form says so in its
@@ -96,7 +77,7 @@ tidy-up; it is a claim of provenance the source cannot support.
   uncooperative extension is refused on the record and stays refused
   (`docs/plugins.md § There is no uncooperative extension`).
 
-## Verify before building
+## Verify before distribution
 
-Whether rung 2 has shipped (changes gate 1's risk text and the dev-grant note); and whether the
-lockfile still pins hashes for fetched sources and the installer still refuses downgrades.
+Verify that the rung-2 acceptance tests still deny core and peer database access, that the lockfile
+still pins hashes for fetched sources, and that the installer still refuses downgrades.

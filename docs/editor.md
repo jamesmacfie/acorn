@@ -38,11 +38,24 @@ resolution and the completion source), `client-core/host/layouts/DocumentSplit.t
 layout) and `client-core/host/frames/layouts.ts` (the trust and confinement
 gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
 
-**Step 7 — the editor plugin's own move — is all that remains**, and it still waits on its consumer in
-the same way: its template shape and the open-document verb land when that move is planned. What came
-out differently from the design is recorded against each step below and, in more detail, in
-`docs/loaded-plugin-migration.md § database has moved`. The rest of this document is the design, kept as
-written.
+**Step 7 — the editor plugin's own move — was reassessed on 2026-09-11 and is not ready to take.**
+The size premise is gone: `pnpm --filter @acorn/node measure:editor-bundle` builds the current pane as
+one loaded-frame-style file and measures 1,271,605 raw bytes (265,587 gzip), well under the 8 MiB
+ceiling. `EDITOR` and `SEARCH` are private route indirections with no consumer outside this plugin, so
+they should be deleted rather than ported when the move happens.
+
+What remains is host contract, not bundle arithmetic. The Node half owns the `editor:pty:*` WS channel
+used by the `$EDITOR` mode; the client half registers the persisted open-file slice, which has no
+manifest form; and the pane owns a dynamic file tree and multi-document tab model while the current
+declarative `document` layout describes one document. Extraction therefore waits for an explicit
+multi-document/open-document contract and persisted-state descriptor, or for a deliberate decision
+to keep those two capabilities first-party. Desktop CodeMirror and the terminal's read-only plus
+`$EDITOR` rendering remain behind `@acorn/plugin-api/ui/editor` and the host `editor` rectangle. They
+must not be copied into a loaded bundle to make the move appear complete.
+
+What came out differently from the design is recorded against each step below and, in more detail,
+in `docs/loaded-plugin-migration.md § database has moved`. The rest of this document is the design,
+kept as written.
 
 ## The engine is CodeMirror, and that is the point
 

@@ -377,12 +377,12 @@ refuses.
 
 ### Permissions
 
-Three lists, and they are enforced in three different places.
+Three groups, enforced at the boundary that owns each one.
 
-`permissions.node` shapes the `ctx` your node half receives (`server/plugins/permissions.ts`). It is **least
-privilege for cooperative code, not a sandbox** — a loaded bundle shares the node's process and can
-`import('node:fs')` and ignore `ctx` entirely. Gating is by omission: an undeclared facet is absent,
-so the first call is a `TypeError` the author sees immediately.
+`permissions.node` shapes both the RPC `ctx` your node half receives
+(`server/plugins/permissions.ts`) and its permission-scoped worker realm. Gating is by omission: an
+undeclared host facet is absent, so the first call is a `TypeError` the author sees immediately.
+Filesystem, environment, process, and network grants are also absent unless declared.
 
 - `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`, plus
   `projects:read`, `projects:config`, `projects:write`. The project grants nest — `config` and
@@ -393,7 +393,14 @@ so the first call is a `TypeError` the author sees immediately.
   exporting a capability is a contribution, not an access grant.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
-- `net`: intended egress hosts. Pure disclosure today.
+- `net`: exact hostnames the worker's `fetch` may reach. Raw network modules stay unavailable,
+  and redirects are returned rather than followed so fetching the next location rechecks its host.
+- `env`: parent-environment variable names the worker may inherit in addition to the process broker's
+  credential-free base. Each is a high-risk trust line.
+- `files`: local path grants resolved from environment variables, as
+  `{ "env": "MY_PLUGIN_FILE", "access": "read" | "read-write" }`. The value must be absolute and
+  outside acorn's data root. A read-write grant includes one fixed `.acorn-tmp` sidecar so an author
+  can replace the file atomically without receiving its whole directory.
 
 **`telemetry` is the one grant that hands you other packages' data.** It gives you
 `ctx.core.telemetry.onBatch`, and a sink sees every record this node collects from every owner:
@@ -426,9 +433,8 @@ both: a connected OpenAI or Anthropic key, and any agent CLI on the machine that
 text mode ([integrations.md](../integrations.md) § Model providers). Which of them runs is decided by
 the person picking from the dropdown, or by your own fallback to the first available backend. You
 cannot name a CLI the owner does not have, and you cannot make one run with tools or inside a
-worktree, because core owns that process. There is no second token for the CLI half: the boundary it
-would draw is not real, and `permissions.node` is declared rather than enforced, so it would buy a
-trust line describing a distinction the runtime does not hold.
+worktree, because core owns that process. There is no second token for the CLI half: `models` is the
+host operation being granted, whichever host-owned backend the person later chooses.
 
 `permissions.api` is the **frame's** scope list, and unlike the node block it is genuinely enforced —
 by an allowlist of (path shape, method) pairs at

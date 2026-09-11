@@ -140,11 +140,9 @@ The page every trust prompt links to. Three lists, and where each is enforced ve
   grantable scopes (`core.projects:config|read|write`, `core.tasks:read|write`,
   `core.workspaces:read`); a plugin's own namespace is always allowed, another plugin's never.
 - `permissions.events` — names the shell channels a frame may subscribe to.
-- `permissions.node` (and `net`, `secrets`, `exec`) — **declared, not enforced**. The node half
-  runs in-process; these shape the context handed to cooperative code and inform the trust
-  prompt, and the page says so in those words. This is the "disclosed, not contained" honesty
-  constraint from [README.md](./README.md), stated where authors and users will actually read
-  it.
+- `permissions.node` (and `net`, `secrets`, `exec`) — **enforced** by the isolated worker's
+  manifest-shaped RPC context and runtime grants. Scheduled and task-check behavior remains
+  **declared**, because the host controls placement and timing but cannot verify plugin intent.
 
 Plus the trust model: install is per-node and owner-authenticated, trust is per-device with a
 prompt that renders the permission lists, and bundled plugins ride the identical

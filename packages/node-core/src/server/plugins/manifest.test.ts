@@ -88,6 +88,21 @@ describe('permission identifier shape', () => {
     const result = permissionManifest({ api: ['core.quantum:read'], events: ['runtime:quantum-shift'] })
     expect(result.success).toBe(true)
   })
+
+  it('accepts only individually named worker environment and file grants', () => {
+    const result = permissionManifest({
+      node: {
+        env: ['DATABASE_URL'],
+        files: [{ env: 'ACORN_NODES_FILE' }, { env: '_PRIVATE_CACHE', access: 'read-write' }],
+      },
+    })
+    expect(result.success && result.data.permissions.node).toMatchObject({
+      env: ['DATABASE_URL'],
+      files: [{ env: 'ACORN_NODES_FILE', access: 'read' }, { env: '_PRIVATE_CACHE', access: 'read-write' }],
+    })
+    expect(permissionManifest({ node: { env: ['DATABASE_*'] } }).success).toBe(false)
+    expect(permissionManifest({ node: { files: [{ env: 'nodes_file' }] } }).success).toBe(false)
+  })
 })
 
 describe('overlay surfaces', () => {

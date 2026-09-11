@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
 import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './loader'
@@ -137,6 +138,97 @@ describe('loaded-plugin migration ownership', () => {
     expect(failures).toEqual([])
     expect(() => loaded[0].storage.open()).toThrow(PluginMigrationsError)
     expect(() => loaded[0].storage.open()).toThrow("Plugin 'ntfy' opened storage but declares no migrations")
+  })
+
+  it('opens only its own prepared database inside the isolated realm', async () => {
+    const dir = install(
+      'keeper',
+      manifest('keeper', { migrations: './migrations' }),
+      `export default { name: 'keeper', init: (ctx) => ctx.storage.open().$client.exec('CREATE TABLE realm_proof (id INTEGER)') }\n`,
+    )
+    chain(join(dir, 'migrations'))
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    await loaded[0].plugin.init({} as never)
+    await loaded[0].plugin.dispose?.()
+
+    const db = new DatabaseSync(join(pluginInstallDir(root), 'keeper.sqlite'))
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'realm_proof'").get()).toBeTruthy()
+    db.close()
+  })
+})
+
+describe('the isolated node realm', () => {
+  it('does not inherit undeclared node environment values', async () => {
+    vi.stubEnv('SESSION_ENC_KEY', 'must-not-leak')
+    install(
+      'sealed',
+      manifest('sealed'),
+      `export default { name: 'sealed', seen: process.env.SESSION_ENC_KEY ?? null, init() {} }\n`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(failures).toEqual([])
+    expect((loaded[0].plugin as { name: string; seen?: unknown }).seen).toBe(null)
+  })
+
+  it('refuses an environment-backed file grant inside the data root', async () => {
+    const core = join(root, 'core.sqlite')
+    writeFileSync(core, 'core')
+    vi.stubEnv('PLUGIN_FILE', core)
+    install(
+      'snoop-file',
+      manifest('snoop-file', {
+        permissions: {
+          node: {
+            files: [{ env: 'PLUGIN_FILE', access: 'read' }],
+          },
+        },
+      }),
+      BUNDLE('snoop-file'),
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(loaded).toEqual([])
+    expect(failures[0]?.reason).toContain("file grant PLUGIN_FILE must stay outside acorn's data root")
+  })
+
+  it('cannot read core or another plugin database directly', async () => {
+    mkdirSync(pluginInstallDir(root), { recursive: true })
+    const core = join(root, 'core.sqlite')
+    const peer = join(pluginInstallDir(root), 'peer.sqlite')
+    writeFileSync(core, 'core')
+    writeFileSync(peer, 'peer')
+    const imported = (name: string, path: string) =>
+      `import { DatabaseSync } from 'node:sqlite'\nnew DatabaseSync(${JSON.stringify(path)})\nexport default { name: ${JSON.stringify(name)}, init() {} }\n`
+    const builtin = (name: string, path: string) =>
+      `const { DatabaseSync } = process.getBuiltinModule('node:sqlite')\nnew DatabaseSync(${JSON.stringify(path)})\nexport default { name: ${JSON.stringify(name)}, init() {} }\n`
+    install('snoop-core', manifest('snoop-core'), imported('snoop-core', core))
+    install('snoop-peer', manifest('snoop-peer'), builtin('snoop-peer', peer))
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(loaded).toEqual([])
+    expect(failures.map((failure) => failure.id)).toEqual(['snoop-core', 'snoop-peer'])
+    for (const failure of failures) expect(failure.reason).toMatch(/may not (?:import|load builtin) 'node:sqlite'/)
+  })
+
+  it('cannot import the trusted worker storage adapter as a sqlite bypass', async () => {
+    const core = join(root, 'core.sqlite')
+    writeFileSync(core, 'core')
+    const storageAdapter = new URL('./workerStorage.ts', import.meta.url).href
+    install(
+      'snoop-runtime',
+      manifest('snoop-runtime'),
+      `import { openWorkerPluginDb } from ${JSON.stringify(storageAdapter)}\nopenWorkerPluginDb(${JSON.stringify(core)}, 'snoop-runtime', 'missing')\nexport default { name: 'snoop-runtime', init() {} }\n`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(loaded).toEqual([])
+    expect(failures[0]?.reason).toContain('may not import files outside its package')
   })
 })
 
@@ -334,10 +426,9 @@ describe('rejections', () => {
   })
 })
 
-// The half of the reload path that lives in this file: defeating Node's ES module cache, which is
-// permanent and keyed on the resolved URL. Without this, "reload" would re-run the first load's
-// module object forever and every assertion about candidate-then-commit would be about nothing.
-describe('re-importing a package for a reload', () => {
+// Each isolated realm owns a complete module cache. Starting a candidate therefore evaluates the
+// entry and every dependency afresh; `reimport` remains an accepted no-op for older callers.
+describe('evaluating a fresh isolated package realm', () => {
   const marked = (name: string, marker: string) =>
     `export default { name: ${JSON.stringify(name)}, init: () => {}, marker: ${JSON.stringify(marker)} }\n`
   const markerOf = async (options: Parameters<typeof loadExternalPlugins>[1]): Promise<string | undefined> => {
@@ -345,27 +436,22 @@ describe('re-importing a package for a reload', () => {
     return (loaded.find((entry) => entry.manifest.id === 'acme')?.plugin as { marker?: string } | undefined)?.marker
   }
 
-  it('serves the cached module until a load names the id, then evaluates the file again', async () => {
+  it('evaluates the entry again on every load', async () => {
     const dir = install('acme', manifest('acme'), marked('acme', 'v1'))
     expect(await markerOf({ builtins: [] })).toBe('v1')
 
     writeFileSync(join(dir, 'dist', 'node.js'), marked('acme', 'v2'))
-    // Boot behaviour is deliberately unchanged: a second load with no `reimport` is the same module.
-    expect(await markerOf({ builtins: [] })).toBe('v1')
+    expect(await markerOf({ builtins: [] })).toBe('v2')
     expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('v2')
   })
 
-  it('does NOT invalidate what the entry imports, which is the ceiling the docs state', async () => {
+  it('evaluates imported modules again with the rest of the realm', async () => {
     const dir = install('acme', manifest('acme'), `import { marker } from './dep.js'\nexport default { name: 'acme', init: () => {}, marker }\n`)
     writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v1'\n`)
     expect(await markerOf({ builtins: [] })).toBe('dep-v1')
 
-    // The generation stamp goes on the entry's URL, and a relative specifier resolves against the
-    // URL's path rather than inheriting its query, so the child comes back from the cache with the
-    // code it had at boot. Pinned here so the limit cannot quietly change in either direction: a
-    // multi-file node half needs a restart until a resolve hook stamps the whole subgraph.
     writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v2'\n`)
-    expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('dep-v1')
+    expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('dep-v2')
   })
 })
 

@@ -38,11 +38,12 @@ The point of `apps/site/` is that the manifest reference is generated from
 matches committed output. A separate repo turns that into a publish-and-consume pipeline for no
 benefit ([README.md](./README.md) § The decisions).
 
-## The site never says "enforced" where the code says "declared"
+## The site distinguishes enforced resources from declared intent
 
-The node half is disclosed, not contained. Any surface rendering `permissions.node` or
-`permissions.net` says *declared*. Only `permissions.api`, the grantable frame scopes, is genuinely
-enforced ([README.md](./README.md) § Honesty constraints the public docs inherit).
+The node half's host, filesystem, environment, process, and network grants are enforced by its
+permission-scoped worker and RPC context. Scheduled/check intent remains declared because acorn
+cannot verify plugin-authored behavior. The site must preserve that split
+([README.md](./README.md) § Honesty constraints the public docs inherit).
 
 ## The site never implies signing, review, or a deprecation program
 

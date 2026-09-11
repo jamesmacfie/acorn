@@ -371,9 +371,9 @@ export type CompiledPluginBroadcast = PluginBroadcast & {
 // receives a filtered wrapper (server/plugins/permissions.ts).
 export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
 
-// Host-bound storage, for both tiers. The host binds the database filename to the plugin id, applies the
-// Drizzle chain, hands back one handle per boot however many times open() is called, and closes it after
-// that plugin's dispose. Only the chain's origin differs between the tiers.
+// Host-bound storage, for both tiers. The host binds the database filename to the plugin id. A loaded
+// plugin opens and migrates that exact file inside its isolated realm; a built-in does so in the host.
+// Both memoize one handle per lifecycle and close it after dispose.
 // See docs/data-layer.md § Plugin DBs.
 export type PluginStorage = {
   open(): PluginDatabase

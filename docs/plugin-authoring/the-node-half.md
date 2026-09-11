@@ -431,3 +431,8 @@ database. A journal is small enough to write by hand:
 
 with `0000_init.sql` beside it holding the DDL. A broken chain fails **contained** — that plugin ends
 up `failed`, the node boots, other plugins are untouched.
+
+Applied migrations are immutable. Before an update or reload runs new SQL, acorn compares each
+applied row with the journal position, timestamp, and SHA-256 of its SQL file. If you edit an applied
+file, reorder the journal, or remove an applied entry, the plugin fails without changing its database.
+Restore the original chain and add a new migration for the next change.

@@ -250,18 +250,15 @@ contained failure at boot. The route answers **200 with `state: 'failed'`** for 
 request did nothing wrong and nothing was lost. Only on success does the host clear the previous
 registrations, run its `dispose`, close its database, revoke its context and replay the buffer.
 
-Four limits, all deliberate:
+Four properties, all deliberate:
 
 - **A revoked context throws.** After a swap, anything reached through the previous instance's `ctx` —
   a registration, a broadcast, `storage.open()` — throws rather than writing through a plugin that is no
   longer running. `ctx.core` and `ctx.capabilities.get` stay live: they are host services that did not go
   anywhere.
-- **Only the entry module is re-evaluated.** Node caches an ES module permanently by resolved URL, so the
-  loader stamps a generation onto the entry's file URL (`?load=<n>`) when a reload names it. A relative
-  specifier *inside* that module resolves against the URL's path and does not inherit the query, so
-  `./chunk.js` comes back from the cache with the code it had at boot. A single-file node half — the
-  authoring profile — is fully covered; a multi-file one needs a restart for a change that lands outside
-  the entry file, until a `module.register` resolve hook stamps the whole subgraph.
+- **The complete dependency graph is re-evaluated.** A candidate starts in a fresh worker realm, so
+  neither the entry module nor its imports can come from the previous realm's module cache. Multi-file
+  node halves therefore reload without restarting the Node.
 - **Registration rollback is not schema rollback.** The candidate's `init` may open and migrate the
   plugin's database, mid-process, before it fails. The host puts every registration back; it cannot
   un-migrate. The author iterating on the plugin owns the data whose shape they just changed.
@@ -426,9 +423,9 @@ all, where bb pays for its 1,678-line equivalent on every session.
 What the derivation cannot cover is process, so that half is prose: write the directory, ask with
 `plugin_request { action: 'install', source: { path }, dev: true }`, expect `needs-trust`, call again with
 identical arguments to collect the answer, then iterate with `action: 'update'` and the same `dev: true`
-so the approval ends in a reload rather than a restart. The one limit that will otherwise baffle an
-author is stated in those words: **only the entry module is re-evaluated**, so a multi-file node half needs
-a restart for a change outside its entry file, and a plugin being iterated on hard wants to be one file.
+so the approval ends in a reload rather than a restart. A reload starts a fresh worker realm and
+re-evaluates the complete node dependency graph, so splitting the node half does not create a
+restart-only development path.
 
 The entry point is **Settings → Plugins → Create a plugin**, which drafts that starting prompt into the
 current task's agent composer through the same `sendReferenceToAgent` seam the editor and changes panes

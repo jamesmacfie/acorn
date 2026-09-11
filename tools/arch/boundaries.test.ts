@@ -681,6 +681,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/permissions.ts', "'context' the permission name"],
+      ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.
       ['packages/protocol/src/workflow.ts', "'database' the workflow definition layer"],

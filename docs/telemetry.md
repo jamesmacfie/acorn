@@ -403,7 +403,7 @@ reaches every sink, and is scrubbed on the way.
 | Every uncaught route error | `server/respond.ts` `onServerError` | error with a name and a code, no message and no stack |
 | Every scheduled run | `server/schedules/scheduler.ts` | span `schedule.run`, owner from the key prefix, with the run's period and timeout in milliseconds so a sink can describe the schedule |
 | Every hook handler | `server/pluginHost/hooks.ts` | span `hook.run`, owner from the handler's registration |
-| Every in-process plugin dispatch | `server/pluginHost/dispatch.ts` | span `plugin.dispatch`, owner from the plugin being dispatched to |
+| Every plugin route dispatch | `server/pluginHost/dispatch.ts` | span `plugin.dispatch`, owner from the plugin being dispatched to |
 | Every background refresh failure | `server/background.ts` | a handled error naming the resource, never the account whose mirror it was |
 | Every git spawn | `server/core/git.ts` | histogram `git.<subcommand>`, owner from the ambient context |
 | Every SQL statement | `server/storage/sqlite.ts` | histogram `sql.<verb>`, owner from the ambient context |

@@ -7,8 +7,10 @@ import { describe, expect, it } from 'vitest'
 // reference that points at nothing is a bug rather than a typo. Twelve of the source paths cited
 // across `docs/` had rotted by 2026-08-27, four of them naming files that no longer exist at all.
 //
-// Two things are checked, and the second one is the cheap half: a repo-rooted path in backticks has
-// to resolve, and a relative markdown link between two docs has to resolve.
+// Three things are checked: a repo-rooted path in backticks has to resolve, a relative markdown link
+// between two docs has to resolve, and a fragment on either kind of doc link has to name a heading or
+// an explicit anchor in the target. A file-only check turns a moved section into a link that looks
+// valid in review and lands at the top of a long page.
 
 const ROOT = (() => {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -65,6 +67,45 @@ const isDataRoot = (path: string) => path.endsWith('.sqlite')
 const REVIEWS: string[] = []
 const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
 
+// GitHub-style heading ids: markup is removed, punctuation is dropped, spaces become hyphens, and a
+// repeated heading receives a numeric suffix. Explicit `<a id="…">` anchors are included because the
+// landing pages use them to preserve old section links after moving long references into subfolders.
+const anchors = (file: string): Set<string> => {
+  const found = new Set<string>()
+  const duplicates = new Map<string, number>()
+  let fenced = false
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (line.startsWith('```')) {
+      fenced = !fenced
+      continue
+    }
+    if (fenced) continue
+    for (const match of line.matchAll(/<a\s+(?:name|id)=["']([^"']+)["'][^>]*>/gi)) found.add(match[1])
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line)
+    if (!heading) continue
+    const base = heading[2]
+      .replace(/<\/?(?:a|span|code|em|strong)\b[^>]*>/gi, '')
+      .replace(/!?(?:\[([^\]]*)\])\([^)]*\)/g, '$1')
+      .replace(/[`*_~]/g, '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
+      .trim()
+      .replace(/\s/g, '-')
+    const count = duplicates.get(base) ?? 0
+    duplicates.set(base, count + 1)
+    found.add(count === 0 ? base : `${base}-${count}`)
+  }
+  return found
+}
+
+const decodeFragment = (fragment: string): string => {
+  try {
+    return decodeURIComponent(fragment)
+  } catch {
+    return fragment
+  }
+}
+
 describe('docs cite paths that exist', () => {
   it('every repo-rooted path in backticks resolves', () => {
     const broken: string[] = []
@@ -92,9 +133,11 @@ describe('docs cite paths that exist', () => {
   })
 
   it('every relative link between docs resolves', () => {
-    const LINK = /\]\(([^)\s#]+)(?:#[^)]*)?\)/g
+    const LINK = /\]\(([^)\s#]*)(?:#([^)]*))?\)/g
     const broken: string[] = []
+    const brokenFragments: string[] = []
     let checked = 0
+    let fragmentsChecked = 0
     for (const file of FILES) {
       // Fences are skipped here and nowhere else. What is inside one is sample text or captured
       // output, and the avatar and chip a terminal screenshot draws around an author name is not
@@ -108,14 +151,25 @@ describe('docs cite paths that exist', () => {
         let match: RegExpExecArray | null
         while ((match = LINK.exec(line))) {
           const target = match[1]
-          if (/^(https?:|mailto:|#)/.test(target)) continue
+          const fragment = match[2]
+          if (/^(https?:|mailto:)/.test(target)) continue
           checked += 1
-          if (!existsSync(resolve(dirname(file), target))) broken.push(`${rel(file)}:${index + 1}: ${target}`)
+          const destination = target ? resolve(dirname(file), target) : file
+          if (!existsSync(destination)) {
+            broken.push(`${rel(file)}:${index + 1}: ${target}`)
+            continue
+          }
+          if (!fragment || !destination.endsWith('.md')) continue
+          fragmentsChecked += 1
+          const anchor = decodeFragment(fragment)
+          if (!anchors(destination).has(anchor)) brokenFragments.push(`${rel(file)}:${index + 1}: ${target}#${fragment}`)
         }
       }
     }
     expect(broken.sort()).toEqual([])
+    expect(brokenFragments.sort()).toEqual([])
     expect(checked).toBeGreaterThan(100)
+    expect(fragmentsChecked).toBeGreaterThan(75)
   })
   it('no doc cites a retired directory name', () => {
     // The escape hatch above — a path with no file extension is a directory, and directories move for

@@ -1,8 +1,6 @@
-// Rung 1 of the containment ladder (docs/security.md § Rung 1, permission-shaped context). A loaded
-// plugin's NodePluginContext comes from its manifest's `permissions.node` block rather than the full
-// context a built-in gets. This is least privilege for cooperative code, not a security boundary: a
-// loaded bundle shares the Node process, so it can `import('node:fs')`, open core.sqlite, and ignore
-// `ctx` entirely.
+// A loaded plugin's NodePluginContext comes from its manifest's `permissions.node` block rather than
+// the full context a built-in gets. Rung 2 sends this owner-bound projection over RPC to a
+// permission-scoped worker, making it the plugin's host authority rather than a cooperative view.
 import type { CoreServices } from '../core'
 import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'

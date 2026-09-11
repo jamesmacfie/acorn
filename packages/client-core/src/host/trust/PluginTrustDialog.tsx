@@ -17,9 +17,9 @@ import { Alert, Badge, Button, Kbd } from '../../kit/components/primitives'
 // new laptop asks again.
 //
 // Three groups, and the split between them is the whole point (docs/security.md § Design rules,
-// rule 6). `Enforced` is a fence: the UI bridge refuses anything undeclared. `Declared` is a
-// disclosure and nothing more: that code shares the node's process and can ignore its manifest
-// entirely. `Web pages` is enforced by the shell but reaches the live internet, so it is neither of
+// rule 6). `Enforced` is a fence held by the UI bridge and isolated node realm. `Declared`
+// describes plugin-authored unattended behavior whose intent cannot be verified. `Web pages` is
+// enforced by the shell but reaches the live internet, so it is neither of
 // the other two. The vocabulary is defined once in the legend rather than being spelled out on every
 // heading, and the groups may never be rendered as one list: a strong claim must not lend
 // credibility to a weaker one sitting next to it.
@@ -164,17 +164,14 @@ export default function PluginTrustDialog() {
                 </Show>
               </Show>
 
-              {/* The vocabulary, once. `Declared`'s second sentence is the canonical wording
-                  docs/security.md § Node-half plugin security requires: it must not be softened,
-                  dropped, or drawn as fine print. */}
+              {/* The vocabulary, once, matching docs/security.md § Node-half plugin security. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
-                  <span><strong>Enforced</strong> — acorn checks these; its interface runs in a sandbox and anything not listed is refused.</span>
+                  <span><strong>Enforced</strong> — acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.</span>
                 </Show>
                 <Show when={has('declared')}>
                   <span>
-                    <strong>Declared</strong> — the plugin’s own description of what it touches; acorn can’t check it.{' '}
-                    <span class="plugin-trust-plain">This plugin’s server code runs with the same access as acorn itself.</span>
+                    <strong>Declared</strong> — plugin-authored scheduled and check behavior. Acorn confines when and where it runs, but cannot verify what the code intends to do.
                   </span>
                 </Show>
                 <Show when={has('web')}>

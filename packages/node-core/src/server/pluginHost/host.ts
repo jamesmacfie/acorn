@@ -27,6 +27,7 @@ import { dispatchPluginRoute } from './dispatch'
 import type { ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
+import { disposeUnstartedPlugin } from '../plugins/isolation'
 import { clearHooks, isHookMode } from './hooks'
 import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { runPluginHookRoute } from './hookRun'
@@ -389,6 +390,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // and providers, served through a database handle its dispose already closed.
     clearRegistrations(plugin.name)
     if (disabled.has(plugin.name) && !plugin.required) {
+      if (options.loaded?.has(plugin.name)) disposeUnstartedPlugin(plugin)
       skipped.push(plugin.name)
       continue
     }
@@ -601,6 +603,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still serving,
       // and the candidate's database handle is the only thing it opened.
+      try {
+        await next.plugin.dispose?.()
+      } catch {
+        // The init failure is the useful error. A broken candidate's cleanup must not replace it.
+      }
       try {
         candidate.db?.close()
       } catch {

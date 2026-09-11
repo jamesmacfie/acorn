@@ -33,15 +33,12 @@ no-bundler profile in one command or the typed bridge if they run a bundler
 build, so the directory the scaffold just wrote installs on a packaged acorn instead of being refused
 (`docs/security.md § Installing from a folder`).
 
-What remains is exactly three programs plus one map:
+What remains is two programs plus one map. Rung-2 containment has shipped:
 
-1. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
-   loaded plugin's node half still runs in-process, disclosed rather than contained.
-   (`blockers.md`)
-2. **Dashboards** — shipped (`docs/dashboards.md`); the remaining backlog is
+1. **Dashboards** — shipped (`docs/dashboards.md`); the remaining backlog is
    `docs/future/dashboards/`. Independent of the above; this is where plugin composition becomes
    visible to users.
-3. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
+2. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
    a download, then discovery over signed packages. (`work-plan.md`)
 
 `docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
@@ -52,9 +49,9 @@ which is what lets memory's tray section, changes' tool card, and docker's chrom
 tier without widening the sandbox.
 
 Before picking one up, read `work-plan.md § What is actually waiting on something`. The short version:
-all three are startable today except discovery, which is hard-gated on containment — and the only item
-no amount of effort routes around is the Apple Developer Program purchase, which macOS node downloads
-and desktop auto-update are both stuck behind.
+discovery still waits on package signing, while the only item no amount of engineering effort routes
+around is the Apple Developer Program purchase, which macOS node downloads and desktop auto-update are
+both stuck behind.
 
 ## The files
 

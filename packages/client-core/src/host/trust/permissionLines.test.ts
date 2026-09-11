@@ -45,6 +45,25 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('names inherited environment and local-file grants as high risk', () => {
+    const lines = nodePermissionLines(permissions({
+      node: {
+        core: [],
+        capabilities: [],
+        secrets: false,
+        exec: false,
+        net: [],
+        env: ['DATABASE_URL'],
+        files: [{ env: 'ACORN_NODES_FILE', access: 'read-write' }],
+      },
+    }))
+    expect(texts(lines)).toEqual([
+      'Read the node environment value DATABASE_URL',
+      'Read and write the local file configured by ACORN_NODES_FILE',
+    ])
+    expect(lines.every((entry) => entry.high)).toBe(true)
+  })
+
   it('names what a telemetry sink can see, because it is every owner and not just this plugin', () => {
     // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
     // no token, because a plugin measuring its own work reads nobody else's

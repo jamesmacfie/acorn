@@ -465,11 +465,12 @@ The threats this closes, and the ones it does not:
   widening a glob all read as newly requested. What this does not bound is the agent itself: an agent
   CLI a person installed and acorn started is code that person is running, which is the same trust class
   as running it in their own terminal (`docs/managed-agents.md § Harnesses`).
-- **Not closed: the Node half.** A loaded plugin's node code runs in the Node's process, disclosed and
-  acknowledged — the same trust class as an editor extension. Its declared `node` permissions shape
-  the context it is handed; they are not enforced against a bundle that imports `node:fs` directly.
-  Every surface that renders them says *declared*. `docs/security.md` holds the full
-  model and the route to a hard boundary.
+- **The Node half is isolated.** Each loaded node bundle runs in its own permission-scoped worker
+  realm. Its context is an owner-bound RPC projection, its package is read-only, and only its own
+  database paths plus explicitly accepted local-file resources are writable. Its environment is
+  scrubbed to a credential-free base plus individually accepted names. Direct `node:sqlite`, raw
+  network modules, nested workers, native addons, and undeclared child processes are unavailable.
+  `docs/security.md` holds the full model and the remaining OS-isolation ceiling.
 
 The only way a package reaches a Node's install directory is the owner-authenticated install route
 (`POST /v2/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
@@ -521,9 +522,8 @@ what an attacker gains:
   the mode and should not pretend to; a mode check would be a boundary shaped like advice, and the owner
   chose the path. What it does instead is say so — the install form carries its own sentence about a
   folder being linked rather than copied. **Point acorn at a directory only you can write.**
-- The **node half** is uncontained for every source, not just this one — that is the disclosure recorded
-  above and in § Node-half plugin security, and rung 2 fixes it for all of them at once. `{ path }` is not
-  a hole in a boundary; it arrives at the same place a `{ url }` install does.
+- The **node half** gets the same isolated realm for every source. `{ path }` is not a hole in that
+  boundary; it receives the same manifest-shaped RPC context and runtime grants as a `{ url }` install.
 - The **client half** is genuinely unaffected. Device consent is keyed on the hash of the bytes that
   arrive, computed by the device, so editing the client file in place produces a new hash and re-prompts.
   The one mechanism that could have been undermined here already handles it.
@@ -557,11 +557,9 @@ row is marked `dev` so revocation can find it, and `partial` because nobody read
 never become the baseline of a later "what changed" diff.
 
 **The honest cost, stated so it is weighed rather than discovered: while a plugin is in dev mode, the node
-half the agent writes runs with the Node's own access on next load, without a per-save human read.** That
-is exactly the risk the owner accepted by entering dev mode, and it is bounded to plugins they chose — but
-it is the same in-process access described under "Node-half plugin security" below, arriving without a
-prompt. If rung 2 (out-of-process node halves) ships first, dev mode inherits its containment, which is a
-good reason to watch that ordering.
+half the agent writes is accepted on next load without a per-save human read.** It still runs in the same
+permission-scoped worker realm as any other loaded plugin, but the owner has waived the bundle-by-bundle
+review for this `(plugin, node)` pair. That is exactly the risk the owner accepted by entering dev mode.
 
 Three things keep it bounded:
 
@@ -595,20 +593,24 @@ choose the URL but cannot inspect or operate the page.
 
 ## Node-half plugin security
 
-The section above is about bundles a Node distributes to a device. This one is about the code a
-loaded plugin runs *inside the Node*, which is a different trust class and the weaker of the two.
+The section above is about bundles a Node distributes to a device. This one is about the isolated
+worker realm that runs a loaded plugin's node half.
 
-Stated once and bluntly: **a loaded plugin's node bundle runs in-process in the Node and can do
-anything the Node process can do.** Everything that shapes or displays its `permissions.node` block
-is least privilege for cooperative code and honest disclosure for users — not a security boundary.
-Every surface that renders those permissions must label them *declared*, never *enforced*, and must
-keep them in a group of their own — a strong claim must not lend credibility to a weaker one sitting
-beside it. In the trust prompt the label is the group's name and the legend defines it, carrying two
-statements: that the list is unverified ("the plugin's own description of what it touches; acorn
-can't check it") and the canonical wording for what that means — "This plugin's server code runs
-with the same access as acorn itself." The second must not be softened or dropped; it is drawn at
-full contrast rather than as fine print, and `e2e/twoNode.spec.ts` asserts it so its removal cannot
-pass as a copy tidy-up.
+The manifest's `permissions.node` block is now an enforced ceiling. The host serializes only the
+already owner-bound, permission-shaped context; functions cross as RPC references, so the worker
+never receives a core database, registry, or service implementation. Node starts the realm with its
+permission model enabled. The plugin package is readable but not writable, only that plugin's three
+SQLite paths are writable, network calls go through a hostname-checking `fetch`, and child processes
+are absent unless `exec` was declared. Native addons, nested workers, raw sockets, and direct
+`node:sqlite` stay unavailable. The worker inherits only the process broker's credential-free base
+environment plus explicitly named `env` and `files` grants. A file grant resolves an absolute path
+from the named environment variable and is refused inside acorn's data root. The trust prompt therefore puts node grants under *Enforced* beside
+the client broker's grants. Scheduled work and task checks remain *Declared*: acorn confines when and
+where they run, but cannot verify what plugin-authored code intends to do.
+
+This is a resource boundary, not an OS security claim. Node describes its permission model as a
+seat belt rather than a sandbox for hostile code, and a worker is not crash isolation. Rung 3 remains
+the answer for a deployment that needs an operating-system adversarial boundary.
 
 ### The broadcast namespace
 
@@ -617,10 +619,9 @@ plugin's `ctx.events.send` used to accept any channel name, which meant it could
 or `workflow:` and impersonate core's own streams — a renderer cannot tell a forged `term:out` from a
 real one, because the WS envelope is deliberately open and core routes on the channel alone.
 
-It is now confined to `plugin:<its-id>:*`, and naming anything else throws. This is a real check rather
-than a disclosure, and it is cheap precisely because it does not pretend to be more: the same bundle can
-still `import('node:net')` and open its own socket. What the confinement buys is that a plugin cannot
-lie to the renderer *through core's own transport*, which is a different thing from being contained.
+It is confined to `plugin:<its-id>:*`, and naming anything else throws. The worker boundary now backs
+that context check: raw network modules are unavailable and the only network global checks its
+manifest hostname list before connecting.
 
 A built-in is unaffected. It owns real channel prefixes through `ctx.events.channel`, is compiled into
 the binary, and is not the trust class this section is about.
@@ -654,16 +655,13 @@ Assets, concretely, on a machine running a Node:
 - **Agents**: plugin-contributed agent tools execute inside agent sessions that read untrusted
   content.
 
-What in-process JS can reach today: all of the above. `ctx` gating does not change that — a
-bundle can `import('node:fs')`, `import('node:child_process')`, open `core.sqlite` directly, or
-monkeypatch globals shared with core. In-process realms share ambient authority; there is no
-permission check you can write around that.
+The isolated realm cannot reach those assets directly. It can reach only what its RPC context and
+launch grants name. The loader tests execute both ESM-import and `process.getBuiltinModule` attempts
+to open `core.sqlite` and another plugin's database; both fail before `DatabaseSync` is obtained.
 
 ### The containment ladder
 
-Each rung is real, additive, and independently shippable. Rung 0 is the client sandbox, already
-shipped; the phases implement rung 1; rungs 2–3 are the "Future work" node-sandbox entry, specified
-here so nothing in the shipped phases forecloses them.
+Each rung is real and additive. Rungs 0–2 are shipped; rung 3 is the remaining OS boundary.
 
 #### Rung 0 — The client sandbox (shipped)
 
@@ -685,9 +683,10 @@ of them correct what the design expected:
   on Node 24 and 26, `execArgv` applies the permission model to the thread: the worker is denied a read
   the parent is allowed. So the fallback is not needed, and the TUI process itself runs with no
   permission flags at all.
-- **Node's permission model does not cover the network.** That is the one thing the CSP gave the DOM
-  worker for free. So the bootstrap that runs before a stranger's module scope
-  (`apps/tui/src/plugins/pluginWorker.js`) installs a `module.registerHooks` resolver that refuses
+- **The terminal grants no network access.** The CSP gave the DOM worker that default for free; the
+  Node worker also starts without a network grant. Its bootstrap
+  (`apps/tui/src/plugins/pluginWorker.js`) runs before a stranger's module scope and installs a
+  `module.registerHooks` resolver that refuses
   `net`, `http`, `https`, `http2`, `tls`, `dgram`, `dns`, `quic`, `child_process`, `worker_threads`,
   `cluster`, `module`, `vm`, `inspector` and `repl`, and deletes `fetch`, `WebSocket`,
   `XMLHttpRequest`, `EventSource` and `navigator`. `module` is on that list so a bundle cannot register
@@ -758,11 +757,9 @@ CoreServices facets are absent from `ctx.core`; `secrets` and `exec` (the proces
 individually gated and default-off; `ctx.events.streams()`/`channel()` are never present for
 loaded plugins regardless of manifest. Built-ins keep the full context.
 
-What it buys: honest plugins cannot over-reach by accident, the trust prompt is truthful for the
-well-behaved majority, and the ecosystem learns to write minimal manifests from day one — which
-matters because rung 2 turns those same declarations into hard grants, and manifests that were
-always minimal migrate without breakage. What it does not buy: any defense against rung-0
-adversaries (1) and (2) above.
+What it buys: honest plugins cannot over-reach by accident, the trust prompt is truthful, and the
+ecosystem learns to write minimal manifests from day one. Rung 2 now turns those same declarations
+into host and runtime grants.
 
 Implementation notes: gate by **omission**, not by throwing — an absent facet fails at
 development time with a TypeError the author sees immediately, and the shape of `ctx` becomes
@@ -815,69 +812,57 @@ the owner's home directory and the data root, and replaces credential-shaped run
 already withholds a message keeps withholding it: `onServerError` sends a name and a code because
 drivers embed bound values in `err.message`, and its record carries the same and no more.
 
-What this is not is a barrier. It is rung 1, like every facet above: a loaded bundle shares the
-process and can read `core.sqlite` whatever its manifest says. The token makes the ask visible and
-reviewable, which is what rung 1 buys.
+The telemetry token remains a rung-1 disclosure decision: an owner can grant or refuse the stream,
+and the host scopes the RPC surface accordingly. The worker boundary prevents a plugin from walking
+around that decision by importing the host's telemetry graph or opening `core.sqlite` directly.
 
-#### Rung 2 — Out of process (the future hard boundary)
+#### Rung 2 — Isolated Node realm (shipped)
 
-The acorn-native design already exists as a pattern: the MCP server is a stdio child that calls
-the Node over loopback with a **task-scoped internal token** and "can use only task-addressed
-routes and cannot read provider credentials or administer the Node"
-(docs/architecture-overview.md, docs/mcp.md). Apply the same shape to plugins:
+Each loaded plugin's node half runs in its own `node:worker_threads` realm. The worker starts with
+Node's permission model enabled and reaches the host only through one `MessagePort`. The host exports
+an already owner-bound, manifest-shaped `ctx` over that port; registrations, fetch-shaped route
+handlers, capabilities, and the few synchronous public calls all retain their published signatures
+through structured-clone RPC.
 
-**There is a down payment on this rung already**, made for a different half. The terminal's client
-sandbox above is the same object: a Node realm out of the host's process, started under
-`--permission` with a named fs jail, reaching the host only through ports the host handed it. What it
-proves is the part the plan below was least sure of — that the flag set works per realm rather than
-per process, that a bundle can be loaded by path with nothing else readable, and that the network hole
-is closable with a module hook rather than only with rung 3. What it does not do is turn `ctx` into
-authorised calls, which is the remaining work below.
+The launch grant is intentionally narrow:
 
-- Each loaded plugin's node half runs as a **child process** (one per plugin: crash isolation is
-  a free and valuable side effect — a segfault no longer takes the Node down).
-- The child holds a **plugin-scoped internal token** whose scope IS the manifest's permission
-  list. Enforcement moves to the auth middleware
-  (`packages/node-core/src/server/middleware/auth.ts`), where a `Principal` already carries
-  scope — server-side, where it is strong, instead of in the plugin's realm, where it is
-  cooperative.
-- `ctx` becomes an RPC proxy over stdio/loopback. CoreServices facets and capabilities are async
-  calls the Node authorizes per token scope. (They are async-shaped already; see "Design rules"
-  below for keeping them so.)
-- Route contributions: the plugin process serves its own handlers; the Node proxies
-  `/v2/p/<id>/*` to it. This requires the **fetch-shaped route handler** decision from phase 1 —
-  a Hono instance cannot cross a process boundary; a `(Request) → Response` shape can.
-- The plugin's SQLite is opened **by the plugin process** against its own file only.
-- Launch flags from Node's permission model (verify exact flag set against the Node version in
-  use at implementation time; the model was stabilizing across Node 20–23):
-  - `--permission` — deny-by-default posture;
-  - `--allow-fs-read=<pluginDir>,<pluginDataDir>` and `--allow-fs-write=<pluginDataDir>` — the
-    fs jail. `~/.ssh`, `core.sqlite`, and other plugins' databases become unreachable;
-  - child processes and worker threads denied unless the manifest declares `exec`
-    (`--allow-child-process` / `--allow-worker` granted only then);
-  - **never grant `--allow-addons`**: with `--permission`, native addons are blocked by default,
-    which closes the "ship a `.node` binary inside the bundle" escape hatch around all of the
-    above. If a plugin legitimately needs a native dependency, that is a first-party-adoption
-    conversation, not a flag.
-- Network egress is the honest gap: Node's network permission was still experimental at design
-  time. Blocking `exec` and jailing fs makes exfiltration require deliberate raw-socket use from
-  the plugin process, and the credential broker (next section) removes the main *reason* to
-  allow direct egress — but real network enforcement is rung 3. Do not present rung 2 as closing
-  it.
+- the worker may read the installed plugin package and the trusted bootstrap/runtime dependencies;
+- a plugin with migrations may read and write only its pre-created database, WAL, and SHM paths;
+- the worker environment starts from the process broker's credential-free base. Explicit `env`
+  names add individual values; `files` resolves individual absolute paths from named values and
+  refuses anything under acorn's data root;
+- the worker opens that database itself, validates the applied migration history, and never receives
+  the host database or storage service;
+- direct `node:sqlite` access is refused, including the `process.getBuiltinModule` path that would
+  otherwise bypass Node's filesystem permission checks;
+- raw socket modules are refused. `fetch` exists only when `permissions.node.net` is non-empty,
+  checks the destination hostname against that exact set before connecting, and returns redirects
+  unfollowed so the next request re-enters the same check;
+- child processes exist only with the explicit `exec` grant. Nested workers and native addons are
+  never granted.
 
-Costs to accept: per-call loopback latency (noise for this traffic), registration becomes a
-declarative announcement over RPC at child startup, and capabilities/broadcasts are async-only
-across the boundary. Streams/WS-channel ownership cannot cross — already excluded from the
-third-party surface by the two-tier rule.
+Reload preserves the existing candidate-then-commit contract. A candidate gets a fresh realm and
+module graph, buffers its host registrations, and replaces the previous realm only after import,
+dependency validation, and `init` succeed. A rejected or failed candidate is terminated; after a
+successful commit the previous realm is disposed and terminated.
+
+The acceptance test uses two deliberately hostile plugins. One imports `node:sqlite`; the other asks
+`process.getBuiltinModule` for it. They attempt to open `core.sqlite` and a peer plugin database and
+both fail before obtaining `DatabaseSync`.
+
+This rung narrows ambient authority and turns the manifest into an enforced host/realm boundary. It
+does not claim OS-grade hostile-code isolation: Node describes its permission model as a seat belt,
+workers do not provide crash isolation, and an explicitly granted child process is an intentional
+escape hatch. Those are rung 3 concerns.
 
 #### Rung 3 — OS-level sandboxing (the last door)
 
-Per-platform confinement of the plugin child process: Seatbelt profiles on macOS,
+Per-platform confinement of a plugin process: Seatbelt profiles on macOS,
 Landlock/namespaces on Linux, AppContainer on Windows. This is what actually enforces a
 `net` host allowlist and closes raw sockets. Substantial per-platform work; only worth it if the
 ecosystem grows plugins that need direct egress. Design nothing that assumes it; foreclose
-nothing that enables it (a child process per plugin, rung 2, is the shape all three platforms'
-mechanisms confine).
+nothing that enables it. Moving the shipped RPC contract from a worker to a process is the migration
+path if crash isolation or an OS policy becomes necessary.
 
 ### Secrets: narrow, use-scoped access
 
@@ -997,16 +982,13 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Resource abuse
 
-The UI side has the phase-3 bridge rate limiter. The node side has nothing until rung 2, where
-the child process gets OS-level memory/CPU limits essentially for free. Accepted gap; one line
-in the threat model, no interim machinery — an in-process watchdog can't stop a hostile plugin
-anyway (it shares the event loop it would be policing).
+The UI side has the phase-3 bridge rate limiter. The node half now has a separate event loop, so a
+busy plugin does not share core's loop, but a worker still shares the process's memory and CPU budget.
+Per-plugin operating-system resource limits require rung 3 or a move from workers to processes.
 
-### Design rules (keep the boundary buildable)
+### Design rules (keep the boundary intact)
 
-Everything above gets cheaper or free once plugins are out of process. These are the rules that
-keep rung 2 a refactor instead of a redesign; each is already stated in its phase, collected
-here as the checklist reviewers should hold PRs against:
+These are the rules that made rung 2 possible and now keep later API work from punching around it:
 
 1. **Fetch-shaped route handlers** for loaded plugins (phase 1) — a Hono instance cannot cross a
    process boundary. Shipped for both a plugin's own namespace and loaded provider routes:
@@ -1015,39 +997,39 @@ here as the checklist reviewers should hold PRs against:
    connection work goes through `PluginProviderRuntime`, never through `c.env.DB`.
 2. **No `streams`/`channel` for loaded plugins, ever** (phase 1) — the one contribution that
    cannot survive the boundary.
-3. **Async-shaped `ctx` surfaces only** on the public plugin-api — no new synchronous
-   CoreServices facet or capability signature on the third-party surface; sync calls die at a
-   process boundary.
+3. **Prefer async-shaped `ctx` surfaces** on the public plugin API. Existing synchronous
+   registration and codec calls are supported by the worker RPC transport, but a new synchronous
+   cross-realm call must justify blocking both realms and staying within the bounded reply size.
 4. **No general secret read path** on the public surface. The current provider callback is scoped to
-   one host-controlled connection visit and must become a broker protocol at rung 2; do not add a
-   persistent secret-returning method.
+   one host-controlled connection visit; do not add a persistent secret-returning method.
 5. **Structured-clone-safe arguments/results** for every capability exposed to loaded plugins — no
-   live objects or class instances across the seam. Callback-shaped, use-scoped operations must have
-   an explicit request/response visitor protocol before the process boundary ships.
-6. **Honest wording everywhere** the `node` permission block is rendered: *declared*, not
-   enforced, until rung 2 ships — then the same UI flips to *enforced* with no vocabulary
-   change, which is the payoff for declaring the schema now.
+   live objects or class instances across the seam. Callback-shaped, use-scoped operations need an
+   explicit request/response visitor protocol.
+6. **Honest wording everywhere** the `node` permission block is rendered: filesystem, network,
+   child-process, and host-context ceilings are *enforced*. Plugin-authored timing and intent remain
+   *declared*.
 
 ### Summary table
 
-| Asset | Exposure today (in-process) | Mitigation | When |
+| Asset | Loaded-plugin exposure today | Mitigation | When |
 | --- | --- | --- | --- |
-| User files (`~/.ssh`, …) | Full read/write | fs jail via `--permission` flags | Rung 2 |
-| Other plugins' SQLite, `core.sqlite` | Direct open | fs jail + token-scoped core routes | Rung 2 |
-| Provider secrets | Importable/decryptable in-realm; provider runtime lends one per connection callback | Owner/provider-bound callback today; credential-injecting broker at rung 2 | Rung 1 scoped, rung 2 absolute |
-| Process spawning | Unrestricted | `exec` grant → `--allow-child-process` | Declared rung 1, enforced rung 2 |
-| Native code loading | `.node` addon in bundle | `--permission` blocks addons; never `--allow-addons` | Rung 2 |
-| Network egress | Unrestricted | Broker allowlist (brokered traffic); OS sandbox (raw sockets) | Rung 1 partial, rung 3 full |
+| User files (`~/.ssh`, …) | No access unless an owner accepts an explicit environment-backed file grant | exact-path `--permission` grants; data-root paths refused | Rung 2 |
+| Node environment | Credential-free base plus individually declared names | scrubbed worker `env`; each inherited name is a high-risk trust line | Rung 2 |
+| Other plugins' SQLite, `core.sqlite` | Direct open refused | exact plugin DB/WAL/SHM grant; direct `node:sqlite` refused | Rung 2 |
+| Provider secrets | Provider runtime lends one per owner-bound connection callback | scoped RPC callback; future credential-injecting broker can remove plaintext from the plugin realm | Rung 1 scoped, rung 2 contained |
+| Process spawning | Refused unless `exec` is declared | `exec` grant → `--allow-child-process` | Rung 2 |
+| Native code loading | Refused | `--permission` blocks addons; never `--allow-addons` | Rung 2 |
+| Network egress | `fetch` only to declared hostnames; raw network modules refused | realm allowlist today; OS sandbox for an adversarial boundary | Rung 2 enforced, rung 3 hardened |
 | Webview hosts | Loads remote content the plugin chooses | Manifest host allowlist enforced across redirects; no CDP; isolated ephemeral partition | Webview phases 1/2 |
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
 | Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
-| Project config scripts (`setup_script`, `dev_script`, …) | Readable through `core.projects.config()` and writable via the core config route; the Node executes them | Separate `projects:config` read grant; config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Rung 1 (node facet); phase 3 (frames); rung 2 (node half) |
-| Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
+| Project config scripts (`setup_script`, `dev_script`, …) | Available only through `core.projects.config()` when granted; config writes remain unmapped | Separate `projects:config` read grant; project config trust acknowledgement | Rung 2 (node half); phase 3 (frames) |
+| Project folder paths | Available through `core.projects.checkouts()` only when granted | split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 2 |
 | Every other owner's telemetry | A sink sees core's request timings and every plugin's spans, logs and error names | Its own `telemetry` token, drawn high; allowlisted scalar attributes; route patterns rather than URLs; a scrubber on every message; off unless the owner turned it on | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
 | Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
-| A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |
+| A plugin in dev mode | New bundle hashes load without individual review | Same isolated realm; bounded to one `(plugin, node)` the owner chose; badged, revocable, audited | Shipped |
 | The terminal client's device token and plugin consent files | A process on this machine running as the user can read them | `0700` directory, `0600` files, the same discipline as the node's own keys; the token stays in the broker module and the consent file in the custody module, held by an arch rule | Shipped |
 
 ## The renderer's policy and its dangerous sinks

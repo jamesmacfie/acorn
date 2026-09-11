@@ -234,8 +234,8 @@ export default function PluginApprovalDialog() {
                     <p class="muted plugin-trust-intro">
                       <strong>Development mode</strong> means later versions of this plugin from{' '}
                       {nodeLabel()} are trusted on this device without asking again, so the agent can edit and
-                      reload it. Its server code runs with the same access as acorn itself, each time, without
-                      you reading it. End it from Settings → Plugins whenever you like.
+                      reload it without asking again. Each version still runs in its own permission-scoped
+                      realm. End it from Settings → Plugins whenever you like.
                     </p>
                   </Show>
                 </Show>
@@ -256,8 +256,8 @@ export default function PluginApprovalDialog() {
                     </For>
                   </ul>
                   <p class="muted plugin-trust-legend">
-                    <span class="plugin-trust-plain">This plugin’s server code runs with the same access as acorn itself.</span>{' '}
-                    The list above is the plugin’s own description of what it touches; acorn can’t check it.
+                    Its server code runs in a permission-scoped realm. Acorn enforces the listed host,
+                    filesystem, process, and context grants; it cannot verify what the plugin intends to do with them.
                   </p>
                 </Show>
               </div>
