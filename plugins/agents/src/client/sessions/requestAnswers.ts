@@ -57,4 +57,8 @@ export function askedQuestions(
         .map((option) => ({ label: option.label, ...(option.description ? { description: option.description } : {}) })),
     }
   })
+    // A free-text box nobody typed in leaves no trace. It has nothing said and nothing to offer, so
+    // the row would be the agent's own placeholder text over the word "No answer". A choice that was
+    // skipped still keeps its row, because which options went unanswered is worth reading.
+    .filter((entry) => entry.chosen.length > 0 || entry.alternatives.length > 0)
 }
