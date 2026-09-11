@@ -42,6 +42,22 @@ type Pending = {
   reject: (error: Error, receipt?: ReplyReceipt, helper?: HelperReplyTiming) => void
 }
 
+// A slow helper line has to identify the API family that caused it. `node-fetch` alone describes
+// nearly every renderer read, while the raw path would put session and task ids into logs. Keep the
+// same coarse route vocabulary as the API span and add the existing request id so adjacent bridge,
+// renderer and node records can be joined without minting another identifier.
+const callContext = (method: HelperMethod, params: unknown): string => {
+  if (method !== 'node-fetch' || !params || typeof params !== 'object') return ''
+  const request = (params as { request?: unknown }).request
+  if (!request || typeof request !== 'object') return ''
+  const { path, requestId } = request as { path?: unknown; requestId?: unknown }
+  if (typeof path !== 'string') return ''
+  const segments = path.split('?')[0].split('/').filter(Boolean)
+  const keep = segments[0] === 'v2' && segments[1] === 'p' ? 4 : 3
+  const route = `/${segments.slice(0, keep).join('/')}`
+  return ` route=${route}${typeof requestId === 'string' ? ` request=${requestId}` : ''}`
+}
+
 const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
 const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
@@ -133,6 +149,7 @@ const receiveBytes = (frame: Uint8Array): void => {
 const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   const ws = await connect()
   const id = nextId++
+  const context = callContext(method, params)
   const from = performance.now()
   type Completion = {
     value: T
@@ -154,7 +171,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
         if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
         if (receipt && receivedMs >= 250) {
           const deliveryMs = helper ? Math.max(0, receipt.receivedAt - helper.repliedAt) : -1
-          log.info(`slow bridge error method=${method} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
+          log.info(`slow bridge error id=${id} method=${method}${context} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
         }
         reject(error)
       },
@@ -167,7 +184,7 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
     const deliveryMs = completion.helper
       ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt)
       : -1
-    log.info(`slow bridge call method=${method} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`)
+    log.info(`slow bridge call id=${id} method=${method}${context} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`)
   }
   return completion.value
 }
