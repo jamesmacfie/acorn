@@ -5,6 +5,7 @@ import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAg
 import { memoryAgentTools } from '../server/agentTools'
 import { registerKnowledgeChannel, type KnowledgeDeps } from '../server/knowledgeChannel'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
+import { MEMORY_LIBRARY, type MemoryLibraryEntry, type MemoryType } from '../contract/library'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
 
@@ -18,6 +19,9 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
   return {
     name: 'memory',
     required: true,
+    emits: [
+      { verb: 'memories-changed', description: 'The project or private memory library changed' },
+    ],
     // This module's own URL: the chain sits at plugins/memory/migrations beside it, and the host owns
     // open, migrate and close from there.
     migrationsModule: import.meta.url,
@@ -68,6 +72,27 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
+      ctx.capabilities.provide(MEMORY_LIBRARY, {
+        list: async (scope) => {
+          await runtime.reconciled()
+          const rows = await runtime.list(scope.scope === 'project' ? { projectId: scope.projectId } : { projectId: null })
+          return rows
+            .filter((row) => scope.scope === 'project'
+              ? row.scope === 'project' && row.projectId === scope.projectId
+              : row.scope === 'private')
+            .map(({ id, scope, projectId, name, type, description, body, createdAt, updatedAt }): MemoryLibraryEntry => ({
+              id,
+              scope: scope as MemoryLibraryEntry['scope'],
+              projectId,
+              name,
+              type: type as MemoryType,
+              description,
+              body,
+              createdAt,
+              updatedAt,
+            }))
+        },
+      })
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
       for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)

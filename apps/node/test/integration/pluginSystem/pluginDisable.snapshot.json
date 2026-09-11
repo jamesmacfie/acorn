@@ -28,6 +28,7 @@
       "github/tasks",
       "memory",
       "notes",
+      "preview",
       "terminal",
       "workflows",
       "workflows"
@@ -77,9 +78,13 @@
       "agents.draftAttachments",
       "agents.harnessRegistry",
       "agents.managedRoute",
+      "agents.requests",
       "agents.runtime",
       "agents.sessionExecute",
+      "agents.sessions",
+      "agents.turns",
       "agents.usageRoute",
+      "browser.captures",
       "changes.localGit",
       "core.scheduler",
       "docker.route",
@@ -88,9 +93,11 @@
       "github.mirror",
       "memory.knowledge",
       "memory.knowledgeRoute",
+      "memory.library",
       "notes.seedTask",
       "notes.store",
       "preview.rules",
+      "preview.urls",
       "terminal.route",
       "terminal.runRoute",
       "terminal.runTargets",
@@ -99,6 +106,7 @@
       "terminal.taskCreatedHook",
       "terminal.taskSessionsRoute",
       "workflows.defs",
+      "workflows.gates",
       "workflows.notices",
       "workflows.route",
       "workflows.runner"
@@ -125,6 +133,9 @@
         "browser_navigate",
         "browser_screenshot",
         "browser_snapshot"
+      ],
+      "capabilities": [
+        "browser.captures"
       ],
       "databases": [
         "browser.sqlite"
@@ -207,8 +218,12 @@
       ]
     },
     "preview": {
+      "routes": [
+        "preview"
+      ],
       "capabilities": [
-        "preview.rules"
+        "preview.rules",
+        "preview.urls"
       ]
     },
     "workflows": {
@@ -218,6 +233,7 @@
       ],
       "capabilities": [
         "workflows.defs",
+        "workflows.gates",
         "workflows.notices",
         "workflows.route",
         "workflows.runner"

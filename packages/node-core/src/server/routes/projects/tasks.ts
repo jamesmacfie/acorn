@@ -194,7 +194,7 @@ export const tasks = new Hono<AppEnv>()
     // Every write on this router announces itself (server/notify.ts § broadcastTasksChanged). The task
     // list is what the rail draws, so a second window that missed a create used to sit on a stale list
     // until it reconnected (docs/plugins.md § Hearing a core event).
-    broadcastTasksChanged()
+    broadcastTasksChanged({ taskId: id })
     return c.json(
       rowToTask(
         { id, title, icon, origin: seed.origin, projectId: project.id, branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
@@ -212,7 +212,7 @@ export const tasks = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const body = parsed.data
     const db = getDb(c.env)
-    const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
+    const [existing] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (body.title !== undefined && body.title.trim()) patch.title = body.title.trim()
@@ -228,7 +228,12 @@ export const tasks = new Hono<AppEnv>()
     if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
     else if (body.pullNumber === null) patch.pullNumber = null
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
-    broadcastTasksChanged()
+    const publicStateChanged =
+      (patch.title !== undefined && patch.title !== existing.title)
+      || (patch.icon !== undefined && patch.icon !== existing.icon)
+      || (patch.status !== undefined && patch.status !== existing.status)
+      || (patch.pullNumber !== undefined && patch.pullNumber !== existing.pullNumber)
+    if (publicStateChanged) broadcastTasksChanged({ taskId: id })
     return c.json({ id, ...patch })
   })
   // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
@@ -247,11 +252,12 @@ export const tasks = new Hono<AppEnv>()
       if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
       throw error
     }
-    await db
+    const [inserted] = await db
       .insert(schema.taskLinks)
       .values({ taskId: id, integrationId: link.connectionId, provider: link.providerId, identifier: link.identifier, refJson: link.ref ? JSON.stringify(link.ref) : null, createdAt: Date.now() })
       .onConflictDoNothing()
-    broadcastTasksChanged()
+      .returning({ taskId: schema.taskLinks.taskId })
+    if (inserted) broadcastTasksChanged({ taskId: id })
     return c.json({ ok: true })
   })
   .delete('/:id/links', async (c) => {
@@ -260,7 +266,7 @@ export const tasks = new Hono<AppEnv>()
     const connectionId = body.connectionId ?? body.integrationId
     if (!connectionId || !body.identifier) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
-    await db
+    const [deleted] = await db
       .delete(schema.taskLinks)
       .where(
         and(
@@ -269,6 +275,7 @@ export const tasks = new Hono<AppEnv>()
           eq(schema.taskLinks.identifier, body.identifier),
         ),
       )
-    broadcastTasksChanged()
+      .returning({ taskId: schema.taskLinks.taskId })
+    if (deleted) broadcastTasksChanged({ taskId: id })
     return c.json({ ok: true })
   })

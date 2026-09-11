@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./node/index.ts": "./src/node/index.ts",
+    "./contract/*": "./src/contract/*",
     "./testkit": "./src/testkit/index.ts"
   },
   "scripts": {

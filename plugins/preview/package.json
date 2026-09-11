@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "solid-js": "catalog:"
   },

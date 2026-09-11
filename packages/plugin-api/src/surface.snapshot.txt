@@ -385,6 +385,7 @@ testkit: AppDatabase
 testkit: TestDb
 testkit: TestNodeContext
 testkit: TestPluginDb
+testkit: makeTestCoreServices
 testkit: makeTestDb
 testkit: makeTestNodeContext
 testkit: makeTestPluginDb

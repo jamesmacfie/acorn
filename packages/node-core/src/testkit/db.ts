@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openDb, type Env } from '../server/bindings'
+import { memoryIdentityStore } from '../server/activeIdentity'
+import { createCoreServices } from '../server/core'
 import { SecretService } from '../server/core/secrets'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
@@ -33,6 +35,17 @@ export function makeTestDb(): TestDb {
       }
     },
   }
+}
+
+// Build the same core service graph the node gives a built-in plugin, using a test database's
+// matching secret service. Plugin tests should reach this through @acorn/plugin-api/testkit instead
+// of importing the node's composition internals directly.
+export function makeTestCoreServices(testDb: TestDb, userId: string | null = null) {
+  return createCoreServices({
+    db: testDb.db,
+    secrets: testDb.secrets,
+    activeIdentity: memoryIdentityStore(userId),
+  })
 }
 
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every

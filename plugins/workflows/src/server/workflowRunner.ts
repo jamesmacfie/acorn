@@ -18,6 +18,7 @@ import type {
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
+import type { WorkflowGateStatus, WorkflowRunStatus } from '../contract/events'
 import { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from './workflowBuiltins'
 import { Semaphore } from './workflowSemaphore'
 import { intersectToolCeilings } from './workflowTools'
@@ -73,8 +74,10 @@ export type RunnerDeps = {
    *  this instead of re-reading every step on every stream event. */
   stepChanged?(runId: string, stepId: string, status: string): void
   statusChanged?(): void
-  /** A run began or reached a terminal state. Per run, never per step (docs/plugins.md § What is not an event). */
-  runChanged?(runId: string, status: string): void
+  /** A durable run-status edge. Per run, never per ordinary step. */
+  runChanged?(taskId: string, runId: string, status: WorkflowRunStatus): void
+  /** The human-approval reduction of step state. */
+  gateChanged?(taskId: string, runId: string, stepId: string, status: WorkflowGateStatus): void
   emitStepEvent?(runId: string, stepId: string, event: StreamEvent): void
   onRunTerminal?(taskId: string, runId: string): Promise<void>
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
@@ -362,7 +365,6 @@ export class WorkflowRunner {
       createdAt: at,
       updatedAt: at,
     })
-    this.deps.runChanged?.(runId, 'running')
     // Unattended work with its own trace: nobody is waiting on the HTTP request that started this,
     // and every step and every agent turn under it hangs off this span.
     const span = this.deps.telemetry?.startSpan('workflow.run', {
@@ -384,6 +386,8 @@ export class WorkflowRunner {
         updatedAt: at,
       })
     }
+    // Announce only once the run and its complete step roster are readable.
+    this.deps.runChanged?.(taskId, runId, 'running')
     this.changed()
     void this.tick(runId)
     return runId
@@ -792,7 +796,6 @@ export class WorkflowRunner {
       }
     }
     await this.setRun(runId, { status: 'running', error: null })
-    this.deps.runChanged?.(runId, 'running')
     void this.tick(runId)
     return { ok: true }
   }
@@ -839,7 +842,6 @@ export class WorkflowRunner {
     const span = this.#runSpans.get(run.id)
     this.#runSpans.delete(run.id)
     span?.end(status === 'done' ? 'ok' : 'error', { status })
-    this.deps.runChanged?.(run.id, status)
     await this.queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve()).catch(() => undefined)
     await this.deps.onRunTerminal?.(run.taskId, run.id).catch(() => undefined)
     const ref = { runId: run.id, ...(stepId ? { stepId } : {}) }
@@ -886,7 +888,11 @@ export class WorkflowRunner {
   }
 
   private async setRun(runId: string, patch: Partial<WorkflowRunRow>): Promise<void> {
+    const before = patch.status == null ? undefined : await this.run(runId)
     await this.db.update(schema.workflowRuns).set({ ...patch, updatedAt: now() }).where(eq(schema.workflowRuns.id, runId))
+    if (before && before.status !== patch.status) {
+      this.deps.runChanged?.(before.taskId, runId, patch.status as WorkflowRunStatus)
+    }
     this.changed()
   }
 
@@ -901,6 +907,10 @@ export class WorkflowRunner {
     if (before && before.status !== patch.status) {
       this.#markStepSpan(before.runId, stepId, patch.status!)
       this.deps.stepChanged?.(before.runId, stepId, patch.status!)
+      if (before.status === 'waiting-gate' || patch.status === 'waiting-gate') {
+        const run = await this.run(before.runId)
+        if (run) this.deps.gateChanged?.(run.taskId, before.runId, stepId, patch.status as WorkflowGateStatus)
+      }
     }
     this.changed()
   }

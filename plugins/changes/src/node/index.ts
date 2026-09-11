@@ -9,6 +9,9 @@ export const changesPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
   return {
   name: 'changes',
+  emits: [
+    { verb: 'review-notes-changed', description: 'A task’s local review notes or delivery state changed' },
+  ],
   // migrationsModule: this module's own URL; the host resolves the chain from there
   // (docs/data-layer.md § Migrations).
   migrationsModule: import.meta.url,
@@ -16,7 +19,7 @@ export const changesPlugin = (): NodePlugin => {
     // Opened and migrated by the host before init returns, so no request can reach an unmigrated
     // database (docs/data-layer.md § Plugin databases).
     const db = ctx.storage.open()
-    ctx.routes.register(reviewNotesRoutes(db, ctx.core), { prefix: '/tasks', note: '/:id/review-notes' })
+    ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), { prefix: '/tasks', note: '/:id/review-notes' })
     // localGit holds no tables of its own: it shells out to git in the task worktree, so it needs
     // core's task resolution and nothing else.
     // The two decisions this plugin opens to other plugins, declared before the bridge that runs them

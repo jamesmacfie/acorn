@@ -3,7 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import type { ConnectIntegrationRequest, Integration, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integrations.ts'
-import { broadcastConnectionChanged } from '../notify'
+import { broadcastConnectionChanged, broadcastTasksChanged, broadcastWorkspaceProjectsChanged } from '../notify'
 import type { AppDatabase } from '../db'
 import { getDb, schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
@@ -220,7 +220,23 @@ export async function disconnectConnection(db: AppDatabase, userId: string, id: 
   if (!row) return
   const provider = connectionProviderRegistry.require(row.provider)
   if (!provider.connection.disconnectable) throw new ProviderOperationError('provider_bad_config', 400)
+  const mappings = await db
+    .select({ workspaceId: schema.workspaceExternalProjects.workspaceId })
+    .from(schema.workspaceExternalProjects)
+    .where(eq(schema.workspaceExternalProjects.integrationId, id))
+  const taskLinks = await db
+    .select({ taskId: schema.taskLinks.taskId })
+    .from(schema.taskLinks)
+    .where(eq(schema.taskLinks.integrationId, id))
   await cascadeDeleteIntegration(db, userId, id)
+  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, deleted: true })
+  if (mappings.length) {
+    broadcastWorkspaceProjectsChanged({
+      providerId: row.provider,
+      workspaceIds: [...new Set(mappings.map((mapping) => mapping.workspaceId))].sort(),
+    })
+  }
+  if (taskLinks.length) broadcastTasksChanged({ taskId: null })
 }
 
 export async function forEachConnection<T>(

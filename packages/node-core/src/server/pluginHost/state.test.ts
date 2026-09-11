@@ -61,9 +61,17 @@ const row = (result: ReturnType<typeof pluginState>, name: string) => result.plu
 
 describe('pluginState', () => {
   it('reports a running node with nothing pending', () => {
-    const result = pluginState(bridge({ roster: [{ name: 'github', required: false, disabled: false, state: 'active' }] }))
+    const result = pluginState(bridge({ roster: [{
+      name: 'github', required: false, disabled: false, state: 'active',
+      emits: [{ verb: 'pr-synced', description: 'A pull request mirror changed' }],
+    }] }))
     expect(result.restartRequired).toBe(false)
-    expect(row(result, 'github')).toMatchObject({ running: true, disabled: false, state: 'active' })
+    expect(row(result, 'github')).toMatchObject({
+      running: true,
+      disabled: false,
+      state: 'active',
+      emits: [{ verb: 'pr-synced', description: 'A pull request mirror changed' }],
+    })
   })
 
   it('raises the banner for a plugin turned off but still serving', () => {

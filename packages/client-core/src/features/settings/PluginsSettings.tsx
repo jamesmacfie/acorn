@@ -94,9 +94,6 @@ export default function PluginsSettings() {
   )
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
-  // A required plugin cannot be disabled, so it gets no checkbox and the page does not list it.
-  // There is nothing an owner could do to the row.
-  const optional = createMemo(() => rows().filter((row) => !row.required))
   const restartRequired = () => state()?.restartRequired === true
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
@@ -282,15 +279,20 @@ export default function PluginsSettings() {
           column edge however long a name runs. An absent version is an empty cell, not a shifted
           column. */}
       <ul class="plugin-list">
-        <For each={optional()}>
+        <For each={rows()}>
           {(row) => (
             <li class="plugin-row">
-              <Checkbox
-                label={<span class="plugin-name">{row.name}</span>}
-                checked={!row.disabled}
-                disabled={busy()}
-                onChange={(checked) => void toggle(row.name, !checked)}
-              />
+              <Show
+                when={!row.required}
+                fallback={<span class="plugin-name plugin-required">{row.name}</span>}
+              >
+                <Checkbox
+                  label={<span class="plugin-name">{row.name}</span>}
+                  checked={!row.disabled}
+                  disabled={busy()}
+                  onChange={(checked) => void toggle(row.name, !checked)}
+                />
+              </Show>
               {/* Only a plugin off this node's disk has a version worth showing; a built-in's is the
                   app's, and the empty cell is how the owner tells the two apart. */}
               <span class="plugin-version muted">{row.installed?.version ?? ''}</span>
@@ -338,6 +340,16 @@ export default function PluginsSettings() {
                   <Show when={row.reason}>
                     {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
                   </Show>
+                </Show>
+                <Show when={row.emits?.length}>
+                  <details class="plugin-emits">
+                    <summary>{row.emits!.length} event{row.emits!.length === 1 ? '' : 's'}</summary>
+                    <ul>
+                      <For each={row.emits}>
+                        {(event) => <li><code>{event.verb}</code><span>{event.description}</span></li>}
+                      </For>
+                    </ul>
+                  </details>
                 </Show>
               </span>
 

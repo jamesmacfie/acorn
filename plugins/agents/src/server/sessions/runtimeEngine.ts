@@ -9,6 +9,7 @@ import type {
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
 import { readAgentConcurrency } from '../concurrencyStore'
@@ -25,7 +26,9 @@ import { decideAgentCommand } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
 
-type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
+type PublishedFrame = AgentWsFrame
+  | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
+  | AgentLifecycleFrame
 
 // Three tags, one owner: the engine's own lines, the memory hand-off, and the webhook queue. The
 // tag is what the reader greps for and the owner is what a sink files it under.
@@ -131,6 +134,7 @@ export class ManagedAgentEngine {
   protected readonly eventMaterializer: ProviderEventMaterializer
   protected providerCache: { expiresAt: number; descriptors: AgentProviderDescriptor[] } | null = null
   protected pumping = false
+  private readonly pumpIdleWaiters = new Set<() => void>()
   // Set when pump() is called while a scan is already running. That call cannot be a no-op: the scan's
   // queuedHeads snapshot predates the turn that triggered it, and a scan that starts nothing does not
   // loop, so the turn would sit queued until an unrelated event pumped again.
@@ -150,7 +154,7 @@ export class ManagedAgentEngine {
     this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
     this.telemetry = options.telemetry
-    this.store = new AgentStore(options.db, options.core)
+    this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
     // The redaction list grows as sessions start, rather than being computed once, because each session
@@ -222,6 +226,9 @@ export class ManagedAgentEngine {
     for (const timer of this.reconnectTimers) clearTimeout(timer)
     this.reconnectTimers.clear()
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
+    if (this.pumping) {
+      await new Promise<void>((resolve) => this.pumpIdleWaiters.add(resolve))
+    }
     await this.providerEvents.flushAll()
     await this.webhooks.stop()
     this.turnSpans.clear()
@@ -353,10 +360,13 @@ export class ManagedAgentEngine {
 
   protected async commitProviderEvent({ sessionId, event, turnId }: PendingAgentEvent): Promise<void> {
     const live = this.live.get(sessionId)
-    await this.record(sessionId, turnId, event)
-    if (event.type === 'turn_completed' || event.type === 'error') {
+    const settlesTurn = event.type === 'turn_completed' || event.type === 'error'
+    if (settlesTurn) {
       if (live) live.activeTurnId = null
       if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
+    }
+    await this.record(sessionId, turnId, event)
+    if (settlesTurn) {
       if (event.type === 'turn_completed' && turnId && this.onCompletedTurn) {
         void this.completedTurnTranscript(sessionId, turnId)
           .then(({ taskId, transcript }) => this.onCompletedTurn!(taskId, transcript))
@@ -433,7 +443,7 @@ export class ManagedAgentEngine {
         let started = false
         for (const item of sorted) {
           const live = await this.ensureSession(item.session).catch(() => null)
-          if (!live?.handle?.ready || live.activeTurnId) continue
+          if (!live?.handle?.ready || live.activeTurnId || live.stopping || this.stopped) continue
           const currentSession = await this.store.requireSession(item.session.id)
           const decision = decideAgentCommand({
             runtimeState: currentSession.runtimeState,
@@ -449,25 +459,27 @@ export class ManagedAgentEngine {
           workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
           providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
           this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
-          await this.store.startTurn(item.turn.id)
-          this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
-          await this.record(item.session.id, item.turn.id, { type: 'user_message', text: agentTurnInputText(item.turn) })
-          const attachments = Object.fromEntries((await Promise.all(
-            [...new Set(item.turn.input.flatMap((part) =>
-              part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
-              .map(async (attachmentId) => {
-                const attachment = await this.attachments.resolve(attachmentId)
-                if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
-                return [attachmentId, {
-                  id: attachment.id,
-                  filename: attachment.filename,
-                  mediaType: attachment.mediaType,
-                  byteSize: attachment.byteSize,
-                  localPath: attachment.localPath,
-                }] as const
-              }),
-          )))
-          void live.handle.sendTurn({ turn: item.turn, input: item.turn.input, attachments })
+          await this.store.dispatchTurn(item.turn.id)
+          try {
+            await this.record(item.session.id, item.turn.id, { type: 'user_message', text: agentTurnInputText(item.turn) })
+            const attachments = Object.fromEntries((await Promise.all(
+              [...new Set(item.turn.input.flatMap((part) =>
+                part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
+                .map(async (attachmentId) => {
+                  const attachment = await this.attachments.resolve(attachmentId)
+                  if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
+                  return [attachmentId, {
+                    id: attachment.id,
+                    filename: attachment.filename,
+                    mediaType: attachment.mediaType,
+                    byteSize: attachment.byteSize,
+                    localPath: attachment.localPath,
+                  }] as const
+                }),
+            )))
+            await this.store.startTurn(item.turn.id)
+            this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
+            void live.handle.sendTurn({ turn: item.turn, input: item.turn.input, attachments })
             .then(async (result) => {
               if (result.providerTurnRef) await this.store.setTurnProviderRef(item.turn.id, result.providerTurnRef)
             })
@@ -518,6 +530,19 @@ export class ManagedAgentEngine {
               })
               void this.pump()
             })
+          } catch (error) {
+            live.activeTurnId = null
+            await this.providerEvents.accept({
+              sessionId: item.session.id,
+              turnId: item.turn.id,
+              event: {
+                type: 'error',
+                code: 'turn_dispatch_failed',
+                message: safeProviderMessage(error, 'Agent turn preparation failed.', this.mintedSecrets),
+                retryable: false,
+              },
+            })
+          }
           started = true
         }
         // Rescan while there is a reason to: a start moves that session on to its next queued head, and
@@ -526,6 +551,8 @@ export class ManagedAgentEngine {
       }
     } finally {
       this.pumping = false
+      for (const resolve of this.pumpIdleWaiters) resolve()
+      this.pumpIdleWaiters.clear()
     }
   }
 

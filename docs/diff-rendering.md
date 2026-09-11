@@ -45,6 +45,11 @@ under a code row, inside the virtualized row so its height is measured, and `lin
 affordance on a code line. The changes pane uses the first for review notes and the second for
 Alt-click to send a line reference to the agent.
 
+Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
+sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not
+note ids, paths, snippets, or bodies, so badges and delivery gates can react without receiving review
+content. Consumers that need the notes themselves continue to use the task-authorized route.
+
 `plugins/github/src/client/DiffForPull.tsx` and `plugins/changes/src/client/ChangesPane.tsx` are the
 two implementations, and both are short enough to read in one sitting. That is the measure of whether
 the port is the right size.

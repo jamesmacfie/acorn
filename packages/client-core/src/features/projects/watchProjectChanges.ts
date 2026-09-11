@@ -6,7 +6,7 @@
 // creating a project, which was right for that window and silent for every other one.
 import { activeCacheId } from '../../infra/node/activeNode'
 import { clientFor } from '../../infra/node/fleet'
-import { projectsKey } from '../../infra/queries'
+import { projectsKey, workspacesKey } from '../../infra/queries'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { wsOnNodeEvent } from '../../infra/node/wsClient'
 
@@ -15,6 +15,9 @@ import { wsOnNodeEvent } from '../../infra/node/wsClient'
 export function watchProjectChanges(): () => void {
   return wsOnNodeEvent('project:changed', (event) => {
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: projectsKey })
+    // Workspace rows embed their project membership, so moving, creating, or deleting a project
+    // invalidates both projections even though `project:changed` remains the one wire contract.
+    void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: workspacesKey })
     clientEvents.emit('project:changed', event)
   })
 }

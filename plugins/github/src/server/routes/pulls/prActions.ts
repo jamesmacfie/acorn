@@ -6,6 +6,7 @@ import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 import { githubToken } from '../../githubToken'
 import { comments, prLabels, pullRequests, reviewRequests, viewedFiles } from '../../../node/schema'
+import { type GithubEmit, NO_EMIT, prChangedPayload } from '../../events'
 
 // PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
@@ -46,7 +47,7 @@ async function readBody<S extends z.ZodType>(c: Context<AppEnv>, schema: S, miss
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
+export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.
   .post('/:owner/:repo/pulls/:number/merge', async (c) => {
     const r = await resolvePr(db, c)
@@ -62,6 +63,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     await setPrState(r.db, r.userId, r.repoId, r.number, 'merged')
+    if (r.state !== 'merged') emit('pr-synced', prChangedPayload(r))
     return c.json({ state: 'merged' })
   })
   // Enable auto-merge: GraphQL enablePullRequestAutoMerge (no REST endpoint exists). Needs the PR
@@ -87,6 +89,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
       .update(pullRequests)
       .set({ autoMergeEnabled: true })
       .where(and(eq(pullRequests.userId, r.userId), eq(pullRequests.repoId, r.repoId), eq(pullRequests.number, r.number)))
+    if (r.autoMergeEnabled !== true) emit('pr-synced', prChangedPayload(r))
     return c.json({ autoMergeEnabled: true })
   })
   // Disable auto-merge: GraphQL disablePullRequestAutoMerge (no REST endpoint exists).
@@ -106,6 +109,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
       .update(pullRequests)
       .set({ autoMergeEnabled: false })
       .where(and(eq(pullRequests.userId, r.userId), eq(pullRequests.repoId, r.repoId), eq(pullRequests.number, r.number)))
+    if (r.autoMergeEnabled !== false) emit('pr-synced', prChangedPayload(r))
     return c.json({ autoMergeEnabled: false })
   })
   // Close / reopen: PATCH /pulls/{n} { state }.
@@ -121,6 +125,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     await setPrState(r.db, r.userId, r.repoId, r.number, state)
+    if (r.state !== state) emit('pr-synced', prChangedPayload(r))
     return c.json({ state })
   })
   // Draft ↔ ready: GraphQL only, needs the PR node id.
@@ -150,6 +155,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
           eq(pullRequests.number, r.number),
         ),
       )
+    if (r.draft !== draft) emit('pr-synced', prChangedPayload(r))
     return c.json({ draft: !!draft })
   })
   // Add a discussion comment: POST /issues/{n}/comments. full+json returns body_html.
@@ -177,13 +183,14 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
       body: ct.body_html ?? body,
       createdAt: Date.parse(ct.created_at),
     }
-    await r.db.insert(comments).values(row).onConflictDoNothing()
+    const inserted = await r.db.insert(comments).values(row).onConflictDoNothing().returning({ id: comments.id })
+    if (inserted.length) emit('pr-synced', prChangedPayload(r))
     return c.json({ id: row.id, author: row.author, body: row.body, createdAt: row.createdAt })
   })
   // Add a label: POST /issues/{n}/labels. Remove a label: DELETE /issues/{n}/labels/{name}.
   // Both return the PR's full label set → replace the pr_labels mirror so a within-TTL read is fresh.
-  .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'add'))
-  .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'remove'))
+  .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'add', emit))
+  .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'remove', emit))
   // Toggle a file's "viewed" checkbox (app-state, no GitHub call).
   .post('/:owner/:repo/pulls/:number/viewed', async (c) => {
     const r = await resolvePr(db, c)
@@ -198,8 +205,14 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
       eq(viewedFiles.number, r.number),
       eq(viewedFiles.path, path),
     )
-    if (viewed) await r.db.insert(viewedFiles).values({ ...key, viewedAt: Date.now() }).onConflictDoNothing()
-    else await r.db.delete(viewedFiles).where(where)
+    const [existing] = await r.db.select({ path: viewedFiles.path }).from(viewedFiles).where(where)
+    if (viewed && !existing) {
+      await r.db.insert(viewedFiles).values({ ...key, viewedAt: Date.now() })
+      emit('pr-synced', prChangedPayload(r))
+    } else if (!viewed && existing) {
+      await r.db.delete(viewedFiles).where(where)
+      emit('pr-synced', prChangedPayload(r))
+    }
     return c.json({ path, viewed: !!viewed })
   })
   // Start a new inline review comment on a line: POST /pulls/{n}/comments { commit_id, path, line, side }.
@@ -219,6 +232,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     await bustPrSync(r.db, r.userId, r.repoId, r.number)
+    emit('pr-synced', prChangedPayload(r))
     return c.json({ ok: true })
   })
   // Reply to an existing thread: POST /pulls/{n}/comments/{comment_id}/replies. id = numeric databaseId.
@@ -238,6 +252,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     await bustPrSync(r.db, r.userId, r.repoId, r.number)
+    emit('pr-synced', prChangedPayload(r))
     return c.json({ ok: true })
   })
   // Resolve / unresolve a thread (GraphQL, by thread node id).
@@ -258,6 +273,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
       return respondError(c, result.failure.status, result.failure.error)
     }
     await bustPrSync(r.db, r.userId, r.repoId, r.number)
+    emit('pr-synced', prChangedPayload(r))
     return c.json({ resolved: !!resolved })
   })
   // Submit a PR review: POST /pulls/{n}/reviews { event, body }.
@@ -277,12 +293,13 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     await bustPrSync(r.db, r.userId, r.repoId, r.number)
+    emit('pr-synced', prChangedPayload(r))
     return c.json({ ok: true })
   })
   // Request a reviewer: POST /pulls/{n}/requested_reviewers { reviewers }. Remove: DELETE same.
   // bustPrSync so the next composite refetch picks up the changed request set.
-  .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'add'))
-  .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'remove'))
+  .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'add', emit))
+  .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'remove', emit))
   // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update;
   // the new run states surface on the next composite refetch.
@@ -298,7 +315,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     return c.json({ ok: true })
   })
 
-async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
+async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove', emit: GithubEmit) {
   const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
   const parsed = await readBody(c, reviewerBody, {})
@@ -319,11 +336,14 @@ async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add'
     eq(reviewRequests.repoId, r.repoId),
     eq(reviewRequests.number, r.number),
   )
+  const previous = await r.db.select({ login: reviewRequests.login }).from(reviewRequests).where(where)
   await r.db.batch([r.db.delete(reviewRequests).where(where), ...rows.map((row) => r.db.insert(reviewRequests).values(row))])
+  if (!sameStrings(previous.map((row) => row.login), rows.map((row) => row.login)))
+    emit('pr-synced', prChangedPayload(r))
   return c.json(rows.map((row) => row.login))
 }
 
-async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
+async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove', emit: GithubEmit) {
   const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
   const parsed = await readBody(c, labelBody, {})
@@ -349,6 +369,21 @@ async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 
     eq(prLabels.repoId, r.repoId),
     eq(prLabels.number, r.number),
   )
+  const previous = await r.db.select({ name: prLabels.name, color: prLabels.color }).from(prLabels).where(where)
   await r.db.batch([r.db.delete(prLabels).where(where), ...rows.map((row) => r.db.insert(prLabels).values(row))])
+  if (!sameLabels(previous, rows)) emit('pr-synced', prChangedPayload(r))
   return c.json(rows.map((row) => ({ name: row.name, color: row.color })))
+}
+
+const sameStrings = (left: string[], right: string[]) => {
+  if (left.length !== right.length) return false
+  const leftSorted = [...left].sort()
+  const rightSorted = [...right].sort()
+  return leftSorted.every((value, index) => value === rightSorted[index])
+}
+
+const sameLabels = (left: { name: string; color: string | null }[], right: { name: string; color: string | null }[]) => {
+  const normalize = (rows: { name: string; color: string | null }[]) =>
+    rows.map((row) => `${row.name}\u0000${row.color ?? ''}`).sort()
+  return sameStrings(normalize(left), normalize(right))
 }

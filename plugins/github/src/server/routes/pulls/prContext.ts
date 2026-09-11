@@ -23,6 +23,9 @@ type PrContext = {
   repoId: number
   nodeId: string | null
   headSha: string | null
+  state: string | null
+  draft: boolean | null
+  autoMergeEnabled: boolean | null
 }
 
 // Write-path PR resolution, mirror-only and stricter than the read path's resolveRepoForUser
@@ -42,7 +45,13 @@ export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise
     .where(and(eq(repos.userId, userId), repoMatches(owner, repo)))
   if (!repoRow) return { error: 'repo_not_found' as const, status: 404 as const }
   const [pr] = await db
-    .select({ nodeId: pullRequests.nodeId, headSha: pullRequests.headSha })
+    .select({
+      nodeId: pullRequests.nodeId,
+      headSha: pullRequests.headSha,
+      state: pullRequests.state,
+      draft: pullRequests.draft,
+      autoMergeEnabled: pullRequests.autoMergeEnabled,
+    })
     .from(pullRequests)
     .where(
       and(
@@ -61,6 +70,9 @@ export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise
     repoId: repoRow.id,
     nodeId: pr?.nodeId ?? null,
     headSha: pr?.headSha ?? null,
+    state: pr?.state ?? null,
+    draft: pr?.draft ?? null,
+    autoMergeEnabled: pr?.autoMergeEnabled ?? null,
   }
 }
 

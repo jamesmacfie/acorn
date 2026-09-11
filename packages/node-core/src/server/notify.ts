@@ -1,6 +1,6 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 
@@ -92,17 +92,28 @@ export function broadcastPluginsChanged(): void {
   wsBroadcast({ channel: 'plugins:changed' })
 }
 
-// A task was created, patched, archived, cancelled or had its links change. Content-free for the same
-// reason as the two above: the task list is a fetchable route, and a payload would be a second
-// projection to keep in step.
+// A task was created, patched, archived, cancelled or had its links change. The id makes this an
+// addressable invalidation for consumers that can read one task; `null` is the explicit escape hatch
+// for batch writes such as a project deletion or pull-number adoption.
 //
 // It is `tasks:changed` rather than another `term:status` ping because a client has to be able to tell
 // "the task list moved" from "a terminal's status moved" — the first invalidates a query, the second
 // re-pulls a session list — and because a plugin's node half can subscribe to this one by name
 // (@acorn/protocol/nodeEvents.ts). Without it a second client kept a stale task list until it
 // reconnected (docs/plugins.md § Hearing a core event).
-export function broadcastTasksChanged(): void {
-  wsBroadcast({ channel: 'tasks:changed' })
+export function broadcastTasksChanged(event: TaskChangedEvent): void {
+  wsBroadcast({ channel: 'tasks:changed', ...event })
+}
+
+// Workspace identity and external-project membership are separate read models. A workspace frame
+// invalidates the roster; a mapping frame says which scopes to re-read and which provider can ignore
+// the event. Keeping them separate avoids making a rename invalidate every provider mapping.
+export function broadcastWorkspaceChanged(event: WorkspaceChangedEvent): void {
+  wsBroadcast({ channel: 'workspace:changed', ...event })
+}
+
+export function broadcastWorkspaceProjectsChanged(event: WorkspaceProjectsChangedEvent): void {
+  wsBroadcast({ channel: 'workspace-projects:changed', ...event })
 }
 
 // A connection was made, rotated, tested, disabled, re-enabled, or demoted to `needs-auth` because its
@@ -111,7 +122,7 @@ export function broadcastTasksChanged(): void {
 // from the next 401 (docs/plugins.md § Hearing a core event).
 //
 // This one carries a payload where the other three are content-free, and the difference is who the
-// audience is. `tasks:changed` has one consumer that always re-reads the whole list. A revoked
+// audience is. The built-in `tasks:changed` consumer always re-reads the whole list. A revoked
 // credential is heard by every integration plugin on the node, and almost all of them are looking at a
 // different provider. Three fields let a listener drop the frame without a round trip.
 //

@@ -42,7 +42,7 @@ export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emi
   // open | closed (closed covers merged, since GitHub's list reports merged PRs as "closed").
   const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
 
-  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo, { emit })
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
 

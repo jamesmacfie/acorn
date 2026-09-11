@@ -45,7 +45,7 @@ export const pullsBatch = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => ne
   if (!isFilesMode(filesMode)) return respondError(c, 400, 'bad_files_mode')
 
   const userId = uid
-  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo, { emit })
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
 

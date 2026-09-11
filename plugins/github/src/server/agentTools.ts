@@ -8,6 +8,7 @@ import {
 } from '@acorn/plugin-api/node'
 import { createPullRequest } from './createPull'
 import { checkFailed, taskChecks, taskReviewFeedback } from './mirrorQueries'
+import { type GithubEmit, NO_EMIT } from './events'
 
 type GithubToolCore = Pick<CoreServices, 'projects' | 'tasks'>
 type GithubProviderAccess = {
@@ -23,6 +24,7 @@ export function githubAgentTools(
   core: GithubToolCore,
   providers: GithubProviderAccess,
   onAttached: () => void = () => {},
+  emit: GithubEmit = NO_EMIT,
 ): AgentToolContribution[] {
   return [{
     name: 'github_pull_create',
@@ -56,7 +58,7 @@ export function githubAgentTools(
         createPullRequest(token, db, ctx.userLogin, owner, repo, {
           ...input,
           head: task.branch!,
-        }))
+        }, emit))
       if (!created) throw new ToolError('failed', 'GitHub is not connected.')
       if (!created.ok) {
         const message = created.failure.detail?.[0] ?? created.failure.error

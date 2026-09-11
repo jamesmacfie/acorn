@@ -80,9 +80,9 @@ agent sessions on a given node fills them. `HOST_OWNED_CAPABILITY_IDS` in
 constants.
 
 The catalogue of every id the first-party plugins publish, with its signature, is
-`CapabilityCatalogue` in `acorn-plugin-types`. It lives there because eleven of the fourteen are
-declared in `plugins/*/src/contract/` modules a loaded plugin cannot import, so prose was the only way
-a stranger could learn one existed.
+`CapabilityCatalogue` in `acorn-plugin-types`. Most ids are declared in
+`plugins/*/src/contract/` modules a loaded plugin cannot import, so the catalogue is the stable way
+a stranger learns what exists.
 
 **Hearing a core event.** `ctx.events.on(event, listener)` is the receive side, and it fires whether or
 not a client is attached, which is the point on a node nobody is sitting at. The event must be one core
@@ -91,7 +91,7 @@ one its manifest named in `permissions.events`, the same grant list its frames s
 there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
 unload, exactly as a route registration does. The catalogue is in `nodeEvents.ts`.
 
-Two of the nine are worth calling out because they are what a coarser ping split into.
+Two of the eleven are worth calling out because they are what a coarser ping split into.
 `terminal:sessions-changed` says a session was created, exited, or flipped between working and idle.
 It is the one core channel that fires at machine speed, so hear it only if a session roster is what
 you draw. `worktree:status-changed` says something under a task's worktree changed, and carries the
@@ -120,7 +120,33 @@ not consult the producer's `emits`: a producer's frames reach every socket regar
 would be cosmetic, and the node-side check is the one that holds. One ceiling to know: init order is
 not a dependency contract, so a consumer that subscribes before its producer's init has run sees an
 "absent" producer and is admitted even for an undeclared verb. The frames never arrive, so the contract
-holds; only the error is lost. What remains unbuilt is in [docs/future/events.md](../future/events.md).
+holds; only the error is lost.
+
+### Shipped first-party lifecycle events
+
+Every row below is an invalidation over durable or otherwise node-authoritative state. Payloads carry
+only enough current state or scope to avoid an unnecessary broad read; startup, reconnect, and a
+sequence gap still require a re-read.
+
+| Producer event | Safe payload | Re-read seam |
+| --- | --- | --- |
+| `plugin:workflows:run-changed` | task, run, durable run status | workflow run routes |
+| `plugin:workflows:gate-changed` | task, run, step, human-gate status | `workflows.gates` |
+| `plugin:agents:turn-changed` | task, session, turn, source, status, attempt | `agents.turns` |
+| `plugin:agents:request-changed` | task, session, request, kind, status | `agents.requests` |
+| `plugin:agents:sessions-changed` | task, session, present, archived | `agents.sessions` |
+| `plugin:github:repos-changed` | none | user-scoped repositories from `github.mirror` |
+| `plugin:github:pulls-changed` | repository scope | GitHub mirror routes |
+| `plugin:github:pr-synced` | repository, pull, current head | GitHub mirror routes |
+| `plugin:browser:captures-changed` | task | `browser.captures` |
+| `plugin:changes:review-notes-changed` | task, total count, unsent count | task-confined review-note routes |
+| `plugin:memory:memories-changed` | project or private scope | `memory.library` |
+| `plugin:preview:url-changed` | task, nullable URL and resolution source | `preview.urls` |
+
+The browser also sends `capture-created` for one compatibility period. New consumers use the
+collection event. Core's `agent-session:changed` remains the deliberately coarse compatibility
+reduction for completion and attention; the agents plugin's lifecycle events do not duplicate its
+transcript stream.
 
 **What earns a place in the catalogue.** An event is admitted only if all four hold: core (or the
 emitting plugin) is the only possible observer; it is human-scale, not machine-scale (per commit, yes;
@@ -145,6 +171,13 @@ third-party surface could carry; core keeps its own activity record and exposes 
 and query payloads*: http's request-sent and database's query-ran are the user's private data and can
 carry resolved secrets; the plugin-local record is the feature. *Compose up and down*: another plugin can
 ask `docker compose ps`; `task-teardown` made the cut instead because it is archive-coupled state.
+
+Three adjacent events remain conditional by design. `http:variables-changed` ships only with a
+concrete consumer and a capability exposing redacted metadata—never names, values, commands, or
+resolved secrets. `agents:delegation-changed` waits for a task-authorized durable provisioning read
+model and never carries prompts or lineage detail. `preview:navigated` waits for an authoritative
+node-side current-URL read and an explicit rule for redacting sensitive query values. None is emitted
+today; their absence is the contract, not unfinished wiring.
 
 **Where a key lives.** With whichever side would otherwise have to import the other. On the node that is
 almost always the provider, and the registry says so: "the signature lives in the provider's

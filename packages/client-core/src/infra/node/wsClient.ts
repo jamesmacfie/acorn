@@ -9,7 +9,7 @@
 // Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
 // `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
 // `docker:` and `agent:` are registered by the plugins that own them.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { decodeIdFrame, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
@@ -37,7 +37,7 @@ type StepChangedCb = (event: { runId: string; stepId: string; status: string }) 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
-const tasksSubs = new Set<() => void>()
+const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
 // The node events after the first three, keyed by channel. One registry rather than one Set per event,
 // because they share a shape: a core-named frame whose fields are the payload
@@ -47,6 +47,8 @@ type NodeEventMap = {
   'run:changed': RunTargetChangedEvent
   'agent-session:changed': AgentSessionChangedEvent
   'project:changed': ProjectChangedEvent
+  'workspace:changed': WorkspaceChangedEvent
+  'workspace-projects:changed': WorkspaceProjectsChangedEvent
   // Content-free: a session was created, exited, or flipped between working and idle.
   'terminal:sessions-changed': Record<string, never>
   'worktree:status-changed': WorktreeStatusChangedEvent
@@ -179,10 +181,13 @@ registerWsChannel('plugins', (frame) => {
 })
 
 // And its fourth. A task was created, patched, archived, cancelled, or had its links change on the
-// node — from this window, from another one, or from an agent (node-core/server/notify.ts). Content-free
-// again: the subscriber invalidates the task-list query and refetches.
+// node — from this window, from another one, or from an agent (node-core/server/notify.ts). The id is
+// preserved for plugin consumers even though the built-in watcher invalidates the whole task list.
 registerWsChannel('tasks', (frame) => {
-  if (frame.channel === 'tasks:changed') tasksSubs.forEach((cb) => cb())
+  if (frame.channel !== 'tasks:changed') return
+  const { taskId } = frame
+  if (typeof taskId !== 'string' && taskId !== null) return
+  tasksSubs.forEach((cb) => cb({ taskId }))
 })
 
 // And its fifth. A connection was made, rotated, tested, disabled, or demoted to `needs-auth` because
@@ -191,18 +196,20 @@ registerWsChannel('tasks', (frame) => {
 // frame off the wire is `Record<string, unknown>` and every consumer would otherwise repeat the check.
 registerWsChannel('connection', (frame) => {
   if (frame.channel !== 'connection:changed') return
-  const { integrationId, providerId, status } = frame as Partial<ConnectionChangedEvent>
-  if (typeof integrationId !== 'string' || typeof providerId !== 'string' || typeof status !== 'string') return
-  connectionSubs.forEach((cb) => cb({ integrationId, providerId, status }))
+  const { integrationId, providerId } = frame
+  if (typeof integrationId !== 'string' || typeof providerId !== 'string') return
+  if (frame.deleted === true) return connectionSubs.forEach((cb) => cb({ integrationId, providerId, deleted: true }))
+  if (typeof frame.status !== 'string') return
+  connectionSubs.forEach((cb) => cb({ integrationId, providerId, status: frame.status as Extract<ConnectionChangedEvent, { status: unknown }>['status'] }))
 })
 
-// Core's sixth through eleventh: HEAD moved, a run target started or stopped, an agent session reached
-// an edge, a project row or its config moved, a terminal session's roster moved, something under a
-// task's worktree changed (docs/plugins.md § Hearing a core event). Each prefix is the noun before the
+// The rest of core's payload-carrying catalogue: HEAD moved, a run target started or stopped, an agent
+// session reached an edge, a project or workspace projection moved, a terminal session's roster moved,
+// or something under a task's worktree changed. Each prefix is the noun before the
 // colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project', 'terminal', 'worktree']) {
+for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'terminal', 'worktree']) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
@@ -240,6 +247,7 @@ export function _resetWsClient(): void {
   pluginsSubs.clear()
   tasksSubs.clear()
   connectionSubs.clear()
+  nodeEventSubs.clear()
   noticeSubs.clear()
   stepEventSubs.clear()
   reconnectSubs.clear()
@@ -292,7 +300,7 @@ export function wsOnPluginsChanged(cb: () => void): () => void {
 
 // The node's task list moved. Same subscriber shape and the same reason: tasks/mutations.ts would be a
 // cycle if this module reached into it.
-export function wsOnTasksChanged(cb: () => void): () => void {
+export function wsOnTasksChanged(cb: (event: TaskChangedEvent) => void): () => void {
   tasksSubs.add(cb)
   connect()
   return () => void tasksSubs.delete(cb)
@@ -332,4 +340,3 @@ export function wsOnWorkflowStepChanged(cb: StepChangedCb): () => void {
   connect()
   return () => void stepChangedSubs.delete(cb)
 }
-

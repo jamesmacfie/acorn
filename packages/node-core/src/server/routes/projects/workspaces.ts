@@ -8,6 +8,7 @@ import { ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import type { Workspace, WorkspaceExternalProjectsResponse, WorkspaceProjectRef, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { getConnection } from '../../integrations/connections'
+import { broadcastProjectChanged, broadcastWorkspaceChanged, broadcastWorkspaceProjectsChanged } from '../../notify'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
@@ -61,13 +62,38 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
   }))
 }
 
-async function ensureDefault(db: ReturnType<typeof getDb>): Promise<string> {
+const mappingKey = (row: { integrationId: string; externalId: string; projectId: string }) =>
+  `${row.integrationId}\0${row.externalId}\0${row.projectId}`
+
+const mappingsEqual = (
+  before: { integrationId: string; externalId: string; projectId: string }[],
+  after: { integrationId: string; externalId: string; projectId: string }[],
+): boolean => {
+  const previous = new Set(before.map(mappingKey))
+  return previous.size === after.length && after.every((row) => previous.has(mappingKey(row)))
+}
+
+async function mappingProviders(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  integrationIds: Iterable<string>,
+): Promise<Set<string>> {
+  const ids = [...new Set(integrationIds)]
+  if (!ids.length) return new Set()
+  const rows = await db
+    .select({ provider: schema.integrations.provider })
+    .from(schema.integrations)
+    .where(and(eq(schema.integrations.userId, userId), inArray(schema.integrations.id, ids)))
+  return new Set(rows.map((row) => row.provider))
+}
+
+async function ensureDefault(db: ReturnType<typeof getDb>): Promise<{ id: string; created: boolean }> {
   const existing = await db.select().from(schema.workspaces).where(eq(schema.workspaces.isDefault, true)).limit(1)
-  if (existing[0]) return existing[0].id
+  if (existing[0]) return { id: existing[0].id, created: false }
   const now = Date.now()
   const id = randomUUID()
   await db.insert(schema.workspaces).values({ id, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-  return id
+  return { id, created: true }
 }
 
 export const workspaces = new Hono<AppEnv>()
@@ -79,7 +105,8 @@ export const workspaces = new Hono<AppEnv>()
   // projection into application-owned project state.
   .post('/bootstrap', async (c) => {
     const db = getDb(c.env)
-    await ensureDefault(db)
+    const ensured = await ensureDefault(db)
+    if (ensured.created) broadcastWorkspaceChanged({ workspaceId: ensured.id })
     return c.json(await listWorkspaces(db))
   })
   .post('/', async (c) => {
@@ -90,6 +117,7 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
+    broadcastWorkspaceChanged({ workspaceId: id })
     return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, projects: [] } satisfies Workspace)
   })
   // Workspace identity is its name. Project colour and project configuration belong to project routes.
@@ -98,9 +126,12 @@ export const workspaces = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const id = c.req.param('id')
-    const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
+    const [existing] = await db.select({ id: schema.workspaces.id, name: schema.workspaces.name }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
-    await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
+    if (existing.name !== parsed.data.name) {
+      await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
+      broadcastWorkspaceChanged({ workspaceId: id })
+    }
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {
@@ -109,11 +140,18 @@ export const workspaces = new Hono<AppEnv>()
     const row = (await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id)).limit(1))[0]
     if (!row) return respondError(c, 404, 'not_found')
     if (row.isDefault) return respondError(c, 400, 'cannot_delete_default')
-    const defaultId = await ensureDefault(db)
+    const reassignedProjects = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, id))
+    const removedMappings = await db.select({ integrationId: schema.workspaceExternalProjects.integrationId }).from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
+    const removedProviders = await mappingProviders(db, ownerId(c), removedMappings.map((mapping) => mapping.integrationId))
+    const defaultWorkspace = await ensureDefault(db)
     // Reassign this workspace's projects back to Default rather than orphaning them.
-    await db.update(schema.projects).set({ workspaceId: defaultId, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id))
+    await db.update(schema.projects).set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id))
     await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
     await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
+    if (defaultWorkspace.created) broadcastWorkspaceChanged({ workspaceId: defaultWorkspace.id })
+    for (const project of reassignedProjects) broadcastProjectChanged({ projectId: project.id })
+    for (const providerId of removedProviders) broadcastWorkspaceProjectsChanged({ providerId, workspaceIds: [id] })
+    broadcastWorkspaceChanged({ workspaceId: id })
     return c.json({ ok: true })
   })
   // External projects (Linear/Rollbar/…) linked to this workspace: (integrationId, externalId) pairs.
@@ -132,6 +170,7 @@ export const workspaces = new Hono<AppEnv>()
     const projects = parsed.data.projects ?? []
     const db = getDb(c.env)
     const uid = ownerId(c)
+    const previous = await db.select().from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
     for (const project of projects) {
       if (!(await getConnection(db, uid, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
     }
@@ -151,6 +190,11 @@ export const workspaces = new Hono<AppEnv>()
           createdAt: now,
         })))
         .onConflictDoNothing()
+    }
+    const current = await db.select().from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
+    if (!mappingsEqual(previous, current)) {
+      const providers = await mappingProviders(db, uid, [...previous, ...current].map((mapping) => mapping.integrationId))
+      for (const providerId of providers) broadcastWorkspaceProjectsChanged({ providerId, workspaceIds: [id] })
     }
     return c.json({ ok: true })
   })

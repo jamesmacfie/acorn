@@ -28,6 +28,7 @@ describe('resolveTargetUrl precedence', () => {
 describe('RuntimeService over real processes', () => {
   let dir: string
   const children = new Map<string, ChildProcess>()
+  const exitListeners = new Set<(sessionId: string, exitCode: number | null) => void>()
   let targets: RunTarget[]
 
   const deps: RuntimeDeps = {
@@ -36,11 +37,19 @@ describe('RuntimeService over real processes', () => {
       const child = spawn('/bin/sh', ['-c', target.command], { cwd })
       const id = `s${children.size + 1}`
       children.set(id, child)
+      const listeners = [...exitListeners]
+      child.once('exit', (exitCode) => {
+        for (const listener of listeners) listener(id, exitCode)
+      })
       return id
     },
     isRunning: (id) => {
       const c = children.get(id)
       return !!c && c.exitCode === null && !c.killed
+    },
+    onExit: (listener) => {
+      exitListeners.add(listener)
+      return () => exitListeners.delete(listener)
     },
     exitCode: (id) => children.get(id)?.exitCode,
     killSession: (id) => children.get(id)?.kill(),
@@ -60,6 +69,7 @@ describe('RuntimeService over real processes', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-run-'))
     children.clear()
+    exitListeners.clear()
   })
 
   afterEach(() => {
@@ -105,6 +115,23 @@ describe('RuntimeService over real processes', () => {
     expect(status.running).toBe(false)
     expect(status.exitCode).toBe(0)
     expect((await svc.start('t1', 'nope')).ok).toBe(false)
+  })
+
+  it('announces a natural target exit once and removes the declared instance', async () => {
+    targets = [{ id: 'seed', command: 'true' }]
+    const changes: Array<{ taskId: string; targetId: string; running: boolean }> = []
+    const svc = new RuntimeService({
+      ...deps,
+      onChange: (taskId, targetId, running) => changes.push({ taskId, targetId, running }),
+    })
+    await svc.start('t1', 'seed')
+    await waitFor(() => changes.length === 2)
+    expect(changes).toEqual([
+      { taskId: 't1', targetId: 'seed', running: true },
+      { taskId: 't1', targetId: 'seed', running: false },
+    ])
+    expect(await svc.stop('t1', 'seed')).toEqual({ ok: false, reason: 'Not running.' })
+    svc.dispose()
   })
 
   it('restart runs the declared restart command when present', async () => {

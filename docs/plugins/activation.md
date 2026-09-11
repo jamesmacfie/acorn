@@ -21,7 +21,11 @@ Which plugins a Node runs decides which routes exist and which SQLite files it o
 plugin is a statement about one machine: a fleet is a set of independently administered nodes, and
 there is no "install everywhere" or "disable everywhere" here.
 
-The page shows two facts per row, not one: `disabled` is what will happen (it takes effect at the
+The page includes required plugins as read-only rows and optional plugins with their enable checkbox.
+Each row lists the event verbs and descriptions the plugin declares in `emits`, including built-ins;
+this is the human-readable source behind a cross-plugin live-update grant.
+
+The page shows two activation facts per row, not one: `disabled` is what will happen (it takes effect at the
 Node's next start, since routes, tables, and jobs are wired at init) and `running` is what is happening
 now. Between saving a toggle and restarting the Node, the two can differ, and the page keeps both
 visible with a restart banner rather than collapsing them into one state that would either lie about

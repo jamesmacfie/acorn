@@ -58,6 +58,12 @@ carries the project it was made under, so acceptance no longer depends on the ta
 a proposal that names no project is accepted into the private root rather than discarded.
 The index is rebuildable; the Markdown files remain the durable content.
 
+After a manual write or accepted proposal, the plugin first reconciles the file and derived index,
+then publishes `plugin:memory:memories-changed`. Its payload is only the affected project scope, or
+the private scope with `projectId: null`; recall counters and ordinary reconciliation reads stay
+silent. A node-side consumer re-reads `memory.library`, which returns authorized entry content and
+metadata but no file paths or recall bookkeeping.
+
 A search hit or a `memory_get` read bumps that row's recall stats (last-accessed time and access
 count), the inputs for future decay and ranking. Listing the index does not count as a read. The
 stats survive reconciliation because rows are keyed by a content-hash id.

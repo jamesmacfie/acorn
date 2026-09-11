@@ -424,7 +424,7 @@ aliases for one release and resolve through the same notes store.
 | `notes` | task, workspace, and global note CRUD |
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
-| `preview` | preview rules and browser-agent operations |
+| `preview` | preview rules, node-owned URL resolution, and recipe selection |
 
 ### Command palette routes
 
@@ -478,19 +478,26 @@ both ends. Core owns twelve, and every other prefix belongs to the plugin that r
 `term:` is transport on both ends and `workflow:` carries the notification bell's notices, per-step
 stream events, and `workflow:step-changed`, which names one step whose status moved so a run surface
 can redraw that node without re-reading the run. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
-them, described under [Backpressure](./terminal.md#backpressure). The other nine are the Node saying
+them, described under [Backpressure](./terminal.md#backpressure). The other eleven are the Node saying
 that something it owns has moved, and each is one frame:
 
 - `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in
   [the plugins doc](./plugins.md).
-- `tasks:changed`, on every task write: create, patch, links, archive, cancel, and a project delete
-  taking its tasks with it.
+- `tasks:changed`, on every task write: create, patch, links, archive, cancel, worktree creation or
+  removal, relation changes, and a project delete taking its tasks with it. It carries the task id,
+  or `null` for a batch.
+- `workspace:changed`, after a workspace is created, renamed, or deleted. Its id remains useful on
+  deletion because absence from the list is the new state.
+- `workspace-projects:changed`, after a provider's external-project mapping replacement or a
+  connection deletion removes mappings. It carries the provider and the union of affected old and
+  new workspace ids.
 - `connection:changed`, on every write to a connection's status, including the demotions to
-  `needs-auth` that happen mid-request when a credential stops being readable.
+  `needs-auth` that happen mid-request when a credential stops being readable, and after deletion.
+  The deletion branch carries `deleted: true` in place of `status`.
 - `head:changed`, when a task worktree's tip moves. Detected by the task-status poll, so it fires
   within one status round trip of an in-app commit and within ten seconds of one made from a
   terminal, an agent, or an outside editor, while a client is attached.
-- `run:changed`, when a declared run target is started or stopped.
+- `run:changed`, when a declared run target starts, is stopped, or exits naturally.
 - `agent-session:changed`, when a managed agent session finishes a turn or asks for attention. The
   same two kinds the agent webhook delivers externally.
 - `project:changed`, on every project write: create, patch, re-detect, delete, and the config and
@@ -509,12 +516,13 @@ plugin-chrome sweep is the only thing that hears it. A ping with no `pluginId` i
 every plugin's. The terminal's two former meanings are `terminal:sessions-changed` and
 `worktree:status-changed`.
 
-`plugins:changed`, `tasks:changed` and `terminal:sessions-changed` are content-free, because the list
-behind each is a fetchable route and a payload would be a second projection to keep in step.
-`connection:changed` carries `integrationId`, `providerId`, and the new `status`, because every
+`plugins:changed` and `terminal:sessions-changed` are content-free, because the list behind each is a
+fetchable route and a payload would be a second projection to keep in step. `tasks:changed` carries
+only its addressable task scope. `connection:changed` carries `integrationId`, `providerId`, and
+either the new `status` or `deleted: true`, because every
 integration plugin hears it and most of them are looking at a different provider. The three fields let
 a listener drop the frame without a round trip, and the client still re-reads the route. The other
-five carry a payload for the same reason; the shapes are in `@acorn/protocol/nodeEvents.ts`.
+payloads follow the same rule; their shapes are in `@acorn/protocol/nodeEvents.ts`.
 
 All of them are invalidation, not replay: a client that missed a frame is not owed a delta, which is
 why each field is what the thing now is rather than what changed about it.

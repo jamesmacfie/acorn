@@ -31,7 +31,8 @@ describe('github_pull_create agent tool', () => {
         visit({ id: 'github-1' } as StoredConnection, 'token'),
     }
     const onAttached = vi.fn()
-    const [tool] = githubAgentTools({} as PluginDatabase, core, providers, onAttached)
+    const emit = vi.fn()
+    const [tool] = githubAgentTools({} as PluginDatabase, core, providers, onAttached, emit)
 
     expect(await tool.when?.({ taskId: 'task-1', userLogin: 'owner', sessionId: 'session-1' })).toBe(true)
     await expect(tool.handler(
@@ -44,7 +45,7 @@ describe('github_pull_create agent tool', () => {
     })
     expect(createPullRequest).toHaveBeenCalledWith('token', expect.anything(), 'owner', 'acme', 'widget', {
       title: 'Ship it', body: 'Details', base: 'main', draft: true, head: 'feat/task',
-    })
+    }, emit)
     expect(attachPull).toHaveBeenCalledWith('task-1', {
       repoOwner: 'acme', repoName: 'widget', pullNumber: 73, sessionId: 'session-1',
     })

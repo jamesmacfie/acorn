@@ -104,4 +104,33 @@ describe('what a run reports', () => {
       expect(spans(ctx)).toEqual([])
     })
   })
+
+  it('announces readable run and gate state once per durable status edge', async () => {
+    await withProfile(async () => {
+      const runEvents: Array<{ taskId: string; runId: string; status: string; steps: number }> = []
+      const gateEvents: Array<{ taskId: string; runId: string; stepId: string; status: string }> = []
+      let runner!: WorkflowRunner
+      runner = new WorkflowRunner(ctx.storage.open(), baseDeps(ctx.telemetry, {
+        runChanged: async (taskId, runId, status) => {
+          runEvents.push({ taskId, runId, status, steps: (await runner.steps(runId)).length })
+        },
+        gateChanged: (taskId, runId, stepId, status) => {
+          gateEvents.push({ taskId, runId, stepId, status })
+        },
+      }), noExtensions)
+
+      const runId = await runner.start('task-1', {
+        name: 'Approval',
+        steps: [{ name: 'approve', kind: 'gate-human' }],
+      })
+      await vi.waitFor(() => expect(runEvents.map((event) => event.status)).toEqual(['running', 'gated']))
+      expect(runEvents[0]).toMatchObject({ taskId: 'task-1', runId, steps: 1 })
+      expect(gateEvents).toHaveLength(1)
+      expect(gateEvents[0]).toMatchObject({ taskId: 'task-1', runId, status: 'waiting-gate' })
+
+      await runner.resolveGate(runId, gateEvents[0]!.stepId, true)
+      await vi.waitFor(() => expect(runEvents.map((event) => event.status)).toEqual(['running', 'gated', 'running', 'done']))
+      expect(gateEvents.map((event) => event.status)).toEqual(['waiting-gate', 'done'])
+    })
+  })
 })

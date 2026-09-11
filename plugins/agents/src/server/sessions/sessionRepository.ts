@@ -14,6 +14,8 @@ import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protoco
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
 import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
+import type { AgentLifecyclePublisher } from '../../contract/lifecycle'
+import { AgentLifecycle } from './lifecycle'
 
 const now = (): number => Date.now()
 
@@ -36,7 +38,6 @@ type SessionSearchFilter = {
 }
 
 /**
-/**
  * Session projection, request-resolution, deletion, and search repository.
  *
  * The append-only event transaction lives here because it is the authority that advances the
@@ -47,10 +48,15 @@ type SessionSearchFilter = {
  * through core before filtering this plugin's own tables.
  */
 export class AgentSessionRepository {
+  protected readonly lifecycle: AgentLifecycle
+
   constructor(
     protected readonly db: PluginDatabase,
     protected readonly core: CoreServices,
-  ) {}
+    publishLifecycle?: AgentLifecyclePublisher,
+  ) {
+    this.lifecycle = new AgentLifecycle(db, publishLifecycle)
+  }
 
   // `null` means no workspace filter. An empty array means the workspace has no tasks, so the query
   // narrows to nothing rather than falling through to unfiltered.
@@ -74,7 +80,7 @@ export class AgentSessionRepository {
     const timestamp = now()
     const projection = projectAgentEvent(event, turnId)
     const eventId = randomUUID()
-    const row = this.db.transaction((tx) => {
+    const committed = this.db.transaction((tx) => {
       const current = tx
         .select({
           lastEventSeq: schema.agentSessions.lastEventSeq,
@@ -131,10 +137,17 @@ export class AgentSessionRepository {
         createdAt: timestamp,
       }
       tx.insert(schema.agentEvents).values(values).run()
-      this.applyEventProjection(tx, sessionId, turnId, event, timestamp)
-      return { ...values, turnId: values.turnId ?? null, searchText: values.searchText ?? null }
+      const changed = this.applyEventProjection(tx, sessionId, turnId, event, timestamp)
+      return {
+        row: { ...values, turnId: values.turnId ?? null, searchText: values.searchText ?? null },
+        ...changed,
+      }
     })
-    return mapAgentEvent(row)
+    if (committed.turnChanged && turnId) await this.lifecycle.announceTurn(turnId)
+    if (committed.requestChanged && (event.type === 'request' || event.type === 'request_resolved')) {
+      await this.lifecycle.announceRequest(sessionId, event.requestId)
+    }
+    return mapAgentEvent(committed.row)
   }
 
   private applyEventProjection(
@@ -143,9 +156,9 @@ export class AgentSessionRepository {
     turnId: string | null,
     event: AgentNormalizedEvent,
     timestamp: number,
-  ): void {
+  ): { turnChanged: boolean; requestChanged: boolean } {
     if (event.type === 'request') {
-      tx.insert(schema.agentRequests)
+      const result = tx.insert(schema.agentRequests)
         .values({
           id: randomUUID(),
           sessionId,
@@ -160,31 +173,70 @@ export class AgentSessionRepository {
         })
         .onConflictDoNothing()
         .run()
+      return { turnChanged: false, requestChanged: result.changes > 0 }
     } else if (event.type === 'request_resolved') {
+      const current = tx
+        .select({ status: schema.agentRequests.status })
+        .from(schema.agentRequests)
+        .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.providerRequestId, event.requestId)))
+        .get()
       tx.update(schema.agentRequests)
         .set({ status: 'resolved', resolutionJson: JSON.stringify(event.resolution), resolvedAt: timestamp })
-        .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.providerRequestId, event.requestId)))
+        .where(and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, event.requestId),
+          inArray(schema.agentRequests.status, ['pending', 'resolving']),
+        ))
         .run()
+      return {
+        turnChanged: false,
+        requestChanged: current?.status === 'pending' || current?.status === 'resolving',
+      }
     } else if (event.type === 'turn_completed' && turnId) {
+      const current = tx
+        .select({ status: schema.agentTurns.status })
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId))
+        .get()
       tx.update(schema.agentTurns)
         .set({ status: 'completed', stopReason: event.stopReason ?? null, completedAt: timestamp })
-        .where(eq(schema.agentTurns.id, turnId))
+        .where(and(
+          eq(schema.agentTurns.id, turnId),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ))
         .run()
+      return {
+        turnChanged: current?.status === 'dispatching' || current?.status === 'active',
+        requestChanged: false,
+      }
     } else if (event.type === 'usage' && turnId) {
       tx.update(schema.agentTurns)
         .set({ usageJson: JSON.stringify(event.usage) })
         .where(eq(schema.agentTurns.id, turnId))
         .run()
     } else if (event.type === 'error' && turnId) {
+      const current = tx
+        .select({ status: schema.agentTurns.status })
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId))
+        .get()
       tx.update(schema.agentTurns)
         .set({
           status: event.retryable ? 'interrupted' : 'failed',
           errorJson: JSON.stringify({ code: event.code, message: event.message }),
           completedAt: timestamp,
         })
-        .where(eq(schema.agentTurns.id, turnId))
+        .where(and(
+          eq(schema.agentTurns.id, turnId),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ))
         .run()
+      return {
+        turnChanged: current?.status === 'dispatching' || current?.status === 'active',
+        requestChanged: false,
+      }
     }
+    return { turnChanged: false, requestChanged: false }
   }
 
   async claimRequestResolution(
@@ -193,7 +245,7 @@ export class AgentSessionRepository {
     resolution: unknown,
     idempotencyKey: string,
   ): Promise<{ request: AgentRequest; claimed: boolean }> {
-    return this.db.transaction((tx) => {
+    const result = this.db.transaction((tx) => {
       const request = tx
         .select()
         .from(schema.agentRequests)
@@ -228,6 +280,8 @@ export class AgentSessionRepository {
       if (!claimed) throw new Error('Claimed agent request disappeared.')
       return { request: mapAgentRequest(claimed), claimed: true }
     })
+    if (result.claimed) await this.lifecycle.announceRequest(sessionId, providerRequestId)
+    return result
   }
 
   async request(sessionId: string, providerRequestId: string): Promise<AgentRequest | null> {
@@ -243,6 +297,8 @@ export class AgentSessionRepository {
   }
 
   async expireClaimedRequest(sessionId: string, providerRequestId: string): Promise<void> {
+    const before = await this.request(sessionId, providerRequestId)
+    if (before?.status !== 'resolving') return
     await this.db
       .update(schema.agentRequests)
       .set({ status: 'expired', resolvedAt: now() })
@@ -251,9 +307,18 @@ export class AgentSessionRepository {
         eq(schema.agentRequests.providerRequestId, providerRequestId),
         eq(schema.agentRequests.status, 'resolving'),
       ))
+    await this.lifecycle.announceRequest(sessionId, providerRequestId)
   }
 
   async expirePendingRequests(sessionId: string): Promise<void> {
+    const requests = await this.db
+      .select({ providerRequestId: schema.agentRequests.providerRequestId })
+      .from(schema.agentRequests)
+      .where(and(
+        eq(schema.agentRequests.sessionId, sessionId),
+        inArray(schema.agentRequests.status, ['pending', 'resolving']),
+      ))
+    if (!requests.length) return
     await this.db
       .update(schema.agentRequests)
       .set({ status: 'expired', resolvedAt: now() })
@@ -261,12 +326,14 @@ export class AgentSessionRepository {
         eq(schema.agentRequests.sessionId, sessionId),
         inArray(schema.agentRequests.status, ['pending', 'resolving']),
       ))
+    for (const request of requests) await this.lifecycle.announceRequest(sessionId, request.providerRequestId)
   }
 
   async patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
   ): Promise<AgentSession> {
+    const before = await this.requireSession(sessionId)
     const timestamp = now()
     await this.db
       .update(schema.agentSessions)
@@ -288,7 +355,11 @@ export class AgentSessionRepository {
         ...(patch.config ? { configJson: JSON.stringify(patch.config) } : {}),
       })
       .where(eq(schema.agentSessions.id, sessionId))
-    return this.requireSession(sessionId)
+    const session = await this.requireSession(sessionId)
+    const rosterChanged = (patch.title != null && session.title !== before.title)
+      || (patch.archived != null && (session.archivedAt != null) !== (before.archivedAt != null))
+    if (rosterChanged) this.lifecycle.announceSession(session)
+    return session
   }
 
   async setController(sessionId: string, controller: AgentSession['controller']): Promise<AgentSession> {
@@ -314,6 +385,8 @@ export class AgentSessionRepository {
     attachmentIds: string[]
     artifactObjects: RemovedArtifactObject[]
   }> {
+    const session = await this.getSession(sessionId)
+    if (!session) return { attachmentIds: [], artifactObjects: [] }
     const turns = await this.db.select({ id: schema.agentTurns.id }).from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
     const turnIds = turns.map((turn) => turn.id)
     const [attachmentRows, artifactRows] = await Promise.all([
@@ -336,6 +409,7 @@ export class AgentSessionRepository {
       tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
     })
+    this.lifecycle.announceSession(session, false)
     return {
       attachmentIds: attachmentRows.map((row) => row.attachmentId),
       artifactObjects: artifactRows,
@@ -450,5 +524,17 @@ export class AgentSessionRepository {
       .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.status, 'pending')))
       .orderBy(asc(schema.agentRequests.createdAt))
     return rows.map(mapAgentRequest)
+  }
+
+  lifecycleTurns(filter: { taskId: string; sessionId?: string }) {
+    return this.lifecycle.turns(filter)
+  }
+
+  lifecycleRequests(filter: { taskId: string; sessionId?: string }) {
+    return this.lifecycle.requests(filter)
+  }
+
+  lifecycleSessions(taskId: string) {
+    return this.lifecycle.sessions(taskId)
   }
 }

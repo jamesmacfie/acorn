@@ -11,6 +11,12 @@ vi.mock('../../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
+const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
+vi.mock('../../transport/wsHub', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
+
 // What the active-task list costs to answer.
 //
 // It used to `await getProject` inside a loop over rows, so a hundred tasks in one project was a
@@ -52,6 +58,7 @@ describe('the active-task list route', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    broadcasts.length = 0
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
   })
@@ -102,5 +109,28 @@ describe('the active-task list route', () => {
     const { body, queries } = await listWithQueryCount()
     expect(body).toEqual([])
     expect(queries).toBe(1)
+  })
+
+  it('announces the affected task id and suppresses unchanged patches', async () => {
+    await seed(1, 0)
+    const created = await app.request('http://acorn.test/api/tasks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ origin: 'local', projectId: 'project-0', title: 'New task' }),
+    })
+    expect(created.status).toBe(200)
+    const task = (await created.json()) as Task
+    expect(broadcasts).toEqual([{ channel: 'tasks:changed', taskId: task.id }])
+    broadcasts.length = 0
+
+    const patch = (title: string) => app.request(`http://acorn.test/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+    expect((await patch('New task')).status).toBe(200)
+    expect((await patch('Renamed task')).status).toBe(200)
+
+    expect(broadcasts).toEqual([{ channel: 'tasks:changed', taskId: task.id }])
   })
 })

@@ -305,6 +305,8 @@ export type TelemetrySummary = {
 // `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
 export type NodePluginRow = {
   name: string
+  /** Events this running or installed plugin declares for cross-plugin subscribers. */
+  emits?: readonly import('./plugin/contract.ts').PluginEmit[]
   required: boolean
   disabled: boolean
   running: boolean

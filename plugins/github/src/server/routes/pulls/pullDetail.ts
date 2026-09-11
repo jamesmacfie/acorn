@@ -28,7 +28,7 @@ export const pullDetail = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => ne
   const number = Number(c.req.param('number'))
   if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
-  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo, { emit })
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
   const key = { userId, repoId, number }

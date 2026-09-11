@@ -1,11 +1,10 @@
 // The client half of `connection:changed` (docs/plugins.md § Hearing a core event).
 //
-// Nine writers on the node move a connection's status, and six of them are not the owner clicking
-// anything: a credential that stopped being readable demotes itself to `needs-auth` mid-request. Until
-// this existed, a client found out by refetching on suspicion, and onboarding hand-invalidated after
-// connecting because nothing else would (`GithubConnect.tsx`).
+// Status writers and connection deletion announce the row's current state. Several status changes are
+// not the owner clicking anything: a credential that stopped being readable demotes itself to
+// `needs-auth` mid-request. Until this existed, a client found out by refetching on suspicion.
 //
-// The frame carries the new status, and this still throws it away and refetches. The list route
+// The frame carries the new status or says the row was deleted, and this still refetches. The list route
 // resolves capabilities and the synthesized GitHub row on top of the stored one, so patching a status
 // into the cache would leave the rest of that projection behind. The payload is for the plugin bus,
 // where a listener uses it to ignore a provider it does not own.

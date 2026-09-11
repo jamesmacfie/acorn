@@ -33,6 +33,8 @@ export const SUBSCRIBABLE_CHANNELS = [
   'runtime:node-switched',
   'runtime:focus-changed',
   'tasks:changed',
+  'workspace:changed',
+  'workspace-projects:changed',
   'connection:changed',
   'head:changed',
   'run:changed',
@@ -51,11 +53,13 @@ const CHANNEL_DESCRIPTIONS = {
   'runtime:node-switched': { text: 'Receive active-node change events', icon: 'radio' },
   'runtime:focus-changed': { text: 'See which pane and region of this window has keyboard focus', icon: 'radio' },
   'tasks:changed': { text: 'Receive notice when this node’s tasks change', icon: 'radio' },
+  'workspace:changed': { text: 'Receive notice when this node’s workspaces change', icon: 'radio' },
+  'workspace-projects:changed': { text: 'See when external projects mapped to this node’s workspaces change', icon: 'radio' },
   // Named for what the owner is consenting to rather than for the frame: the payload carries a provider
   // id and a status, so a plugin granted this learns which of their accounts stopped working and when
   // one is reconnected. That is worth a sentence of its own, because it is more than the other four
   // give away.
-  'connection:changed': { text: 'See which of this node’s connected accounts change status', icon: 'radio' },
+  'connection:changed': { text: 'See which of this node’s connected accounts change status or are removed', icon: 'radio' },
   // Each sentence names what the payload gives away, since that is what the owner is consenting to.
   'head:changed': { text: 'See when a task’s branch gets a new commit, and which commit', icon: 'radio' },
   'run:changed': { text: 'See when a task’s dev processes start or stop', icon: 'radio' },

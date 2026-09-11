@@ -7,10 +7,11 @@ import { REPOS_STALE_AFTER_MS } from '../../syncPolicy'
 import { readCachedRepos, refreshRepos, toPublicRepo } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
 import { repos as reposTable, syncState } from '../../../node/schema'
+import { type GithubEmit, NO_EMIT } from '../../events'
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const repos = (db: PluginDatabase) => new Hono<AppEnv>()
+export const repos = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   .get('/', async (c) => {
     const uid = ownerId(c)
     const token = await githubToken(c)
@@ -36,7 +37,7 @@ export const repos = (db: PluginDatabase) => new Hono<AppEnv>()
       userId,
       ttlMs: REPOS_STALE_AFTER_MS,
       read,
-      refresh: () => refreshRepos(token, db, userId),
+      refresh: () => refreshRepos(token, db, userId, { emit }),
     })
     if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
     return c.json(result.value)

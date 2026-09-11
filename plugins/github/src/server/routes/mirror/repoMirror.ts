@@ -6,11 +6,13 @@ import type { Repo } from '../../../shared/api'
 import { deleteRepoMirrorStatements } from '../../mirrorRetention'
 import { repoMatches } from '../../repoMatch'
 import { repos, syncState } from '../../../node/schema'
+import { type GithubEmit, NO_EMIT } from '../../events'
 
 // Every exported helper here already took the handle as a parameter, which is why this module needed no
 // reshaping when the tables moved.
 type Db = PluginDatabase
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
+type RepoMirrorDependencies = { emit?: GithubEmit; fetcher?: GitHubFetcher }
 
 type GitHubRepo = {
   id: number
@@ -68,7 +70,13 @@ const repoRow = (userId: string, repo: GitHubRepo, fetchedAt: number) => ({
 // Refresh the user's repo mirror from GitHub, atomically (one db.batch, like mirrorPr). The repos list
 // carries an ETag in sync_state, so a 304 costs no rate budget. Returns RouteResult<void>, because the
 // sync engine re-reads the mirror after a cold refresh.
-export const refreshRepos = async (token: string, db: Db, userId: string, fetcher: GitHubFetcher = gh): Promise<RefreshResult> => {
+export const refreshRepos = async (
+  token: string,
+  db: Db,
+  userId: string,
+  dependencies: RepoMirrorDependencies = {},
+): Promise<RefreshResult> => {
+  const { emit = NO_EMIT, fetcher = gh } = dependencies
   const resource = reposResource()
   const [sync] = await db
     .select()
@@ -111,6 +119,7 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
       .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { etag, fetchedAt: now } }),
   ])
 
+  emit('repos-changed')
   return { ok: true }
 }
 
@@ -125,8 +134,9 @@ export const resolveRepoForUser = async (
   userId: string,
   owner: string,
   repo: string,
-  fetcher: GitHubFetcher = gh,
+  dependencies: RepoMirrorDependencies = {},
 ): Promise<RouteResult<ResolvedRepo>> => {
+  const { emit = NO_EMIT, fetcher = gh } = dependencies
   const [cached] = await db
     .select({ id: repos.id })
     .from(repos)
@@ -147,5 +157,6 @@ export const resolveRepoForUser = async (
       set: row,
     })
 
+  emit('repos-changed')
   return { ok: true, value: { repoId: body.id } }
 }

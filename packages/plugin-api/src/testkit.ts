@@ -20,7 +20,7 @@ export type { TestNodeContext } from '@acorn/node-core/testkit/pluginContext.ts'
 // makeTestNodeContext already hands back a migrated core database and an `env`. These are for a test
 // that needs one without a plugin context, such as a service or a route mounted on its own Hono app.
 // `TEST_ENCRYPTION_KEY` is not here, because `testEnv` bakes it in.
-export { makeTestDb, makeTestPluginDb, testEnv, testSecretEnv } from '@acorn/node-core/testkit/db.ts'
+export { makeTestCoreServices, makeTestDb, makeTestPluginDb, testEnv, testSecretEnv } from '@acorn/node-core/testkit/db.ts'
 export type { TestDb, TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 // Seed the principal exactly as authMiddleware would, then run the real requireUser gate:
 // `.use('/api/*', ...testGate(principal))`.
@@ -35,4 +35,3 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit/manifest.ts'
-

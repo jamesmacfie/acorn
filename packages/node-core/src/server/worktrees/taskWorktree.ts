@@ -250,7 +250,7 @@ export async function resolveTaskCwd(
     // The task row just gained a worktree, and archive already announces losing one, so "worktree
     // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
     // (docs/plugins.md § Hearing a core event).
-    broadcastTasksChanged()
+    broadcastTasksChanged({ taskId: t.id })
     if (wt.created) {
       await copyConfiguredFiles(db, t, checkout, wt.path)
       // Awaited, not fired and forgotten: setup runs real commands in this worktree and the terminal

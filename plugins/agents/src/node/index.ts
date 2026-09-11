@@ -11,6 +11,7 @@ import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../se
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
+import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { agentUsageCollectors } from '../server/usage/collectors'
@@ -91,9 +92,16 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let usageRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
+  let lifecycleCapabilities: Array<{ dispose(): void }> = []
   return {
     name: 'agents',
     required: true,
+    emits: [
+      { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
+      { verb: 'request-changed', description: 'An agent input request was created or changed state' },
+      { verb: 'sessions-changed', description: 'A managed agent session entered or changed its task roster' },
+      { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
+    ],
     // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
@@ -165,6 +173,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
+      lifecycleCapabilities = [
+        ctx.capabilities.provide(AGENTS_TURNS, {
+          list: (filter) => runtime!.store.lifecycleTurns(filter),
+        }),
+        ctx.capabilities.provide(AGENTS_REQUESTS, {
+          list: (filter) => runtime!.store.lifecycleRequests(filter),
+        }),
+        ctx.capabilities.provide(AGENTS_SESSIONS, {
+          list: (taskId) => runtime!.store.lifecycleSessions(taskId),
+        }),
+      ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
       // core's table (../server/pricingStore.ts).
@@ -251,6 +270,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
       harnessRoute?.dispose()
+      for (const capability of lifecycleCapabilities) capability.dispose()
+      lifecycleCapabilities = []
       for (const dispose of builtInProfileDisposables ?? []) dispose()
       builtInProfileDisposables = null
       for (const dispose of builtInDriverDisposables ?? []) dispose()

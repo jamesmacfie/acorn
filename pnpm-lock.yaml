@@ -1460,6 +1460,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
