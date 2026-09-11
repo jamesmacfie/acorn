@@ -190,6 +190,10 @@ const fieldList = (value: unknown): string[] | undefined =>
   Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string')
     ? value : undefined
 
+const RAIL_SEVERITIES = new Set(['info', 'warn', 'danger'])
+const railSeverity = (value: unknown): PluginRailItem['severity'] =>
+  typeof value === 'string' && RAIL_SEVERITIES.has(value) ? value as PluginRailItem['severity'] : undefined
+
 /** Parse plugin row data field by field. A malformed optional task claim loses that claim; it does
  * not get to erase an otherwise useful row from the host-owned source list. */
 export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem | null => {
@@ -200,7 +204,10 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
   if (!item.task || typeof item.task !== 'object') {
     return { id: item.id, title: item.title, ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
       ...(fields ? { fields } : {}),
-      ...(str(item.icon) ? { icon: item.icon } : {}), ...(str(item.badge) ? { badge: item.badge } : {}) }
+      ...(item.fieldsFirst === true ? { fieldsFirst: true } : {}),
+      ...(str(item.icon) ? { icon: item.icon } : {}),
+      ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
+      ...(str(item.badge) ? { badge: item.badge } : {}) }
   }
   const task = item.task
   const link = railLink(task.link)
@@ -209,7 +216,9 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
     title: item.title,
     ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
     ...(fields ? { fields } : {}),
+    ...(item.fieldsFirst === true ? { fieldsFirst: true } : {}),
     ...(str(item.icon) ? { icon: item.icon } : {}),
+    ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
     ...(str(item.badge) ? { badge: item.badge } : {}),
     task: {
       ...(str(task.origin) && ownsTaskOrigin(pluginId, task.origin) ? { origin: task.origin } : {}),

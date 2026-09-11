@@ -21,6 +21,9 @@ import { PromoteToTaskModal } from '../../features/integrations/PromoteToTaskMod
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 
+const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
+  severity === 'info' ? 'accent' : severity
+
 // The one rail list every descriptor source renders through. `Row`, `Badge` and `Icon` are the shell's
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
 // (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
@@ -252,7 +255,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
                 <Row
                   onPress={props.descriptor.onSelect ? () => select(item) : undefined}
                   selected={item.id === detailItem()}
-                  leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
+                  leading={<Show when={item.icon}>{(name) => <Icon name={name()} tone={iconTone(item.severity)} />}</Show>}
                   meta={(
                     <Show
                       when={item.fields?.length}
@@ -262,6 +265,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
                     </Show>
                   )}
                   metaFields={item.fields?.length}
+                  metaFirst={item.fieldsFirst}
                   trailing={(
                     <>
                       <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>

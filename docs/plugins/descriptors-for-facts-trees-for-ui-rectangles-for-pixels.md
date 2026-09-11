@@ -14,6 +14,10 @@ of that plugin happened to be mounted. So none of the small surfaces are open to
 answer to "I want a chip in the topbar" is to grow the descriptor vocabulary rather than to open a
 slot id to an iframe.
 
+A source row may attach a semantic `severity` to its icon and may request `fieldsFirst` when a stable
+identifier must precede the flexible title. The host still owns the severity colour, fixed field
+tracks, ellipsis, and layout; the descriptor names meaning and ordering, never pixels.
+
 A pane, a reference panel body, a settings page, a card in somebody else's list: those are UI, and
 they are trees. The plugin's bundle names the host's own components and the host draws them, so the
 result has the shell's keyboard handling, focus, ARIA and the reader's chosen style pack, and the

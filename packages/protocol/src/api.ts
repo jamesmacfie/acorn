@@ -463,7 +463,11 @@ export type PluginRailItem = {
   /** Ordered secondary facts, one per column. The host reserves the same track width for each, so
    *  the Nth fact lines up down the whole list. Wins over `subtitle` when both are present. */
   fields?: string[]
+  /** Draw the aligned fields between the leading icon and title. The default keeps the title first. */
+  fieldsFirst?: boolean
   icon?: string
+  /** Semantic severity for the icon; the host owns its actual colour. */
+  severity?: 'info' | 'warn' | 'danger'
   badge?: string
   task?: PluginRailTask
 }

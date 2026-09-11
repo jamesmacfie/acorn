@@ -33,8 +33,11 @@ describe('Rollbar descriptor rows', () => {
     expect(rollbarRailItem(ITEM)).toEqual({
       id: 'rollbar%3Aproduction:142%2F7',
       title: 'Checkout failed',
-      fields: ['#142/7', 'error', 'production', 'Production'],
-      badge: '12 occurrences',
+      fields: ['#142/7'],
+      fieldsFirst: true,
+      icon: 'circle-x',
+      severity: 'danger',
+      badge: '12',
       task: {
         origin: 'rollbar',
         title: 'Checkout failed',
@@ -53,5 +56,13 @@ describe('Rollbar descriptor rows', () => {
         },
       },
     })
+  })
+
+  it.each([
+    ['critical', 'circle-x', 'danger'],
+    ['warning', 'triangle-alert', 'warn'],
+    ['info', 'info', 'info'],
+  ] as const)('maps %s to a semantic severity icon', (level, icon, severity) => {
+    expect(rollbarRailItem({ ...ITEM, level })).toMatchObject({ icon, severity })
   })
 })

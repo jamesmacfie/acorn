@@ -652,6 +652,8 @@ export function Row(props: {
   item?: ItemProps
   /** Number of `.ui-row-field` cells inside `meta`, so the row can reserve a track for each. */
   metaFields?: number
+  /** Visually place meta after the leading content and before the title. DOM reading order stays intact. */
+  metaFirst?: boolean
   selected?: boolean
   nested?: boolean
   /** Indentation level. Generalises `nested` (which is depth 1) for TreeRow. */
@@ -705,6 +707,7 @@ export function Row(props: {
         data-reveal={props.reveal ? '' : undefined}
         data-density={props.density ?? 'default'}
         data-variant={props.variant ?? 'default'}
+        data-meta-first={props.metaFirst ? '' : undefined}
         title={props.title}
         aria-label={props.label}
         aria-selected={props.item ? !!props.selected : undefined}
@@ -740,6 +743,7 @@ export function Row(props: {
       data-reveal={props.reveal ? '' : undefined}
       data-density={props.density ?? 'default'}
       data-variant={props.variant ?? 'default'}
+      data-meta-first={props.metaFirst ? '' : undefined}
       title={props.title}
       aria-label={props.label}
       aria-selected={props.item ? !!props.selected : undefined}

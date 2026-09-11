@@ -51,6 +51,19 @@ describe('descriptor source row parsing', () => {
     })
   })
 
+  it('keeps host-owned row layout and semantic severity values only', () => {
+    expect(sanitizeRailItem('rollbar', {
+      id: '142', title: 'Checkout failed', fields: ['#142'], fieldsFirst: true,
+      icon: 'circle-x', severity: 'danger', badge: '12',
+    })).toEqual({
+      id: '142', title: 'Checkout failed', fields: ['#142'], fieldsFirst: true,
+      icon: 'circle-x', severity: 'danger', badge: '12',
+    })
+    expect(sanitizeRailItem('rollbar', {
+      id: '142', title: 'Checkout failed', severity: 'magenta', fieldsFirst: 'yes',
+    })).toEqual({ id: '142', title: 'Checkout failed' })
+  })
+
   it('strips a malformed task link while retaining valid task fields', () => {
     expect(sanitizeRailItem('rollbar', {
       id: '142', title: 'Checkout failed', task: { origin: 'rollbar', link: { connectionId: 7 } },
