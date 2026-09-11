@@ -1,599 +1,174 @@
 # How a plugin fits together
 
-**Read this first if you are new to the plugin system.** The other plugin docs are reference and
-argument; this one is the map, and 30 minutes here saves an afternoon in `plugins.md`.
+A plugin adds functionality through declared APIs. Keep its data and implementation private; use
+capabilities for calls, events for notifications, and extension points for contributions to another
+plugin's UI or behavior.
 
-An orientation map, not the reference. It names every surface a plugin can reach, says what each one
-does in a line, and shows two working examples. When you need the argument behind a rule, follow the
-link: [plugins.md](./plugins.md) is the reference, [plugin-authoring.md](./plugin-authoring.md) is the
-by-hand walkthrough for a package you install from disk, and
-[extensibility.md](./extensibility.md) holds the reasoning.
+For a third-party package, start with [Plugin authoring](./plugin-authoring.md). For signatures and
+limits, use the [Plugin reference](./plugins.md).
 
 ## The four shapes a plugin can take
 
-A plugin has a node half, a client half, or both. Which one you write decides what you can reach.
+Compiled and loaded describe how a plugin is installed. Frame and tree describe its client UI.
+A loaded plugin can have a node half, a client half, both, or only manifest descriptors.
 
-| Shape | Where it runs | What it can do |
+| Form | Runtime | Authoring API |
 | --- | --- | --- |
-| Compiled | In the app binary, one roster line per side | The whole API, including Hono routers and websocket channel prefixes |
-| Loaded | A package on disk the node imports at boot | The same node API minus live-object seams, plus manifest descriptors |
-| Frame | A sandboxed iframe inside a pane the host draws | The bridge only: HTTP to its own routes, state, one channel, a few UI verbs |
-| Tree | A Web Worker with no DOM, drawing acorn's own components | The same bridge, and the kit instead of pixels: the shell's focus, keys, ARIA and style pack come with it |
+| Compiled plugin | Built into the Node or client | Repository facade and plugin context |
+| Loaded node plugin | Imported from an installed directory | Permission-filtered node context |
+| Frame | Desktop iframe | Sandbox bridge and browser DOM |
+| Remote tree | Desktop worker or terminal worker | Sandbox bridge and shared component tree |
 
-Tree is the default. `npm create acorn-plugin my-widget` emits one, and `--rectangle` emits a frame.
-Pick the frame when the surface owns its pixels, such as a chart, an image editor or a canvas.
+Use a tree for UI that must work on desktop and terminal. Use a frame for browser-specific rendering.
+The default scaffold emits a tree without a build step; `--rectangle` emits a frame.
 
-A compiled plugin registers by adding one line to each roster:
-`apps/node/src/composition/plugins.ts` and `apps/desktop/src/client/plugins.ts`. Everything else it
-does, it does through the context object the host hands it.
-
-A loaded plugin arrives through `POST /v2/core/plugins/install` and declares its contributions in an
-`acorn-plugin.json` manifest. It joins the same array and the same host pass, so ordering, `ready`,
-capability binding, and disposal work identically.
+Node plugins run on one Node. Client connections form a fleet, but a plugin's database and capability
+registry do not span that fleet. Keep client reads, caches, and subscriptions scoped to the selected Node.
 
 ## Startup
 
-Both sides run the same two-pass lifecycle, and the reason for the second pass is the same on each:
-no plugin should do work while half the registries are still empty.
+The Node awaits each plugin's `init(ctx)`, then each optional `ready(ctx)`, before opening the listener.
+Loaded packages initialize after their declared `requires.plugins` dependencies. Resolve optional
+capabilities at call time so a reload or disabled provider does not leave a cached implementation.
 
-**Node.** The host awaits `init(ctx)` on every enabled plugin, then awaits the optional `ready(ctx)`
-on every plugin that has one, then binds the listener. So a route exists before the first request
-arrives, and a plugin that needs another plugin's contribution waits for `ready`. Init order is not a
-dependency contract, and reading a capability during `init` can read `undefined` for no better reason
-than roster position.
+Compiled client plugins register contributions synchronously in `init(ctx)` and start side effects
+in `activate(ctx)`. Handle rejections from asynchronous work started there.
 
-`dispose()` releases what the plugin opened: timers, child processes, pools, capability slots. Not its
-database. The host closes that after your `dispose` returns, so an in-flight write still has a live
-connection.
-
-**Client.** `init(ctx)` is registration only, and synchronous, because nothing there does I/O.
-`activate(ctx)` is the side-effect pass, and also synchronous, so a plugin that wants a network read
-fires it and handles its own rejection.
-
-Failures diverge by tier. A compiled plugin throwing from `init` fails the boot, because a node that
-cannot assemble itself should say so. A loaded plugin throwing has its registrations rolled back, gets
-a `failed` roster row carrying `reason` and `stage`, and the node keeps starting.
+The host rolls back registrations when a loaded plugin fails initialization and records the failure
+in its roster. A compiled plugin initialization failure stops boot. The host calls `dispose()` before
+closing plugin storage.
 
 ## The node API
 
-Your plugin exports a `NodePlugin`: a `name`, an `init`, and optionally `ready`, `dispose`,
-`required`, and `migrationsModule`. Everything else reaches you through `ctx`.
+Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its main groups are:
 
-| `ctx` member | What it gives you |
+| Group | Purpose |
 | --- | --- |
-| `name` | Your own plugin id, already bound by the host |
-| `routes` | Mount HTTP under `/v2/p/<your-id>`. `register(hono)` for compiled, `fetch(handler)` for loaded |
-| `tools` | Register an agent tool. Core projects it to the task HTTP surface, the MCP server, and the permission UI |
-| `schedules` | Periodic node-side work, floored at 300 seconds for a plugin. Any `setInterval` in plugin code is a review flag |
-| `collections` | Where a collection can be read with no client attached, so the dashboard sampler can ask the same question |
-| `taskChecks` | What you have to say when the owner archives a task, and the cleanup you can offer |
-| `contextSections` | One section of the task context an agent gets at launch |
-| `providers` | `integration`, `connection`, `model` and `nodes` descriptors, plus `withConnection` for credential access outside a request |
-| `capabilities` | `provide`, `get`, `require`, `ids`. The only late-binding seam between two node halves |
-| `storage` | `open()` returns your own SQLite handle. Absent unless you declared migrations |
-| `core` | Core services: see the table below |
-| `events` | Tell connected clients something changed. Read the events section before you assume this is a bus |
-| `telemetry` | Spans, events, counts, gauges and errors about your own work, with your id bound by the host. No permission ([telemetry.md](./telemetry.md)) |
-| `log` | A stderr line prefixed with your id, and a log record with the owner bound when telemetry is on |
+| `routes.fetch` | Register a portable request handler under `/v2/p/<id>/` |
+| `storage.open` | Open the plugin's host-migrated SQLite database |
+| `core` | Access granted core services and entity projections |
+| `capabilities` | Provide or resolve a named plugin API |
+| `events` | Subscribe to granted events and publish notifications |
+| `schedules`, `taskChecks`, `runs` | Register periodic work, archive checks, and run listings |
+| `providers`, `collections` | Register providers and data collections |
+| `extensionPoints`, `hooks` | Accept contributions and run declared hooks |
+| `audit`, `telemetry`, `log` | Record actions and operational diagnostics |
 
-Two node contributions have no `ctx` member, on purpose: **node actions** (which of your chrome actions
-a person may put on a timer, plus its risk tier) and **managed-agent harnesses**. Both are declared in
-the manifest — a command whose verb is `runNodeAction`, and `contributions.harnesses` — and the host
-registers them on your behalf.
+Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `providers.model`,
+`events.channel`, or `events.streams`. Those members belong to the compiled context.
 
-`ctx.core` is how you consume core capability without deep-importing whichever core module holds the
-helper:
-
-| Facet | What it does |
-| --- | --- |
-| `fs` | Path-confined reads and writes for anything a caller names |
-| `git` | The one git seam. Terminal prompts off, SSH agent passed through, output bounded |
-| `proc` | Every child process. Environment allowlist, process-group kill, bounded capture |
-| `secrets` | Use-scoped credentials. Scrubs plaintext out of anything thrown from its scope |
-| `tasks` | Resolve a task id to a `TaskRef` projection, never the row |
-| `context` | The launch-context reads: the injection preference and core's section assembler |
-| `models` | Text generation through a stored model-provider connection |
-| `prefs` | One `(userId, key)` row of core's preferences table |
-| `identity` | Which owner this node is bound to. Read-only |
-| `projects` | Project identity, scope resolution, importer writes, mapped folders |
-| `telemetry` | Subscribe to every record this node collects, from every owner. Behind the `telemetry` token, and the trust prompt draws it high ([security.md](./security.md) § Telemetry sinks) |
-
-Two things to know about `core`. What it hands back for a core entity is a projection, never the
-database row: `projects` answers with `ProjectRef`, `tasks` answers with `TaskRef` carrying six fields.
-Core can rename a column without breaking you. And there is no HTTP client on it. See
-[http-client.md](./http-client.md) for why that gap matters.
+Core returns projections such as `TaskRef`, not database rows. A manifest grants each core facet
+explicitly. Context permissions guide cooperative node code; they do not isolate an in-process plugin
+from Node builtins. For the trust boundary, see [Security](./security.md).
 
 ## The client API
 
-Your plugin exports a `ClientPlugin`: a `name`, an `init`, and optionally `activate` and `required`.
+Compiled clients use `ClientPluginContext` to register panes, rail sources, commands, settings,
+slots, extension points, collections, and other contributions. Loaded clients declare their
+contributions in the manifest and use the sandbox bridge at runtime.
 
-| `ctx` member | What it gives you |
-| --- | --- |
-| `panes` | A rectangle inside a task, with a glyph, an order, and an optional default chord |
-| `sources` | A rail entry, and the surface the shell renders when it is selected |
-| `commands` | A palette entry: an action, a group, a live search, a submitted text input, or a two-to-thirty-two-choice setting |
-| `keybindings` | A chord bound to a command |
-| `integrationFlows` | The connect flow for a provider you own. The id must equal your plugin name |
-| `projectImporters` | An importer the first-run onboarding hosts |
-| `settingsPages` | A page in Settings, with a group and an order |
-| `slots` | A component in a host-owned region of the shell, or inside a task's chrome. The slot id decides which, and which context your component receives |
-| `extensionPoints` | A place inside one of your own surfaces that other plugins may fill. The host mints the id from your plugin name. A `remote` point may also declare `actions`: the closed list of things a contributor may ask you to do, since its props are data and it has no other way to reach back ([plugins.md](./plugins.md) § Asking the owner) |
-| `extensions` | What you bring to somebody else's point, as a component the host mounts. This is how your tool's calls draw in an agent transcript: fill `agents:tool-card` |
-| `refPanels` | A reference panel for an external item. Not a pane, see [panes.md](./panes.md) |
-| `agentContexts` | Context an agent can pull from your plugin |
-| `schedules` | Periodic client work with an interval and an optional external refresh trigger |
-| `railMarkers` | Status markers the host draws on a rail control |
-| `persistedStateSlices` | A slice of state that survives a reload |
-| `nodeStats` | One number on a node card on the Fleet home |
-| `attentionSources` | Rows for the attention inbox: states on a node that need the owner |
-| `collections` | A typed record set a user can compose a dashboard panel over |
-| `brandMarks` | A brand logo as one SVG path, drawn wherever a `brand:` glyph name appears |
-| `contentLinks` | A recogniser that turns an external URL into an in-app destination |
-| `contribute` | Register into a registry another PLUGIN published, with the same ownership check |
-| `capabilities` | `provide`, `get`, `require`, `ids`, the same four verbs as the node's. Not the platform gate — that is `requires` on a contribution |
+A remote tree names components in the shared kit. The host owns rendering, focus, and keyboard
+behavior. A frame owns its DOM and requests host operations through the bridge.
 
-There is no `telemetry` or `log` member here, unlike the node's context: a client context is
-contribution points and nothing else. Import `telemetryFor('<your id>')` and
-`createLogger(tag, '<your id>')` from `@acorn/plugin-api/client` instead. Same six verbs as the
-node's `ctx.telemetry`, same records, and the id is an argument because `init` is the only place
-your own name is in hand ([telemetry.md](./telemetry.md) § Writing telemetry from a plugin). A
-sandboxed frame gets neither and posts over the bridge instead
-([plugin-authoring.md](./plugin-authoring.md) § Telemetry from a frame).
+Contribution `requires` fields express host requirements. A contribution's `when` predicate controls
+its own contextual availability. Gate desktop operations and provide a terminal alternative where
+appropriate; a shared component does not make an iframe or webview available in a terminal.
 
-Two rules the host enforces here. A contribution that names a `providerId` must name your own plugin,
-so you cannot register under a stranger's provider by typo. And `register` returns nothing, because the
-host owns the disposable: re-activating replaces your contributions instead of appending to them.
-
-**Two gates, and where each one belongs.** `requires` is the host's question — `'desktop'` for a shell
-affordance, `'terminal'` for a node that runs terminals — and every contribution the host filters before
-drawing takes it, so you never have to remember which ones do. `when` is your own predicate, and it
-takes whatever context that draw site has: a task for a pane, the shell context for a slot, nothing for
-a rail source. It is absent where the host has no context to hand it, such as a client schedule or a
-settings page. A rail source has a third, narrower gate: `requiresProvider`, which asks whether the
-connected integration behind its `providerId` grants a named capability.
+For each contribution's availability, see [Contribution kinds](./contribution-kinds.md).
 
 ## Import entrypoints
 
-Import the host through `@acorn/plugin-api` and nothing else. The split is enforced by an architecture
-test, and each entrypoint exists because of what it can and cannot be loaded into.
-
-| Entrypoint | What it holds |
+| Package or entrypoint | Use |
 | --- | --- |
-| `@acorn/plugin-api/node` | The node contract, the route toolkit, core service types, provider types, the sync engine |
-| `@acorn/plugin-api/client` | The client contract, transport, queries, contribution types, notifications, shell state |
-| `@acorn/plugin-api/ui` | Frame-safe components: props in, DOM out |
-| `@acorn/plugin-api/ui/host` | Components that need the shell's focus machinery. Never safe inside a sandboxed frame |
-| `@acorn/plugin-api/ui/diff` | The diff toolkit's model, virtualizer, and find pass |
-| `@acorn/plugin-api/ui/editor` | The Monaco theme and language mapping. Compiled panes only, so 30 MB of editor stays out of other boot graphs |
-| `@acorn/plugin-api/ui/sdk` | The sandbox bridge and both render paths: `connect`, `mountFrame`, `mountTree`, the remote root, `openLinkOnClick` |
-| `@acorn/plugin-api/ui/tree` | The kit as nodes a tree writes in JSX, plus the Solid adapter the builder's `generate: 'universal'` transform compiles against. **A tree imports this and never the `/ui` barrel**: `/ui` is Solid components for a DOM, a tree emits node names for a worker, and pulling the barrel into a worker bundle drags in a DOM that is not there |
-| `@acorn/plugin-api/ui/tokens` | The role enums and the support matrix as data, with no components on them, so a node-environment test can read them |
-| `@acorn/plugin-api/testkit` | Node-side test scaffolding: `makeTestNodeContext`, `validatePluginConfig` |
-| `@acorn/plugin-api/testkit/client` | The client-side half of the same |
+| `acorn-plugin-types` | Standalone node declarations, with no runtime import |
+| `acorn-plugin-sdk` | Bridge helpers for a bundled third-party client |
+| `acorn-plugin-sdk/remote` | Shared tree nodes and Solid adapter for a bundled client |
+| `@acorn/plugin-api/node` | Repository node facade |
+| `@acorn/plugin-api/client` | Repository client contracts and services |
+| `@acorn/plugin-api/ui` | Repository component kit |
+| `@acorn/plugin-api/ui/host` | Components that depend on host context |
+| `@acorn/plugin-api/ui/tree` | Remote-tree nodes for repository bundles |
+| `@acorn/plugin-api/ui/sdk` | Repository bridge helpers |
+| `@acorn/plugin-api/ui/editor` | CodeMirror themes, language selection, view state, and embedded editors |
+| `@acorn/plugin-api/ui/diff`, `ui/tokens` | Diff tools and component role tokens |
+| `@acorn/plugin-api/testkit`, `testkit/client` | Repository test helpers |
 
-The split between `/client` and `/ui` is one question: is it a component? A barrel evaluates every
-module on it, so one Solid component on `/client` would make that entrypoint unloadable from a
-node-environment test.
+`@acorn/plugin-api` is private to the workspace. Do not use it as an npm runtime dependency in a
+third-party package. Bundle runtime dependencies into the output; an unbundled client file cannot
+resolve package imports. A remote tree must not import the DOM component barrel.
 
 ## Events
 
-The honest version first. `ctx.events` is an invalidation channel, not a bus: no durability, no
-replay, no delivery guarantee. A client that misses a frame refetches after the gap, and that is the
-whole contract. Durable history belongs in your own tables.
+`ctx.events.on` subscribes to events on the plugin's Node, including when no client is attached.
+Declare each channel in `permissions.events`.
 
-The receive side is `ctx.events.on`. It hears the core events in `NODE_EVENT_CHANNELS`
-(`tasks`, `connection`, `head`, `run`, `agent-session`, `project`, and `plugins`, each `:changed`) on
-this node whether or not a client is attached, and it hears another plugin's `plugin:<id>:<verb>` when
-that plugin declared the verb in its `emits` and your manifest named the channel in
-`permissions.events`. A producer that is not running delivers nothing and errors nothing, so re-read on
-receipt and keep a poll only where "no events, ever" would be wrong. The rules for what may be an event
-and what never will be are in `docs/plugins.md § Hearing another plugin`; what is still unbuilt is in
-[docs/future/events.md](./future/events.md).
+Core channels are defined in `packages/protocol/src/nodeEvents.ts`:
 
-### Broadcast to clients, from the node
+- `plugins:changed`
+- `tasks:changed`
+- `connection:changed`
+- `head:changed`
+- `run:changed`
+- `agent-session:changed`
+- `project:changed`
+- `terminal:sessions-changed`
+- `worktree:status-changed`
 
-| Call | What it does |
-| --- | --- |
-| `ctx.events.status()` | "Re-read my chrome descriptors." Scoped to your plugin by the host |
-| `ctx.events.worktreeStatus(taskId)` | "Something under this task's worktree changed." Moves the dirty markers |
-| `ctx.events.send(frame)` | Push one frame to every connected client. The hub skips task-confined sockets |
-| `ctx.events.repoConfigTrustNotice(taskId)` | The one notice carrying an action: this repo's committed config needs review |
-| `ctx.events.notice({ title, target, ... })` | A row in the owner's bell, and where clicking it lands. Both tiers |
-| `ctx.events.on(event, listener)` | Hear a core event on this node. The event must be one `permissions.events` named |
-| `ctx.events.channel(prefix, handler)` | Claim a websocket channel prefix and receive client frames on it. Compiled plugins only |
-| `ctx.events.streams(handlers)` | The PTY stream handlers. Exactly one plugin may own these |
+A plugin publishes `plugin:<id>:<verb>`. Another plugin can subscribe when the producer declares the
+verb in `emits` and the consumer grants the full channel. Missing producers emit nothing.
 
-The workflow step stream used to sit here too, as `ctx.events.stepEvent`. It was one plugin's domain
-vocabulary on the surface every plugin receives, and it moved to the `workflows.notices` capability,
-where the rest of that plugin's cross-plugin surface already was.
+Events have no replay or delivery guarantee. Re-read stored state after startup or reconnect.
+Use `ctx.events.status()` to invalidate your descriptors and `worktreeStatus(taskId)` after a
+worktree change. Store durable work in your own database.
 
-The bell left on the same argument and came back, because the objection was to the vocabulary rather
-than to the surface: a `target` is core's own and is shared with the attention inbox, so nothing here
-knows what a workflow run is. What it cost in the meantime is in
-[notifications.md](./notifications.md) § Raising one from a plugin.
-
-Prefer `status()` to `send()`. A payload a client can trust is a payload you have to keep correct
-across every reconnect and version skew, and re-reading costs one request.
-
-### Subscribe in the renderer
-
-For a compiled plugin, `registerWsChannel(prefix, handler, reattach)` from
-`@acorn/plugin-api/client` is the mirror of `ctx.events.channel`. Core routes by the token before the
-first colon and never looks inside a payload, so adding a stream touches no core file. The optional
-`reattach` returns the frames to replay after a reconnect, recomputed at call time because only you
-know what is attached right now.
-
-`wsOnStatus`, `wsOnNotice`, and `wsOnWorkflowStepEvent` cover the three core channels. They are on the
-API today and marked as prune candidates: reach for `registerWsChannel` or something on `ctx` first.
-
-### The in-renderer bus
-
-`clientEvents` is a typed emitter inside one renderer. It carries shell presentation intents and
-runtime lifecycle facts: `runtime:task-archived`, `runtime:node-switched`,
-`runtime:focus-changed`, `presentation:pane-intent`, and a fixed set of others declared in
-`ClientEventMap`. You can subscribe
-with `clientEvents.on(kind, listener)`, and you can emit the kinds that already exist, but you cannot
-add your own key. It is renderer-local, so a second window or a paired device never sees your emission.
-That is exactly why it is not an event a third party can build on.
-
-### The live channel, for a loaded plugin
-
-A loaded plugin cannot claim a websocket prefix. Core claims the single `plugin` prefix and routes by
-the id inside the channel name, which is `plugin:<your-id>:<verb>`. Your node half broadcasts on that
-namespace and nothing else, your own frames subscribe to it through `bridge.events.on(channel, cb)`,
-and the manifest has to list the channel under `permissions.events`. Chrome gets a coalesced nudge
-capped at two passes a second, so a rail row does not cost a network read per frame you send.
-
-### When none of that fits
-
-Register a client schedule. `ctx.schedules.register({ id, intervalMs, run, subscribe })` runs `run` on
-an interval, skips it while the document is hidden, and runs it again when the tab becomes visible. The
-optional `subscribe` lets a websocket frame trigger an early refresh, which is how you get periodic work
-that is cheap when idle and prompt when something happens. Same word as the node's `ctx.schedules`,
-raw milliseconds instead of a budgeted cadence: below the node's 300-second floor a schedule is a poll,
-and polling is the client's job for a person who is present.
+The client-local `clientEvents` emitter carries presentation and lifecycle events within one client.
+It does not notify other devices. Compiled clients can also register WebSocket handlers through
+`registerWsChannel`. Loaded clients subscribe through the bridge.
 
 ## Talking to another plugin
 
-Four mechanisms, in the order you should reach for them.
+Resolve a capability through `ctx.capabilities.get(id)` when you need a result. `get` returns
+`undefined` when the provider is absent or the capability is ungranted; `require` throws.
+Declare required plugin dependencies and capability permissions in the manifest.
 
-**Contracts.** Import only a plugin's `contract/` entrypoint, for types, capability ids, and narrow
-pure functions. Anything else is an import edge the architecture test rejects.
-
-**Capabilities.** A typed map with a phantom-typed key, which is the whole point: two packages agree on
-a function signature without an import between them. The provider exports the key from its `contract/`,
-and the consumer resolves it:
-
-```ts
-import { capabilityId } from '@acorn/plugin-api/node'
-
-// In the provider's contract/, so both sides can import the key and neither imports the other.
-export const AGENTS_SESSION_EXECUTE = capabilityId<(taskId: string, prompt: string) => Promise<string>>(
-  'agents.sessionExecute',
-)
-
-// In the provider's init:
-ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, execute)
-
-// In the consumer, at call time. Never at init, never at module scope.
-const execute = ctx.capabilities.get(AGENTS_SESSION_EXECUTE)
-if (!execute) return  // that plugin is disabled. Degrade, do not throw
-```
-
-Use `get` by default and treat `undefined` as "that plugin is disabled". Use `require` only for the four
-plugins that cannot be disabled: agents, memory, notes, and terminal.
-
-An id you provide has to start with your own plugin id. That is enforced for a loaded plugin and is the
-convention for a compiled one; the two exceptions are `core.taskWorktreeCreated` and
-`agents.harnessRegistry`, which the host declares as invitations for whichever plugin owns worktree side
-effects or agent sessions. Every id the first-party plugins publish is catalogued, with its signature,
-as `CapabilityCatalogue` in `acorn-plugin-types`.
-
-Resolve at call time. Resolving during `init`, or in a component body that runs once, can cache
-`undefined` for no reason other than registration order, and a dropped feature looks like a backend
-problem for a day.
-
-The client mirrors this with the same four verbs on `ctx.capabilities`, plus `clientCapability(id)` and
-`requireClientCapability(id)` as free functions for a component that has no `ctx` in hand. That mirror
-exists
-because the agent sidebar wants workflow steps while workflows' node half wants agents to execute a
-session. Two legitimate couplings pointing opposite ways is a package cycle turbo refuses to build, and
-routing one direction through a capability breaks it.
-
-**Registries.** Publish a registry, and another plugin contributes to it through
-`ctx.contribute(registry, entry)`. That is the line the escape hatch sits on: a registry the HOST owns
-has a named `ctx` member above, and `ctx.contribute` is for a registry another plugin published. The
-host records the disposable either way, so disabling that plugin removes its
-entries. Use the seam rather than calling `registry.register` yourself: a bare register survives
-a disable and re-enable cycle, then throws on the duplicate id at the next activation.
-
-**Broadcasts.** Not this. `ctx.events` talks to clients, not to plugins.
-
-Two things stay off limits between plugins: no cross-file foreign keys or transactions spanning plugin
-databases, and no importing another plugin's implementation. Cross-plugin work uses explicit ids and
-durable state on both sides.
+Share identifiers and types through public contracts. Do not import a provider's implementation,
+read its database, or use core internals to bypass a missing API. For working fragments, see
+[Events and capabilities](./plugin-authoring/events-and-capabilities.md).
 
 ## Notifications
 
-Pick by how long the message should live.
-
-| Call | Lifetime | Use it for |
-| --- | --- | --- |
-| `toast(message, { tone, durationMs })` | Seconds | "That worked." No actions, no buttons |
-| `ctx.events.notice({ title, target, ... })` | Until read | Something happened while the user was elsewhere. Core's, so it works with every other plugin disabled |
-| `pushManagedAgentNotice({ taskId, sessionId, kind, title })` | Until read | An agent finished, needs input, or failed |
-| `ctx.attentionSources.register(source)` | Until resolved | A state on the node that needs the owner to act |
-| `bridge.ui.toast(title, detail)` | Seconds | The same, from inside a sandboxed frame |
-
-Toast tones are `neutral`, `success`, and `danger`. A failure gets 8 seconds instead of 4, because it is
-the one you might need to read twice.
-
-Agent notices come from a change of state, not from an event. A plugin holding agent sessions calls
-`observeAttention(snapshots)` with what its adapter produced, and the gate in
-`client-core/features/notifications/deliver.ts` decides the rest: it holds each change for a second
-and re-checks it, so a permission that policy auto-approves never reaches anybody, and it marks a
-change you watched happen as read, so the history is complete and the bell's count does not move.
-`pushManagedAgentNotice` goes through the same gate and is the way in for a notice that has no
-session behind it. For the states, the edges, the gate, and the channels, see
-[notifications.md](./notifications.md).
-
-A notice that should open something when clicked carries a `target`, and you register what happens with
-`registerNoticeTargetHandler(kind, handler)`. The same dispatch serves the attention inbox, which uses
-the identical target shape.
-
-A toast that needs a button is the wrong control. If the user must act, that is an `Alert`. If it must
-persist, that is a notice.
+Use `ctx.events.notice` for a notification from a node plugin. The host binds a loaded plugin's
+notification destination to that plugin and drops its supplied `target` and `kind` fields.
+Use attention contributions for persistent conditions that the user needs to resolve.
+For delivery and acknowledgment behavior, see [Notifications](./notifications.md).
 
 ## Attaching to the rail
 
-The rail is `ctx.sources.register(contribution)`. The fields that matter:
-
-| Field | What it decides |
-| --- | --- |
-| `id`, `label`, `glyph`, `order` | Identity and position. Order is required, never derived from activation order |
-| `component` | What the shell renders when your source is selected |
-| `providerId` | Gates the source on an integration row existing. Omit it for a local source, which is always shown |
-| `when` | An extra gate for relevance that is not an integration question |
-| `projectScoped` | Opt in if your surface reads the routed project. The shell shows the project picker only for sources that declare it |
-| `routes` | URL patterns to register, with an order so a static path can beat a parameter path |
-| `taskPath` | Where a task belongs in the router when your source owns it |
-| `tracksRef` | Does this task already track the item a reference panel is showing |
-| `promotion` | How a row from your source becomes a task |
-| `isDefault` | Your source is the initial browse surface |
-
-One trap worth stating outright. The shell renders from the selected source, not from the URL. Every
-contributed route mounts as a `noop` component and the shell picks the surface off the rail, so
-navigating to your route while another source is selected changes the address bar and nothing else.
-Set the source too.
-
-Status markers are separate, and they are data only. A marker has no click verb:
-
-```ts
-ctx.railMarkers.register({
-  id: 'tunnels',
-  order: 50,
-  // Called during the consuming render, for every visible control, so read your own signals here
-  // and the rail re-renders when they change.
-  markers: (target) => {
-    if (target.kind !== 'task') return []
-    const open = tunnelsForTask(target.id).length
-    if (!open) return []
-    return [{
-      id: 'open',
-      label: `${open} open tunnel${open === 1 ? '' : 's'}`,  // the tooltip legend and the a11y text
-      icon: 'radio-tower',       // exactly one of icon or dotTone
-      tone: 'accent',            // neutral, accent, warn, or danger
-      placements: ['top-end', 'bottom-end'],  // preferences in order, never guarantees
-    }]
-  },
-})
-```
-
-Placements are `top-start`, `top-end`, `bottom-start`, and `bottom-end`. The slot under the main
-glyph is reserved for host lifecycle and activity, because two things there read as one broken thing.
-Priorities are clamped to 100, so you can order your own markers among themselves without outranking a
-core lifecycle state.
-
-The host qualifies your marker ids with your contribution id, so two plugins can both call a marker
-`running`. A throwing contribution is isolated and logged rather than blanking the rail.
+Declare a source and the contributions it needs, such as routes, project surfaces, and content-link
+resolution. Keep IDs in the plugin's namespace. Use status invalidation when source data changes.
+For the complete source descriptor, see [Descriptors](./plugins/descriptors.md).
 
 ## Example: a compiled plugin, both halves
 
-A plugin that watches something on the node and shows it in the rail.
-
-The node half:
-
-```ts
-import type { NodePlugin } from '@acorn/plugin-api/node'
-import { Hono } from 'hono'
-
-export const tunnelsPlugin: NodePlugin = {
-  name: 'tunnels',
-  // Turns ctx.storage on. The host binds the filename to your plugin id and walks from this module
-  // for the migration chain, which is how one declaration covers all three runtime layouts.
-  migrationsModule: import.meta.url,
-
-  async init(ctx) {
-    const db = ctx.storage.open()
-
-    const app = new Hono()
-    app.get('/list', async (c) => c.json({ tunnels: await listTunnels(db) }))
-    // Mounts at /v2/p/tunnels. The host binds the namespace, so you cannot mount under another id.
-    ctx.routes.register(app)
-
-    ctx.schedules.register({
-      scheduleId: 'reap',
-      name: 'Close idle tunnels',
-      // { every: seconds }, { daily: '03:00' }, or { weekly: { day, at } }. Clamped on read to the
-      // plugin floor of 300 seconds, because your work hits someone else's rate budget.
-      cadence: { every: 600 },
-      run: async (signal) => {
-        const closed = await reapIdle(db, ctx.core.proc, signal)
-        // Content-free, and scoped to this plugin by the host. Every client re-reads /list rather than
-        // trusting a payload that has to stay correct across reconnects.
-        if (closed > 0) ctx.events.status()
-        return `closed ${closed}`
-      },
-    })
-  },
-
-  dispose() {
-    // What this plugin opened. Not the database: the host closes that after this returns.
-    stopWatchers()
-  },
-}
-```
-
-The client half:
-
-```ts
-import { lazy } from 'solid-js'
-import { toast, wsOnStatus, type ClientPlugin } from '@acorn/plugin-api/client'
-import { refreshTunnels, tunnelsForTask } from './store'
-
-const TunnelsSurface = lazy(() => import('./TunnelsSurface'))
-
-export const tunnelsClientPlugin: ClientPlugin = {
-  name: 'tunnels',
-  init(ctx) {
-    ctx.sources.register({
-      id: 'tunnels',
-      order: 70,
-      glyph: 'radio-tower',
-      label: 'Tunnels',
-      component: TunnelsSurface,
-      projectScoped: true,
-    })
-
-    ctx.railMarkers.register({
-      id: 'open',
-      order: 50,
-      markers: (target) => {
-        if (target.kind !== 'task') return []
-        const open = tunnelsForTask(target.id).length
-        return open
-          ? [{ id: 'open', label: `${open} open`, icon: 'radio-tower', tone: 'accent', placements: ['top-end'] }]
-          : []
-      },
-    })
-
-    ctx.schedules.register({
-      id: 'tunnels',
-      intervalMs: 30_000,
-      run: refreshTunnels,
-      // The node's status ping arrives sooner than 30 seconds when something actually changed.
-      subscribe: (refresh) => wsOnStatus(refresh),
-    })
-  },
-
-  activate() {
-    // The side-effect pass. Fire and forget, and handle your own rejection: init must stay synchronous.
-    refreshTunnels().catch(() => toast('Could not read tunnels', { tone: 'danger' }))
-  },
-}
-```
-
-Two roster lines make it real: one in `apps/node/src/composition/plugins.ts`, one in
-`apps/desktop/src/client/plugins.ts`.
+Register the node and client entrypoints in the application rosters. Import host contracts through
+the repository facade, keep plugin-owned types in `contract/`, and contribute UI through the shared kit.
+For package layout and registration, see [Package shape](./plugins/package-shape.md).
 
 ## Example: a loaded plugin pushing to its own tree
 
-A loaded plugin has no Hono and no channel prefix. It serves a fetch handler and broadcasts on its own
-namespace.
-
-The node half:
-
-```ts
-import { portableCarrier, type NodePlugin } from '@acorn/plugin-api/node'
-import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { Hono } from 'hono'
-
-export default {
-  name: 'buildwatch',
-  init(ctx) {
-    const app = new Hono()
-    const { portableFetch, requestContext } = portableCarrier('buildwatch')
-    app.get('/status', (c) => c.json({ state: current(), userId: requestContext(c).userId }))
-    // The portable carrier, not ctx.routes.register. A Hono instance cannot cross a process
-    // boundary. A (Request) to Response function can.
-    ctx.routes.fetch(portableFetch(app))
-
-    onBuildChange((state) => {
-      // plugin:buildwatch:status. Broadcasting on anything else throws. The manifest has to list this
-      // channel under permissions.events before a frame may subscribe.
-      ctx.events.send({ channel: pluginChannel('buildwatch', 'status'), state })
-    })
-  },
-} satisfies NodePlugin
-```
-
-The client half. A tree, which is what the manifest's `layout` and `remote` region name, so the worker
-runs this and the host draws the nodes:
-
-```tsx
-import { mountTree } from '@acorn/plugin-api/ui/sdk'
-import { Badge, Inline, Stack, Text } from '@acorn/plugin-api/ui/tree'
-
-mountTree({
-  // One key per entry a manifest region or extension names. `regions: { body: { kind: 'remote',
-  // entry: 'pane' } }` mounts this one.
-  pane: (bridge) => {
-    const [state, setState] = createSignal('unknown')
-
-    // Returns the unsubscribe. Only your own plugin's channels resolve; another plugin's throws.
-    const off = bridge.events.on('plugin:buildwatch:status', (payload) => {
-      setState((payload as { state: string }).state)
-    })
-    onCleanup(off)
-
-    // Your own routes, already authenticated. The path is relative to your mount.
-    void bridge.api.get<{ state: string }>('/status').then((r) => setState(r.state))
-
-    // Persists through core prefs under plugin:buildwatch:*, the same namespace the node half's prefs
-    // facet is projected into. This is the supported node-to-client state channel, capped at 1 MiB.
-    void bridge.state.set('lastSeen', Date.now())
-
-    return () => (
-      <Stack gap="row">
-        <Inline>
-          <Text emphasis="strong">Build</Text>
-          <Badge tone={state() === 'passing' ? 'ok' : 'danger'}>{state()}</Badge>
-        </Inline>
-      </Stack>
-    )
-  },
-})
-```
-
-Import the nodes from `@acorn/plugin-api/ui/tree`, never `@acorn/plugin-api/ui`. That barrel is
-components compiled for a document, and a tree bundle's own preset would compile one into a tree of
-its own.
-
-A plugin that owns its pixels calls `mountFrame` instead, gets a sandboxed iframe, and writes its own
-markup and CSS. That is the other shape, and it is what `--rectangle` scaffolds.
+Create the default scaffold, then have the node save its data and emit on its own plugin channel.
+The tree subscribes through the bridge and fetches the updated data from the plugin's route.
+For the event declarations and calls, see [Publish an event](./plugin-authoring/events-and-capabilities.md#publish-an-event-for-another-plugin).
 
 ## Rules that bite
 
-Collected from the gotchas that cost the most time.
-
-- Resolve a capability at call time, never at `init` or module scope.
-- Use the `ctx` seam rather than a bare `registry.register`, so the host owns the disposable.
-- Set the rail source when you navigate. Contributed routes mount as `noop`.
-- Register through `ctx`, not by importing another plugin.
-- The node half does not hot-reload. A change needs a node restart, or
-  `POST /v2/core/plugins/:id/reload` for a loaded plugin.
-- Declared node permissions on a loaded plugin are disclosure, not containment. A loaded bundle shares
-  the node's process and can `import('node:fs')`. See [security.md](./security.md) for the threat model,
-  and say "declared" wherever you render them.
-- A table-owning package can never change its id. The database filename is bound from it, and renaming
-  orphans real rows.
+Keep plugin IDs stable. Declare permissions before calling gated APIs. Do not cache optional
+capability implementations across reloads. Keep node data on the Node and client presentation state
+on the device. Check UI behavior on both hosts when declaring support for both.
 
 ## Where to go next
 
-- [plugins.md](./plugins.md) for the reference: the full API surface rules, activation, task checks,
-  harnesses, collaboration rules, and data ownership.
-- [plugin-authoring.md](./plugin-authoring.md) for writing a loaded package by hand, including the
-  manifest and the install loop.
-- [extensibility.md](./extensibility.md) for why the two tiers exist and what each is allowed to become.
-- [panes.md](./panes.md) for panes and reference panels.
-- [docs/future/events.md](./future/events.md) for the three event items still unbuilt.
+- [Plugin authoring](./plugin-authoring.md)
+- [Plugin reference](./plugins.md)
+- [Contribution kinds](./contribution-kinds.md)
+- [Architecture overview](./architecture-overview.md)

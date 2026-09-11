@@ -1,5 +1,7 @@
 # docs/future: the design record for work not yet built
 
+[Documentation review follow-up](./doc-review.md) records application work found during the docs review.
+
 This folder holds designs, analyses, and sequenced plans for work that has not shipped, plus the
 refusals that keep it from being re-argued. Behaviour that has shipped is never described here; it
 moves to an owning doc under `docs/` and the future file either shrinks to a pointer or is deleted,

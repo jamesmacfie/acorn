@@ -3,10 +3,10 @@
 The renderer is a SolidJS application bundled into the desktop app. It loads from
 `app://acorn`; it does not run from a Node origin and cannot make direct network requests.
 
-The framework choice is a private implementation detail: third-party plugin UI runs in its own frame
-with its own bundle, so a plugin author's framework is their own. The shell's workload is a dense,
-always-on surface with live panes and streams, which is what fine-grained reactivity is for. For more
-information, see [extensibility.md](./extensibility.md) § Some decisions that look like gaps.
+Third-party UI can emit a tree of shared components or run in a sandboxed frame. Trees support the
+desktop and terminal hosts. Frames own their DOM and run only on the desktop. Use a frame for UI that
+needs browser APIs, and declare the host requirement. For more information, see
+[Plugin UI choices](./plugin-map.md#the-four-shapes-a-plugin-can-take).
 
 ## Composition
 

@@ -1,11 +1,11 @@
-# The docs
+# Documentation
 
 Every document under `docs/` is listed here, grouped by what it is for. Nothing else indexes them, so
 a new file belongs in this list on the same commit that creates it.
 
-## If you are new
+## Start here
 
-Read four, in this order, and stop.
+Read these pages in order:
 
 1. [architecture-overview.md](./architecture-overview.md) — the runtimes, who owns what, and how a
    request crosses them.
@@ -23,7 +23,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | --- | --- |
 | [architecture-overview.md](./architecture-overview.md) | Runtime topology, process ownership, package boundaries, and the product model. The one to read first. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
-| [api-reference.md](./api-reference.md) | Every `/v2` route, its shape, and its auth requirement. |
+| [api-reference.md](./api-reference.md) | Overview of `/v2` routes, authentication, errors, and transport. |
 | [data-layer.md](./data-layer.md) | The data root, the core database, plugin databases, migrations, backup, and retention. |
 | [state-ownership.md](./state-ownership.md) | Which state the node owns, which the device owns, and what is disposable. |
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
@@ -65,14 +65,14 @@ orientation map over the whole plugin system and it is much shorter than the ref
 
 ## Plugins
 
-Five docs, and they do not overlap. Start at the map.
+Start with the plugin map, then follow the authoring guide or API reference.
 
 | Document | What it holds |
 | --- | --- |
 | [plugin-map.md](./plugin-map.md) | **Read this first.** The orientation map: every surface a plugin can reach, one line each, with two worked examples. |
 | [extensibility.md](./extensibility.md) | The reasoning: why two tiers, where the line is, and which constraints are deliberate. Read before widening a seam. |
-| [plugins.md](./plugins.md) | The reference: the package shape, the API, activation, the client half, the five contribution kinds, and the collaboration rules. |
-| [plugin-authoring.md](./plugin-authoring.md) | Writing a loaded plugin by hand with no build step, including the manifest reference and a complete example. |
+| [plugins.md](./plugins.md) | Topic index for package layout, APIs, lifecycle, UI, and collaboration. |
+| [plugin-authoring.md](./plugin-authoring.md) | Third-party authoring guide, manifest reference, and examples. |
 | [contribution-kinds.md](./contribution-kinds.md) | The table of every contribution kind and its two carriers. Test-enforced. |
 | [first-party-plugins.md](./first-party-plugins.md) | Which first-party plugins have to be, and which are only first-party by history. |
 | [loaded-plugin-migration.md](./loaded-plugin-migration.md) | The record of moving plugins out of the binary: what each move cost and what it found. |
@@ -98,14 +98,45 @@ Five docs, and they do not overlap. Start at the map.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
-## The rules this list follows
+## Documentation ownership
 
-The files stay flat. A folder split by kind — `reference/`, `guides/` — was refused on 2026-08-30
-because this list groups them by kind without moving anything, every inbound link keeps working, and
-the path checker's job stays small. If the count passes 60, the question is open again.
+Keep one owning page for each contract. Link to it from other pages instead of copying its details.
+Group long references by topic in a subfolder. Keep the original landing page when source comments
+or external links depend on its path, and update relative links when moving a section.
 
-A fact has exactly one owning document, and the others link to it. Where a document under
-[future/](./future/README.md) disagrees with one above, the one above wins. When behaviour or a
-contract changes, the owning document changes in the same commit —
-`tools/arch/docPaths.test.ts` checks that the paths and links in here still resolve, but nothing checks
-that the prose is still true except the person changing the code.
+Describe implemented behavior in reference pages. Put proposed application changes in
+[Future work](./future/README.md), and label dated measurements as historical evidence.
+Update this index when adding a page. `tools/arch/docPaths.test.ts` checks file paths and relative
+links; review the implementation to verify API signatures and behavior.
+
+## Plugin reference topics
+
+### Plugin contracts
+
+- [Activation](./plugins/activation.md)
+- [Client authoring and the UI kit](./plugins/client-authoring-and-the-ui-kit.md)
+- [Cooperative extension points](./plugins/cooperative-extension-points.md)
+- [Descriptors for facts, trees for UI, rectangles for pixels](./plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md)
+- [Descriptors](./plugins/descriptors.md)
+- [Forward compatibility](./plugins/forward-compatibility.md)
+- [Frames](./plugins/frames.md)
+- [Node-side extension points](./plugins/node-side-extension-points.md)
+- [Package shape](./plugins/package-shape.md)
+
+### Authoring guides
+
+- [Events and capabilities](./plugin-authoring/events-and-capabilities.md)
+
+- [Installing a hand-written package](./plugin-authoring/installing-a-hand-written-package.md)
+- [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
+- [The manifest](./plugin-authoring/the-manifest.md)
+- [The node half](./plugin-authoring/the-node-half.md)
+
+### Performance archive
+
+- [2026-09-03 — phase 10, the re-measurement](./performance/2026-09-03--phase-10-the-re-measurement.md)
+- [2026-09-03 — phase 2](./performance/2026-09-03--phase-2.md)
+- [2026-09-03 — phase 5](./performance/2026-09-03--phase-5.md)
+- [2026-09-03 — phase 8](./performance/2026-09-03--phase-8.md)
+- [Added 2026-09-03](./performance/added-2026-09-03.md)
+- [What was measured this time](./performance/what-was-measured-this-time.md)
