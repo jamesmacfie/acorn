@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentRequest } from '@acorn/protocol/managedAgents.ts'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
@@ -239,20 +239,35 @@ describe('a subagent\u2019s run on its own', () => {
 })
 
 describe('what a request leaves in the thread', () => {
-  const items = () => buildConversationItems([
+  const asked = [
     event(1, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
     event(2, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
     event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
-  ])
+  ]
+  const rows = (status: AgentRequest['status']) => (requestId: string): AgentRequest | undefined =>
+    requestId === 'allow-1' ? ({ providerRequestId: 'allow-1', status } as AgentRequest) : undefined
 
-  it('keeps the question and drops the permission', () => {
-    const visible = visibleConversationItems(items())
-    expect(visible).toHaveLength(1)
-    expect(visible[0].event).toMatchObject({ type: 'request', requestId: 'ask-1' })
+  const drawn = (status: AgentRequest['status']) =>
+    visibleConversationItems(buildConversationItems(asked), rows(status))
+      .map((item) => item.event.type === 'request' ? item.event.requestId : item.event.type)
+
+  it('draws a permission while it is blocking, because that is where you answer it', () => {
+    expect(drawn('pending')).toEqual(['ask-1', 'allow-1'])
+  })
+
+  it('lets an answered permission go, since the tool call it decided has its own card', () => {
+    expect(drawn('resolved')).toEqual(['ask-1'])
+  })
+
+  it('keeps a question either way, answered or not', () => {
+    expect(drawn('resolved')).toContain('ask-1')
+    // No rows at all: a subagent's own stream, which never holds a request.
+    expect(visibleConversationItems(buildConversationItems(asked))
+      .some((item) => item.event.type === 'request' && item.event.requestId === 'ask-1')).toBe(true)
   })
 
   it('draws no card for the answer itself, which belongs to the question it answered', () => {
-    expect(visibleConversationItems(items()).some((item) => item.event.type === 'request_resolved')).toBe(false)
+    expect(drawn('pending')).not.toContain('request_resolved')
   })
 
   it('seats the question where it was asked, so the thread reads in order', () => {

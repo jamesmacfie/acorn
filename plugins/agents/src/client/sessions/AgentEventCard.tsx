@@ -14,7 +14,8 @@ import { subagentSummary } from './subagentDisplay'
 import { selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
-import { askedQuestions, askWasAbandoned } from './requestAnswers'
+import AgentRequestCard from './AgentRequestCard'
+import { askedQuestions } from './requestAnswers'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -86,6 +87,9 @@ export default function AgentEventCard(props: {
   turn?: AgentTurn
   /** The live row behind a `request` event: what it was answered with, and whether it still can be. */
   request?: AgentRequest
+  /** Bring this request's card to the reader, for the notice or sidebar row that named it. */
+  focusRequest?: boolean
+  onRequestResolved?: () => void
 }) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
@@ -294,16 +298,32 @@ export default function AgentEventCard(props: {
         }}
       </Show>
       {/*
-        A question the agent asked, after it was answered. The card above the stream is the one that
-        takes the answer and it leaves with the question; this is what the thread keeps, and the fold is
-        the part nothing else records: what the reader could have said and did not.
+        Something the agent is blocked on, drawn at the point it asked. While it is blocking this is the
+        card that takes the answer; afterwards it is the record of what was said, and the fold holds the
+        part nothing else keeps: what the reader could have said and did not.
       */}
       <Show when={event().type === 'request'}>
         {(_shown) => {
           const asked = () => event() as Extract<ReturnType<typeof event>, { type: 'request' }>
-          const waiting = () => !askWasAbandoned(props.request)
-            && props.request?.status !== 'resolved'
+          // Still waiting on somebody, so the card that takes the answer is the card, drawn where the
+          // agent asked rather than in a strip above everything that has happened since.
+          const open = () => {
+            const request = props.request
+            const waiting = request?.status === 'pending' || request?.status === 'resolving'
+            return waiting ? request : undefined
+          }
           return (
+            <Show when={!open()} fallback={
+              <Show when={open()}>
+                {(request) => (
+                  <AgentRequestCard
+                    request={request()}
+                    focused={props.focusRequest}
+                    onResolved={props.onRequestResolved}
+                  />
+                )}
+              </Show>
+            }>
             <Card pad="sm">
               <Stack gap="row">
                 <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
@@ -315,9 +335,7 @@ export default function AgentEventCard(props: {
                       </Show>
                       <Show
                         when={entry.chosen.length}
-                        fallback={
-                          <Text emphasis="muted">{waiting() ? 'Waiting for an answer' : 'No answer'}</Text>
-                        }
+                        fallback={<Text emphasis="muted">No answer</Text>}
                       >
                         <Text wrap>{entry.chosen.join(', ')}</Text>
                       </Show>
@@ -339,6 +357,7 @@ export default function AgentEventCard(props: {
                 </For>
               </Stack>
             </Card>
+            </Show>
           )
         }}
       </Show>

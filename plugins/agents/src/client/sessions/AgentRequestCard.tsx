@@ -3,8 +3,10 @@ import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 
-// A question the harness is blocked on: a permission, a choice, a form. Drawn above the transcript
-// rather than in it, because the session cannot move until it is answered.
+// A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
+// point the agent asked, by the card for its own `request` event (./AgentEventCard.tsx), so that
+// answering it happens where the reader is already looking and the thread keeps the interruption in
+// order. The task sidebar's "Needs you" list is how a reader reaches one in a session they are not on.
 export default function AgentRequestCard(props: {
   request: AgentRequest
   focused?: boolean

@@ -1,13 +1,12 @@
 import { agentTelemetry } from './agentTelemetry'
-import { createMemo, For, Index, Show } from 'solid-js'
+import { createMemo, Index, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
-import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
 import { sessionModelLabel } from '../settings/agentConfigOptions'
-import { Button, EmptyState, Icon, Inline, Section, Stack, Text, Timeline, Toolbar } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
@@ -40,9 +39,9 @@ export default function AgentTranscript(props: {
   // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
   // of turns, twenty-five times a second.
   const turnsById = createMemo(() => new Map(props.snapshot.turns.map((turn) => [turn.id, turn])))
-  // Same reason, and the same key the strip above resolves by. A question's card in the thread draws
-  // from the row rather than from its own event, because the answer, and whether one is still coming,
-  // live on the row and keep changing after the event is written.
+  // Same reason, keyed the way the sidebar and every notice name a request. A request's card draws from
+  // the row rather than from its own event, because whether anybody has answered yet, and what they
+  // said, both live on the row and keep changing long after the event is written.
   const requestsById = createMemo(() =>
     new Map(props.snapshot.requests.map((request) => [request.providerRequestId, request])))
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
@@ -59,12 +58,11 @@ export default function AgentTranscript(props: {
   // Falls back to the session's own stream when the card is not there: selecting a subagent under
   // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
   const items = createMemo(() => {
-    const items = agentTelemetry.measure('agents.transcript.visible', () => visibleConversationItems(focused()?.children ?? conversation()))
+    const items = agentTelemetry.measure('agents.transcript.visible', () =>
+      visibleConversationItems(focused()?.children ?? conversation(), (requestId) => requestsById().get(requestId)))
     agentTelemetry.observe('agents.transcript.items', items.length)
     return items
   })
-  const pending = createMemo(() => props.snapshot.requests.filter((request) =>
-    request.status === 'pending' || request.status === 'resolving'))
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelLabel(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -91,6 +89,9 @@ export default function AgentTranscript(props: {
           request={item().event.type === 'request'
             ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId)
             : undefined}
+          focusRequest={item().event.type === 'request'
+            && (item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId === props.focusRequestId}
+          onRequestResolved={props.onRequestResolved}
         />
       </Timeline.Turn>
     )
@@ -101,21 +102,6 @@ export default function AgentTranscript(props: {
 
   return (
     <>
-      <Show when={pending().length}>
-        <Section label="Needs you" count={pending().length}>
-          <Stack gap="row">
-            <For each={pending()}>
-              {(request) => (
-                <AgentRequestCard
-                  request={request}
-                  focused={request.providerRequestId === props.focusRequestId}
-                  onResolved={props.onRequestResolved}
-                />
-              )}
-            </For>
-          </Stack>
-        </Section>
-      </Show>
       <Show when={focusedSubagent()}>
         {(narrowed) => {
           const subagent = narrowed

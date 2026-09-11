@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentNormalizedEvent, AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { askedQuestions, askWasAbandoned } from './requestAnswers'
+import { askedQuestions } from './requestAnswers'
 
 const asked = (questions: Extract<AgentNormalizedEvent, { type: 'request' }>['questions']) => ({
   type: 'request' as const,
@@ -83,12 +83,5 @@ describe('what the agent asked, and what it was not told', () => {
       chosen: ['Allow once'],
       alternatives: [{ label: 'Reject' }],
     }])
-  })
-
-  it('knows the two ways an answer never arrives', () => {
-    expect(askWasAbandoned(row({ cancelled: true }))).toBe(true)
-    expect(askWasAbandoned(row({}, 'expired'))).toBe(true)
-    expect(askWasAbandoned(row({ answers: { pick: 'pnpm' } }))).toBe(false)
-    expect(askWasAbandoned(undefined)).toBe(false)
   })
 })

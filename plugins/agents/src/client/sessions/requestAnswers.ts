@@ -24,10 +24,6 @@ const picked = (value: unknown): string[] => {
   return typeof value === 'string' && value ? [value] : []
 }
 
-/** Nobody answered, and nobody will: the turn was cancelled, or the agent stopped waiting. */
-export const askWasAbandoned = (request: AgentRequest | undefined): boolean =>
-  request?.status === 'expired' || asRecord(request?.resolution).cancelled === true
-
 export function askedQuestions(
   event: AgentRequestEvent,
   request: AgentRequest | undefined,
@@ -50,8 +46,8 @@ export function askedQuestions(
   }
 
   return event.questions.map((question) => {
-    // An answer the agent asked to keep to itself stays out of the transcript, which is durable and
-    // searchable in a way the one-off card above the stream was not.
+    // An answer the agent asked to keep to itself is not written into the thread, which is durable and
+    // searchable in a way a prompt answered and gone was not.
     const chosen = question.secret ? ['Answer hidden'] : picked(answers[question.id])
     return {
       prompt: question.header ? `${question.header}: ${question.prompt}` : question.prompt,

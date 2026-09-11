@@ -1,6 +1,7 @@
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
+  AgentRequest,
   AgentSubagentUpdate,
   AgentToolCall,
 } from '@acorn/protocol/managedAgents.ts'
@@ -39,14 +40,31 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'diagnostic',
 ])
 
-// A question the agent asked belongs in the thread: it interrupted the conversation, and what it was
-// told is part of the record. A permission does not. It is a decision about one tool call, the tool
-// call already has a card, and a busy session would bury itself under them.
-const belongsInThread = (event: AgentNormalizedEvent): boolean =>
-  event.type !== 'request' || event.kind === 'question' || event.kind === 'elicitation'
+// Anything the agent is blocked on is drawn where it asked, because that is the moment it interrupted
+// and answering it there costs no hunting. What happens afterwards differs by kind. A question stays:
+// what it was told is part of the record. A permission goes: it is a decision about one tool call, the
+// call already has a card of its own, and a busy session would bury itself under them.
+//
+// So this needs the request row and not only the event, since only the row knows whether anybody has
+// answered yet. A caller with no rows to hand is drawing a subagent's own stream, which never contains
+// one (`subagentIdOf` below), so the lookup is optional.
+const belongsInThread = (
+  event: AgentNormalizedEvent,
+  requestFor: RequestLookup | undefined,
+): boolean => {
+  if (event.type !== 'request') return true
+  if (event.kind !== 'permission') return true
+  const status = requestFor?.(event.requestId)?.status
+  return status === 'pending' || status === 'resolving'
+}
 
-export const visibleConversationItems = (items: AgentConversationItem[]): AgentConversationItem[] =>
-  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event))
+export type RequestLookup = (requestId: string) => AgentRequest | undefined
+
+export const visibleConversationItems = (
+  items: AgentConversationItem[],
+  requestFor?: RequestLookup,
+): AgentConversationItem[] =>
+  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
