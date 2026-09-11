@@ -142,12 +142,18 @@
 .plugin-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.plugin-required { padding-inline-start: var(--space-5); }
 .plugin-pending { font-size: var(--fs-xs); }
 /* Only present on a plugin loaded from the node's disk; a built-in's version is the app's. */
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
 /* Source and status share the one flexible column; the source ellipsises (full text in its title)
    rather than wrapping an absolute path across the row. */
 .plugin-meta { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.plugin-emits { font-size: var(--fs-xs); }
+.plugin-emits summary { cursor: pointer; color: var(--text-muted); }
+.plugin-emits ul { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding-inline-start: var(--space-5); }
+.plugin-emits li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2); }
+.plugin-emits li span { color: var(--text-muted); }
 .plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
 /* Development mode. Drawn as a warning rather than as muted meta text on purpose: it says this device

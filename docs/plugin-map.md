@@ -107,6 +107,8 @@ Core channels are defined in `packages/protocol/src/nodeEvents.ts`:
 
 - `plugins:changed`
 - `tasks:changed`
+- `workspace:changed`
+- `workspace-projects:changed`
 - `connection:changed`
 - `head:changed`
 - `run:changed`
@@ -117,6 +119,13 @@ Core channels are defined in `packages/protocol/src/nodeEvents.ts`:
 
 A plugin publishes `plugin:<id>:<verb>`. Another plugin can subscribe when the producer declares the
 verb in `emits` and the consumer grants the full channel. Missing producers emit nothing.
+
+First-party lifecycle broadcasts cover workflow runs and human gates, managed-agent turns,
+requests and session rosters, GitHub repositories and pull-request mirrors, browser-capture
+collections, local review-note counts, memory-library scopes, and resolved preview homes. The
+provider's `contract/` directory holds the matching read capability whenever a listener needs more
+than the event's safe state payload. Exact payloads and deliberate omissions are in
+[Forward compatibility](./plugins/forward-compatibility.md#shipped-first-party-lifecycle-events).
 
 Events have no replay or delivery guarantee. Re-read stored state after startup or reconnect.
 Use `ctx.events.status()` to invalidate your descriptors and `worktreeStatus(taskId)` after a

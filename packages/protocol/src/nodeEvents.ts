@@ -28,6 +28,8 @@ import type { IntegrationConnectionStatus } from './integrations'
 export const NODE_EVENT_CHANNELS = [
   'plugins:changed',
   'tasks:changed',
+  'workspace:changed',
+  'workspace-projects:changed',
   'connection:changed',
   'head:changed',
   'run:changed',
@@ -45,11 +47,15 @@ export const isNodeEventChannel = (channel: string): channel is NodeEventChannel
 // The payload-carrying node events, and the shapes both sides read them through. Each one is state,
 // not a delta: the field says what the thing now is, so a listener that missed an earlier frame still
 // ends up correct (node-core/server/notify.ts says per event why it is not content-free).
-export type ConnectionChangedEvent = {
-  integrationId: string
-  providerId: string
-  status: IntegrationConnectionStatus
-}
+export type TaskChangedEvent = { taskId: string | null }
+
+export type WorkspaceChangedEvent = { workspaceId: string }
+
+export type WorkspaceProjectsChangedEvent = { providerId: string; workspaceIds: string[] }
+
+export type ConnectionChangedEvent =
+  | { integrationId: string; providerId: string; status: IntegrationConnectionStatus }
+  | { integrationId: string; providerId: string; deleted: true }
 
 // A task worktree's HEAD moved: a commit, a checkout, a pull or rebase (docs/plugins.md § Hearing a core event
 // § HEAD moved). `head` is the SHA the tip is at now, `dirty` whether the tree still has uncommitted

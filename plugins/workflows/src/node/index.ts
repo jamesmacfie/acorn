@@ -12,6 +12,7 @@ import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
+import { WORKFLOW_GATES } from '../contract/events'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/workflowTools'
 import { validateWorkflow, WorkflowValidationError } from '../server/workflowValidation'
@@ -60,6 +61,10 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     })
   return {
     name: 'workflows',
+    emits: [
+      { verb: 'run-changed', description: 'A workflow run changed durable status' },
+      { verb: 'gate-changed', description: 'A workflow approval gate started or settled' },
+    ],
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
     // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
@@ -195,7 +200,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         stepChanged: (runId, stepId, status) => ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
         statusChanged: ctx.events.status,
         // `plugin:workflows:run-changed` (docs/plugins.md § Hearing another plugin).
-        runChanged: (runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), runId, status }),
+        runChanged: (taskId, runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status }),
+        gateChanged: (taskId, runId, stepId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           if (!deps.memoryReviewTrigger) return
@@ -457,6 +463,17 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
       // (server/workflowRunner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
+      ctx.capabilities.provide(WORKFLOW_GATES, {
+        list: async (taskId) => {
+          const runs = await store.select().from(workflowRuns).where(eq(workflowRuns.taskId, taskId))
+          const taskRuns = new Set(runs.map((run) => run.id))
+          if (!taskRuns.size) return []
+          const steps = await store.select().from(workflowSteps)
+          return steps
+            .filter((step) => taskRuns.has(step.runId) && step.status === 'waiting-gate')
+            .map((step) => ({ taskId, runId: step.runId, stepId: step.id, name: step.name, status: 'waiting-gate' as const }))
+        },
+      })
       ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
 
       // The trigger clock, and the reason it is here rather than in the client half: a schedule is a

@@ -43,7 +43,9 @@ export class AgentStore extends AgentSessionRepository {
       createdAt: timestamp,
       updatedAt: timestamp,
     })
-    return this.requireSession(id)
+    const session = await this.requireSession(id)
+    this.lifecycle.announceSession(session)
+    return session
   }
 
   /** Recover a delegated session when the process exited after its row was written but before the
@@ -210,6 +212,7 @@ export class AgentStore extends AgentSessionRepository {
       .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, input.idempotencyKey)))
       .limit(1)
     if (existing) return mapAgentTurn(existing)
+    const beforeSession = await this.requireSession(sessionId)
 
     const attachmentParts = input.input.flatMap((part, position) =>
       part.type === 'attachment' || part.type === 'image'
@@ -280,7 +283,11 @@ export class AgentStore extends AgentSessionRepository {
     }
     const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, id)).limit(1)
     if (!row) throw new Error('Queued turn was not persisted.')
-    return mapAgentTurn(row)
+    const turn = mapAgentTurn(row)
+    await this.lifecycle.announceTurn(turn.id)
+    const afterSession = await this.requireSession(sessionId)
+    if (afterSession.title !== beforeSession.title) this.lifecycle.announceSession(afterSession)
+    return turn
   }
 
   /**
@@ -397,20 +404,50 @@ export class AgentStore extends AgentSessionRepository {
     return mapAgentTurn(updated)
   }
 
-  async startTurn(turnId: string): Promise<void> {
+  async dispatchTurn(turnId: string): Promise<void> {
+    const before = await this.turn(turnId)
+    if (before?.status !== 'queued') return
     await this.db
       .update(schema.agentTurns)
       .set({
-        status: 'active',
+        status: 'dispatching',
         attempt: sql`${schema.agentTurns.attempt} + 1`,
         startedAt: now(),
         completedAt: null,
         errorJson: null,
       })
       .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'queued')))
+    const after = await this.turn(turnId)
+    if (after?.status === 'dispatching') await this.lifecycle.announceTurn(turnId)
+  }
+
+  async startTurn(turnId: string): Promise<void> {
+    const before = await this.turn(turnId)
+    if (!before || (before.status !== 'queued' && before.status !== 'dispatching')) return
+    await this.db
+      .update(schema.agentTurns)
+      .set({
+        status: 'active',
+        ...(before.status === 'queued'
+          ? {
+              attempt: sql`${schema.agentTurns.attempt} + 1`,
+              startedAt: now(),
+              completedAt: null,
+              errorJson: null,
+            }
+          : {}),
+      })
+      .where(and(
+        eq(schema.agentTurns.id, turnId),
+        eq(schema.agentTurns.status, before.status),
+      ))
+    const after = await this.turn(turnId)
+    if (after?.status === 'active') await this.lifecycle.announceTurn(turnId)
   }
 
   async requeueTransientTurn(turnId: string, message: string): Promise<void> {
+    const before = await this.turn(turnId)
+    if (before?.status !== 'active') return
     await this.db
       .update(schema.agentTurns)
       .set({
@@ -421,6 +458,8 @@ export class AgentStore extends AgentSessionRepository {
         errorJson: JSON.stringify({ code: 'safe_transient_retry', message }),
       })
       .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'active')))
+    const after = await this.turn(turnId)
+    if (after?.status === 'queued') await this.lifecycle.announceTurn(turnId)
   }
 
   async setTurnProviderRef(turnId: string, providerTurnRef: string): Promise<void> {
@@ -431,13 +470,25 @@ export class AgentStore extends AgentSessionRepository {
   }
 
   async cancelTurn(turnId: string): Promise<void> {
+    const before = await this.turn(turnId)
+    if (!before || !['queued', 'dispatching', 'active'].includes(before.status)) return
     await this.db
       .update(schema.agentTurns)
       .set({ status: 'cancelled', completedAt: now() })
       .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['queued', 'dispatching', 'active'])))
+    const after = await this.turn(turnId)
+    if (after?.status === 'cancelled') await this.lifecycle.announceTurn(turnId)
   }
 
   async interruptActiveTurn(sessionId: string, message: string): Promise<void> {
+    const before = await this.db
+      .select({ id: schema.agentTurns.id })
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.sessionId, sessionId),
+        inArray(schema.agentTurns.status, ['dispatching', 'active']),
+      ))
+    if (!before.length) return
     await this.db
       .update(schema.agentTurns)
       .set({
@@ -449,6 +500,7 @@ export class AgentStore extends AgentSessionRepository {
         eq(schema.agentTurns.sessionId, sessionId),
         inArray(schema.agentTurns.status, ['dispatching', 'active']),
       ))
+    for (const turn of before) await this.lifecycle.announceTurn(turn.id)
   }
 
   async queuedHeads(): Promise<Array<{ session: AgentSession; turn: AgentTurn }>> {
@@ -483,7 +535,8 @@ export class AgentStore extends AgentSessionRepository {
   }
 
   async unsettledSessions(): Promise<AgentSession[]> {
-    const rows = await this.db
+    const [runtimeRows, turnRows, requestRows] = await Promise.all([
+      this.db
       .select()
       .from(schema.agentSessions)
       .where(inArray(schema.agentSessions.runtimeState, [
@@ -494,8 +547,29 @@ export class AgentStore extends AgentSessionRepository {
         'waiting',
         'cancelling',
         'reconnecting',
-      ]))
-    return rows.map(mapAgentSession)
+      ])),
+      this.db
+        .selectDistinct({ sessionId: schema.agentTurns.sessionId })
+        .from(schema.agentTurns)
+        .where(inArray(schema.agentTurns.status, ['dispatching', 'active'])),
+      this.db
+        .selectDistinct({ sessionId: schema.agentRequests.sessionId })
+        .from(schema.agentRequests)
+        .where(inArray(schema.agentRequests.status, ['pending', 'resolving'])),
+    ])
+    const known = new Map(runtimeRows.map((row) => [row.id, row]))
+    const missingIds = [...new Set([
+      ...turnRows.map((row) => row.sessionId),
+      ...requestRows.map((row) => row.sessionId),
+    ])].filter((id) => !known.has(id))
+    if (missingIds.length) {
+      const rows = await this.db
+        .select()
+        .from(schema.agentSessions)
+        .where(inArray(schema.agentSessions.id, missingIds))
+      for (const row of rows) known.set(row.id, row)
+    }
+    return [...known.values()].map(mapAgentSession)
   }
 
 

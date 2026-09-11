@@ -10,6 +10,7 @@ import { fetchFiles, mirrorFiles, readFiles } from '../mirror/prMirror'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
 import { syncState } from '../../../node/schema'
+import { type GithubEmit, NO_EMIT } from '../../events'
 
 const MAX_PATCH_PATHS = 20
 
@@ -40,7 +41,12 @@ const uniqueStringPaths = (paths: unknown): string[] | null => {
   return out
 }
 
-const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
+const handleFilesRead = async (
+  db: PluginDatabase,
+  c: Context<AppEnv>,
+  emit: GithubEmit,
+  options: { summaryOnly?: boolean; paths?: string[] } = {},
+) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
@@ -51,7 +57,7 @@ const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: 
   if (!owner || !repo) return respondError(c, 404, 'repo_not_found')
   if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
-  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo, { emit })
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
   const key = { userId, repoId, number }
@@ -96,15 +102,15 @@ const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: 
 // Mirror logic is shared with the batch route, see prMirror.ts.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const pullFiles = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
+export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const path = c.req.query('path')
   const summaryOnly = c.req.query('summary') === '1' && !path
-  return handleFilesRead(db, c, { summaryOnly, paths: path ? [path] : undefined })
+  return handleFilesRead(db, c, emit, { summaryOnly, paths: path ? [path] : undefined })
 }).post('/:owner/:repo/pulls/:number/files/patches', async (c) => {
   const parsed = patchBody.safeParse(await c.req.json().catch(() => null))
   const paths = parsed.success ? uniqueStringPaths(parsed.data.paths) : null
   if (!paths) return respondError(c, 400, 'bad_paths')
   if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
   if (paths.length === 0) return c.json([])
-  return handleFilesRead(db, c, { paths })
+  return handleFilesRead(db, c, emit, { paths })
 })

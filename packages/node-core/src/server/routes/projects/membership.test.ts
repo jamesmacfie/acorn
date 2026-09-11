@@ -18,6 +18,12 @@ vi.mock('../../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
+const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
+vi.mock('../../transport/wsHub', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
+
 // The project contract: workspace membership and visibility are both owned by the project row.
 
 const makeApp = () => {
@@ -42,6 +48,7 @@ describe('project rows own workspace membership and visibility', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    broadcasts.length = 0
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
     dir = mkdtempSync(join(tmpdir(), 'acorn-projects-sync-'))
@@ -95,11 +102,28 @@ describe('project rows own workspace membership and visibility', () => {
       createdAt: now, updatedAt: now,
     })
     // Creating any workspace does not create Default; deleting one must.
+    broadcasts.length = 0
     await call(`/api/workspaces/${w1}`, 'DELETE')
     const [project] = await projectRows()
     const [defaultWs] = await t.db.select().from(schema.workspaces).where(eq(schema.workspaces.isDefault, true))
     expect(defaultWs).toBeTruthy()
     expect(project.workspaceId).toBe(defaultWs.id)
+    expect(broadcasts).toEqual([
+      { channel: 'workspace:changed', workspaceId: defaultWs.id },
+      { channel: 'project:changed', projectId: 'project-web' },
+      { channel: 'workspace:changed', workspaceId: w1 },
+    ])
+  })
+
+  it('announces workspace creation and real renames, but not an unchanged patch', async () => {
+    const workspaceId = await createWorkspace('Named')
+    expect(broadcasts).toEqual([{ channel: 'workspace:changed', workspaceId }])
+    broadcasts.length = 0
+
+    expect((await call(`/api/workspaces/${workspaceId}`, 'PATCH', { name: 'Renamed' })).status).toBe(200)
+    expect((await call(`/api/workspaces/${workspaceId}`, 'PATCH', { name: 'Renamed' })).status).toBe(200)
+
+    expect(broadcasts).toEqual([{ channel: 'workspace:changed', workspaceId }])
   })
 
   it('creating a task stamps the supplied project id', async () => {

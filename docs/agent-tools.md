@@ -292,6 +292,12 @@ to the task and capped per task, and the tool result is a URL handle rather than
 outlives the transcript. An audit trail of tool usage belongs at the registry dispatch seam, where
 every call already passes, not inside this plugin.
 
+The insert and newest-20 retention sweep complete before
+`plugin:browser:captures-changed { taskId }` is published. `browser.captures` then lists ordered
+metadata for that task; pixels stay behind the authenticated capture route. The older
+`capture-created` frame remains for one compatibility period, but new consumers use the collection
+event so a missed frame or retention deletion self-heals on re-read.
+
 The user's preview pane and the agent's browser are two surfaces on purpose. The shell's child
 webview is view-only for the person, covered by host-owned webviews in [the shell doc](./shell.md),
 and when the agent needs to see what the user sees, it points its own browser at the same tunnel URL.

@@ -148,6 +148,7 @@ export function createTaskService(db: AppDatabase): TaskService {
       if (!updates.length) return 0
       // One batch within core's file, which is all the atomicity docs/data-layer.md permits here.
       await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
+      broadcastTasksChanged({ taskId: null })
       return updates.length
     },
     load: async (taskId) => {
@@ -198,7 +199,7 @@ export function createTaskService(db: AppDatabase): TaskService {
       const repoOwner = normalizeGithubPart(input.repoOwner)
       const repoName = normalizeGithubPart(input.repoName)
 
-      return db.transaction((tx) => {
+      const result = db.transaction((tx) => {
         const task = tx.select({
           id: schema.tasks.id,
           pullNumber: schema.tasks.pullNumber,
@@ -224,14 +225,17 @@ export function createTaskService(db: AppDatabase): TaskService {
         )).get()
         if (existing) {
           return {
-            taskId: existing.taskId,
-            repoOwner: existing.repoOwner,
-            repoName: existing.repoName,
-            pullNumber: existing.pullNumber,
-            role: existing.role as TaskPullRelation['role'],
-            provenance: existing.provenance as TaskPullRelation['provenance'],
-            sessionId: existing.sessionId,
-            ...(existing.requestId ? { requestId: existing.requestId } : {}),
+            changed: false,
+            relation: {
+              taskId: existing.taskId,
+              repoOwner: existing.repoOwner,
+              repoName: existing.repoName,
+              pullNumber: existing.pullNumber,
+              role: existing.role as TaskPullRelation['role'],
+              provenance: existing.provenance as TaskPullRelation['provenance'],
+              sessionId: existing.sessionId,
+              ...(existing.requestId ? { requestId: existing.requestId } : {}),
+            },
           }
         }
 
@@ -263,8 +267,10 @@ export function createTaskService(db: AppDatabase): TaskService {
           ...(input.requestId ? { requestId: input.requestId } : {}),
         }
         tx.insert(schema.taskPulls).values({ ...relation, requestId: relation.requestId ?? null, createdAt: Date.now() }).run()
-        return relation
+        return { changed: true, relation }
       })
+      if (result.changed) broadcastTasksChanged({ taskId })
+      return result.relation
     },
     createChild: async (parentTaskId, seed, intendedChildId) => {
       const parent = await loadTask(db, parentTaskId)
@@ -317,13 +323,15 @@ export function createTaskService(db: AppDatabase): TaskService {
       })
       if (!created) return id
       broadcastWorktreeStatusChanged({ taskId: id })
-      broadcastTasksChanged()
+      broadcastTasksChanged({ taskId: id })
       return id
     },
     cancel: async (taskId) => {
+      const [task] = await db.select({ status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.id, taskId))
+      if (!task || task.status === 'cancelled') return
       await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
       broadcastWorktreeStatusChanged({ taskId })
-      broadcastTasksChanged()
+      broadcastTasksChanged({ taskId })
     },
   }
 }

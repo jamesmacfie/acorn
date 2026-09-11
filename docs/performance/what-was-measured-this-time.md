@@ -261,7 +261,8 @@ fixes without touching the model. Revisit only if instrumented refetch volume st
 
 ## A general topic or subscription model on `/v2/events`
 
-`docs/future/events.md` records the broadcast ceiling knowingly. A per-connection interest registry
+The event admission rule in `docs/plugins/forward-compatibility.md` records the broadcast ceiling
+knowingly. A per-connection interest registry
 is real machinery with its own failure modes, and the two concrete costs found in the trace, the
 `term:status` fan-out and the helper forwarding non-active nodes, are both fixable at their source
 in phase 2. The model stays refused until a measurement on a real multi-node fleet demands it.

@@ -68,7 +68,8 @@ export const integrationProjectsOptions = (connectionId: string, enabled: boolea
 // Where one connection's external projects show up: (workspace, external project, optional project)
 // rows, read from the connection's side so Settings can draw its whole map at once
 // (settings/ConnectionProjectMap.tsx). Core's table, so it stays a core query.
-export const integrationMappingsKey = (connectionId: string) => ['integration-mappings', connectionId] as const
+export const integrationMappingsRootKey = ['integration-mappings'] as const
+export const integrationMappingsKey = (connectionId: string) => [...integrationMappingsRootKey, connectionId] as const
 export const integrationMappingsOptions = (connectionId: string, enabled: boolean) => ({
   queryKey: integrationMappingsKey(connectionId),
   enabled: enabled && !!connectionId,

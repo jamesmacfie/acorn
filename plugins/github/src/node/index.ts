@@ -25,6 +25,7 @@ import { githubClientId } from '../server/config'
 import { githubAgentTools } from '../server/agentTools'
 import { taskPulls } from '../server/routes/pulls/taskPulls'
 import { githubEmitter } from '../server/events'
+import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 
 export const githubPlugin = (): NodePlugin => {
   return {
@@ -34,8 +35,9 @@ export const githubPlugin = (): NodePlugin => {
     // subscriptions.md § The cross-plugin grant). workflows hears `checks-changed`.
     emits: [
       { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
-      { verb: 'pr-synced', description: 'A pull request’s mirror was refreshed' },
+      { verb: 'pr-synced', description: 'A pull request’s mirror was committed or invalidated' },
       { verb: 'pulls-changed', description: 'A repository’s open pull request list was refreshed' },
+      { verb: 'repos-changed', description: 'The repository mirror changed' },
     ],
     // This module's own URL, so the host can walk from here for the migration chain (docs/plugins.md
     // § Data ownership).
@@ -66,8 +68,8 @@ export const githubPlugin = (): NodePlugin => {
       // /v2/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
       // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono
       // matches them. Reshuffling it changes which handler wins.
-      ctx.routes.register(repos(store), { prefix: '/repos' })
-      ctx.routes.register(repoLabels(store), { prefix: '/repos', note: '/:owner/:repo/labels' })
+      ctx.routes.register(repos(store, emit), { prefix: '/repos' })
+      ctx.routes.register(repoLabels(store, emit), { prefix: '/repos', note: '/:owner/:repo/labels' })
       // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
       // local-first task on that branch (Flow B). `tasks` is core's table, so that write goes through
       // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
@@ -76,14 +78,14 @@ export const githubPlugin = (): NodePlugin => {
       // The one github router with no plugin database handle: it shells out to git in the mapped project
       // checkout, and the path comes from CoreServices.projects through the core git seam.
       ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
-      ctx.routes.register(pullFiles(store), { prefix: '/repos' })
-      ctx.routes.register(pullBlob(store), { prefix: '/repos' })
+      ctx.routes.register(pullFiles(store, emit), { prefix: '/repos' })
+      ctx.routes.register(pullBlob(store, emit), { prefix: '/repos' })
       ctx.routes.register(pullsBatch(store, emit), { prefix: '/repos' })
-      ctx.routes.register(prActions(store), { prefix: '/repos' })
+      ctx.routes.register(prActions(store, emit), { prefix: '/repos' })
       // Workflow-run and job reads and re-runs. It resolves everything from the GitHub API and the
       // URL, so it holds no mirror state and takes no handle.
       ctx.routes.register(actions, { prefix: '/repos' })
-      ctx.routes.register(prCreate(store), { prefix: '/repos' })
+      ctx.routes.register(prCreate(store, emit), { prefix: '/repos' })
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
       ctx.routes.register(mentions(store), { prefix: '/repos' })
       // `pinned_repos` moved out of core, so /v2/core/pins became /v2/p/github/pins. The repo
@@ -107,9 +109,10 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
       ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
 
-      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status())) ctx.tools.register(tool)
+      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit)) ctx.tools.register(tool)
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
+        repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
         // Resolving the task itself is core's job (`tasks` is core's table and this plugin has no
         // handle to it), so the taskId round-trips through CoreServices before the mirror is consulted.

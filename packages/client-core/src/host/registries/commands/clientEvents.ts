@@ -2,7 +2,7 @@ import { dispatchLayout } from '../../../features/tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('client-event')
@@ -72,11 +72,10 @@ export type ClientEventMap = {
   // arrive over the socket from the node and mean "something happened there you may want to act on",
   // so they reach every window, not just the one that acted.
   //
-  // The payload is empty on purpose and the contract is "go re-read". The socket is an invalidation
-  // channel with no replay, so a delta would be wrong for a client that missed a frame
-  // (@acorn/protocol/ws.ts).
-  'tasks:changed': Record<string, never>
-  // The exception to the empty payload above, and the reason is the audience. Every integration plugin
+  // The task id is an addressable invalidation; null says the writer changed a batch or could not
+  // narrow the scope. It remains a "go re-read" hint, not an event log.
+  'tasks:changed': TaskChangedEvent
+  // Connection carries more state, and the reason is the audience. Every integration plugin
   // hears this one, and almost all of them are looking at a different provider, so three fields let a
   // listener drop the frame without a round trip. Still state rather than a delta: `status` is what the
   // connection now is (node-core/server/notify.ts § broadcastConnectionChanged).
@@ -87,6 +86,8 @@ export type ClientEventMap = {
   'run:changed': RunTargetChangedEvent
   'agent-session:changed': AgentSessionChangedEvent
   'project:changed': ProjectChangedEvent
+  'workspace:changed': WorkspaceChangedEvent
+  'workspace-projects:changed': WorkspaceProjectsChangedEvent
 }
 
 type Listener<T> = (payload: T) => void

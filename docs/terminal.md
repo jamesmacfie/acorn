@@ -106,6 +106,12 @@ re-reading, and the node drops its coalesced `git status` for the session's dire
 edge. A session going from idle to working changes nothing about the files, so it says nothing about
 them.
 
+A declared run target has one more lifecycle reduction: `run:changed { taskId, targetId, running }`.
+The runtime keeps a reverse session-to-target index, so the authoritative PTY exit removes the live
+target instance and publishes `running: false` even when nobody pressed Stop. Explicit stop removes
+the index first, which suppresses a duplicate frame from the PTY's later exit callback. This remains
+strictly about declared targets; arbitrary processes and ports do not become broadcast events.
+
 ## Backpressure
 
 The node's hub holds one WebSocket per client and stamps a per-connection `seq` on every frame. A gap

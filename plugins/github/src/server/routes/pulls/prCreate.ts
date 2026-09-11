@@ -5,6 +5,7 @@ import type { Branch, Compare } from '../../../shared/api'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { githubToken } from '../../githubToken'
 import { createPullRequest } from '../../createPull'
+import { type GithubEmit, NO_EMIT } from '../../events'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror,
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
@@ -38,7 +39,7 @@ type GitHubCompare = {
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
+export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   .get('/:owner/:repo/branches', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
@@ -118,7 +119,7 @@ export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
     if (!title.trim()) return respondError(c, 400, 'bad_request')
     // Resolved after validation: a request we are about to reject should not cost a credential read.
     const token = await githubToken(c)
-    const result = await createPullRequest(token, db, uid, owner, repo, { title, body, base, head, draft })
+    const result = await createPullRequest(token, db, uid, owner, repo, { title, body, base, head, draft }, emit)
     return result.ok
       ? c.json({ number: result.number })
       : respondError(c, result.failure.status, result.failure.error, result.failure.detail)

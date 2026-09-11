@@ -57,6 +57,10 @@ const { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/
 const { setNodeStarting } = await import('./chrome/nodeState')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
+const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
+const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
+const { watchWorkspaceChanges } = await import('@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts')
+const { watchNodeEvents } = await import('@acorn/client-core/infra/node/watchNodeEvents.ts')
 const { createEffect, createRoot } = await import('solid-js')
 const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
 const { startClientTelemetry } = await import('@acorn/client-core/infra/telemetry/emitter.ts')
@@ -179,6 +183,10 @@ async function fillIn(): Promise<void> {
   // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
   // another window moved nothing on screen until a restart.
   watchTaskChanges()
+  watchConnectionChanges()
+  watchProjectChanges()
+  watchWorkspaceChanges()
+  watchNodeEvents()
 
   // The node's arrival, which is behind the first frame now. Everything the shell asked for while a
   // node it had just spawned was booting came back as `ECONNREFUSED`, and the first non-offline state

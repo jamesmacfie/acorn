@@ -284,6 +284,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         effectivePolicy: { imported: true },
         idempotencyKey: randomUUID(),
       })
+      await this.store.dispatchTurn(turn.id)
       await this.store.startTurn(turn.id)
       await this.record(session.id, turn.id, { type: 'user_message', text: imported.user })
       for (const text of imported.assistant) {
@@ -423,7 +424,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       return
     }
     await this.record(sessionId, target, { type: 'session_state', state: 'cancelling' })
+    await this.store.expirePendingRequests(sessionId)
     await live?.handle?.cancel()
+    await this.store.cancelTurn(target)
   }
 
   async patchQueuedTurn(

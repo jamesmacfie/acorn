@@ -120,6 +120,7 @@ let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
 let statusBroadcast: () => void = () => {}
 let worktreeBroadcast: (taskId: string) => void = () => {}
+const runSessionExitListeners = new Set<(sessionId: string, exitCode: number | null) => void>()
 
 // A session's command went quiet, exited, or finished setting up. Whatever it was doing to the files in
 // its worktree, it has stopped doing it, so drop the coalesced `git status` for that directory and tell
@@ -301,6 +302,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
     if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
     worktreeSettled(s)
+    for (const listener of runSessionExitListeners) listener(s.meta.id, exitCode)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.tail(10_000))
     statusBroadcast()
@@ -525,6 +527,10 @@ export function terminalRunGlue(): RunSessionGlue {
       return meta.id
     },
     isRunning: (sessionId: string) => sessions.get(sessionId)?.meta.status === 'running',
+    onExit: (listener) => {
+      runSessionExitListeners.add(listener)
+      return () => runSessionExitListeners.delete(listener)
+    },
     exitCode: (sessionId: string) => sessions.get(sessionId)?.meta.exitCode,
     killSession: (sessionId: string) => {
       const s = sessions.get(sessionId)
@@ -581,6 +587,7 @@ export function disposeTerminal(): void {
   bootReconciled = Promise.resolve()
   statusBroadcast = () => {}
   worktreeBroadcast = () => {}
+  runSessionExitListeners.clear()
 }
 
 export type TerminalChannelRegistrations = {

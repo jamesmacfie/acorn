@@ -34,6 +34,11 @@ commits, review threads, labels, requested reviewers, checks, freshness, viewed 
 repositories. Provider reads are serve-then-revalidate and may use ETags. List refreshes replace
 collections so inaccessible repositories/PRs disappear from the local projection.
 
+`plugin:github:repos-changed` announces a completed full repository-list replacement or a repository
+inserted by a live lookup after a mirror miss. A `304 Not Modified` response updates only freshness
+and does not send the event. Node-side plugins can use the user-scoped `github.mirror` capability to
+list the same repository inventory without calling GitHub.
+
 Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A blob miss fetches
 from GitHub and stores the result by SHA. The cache is per Node and can hold private repository data.
 
@@ -46,9 +51,15 @@ value.
 
 PR detail keeps the mirror's serve-then-revalidate behavior, including provider-rendered `bodyHTML`.
 That HTML can contain GitHub `private-user-images` URLs signed for only a few minutes, so a stale read
-may briefly carry an expired URL. When the background refresh commits, `plugin:github:pr-synced`
-invalidates the matching active detail query and replaces that HTML with the freshly signed version;
-the event is part of the read contract rather than only a notification for other plugins.
+may briefly carry an expired URL. `plugin:github:pr-synced` means that the local pull request mirror
+was committed or invalidated, so consumers re-read the identified pull request. The plugin sends it
+after a background refresh and after a successful PR mutation updates or invalidates mirror state.
+A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
+other clients and plugins in sync with the initiating client.
+
+Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
+repository's open-pull list. The interactive route and `github_pull_create` agent tool share this
+write path.
 
 The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
 route. It infers the head from the task branch, uses the requested base, and atomically attaches the

@@ -1,8 +1,14 @@
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema, type AppDatabase } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createTaskService } from './tasks'
+
+const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
+vi.mock('../transport/wsHub', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
 
 // `workspaceId` vs `workspaceIdOrNull`: two answers to the same question, and the difference is
 // what a caller does with "no workspace".
@@ -58,6 +64,7 @@ describe('createChild project inheritance', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    broadcasts.length = 0
   })
 
   afterEach(() => t.cleanup())
@@ -115,6 +122,9 @@ describe('createChild project inheritance', () => {
       branch: 'inspect-tests-2',
       worktreePath: null,
     })
+    expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
+      { channel: 'tasks:changed', taskId: 'stable-child' },
+    ])
   })
 
   it('rejects reuse of an intended id by another parent or seed', async () => {
@@ -144,6 +154,7 @@ describe('adoptPullNumbers project matching', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    broadcasts.length = 0
   })
 
   afterEach(() => t.cleanup())
@@ -167,6 +178,7 @@ describe('adoptPullNumbers project matching', () => {
       { id: 'clone-one-task', pullNumber: 42 },
       { id: 'clone-two-task', pullNumber: 42 },
     ]))
+    expect(broadcasts).toContainEqual({ channel: 'tasks:changed', taskId: null })
   })
 })
 
@@ -175,6 +187,7 @@ describe('task pull attachments', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
+    broadcasts.length = 0
     await t.db.insert(schema.workspaces).values({ id: 'workspace-pulls', name: 'Pulls', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
       id: 'project-pulls', name: 'widget', path: null, workspaceId: 'workspace-pulls', sort: 0, hidden: false,
@@ -205,6 +218,10 @@ describe('task pull attachments', () => {
       expect.objectContaining({ pullNumber: 41, role: 'primary', sessionId: 'session-one' }),
       expect.objectContaining({ pullNumber: 42, role: 'related', sessionId: 'session-two', requestId: 'request-two' }),
     ])
+    expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
+      { channel: 'tasks:changed', taskId: 'task-pulls' },
+      { channel: 'tasks:changed', taskId: 'task-pulls' },
+    ])
   })
 
   it('is idempotent for the same task pull and rejects another repository', async () => {
@@ -214,5 +231,8 @@ describe('task pull attachments', () => {
     await expect(tasks.attachPull('task-pulls', {
       repoOwner: 'acme', repoName: 'other', pullNumber: 9, sessionId: 'session-one',
     })).rejects.toThrow(/does not match/)
+    expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
+      { channel: 'tasks:changed', taskId: 'task-pulls' },
+    ])
   })
 })

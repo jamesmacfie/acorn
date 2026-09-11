@@ -453,6 +453,8 @@ export type PluginNotice = {
 export type NodeEventChannel =
   | 'plugins:changed'
   | 'tasks:changed'
+  | 'workspace:changed'
+  | 'workspace-projects:changed'
   | 'connection:changed'
   | 'head:changed'
   | 'run:changed'
@@ -828,13 +830,13 @@ export type TelemetryBatch = {
 
 /** Every capability the first-party plugins publish, with its signature.
  *
- * Eleven of these are declared in `plugins/*​/src/contract/` modules a loaded plugin cannot import,
+ * These are declared in `plugins/*​/src/contract/` modules a loaded plugin cannot import,
  * which is why the catalogue is here. Consuming one means naming its id in
  * `permissions.node.capabilities` and resolving it at call time, never at init: plugin init order is
  * undefined, and the providing plugin may be disabled, in which case `get` returns undefined and you
  * degrade around it.
  *
- * A map rather than fourteen exported constants, because this package has no runtime: an `import
+ * A map rather than exported constants, because this package has no runtime: an `import
  * { NOTES_STORE }` that resolved to nothing at run time would be a worse trap than a cast. Write the
  * one line the cast needs and keep it beside your other ids:
  *
@@ -847,6 +849,12 @@ export type CapabilityCatalogue = {
   'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
   /** Ask the agent runtime to reconcile after a restart. */
   'agents.runtime': { reconcile(): Promise<void> }
+  /** Read durable turn lifecycle state within one task, without prompt or transcript content. */
+  'agents.turns': HostOwned<'plugins/agents/contract/lifecycle.AgentTurnsCapability'>
+  /** Rebuild one task's agent input-request inbox. */
+  'agents.requests': HostOwned<'plugins/agents/contract/lifecycle.AgentRequestsCapability'>
+  /** Rebuild one task's active and archived managed-session roster. */
+  'agents.sessions': HostOwned<'plugins/agents/contract/lifecycle.AgentSessionsCapability'>
   /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
    *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
   'agents.draftAttachments': DraftAttachmentsCapability
@@ -866,12 +874,20 @@ export type CapabilityCatalogue = {
   'notes.seedTask': HostOwned<'plugins/notes/contract/store.SeedTaskNotes'>
   /** The memory index and its launch-context hooks. */
   'memory.knowledge': HostOwned<'plugins/memory/contract/knowledge.MemoryLaunchHooks'>
+  /** Read the project or private memory library without exposing file paths or recall bookkeeping. */
+  'memory.library': HostOwned<'plugins/memory/contract/library.MemoryLibraryCapability'>
+  /** Read ordered metadata for one task's retained browser captures. */
+  'browser.captures': HostOwned<'plugins/browser/contract/captures.BrowserCapturesCapability'>
   /** The mirrored GitHub read model for a project. */
   'github.mirror': HostOwned<'plugins/github/contract/mirror.GithubMirrorCapability'>
   /** The page rules that decide what a task's preview pane shows. */
   'preview.rules': HostOwned<'plugins/preview/contract/rules.PreviewRulesCapability'>
+  /** Read the node-owned preview home selected from recipe, run target, or project config. */
+  'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
   /** Ask the workflow runner to reconcile after a restart. */
   'workflows.runner': { reconcile(): Promise<void> }
+  /** Rebuild a task's pending workflow approval inbox. */
+  'workflows.gates': HostOwned<'plugins/workflows/contract/events.WorkflowGatesCapability'>
   /** The per-step event stream behind the run panel. For a bell row, use `events.notice`, which is
    *  core's and works with workflows disabled. */
   'workflows.notices': {

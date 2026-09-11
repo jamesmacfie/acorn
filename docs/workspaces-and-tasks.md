@@ -184,6 +184,13 @@ Project configuration lives on `projects`: setup/dev/restart/teardown/database/p
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
 machine-local values.
 
+The node publishes `workspace:changed { workspaceId }` after create, rename, and deletion. Project
+membership remains `project:changed`; a deletion that reassigns projects announces each affected
+project. Provider-owned workspace mappings have their own batch invalidation,
+`workspace-projects:changed { providerId, workspaceIds }`, whose workspace ids are the union of the
+old and new scopes. Connection deletion uses the same event after its cascade. Plugins re-read the
+owner-filtered `projects.externalProjects` capability instead of receiving one frame per mapping.
+
 The `dev` run target layers in this order, each entry overriding the last: `workspaces.devScript`
 and `devRestartScript` as a base target, then `projects.run_targets` (the per-project Settings
 surface), then `~/.acorn/config.toml`, then the committed `./.acorn/config.toml`, which always

@@ -105,14 +105,16 @@ it('leaves most of the surface compared, not substituted', () => {
 })
 
 it('names every capability the first-party plugins publish', () => {
-  // The discovery half of the capability work: eleven of these ids are declared in
+  // The discovery half of the capability work: these ids are declared in
   // `plugins/*/src/contract/` modules a loaded plugin cannot import.
   const ids: Array<keyof Published.CapabilityCatalogue> = [
-    'agents.sessionExecute', 'agents.runtime', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
+    'agents.sessionExecute', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
+    'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
     'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
-    'memory.knowledge', 'github.mirror', 'preview.rules', 'workflows.runner', 'workflows.notices',
+    'memory.knowledge', 'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
+    'workflows.runner', 'workflows.gates', 'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(14)
+  expect(new Set(ids).size).toBe(22)
 })
 
 it('declares no runtime, which is what makes it publishable as a .d.ts', () => {

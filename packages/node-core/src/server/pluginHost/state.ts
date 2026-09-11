@@ -132,24 +132,28 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   }
   // `disabled` is what will be true after a restart; `running` is what is true now. A required plugin is
   // never disabled either way, whatever the file says.
-  const rows: NodePluginRow[] = bridge.roster().map((entry) => ({
-    name: entry.name,
-    required: entry.required,
-    disabled: !entry.required && pending.has(entry.name),
-    // An uninstalled-but-still-serving plugin is genuinely running; a plugin whose directory changed under
-    // it is running the old code. Either way `running` describes this process, and `state` is what says
-    // the disk has moved on.
-    running: !entry.disabled,
-    // The outcome for this boot, passed through untouched, except that a package the disk no longer agrees
-    // with outranks it. A failed row still reports `running: true` on purpose (see the note on
-    // NodePluginRow), and 'failed' is deliberately not overridden: a restart cannot fix a plugin whose init
-    // throws, so it must not raise the banner even if its directory also changed.
-    state: entry.state === 'failed' ? 'failed' : stale(entry.name) ? 'pending-restart' : entry.state,
-    ...(entry.failedAt === undefined ? {} : { failedAt: entry.failedAt }),
-    ...(entry.state === 'failed' ? trimReason(entry.reason) : {}),
-    ...(entry.stage === undefined ? {} : { stage: entry.stage }),
-    ...declared(entry.name),
-  }))
+  const rows: NodePluginRow[] = bridge.roster().map((entry) => {
+    const emits = entry.emits ?? installed.get(entry.name)?.emits
+    return {
+      name: entry.name,
+      ...(emits?.length ? { emits } : {}),
+      required: entry.required,
+      disabled: !entry.required && pending.has(entry.name),
+      // An uninstalled-but-still-serving plugin is genuinely running; a plugin whose directory changed under
+      // it is running the old code. Either way `running` describes this process, and `state` is what says
+      // the disk has moved on.
+      running: !entry.disabled,
+      // The outcome for this boot, passed through untouched, except that a package the disk no longer agrees
+      // with outranks it. A failed row still reports `running: true` on purpose (see the note on
+      // NodePluginRow), and 'failed' is deliberately not overridden: a restart cannot fix a plugin whose init
+      // throws, so it must not raise the banner even if its directory also changed.
+      state: entry.state === 'failed' ? 'failed' : stale(entry.name) ? 'pending-restart' : entry.state,
+      ...(entry.failedAt === undefined ? {} : { failedAt: entry.failedAt }),
+      ...(entry.state === 'failed' ? trimReason(entry.reason) : {}),
+      ...(entry.stage === undefined ? {} : { stage: entry.stage }),
+      ...declared(entry.name),
+    }
+  })
   // Packages the plugin host never saw. Two kinds, and they are not the same answer:
   //
   //   client-only. Nothing to init, ever. `running` tracks `disabled` exactly so it never raises a restart
@@ -169,6 +173,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     const waiting = entry.hasNode && !off && !failure && booted.get(entry.id) !== entry.version
     rows.push({
       name: entry.id,
+      ...(entry.emits?.length ? { emits: entry.emits } : {}),
       required: false,
       disabled: off,
       // `true` for a failed row, matching what the roster does with a contained plugin: `running` is what

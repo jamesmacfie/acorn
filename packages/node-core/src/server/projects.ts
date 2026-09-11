@@ -5,7 +5,7 @@ import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 import { git } from './core/git'
-import { broadcastProjectChanged, broadcastTasksChanged } from './notify'
+import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChanged } from './notify'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
@@ -110,6 +110,7 @@ export async function defaultWorkspaceId(db: AppDatabase): Promise<string> {
   const id = randomUUID()
   const now = Date.now()
   await db.insert(schema.workspaces).values({ id, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  broadcastWorkspaceChanged({ workspaceId: id })
   return id
 }
 
@@ -252,8 +253,9 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
     await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
   }
   await db.delete(schema.projects).where(eq(schema.projects.id, id))
-  // The rail's task list just lost every task in this project (./notify.ts § broadcastTasksChanged).
-  broadcastTasksChanged()
+  // The rail's task list just lost a batch of tasks in this project (./notify.ts §
+  // broadcastTasksChanged). No task event when the project had none: public task state did not move.
+  if (taskIds.length) broadcastTasksChanged({ taskId: null })
   broadcastProjectChanged({ projectId: id })
 }
 

@@ -5,11 +5,10 @@ import { join } from 'node:path'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { memories } from '../node/schema'
+import type { MemoryScope, MemoryType } from '../contract/library'
 
-export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
+export type { MemoryScope, MemoryType } from '../contract/library'
 export const MEMORY_TYPES: readonly MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
-
-export type MemoryScope = 'project' | 'private'
 
 export type MemoryFile = {
   name: string

@@ -28,6 +28,12 @@ vi.mock('../../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
+const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
+vi.mock('../../transport/wsHub', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
+
 const OWNER = 'external-projects-test'
 const USER = 'james'
 const SECRETS = new SecretService('42'.repeat(32))
@@ -73,6 +79,7 @@ describe('workspace external projects, end to end', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
+    broadcasts.length = 0
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
 
@@ -179,6 +186,18 @@ describe('workspace external projects, end to end', () => {
     expect(rows).toMatchObject([{ workspaceId: workspace.id, integrationId: 'tracker-1', externalId: 'proj-1' }])
   })
 
+  it('announces one provider-scoped mapping invalidation only when the public map changes', async () => {
+    const workspace = await createWorkspace('Runn')
+    broadcasts.length = 0
+
+    await setLinked(workspace.id, [{ integrationId: 'tracker-1', externalId: 'proj-1' }])
+    await setLinked(workspace.id, [{ integrationId: 'tracker-1', externalId: 'proj-1' }])
+
+    expect(broadcasts).toEqual([
+      { channel: 'workspace-projects:changed', providerId: 'tracker', workspaceIds: [workspace.id] },
+    ])
+  })
+
   it('leaves a sibling provider — and a failed connection — alone when one selection is edited', async () => {
     const workspace = await createWorkspace('Runn')
     // The starting state: one row per provider, including the connection whose list cannot load.
@@ -257,6 +276,21 @@ describe('workspace external projects, end to end', () => {
     expect((await setMapped('tracker-1', [{ workspaceId: side.id, externalId: 'proj-2' }])).status).toBe(200)
     expect(await mapped('tracker-1')).toEqual([{ workspaceId: side.id, externalId: 'proj-2' }])
     expect(await mapped('errors-1')).toEqual([{ workspaceId: runn.id, externalId: 'errors-1-project' }])
+  })
+
+  it('announces the union of old and new workspace scopes for a connection-side replacement', async () => {
+    const runn = await createWorkspace('Runn')
+    const side = await createWorkspace('Side')
+    await setMapped('tracker-1', [{ workspaceId: runn.id, externalId: 'proj-1' }])
+    broadcasts.length = 0
+
+    await setMapped('tracker-1', [{ workspaceId: side.id, externalId: 'proj-2' }])
+
+    expect(broadcasts).toEqual([{
+      channel: 'workspace-projects:changed',
+      providerId: 'tracker',
+      workspaceIds: [runn.id, side.id].sort(),
+    }])
   })
 
   it('refuses a connection map the caller has no row for', async () => {

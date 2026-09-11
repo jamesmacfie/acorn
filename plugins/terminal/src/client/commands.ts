@@ -1,6 +1,7 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
+  clientCapability,
   dispatchLayout,
   localSearch,
   refreshSessions,
@@ -8,13 +9,13 @@ import {
   requestTerminalFocus,
   runApi,
   sessions,
-  setRecipeBrowserUrl,
   setTerminalOpen,
   type CommandExecutionContext,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
+import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 
 // The three things this plugin knows about the open task: what it can run, how it can be laid out, and
 // which terminals are alive in it (docs/terminal.md § From the command palette).
@@ -187,7 +188,9 @@ export const terminalCommands: readonly ContributedCommand[] = [
         setLayout: (id, layout) => dispatchLayout(id, { type: 'replace', layout }),
         startTarget: (id, targetId) => runApi.start(id, targetId),
         targetUrl: async (id, targetId) => (await runApi.status(id, targetId)).url,
-        setBrowserUrl: setRecipeBrowserUrl,
+        setBrowserUrl: async (id, url) => {
+          await clientCapability(PREVIEW_RECIPE_SELECTION)?.set(id, url)
+        },
         openTerminal: (id) => setTerminalOpen(id, true),
       })
       await refreshSessions()

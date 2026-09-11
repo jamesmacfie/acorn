@@ -590,6 +590,17 @@ Three frames of its own, and each one costs what it should:
 - `plugin:workflows:run-changed` re-reads the run and its steps, because a run beginning or ending
   changes rows this client never saw.
 
+The last frame is the public run lifecycle, not merely a start/finish hint. It carries
+`{ taskId, runId, status }` after the run's full step roster is readable and after every real durable
+transition through `running`, `gated`, `cancelling`, `done`, `failed`, `safety-rail`, or `cancelled`.
+One `setRun` mutation funnel compares old and new state, so retries and terminal completion cannot
+drift into separate event semantics.
+
+Human approvals have the narrower `plugin:workflows:gate-changed` frame. It names task, run, step,
+and the current `waiting-gate`, `done`, `failed`, or `cancelled` state only when entering or leaving
+the gate. Node-side consumers re-list pending gates through `workflows.gates`; ordinary workflow
+steps remain on the owned stream and never become cross-plugin events.
+
 An agent node adds the agents plugin's own subscription, which is a session's event stream at about
 25 frames a second ([managed-agents.md](./managed-agents.md) § The transcript store). That is the
 conversation's cost and it is paid by whichever pane is drawing one; the socket is refcounted, so two

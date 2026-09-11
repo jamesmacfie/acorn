@@ -9,7 +9,20 @@ export type MirroredPullRequest = {
   changedFiles: string[]
 }
 
+/** Repository metadata from one owner's disposable local GitHub mirror. */
+export type MirroredRepository = {
+  id: number
+  owner: string
+  name: string
+  private: boolean
+  defaultBranch: string | null
+  pushedAt: number | null
+}
+
 export type GithubMirrorCapability = {
+  /** The repository inventory visible to this node owner. Never performs a provider fetch. */
+  repositories(userId: string): Promise<MirroredRepository[]>
+
   /**
    * The mirrored PR for a task's (owner, repo, pullNumber), or null when there is no PR, no mirrored
    * repo, or nothing cached. Never fetches: this backs the `pr` context section, assembled while a

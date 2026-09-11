@@ -15,6 +15,7 @@ import { type RuntimeDeps, RuntimeService } from './runtime'
 export type RunSessionGlue = {
   startSession(taskId: string, target: RunTarget, cwd: string): Promise<string>
   isRunning(sessionId: string): boolean
+  onExit(listener: (sessionId: string, exitCode: number | null) => void): () => void
   exitCode(sessionId: string): number | null | undefined
   killSession(sessionId: string): void
 }
@@ -54,6 +55,7 @@ export function createRuntimeService(
     // `terminal:before-run-target` could be declared in the trust prompt and never called.
     hooks,
     isRunning: glue.isRunning,
+    onExit: glue.onExit,
     exitCode: glue.exitCode,
     killSession: glue.killSession,
     runScript,

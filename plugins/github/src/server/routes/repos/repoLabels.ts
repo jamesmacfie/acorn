@@ -4,6 +4,7 @@ import { gh, ghError } from '../../githubApi'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
+import { type GithubEmit, NO_EMIT } from '../../events'
 
 type GitHubLabel = {
   name: string
@@ -12,13 +13,13 @@ type GitHubLabel = {
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const repoLabels = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/labels', async (c) => {
+export const repoLabels = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/labels', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
-  const resolved = await resolveRepoForUser(db, token, uid, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, uid, owner, repo, { emit })
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
 
   const res = await gh(token, `/repos/${owner}/${repo}/labels?per_page=100`)

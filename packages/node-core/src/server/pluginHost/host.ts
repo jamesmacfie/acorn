@@ -30,6 +30,7 @@ import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { disposeUnstartedPlugin } from '../plugins/isolation'
 import { clearHooks, isHookMode } from './hooks'
 import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
+import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
 import { declareEmits } from './emits'
@@ -86,6 +87,7 @@ export type PluginHostOptions = {
 // whole list, including a checkbox for one the owner turned off, and which names are `required`.
 export type PluginRosterEntry = {
   name: string
+  emits?: readonly PluginEmit[]
   required: boolean
   disabled: boolean
   // What happened in this process. `disabled` above is what the owner asked for, this is the outcome.
@@ -514,6 +516,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     const failure = failures.get(plugin.name)
     return {
       name: plugin.name,
+      ...(plugin.emits?.length ? { emits: plugin.emits } : {}),
       required: plugin.required === true,
       disabled: isDisabled,
       // A failure outranks the disabled flag only because the two cannot co-occur: a disabled plugin
@@ -671,6 +674,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     if (!enabled.includes(name)) enabled.push(name)
     contexts.set(name, candidateCtx)
     loadedBindings.set(name, next.binding)
+    const rosterRow = roster.find((entry) => entry.name === name)
+    if (rosterRow) {
+      if (next.plugin.emits?.length) rosterRow.emits = next.plugin.emits
+      else delete rosterRow.emits
+    }
     if (candidate.db) opened.set(name, candidate.db)
 
     if (next.plugin.ready) {

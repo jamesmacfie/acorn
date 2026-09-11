@@ -172,6 +172,29 @@ describe('wsClient', () => {
     expect(worktrees).toEqual(['t1'])
   })
 
+  it('routes addressable task, workspace, mapping, and connection-deletion events', () => {
+    const tasks: (string | null)[] = []
+    const workspaces: string[] = []
+    const mappings: { providerId: string; workspaceIds: string[] }[] = []
+    const connections: unknown[] = []
+    client.wsOnTasksChanged((event) => tasks.push(event.taskId))
+    client.wsOnNodeEvent('workspace:changed', (event) => workspaces.push(event.workspaceId))
+    client.wsOnNodeEvent('workspace-projects:changed', (event) => mappings.push(event))
+    client.wsOnConnectionChanged((event) => connections.push(event))
+
+    bridge.emitFrame({ channel: 'tasks:changed', taskId: 't1' })
+    bridge.emitFrame({ channel: 'tasks:changed', taskId: null })
+    bridge.emitFrame({ channel: 'tasks:changed' })
+    bridge.emitFrame({ channel: 'workspace:changed', workspaceId: 'w1' })
+    bridge.emitFrame({ channel: 'workspace-projects:changed', providerId: 'linear', workspaceIds: ['w1', 'w2'] })
+    bridge.emitFrame({ channel: 'connection:changed', integrationId: 'c1', providerId: 'linear', deleted: true })
+
+    expect(tasks).toEqual(['t1', null])
+    expect(workspaces).toEqual(['w1'])
+    expect(mappings).toEqual([{ providerId: 'linear', workspaceIds: ['w1', 'w2'] }])
+    expect(connections).toEqual([{ integrationId: 'c1', providerId: 'linear', deleted: true }])
+  })
+
   // The node's hub shed invalidation frames because this socket was too far behind to take them. The
   // remedy is the reconnect remedy, because nothing says which ones were dropped
   // (node-core/server/transport/wsHub.ts).

@@ -1,9 +1,8 @@
 // The client half of `tasks:changed` (docs/plugins.md § Hearing a core event).
 //
-// Every task write on the node announces itself (node-core/server/notify.ts § broadcastTasksChanged) and
-// this turns that into one cache invalidation. The frame is content-free by design, so there is
-// nothing to merge and no ordering to get wrong: the task list is a fetchable route, and the client
-// re-reads it.
+// Every task write on the node announces itself (node-core/server/notify.ts § broadcastTasksChanged)
+// and this turns that into one cache invalidation. The frame names one task, or null for a batch, but
+// the shell's source of truth is still its list query, so it re-reads it.
 //
 // It exists because the invalidation used to be the caller's job — `mutations.ts` still says "callers
 // invalidate tasksKey after" — which is correct for the window that did the writing and silently wrong
@@ -19,13 +18,13 @@ import { wsOnTasksChanged } from '../../infra/node/wsClient'
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
  * the app never calls it. */
 export function watchTaskChanges(): () => void {
-  return wsOnTasksChanged(() => {
+  return wsOnTasksChanged((event) => {
     // The active node's cache only: the socket that delivered this belongs to it, and no other node
     // has a mounted query to refetch. Same reasoning as the reconnect sweep in the desktop bootstrap.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: tasksKey })
     // …and re-emit for everything that listens on the client bus rather than on the cache, which is
     // how a plugin frame hears it: the bus is the only thing a frame can subscribe to, and the socket
     // is not (plugins/frames/channels.ts).
-    clientEvents.emit('tasks:changed', {})
+    clientEvents.emit('tasks:changed', event)
   })
 }

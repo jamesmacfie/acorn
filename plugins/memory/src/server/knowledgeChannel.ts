@@ -10,6 +10,7 @@ import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts
 import type { NoteKind } from '@acorn/protocol/notes.ts'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
 import type { MemoryHit, MemoryRow } from './memory'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
@@ -84,6 +85,10 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
     return await memorySources(active, checkouts, homedir())
   }
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
+  const announceMemories = (projectId: string | null) => deps.emit?.({
+    channel: pluginChannel('memory', 'memories-changed'),
+    ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
+  })
 
   const launchInjector = async (taskId: string, sessionId: string) => {
     // Launch injection (docs/notes-and-memory.md § Context integration): task context is gated by
@@ -212,6 +217,7 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
           body: p.body,
         })
         await reconciled()
+        announceMemories(p.scope === 'private' ? null : t!.projectId!)
         return res
       }),
     // The human gate over auto-generated proposals (docs/notes-and-memory.md).
@@ -228,7 +234,10 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
       // everywhere rather than throwing away what the agent learned.
       const projectId = proposal.projectId ?? (await core.tasks.load(proposal.taskId))?.projectId ?? null
       const dir = projectId ? projectMemoryDir(homedir(), projectId) : privateMemoryRoot(homedir())
-      return acceptProposal(proposals, proposal.id, dir, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
+      return acceptProposal(proposals, proposal.id, dir, async () => {
+        await reconciled()
+        announceMemories(projectId)
+      }, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
     // --- notes ---
     //

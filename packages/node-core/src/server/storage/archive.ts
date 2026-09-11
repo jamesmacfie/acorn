@@ -115,7 +115,7 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
     .update(schema.tasks)
     .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
     .where(eq(schema.tasks.id, id))
-  broadcastTasksChanged()
+  broadcastTasksChanged({ taskId: id })
   // Archived, but say what did not happen. `ok` stays true, because the task is archived, and
   // reporting a failure would have the caller offer a retry for work already done.
   return checkFailures.length ? { ok: true, cleanupFailed: checkFailures } : { ok: true }

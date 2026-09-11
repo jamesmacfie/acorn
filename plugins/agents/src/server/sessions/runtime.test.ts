@@ -19,6 +19,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { writeAgentConcurrency } from '../concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
+import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -529,6 +530,7 @@ describe('managed agent runtime conformance', () => {
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     const published: number[] = []
+    const lifecycle: AgentLifecycleFrame[] = []
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -539,6 +541,7 @@ describe('managed agent runtime conformance', () => {
       registry,
       publish: (frame) => {
         if (frame.channel === 'agent:event') published.push(frame.event.seq)
+        if (frame.channel.startsWith('plugin:agents:')) lifecycle.push(frame as AgentLifecycleFrame)
       },
     })
 
@@ -565,6 +568,12 @@ describe('managed agent runtime conformance', () => {
     )
     expect(published).toEqual([...published].sort((a, b) => a - b))
     expect(snapshot.events.some((event) => event.event.type === 'assistant_message')).toBe(true)
+    expect(lifecycle.filter((frame) => frame.channel === 'plugin:agents:turn-changed')).toEqual([
+      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'queued', attempt: 0 },
+      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'dispatching', attempt: 1 },
+      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'active', attempt: 1 },
+      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'completed', attempt: 1 },
+    ])
   })
 
   it('holds a settled session settled when the provider streams past its turn', async () => {
@@ -972,6 +981,12 @@ describe('managed agent runtime conformance', () => {
       message: 'Preserve me.',
     })
     await beforeRestart.store.recordEvent(session.id, active.id, { type: 'session_state', state: 'working' })
+    await beforeRestart.store.recordEvent(session.id, active.id, {
+      type: 'request',
+      requestId: 'restart-question',
+      kind: 'question',
+      title: 'This request did not survive the restart',
+    })
     const queued = await beforeRestart.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Continue after restart.' }],
       source: 'delegation',
@@ -981,6 +996,7 @@ describe('managed agent runtime conformance', () => {
 
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
+    const lifecycle: AgentLifecycleFrame[] = []
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -989,12 +1005,32 @@ describe('managed agent runtime conformance', () => {
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
+      publish: (frame) => {
+        if (frame.channel.startsWith('plugin:agents:')) lifecycle.push(frame as AgentLifecycleFrame)
+      },
     })
     await runtime.reconcile()
     const snapshot = await runtime.wait(session.id, 2, 'turn_completed', 2_000)
 
     expect(snapshot.turns.find((turn) => turn.id === active.id)?.status).toBe('interrupted')
     expect(snapshot.turns.find((turn) => turn.id === queued.id)?.status).toBe('completed')
+    expect(lifecycle).toContainEqual({
+      channel: 'plugin:agents:turn-changed',
+      taskId: seed.taskId,
+      sessionId: session.id,
+      turnId: active.id,
+      source: 'delegation',
+      status: 'interrupted',
+      attempt: 1,
+    })
+    expect(lifecycle).toContainEqual({
+      channel: 'plugin:agents:request-changed',
+      taskId: seed.taskId,
+      sessionId: session.id,
+      requestId: 'restart-question',
+      kind: 'question',
+      status: 'expired',
+    })
     expect((await runtime.store.eventsForTurn(active.id)).some((record) =>
       record.event.type === 'diagnostic' && record.event.message === 'Preserve me.')).toBe(true)
   })

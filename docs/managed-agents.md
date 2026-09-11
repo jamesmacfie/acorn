@@ -35,6 +35,25 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+### Cross-plugin lifecycle
+
+Three plugin events reduce the durable model without copying its private content:
+
+- `plugin:agents:turn-changed` carries task, session, turn, source, status, and attempt after enqueue,
+  dispatch, activation, retry, completion, failure, cancellation, interruption, or restart repair.
+- `plugin:agents:request-changed` carries task, session, provider request id, kind, and status after
+  creation, resolution claim, provider acknowledgement, expiry, cancellation cleanup, or restart
+  repair.
+- `plugin:agents:sessions-changed` carries task, session, presence, and archive state after create,
+  title change, archive, restore, or deletion. Titles never enter the event payload.
+
+The store and repository own these post-commit announcements, rather than each route and runtime
+path sending independently. Node-side consumers rebuild current state through the task-scoped
+`agents.turns`, `agents.requests`, and `agents.sessions` capabilities. Turn reads omit prompt,
+effective policy, error, and transcript content; request resolution remains private to the agent
+runtime. Core `agent-session:changed` remains the generic completion/attention compatibility event,
+and `agent:*` remains the owned transcript stream.
+
 ### What a session reports
 
 Starting a provider raises an `agent.session` span and dispatching a turn raises an `agent.turn`

@@ -13,6 +13,7 @@ import { seedGithubIntegration } from '../../../testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 // Aliased away from the `repos` router imported above because the table and route factory share a name.
 import { repos as reposTable, syncState } from '../../../node/schema'
+import type { GithubEmit } from '../../events'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()
@@ -43,11 +44,13 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
   let core: TestDb
   let plugin: TestPluginDb
   let app: Hono<AppEnv>
+  let emit = vi.fn<GithubEmit>()
 
   beforeEach(async () => {
     vi.clearAllMocks()
     core = makeTestDb()
     plugin = makeTestPluginDb('github')
+    emit = vi.fn<GithubEmit>()
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     app = new Hono<AppEnv>()
@@ -55,7 +58,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', repos(plugin.db))
+    app.route('/api/repos', repos(plugin.db, emit))
   })
 
   afterEach(() => {
@@ -77,6 +80,8 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
 
     const [sync] = await syncRow()
     expect(sync.etag).toBe('"repos-v1"')
+    expect(emit).toHaveBeenCalledOnce()
+    expect(emit).toHaveBeenCalledWith('repos-changed')
   })
 
   it('cold error surfaces the GitHub status', async () => {
@@ -84,6 +89,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     const res = await get()
     expect(res.status).toBe(401)
     expect(await res.json()).toMatchObject({ error: { code: 'reauth' } })
+    expect(emit).not.toHaveBeenCalled()
   })
 
   it('stale: serves the mirror immediately, then revalidates with If-None-Match → 304 keeps rows', async () => {
@@ -102,6 +108,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     expect(await plugin.db.select().from(reposTable)).toHaveLength(1)
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBeGreaterThan(stale)
+    expect(emit).not.toHaveBeenCalled()
   })
 
   it('POST /refresh zeroes freshness so the next read revalidates', async () => {
@@ -113,5 +120,6 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBe(0)
     expect(sync.etag).toBe('"repos-v1"') // ETag preserved so the refetch can still 304
+    expect(emit).not.toHaveBeenCalled()
   })
 })

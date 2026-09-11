@@ -547,6 +547,14 @@ No webview is attached to a debugger. Agent browser automation is `plugins/brows
 Playwright against a browser of the node's own, so an agent on a headless node has one too. The
 preview pane is the person's surface and nothing steers it but them.
 
+The preview home is nevertheless node-owned. `preview.urls` resolves, in order, a layout recipe's
+selected target URL, the running default target, and the project's URL, port, or script setting;
+script discovery runs on the node in the task worktree. The pane reads `/v2/p/preview/tasks/:id/url`
+and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url` and `source` are
+`null` when the last preview disappears, so a headless node and every
+connected client agree on the answer. The terminal recipe picker reaches preview through the
+`preview.recipeSelection` client capability, avoiding a reverse package import.
+
 For a task whose dev server is served by another node process,
 `@acorn/custody/supervision/previewTunnel.ts` opens an authenticated loopback listener that forwards
 raw bytes to the node's own tunnel endpoint over its pinned agent, so the preview pane can reach a

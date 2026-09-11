@@ -17,6 +17,7 @@ export type TerminalPluginDeps = Omit<TerminalChannelDeps, 'seedTaskNotes'>
 
 export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
+  let runTargets: ReturnType<typeof createRuntimeService> | null = null
   return {
     name: 'terminal',
     required: true,
@@ -93,29 +94,30 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         payload: { taskId: 'string', targetId: 'string', command: 'string', cwd: 'string' },
         allows: ['observe', 'veto'],
       })
-      const runTargets = createRuntimeService(
+      const runTargetService = createRuntimeService(
         ctx.core,
         terminalRunGlue(),
         (taskId, targetId, running) => ctx.events.send({ channel: 'run:changed', taskId, targetId, running }),
         ctx.hooks,
       )
+      runTargets = runTargetService
       routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
-        targets: (taskId) => runTargets.targets(taskId),
-        start: (taskId, targetId) => runTargets.start(taskId, targetId),
-        stop: (taskId, targetId) => runTargets.stop(taskId, targetId),
-        restart: (taskId, targetId) => runTargets.restart(taskId, targetId),
-        status: (taskId, targetId) => runTargets.status(taskId, targetId),
-        defaultUrl: (taskId) => runTargets.defaultUrl(taskId),
-        }))
-      ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargets)
+        targets: (taskId) => runTargetService.targets(taskId),
+        start: (taskId, targetId) => runTargetService.start(taskId, targetId),
+        stop: (taskId, targetId) => runTargetService.stop(taskId, targetId),
+        restart: (taskId, targetId) => runTargetService.restart(taskId, targetId),
+        status: (taskId, targetId) => runTargetService.status(taskId, targetId),
+        defaultUrl: (taskId) => runTargetService.defaultUrl(taskId),
+      }))
+      routeDisposables.push(ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargetService))
       // This plugin's two workflow step kinds (../server/workflowSteps.ts). Contributed rather than
       // granted, like http's: workflows opens the point and any plugin may fill it. Nothing happens on
       // a node with workflows disabled, because the point is never opened.
       ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'command', value: commandStep(ctx.core) })
-      ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'run-target', value: runTargetStep(runTargets) })
+      ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'run-target', value: runTargetStep(runTargetService) })
       // The five run_* agent tools, over the service built two lines up. The capability stays published
       // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
-      for (const tool of runAgentTools(runTargets, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
+      for (const tool of runAgentTools(runTargetService, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
       // terminal.sendToAgent (contract/sendToAgent.ts): the PTY delivery primitive plugins/memory's
       // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
       // call time and degrades to a no-op when this plugin is absent.
@@ -132,6 +134,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     // The slots clear explicitly rather than trusting teardown order, or a second boot in one process
     // serves through the first boot's closures.
     dispose: () => {
+      runTargets?.dispose()
+      runTargets = null
       disposeTerminal()
       for (const disposable of routeDisposables) disposable.dispose()
       routeDisposables = []

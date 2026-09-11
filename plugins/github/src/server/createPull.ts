@@ -4,6 +4,7 @@ import { gh, ghError } from './githubApi'
 import { pullsResource } from './resourceKeys'
 import { repos, syncState } from '../node/schema'
 import { repoMatches } from './repoMatch'
+import { type GithubEmit, NO_EMIT } from './events'
 
 export type CreatePullInput = {
   title: string
@@ -33,6 +34,7 @@ export async function createPullRequest(
   owner: string,
   repo: string,
   input: CreatePullInput,
+  emit: GithubEmit = NO_EMIT,
 ): Promise<CreatePullResult> {
   if (!input.title.trim() || !input.base || !input.head)
     return { ok: false, failure: { status: 400, error: 'bad_request' } }
@@ -69,5 +71,6 @@ export async function createPullRequest(
       .delete(syncState)
       .where(and(eq(syncState.userId, userId), eq(syncState.resource, pullsResource(repoRow.id, 'open'))))
   }
+  emit('pulls-changed', { repoOwner: owner, repoName: repo })
   return { ok: true, number: created.number }
 }

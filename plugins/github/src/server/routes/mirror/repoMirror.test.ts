@@ -10,6 +10,7 @@ import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 import type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 import { seedGithubIntegration } from '../../../testkit'
+import type { GithubEmit } from '../../events'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()
@@ -76,18 +77,21 @@ describe('resolveRepoForUser', () => {
     const fetcher = vi.fn()
     const { db, insert } = makeResolverDb([{ id: 123 }])
 
-    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', fetcher)
+    const emit = vi.fn<GithubEmit>()
+    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', { fetcher, emit })
 
     expect(result).toEqual({ ok: true, value: { repoId: 123 } })
     expect(fetcher).not.toHaveBeenCalled()
     expect(insert).not.toHaveBeenCalled()
+    expect(emit).not.toHaveBeenCalled()
   })
 
   it('resolves an accessible cold repo through GitHub and upserts it', async () => {
     const fetcher = vi.fn(async () => responseJson(ghRepo, { headers: { etag: '"repo-etag"' } }))
     const { db, inserted } = makeResolverDb()
 
-    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', fetcher)
+    const emit = vi.fn<GithubEmit>()
+    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', { fetcher, emit })
 
     expect(result).toEqual({ ok: true, value: { repoId: 19847 } })
     expect(fetcher).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn')
@@ -101,16 +105,20 @@ describe('resolveRepoForUser', () => {
       defaultBranch: 'main',
       pushedAt: Date.parse('2026-06-25T01:00:00Z'),
     })
+    expect(emit).toHaveBeenCalledOnce()
+    expect(emit).toHaveBeenCalledWith('repos-changed')
   })
 
   it('returns repo_not_found for inaccessible cold repos', async () => {
     const fetcher = vi.fn(async () => new Response('not found', { status: 404 }))
     const { db, inserted } = makeResolverDb()
 
-    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', fetcher)
+    const emit = vi.fn<GithubEmit>()
+    const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', { fetcher, emit })
 
     expect(result).toEqual({ ok: false, failure: { error: 'repo_not_found', status: 404 } })
     expect(inserted).toHaveLength(0)
+    expect(emit).not.toHaveBeenCalled()
   })
 })
 
