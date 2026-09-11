@@ -114,6 +114,7 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
     const reply = await call(helper, 'node-adopt', REQUEST)
 
     expect(reply.ok).toBe(true)
+    expect(reply.timing).toMatchObject({ receivedAt: expect.any(Number), repliedAt: expect.any(Number), handlerMs: expect.any(Number) })
     expect(reply.ok === true && reply.value).toEqual({
       nodeId: 'node-1',
       label: 'Big box',

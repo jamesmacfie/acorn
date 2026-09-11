@@ -7,6 +7,7 @@ import {
   isPush,
   type HelperMessage,
   type HelperMethod,
+  type HelperReplyTiming,
   type WireFetchBody,
   type WireFetchRequest,
 } from './wire'
@@ -31,7 +32,15 @@ const log = createLogger('helper')
 // serves both, and the key prefix is what picks the policy on the Rust side
 // (src-tauri/src/webviews.rs).
 
-type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void }
+type ReplyReceipt = {
+  receivedAt: number
+  parseMs: number
+  payloadChars: number
+}
+type Pending = {
+  resolve: (value: unknown, receipt: ReplyReceipt, helper?: HelperReplyTiming) => void
+  reject: (error: Error, receipt?: ReplyReceipt, helper?: HelperReplyTiming) => void
+}
 
 const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
@@ -69,14 +78,23 @@ const connect = (): Promise<WebSocket> => {
         ws.binaryType = 'arraybuffer'
         ws.onmessage = (event) => {
           if (event.data instanceof ArrayBuffer) return receiveBytes(new Uint8Array(event.data))
-          receive(JSON.parse(String(event.data)) as HelperMessage)
+          const receivedAt = Date.now()
+          const parseFrom = performance.now()
+          const payload = String(event.data)
+          const message = JSON.parse(payload) as HelperMessage
+          const parsedAt = performance.now()
+          receive(message, {
+            receivedAt,
+            parseMs: parsedAt - parseFrom,
+            payloadChars: payload.length,
+          })
         }
       }),
   )
   return socket
 }
 
-const receive = (message: HelperMessage): void => {
+const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
   if (isPush(message)) {
     if (message.push === 'node-frame') for (const cb of frameListeners) cb(message.nodeId, message.frame)
     else if (message.push === 'node-status') for (const cb of statusListeners) cb(message.status)
@@ -89,8 +107,11 @@ const receive = (message: HelperMessage): void => {
   const call = pending.get(message.id)
   if (!call) return
   pending.delete(message.id)
-  if (message.ok) call.resolve(message.value)
-  else call.reject(new Error(message.error))
+  // Replies always arrive through the string branch above. The fallback keeps this pure function
+  // tolerant in tests and if another host calls it directly.
+  const observed = receipt ?? { receivedAt: Date.now(), parseMs: 0, payloadChars: 0 }
+  if (message.ok) call.resolve(message.value, observed, message.timing)
+  else call.reject(new Error(message.error), observed, message.timing)
 }
 
 // The node id is this end's business; the frame inside still holds the session id and is passed on
@@ -112,17 +133,43 @@ const receiveBytes = (frame: Uint8Array): void => {
 const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   const ws = await connect()
   const id = nextId++
-  const from = telemetryEnabled() ? performance.now() : 0
-  const done = (): void => {
-    if (from !== 0) recordDuration('core', 'bridge.call', performance.now() - from, { 'helper.method': method })
+  const from = performance.now()
+  type Completion = {
+    value: T
+    receipt: ReplyReceipt
+    helper?: HelperReplyTiming
+    resolvedAt: number
+    receivedMs: number
   }
-  return new Promise<T>((resolve, reject) => {
+  const completion = await new Promise<Completion>((resolve, reject) => {
     pending.set(id, {
-      resolve: (value: unknown) => { done(); resolve(value as T) },
-      reject: (error: Error) => { done(); reject(error) },
+      resolve: (value: unknown, receipt, helper) => {
+        const resolvedAt = performance.now()
+        const receivedMs = resolvedAt - from
+        if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
+        resolve({ value: value as T, receipt, helper, resolvedAt, receivedMs })
+      },
+      reject: (error: Error, receipt, helper) => {
+        const receivedMs = performance.now() - from
+        if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
+        if (receipt && receivedMs >= 250) {
+          const deliveryMs = helper ? Math.max(0, receipt.receivedAt - helper.repliedAt) : -1
+          log.info(`slow bridge error method=${method} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
+        }
+        reject(error)
+      },
     })
     ws.send(JSON.stringify({ id, method, params: params ?? null }))
   })
+  const continuationMs = performance.now() - completion.resolvedAt
+  const totalMs = completion.receivedMs + continuationMs
+  if (totalMs >= 250) {
+    const deliveryMs = completion.helper
+      ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt)
+      : -1
+    log.info(`slow bridge call method=${method} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`)
+  }
+  return completion.value
 }
 
 // Fire-and-forget from the seam's point of view: the reply still comes back, and a rejection is logged
@@ -203,7 +250,11 @@ const acorn = {
     const { body, ...rest } = request as { body?: unknown }
     const wire: WireFetchRequest = { ...(rest as Omit<WireFetchRequest, 'body'>), ...(body ? { body: toWireBody(body) } : {}) }
     const response = await call<{ status: number; headers: Record<string, string>; body: string }>('node-fetch', { nodeId, request: wire })
-    return { status: response.status, headers: response.headers, body: decodeBytes(response.body) }
+    const decodeFrom = performance.now()
+    const decoded = decodeBytes(response.body)
+    const decodeMs = performance.now() - decodeFrom
+    if (decodeMs >= 50) log.info(`slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`)
+    return { status: response.status, headers: response.headers, body: decoded }
   },
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),
   nodeSend: (nodeId: string, frame: unknown) => tell('node-send', { nodeId, frame }),

@@ -325,7 +325,13 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     const request = raw as HelperRequest
     // No id, nothing to answer, so this is the only case that goes unanswered.
     if (!request || typeof request.id !== 'number') return
-    const reply = (message: object): void => socket.send(JSON.stringify({ id: request.id, ...message }))
+    const receivedAt = Date.now()
+    const handlerFrom = performance.now()
+    const reply = (message: object): void => socket.send(JSON.stringify({
+      id: request.id,
+      ...message,
+      timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
+    }))
     // `hasOwn`, not `in`: `method` came off the wire, and `in` would happily resolve `toString` off
     // the prototype and call it with whatever params came with it.
     if (!Object.hasOwn(handlers, request.method)) {

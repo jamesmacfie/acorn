@@ -31,7 +31,19 @@ export type HelperMethod =
   | 'plugins-dev-grant'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }
-export type HelperReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string }
+export type HelperReplyTiming = {
+  /** Wall-clock marks from the helper, which shares this machine's clock with the renderer. */
+  receivedAt: number
+  repliedAt: number
+  /** Monotonic time spent awaiting and executing the helper handler. */
+  handlerMs: number
+}
+export type HelperReply = (
+  { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string }
+) & {
+  /** Optional so a renderer can tolerate a helper from before this diagnostic field existed. */
+  timing?: HelperReplyTiming
+}
 
 // Pushes carry no id. `node-replaced` means the node the renderer was talking to has a new endpoint,
 // certificate, and token, so whatever is rendering has to start over.
