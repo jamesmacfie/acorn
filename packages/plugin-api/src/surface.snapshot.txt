@@ -442,6 +442,7 @@ ui/editor: editorTheme
 ui/editor: languageForPath
 ui/editor: mountEmbeddedEditor
 ui/editor: refreshEditorTheme
+ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn
 ui/host: AnnotationMarks

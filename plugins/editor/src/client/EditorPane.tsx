@@ -3,9 +3,9 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
 import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
+import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
-import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -16,6 +16,8 @@ import SearchPanel from './search/SearchPanel'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
+const log = createLogger('editor', 'editor')
+const telemetry = telemetryFor('editor')
 
 /** One open file, as this pane keeps it while the task is open. */
 type PooledFile = {
@@ -291,9 +293,27 @@ export default function EditorPane(props: { task: Task }) {
     ])
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
-    const state = EditorState.create({ doc: content, extensions: perFile(relPath, language) })
+    const highlighted = shouldHighlightDocument(content.length)
+    if (!highlighted) telemetry.observe('editor.syntax.skipped', content.length, 'character', { reason: 'document-size' })
+    let activeLanguage: Extension = highlighted ? language : []
+    let state: EditorState
+    try {
+      state = telemetry.measure('editor.state.create', () => EditorState.create({
+        doc: content,
+        extensions: perFile(relPath, activeLanguage),
+      }), { highlighted })
+    } catch (error) {
+      // A grammar is optional presentation. If a parser rejects ordinary-sized input, keep the file
+      // usable and report one bounded failure instead of rejecting `show()` into the window handler.
+      if (!highlighted) throw error
+      log.warn('syntax parser failed; opening the document as plain text', error, {
+        'document.characters': content.length,
+      })
+      activeLanguage = []
+      state = EditorState.create({ doc: content, extensions: perFile(relPath, activeLanguage) })
+    }
     saved.set(relPath, state.doc)
-    pool.files.set(relPath, { state, language, mount: mountToken })
+    pool.files.set(relPath, { state, language: activeLanguage, mount: mountToken })
     return state
   }
 
