@@ -46,6 +46,33 @@ export class AgentStore extends AgentSessionRepository {
     return this.requireSession(id)
   }
 
+  /** Recover a delegated session when the process exited after its row was written but before the
+   * spawn ledger or operation record was updated. The spawn id is server-authored configuration;
+   * this scan is startup-only and deliberately does not become an authorization lookup. */
+  async delegatedSessionForSpawn(spawnId: string): Promise<AgentSession | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentSessions)
+      .where(eq(schema.agentSessions.kind, 'delegated'))
+    for (const row of rows) {
+      const session = mapAgentSession(row)
+      if (session.config.delegationSpawnId === spawnId) return session
+    }
+    return null
+  }
+
+  async turnForIdempotency(sessionId: string, idempotencyKey: string): Promise<AgentTurn | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.sessionId, sessionId),
+        eq(schema.agentTurns.idempotencyKey, idempotencyKey),
+      ))
+      .limit(1)
+    return row ? mapAgentTurn(row) : null
+  }
+
   async operationResult<T>(idempotencyKey: string, command: string): Promise<T | null> {
     const [row] = await this.db
       .select()
@@ -88,7 +115,7 @@ export class AgentStore extends AgentSessionRepository {
     // lives in the plugin's. An empty result narrows to nothing, not to unfiltered.
     // See docs/managed-agents.md § Session model.
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
-    if (taskIds?.length === 0) return { sessions: [], nextCursor: null }
+    if (taskIds?.length === 0) return { sessions: [], delegations: [], nextCursor: null }
     // A session outlives its task's worktree but not its task. A caller already pinned to a task id is
     // exempt (docs/managed-agents.md § Client surfaces).
     //
@@ -116,7 +143,7 @@ export class AgentStore extends AgentSessionRepository {
       .limit(limit + 1)
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).map(mapAgentSession)
-    return { sessions: page, nextCursor: hasMore ? String(page.at(-1)?.updatedAt ?? '') : null }
+    return { sessions: page, delegations: [], nextCursor: hasMore ? String(page.at(-1)?.updatedAt ?? '') : null }
   }
 
   async snapshot(sessionId: string, afterSeq = 0, eventLimit = 500): Promise<AgentSessionSnapshot> {

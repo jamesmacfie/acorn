@@ -153,6 +153,12 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   process, so this one calls the functions directly;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
+- managed-agent delegation tests cover signed caller context, execute permissions, ceiling
+  inheritance, direct-child authorization, atomic depth and live-count limits, MCP retry
+  idempotency, shared and worktree provisioning recovery, bounded read projection, structured-result
+  validation, wait and attention states, cancellation, managed-parent navigation, session roster
+  nesting, and core task hierarchy. The provider runtime tests remain the contract for both managed
+  harness drivers; a real Claude Code or Codex login belongs to the manual checklist;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using
   package-local fixtures. Every plugin's `vitest.config.ts` is one line re-exporting
   `plugins/vitest.shared.ts`, and the testkit resolves a plugin's migration chain from its id —
@@ -617,6 +623,25 @@ and no API key at all. Run them with the keys disconnected first.
     the Agent pane, in a task terminal, and in every Generate control, and generates a commit
     message. That the doc is enough on its own is what is being checked, so a step that sent you to
     the source is a failure of the doc.
+
+The next two items cover agent-driven delegation. They were not run for this implementation because
+the available checkout cannot launch the app without GitHub credentials. The automated suites cover
+the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
+acceptance pass.
+
+63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+    `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
+    paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
+    `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original
+    MCP call does not create another task, session, or turn; the shared child appears in the same task's
+    Agent pane; and the worktree child appears under its parent task and opens its own panes.
+64. Repeat the same flow from one managed Claude Code parent and one managed Codex parent. Confirm
+    that each child nests under its managed parent, the parent chip returns to that session,
+    provider-native subagents still render under their provider session, and a child can create one
+    directly owned grandchild but the next level is refused. Trigger a permission or question request
+    in a child and confirm `agent_wait` reports attention without giving the parent an approval action.
+    Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
+    workflow-owned session and confirm `agent_spawn` is absent.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

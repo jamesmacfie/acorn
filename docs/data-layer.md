@@ -83,7 +83,7 @@ These plugins own SQLite files and migrations:
 
 | File | Main data |
 | --- | --- |
-| `plugins/agents.sqlite` | managed sessions, turns, event ledger, requests, attachments, artifacts, webhooks, FTS |
+| `plugins/agents.sqlite` | managed sessions, turns, event ledger, delegation spawn ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
@@ -115,6 +115,12 @@ inheriting a handle the other has already closed.
 Plugin databases have independent migration chains. There are no cross-database foreign keys,
 `ATTACH` queries, or transactions spanning files. A cross-plugin workflow uses IDs, capabilities,
 events, and durable operation state rather than joining tables.
+
+`agent_spawns` is the Agents plugin's authority relation for agent-driven delegation and its recovery
+record. It stores root and direct-owner IDs, stable child task and session IDs, depth, isolation,
+provisioning state, and an owner-scoped idempotency key. It does not mirror child runtime state. A
+worktree spawn crosses the Agents and core databases through stable IDs and replayable operations;
+there is no cross-file transaction.
 
 ## Database plugin: the Postgres pane
 

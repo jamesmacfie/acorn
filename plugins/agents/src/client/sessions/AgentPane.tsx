@@ -63,6 +63,16 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           </Chip>
         )}
       </Show>
+      <Show when={model.selectedManagedParent()}>
+        {(parent) => (
+          <Chip
+            leading={<Icon name="arrow-left" />}
+            onPress={() => model.openManagedParent()}
+          >
+            {`Parent: ${parent().title}`}
+          </Chip>
+        )}
+      </Show>
       {/* Right after the title, not after the session's controls: the title truncates, so a spacer
           further along the bar never gets any width and the state and the buttons end up crowding
           the last word of it. */}

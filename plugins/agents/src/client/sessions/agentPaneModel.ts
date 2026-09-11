@@ -8,11 +8,13 @@ import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
 import {
   agentAttentionItemId,
+  clearManagedSubagent,
   clearManagedSession,
   requestComposerFocus,
   selectManagedSession,
   selectedManagedSession,
 } from './managedSelection'
+import { agentSessionRoster } from './sessionRoster'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -51,11 +53,21 @@ export function createAgentPaneModel(task: Task) {
     managedAgentStore.sessions()
       .filter((session) => session.taskId === task.id && !session.archivedAt)
       .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)))
+  const sessionRoster = createMemo(() => agentSessionRoster(taskSessions(), managedAgentStore.delegations()))
   const selected = createMemo(() => {
     const id = selectedManagedSession(task.id)
     return taskSessions().find((session) => session.id === id) ?? taskSessions()[0]
   })
   const selectedSessionId = createMemo(() => selected()?.id)
+  const selectedDelegation = createMemo(() => {
+    const id = selectedSessionId()
+    return id ? managedAgentStore.delegations()[id] : undefined
+  })
+  const selectedManagedParent = createMemo(() => {
+    const owner = selectedDelegation()?.owner
+    if (owner?.kind !== 'managed') return undefined
+    return taskSessions().find((session) => session.id === owner.parentSessionId)
+  })
   const snapshot = createMemo(() => {
     const session = selected()
     return session ? managedAgentStore.snapshots()[session.id] : undefined
@@ -137,6 +149,13 @@ export function createAgentPaneModel(task: Task) {
     } finally {
       setCreating(false)
     }
+  }
+
+  function openManagedParent() {
+    const parent = selectedManagedParent()
+    if (!parent) return
+    clearManagedSubagent(parent.id)
+    selectManagedSession(task.id, parent.id)
   }
 
   async function fork() {
@@ -289,8 +308,12 @@ export function createAgentPaneModel(task: Task) {
     providers: () => providers() ?? [],
     refreshProviders,
     taskSessions,
+    sessionRoster,
     selected,
     selectedSessionId,
+    selectedDelegation,
+    selectedManagedParent,
+    openManagedParent,
     snapshot,
     creating,
     error,

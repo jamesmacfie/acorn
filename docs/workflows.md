@@ -693,10 +693,10 @@ node's own scheduler. A failed node is retried by hand through the retry route; 
 external outcome is unknown is never retried on its own, because acorn cannot tell a side effect that
 landed from one that did not.
 
-An agent cannot start or drive a run: no workflow or session tool is registered, so orchestration is
-declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an
-agent-driven path would cost. Database rows have no trigger and no schedule; committed files keep
-theirs.
+An agent cannot start or drive a workflow run: no workflow control tool is registered. The Agents
+plugin's `agent_*` tools drive managed sessions and keep their dynamic delegation tree in the Agents
+plugin. They do not create `workflow_runs`, append workflow steps, or mutate a run's frozen
+definition. Database rows have no trigger and no schedule; committed files keep theirs.
 
 ## What workflows refuses
 
@@ -788,9 +788,11 @@ hold them (§ Where positions live).
 is small. But a row that fires on its own runs an agent when nobody typed anything, and that wants
 the same trust thinking the file layer had.
 
-**Agent tools that start or drive a run.** Not refused on principle, and not built. `agent_spawn` and
-its spawn ledger belong to [orchestration.md](./future/orchestration.md), and § Gaps says what their
-absence costs.
+**Agent tools that start or drive a run.** Refused for the managed-session orchestration tools.
+`agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, and `agent_cancel` operate on managed
+sessions and their Agents-owned spawn ledger. They do not make the workflow graph mutable. A future
+workflow control tool would need to preserve frozen definitions, run authorization, and every run
+budget rather than reusing these session tools.
 
 **Editing a live run's definition.** Refused. A run freezes its definition when it starts and stays
 that way, so the editor never offers to retarget one. Retry with an edited prompt patches one step of

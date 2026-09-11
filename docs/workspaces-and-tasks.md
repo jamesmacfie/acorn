@@ -107,6 +107,12 @@ owner and name pair, is the source of task identity.
 Tasks created from external items retain a `task_links` record tied to the exact provider connection.
 This avoids collisions when two Linear or Rollbar connections expose the same visible identifier.
 
+Core creates workflow and delegated-agent child tasks through `CoreServices.tasks.createChild()`.
+The caller may reserve the child ID before creation. Replaying the same parent, title, branch seed,
+and intended ID returns the same task; reusing that ID for another parent or seed fails. Branch
+deduplication still considers every other task, because two tasks cannot share one branch worktree.
+Creating the task does not create its worktree.
+
 ## Worktrees and setup
 
 Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
@@ -205,3 +211,7 @@ already present.
 
 The desktop stores task ordering, layout, last pane/source, and drafts per Node. `⌘1`–`⌘9` activates
 the corresponding visible task. A task can be archived without deleting its historical row.
+
+The desktop and terminal rails group a child after its parent from `Task.parentId`, while retaining
+the original order among roots and siblings. The child remains a normal selectable task with its own
+panes. An orphan or a lineage cycle stays visible as a top-level row instead of being dropped.

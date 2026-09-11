@@ -424,7 +424,7 @@ const json = (value: unknown) => ({
       // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
       // `Alert` reads the same however unreadable the real thing is.
       if (path === '/v2/p/agents/providers') return json(AGENT_PROVIDERS)
-      if (path.startsWith('/v2/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, nextCursor: null })
+      if (path.startsWith('/v2/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, delegations: [], nextCursor: null })
       // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
       // reads as a session id, and the caller would get a snapshot object where it expects an array
       // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).

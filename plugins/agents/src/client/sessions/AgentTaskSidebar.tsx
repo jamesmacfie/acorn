@@ -11,6 +11,7 @@ import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
+import { delegationSummary } from './sessionRoster'
 import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
@@ -59,16 +60,10 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
 
   // Sessions and their subagents in one list, because they are one thing to walk with the arrows.
   // The key says which: `<session id>` or `<session id>/<subagent id>`.
-  const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () => model.taskSessions().flatMap((session) => [
-    { key: session.id, label: session.title },
-    ...session.subagents.map((subagent) => ({ key: `${session.id}/${subagent.id}`, label: subagent.title })),
-  ])))
+  const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () =>
+    model.sessionRoster().map(({ key, label }) => ({ key, label }))))
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
-  const sessionOf = (key: string) => {
-    const [sessionId, subagentId] = key.split('/')
-    const session = model.taskSessions().find((candidate) => candidate.id === sessionId)
-    return session ? { session, subagentId } : null
-  }
+  const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
   const selectedRowKey = createMemo(() => {
     const sessionId = model.selectedSessionId()
     if (!sessionId) return null
@@ -78,7 +73,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   const openRow = (key: string) => {
     const found = sessionOf(key)
     if (!found) return
-    if (!found.subagentId) {
+    if (found.kind === 'managed') {
       // Picking the session row is how you come back out of a subagent's run.
       clearManagedSubagent(found.session.id)
       openManagedSession(props.task.id, found.session.id)
@@ -88,7 +83,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
     // transcript up before there is a card to scroll to.
     if (found.session.id !== model.selectedSessionId()) openManagedSession(props.task.id, found.session.id)
     else selectManagedSession(props.task.id, found.session.id)
-    selectManagedSubagent(found.session.id, found.subagentId)
+    selectManagedSubagent(found.session.id, found.subagent.id)
   }
 
   return (
@@ -150,9 +145,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
               const session = () => found()?.session
               const subagent = () => {
                 const entry = found()
-                return entry?.subagentId
-                  ? entry.session.subagents.find((candidate) => candidate.id === entry.subagentId)
-                  : undefined
+                return entry?.kind === 'provider-subagent' ? entry.subagent : undefined
+              }
+              const managedRow = () => {
+                const entry = found()
+                return entry?.kind === 'managed' ? entry : undefined
               }
               return (
                 <Show when={session()}>
@@ -164,6 +161,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           item={itemProps}
                           variant="stacked"
                           density="compact"
+                          depth={found()?.depth}
                           selected={selected()}
                           leading={<RuntimeStateIcon state={current().runtimeState} />}
                           trailing={
@@ -209,6 +207,13 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                                 .filter(Boolean).join(' · ')}
                             </Text>
                           </Inline>
+                          <Show when={managedRow()}>
+                            {(row) => (
+                              <Show when={delegationSummary(row())}>
+                                {(summary) => <Text emphasis="muted">{summary()}</Text>}
+                              </Show>
+                            )}
+                          </Show>
                         </Row>
                       }
                     >
@@ -222,7 +227,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           item={itemProps}
                           variant="stacked"
                           density="compact"
-                          depth={1}
+                          depth={found()?.depth ?? 1}
                           selected={selected()}
                           leading={<SubagentStateIcon status={child().status} />}
                           onPress={() => openRow(item.key)}

@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
@@ -40,6 +40,7 @@ import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
 import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
 import { Menu } from '../../kit/components/overlays/Menu'
+import { taskHierarchy } from '../tasks/taskHierarchy'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
@@ -127,13 +128,16 @@ export default function TabRail() {
   const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
   const activeWorkspace = () => workspaceForProject(workspaces.data, activeProjectId())
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
-  const visibleTasks = () => {
+  const orderedTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
     const inWs = ws ? new Set(ws.projects.map((project) => project.id)) : null
     const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
     return applyRailOrder(scoped, railOrder())
   }
+  const taskRows = createMemo(() => taskHierarchy(orderedTasks()))
+  const visibleTasks = () => taskRows().map((row) => row.task)
+  const taskDepths = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row.depth])))
 
   // What other plugins know about the rows on screen (`core:task`, ../tasks/taskAnnotations.ts). One
   // request per contributor for the whole list, re-asked when the list changes and not when the rail
@@ -392,6 +396,8 @@ export default function TabRail() {
             return (
             <div
               class="tabrail-item"
+              data-task-depth={taskDepths().get(w.id) || undefined}
+              style={{ '--task-depth': String(taskDepths().get(w.id) ?? 0) }}
               draggable={true}
               // Warm the panes this task can show, once the pointer has settled on the row
               // (registries/panes/panes.ts). The tasks themselves are already cached; what is cold is

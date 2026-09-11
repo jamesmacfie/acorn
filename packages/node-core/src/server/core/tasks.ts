@@ -112,7 +112,7 @@ export type TaskService = {
   //
   // A write on CoreServices: plugins ask core to create a task rather than writing core-owned rows.
   // Throws when the parent does not resolve.
-  createChild(parentTaskId: string, seed: ChildTaskSeed): Promise<string>
+  createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>
   // Cancel a task, the child-task half of cancelling a fan-out run. A distinct verb rather than a
   // general `setStatus`, so a plugin cannot archive or restore a task outside core's own routes.
   cancel(taskId: string): Promise<void>
@@ -266,36 +266,56 @@ export function createTaskService(db: AppDatabase): TaskService {
         return relation
       })
     },
-    createChild: async (parentTaskId, seed) => {
+    createChild: async (parentTaskId, seed, intendedChildId) => {
       const parent = await loadTask(db, parentTaskId)
       if (!parent) throw new Error('Parent task not found.')
       const project = await projectForTask(db, parent)
       if (!project) throw new Error('Parent task has no project.')
-      // De-duped against every task, not just this parent's children. A worktree is keyed on the
-      // branch, so a collision with an unrelated task hands two tasks one checkout.
-      const existing = (await db.select({ branch: schema.tasks.branch }).from(schema.tasks)).flatMap((row) => row.branch ? [row.branch] : [])
-      const branch = project.vcs === 'git'
-        ? dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, existing)
-        : null
-      const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
-      const id = randomUUID()
-      const at = Date.now()
-      await db.insert(schema.tasks).values({
-        id,
-        title: seed.title,
-        origin: 'local',
-        // A child works in the parent's repo by definition, so it inherits the project id too.
-        projectId: project.id,
-        branch,
-        pullNumber: null,
-        worktreePath: null,
-        status: 'active',
-        parentId: parentTaskId,
-        sort: (value ?? -1) + 1,
-        createdAt: at,
-        updatedAt: at,
-        archivedAt: null,
+      const id = intendedChildId ?? randomUUID()
+      const created = db.transaction((tx) => {
+        const existingTask = tx.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
+        // De-duped against every *other* task, not just this parent's children. Excluding the
+        // intended row makes the same seed resolve to its original branch during replay.
+        const branches = tx
+          .select({ id: schema.tasks.id, branch: schema.tasks.branch })
+          .from(schema.tasks)
+          .all()
+          .flatMap((row) => row.id !== id && row.branch ? [row.branch] : [])
+        const branch = project.vcs === 'git'
+          ? dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, branches)
+          : null
+        if (existingTask) {
+          if (
+            existingTask.parentId !== parentTaskId
+            || existingTask.projectId !== project.id
+            || existingTask.title !== seed.title
+            || existingTask.branch !== branch
+          ) {
+            throw new Error(`Child task id '${id}' is already used by a different parent or seed.`)
+          }
+          return false
+        }
+        const value = tx.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
+        const at = Date.now()
+        tx.insert(schema.tasks).values({
+          id,
+          title: seed.title,
+          origin: 'local',
+          // A child works in the parent's repo by definition, so it inherits the project id too.
+          projectId: project.id,
+          branch,
+          pullNumber: null,
+          worktreePath: null,
+          status: 'active',
+          parentId: parentTaskId,
+          sort: (value ?? -1) + 1,
+          createdAt: at,
+          updatedAt: at,
+          archivedAt: null,
+        }).run()
+        return true
       })
+      if (!created) return id
       broadcastWorktreeStatusChanged({ taskId: id })
       broadcastTasksChanged()
       return id

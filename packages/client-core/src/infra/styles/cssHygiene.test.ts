@@ -25,7 +25,7 @@ describe('no phantom tokens', () => {
       // A brand's own colour and what sits on it, from brandStyle() in ui/brandMarks.ts. Third-party
       // identity rather than a design decision, which is why it comes from the mark and not a token.
       '--brand', '--brand-on',
-      '--meter-value', '--kv-extra-cols',
+      '--meter-value', '--kv-extra-cols', '--task-depth',
       // RailTab sets it from the validated project colour, which is a user's choice about one
       // project rather than a design decision (tabs/RailTab.tsx).
       '--rail-accent',

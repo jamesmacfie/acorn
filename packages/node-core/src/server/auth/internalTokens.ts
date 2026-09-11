@@ -2,6 +2,7 @@
 // the signing-key lifecycle).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
+import { normalizeToolCeiling, toolCeilingSchema, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 // 'service': the node calling its own HTTP surface over loopback (notes seeding, workflow context
 //   assembly). Full reach, minted in-process, and never placed in a child's environment.
@@ -15,9 +16,12 @@ export type InternalClaims = {
   // Present for 'task' scope. The credential's task, which is what route handlers compare against the
   // task in the URL (docs/security.md § Transport and auth: the escalation this comparison closes).
   taskId?: string
-  // The terminal/agent session, when the child belongs to one. Carried for attribution and for a future
-  // per-session revocation sweep; nothing enforces on it yet.
+  // The terminal/agent session, when the child belongs to one. Agent-tool contributions may require
+  // this signed owner rather than accepting attribution supplied as transport metadata.
   sessionId?: string
+  // The effective ceiling this server computed for the child. Unlike ACORN_TOOL_CEILING, this value is
+  // covered by the signature and is therefore safe to enforce on the loopback tool projection.
+  toolCeiling?: ToolCeiling
 }
 
 const PREFIX = 'acorn_it_'
@@ -30,6 +34,7 @@ const internalClaimsPayloadSchema = z.strictObject({
   s: z.enum(['service', 'task']),
   t: z.string().min(1).optional(),
   n: z.string().min(1).optional(),
+  c: toolCeilingSchema.optional(),
 })
 const b64 = (value: Buffer | string): string => Buffer.from(value).toString('base64url')
 
@@ -38,8 +43,14 @@ const sign = (key: string, payload: string): string => createHmac('sha256', key)
 export function mintInternalToken(key: string, claims: InternalClaims): string {
   if (!key) throw new Error('Cannot mint an internal token without a signing key.')
   if (claims.scope === 'task' && !claims.taskId) throw new Error("A 'task'-scoped internal token requires a taskId.")
-  // Short keys keep the token out of the way in `env` output: s=scope, t=taskId, n=sessioN.
-  const payload = b64(JSON.stringify({ s: claims.scope, ...(claims.taskId ? { t: claims.taskId } : {}), ...(claims.sessionId ? { n: claims.sessionId } : {}) }))
+  // Short keys keep the token out of the way in `env` output: s=scope, t=taskId, n=sessioN,
+  // c=effective tool Ceiling.
+  const payload = b64(JSON.stringify({
+    s: claims.scope,
+    ...(claims.taskId ? { t: claims.taskId } : {}),
+    ...(claims.sessionId ? { n: claims.sessionId } : {}),
+    ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
+  }))
   return `${PREFIX}${payload}${SEPARATOR}${sign(key, payload)}`
 }
 
@@ -62,7 +73,12 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
   try {
     const decoded = internalClaimsPayloadSchema.safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')))
     if (!decoded.success || (decoded.data.s === 'task' && !decoded.data.t)) return null
-    return { scope: decoded.data.s, taskId: decoded.data.t, sessionId: decoded.data.n }
+    return {
+      scope: decoded.data.s,
+      taskId: decoded.data.t,
+      sessionId: decoded.data.n,
+      toolCeiling: decoded.data.c ? normalizeToolCeiling(decoded.data.c) : undefined,
+    }
   } catch {
     return null
   }

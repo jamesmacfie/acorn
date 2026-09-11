@@ -11,6 +11,7 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSession,
+  AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
 } from '@acorn/protocol/managedAgents.ts'
@@ -27,6 +28,7 @@ const snapshotCalls: string[] = []
 const sessionCalls: { taskId?: string }[] = []
 let failSessions = false
 let served: AgentSessionSnapshot
+let servedList: AgentSessionList = { sessions: [], delegations: [], nextCursor: null }
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     snapshot: async (sessionId: string) => {
@@ -36,7 +38,7 @@ vi.mock('./managedClient', () => ({
     sessions: async (query: { taskId?: string } = {}) => {
       sessionCalls.push(query)
       if (failSessions) throw new Error('offline')
-      return { sessions: [], nextCursor: null }
+      return servedList
     },
   },
 }))
@@ -86,6 +88,7 @@ const seed = async (snapshot: Partial<AgentSessionSnapshot> = {}) => {
 beforeEach(() => {
   managedAgentStore.clear()
   snapshotCalls.length = 0
+  servedList = { sessions: [], delegations: [], nextCursor: null }
 })
 
 describe('appending a streamed event', () => {
@@ -255,6 +258,47 @@ describe('a task’s session list', () => {
     // Two reads for two asks: a window that held on to the rejection would leave the pane empty with
     // nothing to retry.
     expect(sessionCalls).toHaveLength(2)
+  })
+
+  it('keeps list-projected delegation metadata separate from live session updates', async () => {
+    const child = { ...session, id: 'delegated-1', taskId: 't12', kind: 'delegated' as const }
+    servedList = {
+      sessions: [child],
+      delegations: [{
+        sessionId: child.id,
+        depth: 1,
+        isolation: 'shared' as const,
+        owner: { kind: 'terminal' as const, label: 'Codex terminal', profileId: 'codex' },
+      }],
+      nextCursor: null,
+    }
+    await managedAgentStore.loadTask('t12')
+    managedAgentStore.upsertSession({ ...child, runtimeState: 'working', updatedAt: 2 })
+
+    expect(managedAgentStore.delegations()[child.id]).toMatchObject({
+      depth: 1,
+      owner: { kind: 'terminal', label: 'Codex terminal' },
+    })
+    expect(managedAgentStore.sessions().find((item) => item.id === child.id)?.runtimeState).toBe('working')
+  })
+
+  it('loads bounded lineage when a delegated session first arrives over the socket', async () => {
+    const child = { ...session, id: 'delegated-live', taskId: 't13', kind: 'delegated' as const }
+    servedList = {
+      sessions: [child],
+      delegations: [{
+        sessionId: child.id,
+        depth: 1,
+        isolation: 'shared',
+        owner: { kind: 'managed', parentSessionId: 'parent-live' },
+      }],
+      nextCursor: null,
+    }
+    const release = managedAgentStore.activate()
+    push({ channel: 'agent:session', session: child })
+    await vi.waitFor(() => expect(managedAgentStore.delegations()[child.id]).toBeDefined())
+    expect(sessionCalls).toEqual([{ taskId: child.taskId, archived: false }])
+    release()
   })
 })
 

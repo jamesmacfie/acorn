@@ -11,7 +11,9 @@ The Node injects only the values the MCP process needs:
 - `ACORN_DATA_DIR`: the data root, used to resolve the preferred or bound port.
 - `ACORN_API_TOKEN`: an HMAC task-scoped internal token.
 - `NODE_EXTRA_CA_CERTS`: the Node's self-signed certificate, for normal TLS validation.
-- Task and session identifiers, plus the allowlisted process environment.
+- Task and session identifiers, plus the allowlisted process environment. The token, rather than the
+  session environment or request header, is authoritative for the session ID and effective tool
+  ceiling.
 
 The endpoint is resolved at call time because Node ports are ephemeral. The signing key is persisted
 so a tmux-reattached process still authenticates after a Node restart. Rotating the key revokes
@@ -36,8 +38,10 @@ registered groups are:
 - Browser automation, from `browser`.
 - The pull request, from `github`: two reads over the local mirror, `pr_review_comments` and
   `pr_checks`, and one write, `github_pull_create`.
+- Managed-session orchestration, from `agents`: `agent_spawn`, `agent_prompt`, `agent_wait`,
+  `agent_read`, and `agent_cancel`.
 
-Nothing here reads or writes a file, drives a workflow, opens a database, or talks to Docker. An
+Nothing here reads or writes a file, drives a workflow run, opens a database, or talks to Docker. An
 agent that needs a file uses its own harness tools inside the worktree. Driving a workflow from a step
 of one is a loop; the interactive HTTP sender is denied to this principal outright, under Security
 below; and arbitrary SQL against a task's database would be execute-tier, which is denied by
@@ -46,6 +50,11 @@ default.
 The server returns structured results for absent task context, unavailable optional plugins, and
 provider errors. It never returns device tokens, provider credentials, raw secret fields, or arbitrary
 database handles.
+
+The proxy assigns a UUID call ID once per `tools/call` and sends it as
+`x-acorn-tool-call-id`. If the first loopback request loses the Node during a restart, the retry keeps
+the same ID. Stateful handlers scope it to the signed session and tool so the logical call remains
+idempotent.
 
 ## Security
 

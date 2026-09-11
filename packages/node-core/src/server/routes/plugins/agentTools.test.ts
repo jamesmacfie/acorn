@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import { encodeToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 import { registerAgentTool, removeAgentTools, ToolError, TOOL_PERMS_PREF_KEY, type AgentToolContribution, type ToolPerms } from '../../agentTools/registry'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -19,7 +19,14 @@ vi.mock('../../db', async (importOriginal) => {
 // tests from the same contribution fixture"). The MCP projection is proven in mcp/server.test.ts;
 // this is the harness HTTP projection over the identical shapes.
 const OWNER = 'test'
-const calls: { name: string; args: unknown; taskId: string; session?: string }[] = []
+const calls: {
+  name: string
+  args: unknown
+  taskId: string
+  session?: string
+  callId?: string
+  toolCeiling?: ToolCeiling
+}[] = []
 let availabilityCalls = 0
 const dynamicWhen = async (ctx: { taskId: string }) => {
   availabilityCalls++
@@ -34,7 +41,14 @@ const FIXTURE: AgentToolContribution[] = [
     risk: 'read',
     exposeToRenderer: true,
     handler: async (_a, ctx) => {
-      calls.push({ name: 'read_tool', args: _a, taskId: ctx.taskId, session: ctx.sessionId })
+      calls.push({
+        name: 'read_tool',
+        args: _a,
+        taskId: ctx.taskId,
+        session: ctx.sessionId,
+        callId: ctx.callId,
+        toolCeiling: ctx.toolCeiling,
+      })
       return { data: 'ok', task: ctx.taskId }
     },
   },
@@ -70,12 +84,25 @@ const FIXTURE: AgentToolContribution[] = [
     handler: async () => ({ ran: true }),
   },
   {
-    name: 'throws_tool',
-    description: 'maps a typed error',
+    name: 'orchestration_tool',
+    description: 'requires a signed owner session',
     input: z.object({}),
     scope: 'task',
+    risk: 'execute',
+    requiresSession: true,
+    handler: async (_a, ctx) => {
+      calls.push({ name: 'orchestration_tool', args: _a, taskId: ctx.taskId, session: ctx.sessionId })
+      return { ran: true }
+    },
+  },
+  {
+    name: 'throws_tool',
+    description: 'maps a typed error',
+    input: z.object({ conflict: z.boolean().optional() }),
+    scope: 'task',
     risk: 'read',
-    handler: async () => {
+    handler: async (input) => {
+      if ((input as { conflict?: boolean }).conflict) throw new ToolError('conflict', 'busy')
       throw new ToolError('not_found', 'nope')
     },
   },
@@ -108,13 +135,28 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
       // default is the unbound 'service' scope; 'x-test-task' opts into a 'task'-scoped credential bound
       // to one task, which is what the cross-task case needs.
       const boundTask = c.req.header('x-test-task')
+      const sessionId = c.req.header('x-test-session')
+      const maxRisk = c.req.header('x-test-max-risk') as ToolCeiling['maxRisk'] | undefined
       c.set(
         'principal',
         kind === 'device'
           ? { kind, userId: 'james' }
           : boundTask
-            ? { kind, userId: 'james', scope: 'task' as const, taskId: boundTask }
-            : { kind, userId: 'james', scope: 'service' as const },
+            ? {
+                kind,
+                userId: 'james',
+                scope: 'task' as const,
+                taskId: boundTask,
+                ...(sessionId ? { sessionId } : {}),
+                ...(maxRisk ? { toolCeiling: { maxRisk } } : {}),
+              }
+            : {
+                kind,
+                userId: 'james',
+                scope: 'service' as const,
+                ...(sessionId ? { sessionId } : {}),
+                ...(maxRisk ? { toolCeiling: { maxRisk } } : {}),
+              },
       )
       await next()
     })
@@ -189,11 +231,41 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect((await post('/api/tasks/ready/tools/exec_tool', {})).status).toBe(200)
   })
 
-  it('runs a tool: validates input, passes taskId + session header to the handler', async () => {
-    const res = await post('/api/tasks/task9/tools/read_tool', {}, { 'x-acorn-session-id': 'sess-1' })
+  it('sources session identity from the verified principal and carries transport call metadata', async () => {
+    const res = await post('/api/tasks/task9/tools/read_tool', {}, {
+      'x-test-task': 'task9',
+      'x-test-session': 'signed-sess-1',
+      'x-acorn-session-id': 'forged-sess-2',
+      'x-acorn-tool-call-id': 'call-1',
+    })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ data: 'ok', task: 'task9' })
-    expect(calls[0]).toMatchObject({ name: 'read_tool', taskId: 'task9', session: 'sess-1' })
+    expect(calls[0]).toMatchObject({
+      name: 'read_tool',
+      taskId: 'task9',
+      session: 'signed-sess-1',
+      callId: 'call-1',
+    })
+  })
+
+  it('hides a session-required contribution without a signed session claim', async () => {
+    await setPerms({ tiers: { execute: true } })
+    const forged = { 'x-acorn-session-id': 'forged-sess' }
+    const manifest = (await (await get('/api/tasks/ready/tools', forged)).json()) as { tools: { name: string }[] }
+    expect(manifest.tools.map((tool) => tool.name)).not.toContain('orchestration_tool')
+    expect((await post('/api/tasks/ready/tools/orchestration_tool', {}, forged)).status).toBe(404)
+
+    const signed = { 'x-test-task': 'ready', 'x-test-session': 'signed-sess' }
+    const visible = (await (await get('/api/tasks/ready/tools', signed)).json()) as { tools: { name: string }[] }
+    expect(visible.tools.map((tool) => tool.name)).toContain('orchestration_tool')
+    expect((await post('/api/tasks/ready/tools/orchestration_tool', {}, signed)).status).toBe(200)
+  })
+
+  it('does not expose session-required tools to the same session token on another task', async () => {
+    await setPerms({ tiers: { execute: true } })
+    const foreign = { 'x-test-task': 'task-one', 'x-test-session': 'signed-sess' }
+    expect((await get('/api/tasks/task-two/tools', foreign)).status).toBe(404)
+    expect((await post('/api/tasks/task-two/tools/orchestration_tool', {}, foreign)).status).toBe(404)
   })
 
   it('rejects bad input against the zod schema (400) before the handler', async () => {
@@ -207,6 +279,10 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     const res = await post('/api/tasks/t1/tools/throws_tool', {})
     expect(res.status).toBe(404)
     expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'not_found', message: 'nope' })
+
+    const conflict = await post('/api/tasks/t1/tools/throws_tool', { conflict: true })
+    expect(conflict.status).toBe(409)
+    expect(((await conflict.json()) as ApiError).error).toMatchObject({ code: 'conflict', message: 'busy' })
   })
 
   it('404s an unknown tool and an unavailable (`when` false) tool alike', async () => {
@@ -233,13 +309,17 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect((await post('/api/tasks/t1/tools/read_tool', {})).status).toBe(404)
   })
 
-  it('intersects workflow allowlists/risk ceilings with global permissions for list and call', async () => {
-    const ceiling = encodeToolCeiling({ allow: ['read_tool', 'write_tool'], maxRisk: 'read' })
-    const headers = { 'x-acorn-tool-ceiling': ceiling }
+  it('enforces the signed ceiling and treats ACORN_TOOL_CEILING as metadata only', async () => {
+    const headers = {
+      'x-test-max-risk': 'read',
+      // A caller-controlled transport ceiling that permits execute must not widen the signed claim.
+      'x-acorn-tool-ceiling': 'eyJtYXhSaXNrIjoiZXhlY3V0ZSJ9',
+    }
     const manifest = (await (await get('/api/tasks/ready/tools', headers)).json()) as { tools: { name: string }[] }
-    expect(manifest.tools.map((tool) => tool.name).sort()).toEqual(['read_tool'])
+    expect(manifest.tools.map((tool) => tool.name).sort()).toEqual(['read_tool', 'throws_tool'])
     expect((await post('/api/tasks/ready/tools/write_tool', { slug: 'x' }, headers)).status).toBe(404)
     expect((await post('/api/tasks/ready/tools/read_tool', {}, headers)).status).toBe(200)
+    expect(calls.at(-1)?.toolCeiling).toEqual({ maxRisk: 'read' })
 
     // Global permission is still authoritative even when the workflow allowlist includes a tool.
     await setPerms({ tools: { read_tool: false } })
@@ -254,6 +334,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
         { name: 'write_tool', description: 'a write tool', risk: 'write' },
         { name: 'exec_tool', description: 'a dynamic execute tool', risk: 'execute', availability: 'Only when ready.' },
         { name: 'exec_tool_2', description: 'another dynamic execute tool', risk: 'execute', availability: 'Only when ready.' },
+        { name: 'orchestration_tool', description: 'requires a signed owner session', risk: 'execute' },
         { name: 'throws_tool', description: 'maps a typed error', risk: 'read' },
       ],
     })

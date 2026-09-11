@@ -2,8 +2,9 @@
 import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
+import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
-import { createRoot, createSignal } from 'solid-js'
+import { createMemo, createRoot, createSignal } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
@@ -512,11 +513,19 @@ describe('the footer asks the keymap once per change', () => {
 describe('the rail keeps the rows a change did not touch', () => {
   it('hands the same wrapper back for an unchanged task, and the same array when nothing moved', () => {
     createRoot((dispose) => {
-      const alpha = { id: 'a', title: 'Alpha' }
-      const bravo = { id: 'b', title: 'Bravo' }
-      const charlie = { id: 'c', title: 'Charlie' }
+      type RailTask = { id: string; title: string; parentId: string | null }
+      const alpha: RailTask = { id: 'a', title: 'Alpha', parentId: null }
+      const bravo: RailTask = { id: 'b', title: 'Bravo', parentId: null }
+      const charlie: RailTask = { id: 'c', title: 'Charlie', parentId: null }
       const [tasks, setTasks] = createSignal([alpha, bravo, charlie])
-      const rows = keyedRows(tasks, (task) => ({ key: task.id, task }))
+      const hierarchy = createMemo(() => taskHierarchy(tasks()))
+      const depthByTask = createMemo(() => new Map(hierarchy().map((entry) => [entry.task.id, entry.depth])))
+      const orderedTasks = createMemo(() => hierarchy().map((entry) => entry.task))
+      const rows = keyedRows(orderedTasks, (task) => ({
+        key: task.id,
+        task,
+        get depth() { return depthByTask().get(task.id) ?? 0 },
+      }))
 
       const first = rows()
       expect(first.map((row) => row.key)).toEqual(['a', 'b', 'c'])
@@ -534,11 +543,23 @@ describe('the rail keeps the rows a change did not touch', () => {
 
       // And a task whose data changed is a new wrapper, because the row has to redraw. The rows
       // beside it are untouched, which is the half that matters.
-      setTasks([charlie, { id: 'a', title: 'Alpha renamed' }, bravo])
+      const renamedAlpha: RailTask = { id: 'a', title: 'Alpha renamed', parentId: null }
+      setTasks([charlie, renamedAlpha, bravo])
       const changed = rows()
       expect(changed[0]).toBe(first[2])
       expect(changed[1]).not.toBe(first[0])
       expect(changed[2]).toBe(first[1])
+
+      // A parent's presence changes hierarchy without changing the child row. The retained wrapper
+      // survives, while its reactive depth follows the updated projection.
+      const delta: RailTask = { id: 'd', title: 'Delta', parentId: 'a' }
+      setTasks([delta, charlie, renamedAlpha, bravo])
+      const nested = rows()
+      const deltaRow = nested.find((row) => row.key === 'd')!
+      expect(deltaRow.depth).toBe(1)
+      setTasks([delta, charlie, bravo])
+      expect(rows().find((row) => row.key === 'd')).toBe(deltaRow)
+      expect(deltaRow.depth).toBe(0)
       dispose()
     })
   })

@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory'
 import type { Env } from '../bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 // The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
@@ -19,6 +20,7 @@ export type Principal = {
   // URL; before this existed, a token minted for task A could drive task B's tools.
   taskId?: string
   sessionId?: string
+  toolCeiling?: ToolCeiling
 }
 // `requestId` is set by requestIdMiddleware (server/respond.ts) before anything else, and read by
 // every error envelope. It is not optional in practice; a bare test Context is the only way to see
@@ -45,7 +47,16 @@ function internalPrincipal(c: { env: Env; req: { header(name: string): string | 
   const claims = verifyInternalToken(c.env.INTERNAL_TOKEN, token)
   if (!claims) return null
   const userId = c.env.ACTIVE_IDENTITY.get()
-  return userId ? { kind: 'internal', userId, scope: claims.scope, taskId: claims.taskId, sessionId: claims.sessionId } : null
+  return userId
+    ? {
+        kind: 'internal',
+        userId,
+        scope: claims.scope,
+        taskId: claims.taskId,
+        sessionId: claims.sessionId,
+        toolCeiling: claims.toolCeiling,
+      }
+    : null
 }
 
 // Device bearer: the client's connection broker authenticates with a paired device

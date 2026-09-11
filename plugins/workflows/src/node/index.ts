@@ -140,7 +140,12 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
               : null,
             // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it
             // is denied the owner's provider credentials and confined to this task's tool surface.
-            env: { ...deps.internalEnv({ scope: 'task', taskId }), ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
+            env: {
+              ...deps.internalEnv({ scope: 'task', taskId, toolCeiling: opts.tools ?? {} }),
+              // Transitional transport metadata for older MCP proxies. Authorization uses only the
+              // signed claim above.
+              ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}),
+            },
           })
           return runHeadless(argv, { cwd, env, timeoutMs: opts.timeoutMs, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
         },

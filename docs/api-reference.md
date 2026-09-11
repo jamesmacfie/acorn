@@ -322,6 +322,15 @@ bodies use the shared immutable blob cache. GitHub writes update or invalidate t
 ```
 
 Sessions persist normalized event history and expose paged HTTP reads plus live WebSocket updates.
+`GET /v2/p/agents/sessions` also returns a bounded `delegations` projection for the sessions in that
+page. Each entry names the child session, depth, isolation, and either its managed parent ID or a
+display-safe terminal owner label and profile. The spawn authority row is not returned.
+
+Managed-agent orchestration uses the ordinary task tool routes rather than plugin-specific control
+routes. `GET /v2/core/tasks/:id/tools` lists `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`,
+and `agent_cancel` only for a task-scoped internal principal with a signed session claim and the
+required execute permission. `POST /v2/core/tasks/:id/tools/:name` invokes them. A direct-child
+authorization failure is indistinguishable from an unknown session and returns 404.
 
 ### Terminal, workflows, and execution
 

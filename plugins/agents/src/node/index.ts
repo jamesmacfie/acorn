@@ -23,6 +23,9 @@ import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
+import { AgentDelegationStore } from '../server/delegation/store'
+import { AgentDelegationService } from '../server/delegation/service'
+import { delegationTools } from '../server/delegation/tools'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -74,6 +77,9 @@ export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
   // See docs/security.md § Credential handling.
   internalEnv: InternalEnvFactory
+  // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
+  // spawn cannot race the repair of the same creating ledger row.
+  reconciled: Promise<void>
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
 }
 
@@ -149,7 +155,16 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         onCompletedTurn: deps.memoryReviewTrigger,
       })
 
-      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
+      const delegation = new AgentDelegationService(
+        runtime,
+        new AgentDelegationStore(store),
+        async () => await ctx.capabilities.get(TERMINAL_SESSIONS)?.list() ?? [],
+        core.tasks,
+        deps.reconciled,
+      )
+      for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
+
+      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
       // core's table (../server/pricingStore.ts).
@@ -215,7 +230,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
-      ctx.capabilities.provide(AGENTS_RUNTIME, { reconcile: () => runtime!.reconcile() })
+      ctx.capabilities.provide(AGENTS_RUNTIME, {
+        reconcile: async () => {
+          await runtime!.reconcile()
+          await delegation.reconcile()
+        },
+      })
       // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
       // attachment reaches this plugin through, since a sandbox cannot call another plugin's routes.
       // Read and write only, and only for a draft: the composer still owns which attachment is in the

@@ -50,7 +50,9 @@ event socket.
 
 The Agent pane and Agent Center manage structured Claude and Codex sessions: durable normalized event
 ledgers, queued turns, permission/question requests, attachments, artifacts, usage, search, archive,
-fork, compact, import, and terminal handoff. Aider is available through its terminal profile.
+fork, compact, import, terminal handoff, and agent-driven delegated sessions. Delegation can share the
+parent task or create a selectable child task with a lazy worktree. Aider is available through its
+terminal profile.
 
 ## Integrations and model providers
 

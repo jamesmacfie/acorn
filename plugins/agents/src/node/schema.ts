@@ -195,6 +195,41 @@ export const agentOperations = sqliteTable(
   (t) => [index('agent_operations_created_idx').on(t.createdAt)],
 )
 
+// Durable authority and provisioning ledger for managed sessions created by another signed
+// task-scoped session. Runtime state remains on agent_sessions; this row answers who may address the
+// child, where it sits in the delegation tree, and whether spawn provisioning can be replayed.
+export const agentSpawns = sqliteTable(
+  'agent_spawns',
+  {
+    id: text('id').primaryKey(),
+    rootTaskId: text('root_task_id').notNull(),
+    rootSessionId: text('root_session_id').notNull(),
+    ownerTaskId: text('owner_task_id').notNull(),
+    ownerSessionId: text('owner_session_id').notNull(),
+    parentSpawnId: text('parent_spawn_id'),
+    childTaskId: text('child_task_id').notNull(),
+    childSessionId: text('child_session_id'),
+    childTurnId: text('child_turn_id'),
+    depth: integer('depth').notNull(),
+    isolation: text('isolation').notNull(), // shared | worktree
+    provisioningState: text('provisioning_state').notNull(), // creating | provisioned | failed
+    // Immutable input needed to finish a worktree spawn after the Node exits between core task,
+    // managed session, and initial-turn writes. Shared spawns predate this recovery path and keep it
+    // null.
+    provisioningJson: text('provisioning_json'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    error: text('error'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('agent_spawns_owner_session_idx').on(t.ownerSessionId),
+    index('agent_spawns_child_session_idx').on(t.childSessionId),
+    index('agent_spawns_root_state_idx').on(t.rootTaskId, t.rootSessionId, t.provisioningState),
+    uniqueIndex('agent_spawns_owner_idempotency_idx').on(t.ownerTaskId, t.ownerSessionId, t.idempotencyKey),
+  ],
+)
+
 export const agentWebhooks = sqliteTable(
   'agent_webhooks',
   {

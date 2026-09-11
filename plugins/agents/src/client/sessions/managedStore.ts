@@ -6,6 +6,7 @@ import type {
   AgentEventRecord,
   AgentRequest,
   AgentSession,
+  AgentSessionDelegation,
   AgentSessionSnapshot,
   AgentTurn,
   AgentWsFrame,
@@ -20,6 +21,7 @@ import { clearComposerDraft, clearComposerDrafts } from '../composer/composerSta
 const log = createLogger('agents', 'agents')
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
+const [delegations, setDelegations] = createSignal<Record<string, AgentSessionDelegation>>({})
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
 let subscribers = 0
 let disposeSocket: (() => void) | null = null
@@ -39,6 +41,7 @@ const REFETCH_EVENT_TYPES = new Set(['error'])
 // How long a task's session list is served without asking the node again. See loadTask below.
 const TASK_LOAD_WINDOW_MS = 5_000
 const taskLoads = new Map<string, { at: number; run: Promise<AgentSession[]> }>()
+const delegationLoads = new Map<string, Promise<void>>()
 // A snapshot load in flight, shared rather than repeated. Deliberately not a time window like the one
 // above: every caller after a mutation — a sent turn, a resolved request, a reordered queue — asks
 // because it expects the answer to have changed, and a window would hand back the transcript from
@@ -107,6 +110,20 @@ function upsertSessions(incoming: readonly AgentSession[]): void {
   })
 }
 
+function replaceDelegations(
+  pageSessions: readonly AgentSession[],
+  incoming: readonly AgentSessionDelegation[],
+): void {
+  const sessionIds = new Set(pageSessions.map((session) => session.id))
+  setDelegations((current) => {
+    const next = Object.fromEntries(Object.entries(current).filter(([sessionId]) => !sessionIds.has(sessionId)))
+    for (const delegation of incoming) {
+      if (sessionIds.has(delegation.sessionId)) next[delegation.sessionId] = delegation
+    }
+    return next
+  })
+}
+
 function removeSession(sessionId: string): void {
   deletedSessionIds.add(sessionId)
   // The unsent turn goes with the session it addressed (../composer/composerState.ts). Nothing else
@@ -118,6 +135,12 @@ function removeSession(sessionId: string): void {
   seenEventIds.delete(sessionId)
   usageLines.delete(sessionId)
   setSessions((current) => current.filter((session) => session.id !== sessionId))
+  setDelegations((current) => {
+    if (!(sessionId in current)) return current
+    const next = { ...current }
+    delete next[sessionId]
+    return next
+  })
   setSnapshots((current) => {
     if (!(sessionId in current)) return current
     const next = { ...current }
@@ -247,6 +270,21 @@ function scheduleSnapshotRefresh(sessionId: string): void {
   }, 50))
 }
 
+function refreshDelegationsForTask(taskId: string): Promise<void> {
+  const held = delegationLoads.get(taskId)
+  if (held) return held
+  const run = managedAgentApi.sessions({ taskId, archived: false })
+    .then((page) => {
+      upsertSessions(page.sessions)
+      replaceDelegations(page.sessions, page.delegations)
+    })
+    .finally(() => {
+      if (delegationLoads.get(taskId) === run) delegationLoads.delete(taskId)
+    })
+  delegationLoads.set(taskId, run)
+  return run
+}
+
 function isAgentFrame(value: unknown): value is AgentWsFrame {
   if (!value || typeof value !== 'object') return false
   const channel = (value as { channel?: unknown }).channel
@@ -257,7 +295,15 @@ function isAgentFrame(value: unknown): value is AgentWsFrame {
 function onFrame(value: unknown): void {
   if (!isAgentFrame(value)) return
   if (value.channel === 'agent:event') appendEvent(value.event)
-  else if (value.channel === 'agent:session') upsertSession(value.session)
+  else if (value.channel === 'agent:session') {
+    upsertSession(value.session)
+    // The session row is published independently of its spawn projection. A fresh delegated row
+    // therefore refreshes the bounded list metadata once; later runtime updates retain that separate
+    // projection and cost no read.
+    if (value.session.kind === 'delegated' && !delegations()[value.session.id]) {
+      void refreshDelegationsForTask(value.session.taskId).catch(() => undefined)
+    }
+  }
   else if (value.channel === 'agent:turn') upsertTurn(value.turn)
   else if (value.channel === 'agent:request') upsertRequest(value.request)
   else removeSession(value.sessionId)
@@ -265,6 +311,7 @@ function onFrame(value: unknown): void {
 
 export const managedAgentStore = {
   sessions,
+  delegations,
   snapshots,
   /**
    * Start a session on this provider and put the row in the store.
@@ -314,6 +361,7 @@ export const managedAgentStore = {
     const run: Promise<AgentSession[]> = (async () => {
       const page = await managedAgentApi.sessions({ taskId, archived: false })
       upsertSessions(page.sessions)
+      replaceDelegations(page.sessions, page.delegations)
       return page.sessions
     })().catch((error: unknown) => {
       // A failed read is never remembered: the next caller has to be able to try again.
@@ -326,11 +374,13 @@ export const managedAgentStore = {
   async loadAttention(): Promise<AgentSession[]> {
     const page = await managedAgentApi.sessions({ attention: true, archived: false })
     upsertSessions(page.sessions)
+    replaceDelegations(page.sessions, page.delegations)
     return page.sessions
   },
   async loadAll(archived = false): Promise<AgentSession[]> {
     const page = await managedAgentApi.sessions({ archived })
     upsertSessions(page.sessions)
+    replaceDelegations(page.sessions, page.delegations)
     return page.sessions
   },
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
@@ -371,11 +421,13 @@ export const managedAgentStore = {
   // attention gate clears itself on the same event (client-core deliver.ts).
   clear(): void {
     setSessions([])
+    setDelegations({})
     setSnapshots({})
     deletedSessionIds.clear()
     seenEventIds.clear()
     usageLines.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
+    delegationLoads.clear()
     // An in-flight read of the old node's session. It resolves after this and merges into an empty
     // store, so the entry has to go with the rest or the next reader shares a stale request.
     snapshotLoads.clear()
