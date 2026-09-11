@@ -41,8 +41,8 @@ type EditorPool = {
   files: Map<string, PooledFile>
   /** The document as last loaded or written, for the dirty derivation. */
   saved: Map<string, Text>
-  /** Reads in flight, so the mount's warm-up and the first `show()` share one request. */
-  reading: Map<string, Promise<EditorState | null>>
+  /** Reads in flight for this mount, so its warm-up and first `show()` share one request. */
+  reading: Map<string, { mount: object; run: Promise<EditorState | null> }>
 }
 
 // The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
@@ -216,6 +216,12 @@ export default function EditorPane(props: { task: Task }) {
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
+      // A pane replaced during navigation must not leave its remembered-file warm-up owning later
+      // renderer work. The request may still finish, but `readFile` drops it before CodeMirror state
+      // creation; removing its entry lets a new mount start a read that belongs to the visible pane.
+      for (const [path, reading] of pool.reading) {
+        if (reading.mount === mountToken) pool.reading.delete(path)
+      }
       // The pool stays: it belongs to the task, not to this mount (see EditorPool above).
       watchFocus(false)
     })
@@ -271,16 +277,20 @@ export default function EditorPane(props: { task: Task }) {
     setSaveErr(code ? `Your editor exited with status ${code}.` : '')
   }
 
-  // The pane's own read, deduplicated: the warm-up at mount and the first `show()` ask for the same
-  // file in the same tick, and one of them has to be the request. Not guarded on `disposed`, because
-  // a read that lands after this mount is gone still belongs in the pool for the next one.
+  // The pane's own read, deduplicated within this mount: the warm-up and the first `show()` ask for
+  // the same file in the same tick, and one of them has to be the request. An unmounted pane's read
+  // is deliberately not shared with its successor; its CodeMirror extensions close over this mount.
   function stateFor(relPath: string): Promise<EditorState | null> {
     const cached = pool.files.get(relPath)
     if (cached) return Promise.resolve(adopt(relPath, cached))
     const inFlight = pool.reading.get(relPath)
-    if (inFlight) return inFlight
-    const run = readFile(relPath).finally(() => pool.reading.delete(relPath))
-    pool.reading.set(relPath, run)
+    if (inFlight?.mount === mountToken) return inFlight.run
+    let entry: { mount: object; run: Promise<EditorState | null> }
+    const run = readFile(relPath).finally(() => {
+      if (pool.reading.get(relPath) === entry) pool.reading.delete(relPath)
+    })
+    entry = { mount: mountToken, run }
+    pool.reading.set(relPath, entry)
     return run
   }
 
@@ -291,6 +301,13 @@ export default function EditorPane(props: { task: Task }) {
       // rather than a throw that takes `show()` down with it.
       languageForPath(relPath).catch(() => [] as Extension),
     ])
+    // Navigation can replace this pane while the bridge response is in flight. Parsing syntax and
+    // constructing an EditorState here would block the renderer for a pane nobody can see, and the
+    // state carries listeners bound to this destroyed mount in any case.
+    if (disposed) {
+      telemetry.observe('editor.state.skipped', content.length, 'character', { reason: 'pane-unmounted' })
+      return null
+    }
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
     const highlighted = shouldHighlightDocument(content.length)

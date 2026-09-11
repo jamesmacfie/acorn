@@ -12,7 +12,7 @@
 // binding asks about the focused thing.
 
 import { onCleanup, onMount } from 'solid-js'
-import type { Binding, Keymap, KeymapEvent, TargetMode } from '@opentui/keymap'
+import type { Binding, Keymap, KeymapEvent, Layer, TargetMode } from '@opentui/keymap'
 import type { HtmlKeymapEvent } from '@opentui/keymap/html'
 import { BARE_KEYS, intentKeys } from './keymap'
 import type { Intent } from './intents'
@@ -90,6 +90,53 @@ export const isTyping = (): boolean => typing()
 export const keysFor = (): Record<Intent, readonly string[]> =>
   intentKeys(primary ?? (installed?.getHostMetadata().primaryModifier === 'super' ? 'super' : 'ctrl'))
 
+type DomTarget = {
+  readonly isConnected: boolean
+  readonly ownerDocument: Document
+}
+
+const domTarget = (target: object | undefined): DomTarget | null => {
+  if (!target || typeof (target as Partial<DomTarget>).isConnected !== 'boolean') return null
+  const ownerDocument = (target as Partial<DomTarget>).ownerDocument
+  return ownerDocument ? target as DomTarget : null
+}
+
+/**
+ * Register an element-bound layer once a staged DOM subtree has joined the document.
+ *
+ * Solid may mount lazy or suspense content in a detached subtree before committing it. `onMount`
+ * has run at that point, but the HTML keymap quite correctly refuses the target because it is not
+ * reachable from its root yet. Waiting on the document mutation preserves the layer for the eventual
+ * commit; disposing the Solid owner first cancels the pending registration.
+ *
+ * Non-DOM hosts have no staging state and register synchronously.
+ */
+export function registerLayerWhenConnected<Target extends object, Event extends KeymapEvent>(
+  engine: Keymap<Target, Event>,
+  layer: Layer<Target, Event>,
+): () => void {
+  const target = domTarget(layer.target)
+  if (!target || target.isConnected) return engine.registerLayer(layer)
+
+  const Observer = target.ownerDocument.defaultView?.MutationObserver
+  if (!Observer) return () => {}
+
+  let disposed = false
+  let unregister = () => {}
+  const observer = new Observer(() => {
+    if (!target.isConnected) return
+    observer.disconnect()
+    if (!disposed) unregister = engine.registerLayer(layer)
+  })
+  observer.observe(target.ownerDocument, { childList: true, subtree: true })
+
+  return () => {
+    disposed = true
+    observer.disconnect()
+    unregister()
+  }
+}
+
 /**
  * Bind a run of intents to a target, as a focus-within layer.
  *
@@ -130,10 +177,10 @@ export function registerIntentLayer<Target extends object>(
       })
     }
   }
-  return installed?.registerLayer({
+  return installed ? registerLayerWhenConnected(installed, {
     target,
     targetMode: options.mode ?? 'focus-within',
     priority: options.priority ?? 40,
     bindings,
-  }) ?? (() => {})
+  }) : () => {}
 }

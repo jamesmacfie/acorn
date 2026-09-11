@@ -79,6 +79,10 @@ What changed, and why:
   minified file from blocking WebKit's main thread while CodeMirror builds its tree; one
   `editor.syntax.skipped` sample records the decision with the document size. An ordinary-sized
   document whose grammar throws is retried as plain text instead of rejecting through the window.
+- **Navigation cancels editor construction.** A file response that reaches an editor pane after its
+  mount has gone away is discarded before CodeMirror parses or constructs state. The bounded
+  `editor.state.skipped` sample records the document size and `pane-unmounted` reason; a later mount
+  performs its own read because editor extensions close over the mount that created them.
 - **View state stopped being opaque**, which is the one place the design got *better* rather than
   merely equivalent — see § View state below.
 - **The `ui/editor` entrypoint survives, and is no longer node-hostile.** It exists to keep the
@@ -564,6 +568,12 @@ text, its undo history, its grammar — is held in the pane's model
 builds once per (pane, task) and disposes when another task asks for that pane or the task is evicted.
 The pane used to clear the pool in its own cleanup, so closing the pane and opening it again threw away
 every unsaved edit's undo history and re-read every file. It now costs no requests at all.
+
+An in-flight warm-up is not pooled state yet and stays owned by the mount that started it. If task or
+pane navigation removes that mount before the file arrives, the response is discarded before
+CodeMirror builds an `EditorState` or parses syntax; a later visible mount starts its own read. This
+keeps remembered-file preloading on the one-round-trip path without letting an editor that is no
+longer on screen monopolize the renderer during unrelated navigation.
 
 Closing the pane still flushes a pending autosave, and that write finishes its own bookkeeping even
 though the mount that started it is gone — otherwise the file came back marked dirty against content

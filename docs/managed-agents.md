@@ -570,7 +570,9 @@ second time in `commands.ts`: the label, the availability and the work are read 
 when the row is drawn and again when it is picked, so a session that gains an action gains a command
 with it, and an action the menu would draw disabled is not offered at all — the menu puts the reason
 on the row and the palette has nowhere to put one. Registration is redone only when the set of ids
-changes, so typing in the palette never races a re-register.
+changes, so typing in the palette never races a re-register. The command registry's mutation path is
+non-tracking, so this reactive reconciliation depends only on that id roster and cannot subscribe to
+its own register/dispose writes.
 
 What is missing is deliberate. Stop stays out: it is the one destructive verb here, and it needs the
 runtime state a low-context row cannot carry. Unarchive and import belong to Agent Center, which is

@@ -1,5 +1,5 @@
 import { onCleanup, onMount, Show } from 'solid-js'
-import { keymap } from '../keys/install'
+import { keymap, registerLayerWhenConnected } from '../keys/install'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
 // eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
@@ -36,7 +36,7 @@ export function Tabs(props: LayoutProps) {
   const bindChords = (element: HTMLElement) => onMount(() => {
     const engine = keymap()
     if (!engine) return
-    onCleanup(engine.registerLayer({
+    onCleanup(registerLayerWhenConnected(engine, {
       target: element,
       targetMode: 'focus-within',
       priority: 30,

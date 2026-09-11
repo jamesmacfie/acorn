@@ -12,6 +12,7 @@ import { _resetCollectionState, collectionState } from '../../kit/keys/collectio
 import { registerCommands } from '../registries/commands/commands'
 import type { ResolvedKeybinding } from '../registries/commands/keybindings'
 import { installKeymap } from './install'
+import { keymap } from '../../kit/keys/keymapHost'
 import { _resetRegions, focusedRegion, moveRegion } from './focusRegions'
 
 // The keyboard, rendered. The logic suite proves the tables; this proves the part only a document
@@ -69,6 +70,24 @@ function mountRows(items = PULLS) {
 }
 
 describe('a run of rows is a collection', () => {
+  it('waits to register a layer until a staged target joins the document', async () => {
+    const engine = keymap()
+    expect(engine).not.toBeNull()
+    const errors: string[] = []
+    const stop = engine!.on('error', ({ code }) => errors.push(code))
+
+    host.remove()
+    const list = mountRows()
+    expect(errors).not.toContain('destroyed-layer-target')
+    document.body.append(host)
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+
+    list.querySelector<HTMLElement>('.ui-row')!.focus()
+    press('ArrowDown')
+    expect(collectionState('pulls').active).toBe('pr-2')
+    stop()
+  })
+
   it('renders a listbox whose active option is named', () => {
     const list = mountRows()
     expect(list.getAttribute('role')).toBe('listbox')

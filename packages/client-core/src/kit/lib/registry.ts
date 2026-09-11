@@ -1,4 +1,4 @@
-import { createSignal, type Accessor } from 'solid-js'
+import { createSignal, untrack, type Accessor } from 'solid-js'
 
 export type Disposable = { dispose(): void }
 
@@ -43,7 +43,11 @@ export class Registry<T extends Identified> {
   }
 
   register(entry: T, owner?: string): Disposable {
-    if (this.get(entry.id)) throw new Error(`${this.name} contribution already registered: ${entry.id}`)
+    // Registration is a mutation boundary, not a registry subscription. A surface may legitimately
+    // reconcile registrations from a reactive effect; tracking this duplicate check would make that
+    // effect depend on the signal it writes below, so register -> rerun -> cleanup -> unregister
+    // feeds back synchronously until the JavaScript stack is exhausted.
+    if (untrack(() => this.get(entry.id))) throw new Error(`${this.name} contribution already registered: ${entry.id}`)
     this.#setEntries((entries) => [...entries, entry])
     if (owner) this.#owners.set(entry.id, owner)
     let disposed = false
