@@ -1,237 +1,377 @@
-# Agent-driven orchestration: one agent running acorn's agents
+# Agent-driven orchestration
 
-Analysis, 2026-08-21. Nothing here is scheduled. This file is the standing answer to "what would it
-take for an agent inside a task to spawn other acorn agents, wait on them, collect their results, and
-have all of it visible in the panes."
+Implementation plan, revised 2026-09-11. Not scheduled.
 
-The reference point is herdr (`references/herdr`), whose agent skill is the thing people actually
-enjoy. Its whole vocabulary is five verbs against a live session: `agent start`, `agent prompt
---wait`, `agent wait --until`, `agent read`, `agent send-keys`. There is no workflow language. The
-orchestrator is a normal agent that calls a CLI, reads JSON back, and decides what to do next.
+This file describes the work that remains for an agent running inside an acorn task to delegate work
+to other acorn-managed agents. The calling agent must be able to start a child, send another prompt,
+wait for progress, read a bounded result, and stop the child. The owner must be able to watch the same
+sessions in the app.
 
-acorn already has the durable half of this and none of the conversational half. The gap is narrower
-than it looks.
+The reference behavior is herdr's small conversational vocabulary. The goal is the interaction model,
+not its process model or command-line interface.
 
-## What is already built (verified 2026-08-21)
+## Completion criteria
 
-`plugins/workflows` is a real orchestration engine, not a sketch. `server/workflowRunner.ts` owns
-validation, ordering, persistence, branching, cancellation, and restart reconciliation. Rows are the
-checkpoint, so a step interrupted by a restart is swept back to `pending` rather than repeated blind.
+The work is complete when all of these statements hold:
 
-| Primitive | Where | What it does |
+- A task-scoped agent can start a managed child session without calling a device-only route.
+- Shared delegation uses the caller's task and checkout. Worktree delegation creates a child task
+  through `CoreServices.tasks.createChild()`.
+- Only the session that created a child can prompt, wait for, read, or cancel that child.
+- A delegated child can delegate again within fixed depth and live-child limits.
+- The Node derives caller identity from the signed internal token. A request header or tool argument
+  cannot claim another session.
+- Spawn and prompt operations are idempotent across the MCP proxy's one automatic transport retry.
+- Tool permissions and every server-owned tool ceiling can narrow delegation. A child cannot widen the
+  permissions that reached its parent.
+- Shared children appear under their parent in the Agent pane. Worktree children remain visible as
+  child tasks and lead to their own Agent pane.
+- Restarting the Node preserves ownership, queued turns, readable output, and recoverable provisioning
+  state.
+
+## Architecture to build on
+
+Do not rebuild the execution engine. The following behavior has shipped and belongs to its owning
+document:
+
+- [Agent tools](../agent-tools.md) owns the Node registry, Zod schemas, risk tiers, permission
+  preferences, task-scoped MCP projection, and `ToolContext`.
+- [Managed agents](../managed-agents.md) owns session and turn persistence, the event ledger, provider
+  drivers, queueing, concurrency, attention, cancellation, and the Agent pane.
+- [Workflows](../workflows.md) owns declared graphs, frozen run definitions, workflow budgets, gates,
+  step isolation, the editor, and the run pane.
+- [Authentication](../authentication.md) owns task-scoped internal tokens and the distinction between a
+  device principal and a child process.
+- [Workspaces and tasks](../workspaces-and-tasks.md) owns child tasks, branches, and lazy worktree
+  creation.
+
+The useful code seams are:
+
+| Concern | Owning code | Behavior to reuse |
 | --- | --- | --- |
-| `fan-out` step | `server/workflowBuiltins.ts` | An agent step emits a JSON task list. The runner creates one child task per item through `core.tasks.createChild()`, then runs a headless agent in each. Capped at `MAX_FAN_OUT_TASKS = 12`. |
-| `join` step | same | Collects every child's structured output and status, fails the run if any child failed, and writes the collection as a handoff. |
-| `decide` step | same | A one-shot structured call whose `verdict` string selects a branch. Prose cannot satisfy it. |
-| Concurrency | `server/workflowSemaphore.ts` | `MAX_CONCURRENT_HEADLESS = 4`. Queued children stay `pending` until they hold a slot. |
-| Budgets | `server/workflowRunner.ts` | Wall time, cost, input tokens, output tokens, and turns, intersected workflow over step, with a persisted-usage sum so a restart cannot reset the meter. |
-| Tool ceilings | `server/workflowTools.ts` | Passed to the child process as `ACORN_TOOL_CEILING`, intersected the same way. |
-| Value passing | `server/workflowValidation.ts` | `${steps.<name>.output}` renders an earlier step's output into a later prompt. Structured JSON is the only input to branching. |
-| Handoffs | `node/index.ts` | Each step's result is appended to a task note, `workflow-handoffs-<runId>`, which is injected as context into later steps of the same run and de-included when the run ends. |
-| Sessions | `plugins/agents/src/server/sessions/sessionExecute.ts` | A step runs as a real managed agent session with a durable event ledger, so it appears in the task's Agents sidebar. |
+| Tool registration | `packages/node-core/src/server/agentTools/registry.ts` | `AgentToolContribution`, execute-tier permissions, availability, and `ToolContext`. |
+| MCP transport | `packages/node-core/src/mcp/server.ts` and `mcp/api.ts` | Live tool manifests and the task-confined loopback call. |
+| Signed caller | `packages/node-core/src/server/auth/internalTokens.ts` | The token already carries `taskId` and an optional `sessionId`. |
+| Managed execution | `plugins/agents/src/server/sessions/runtime.ts` | Session creation, durable turns, wait, cancellation, and restart reconciliation. |
+| Session storage | `plugins/agents/src/node/schema.ts` and `server/sessions/store.ts` | Session lineage, event paging, idempotent operations, and turn idempotency. |
+| Worktree child | `packages/node-core/src/server/core/tasks.ts` | `createChild()` and lazy checkout resolution. |
+| Task lineage | `packages/protocol/src/api.ts` | `Task.parentId` is stored and sent to clients. |
 
-One route deserves calling out, because it is the piece everybody assumes is missing:
+`agent_sessions.parent_session_id` and `parent_turn_id` are useful display lineage, but they are not a
+complete authority model. A calling session can be a terminal session rather than a managed agent
+session, and a worktree child belongs to another task. Delegation therefore needs a durable relation
+of its own.
 
-```
-GET /v2/p/agents/sessions/:sessionId/wait?until=turn_completed&timeoutMs=30000
-```
+## What remains
 
-`until` accepts `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` is capped at 30
-seconds (`plugins/agents/src/shared/schemas.ts`). That is herdr's `agent wait --until`, already built,
-already bounded, already owned by the task. `POST /sessions` and `POST /sessions/:sessionId/turns` are
-both reachable by a task-confined principal acting on its own task.
+No registered tool starts or controls a managed session. The managed HTTP routes expose the required
+operations, but task authorization deliberately prevents a parent task from addressing a child task.
+`ToolContext.sessionId` also comes from `x-acorn-session-id`, although the verified internal principal
+already contains the signed session claim. That header is suitable for transport metadata, not for an
+authorization decision.
 
-## The four gaps
+The task rail receives `Task.parentId` but still renders a flat list. The Agent pane receives session
+lineage fields but does not read them. Provider-native subagents are transcript projections and cannot
+be addressed through the managed-session runtime, so they do not satisfy this plan.
 
-**1. No agent tools for any of it.** Thirty tools are registered today: task and pull-request context,
-git changes, notes, memory, terminal run targets, browser automation, plus `plugin_authoring` and
-`plugin_request`. None of them touch sessions, workflows, HTTP, the database, or Docker. An agent
-cannot start a workflow or spawn another agent through MCP at all. This is the entire blocker and it
-is the smallest of the four.
+## Ownership and boundaries
 
-Fixed in [docs/mcp.md](../mcp.md) on 2026-08-28: the section used to claim the surface included
-"terminal/session operations, workflows, database/Docker operations", and it never did.
+The Agents plugin owns agent-driven orchestration. Register the tools from that plugin and close their
+handlers over `ManagedAgentRuntime` and the plugin database. Do not add session operations to core, and
+do not make one plugin call another plugin's HTTP routes.
 
-**2. MCP is welded to one task.** `packages/node-core/src/mcp/server.ts` sends every call to
-`/v2/core/tasks/${ACORN_TASK_ID}/tools/:name`, and `mayActOnTask` refuses a confined principal on any
-other task. A fan-out child is another task. So "spawn a sub-agent and read its result" cannot lean on
-task scope for authority. The handler runs in the node with node authority, so it can reach across, but
-it has to model "the sub-agents I spawned" explicitly.
+Keep `AgentToolContribution.scope` equal to `task`. Cross-task access is a narrow exception implemented
+inside the Agents handlers after they verify a spawn row. Do not weaken `mayActOnTask()`, add a
+cross-task MCP scope, or mint a service token into a child process.
 
-**3. ~~No API-call step, and step kinds are closed.~~ Closed 2026-08-28.** The builtins are still
-`agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`, and `decide`, but they are no
-longer all there can be. `WorkflowContributionRegistry` is deleted; workflows opens three node
-extension points (`workflows:step-kind`, `workflows:policy`, `workflows:trigger`) and any plugin may
-fill them. The HTTP plugin contributes `http:request`, where the scheme check after interpolation and
-the body cap already live. See "Opening the step-kind registry" below.
+Keep workflows declarative. An agent-driven tree is a group of managed sessions, not a workflow with
+steps appended after start. `WorkflowRunner` must continue to freeze `defJson` and expand its graph at
+start. Dynamic workflow steps would split validation, restart, editing, and trust behavior into two
+execution modes.
 
-**4. Visibility is half there.** A step on the parent task creates a managed session, so it shows in
-that task's Agents sidebar. A fan-out child runs on a child task, so its session lives in the child's
-pane instead. `tasks.parentId` is on the wire (`packages/protocol/src/api.ts`) but no client code reads
-it, so a child task looks unrelated in the task list. There is no workflow pane either:
-`docs/panes.md` lists twelve, none of them workflows. Run state is visible only in the sidebar's
-"Terminals and workflows" section and in Settings.
+Managed sessions already appear in the merged run list, retain turns and events across restarts, and
+use the provider and workspace concurrency limits. Those are the durability properties this feature
+needs.
 
-## The decision that comes first: shared worktree or child task
+## Caller identity
 
-herdr's unit of work is a sibling pane in the same tab, same working directory. acorn's fan-out unit is
-a child task with its own git worktree. These are not interchangeable, and picking one for everything
-is the mistake to avoid.
+An orchestration tool requires both `taskId` and `sessionId` from the verified internal principal.
+Terminal and managed-agent processes already receive an internal token minted with both claims.
 
-| | Shared, same task | Child task with worktree |
+Change the agent-tool route so `ToolContext.sessionId` comes from `c.get('principal').sessionId`.
+Ignore `x-acorn-session-id` for authorization. Keep the header only where compatibility requires it
+for non-authoritative attribution, then remove it when all callers read the signed claim.
+
+A task token without a session claim may use ordinary task tools but must not see orchestration tools
+in `tools/list`. A mismatched or missing owner must return `not_found`, so callers cannot probe session
+or task ids.
+
+Make the tool ceiling server-owned in the same phase. Add the effective ceiling to the signed internal
+claims, expose it on the verified principal and `ToolContext`, and enforce that value in the agent-tool
+route. A workflow headless process passes its step ceiling when it asks the composition root to mint
+the token. A managed session reads the ceiling from its persisted config when the runtime mints its
+token. An ordinary terminal has no additional ceiling. Keep `ACORN_TOOL_CEILING` only as transitional
+transport metadata, and do not use it for enforcement after the signed claim is available.
+
+The MCP proxy also needs a call id that survives its retry of a failed loopback request. Generate the
+id once per `tools/call`, send it as transport metadata, and add it to `ToolContext`. Scope every stored
+idempotency key by the signed owner session and the tool name.
+
+## Spawn ledger
+
+Add `agent_spawns` to the Agents plugin database. It is the authority relation and the recovery record,
+not a second copy of session runtime state.
+
+| Column | Purpose |
+| --- | --- |
+| `id` | Stable spawn id, allocated before any child resource. |
+| `root_task_id` | Task of the first caller in the delegation tree. |
+| `root_session_id` | Signed session id of the first caller. |
+| `owner_task_id` | Task from the caller's signed token. |
+| `owner_session_id` | Session from the caller's signed token. |
+| `parent_spawn_id` | Spawn row whose child made this call, or null for a root spawn. |
+| `child_task_id` | Owner task for shared isolation, or the created child task for worktree isolation. |
+| `child_session_id` | Managed session created for the child. Null only while provisioning. |
+| `child_turn_id` | Initial turn created by `agent_spawn`. Null only while provisioning. |
+| `depth` | One for a root spawn, then parent depth plus one. |
+| `isolation` | `shared` or `worktree`. |
+| `provisioning_state` | `creating`, `provisioned`, or `failed`. Do not mirror the child session's runtime state. |
+| `idempotency_key` | The owner-scoped MCP call id. |
+| `error` | Bounded provisioning failure detail. |
+| `created_at`, `updated_at` | Recovery and retention timestamps. |
+
+Index `owner_session_id`, `child_session_id`, and
+`(root_task_id, root_session_id, provisioning_state)`. Make
+`(owner_task_id, owner_session_id, idempotency_key)` unique.
+
+Use the row as follows:
+
+1. Resolve the caller from the signed principal.
+2. Find whether the caller session is itself the child of a spawn. If it is, inherit the root and set
+   the new depth from that row. Otherwise, create a depth-one root.
+3. Enforce limits and insert the `creating` row before starting external work.
+4. Create the child task when isolation is `worktree`.
+5. Create the managed session and its first turn with idempotency keys derived from the spawn id.
+6. Write the child ids and mark provisioning `provisioned`.
+7. On failure, keep the row, record the error, and return the same result for the same call id.
+
+The child session is the authority for turn and runtime status after provisioning. Join to it when
+counting live children. Do not copy `ready`, `working`, `waiting`, or terminal states into the spawn
+row.
+
+When the caller is a managed session, also set the child's `parentSessionId` and active
+`parentTurnId`. For a terminal caller, leave those fields null and use the spawn row for ownership and
+display metadata.
+
+## Tool surface
+
+Register five execute-tier tools from `plugins/agents`. Execute tools are disabled by default through
+the shared permission policy.
+
+| Tool | Input | Result |
 | --- | --- | --- |
-| Cost | A session row. No git operation. | A task row plus a lazily created worktree. |
-| Parallel writes | Collide. Two agents share one checkout. | Isolated by construction. |
-| Where you watch it | The caller's own Agents pane. | The child task's pane. |
-| Good for | Read, review, summarize, research, judge. | Write code on a branch. |
+| `agent_spawn` | `title`, `prompt`, `profileId?`, `isolation?`, `resultSchema?`, `configOptions?` | Spawn, task, session, and initial turn ids; depth; provisioning state; and the first event cursor. |
+| `agent_prompt` | `sessionId`, `prompt`, `resultSchema?`, `configOptions?` | The durable turn id, queue state, and event cursor. |
+| `agent_wait` | `sessionId`, `afterSeq?`, `until?`, `timeoutMs?` | Runtime state, attention, last sequence, whether the condition matched, and whether the call timed out. |
+| `agent_read` | `sessionId`, `afterSeq?`, `limit?` | Bounded assistant messages, diagnostics, errors, validated structured output, and the next cursor. |
+| `agent_cancel` | `sessionId`, `turnId?` | The cancelled turn id and resulting session state. |
 
-Most orchestration is the first column. Three agents each reading a subsystem and reporting back do
-not need three checkouts, and paying a worktree for each is what makes fan-out feel heavy today.
+`agent_spawn` starts the first turn and returns without waiting for it. Keep prompt, wait, and read as
+separate operations. This makes every blocking call explicit and keeps tool responses under the MCP
+client timeout.
 
-**The call: build both, default to shared.** `isolation: 'shared' | 'worktree'` on the spawn tool, and
-`shared` is the default.
+Cap `timeoutMs` at 30 seconds, matching `ManagedAgentRuntime.wait()`. Return a normal timed-out result
+with the latest cursor. The calling agent may wait again.
 
-## The proposed tool surface
+Default isolation to `shared`. If `profileId` is absent, inherit the calling managed session's profile
+or the calling terminal's profile when it has a managed driver. Otherwise, require a supported managed
+profile. Do not silently fall back from one provider to another.
 
-Four tools, `scope: 'task'`, risk `execute`, deliberately named after herdr's verbs because that
-vocabulary is the part people like:
+If a prompt declares `resultSchema`, append the result contract through one Agents-owned helper. Move
+the extraction logic out of workflow-only `sessionExecute.ts`, validate the parsed value against the
+declared schema, and use the same helper for workflows and delegation. Parsing JSON without validating
+the schema is not sufficient.
 
-| Tool | Arguments | Returns |
-| --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, `profileId?`, `isolation?`, `schema?` | `{ sessionId, childTaskId? }` |
-| `agent_prompt` | `sessionId`, `prompt`, `wait?`, `timeoutMs?` | the turn id, and the settled state when `wait` is set |
-| `agent_wait` | `sessionId`, `until`, `timeoutMs` | the session snapshot, or `still_running` on timeout |
-| `agent_read` | `sessionId`, `afterSeq?`, `limit?` | assistant text plus any structured result |
+`agent_read` must not return an unbounded snapshot. Page from `agent_events`, fold streaming assistant
+deltas, include terminal turn failures, and omit verbose tool payloads and attachment bytes. The event
+sequence is the cursor shared by read and wait.
 
-Three notes on the shapes.
+Do not add `agent_send_keys`. Managed sessions accept turns, while terminal keystrokes remain owned by
+the Terminal plugin.
 
-**Cap `timeoutMs` at 30 seconds and let the orchestrator loop.** The existing `wait` route already caps
-there. A tool that blocks for 10 minutes fails on the client side anyway, because Claude Code's MCP
-client applies its own tool timeout. Returning `still_running` and letting the caller poll is both
-honest and what herdr does with `--timeout`.
+## Authorization rules
 
-**`agent_spawn` takes an optional result schema.** `sessionExecute` already appends a result contract
-to the prompt and parses the fenced JSON block back out. Reusing it means a sub-agent's answer arrives
-as data, which is the same rule the declarative half already enforces: prose is not control flow.
+For `agent_prompt`, `agent_wait`, `agent_read`, and `agent_cancel`, require a spawn row whose
+`owner_task_id` and `owner_session_id` match the signed caller and whose `child_session_id` matches the
+argument. Direct ownership is intentional. A root orchestrator controls the children it created, not
+every descendant or sibling in the tree.
 
-**No session names.** herdr needs `reviewer` because a human types CLI commands. The orchestrator gets
-an id back from `agent_spawn` and has no keyboard.
+For `agent_spawn`, enforce these starting limits in one database transaction:
 
-## The spawn ledger, and why it is not optional
+- Maximum delegation depth: two.
+- Maximum live delegated sessions per root: 12.
+- One active turn per child session, which the managed runtime already enforces.
+- Workspace and provider concurrency limits, which the managed dispatcher already enforces.
 
-One new table. A row per spawn: owner task, session id, child task if any, and depth.
+The live limit bounds parallel expansion, not lifetime history. Keep settled spawn rows for audit and
+ownership until the child session is deleted. Add retention only with the session-retention policy that
+owns the child.
 
-The handler then asks "did this task spawn that session" instead of "is that session in this task", so
-`mayActOnTask` stays exactly as it is and `agent_read` on an arbitrary session id is not a hole. That
-row is the whole authority model.
+Count every `creating` row against the live limit. Once a child session exists, count it until its
+runtime state is terminal. Reserving the slot in the same transaction as the depth check prevents two
+parallel calls from both observing the last free slot.
 
-Depth and count caps belong on the same table, because nothing else bounds them. `MAX_FAN_OUT_TASKS`
-bounds the declarative path, but an agent calling `agent_spawn` in a loop is unbounded, and every agent
-it spawns holds the same tool. Suggested starting numbers, matching the ceilings already in the runner:
-depth 2, and 12 live sub-agents per root task.
+The child inherits the parent's signed tool ceiling, and a requested child ceiling may only narrow it.
+Persist the intersection in the child session config so the runtime can mint the child's token from
+server-owned state. Do not accept a wider ceiling from an environment variable, request header, or
+tool argument.
 
-## The open question: implicit runs, or sessions only
+Do not expose `agent_spawn` to a managed session whose config names a `workflowRunId` until workflow
+usage accounting includes delegated descendants. Without that integration, a workflow step could
+spend outside the run's token, cost, turn, and wall-time budgets. This restriction preserves the
+workflow budget contract while the agent-driven path ships independently.
 
-This is the fork in the road and it wants a decision before any code.
+Agent-driven trees do not create `workflow_runs` or `workflow_steps`. If aggregate token or cost budgets
+become a requirement for ordinary delegation, add a root policy to the Agents-owned spawn ledger and
+sum the persisted turn usage. Do not make `WorkflowRunner` accept a mutable graph for that purpose.
 
-**Sessions only** is less work. `agent_spawn` creates managed sessions, the ledger tracks them, done.
-What you lose: no run record, no cost ceiling across the whole tree, no cancel-the-whole-thing, no
-restart reconciliation. Each of those already exists in `WorkflowRunner` and would be reimplemented
-badly or not at all.
+## Worktree isolation
 
-**Implicit run** is the fuller version. `agent_spawn` from a task with no active run opens one with a
-synthetic definition, and each spawn writes a step row under it. Budgets, cancellation, the step
-ledger, and the existing sidebar rendering all apply for free. The cost is that `WorkflowRunner`
-currently drives steps from a frozen `defJson`, and an agent-driven run has no definition up front, so
-`tick()` would need a mode where steps arrive while the run is live rather than being expanded at
-`start()`.
+Implement shared isolation first. Worktree isolation crosses the Agents plugin database and core's
+task database, so it needs recoverable provisioning rather than an optimistic sequence of inserts.
 
-**Recommendation: implicit run.** The budget argument settles it. A tool that lets an agent spawn
-agents that spawn agents needs a cost ceiling with the run, not with each session, and that ceiling is
-already written.
+Allocate the spawn id and intended child task id before calling core. Extend the trusted
+`CoreServices.tasks.createChild()` seam to accept that stable id or an idempotency key. A replay must
+return the same child when its parent and seed match, and refuse a conflicting use of the id. This lets
+startup reconciliation distinguish these states:
 
-## Workflow definitions in a table
+- No child task exists. Retry child creation.
+- The child task exists but no managed session exists. Create the session and initial turn.
+- The session exists but the spawn row lacks its ids. Repair the row from the spawn-derived
+  idempotency records.
+- Provisioning failed permanently. Keep the child task and surface the failure. Do not delete a
+  checkout that might contain work.
 
-The precedent is already in the repo and it is schedules. From `docs/schedules.md`: declared schedules
-are registry truth, where the code is the definition and the database stores only the owner's overrides
-and run state, and user schedules are database truth, full rows parsed tolerantly with unknown kinds
-retained inert.
+Use `createChild()` so branch deduplication, `parentId`, task notifications, and lazy worktree setup
+remain core behavior. The managed runtime resolves the child's checkout when the child session starts.
 
-Do the same thing here:
+Cancelling a worktree child stops its active turn. It does not archive the child task or remove its
+worktree.
 
-- `.acorn/workflows/*.toml` stays repo truth, so a workflow can be reviewed in a pull request and
-  travels with the branch that changed it.
-- A `workflow_defs` table holds user-authored ones.
-- One list read merges both, and repo wins on an id collision. That is the layering
-  `loadWorkflowFiles()` already applies for repo over `~/.acorn`.
+## Visibility
 
-Do not move the TOML into the database. A workflow that runs an agent CLI in a worktree is executable
-configuration, and the trust gate works by hashing the exact file snapshot
-(`core.projects.assertConfigTrusted`). Rows have nothing to hash, so a user-authored workflow needs its
-own answer to trust, and "the owner typed it into this app" is that answer. Repo-authored and
-user-authored are different trust stories, which is the real reason they stay different stores.
+Shared children are managed sessions on the same task, so the Agent pane already receives their live
+rows and events. Update its roster model to use delegated lineage:
 
-## Opening the step-kind registry — done
+- Nest a delegated managed session under its managed parent.
+- Label a child owned by a terminal session as delegated without inventing a managed parent row.
+- Show depth, runtime state, attention, and isolation from bounded projection data.
+- Keep provider-native subagents under their provider session. They remain a different, non-addressable
+  type.
 
-For the agent-driven path, an API-call step is unnecessary. The agent has bash and curl.
+For worktree isolation, render task lineage from core's `Task.parentId`. A child task must remain a
+normal selectable task with its own panes. Grouping or indentation belongs in the core task-list
+fallback because `parentId` is core data. The `core:task` annotation point may add workflow or agent
+status markers, but it must not become the source of task hierarchy.
 
-For the declarative path it was worth one `http` step kind, and adding it was the moment to stop
-having eight builtins forever. **Shipped 2026-08-28**, and not as `registerStepKind` on
-`WORKFLOWS_RUNNER` as this file first proposed. A capability has one provider by construction, and
-"many plugins each add a step kind" is many-to-many, so granting it through the runner capability
-would have been the first of five private registries with slightly different lifecycles. The node
-grew the twin of the client's extension points instead
-(`docs/plugins.md § Node-side extension points`), and workflows was ported onto it. Hooks
-(`docs/plugins.md § Hooks`) generalise the same shape again, with observe, transform, and veto modes; `workflows:step-kind` stays a registry-shaped point and `before-step` is
-the hook.
+Do not add an agent-driven run to the Workflows pane. Declared workflow runs stay there. Managed
+sessions and their delegation tree stay in the Agent pane and the merged Runs list.
 
-Three points, opened by workflows and fillable by anyone: `workflows:step-kind`, `workflows:policy`,
-`workflows:trigger`. The HTTP plugin contributes `http:request`, where the scheme check after
-interpolation and the body cap already live (`docs/http-client.md`). A repo-authored HTTP step is
-executable configuration and the existing trust snapshot already covers it.
+## Failure behavior
 
-Two things fell out that this file did not anticipate:
+- A missing, foreign, sibling, or deleted child id returns `not_found`.
+- A child waiting for permission or an answer returns `attention` from `agent_wait`. The owner resolves
+  the request through the Agent pane. The orchestrator cannot approve its own child.
+- A prompt sent while the session cannot accept another turn returns a classified conflict.
+- Provider startup failure leaves the session and spawn row readable.
+- A wait timeout does not cancel the turn.
+- Cancelling a turn preserves its events and structured-result diagnostics.
+- Restart reconciliation repairs `creating` spawn rows before accepting another call with the same
+  idempotency key.
 
-- **A contributed kind is addressed as `<pluginId>:<entryId>`.** Built-ins stay bare words, so a
-  `.acorn/workflows/*.toml` that says `kind = "http:request"` names the package that will run the
-  step, and two plugins can both call their entry `request` without either shadowing the other.
-- **`[steps.with]`.** A built-in kind's inputs are named fields the host can check; a contributed
-  kind needs somewhere to put its own, so a step carries an opaque `with` table that only the
-  contributing plugin reads and validates.
+## Implementation sequence
 
-## What this does not build
+### Phase 1: Trusted caller context
 
-**A DAG editor.** ~~The declarative half covers fixed pipelines and the agent-driven half covers
-dynamic ones. A visual editor serves neither, and `docs/workflows.md` already names its absence as a
-current limit rather than a gap.~~ **Reversed**, and built. The argument above weighed an agent driving agents. It did not weigh a
-person authoring a workflow in the UI, which is what the editor is:
-[docs/workflows.md](../workflows.md) § Authoring owns it, and § What workflows refuses says why the
-editor is a rail source rather than a pane or a Settings page.
+- Source `ToolContext.sessionId` from the verified principal.
+- Add a per-call id that survives the MCP proxy's loopback retry.
+- Make orchestration tools unavailable without a signed session claim.
+- Carry a server-owned effective tool ceiling in the tool context.
+- Test a forged `x-acorn-session-id`, a missing session claim, another task, and a narrowed ceiling.
 
-**Cross-task MCP scope.** Widening `AgentToolContribution.scope` past `task` is a security change
-bought for a convenience. The ledger gets the same result without touching the boundary.
+### Phase 2: Shared spawn and ownership
 
-**A workflows pane.** ~~Tempting, but the Agents sidebar already merges sessions with workflow steps,
-and an implicit run makes agent-driven work appear there with no new surface. Revisit only if reading
-a run turns out to need more than a roster.~~ **Reversed**, and built. Reading a run does need more than a roster: the sidebar keyed selection
-on a managed-session id a workflow step does not have, and opening a step row spawned a terminal
-instead of showing what the step was doing. [docs/workflows.md](../workflows.md) § The run pane owns
-the pane that replaced it.
+- Add the `agent_spawns` migration and store operations.
+- Add an Agents-owned delegation service over `ManagedAgentRuntime`.
+- Add the `delegated` session kind and `delegation` turn source to protocol and schemas.
+- Implement idempotent `agent_spawn` with `isolation = "shared"`.
+- Implement bounded `agent_read`.
+- Enforce direct ownership, depth two, and 12 live descendants per root under concurrent calls.
 
-## Suggested phasing
+At the end of this phase, one agent can delegate read-and-report work and collect the result.
 
-1. Fix the `docs/mcp.md` tool-surface sentence. One line, and it is wrong today.
-2. Decide implicit run against sessions only.
-3. The spawn ledger, with depth and count caps and a test that a third-level spawn is refused.
-4. `agent_spawn` and `agent_read`, `isolation: 'shared'` only. This is enough for the read-and-report
-   case, which is most of the value.
-5. `agent_prompt` and `agent_wait`, wrapping the existing `runtime.wait`.
-6. `isolation: 'worktree'`, reusing `core.tasks.createChild()`.
-7. Surface `tasks.parentId` in the task list, so a spawned child stops looking unrelated.
-8. ~~`registerStepKind` on `WORKFLOWS_RUNNER`, then the `http` step in the HTTP plugin.~~ **Done**,
-   through node extension points rather than the capability — see above for why.
-9. ~~`workflow_defs` as database truth, merged under the repo layer.~~ **Done**.
-   [docs/workflows.md](../workflows.md) § Database definitions owns it.
+### Phase 3: Conversation and control
 
-Steps 1 through 5 are the herdr experience. Everything after is acorn keeping the durability it
-already has.
+- Implement `agent_prompt`, `agent_wait`, and `agent_cancel`.
+- Share result-contract extraction and validation between workflow execution and delegation.
+- Return stable cursors and classified timeout, attention, conflict, and terminal states.
+- Test restart, transport retry, duplicate calls, pagination, cancellation, and malformed structured
+  output.
+
+### Phase 4: Session visibility
+
+- Project spawn metadata with the Agent pane's session list.
+- Nest managed children and label terminal-owned children.
+- Add navigation from a child to its parent when the parent is managed.
+- Keep provider-native subagent rendering unchanged.
+
+### Phase 5: Worktree children
+
+- Make `createChild()` replayable with a stable child id or idempotency key.
+- Add recoverable worktree provisioning and startup reconciliation.
+- Implement `isolation = "worktree"`.
+- Render `Task.parentId` in the core task list and keep each child selectable.
+- Test branch collisions, restart at each provisioning boundary, cancellation, and preservation of a
+  dirty child worktree.
+
+### Phase 6: Documentation and acceptance
+
+- Update `docs/agent-tools.md`, `docs/managed-agents.md`, `docs/authentication.md`,
+  `docs/workspaces-and-tasks.md`, `docs/api-reference.md`, `docs/mcp.md`, and `docs/security.md`.
+- Keep `docs/workflows.md` explicit that these tools drive managed sessions, not workflow runs.
+- Run the manual acceptance flow with Claude Code and Codex, from both a managed parent and a terminal
+  parent.
+- Delete this file or reduce it to unresolved work after the shipped behavior moves to the owning
+  documents.
+
+## Test matrix
+
+Automated coverage must include:
+
+- Shared spawn, prompt, wait, read, and cancel for both managed providers.
+- A terminal caller and a managed-session caller.
+- Direct-child access and denial for a sibling, grandchild, unrelated session, and another task.
+- Atomic depth and live-count enforcement under parallel spawn calls.
+- Execute-tier disabled, per-tool disabled, and inherited tool ceiling narrowed.
+- MCP loopback retry without duplicate task, session, or turn creation.
+- Node restart during spawn provisioning and during an active or queued turn.
+- Read pagination, response bounds, assistant-delta folding, and structured-schema failure.
+- Attention returned without allowing the parent agent to resolve the child's request.
+- Worktree branch collision, lazy checkout creation, task nesting, and dirty-worktree preservation.
+- Agent-pane nesting without changing provider-native subagent rows.
+
+Before handoff, run `pnpm lint`, the Agents plugin tests, the node-core MCP and agent-tool route tests,
+the core task-service tests, and the client tests for the Agent pane and task rail.
+
+## Verify before building
+
+The named paths are architecture hints, not promises. Before implementation:
+
+1. Re-read the owning documents listed under [Architecture to build on](#architecture-to-build-on).
+2. Confirm that internal tokens still carry a session claim and that tool context still has no trusted
+   call id or effective ceiling.
+3. Confirm the managed runtime's create, enqueue, wait, cancel, event-page, and reconciliation
+   contracts.
+4. Confirm that no agent orchestration tools or equivalent spawn ledger have landed.
+5. Confirm how the Agent pane and task-list fallback consume session and task lineage.
+6. Revisit the limits only if the managed runtime's concurrency or retention policy has changed.
