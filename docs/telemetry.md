@@ -436,6 +436,12 @@ open carries a `traceparent`. So a click, the requests it caused, and what the n
 them are one trace: the command span is the root, the renderer's `api.request` span is its child,
 and the node's `http.request` span is a child of that.
 
+A lifecycle operation caused by an open interaction joins it as a child rather than replacing the
+ambient trace. The same operation opened directly becomes the interaction root, so requests and
+render probes still correlate. Agent center, sidebar, session, and subagent view lifecycles use this
+seam; a session selection that mounts a sidebar therefore stays one trace instead of producing two
+overlapping traces.
+
 The interaction is a module variable rather than an async context, because the renderer has no
 `AsyncLocalStorage` and nothing worth polyfilling one for. Work that continues after the span ends
 gets no parent. That is a known imprecision and it is written down rather than papered over.
@@ -465,7 +471,9 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | histogram `ws.inbound.<channel prefix>` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | span `command`, owner from `ownerId`; opens an interaction |
 | Every page change | `features/tasks/pageChange.ts` | span `nav.change`, ended on the second animation frame; opens an interaction |
+| Consequential view lifecycle | `infra/telemetry/emitter.ts` `startOperation` | child span under an open interaction, or an interaction root when opened directly |
 | Opted-in state transitions | `infra/telemetry/emitter.ts` `startRenderTransition` | one `ui.render` child span with current-turn, first-frame and paint-frame durations; only under an open interaction |
+| Opted-in initial list construction | `infra/telemetry/emitter.ts` `measureRenderBatch` | one `ui.render.batch` span per operation and JavaScript turn, with factory-call count, inclusive factory time and wall time to the microtask checkpoint |
 | Every pane region | `host/registries/panes/panes.ts` `drawLayout` | span `pane.region`, from the host asking for the region to the child's mount |
 | Every pane model build | `host/registries/panes/paneModels.ts` | span `pane.model`; a cache hit is not timed |
 | Every plugin frame boot | `host/frames/PluginFrame.tsx` | span `frame.boot`, ended on the frame's first message; an error record on the ten-second deadline |
@@ -555,7 +563,7 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
-| Is rendering the content expensive? | `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, and `diff.hydrator.reset` cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor. |
+| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, and `diff.hydrator.reset` cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor. |
 | Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
 | Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |
@@ -574,6 +582,12 @@ write to the next microtask checkpoint, the frame wait runs from there to the ne
 and the paint wait is the following frame. It does not walk the DOM or instrument component mounts.
 Outside an open interaction it is inert, and pane resizing is excluded because it fires on every
 pointer move. Callers may attach bounded numeric workload counts, never source or transcript content.
+
+`ui.render.batch` applies the same constraint to repeated synchronous factories. Calls with the same
+owner and operation during one JavaScript turn produce one span rather than one record per item. Its
+`work.ms` is the sum of time inside the wrapped factories, while `wall.ms` includes other synchronous
+work between the first factory and the microtask checkpoint. The agent transcript uses it only for
+its initial visible cards; streaming additions stay off the instrumentation path.
 
 The desktop responsiveness pulse crosses the platform seam and the authenticated helper socket once
 per second while the window is focused and visible, and immediately when the interaction changes.

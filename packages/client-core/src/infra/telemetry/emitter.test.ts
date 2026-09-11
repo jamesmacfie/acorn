@@ -14,7 +14,9 @@ import {
   setTelemetryEnabled,
   startClientTelemetry,
   startInteraction,
+  startOperation,
   startRenderTransition,
+  measureRenderBatch,
   telemetryEnabled,
 } from './emitter'
 
@@ -92,6 +94,28 @@ describe('the interaction trace', () => {
     expect(span?.kind === 'span' && span.traceId).toBe(interaction.traceId)
   })
 
+  it('joins a view operation to the open interaction without replacing it', async () => {
+    const interaction = startInteraction('core', { name: 'nav.change' })
+    const operation = startOperation('agents', { name: 'agents.sidebar.open' })
+    expect(operation.traceId).toBe(interaction.traceId)
+    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(interaction.spanId)
+
+    operation.end()
+    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(interaction.spanId)
+    interaction.end()
+    await flushTelemetry()
+
+    const span = posted[0].find((record) => record.kind === 'span' && record.name === 'agents.sidebar.open')
+    expect(span?.kind === 'span' && span.parentSpanId).toBe(interaction.spanId)
+  })
+
+  it('becomes the ambient interaction when an operation opens directly', () => {
+    const operation = startOperation('agents', { name: 'agents.center.open' })
+    expect(parseTraceparent(currentTraceparent())?.parentSpanId).toBe(operation.spanId)
+    operation.end()
+    expect(currentTraceparent()).toBeUndefined()
+  })
+
   it('attributes one render transition across the current turn and two frame opportunities', async () => {
     vi.useFakeTimers()
     const frames: FrameRequestCallback[] = []
@@ -137,6 +161,26 @@ describe('the interaction trace', () => {
     expect(frame).not.toHaveBeenCalled()
     await flushTelemetry()
     expect(posted).toEqual([])
+  })
+
+  it('aggregates repeated render factories into one turn span', async () => {
+    vi.useFakeTimers()
+    const interaction = startInteraction('agents', { name: 'agents.session.open' })
+    expect(measureRenderBatch('agents', 'agents.transcript.cards', () => 'first', { 'items.visible': 2 })).toBe('first')
+    expect(measureRenderBatch('agents', 'agents.transcript.cards', () => 'second', { 'items.visible': 2 })).toBe('second')
+
+    await Promise.resolve()
+    interaction.end()
+    await flushTelemetry()
+
+    const spans = posted[0].filter((record) => record.kind === 'span' && record.name === 'ui.render.batch')
+    expect(spans).toHaveLength(1)
+    expect(spans[0].kind === 'span' && spans[0].parentSpanId).toBe(interaction.spanId)
+    expect(spans[0].kind === 'span' && spans[0].attrs).toMatchObject({
+      operation: 'agents.transcript.cards',
+      calls: 2,
+      'items.visible': 2,
+    })
   })
 })
 

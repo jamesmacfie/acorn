@@ -116,7 +116,7 @@ export function setTelemetryEnabled(on: boolean): void {
   if (state.enabled === on) return
   state.generation += 1
   slowSamples = 0
-  if (!on) { activity = null; clearInteractionWork() }
+  if (!on) { activity = null; clearInteractionWork(); renderBatches.clear() }
   state.enabled = on
   notifyActivity()
   if (on) return arm()
@@ -232,6 +232,17 @@ export function startInteraction(owner: string, input: SpanInput): SpanHandle {
       }
     },
   }
+}
+
+/**
+ * Describe work caused by the current interaction without replacing its ambient trace. If there is
+ * no interaction to join, the operation becomes one so its requests and render probes still share a
+ * root. View lifecycles use this distinction: mounting a view is usually a consequence of a command
+ * or navigation, while opening it directly still needs a complete trace of its own.
+ */
+export function startOperation(owner: string, input: SpanInput): SpanHandle {
+  if (!telemetryEnabled()) return INERT
+  return currentTrace() ? startSpan(owner, input) : startInteraction(owner, input)
 }
 
 export type TelemetryActivity = { owner: string; operation: string; traceId: string; spanId: string }
@@ -396,6 +407,59 @@ export function startRenderTransition(
   return {
     update: (next) => { attrs = { ...attrs, ...next } },
     cancel: () => finish('cancelled'),
+  }
+}
+
+type RenderBatch = {
+  span: SpanHandle
+  started: number
+  calls: number
+  workMs: number
+}
+const renderBatches = new Map<string, RenderBatch>()
+
+/**
+ * Aggregate repeated synchronous render factories into one span for the current JavaScript turn.
+ * A list can wrap every initial row without emitting one record per row: the span reports the call
+ * count, time inside the wrapped factories, and wall time from the first factory to the microtask
+ * checkpoint. Outside an interaction it is the original call with no allocation or scheduling.
+ */
+export function measureRenderBatch<T>(
+  owner: string,
+  operation: string,
+  run: () => T,
+  attrs?: TelemetryAttrs,
+): T {
+  const trace = currentTrace()
+  if (!telemetryEnabled() || !trace) return run()
+  const key = `${trace.spanId}\u0000${owner}\u0000${operation}`
+  let batch = renderBatches.get(key)
+  if (!batch) {
+    batch = {
+      span: startSpan(owner, { name: 'ui.render.batch', attrs: { ...attrs, operation } }),
+      started: performance.now(),
+      calls: 0,
+      workMs: 0,
+    }
+    renderBatches.set(key, batch)
+    const pending = batch
+    queueMicrotask(() => {
+      if (renderBatches.get(key) !== pending) return
+      renderBatches.delete(key)
+      pending.span.end('ok', {
+        operation,
+        calls: pending.calls,
+        'work.ms': pending.workMs,
+        'wall.ms': performance.now() - pending.started,
+      })
+    })
+  }
+  const started = performance.now()
+  batch.calls += 1
+  try {
+    return run()
+  } finally {
+    batch.workMs += performance.now() - started
   }
 }
 
@@ -602,6 +666,7 @@ export function _resetClientTelemetry(): void {
   state.posting = false
   state.queue = telemetryQueue()
   state.histograms.clear()
+  renderBatches.clear()
   state.trace = null
   state.truncated = 0
   state.runtime = 'renderer'
@@ -615,12 +680,16 @@ export function _resetClientTelemetry(): void {
 export type PluginTelemetry = {
   observe(name: string, value: number, unit?: string, attrs?: TelemetryAttrs): void
   startInteraction(name: string, attrs?: TelemetryAttrs): SpanHandle
+  /** Join the current interaction as a child, or become the interaction when opened directly. */
+  startOperation(name: string, attrs?: TelemetryAttrs): SpanHandle
   event(name: string, attrs?: TelemetryAttrs): void
   count(name: string, value?: number, attrs?: TelemetryAttrs): void
   gauge(name: string, value: number, attrs?: TelemetryAttrs): void
   error(error: ErrorInput): void
   /** Time one call and return its own result untouched. Promise-aware. */
   measure<T>(name: string, run: () => T, attrs?: TelemetryAttrs): T
+  /** Aggregate repeated render factories into one span for the current JavaScript turn. */
+  measureRenderBatch<T>(operation: string, run: () => T, attrs?: TelemetryAttrs): T
   /** For work whose start and end do not fit one closure. `end` is idempotent, and the span hangs
    *  under whatever interaction is open. */
   startSpan(name: string, options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string }): SpanHandle
@@ -643,11 +712,13 @@ export type PluginTelemetry = {
 export const telemetryFor = (owner: string): PluginTelemetry => ({
   observe: (name, value, unit, attrs) => recordSample(owner, name, value, unit, attrs),
   startInteraction: (name, attrs) => startInteraction(owner, { name, attrs }),
+  startOperation: (name, attrs) => startOperation(owner, { name, attrs }),
   event: (name, attrs) => emitEvent(owner, name, attrs),
   count: (name, value = 1, attrs) => emitMetric(owner, { name, type: 'count', value, ...(attrs ? { attrs } : {}) }),
   gauge: (name, value, attrs) => emitMetric(owner, { name, type: 'gauge', value, ...(attrs ? { attrs } : {}) }),
   error: (error) => emitError(owner, error),
   measure: (name, run, attrs) => measure(owner, name, run, attrs),
+  measureRenderBatch: (operation, run, attrs) => measureRenderBatch(owner, operation, run, attrs),
   startSpan: (name, options) => startSpan(owner, { name, ...options }),
   startRenderTransition: (operation, attrs) => startRenderTransition(owner, operation, attrs),
 })
