@@ -18,6 +18,11 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ get data() { return [{ id: 'p1', name: 'acorn', vcs: 'git' }] } }),
 }))
 vi.mock('../../infra/queries', () => ({ projectsOptions: () => ({}) }))
+vi.mock('../tasks/taskBridge', () => ({
+  taskBridge: () => ({
+    project: { get: async () => ({ config: { branchPrefix: null } }) },
+  }),
+}))
 
 const TASK: Task = { id: 'task-9', title: 'Fix it', branch: 'james/fix-it' } as Task
 
@@ -130,6 +135,23 @@ describe('the workflow step', () => {
 // A pull request's head branch already exists on the remote, so the field's seeded value is the
 // branch, not a suggestion. Slugging it gave the task a local branch that could never be pushed back.
 describe('the branch field', () => {
+  it('derives the branch from the task title when the provider does not seed one', async () => {
+    seedBranch = ''
+    mount()
+    await settle()
+
+    const [titleField, branchField] = inputs()
+    expect(branchField.value).toBe('typeerror')
+    expect(primary().disabled).toBe(false)
+
+    type(titleField, 'Fix Login Crash!')
+    expect(branchField.value).toBe('fix-login-crash')
+    primary().click()
+    await settle()
+
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ branch: 'fix-login-crash' }))
+  })
+
   it('creates the task on the seeded branch verbatim', async () => {
     seedBranch = 'dependabot/npm_and_yarn/dev-dependencies-0e84c50104'
     mount()

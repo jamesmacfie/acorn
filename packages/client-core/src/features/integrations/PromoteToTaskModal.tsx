@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, onMount, Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
@@ -9,6 +9,8 @@ import { sourceRegistry } from '../../host/registries/sources/sources'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { Alert, Button, Field, Input, Select } from '../../kit/components/primitives'
+import { taskBridge } from '../tasks/taskBridge'
+import { defaultBranchForTask } from '../tasks/defaultBranch'
 
 /**
  * The workflow step, drawn above the tabs when the caller wants one (docs/workflows.md § Starting a
@@ -49,6 +51,11 @@ export function PromoteToTaskModal(props: {
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
   const github = () => project()?.github
+  const [projectConfig] = createResource(
+    () => (project()?.vcs === 'git' ? project()?.id : undefined),
+    (projectId) => taskBridge().project.get(projectId),
+  )
+  const branchPrefix = () => projectConfig()?.config.branchPrefix ?? null
   const promotion = () => {
     const source = sourceRegistry.get(props.providerId)
     // A source with no promotion cannot be promoted through this modal, and nothing opens it for
@@ -124,12 +131,14 @@ export function PromoteToTaskModal(props: {
   // The branch the task is actually made on. A name the provider seeded is used verbatim: a pull
   // request's head branch already exists on the remote, and slugging it away gave the task a local
   // branch that could never be pushed to that pull request ('npm_and_yarn' became 'npm-and-yarn').
-  // Only what a person types here is slugged, because they are naming a branch that does not exist
-  // yet. Either way an unusable name leaves the button disabled.
+  // With no provider seed, the title supplies the same prefixed, de-duplicated default as the rail's
+  // local-task dialog. Only what a person types in the branch field is slugged. Either way an
+  // unusable name leaves the button disabled.
+  const defaultBranch = () => defaultBranchForTask(title(), branchPrefix(), props.existingBranches)
   const effectiveBranch = () => {
     if (branchTouched()) return slugifyBranch(branch())
     const seeded = branch().trim()
-    return isValidBranch(seeded) ? seeded : ''
+    return seeded ? (isValidBranch(seeded) ? seeded : '') : defaultBranch()
   }
 
   const canAttach = () => typeof promotion().attachToCurrentTask === 'function' && props.attachTasks.length > 0
@@ -234,7 +243,21 @@ export function PromoteToTaskModal(props: {
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
               <input class="ui-input" type="text" placeholder="Task title" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
               <Show when={project()?.vcs === 'git'}>
-                <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => { setBranchTouched(true); setBranch(e.currentTarget.value) }} />
+                <input
+                  class="ui-input"
+                  type="text"
+                  placeholder="branch (from title)"
+                  title="Branch name — defaults to a slug of the title"
+                  value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
+                  onInput={(e) => {
+                    // Read and store the edit before switching the value expression to the touched
+                    // branch. Solid updates synchronously, so flipping the flag first would restore
+                    // the seeded value before `currentTarget.value` was read.
+                    const value = e.currentTarget.value
+                    setBranch(value)
+                    setBranchTouched(true)
+                  }}
+                />
               </Show>
               <div class="close-actions">
                 <Button onPress={props.onClose}>Cancel</Button>

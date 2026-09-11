@@ -323,7 +323,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           <PromoteToTaskModal
             providerId={props.descriptor.id}
             item={item()}
-            headerLabel={`Create task — ${item().id}`}
+            headerLabel="Create task"
             itemTitle={item().title}
             attachTasks={attachTasks()}
             existingBranches={(tasks.data ?? []).flatMap((task) => task.branch ? [task.branch] : [])}
