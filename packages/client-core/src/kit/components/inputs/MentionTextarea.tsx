@@ -201,6 +201,10 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           if (!pasted.length || !props.onFiles) return
           event.preventDefault()
           props.onFiles(pasted)
+          // A paste belongs to this field. Adding the attachment can synchronously redraw the
+          // surrounding composer, so restore the caret after those updates have settled instead of
+          // making the reader click back into the draft before they can keep typing.
+          queueMicrotask(() => field?.focus())
         }}
         onDragOver={(event) => {
           if (props.onFiles && event.dataTransfer?.types.includes('Files')) event.preventDefault()
