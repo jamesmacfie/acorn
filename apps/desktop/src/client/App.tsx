@@ -1,0 +1,575 @@
+// The desktop's own chrome, and why it is here rather than in client-core: it is the arrangement, not
+// the parts. Topbar, rail, routing and the overlay slots are what this composition root decides, and
+// docs/future/client-plugins/ replaces that arrangement with declared slots rather than moving it.
+import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
+import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
+import { clear } from 'idb-keyval'
+import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
+import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
+import { setTaskLookup } from '@acorn/client-core/features/tasks/taskLookup.ts'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx'
+import WorkspacePicker from '@acorn/client-core/kit/components/inputs/WorkspacePicker.tsx'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
+import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
+import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
+import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
+import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
+import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
+import { initSoundNotices } from '@acorn/client-core/features/notifications/chime.ts'
+import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
+import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
+import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
+import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
+import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/features/tasks/tasks.ts'
+import { isTerminalTarget } from '@acorn/client-core/host/keys/install.ts'
+import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
+import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
+import { desktopExtras } from '@acorn/client-core/infra/platform/index.ts'
+import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
+import NodeChip from '@acorn/client-core/features/fleet/NodeChip.tsx'
+import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
+import { warnOnceAboutDisk } from '@acorn/client-core/infra/node/nodeSecurity.ts'
+import { applyNodePlugins } from './activate'
+import TaskView from './TaskView'
+import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
+import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { appearanceCommands, notificationCommands, settingsPageCommands } from '@acorn/client-core/host/registries/commands/coreCommands.ts'
+import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
+import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
+import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
+import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
+import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
+import { startClientSchedules } from '@acorn/client-core/host/registries/shell/schedules.ts'
+import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import { createAppStartupRestore } from '@acorn/client-core/infra/persistence/appStartup.ts'
+import { createTaskDeepLink } from '@acorn/client-core/features/tasks/taskDeepLink.ts'
+import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
+import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
+import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
+import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
+import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { telemetryOn } from '@acorn/client-core/features/settings/telemetrySetting.ts'
+
+// The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
+// navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
+// compete with the first interactive paint.
+const SettingsModal = lazy(() => import('@acorn/client-core/features/settings/SettingsModal.tsx'))
+
+// Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
+// and PullDetail (mid) read useParams() directly; routes exist only to populate params.
+export default function App() {
+  const queryClient = useQueryClient()
+  const params = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isRestoring = useIsRestoring()
+  // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
+  // integrations, shortcuts. `settingsTab` seeds which tab opens.
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
+  const [settingsTab, setSettingsTab] = createSignal('workspaces')
+  const openSettings = (tab = 'workspaces') => {
+    setSettingsTab(tab)
+    setSettingsOpen(true)
+  }
+  // Panes deep-link here rather than receiving an `openSettings` prop: the modal is the shell's, and
+  // threading a callback through every pane that might ever want one is worse than one event.
+  onMount(() => onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))))
+  // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
+  // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
+  // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.
+  const inTaskView = () => !selectedSource() && !!activeTask()
+  const termOpen = () => inTaskView() && isTerminalOpen(activeTaskId())
+  const toggleTerm = () => {
+    const id = activeTaskId()
+    if (id) setTerminalOpen(id, !isTerminalOpen(id))
+  }
+  // Idempotent, unlike the toggle. The drawer contribution closes itself when its last tab goes, and
+  // that path can fire twice (TerminalPanel.closeTab decides after two awaits, so two racing closes
+  // both see an empty roster). A second toggle would reopen the drawer and auto-launch a profile into
+  // it.
+  const closeTerm = () => {
+    const id = activeTaskId()
+    if (id) setTerminalOpen(id, false)
+  }
+
+  // The one place that holds both the QueryClient and the whole mounted app, which is what
+  // client-core's module-level task lookup needs (tasks/taskLookup.ts states why it cannot reach
+  // either itself). Installed before anything is clickable, so a content-link click can ask whether a
+  // pane is available on the task it names rather than claiming the event and rendering nothing.
+  setTaskLookup((taskId) => queryClient.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
+  // Same argument, one entity over: a content-link path resolver asks whether an external URL names a
+  // repo acorn tracks, and only the project rows know (projects/projectLookup.ts).
+  setProjectsLookup(() => queryClient.getQueryData<Project[]>(projectsKey) ?? [])
+
+  // Shell-owned commands are registered once; the single dispatcher below owns the only global
+  // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
+  onMount(() => {
+    const commands = registerCommands([
+      { id: 'core.settings.open', title: 'Open settings', category: 'navigation', run: () => openSettings() },
+      {
+        id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
+        when: inTaskView,
+        run: () => {
+          const taskId = activeTaskId()
+          if (!taskId) return
+          const inTerminal = isTerminalTarget(document.activeElement)
+          if (inTerminal) {
+            setMaximizedPane(taskId, null)
+            setTerminalMax(taskId, !isTerminalMax(taskId))
+          } else if (focusedPane(taskId)) {
+            setTerminalMax(taskId, false)
+            toggleFocusedPaneMax(taskId)
+          } else if (isTerminalMax(taskId)) {
+            setTerminalMax(taskId, false)
+          } else if (isTerminalOpen(taskId)) {
+            setTerminalOpen(taskId, false)
+          }
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
+      { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
+      // The command is the palette's own Last workspace row, registered with the rest of the Go to
+      // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
+      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Switch to the last workspace', category: 'Global', defaultChord: 'meta+;', when: 'global' },
+    ])
+    // The two settings core owns, as bounded choices with the current value marked. Both write through
+    // the same accessors Settings → Appearance and Settings → Notifications call
+    // (client-core/host/registries/commands/coreCommands.ts), so there is one persistence path per
+    // value and not two.
+    //
+    // Registered here rather than in client-core because this app is what contributes those pages
+    // (./pageContributions.tsx): a host with no Appearance page has nothing for an Appearance command
+    // to agree with.
+    const settings = registerCommands([...appearanceCommands(queryClient), ...notificationCommands(queryClient)])
+    onCleanup(() => { settings.dispose(); bindings.dispose(); commands.dispose() })
+  })
+
+  // One row per registered Settings page, rebuilt when the roster changes: a plugin contributes pages,
+  // so a list taken once would go stale the moment one loads or is disabled.
+  createEffect(() => {
+    const pages = registerCommands(settingsPageCommands(openSettings))
+    onCleanup(() => pages.dispose())
+  })
+
+  onMount(() => {
+    // The one archive producer left on the client, and it produces nothing of its own: it asks the
+    // node, which is where every plugin now declares what it has to say about archiving a task
+    // (node-core/server/pluginHost/taskChecks.ts). The docker, changes and terminal warnings that used to
+    // be registered here and in the docker client bundle all arrive through this.
+    //
+    // Mapped rather than passed through because a node concern carries no callback: the cleanup the
+    // owner ticks is a route the node runs at the right point in the archive, and the id below is
+    // what the archive request hands back to name it.
+    const offNode = registerWillHandler('task:archive', 'plugins', async ({ taskId }) =>
+      (await taskBridge().task.archiveConcerns(taskId)).map((concern) => ({
+        id: concern.id,
+        feature: concern.pluginId,
+        message: concern.message,
+        severity: concern.severity,
+        ...(concern.details ? { details: concern.details } : {}),
+        ...(concern.detailsMore ? { detailsMore: concern.detailsMore } : {}),
+        ...(concern.action ? { checkbox: concern.action } : {}),
+      })))
+    // Quitting has no node meaning: a node does not know a window is closing, so this one stays a
+    // client handler over the session store.
+    const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
+      const active = sessions().filter((session) => session.status === 'running')
+      return active.length
+        ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
+        : null
+    })
+    onCleanup(() => { offQuit(); offNode() })
+  })
+  onMount(() => {
+    const off = desktopExtras()?.onWillQuit(async () => (await confirmWillEvent({
+      kind: 'app:quit', payload: {}, title: 'Quit acorn', actionLabel: 'Quit',
+    })).confirmed)
+    if (off) onCleanup(off)
+  })
+
+  // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
+  // badge can show agent-working activity. No-op when the node does not run the terminal plugin
+  // (hasHostCapability); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
+  onMount(() => {
+    if (!hasHostCapability({ plugin: 'terminal' })) return
+    onCleanup(initSessions())
+    onCleanup(startClientSchedules())
+  })
+
+  // Workflow notices are broadcast over `/v2/events` by main, not by the terminal plugin, and a node
+  // without a terminal still runs workflows. They were inside the guard above, which meant no gate
+  // notice at all on such a node.
+  onMount(() => onCleanup(initWorkflowNotices()))
+
+  // The sound channel. Every unseen notice the gate lets through, whatever raised it.
+  onMount(() => onCleanup(initSoundNotices()))
+
+  // The system channel, on the same terms. The dock badge is the bell's, because it is the bell's
+  // number (features/notifications/NotificationBell.tsx).
+  onMount(() => onCleanup(initSystemNotices()))
+
+  // Which plugins the node this shell is showing runs.
+  //
+  // Not `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
+  // mounts App inside a `<Show keyed>` on the active node, so a switch disposes this component and
+  // builds a new one: the fresh effect records the new node and defers, the dying one is disposed
+  // during Solid's pure pass before user effects flush, and `applyNodePlugins` ran exactly once per
+  // window, at boot, from index.tsx. Every node after the first kept the previous node's
+  // contributions, so a plugin disabled on node B still had its pane, source, poller and settings
+  // page. The comment claiming "for the second one onwards" was precisely backwards.
+  //
+  // A plain effect reading the signal is right because of that remount: it runs once on mount, which
+  // is once per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node
+  // whose list it has already applied.
+  // Re-reads on the node's connection state as well as its identity, which is what makes it a retry.
+  // The shell mounts before the node is up now, so the boot attempt in index.tsx usually fails
+  // against nothing listening; `applyNodePlugins` leaves itself unapplied when the node did not
+  // answer, so this runs again the moment the broker reports the node reachable. `offline` is skipped
+  // because a request then cannot succeed.
+  createEffect(() => {
+    const nodeId = activeNodeId()
+    if (nodeId && nodeState(nodeId) !== 'offline') void applyNodePlugins(nodeId)
+  })
+
+  // The one-time disk-encryption warning (docs/data-layer.md § Backup: "the app surfaces a one-time
+  // warning if the disk isn't encrypted"). Once per (device, node), which is why it sits here beside the
+  // plugin apply rather than at boot: a node the owner pairs later has never been checked, and the same
+  // remount that makes the effect above correct makes this one fire for it.
+  //
+  // `warnOnceAboutDisk` swallows its own failures and records the acknowledgement before pushing, so this
+  // can never be the thing that fails a boot or repeats every launch.
+  createEffect(() => {
+    const nodeId = activeNodeId()
+    if (!nodeId) return
+    const label = nodes().find((candidate) => candidate.nodeId === nodeId)?.label ?? 'This node'
+    void warnOnceAboutDisk(queryClient, nodeId, label)
+  })
+
+  // Gated on having a node to ask, not on an identity: there is no login. `nodeReady()` means the
+  // fleet has answered and a node is selected, which is what makes a request addressable — not that
+  // the node is up. So these can fire at a node that is still booting and come back as errors, and
+  // that is the design: whatever the persisted cache holds is already on screen behind them, and
+  // index.tsx refetches the mounted ones when the node reports itself reachable.
+  const prefs = createQuery(() => prefsOptions(nodeReady()))
+  const integrations = createQuery(() => integrationsOptions(nodeReady()))
+  const projects = createQuery(() => projectsOptions(nodeReady()))
+  const tasks = createQuery(() => tasksOptions(nodeReady()))
+  const workspaces = createQuery(() => workspacesOptions(nodeReady()))
+  const [collapsed, setCollapsed] = createSignal(false)
+
+  createAppStartupRestore({
+    queryClient,
+    prefs: () => prefs.data,
+    cacheRestoring: isRestoring,
+    projects: () => projects.data,
+    tasks: () => tasks.data,
+    path: () => location.pathname,
+    navigate,
+    collapsed,
+    setCollapsed,
+  })
+
+  // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
+  // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
+  createTaskDeepLink({
+    taskId: () => activeTaskId(),
+    search: () => location.query,
+    navigate,
+  })
+
+  // Active workspace is derived from the current project. The active node's list, because the route
+  // carries no node, so the workspace the shell is showing is whichever one the active node has for
+  // this repo.
+  const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
+  // TaskView registers callbacks with the keymap, whose layer can still be evaluated while Solid is
+  // disposing the view. Keep the last row available for that teardown tick after an archive removes
+  // it from the query. Rendering still gates on `activeTask()` below, so a missing row is never shown.
+  // Retaining the row instead of keying on the whole object also avoids remounting every pane when a
+  // refetch changes task metadata without changing which task is open.
+  const taskForView = createMemo<Task | null>((previous) => activeTask() ?? previous ?? null)
+  // Which project the shell is "in". The generic task route (`/t/:taskId`) carries no projectId, so
+  // without the task fallback the workspace and project pickers went blank the moment you opened a
+  // task, and the per-workspace view memory below never saw a workspace change.
+  const contextProjectId = () => params.projectId ?? activeTask()?.projectId
+  // A memo, and one that holds its last answer, for two reasons that both belong to the transition
+  // effect below.
+  //
+  // `on` re-fires on identity, not on value, so keying it on a plain derivation re-planned the whole
+  // workspace change on every tasks, projects or params tick.
+  //
+  // And the derivation reports nothing for a beat in ordinary use: while the workspaces query is
+  // cold, and between a task path and its task row landing. `on` would record that nothing as the
+  // workspace we were leaving, and the guard below then dropped the next real switch, which is one
+  // way the last view fails to come back. Holding the last known workspace also stops the topbar
+  // pickers and the rail's scope blinking through the same gap.
+  const activeWorkspace = createMemo<Workspace | null>((previous) =>
+    workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null)
+  const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+
+  // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
+  // switch). An effect rather than a call at boot, because the preference arrives after the first
+  // paint and can change while the app is open: the node's collector re-reads its own copy every
+  // five seconds, and this is the renderer's half of the same promise.
+  createEffect(() => setTelemetryEnabled(telemetryOn(prefs.data)))
+
+  // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
+  // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
+  // than from the picker, because opening a task in another workspace is a change of workspace too.
+  createEffect(() => {
+    const ws = activeWorkspace()
+    if (ws) noteWorkspaceVisit(ws.id)
+  })
+
+  // Whatever source was selected has to still be on offer. A workspace switch can take one away:
+  // a browse source only appears where its provider is connected and the workspace links one of its
+  // projects, and neither is a fact about the source alone.
+  createEffect(() => {
+    const current = selectedSource()
+    const connected = integrations.data?.integrations
+    if (!current || !connected) return
+    if (!availableSources(connected, sourceScope()).some((source) => source.id === current)) {
+      setSelectedSource(defaultSourceId() ?? null)
+    }
+  })
+
+  // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
+  // exactly one node, and two nodes both having a "Default" is the normal case.
+  const fleetWorkspaces = createFleetWorkspaces()
+  const activeFleetWorkspace = () => {
+    const workspace = activeWorkspace()
+    if (!workspace) return null
+    return fleetWorkspaces().entries.find((entry) => entry.nodeId === activeNodeId() && entry.workspace.id === workspace.id) ?? null
+  }
+  // Projects scoped to the active workspace for the topbar selector. Falls back to all projects before
+  // the workspace mapping has loaded so the picker is never empty.
+  const scopedProjects = () => {
+    const ws = activeWorkspace()
+    const all = (projects.data ?? []).filter((project) => !project.hidden)
+    if (!ws) return all
+    return all.filter((project) => project.workspaceId === ws.id)
+  }
+
+  // Remember the last view per workspace (a rail source or a task) so switching workspaces returns
+  // you to exactly what you were looking at, not always Home. On each real workspace change: record
+  // the view we're leaving, then restore the one we're entering (core Home by default). `defer` skips the
+  // startup null→workspace resolution so the persisted-state pipeline's `last_source`/`last_task`
+  // restore still wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
+  createEffect(
+    on(activeWorkspace, (ws, prevWs) => {
+      if (!ws || !prevWs || ws.id === prevWs.id) return
+      const transition = planWorkspaceViewTransition({
+        previousWorkspace: prevWs,
+        nextWorkspace: ws,
+        selectedSource: untrack(selectedSource),
+        activeTaskId: untrack(activeTaskId),
+        tasks: tasks.data ?? [],
+        defaultSource: defaultSourceId() ?? '',
+        rememberedNextView: workspaceView(ws.id),
+      })
+      if (transition.previousView) rememberWorkspaceView(prevWs.id, transition.previousView)
+
+      if (transition.next.kind === 'keep-task') {
+        // An explicit task jump already selected the destination task before navigation. Keep it,
+        // and seed the destination memory so a later workspace switch returns to the same task.
+        rememberWorkspaceView(ws.id, { taskId: transition.next.task.id })
+      } else if (transition.next.kind === 'restore-task') {
+        activateTaskSignals(transition.next.task)
+        navigate(pathForTask(transition.next.task), { replace: true })
+      } else {
+        // Also overwrites an invalid remembered task, so old cross-workspace pollution heals in
+        // the current session rather than requiring a restart.
+        rememberWorkspaceView(ws.id, { source: transition.next.source })
+        setSelectedSource(transition.next.source)
+      }
+    }, { defer: true }),
+  )
+
+  const slotContext = (): UiSlotContext => ({
+    taskActive: inTaskView(),
+    terminalOpen: termOpen(),
+    toggleTerminal: toggleTerm,
+    closeTerminal: closeTerm,
+    openSettings,
+    activeTask: activeTask(),
+    selectTask: (taskId) => {
+      const task = tasks.data?.find((candidate) => candidate.id === taskId)
+      if (!task) return
+      activateTaskSignals(task)
+      navigate(pathForTask(task))
+    },
+  })
+
+  // The project picker appears where choosing a project changes something: a source that declared
+  // itself project-scoped, or a task view, where it is the only thing naming the task's project
+  // (`/t/:taskId` carries no projectId, so the breadcrumb shows the brand instead). On Home it used to
+  // sit there looking like navigation and move nothing but the breadcrumb.
+  //
+  // Through `sourceIsProjectScoped` rather than a local check, so a palette command that switches
+  // project can ask the same question and the two can never disagree.
+  const showProjectPicker = () => scopedProjects().length > 0
+    && (inTaskView() || sourceIsProjectScoped(selectedSource()))
+
+  // The source on screen, when it has something to draw. A source that contributed neither a component
+  // nor regions is a rail row and nothing else, and the Switch's empty state below is the honest
+  // answer for it — which is what asking for `?.component` used to get us before `regions` existed.
+  const drawnSource = () => {
+    const source = sourceRegistry.get(selectedSource() ?? '')
+    return source && (source.component || source.regions) ? source : undefined
+  }
+
+  const toggleCollapsed = () => setCollapsed((value) => !value)
+
+  // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
+  const newMatch = useMatch(() => CREATE_TASK_ROUTE)
+  const isNew = () => !!newMatch()
+
+  async function clearCache() {
+    queryClient.clear()
+    await clear() // wipe the persisted IndexedDB cache before reload so it can't rehydrate
+    window.location.reload()
+  }
+
+  // The gate below is a state, not a wall (docs/frontend.md § Painting before the node).
+  // `nodeGateHolds()` is false the moment there is a node id to address, which on a warm launch is the
+  // first tick, so the rail, the topbar and the pane host draw from the persisted cache with the node
+  // still absent — empty lists where the cache is cold, and a chip that says the node is starting.
+  // What still holds the screen is a broker that could not answer and a launch with no node to talk
+  // to. The `isRestoring` gate stays: it is an IndexedDB read, and painting in front of it would show
+  // the empty shell and then fill it.
+  return (
+    <Show when={!nodeGateHolds() && !isRestoring()} fallback={<NodeGate />}>
+    <div class="shell">
+    <TabRail />
+    <div class="app" classList={{ 'left-collapsed': collapsed() }}>
+      <header class="topbar">
+        <div class="topbar-side">
+          <Button
+            variant="bare"
+            title={collapsed() ? 'Show left pane' : 'Hide left pane'}
+            pressed={collapsed()}
+            onPress={toggleCollapsed}
+          >
+            {collapsed() ? '»' : '«'}
+          </Button>
+          <Show when={fleetWorkspaces().entries.length}>
+            <WorkspacePicker
+              workspaces={fleetWorkspaces().entries}
+              active={activeFleetWorkspace()}
+              grouped={fleetWorkspaces().grouped}
+              /* Switches node context before navigating, so the route resolves against the node that
+                 owns the workspace (client-core's workspaces/fleetWorkspaces.ts explains the order).
+                 The last view is then restored per-workspace by the activeWorkspace effect above. */
+              onSelect={(entry) => selectFleetWorkspace(entry, navigate)}
+            />
+          </Show>
+          <Show when={showProjectPicker()}>
+            <Picker<Project>
+              label={scopedProjects().find((project) => project.id === contextProjectId())?.name ?? 'Select a project'}
+              ariaLabel="Project"
+              placeholder="Filter projects…"
+              emptyText="No projects."
+              results={(query) => {
+                const q = query.trim().toLowerCase()
+                return q ? scopedProjects().filter((project) => project.name.toLowerCase().includes(q)) : scopedProjects()
+              }}
+              rowLabel={(project) => project.name}
+              isActive={(project) => project.id === contextProjectId()}
+              disabled={!selectedSource() && !!activeTask()}
+              onSelect={(project) => {
+                if (!selectedSource()) {
+                  const source = defaultSourceId()
+                  if (source) setSelectedSource(source)
+                }
+                navigate(projectPath(project.id))
+              }}
+            />
+          </Show>
+        </div>
+        <div class="breadcrumb">
+          <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
+            <Button variant="bare" onPress={() => navigate(projectPath(params.projectId ?? ''))}>
+              {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
+            </Button>
+            <Show when={params.number}>
+              <span class="crumb-sep">/</span>
+              <span class="crumb crumb-num">#{params.number}</span>
+            </Show>
+            <Show when={isNew()}>
+              <span class="crumb-sep">/</span>
+              <span class="crumb crumb-num">new</span>
+            </Show>
+          </Show>
+        </div>
+        <div class="topbar-side topbar-end">
+          {/* Keep the node switcher out of production first-run until a second node exists. */}
+          <Show when={nodes().length > 1 || import.meta.env.DEV}>
+            <Select
+              width="auto"
+              label="Active node"
+              value={activeNodeId() ?? ''}
+              onChange={(value) => setActiveNode(value || null)} options={[...nodes().map((node) => ({ value: node.nodeId, label: node.label }))]} />
+          </Show>
+          {/* The compact chip reports the active node's connection state; surfaces render their own
+              freshness where they have useful scope. */}
+          <Show when={activeNodeId()}>
+            {(nodeId) => <NodeChip nodeId={nodeId()} compact={nodes().length <= 1} query={{}} />}
+          </Show>
+          <SlotHost slot="topbar.right" context={slotContext()} />
+          <OverflowMenu onSettings={() => openSettings()} onClearCache={clearCache} />
+        </div>
+      </header>
+      <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
+      >
+        <Match when={drawnSource()}>
+          {(source) => <SourceSurface source={source()} />}
+        </Match>
+        <Match when={!selectedSource() && activeTask()}>
+          {/* Key by identity so task metadata refreshes do not remount its panes. `taskForView` holds
+              the last non-null row until this keyed scope and its command matchers have disposed. */}
+          <Show keyed when={activeTaskId()}>
+            {(_taskId) => (
+              <TaskView
+                task={taskForView()!}
+                terminalOpen={termOpen()}
+                onToggleTerminal={() => void toggleTerm()}
+                onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
+              />
+            )}
+          </Show>
+        </Match>
+      </Switch>
+      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
+      {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
+          from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
+          hold markup. */}
+      <CheatSheet />
+      <WillConfirmationHost />
+      {/* A referenced item from another provider, opened by any surface that renders content
+          (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
+          Before this, the only place in the app that could open one was github's PR conversation. */}
+      <RefPanelHost />
+      <Show when={settingsOpen()}>
+        <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
+      </Show>
+      {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
+          shell still owns the per-task `terminalOpen` flag, which the tab rail and topbar badge read
+          too, and passes it through slotContext; it no longer knows what fills the drawer. Order
+          matters: this host sits before the overlay host, so a dialog still paints above the drawer. */}
+      <SlotHost slot="drawer" context={slotContext()} />
+      <SlotHost slot="overlay" context={slotContext()} />
+    </div>
+    <Tips />
+    {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast
+        lands here too. */}
+    <ToastHost />
+    </div>
+    </Show>
+  )
+}

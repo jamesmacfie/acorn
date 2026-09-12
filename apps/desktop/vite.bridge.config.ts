@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 
 // The renderer bridge, as one self-contained script the shell injects into the webview before any page
 // script runs. That is what a preload is, and injecting it rather than importing it from the entry is
-// what keeps `src/app/client/index.tsx` shell-agnostic — the seam's whole point.
+// what keeps `src/client/index.tsx` shell-agnostic — the seam's whole point.
 //
 // IIFE, not a module: a webview initialization script is evaluated as a classic script, so it cannot
 // carry `import`.

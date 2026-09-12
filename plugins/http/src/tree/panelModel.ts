@@ -118,8 +118,18 @@ function build(subject: PanelSubject) {
   //
   // Subscribed once, here, rather than in a region: one worker serves both regions and so holds one
   // bridge, and two subscriptions would open the same request twice.
-  const [requested, setRequested] = createSignal<string | undefined>(subject.initialRequestId)
+  // The routed item first, then the selection that opened the pane. Those are two different arrivals:
+  // a project surface's selection is in the URL and comes down as a prop, and a task pane opened by a
+  // click or by the palette's curl import has no URL to hold one, so it arrives in `context`
+  // (docs/plugins.md § The tree contract).
+  const [requested, setRequested] = createSignal<string | undefined>(subject.initialRequestId ?? bridge.context.item)
   onCleanup(bridge.onSelect((item) => setRequested(item)))
+  // The palette's `New request` row, resolved by the host against this plugin's own manifest and
+  // delivered here. Subscribed once for the same reason `onSelect` is: one worker, one bridge, two
+  // regions, and two subscriptions would start two drafts.
+  onCleanup(bridge.onSurfaceAction((command) => {
+    if (command === 'new-request') startNew()
+  }))
   createEffect(() => {
     const id = requested()
     if (!id) return

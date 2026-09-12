@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ensureCert } from '../main/tls.ts'
+import { ensureCert } from '../server/transport/tls.ts'
 
 // One certificate per test process, copied into every data root that wants one.
 //

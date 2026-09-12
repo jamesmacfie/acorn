@@ -5,7 +5,7 @@
 // declared nodes at install; the client validates the stream at runtime; neither may reach for the
 // other's copy. See docs/plugins.md § The tree contract.
 //
-// The lists are duplicated from `client-core/src/ui/kit/{support,tokens}.ts`, which own them, and a
+// The lists are duplicated from `client-core/src/kit/tokens/{support,tokens}.ts`, which own them, and a
 // test over there fails the moment the two disagree. Protocol is a pure sink (tools/arch/boundaries.test.ts),
 // so an import is not available and a duplicate with a lock is the honest alternative.
 
@@ -23,15 +23,16 @@ export const KIT_NODES = [
   // Grouping
   'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar',
   'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
+  'Sections',
   'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer',
   // Showing
-  'Text', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
-  'DescriptionList', 'Table', 'Grid', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
+  'Text', 'Link', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
+  'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
   'FileHead', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
   // Asking
   'Button', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
   'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor', 'FindBar', 'Field', 'ConfirmButton',
-  'CopyButton', 'ModelConnectionPicker',
+  'CopyButton', 'ModelBackendPicker',
   // Pixels. A tree naming this gets the box and the keyboard contract, and nothing else: what fills a
   // rectangle with somebody else's pixels is the `rectangle` extension kind, which is an iframe the
   // host places as a sibling region and never a node in another plugin's stream.

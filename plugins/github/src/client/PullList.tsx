@@ -1,10 +1,10 @@
-import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import {
-  activateTaskSignals, CHECK_TONE, checksState, clientEvents, formatRelativeTime,
-  integrationsOptions, pathForTask, projectsOptions, railDotProps, workspaceForProject,
-  workspacesOptions,
+  activateTaskSignals, CHECK_TONE, checksState, clientEvents, contextMenuItems, formatRelativeTime,
+  integrationsOptions, pathForTask, projectsOptions, railDotProps, registerContextMenuItems,
+  runContextMenuItem, workspaceForProject, workspacesOptions, type ItemRowTarget,
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, EmptyState, Icon, Input, Menu, Row, RowActions, Rows, StatusDot, Tabs, Text,
@@ -12,10 +12,10 @@ import {
 } from '@acorn/plugin-api/ui'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
-import { type Pull } from '../contract/api'
+import { type Pull } from '../shared/api'
 import { filterPulls } from './pullList/model'
-import { prFilterFor, setPrFilter } from './pullList/filterState'
-import { githubBrowsePath } from './routes'
+import { prFilterFor, setPrFilter } from './pullList/filterStore'
+import { githubBrowsePath } from './clientRoutes'
 import { promotePullToTask } from './pullTasks'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
@@ -83,7 +83,18 @@ export default function PullList() {
     label: `#${pull.number} ${pull.title}`,
   })))
   const byNumber = createMemo(() => new Map(shown().map((pull) => [String(pull.number), pull])))
-  const open = (number: string) => navigate(`${githubBrowsePath(params.projectId ?? '')}/${number}`)
+  // A pull's own URL, or nothing at all without a project to hang it off. `githubBrowsePath('')` is
+  // `/p/`, so the old `?? ''` built `/p//42` — which is not a broken path, it is a *different* one:
+  // the empty segment falls out of the split and `/p/:projectId` matches with the pull number as the
+  // project. The shell then finds no such project in the workspace and navigates to the first one,
+  // and the list the reader was moving through reloads for another repository
+  // (apps/tui/src/chrome/routing.ts).
+  const pullPath = (number: string): string | null =>
+    params.projectId ? `${githubBrowsePath(params.projectId)}/${number}` : null
+  const open = (number: string) => {
+    const path = pullPath(number)
+    if (path) navigate(path)
+  }
 
   // Promotes a pull into a task: origin github-pr, branch = headRef, pullNumber
   // (docs/workspaces-and-tasks.md § Task creation and navigation).
@@ -110,6 +121,43 @@ export default function PullList() {
       setTaskError(error instanceof Error ? error.message : 'Could not create a task for this PR.')
     }
   }
+
+  // What a row's menu is about, in the shape core's rail list uses, so one registry serves both
+  // (docs/plugins.md § Context menus). The pull itself rides along as `item`; only `providerId` and
+  // `projectId` are facts a contributed row may match on.
+  //
+  // `body` comes from the warmed detail cache when the row has one, because the list route does not
+  // carry a pull's body and asking for a hundred of them to fill a menu nobody opened would be a
+  // worse trade than a menu that sometimes starts a workflow with the title alone.
+  const rowTarget = (pull: Pull, body?: string | null): ItemRowTarget => ({
+    location: 'item.row',
+    id: String(pull.number),
+    title: `#${pull.number} ${pull.title}`,
+    providerId: 'github',
+    projectId: params.projectId ?? '',
+    ...(body ? { body } : {}),
+    ...(owner() && repo() ? { link: `https://github.com/${owner()}/${repo()}/pull/${pull.number}` } : {}),
+    item: pull,
+  })
+
+  onMount(() => {
+    // This list's own row, on the registry rather than written into the menu below. It keeps
+    // `openAsTask` exactly as it was — find the PR's task or make one, with its Linear links — and
+    // it now sits beside whatever else offers an `item.row` action, "Start workflow…" first among
+    // them.
+    const rows = registerContextMenuItems([
+      {
+        id: 'github.pull.create-task',
+        location: 'item.row',
+        label: 'Create task',
+        icon: 'square-plus',
+        order: 10,
+        when: (target) => target.providerId === 'github' && !!(target.item as Pull).headRef,
+        run: (target) => void openAsTask(target.item as Pull),
+      },
+    ])
+    onCleanup(() => rows.dispose())
+  })
 
   let rowPrefetch: { cancel: () => void } | null = null
   const cancelRowPrefetch = () => {
@@ -171,51 +219,70 @@ export default function PullList() {
             onActivate={open}
           >
             {(item, itemProps, selected, place) => {
-              const pull = () => byNumber().get(item.key)!
+              // Not `byNumber().get(item.key)!`. A row outlives the list it was built from by the
+              // width of one update: the pull list refetches under the reader — a prefetch on the row
+              // they just moved to, a websocket invalidation, the refresh button — and a row whose
+              // pull has left the map runs its own accessors once more before it is disposed. With
+              // the assertion that read `undefined.title`, and a throw inside a row takes the whole
+              // list down with it, which in a terminal is a browse panel that goes blank and says
+              // nothing (apps/tui/src/panel.tsx).
+              const pull = () => byNumber().get(item.key)
               // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
               // checks dot appears as prefetchOpenPulls seeds each pull. No checks → no dot.
               const detail = createQuery(() => pullDetailOptions(owner(), repo(), item.key, false))
               const checks = () => detail.data?.checks ?? []
               return (
-                <Row
-                  item={itemProps}
-                  // `href` keeps the real link for middle-click and copy address; `onPress` routes
-                  // the plain click.
-                  href={`${githubBrowsePath(params.projectId ?? '')}/${item.key}`}
-                  onPress={() => open(item.key)}
-                  selected={selected()}
-                  onHover={(entered) => (entered ? queueRowPrefetch(pull().number) : cancelRowPrefetch())}
-                  offset={place.offset}
-                  height={place.height}
-                  title={pull().title}
-                  label={item.label}
-                  leading={
-                    <>
-                      <Show when={checks().length}>
-                        <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
-                      </Show>
-                      <Icon name={PR_STATE_ICON[prState(pull())]} title={prState(pull())} size={14} />
-                      {/* The author column is gone, so the avatar carries the login on hover. */}
-                      <UserAvatar login={pull().author} />
-                      <Text emphasis="muted">#{item.key}</Text>
-                    </>
-                  }
-                  meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
-                  metaFields={1}
-                  trailing={
-                    <Show when={pull().headRef}>
-                      <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
-                        {(menu) => (
-                          <Menu.Item context={menu} onSelect={() => void openAsTask(pull())}>
-                            Create task
-                          </Menu.Item>
-                        )}
-                      </RowActions>
-                    </Show>
-                  }
-                >
-                  {pull().title}
-                </Row>
+                <Show when={pull()}>
+                  {(pull) => (
+                    <Row
+                      item={itemProps}
+                      // `href` keeps the real link for middle-click and copy address; `onPress` routes
+                      // the plain click.
+                      {...(pullPath(item.key) ? { href: pullPath(item.key)! } : {})}
+                      onPress={() => open(item.key)}
+                      selected={selected()}
+                      onHover={(entered) => (entered ? queueRowPrefetch(pull().number) : cancelRowPrefetch())}
+                      offset={place.offset}
+                      height={place.height}
+                      title={pull().title}
+                      label={item.label}
+                      leading={
+                        <>
+                          <Show when={checks().length}>
+                            <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
+                          </Show>
+                          <Icon name={PR_STATE_ICON[prState(pull())]} title={prState(pull())} size={14} />
+                          {/* The author column is gone, so the avatar carries the login on hover. */}
+                          <UserAvatar login={pull().author} />
+                          <Text emphasis="muted">#{item.key}</Text>
+                        </>
+                      }
+                      meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
+                      metaFields={1}
+                      trailing={
+                        <Show when={contextMenuItems('item.row', rowTarget(pull())).length}>
+                          <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
+                            {(menu) => (
+                              <For each={contextMenuItems('item.row', rowTarget(pull()))}>
+                                {(row) => (
+                                  <Menu.Item
+                                    context={menu}
+                                    tone={row.tone ?? 'neutral'}
+                                    onSelect={() => runContextMenuItem(row, rowTarget(pull(), detail.data?.pull?.body))}
+                                  >
+                                    {row.label}
+                                  </Menu.Item>
+                                )}
+                              </For>
+                            )}
+                          </RowActions>
+                        </Show>
+                      }
+                    >
+                      {pull().title}
+                    </Row>
+                  )}
+                </Show>
               )
             }}
           </Rows>

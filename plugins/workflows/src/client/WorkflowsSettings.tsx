@@ -1,6 +1,6 @@
 import { createResource, For, Show } from 'solid-js'
 import { activeTaskId, hasHostCapability } from '@acorn/plugin-api/client'
-import { workflowApi } from '../contract/workflowClient'
+import { workflowApi } from './workflowsClient'
 import { Alert, Button, EmptyState, Field, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the workflow definitions the
@@ -29,6 +29,10 @@ export default function WorkflowsSettings() {
       <Text emphasis="muted" wrap>
         Read-only view of the workflows the active task's worktree would load (.acorn/workflows/*.toml
         in the repo, plus ~/.acorn/workflows). Launch one from the command palette (⌘K).
+      </Text>
+      <Text emphasis="muted" wrap>
+        To write one, open Workflows in the left rail. That is where every workflow this workspace can
+        run is listed, and where the editor is.
       </Text>
 
       <Show

@@ -18,6 +18,28 @@ The shell owns navigation chrome and modal prompts. Plugins supply feature conte
 and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
+The terminal draws the same hierarchy at a quarter of the size, and where it differs it differs
+because there are no pixels to spend (`apps/tui/src/chrome/`):
+
+```text
+Topbar:   one line. Workspace, task count, the open branch, the node's state as a dot
+Rail:     a column of tasks, browse sources under a rule; two cells of marks below 100 columns
+Main:     one pane, with a strip of pane labels above it
+Overlays: the palette, the cheat sheet and a quit confirmation, drawn where the pane is
+Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
+```
+
+Three differences are worth naming. There is one pane rather than a row of them, because two panes at
+80 columns are two 40-column panes and the kit's own floor is 80, so `nextPane` switches which pane is
+drawn instead of walking to the next one. The region cycle is the whole screen rather than the focused
+pane, for the same reason: rail, pane strip, the pane's own regions, and back. And an overlay hides the
+pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
+model.
+
+The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
+plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
+on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
+
 Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
 one component: `tabs/RailTab.tsx`, a square 52px control styled by `.tabrail-tab`. Every control in
 both rails goes through it, including the bottom-pinned "+" on the left and "close task" on the
@@ -30,7 +52,7 @@ active accent on the right edge instead of the left.
 ### Rail controls and status markers
 
 `RailTab` is presentation only. It takes a `label` (which becomes both the tooltip title and the
-accessible name), a `glyph` resolved through `ui/Icon.tsx`, and explicit `active`, `tone`, `accent`,
+accessible name), a `glyph` resolved through `kit/components/content/Icon.tsx`, and explicit `active`, `tone`, `accent`,
 `busy`, `sublabel`, and `markers` props. It never reads task state, asks a registry anything, or
 knows which rail it is in. `children` stays as an escape hatch for a genuinely compound centre;
 prefer `glyph` plus `sublabel`.
@@ -60,7 +82,7 @@ chrome may hide an icon; it must never hide a state. `bottom-center` is reserved
 and activity, because it sits under the main glyph rather than in a corner.
 
 Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
-`registries/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
+`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
 clamped below core's, so a plugin can order its own markers among themselves but can never push a
 core lifecycle state out of its corner. Placement requests are preferences, never guarantees.
 
@@ -82,7 +104,7 @@ preferences persist locally; they do not depend on which Node is active.
 A plugin may contribute a **colour** theme, and only as data. `contributions.themes` in
 `acorn-plugin.json` is a map of theme-token values; the host validates it and generates the
 `:root[data-theme="plugin:<pluginId>:<themeId>"]` block itself
-(`client-core/src/plugins/chrome/themes.ts`). **No plugin-authored CSS ever reaches the shell.** The
+(`client-core/src/host/chrome/chromeThemes.ts`). **No plugin-authored CSS ever reaches the shell.** The
 theme cannot break shape, density or layout because it cannot express anything but colour, which is
 what makes this seam cheap: there is no stylesheet to parse and no selector to confine.
 
@@ -92,7 +114,7 @@ The token contract splits three ways, and only the first is declarable:
 | --- | --- | --- |
 | **Palette primitives** (`--bg`, `--text`, `--accent`, `--del-marker`, …) | 22 | The manifest, in full. `@acorn/protocol/themeTokens.ts` is the list, so the node can refuse an incomplete map at parse time without importing the client. |
 | **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 15 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
-| **Self-description** (`--is-dark`, `--color-scheme`, `--syntax-fg`) | 3 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
+| **Self-description** (`--is-dark`, `--color-scheme`) | 2 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
 
 Validation is "every primitive present, no unknown key, every value a hex colour or a flat colour
 function". Named colours, `var()` and nested functions (`url(…)`, `calc(…)`) are refused: the value
@@ -162,12 +184,19 @@ theme on the light values. A pack may restate them; a plugin theme may not, for 
 may not restate a derived token. See `docs/dashboards.md` § Views are derived, not chosen from a
 menu for how a chart mark uses them.
 
-Three tokens describe the theme rather than colour it: `--is-dark`, `--color-scheme`, and
-`--syntax-fg`. The host sets all three from the theme's one `dark` boolean. The previous approach
-derived dark/light from parsing `--bg` as a hex colour (`plugins/terminal/src/client/theme.ts`), which
-required `--bg` to stay a literal 6-digit hex and silently classified every other colour syntax as
-light; `--syntax-fg` replaces two hardcoded lists of dark theme names that lived in `diff.css` and
-`checks-panel.css` and both needed editing by hand every time a dark theme shipped.
+Two tokens describe the theme rather than colour it: `--is-dark` and `--color-scheme`. The host sets
+both from the theme's one `dark` boolean. The previous approach derived dark/light from parsing
+`--bg` as a hex colour (`plugins/terminal/src/client/theme.ts`), which required `--bg` to stay a
+literal 6-digit hex and silently classified every other colour syntax as light.
+
+A third token, `--syntax-fg`, used to sit beside them, declared on `:root` as `var(--l)` and flipped
+to `var(--r)` by every dark block, and it never worked. A custom property has its `var()` references
+substituted where it is declared, not where it is read, and `--l` and `--r` exist only on the
+individual Shiki token spans, so `--syntax-fg` computed to nothing on `:root` and inherited as
+nothing. Both rules that read it fell back to plain body text. What the two syntax rules do instead is
+spell the choice out on the span itself, with `light-dark(var(--l), var(--r))`, which follows
+`color-scheme` and so follows `--color-scheme`. The rule of thumb the token broke: a `:root` token may
+reference another `:root` token, never a token an element sets on itself.
 
 The manual toggle (`data-theme="dark"` on `<html>`) wins over the OS preference
 (`prefers-color-scheme: dark`), and both apply the same `--dark-*` values through one-line `var()`
@@ -178,9 +207,9 @@ show a dark-mode user a white flash on boot.
 
 Some tokens are read from JavaScript instead of CSS, because a canvas cannot read a stylesheet.
 `--bg`, `--bg-subtle`, `--bg-hover`, `--bg-selected`, `--text`, `--text-muted`, and `--text-faint` are
-read with `getComputedStyle` by the xterm and Monaco bridges; `--term-fs` is read the same way by
+read with `getComputedStyle` by the xterm and CodeMirror bridges; `--term-fs` is read the same way by
 `TerminalSurface`, because xterm measures its cell width from the font. These are `BRIDGE_TOKENS` in
-`ui/tokenAxes.ts`, and the test asserts they exist, because renaming one breaks the terminal or the
+`kit/tokens/tokenAxes.ts`, and the test asserts they exist, because renaming one breaks the terminal or the
 editor with no type error anywhere. `--font-mono` cannot be repointed by a style pack for the same
 reason on the type side: code, diffs, the terminal, and the SQL grid stay monospace in every pack
 because xterm measures cell width from the font. `--font-glyph` keeps the same protection for the
@@ -209,18 +238,27 @@ is reverse video.
 
 The role tokens are the plugin-facing half of the same system. A plugin picks a role, and the host
 maps it: on the DOM to a custom property from the two axes above, on a terminal to a cell, a colour,
-or nothing. `ui/kit/roles.ts` holds both columns and `ui/kit/roles.test.ts` holds them to it.
+or nothing. `kit/tokens/roles.ts` holds both columns and `kit/tokens/roles.test.ts` holds them to it.
+
+A space role answers both axes, because the same token spaces a column of rows and a line of words.
+`row` and `stack` are 0 lines vertically and one cell horizontally: two runs of text with nothing
+between them are one word, which is what an `Inline gap="row"` drew before the terminal read it.
 
 | Role | DOM token | Terminal |
 | --- | --- | --- |
-| `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | 0 lines, one cell, 0, 0, one blank line |
+| `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | nothing; one cell; 0 lines and one cell; 0 lines and one cell; one blank line and one cell |
 | `size` | `--control-h-xs`, `--control-h-sm`, `--control-h`, `--pad-control-lg` | one line either way; padding ignored |
-| `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, dim, and the palette's accent, green, yellow and red |
-| `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, dim, ignored, dim uppercase, bold |
+| `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, and the palette's grey, accent, green, yellow and red |
+| `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, grey, ignored, grey uppercase, bold |
 | `border` | `--bw-0`, `--divider`, `--control-border`, `--surface-border`, `--stripe-w` | nothing, a rule, an underline, box corners, a stripe |
 | `radius` | `--radius-control`, `--radius-surface`, `--radius-chip`, `--radius-pill` | ignored |
 
-So a theme stays 40-odd colours, and on a terminal it is 16 of them plus dim and bold. Most of a
+`muted` is a palette slot rather than the `dim` attribute, and the difference matters on a light
+terminal: dim tells the emulator to blend a run toward the background, which on white paper is white
+on white. Slot 8 is the palette's own grey, so the colour still comes from the theme the person
+chose.
+
+So a theme stays 40-odd colours, and on a terminal it is 16 of them plus bold. Most of a
 style pack is shape and padding a terminal has no answer for, which is honest: density is the one
 style axis it keeps.
 
@@ -247,7 +285,8 @@ business on `:root`: `diff.css`'s `--diff-gutter-w`, `--diff-marker-w`, `--diff-
 `--diff-chrome-w` let a row canvas's minimum width add up the same gutter and marker widths the
 columns themselves use, so the two cannot drift apart and clip the last character off a long line;
 `primitives.css`'s `--row-field-w` is the track width `.ui-row`'s `meta` column reserves, shared by
-the row and its own grid and meaningless to anything else.
+the row and its own grid and meaningless to anything else; `--row-owner-inset` places a nested row's
+one-pixel ownership rule on its parent's text column and keeps the row width inside the pane.
 
 ### Border roles
 
@@ -306,7 +345,7 @@ hover.
 
 ## The closed kit
 
-Every component a plugin may draw with is in one list, in `packages/client-core/src/ui/`, reaching
+Every component a plugin may draw with is in one list, in `packages/client-core/src/kit/`, reaching
 plugins through `@acorn/plugin-api/ui`. The list is closed: a component's props are role tokens,
 content, counts, booleans, and handlers, and never `class`, `className`, `style`, or a DOM attribute
 passed through. `@acorn/plugin-api/ui/tokens` carries the role enums and the support matrix as data,
@@ -316,8 +355,8 @@ with no components on it, so a node-environment test can read them.
 question is what gets in, and this is the answer that keeps it small:
 
 1. Two or more plugins need it, or one first-party pane cannot be expressed without it.
-2. It has a written rendering at 80 columns by 24 rows in monochrome, even though no terminal host is
-   built. If that sentence cannot be written, the thing is a rectangle, not a node.
+2. It has a written rendering at 80 columns by 24 rows in monochrome, and a component on the terminal
+   host that draws it. If that sentence cannot be written, the thing is a rectangle, not a node.
 3. Its props are semantic: tone, emphasis, size in three steps, grouping. Never a pixel, a colour, a
    class, or a style.
 4. If it is an extension kind, one host-owned sentence describes it in the trust prompt, and a person
@@ -331,22 +370,45 @@ Three things follow from closing it, and each has a test.
 
 **A node takes a meaning, not a value.** `tone="danger"`, `gap="section"`, `size="sm"`. A plugin
 never names a pixel, a colour, or a class, so the same tree can be drawn by a host with no pixels.
-`ui/kit/tokens.ts` declares the six enums and `ui/kit/roles.ts` maps each role to a CSS custom
+`kit/tokens/tokens.ts` declares the six enums and `kit/tokens/roles.ts` maps each role to a CSS custom
 property and to a terminal value. That mapping is the only place outside a stylesheet that names a
 custom property.
 
-**A node says which hosts can draw it.** `ui/kit/support.ts` holds a row per node with a `dom`
+**A node says which hosts can draw it.** `kit/tokens/support.ts` holds a row per node with a `dom`
 column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
 named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
-node has a `<Fallback>` child. Only `dom` is implemented. The `tui` column is documentation with a
-test that it is filled in, so nobody adds a node without deciding what it does on a terminal. The
-80-column sentence for each one is in [Every node at 80 by 24](#every-node-at-80-by-24) at the end of
-this page.
+node has a `<Fallback>` child. A `reduced` row names what is missing in a `loss` beside its level,
+because "named things" is the load-bearing half of that word and an author predicting a host should
+not have to open a second file. The 80-column sentence for each one is in
+[Every node at 80 by 24](#every-node-at-80-by-24) at the end of this page.
+
+Which host a build draws to is `HOST` in the same file, supplied by the host package at build time,
+because it is a fact about the bundle rather than about the run: `apps/desktop`'s Vite config defines
+it `dom` and `apps/tui`'s defines it `tui`. Where nothing defines it — a test, a plain browser served
+by a node — it is `dom`. `Only` and `Fallback` are the only things that read it, and that is the rule:
+a node that wants to know which host it is on is a node about to draw something host-specific, and the
+answer to that is a `<Fallback>` child, not a branch.
+
+Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
+`client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
+since 2026-08-31 (`docs/tui.md`). The two tables have the same
+keys as each other and as this matrix, held by `tools/arch/kitTable.test.ts`, so a node cannot be
+added to one host and forgotten on the other, and nobody adds a node at all without deciding what it
+does on a host with no pixels.
 
 **The classes moved inward.** A kit component keeps its `ui-*` classes and styles its own children
 by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, `cx.ts` is internal,
 and a pane that wants a control to look different asks for that in the kit rather than in its own
 stylesheet.
+
+**One node is a picture, and it is still a list.** `Graph` draws cards on a grid with the edges as
+curves: the workflows editor authors a definition on it and the run pane watches a run on it. It is in
+the kit rather than in the plugin because plugin client code may not emit raw DOM or SVG, and a canvas
+is the one thing a terminal cannot draw — so admitting it meant writing both projections first. In
+cells it is the indented list the editor already drew: the same cards, the same order, the same
+selection, indented by rank instead of placed by coordinate. `kit/lib/graphLayout.ts` is the geometry,
+shared by both hosts, so the two cannot disagree about which card sits under which. Where a card goes
+is a device preference the caller holds, never part of what it is drawing.
 
 **One node is a box, and admits it.** `Rectangle kind="pty" | "webview" | "frame" | "editor"` is what
 the kit offers a surface that owns its own pixels: a PTY, a webview, a plugin's iframe, a code editor.
@@ -381,7 +443,9 @@ no paste event to deliver.
 **Behaviour a pane keeps redoing becomes a node's prop.** Three arrived with the agents pane, and each
 replaced a copy of the same machinery in a plugin. `Timeline follow` makes the timeline the scroller
 and keeps it on the newest turn until the reader scrolls away, with the place they left held per
-`viewKey`; the transcript had 80 lines of that and github's conversation will want it too. `Card focus`
+`viewKey`; the transcript had 80 lines of that and github's conversation will want it too. Both hosts
+put the scroller on the timeline and let the region around it clip, which is what keeps a pane's
+header and composer pinned where the reader can reach them ([tui.md](./tui.md) § Scrolling viewports). `Card focus`
 puts the reader on one card, which is the same argument that made collection state the host's: a pane
 told "show this item" holds a key and nothing else, and the kit gives it no class and no id to select
 on. `Rows` hands back the same item object for an unchanged key, so a list rebuilt from a live store
@@ -399,23 +463,23 @@ actually used.
 Modelled on `styles/tokenAxes.test.ts`, which reads the stylesheets and asserts they agree with the
 declared axes:
 
-- `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that the nodes it exports and the rows
+- `kit/tokens/support.test.ts` reads the `/ui` barrel and asserts that the nodes it exports and the rows
   in `NODE_SUPPORT` are the same list, with a `tui` level on every row.
-- `ui/kit/roles.test.ts` asserts that every role in every enum has a DOM value and a terminal value,
+- `kit/tokens/roles.test.ts` asserts that every role in every enum has a DOM value and a terminal value,
   and that each DOM value names a token `tokenAxes.ts` declares.
-- `ui/kit/props.test-d.ts` is a type-level test: no exported node's props accept `class`,
+- `kit/tokens/props.test-d.ts` is a type-level test: no exported node's props accept `class`,
   `className`, `style`, or `classList`, and no role-typed prop accepts an arbitrary string. It has
   nothing to run. `tsc --noEmit` across every package is the check, which `pnpm lint` already makes.
 
 ### How the kit is built
 
-`primitives.css` holds the shared CSS for the components in `ui/primitives.tsx` and the component
+`primitives.css` holds the shared CSS for the components in `kit/components/primitives.tsx` and the component
 files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
 
-`ui/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
+`kit/lib/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
 raw controls. Phase 9 of the layout programme finished the conversion and inverted it, so what is left
 are rules rather than a list. **No plugin draws a raw `div` or `span`.** A plugin's tree is kit nodes,
 and a raw element is how a plugin used to reach a class in the host's stylesheet. It is also the one
@@ -427,6 +491,34 @@ root the host does not know about sits outside every focus group and no intent r
 
 The CSS clash and Checkbox checks stay, for the host's own code. Core still writes elements and
 stylesheets and can still lose a rule to a primitive's own attribute selector.
+
+**`Markdown` renders block by block, and that is a contract rather than an optimisation.**
+`kit/lib/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
+the key hashed over that block's own source, and `renderMarkdown` is now that list joined. The
+component keeps the element it rendered for each key, so an update replaces only the blocks whose
+source moved: appending to a message changes exactly one key, its last. Three things follow, and every
+caller depends on at least one of them.
+
+- **A reader's text selection survives an update.** Rewriting `innerHTML` replaces every text node
+  underneath it, and the agent transcript updates a streaming message about 25 times a second. Only
+  the growing block's node is now replaced.
+- **A copy button lives on its block**, so it is mounted once rather than disposed and re-created on
+  every tick.
+- **A closed code fence is highlighted once.** Its block keeps its element, so nothing asks the
+  highlighter again. Behind that, `infra/highlight/shiki.ts`'s `highlightToHtml` keeps a small
+  first-in-first-out cache of fence html keyed by the exact text and language, which catches the same
+  fence coming back after a scroll or a remount.
+
+A fence takes its colour from the theme rather than from Shiki. `highlightToHtml` asks for the
+dual-theme html with `defaultColor: false`, so each token leaves carrying both colours as `--l` and
+`--r` and none of them leaves carrying a fixed one, and `.ui-markdown .shiki` picks a side with
+`light-dark()` the way `.diff-code span` does. Shiki's default writes the light colour into `color`
+and hides the dark one in a `--shiki-dark` that no stylesheet here reads, which is how a fence under a
+dark theme came to draw github-light on a white background.
+
+The one rule a caller has to keep is the one the component already had: `text` is read in an effect,
+and a prop is a getter rather than a memo, so the effect re-runs whenever anything upstream ticks. The
+guard on the last rendered string is what stops an identical value from touching the DOM at all.
 
 ### What the kit refuses
 
@@ -453,7 +545,7 @@ the rule templates set before there were layouts.
 
 **Anything that depends on hover.** Hover exists on a DOM host with a pointer and nowhere else. The
 kit uses it for affordance only, and everything reachable on hover is reachable by focus.
-`ui/kit/hover.test.ts` reads the stylesheets and fails if a `:hover` rule reveals something no
+`kit/tokens/hover.test.ts` reads the stylesheets and fails if a `:hover` rule reveals something no
 `:focus-within` rule reveals. A `RowActions` that appears only on hover is a bug, not a style.
 
 **Controlled and uncontrolled selection mixed on one node.** The host owns `selected` by default; a
@@ -462,9 +554,9 @@ one node is a steady source of bugs in every library that has tried it.
 
 ## Icons
 
-`ui/Icon.tsx` takes a **name string** and resolves it against two families, in this order:
+`kit/components/content/Icon.tsx` takes a **name string** and resolves it against two families, in this order:
 
-1. A **`brand:`-prefixed name** is a brand mark from `ui/brandMarks.ts`: one SVG path's `d`
+1. A **`brand:`-prefixed name** is a brand mark from `kit/tokens/brandMarks.ts`: one SVG path's `d`
    attribute in a 24 box, drawn as a single `<path fill="currentColor">`.
 2. Any **other name** is a Lucide glyph from `lucide-static/icon-nodes.json`, drawn stroked and
    unfilled in the same box, node by node through `<Dynamic>` and never `innerHTML`.
@@ -481,9 +573,37 @@ unlike `.spin`: on a state icon the turn is the whole signal that something is r
 rotation is not the motion that setting exists to stop.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
-names before and will again) and so brand marks stay out of `ICON_NAMES`, which `ui/IconPicker.tsx`
-enumerates for user-chosen task icons. Putting them in that picker is then a
-deliberate one-line decision rather than something that happens by accident.
+names before and will again) and so brand marks stay out of the Lucide name list
+`kit/components/inputs/IconPicker.tsx` enumerates for user-chosen task icons. Putting them in that
+picker is then a deliberate one-line decision rather than something that happens by accident.
+
+### Which names are drawn without waiting
+
+Lucide ships 1,756 icons and 706 KB of geometry, and step 2 above resolves a name at render time, so a
+bundler cannot see which names are reachable and used to put all of it in a chunk the window loads
+before it draws. The set is split in `kit/tokens/iconNodes.ts`:
+
+- **The eager half** is every Lucide name spelled as a literal in this repository's product code —
+  77 of them, about 14 KB — written to `iconNodes.eager.json` and carried by the chunk that holds
+  `Icon`. Those draw on the first pass with nothing awaited.
+- **The lazy half** is the rest, behind `() => import('lucide-static/icon-nodes.json')`. A name only
+  that half has takes the text fallback for one frame, then becomes an SVG when the map lands.
+
+The eager half is **generated, never hand-kept**. `packages/client-core/scripts/icon-census.mjs`
+scans `packages/`, `plugins/` and `apps/` for `name="…"`, `icon: '…'` and `glyph: '…'` literals that
+are Lucide names, and client-core's `lint` re-runs it in `--check` mode. Spell a new icon in the tree
+without regenerating the file and lint fails, naming the icon, because the alternative is that the
+icon ships in the lazy half and flashes as its own text. Run
+`pnpm --filter @acorn/client-core icons` and commit the result.
+
+Nothing is dropped. A person can assign any of the 1,756 to a task and a plugin manifest can name any
+one, and both choices are persisted, so a build-time census of what is reachable would break stored
+data. The split moves the bytes; it does not lose the names.
+
+Two consumers must never show that one frame, so they ask for the full map up front: `IconPicker`,
+whose whole purpose is the other 1,679, and `features/tabs/TabRail.tsx`, whose rows draw whatever
+icon the owner picked. The rest of the chrome only ever names an eager icon, so it never sees the
+miss. A new surface that draws a **stored** icon name should call `loadIconNodes()` when it mounts.
 
 **A mark belongs in core if and only if a core surface renders it.** Otherwise it belongs to the
 plugin that draws it. The reason is the text fallback: if core names `brand:x` and no plugin has
@@ -514,7 +634,7 @@ The alternative, a `--brand-<name>` token in `tokens-invariant.css` paired with 
 to write the rule, so a fourth provider needs a core change, and any surface without a matching rule
 falls back to `--accent` whoever the provider is.
 
-`brandStyle(name)` in `ui/brandMarks.ts` turns an icon name into two custom properties on the element
+`brandStyle(name)` in `kit/tokens/brandMarks.ts` turns an icon name into two custom properties on the element
 that renders the mark: `--brand` for the fill, and `--brand-on` for whatever sits on top of it, which
 is `--brand-fg`. A surface reads them with a fallback, so a mark with no colour and a plain Lucide name
 both keep the surface's own look:
@@ -533,7 +653,7 @@ fix if a mark ever does disappear is a light and dark pair on the mark, not a ru
 
 **It is validated as a hex, not as a CSS colour.** The string reaches a `style` attribute, and a
 colour slot accepts `url()`, so any-CSS-colour would let a manifest make an outbound request.
-`pluginContract.ts` checks `/^#[0-9a-f]{6}$/i`.
+`plugin/contract.ts` checks `/^#[0-9a-f]{6}$/i`.
 
 A frame is the exception to all of this, because it is a separate origin and a separate JS realm with
 no reach into the registry. It draws its own copy of the mark and sets its own `--brand` inline. That
@@ -545,7 +665,7 @@ A mark is one SVG path's `d` attribute in a 24x24 box, not a full SVG document. 
 allow `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers, and CSS
 `@import`, which would need an allowlist parser and a new trust boundary for what is only a logo.
 There is nothing in `d`'s grammar to sanitise, so a manifest-supplied mark needs only a
-character-class check (`node-core/main/pluginManifest.ts`) and renders through the same `<path>`
+character-class check (`node-core/server/plugins/manifest.ts`) and renders through the same `<path>`
 machinery `Icon.tsx` already had. `Icon` fills it with `currentColor`, so a plugin's mark themes
 across every theme exactly as a first-party one does, which a data-URI `<img>` could not, since CSS
 does not cross into its document.
@@ -623,7 +743,7 @@ never swallows a click on the app behind it, and each toast re-enables its own.
 The command palette and the file finder share one surface, `PaletteSurface`, rather than the
 near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by side.
 
-Modal dismissal (Escape, backdrop click, Tab focus containment) is `ui/dismissable.ts`, a hook
+Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/dismissable.ts`, a hook
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
 walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` uses it
@@ -666,7 +786,7 @@ the edge. A legend entry mirrors one active rail status marker, placed or crowde
 both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
-inside it and `data-tip` would otherwise be silently inert there. `ui/frameTips.ts` mounts the same
+inside it and `data-tip` would otherwise be silently inert there. `kit/lib/frameTips.ts` mounts the same
 delegated listener and bubble markup into a frame's document, the way frames already mount their
 own copy of the shared CSS. It stays framework-free and importless on purpose: it is reached from
 `@acorn/plugin-api/ui/sdk`, which bundles into a plugin's frame and must not drag a slice of the
@@ -674,7 +794,7 @@ shell, or a second copy of Solid, across that boundary.
 
 ## Drag-to-resize
 
-`ui/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
+`kit/lib/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
 drawer's height handle, and the splits the host layouts draw. Three hand-rolled splitters existed
 before it, and none had a keyboard contract. A plugin never calls it: where a split is between two
 *regions* the layout owns the handle ([docs/panes.md § Layout model](./panes.md#layout-model)), and
@@ -724,16 +844,16 @@ set, and the layer priorities are in
 
 ### Menus and right-click
 
-There is one menu. `ui/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
+There is one menu. `kit/components/overlays/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
 outside-click, and focus returning to where it came from — and both ways of opening it mount that same
-surface (`MenuSurface`) over the same hook (`ui/anchor.ts`). The roving focus is not its own: a menu is
+surface (`MenuSurface`) over the same hook (`kit/lib/anchor.ts`). The roving focus is not its own: a menu is
 a collection, so the arrows, Home, End, the page keys and `j`/`k` arrive as intents from
 `keys/collection.ts`, the same ones a list of rows gets. A
 button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
 right-click menu with its own markup would be a second place for the accessibility to be wrong.
 
 **Right-click is never the only door.** The rows come from the context-menu registry
-(`registries/contextMenus.ts`), and the button menu on the same row renders the identical list, so
+(`registries/panes/contextMenus.ts`), and the button menu on the same row renders the identical list, so
 nothing is mouse-only. It is also keyboard-reachable directly: `contextmenu` is what the platform
 dispatches for Shift+F10 and the menu key as well as for the right button, and the surface focuses its
 first item on mount, so the menu is operable the moment it appears rather than something to Tab into.
@@ -761,7 +881,7 @@ plus the button's own `aria-expanded`. The last one is not redundant: the surfac
 while the menu is open, `:focus-within` on the row is false and the trigger would otherwise fade out
 from under the menu it opened.
 
-Both `Menu.tsx` and its anchoring hook (`ui/anchor.ts`) replaced hand-rolled implementations that
+Both `Menu.tsx` and its anchoring hook (`kit/lib/anchor.ts`) replaced hand-rolled implementations that
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor
 roles, terminal's profile menu had no portal at all so an overflow ancestor clipped it, and
 AccountMenu and NotificationBell each hand-rolled their own outside-click listener. `anchor.ts` owns
@@ -778,7 +898,7 @@ sandboxed plugin frame, where the "viewport" is just the frame.
 their own semantics and forcing every clickable through one shared component would blur that.
 `Menu.Item`'s `onSelect` closes the menu, with one exception: `closeOnSelect={false}` exists for
 arm-to-confirm items, whose first press has to survive to show its armed label
-(`createArmedConfirm`, `ui/confirm.ts`) rather than close under it.
+(`createArmedConfirm`, `kit/lib/confirm.ts`) rather than close under it.
 
 An `AnchorTarget` can be a point as well as an element; a point is a zero-size rect, so everything
 downstream of the positioning math already works unchanged, which is what lets `ContextMenu` reuse
@@ -815,7 +935,7 @@ client-core primitives. Dense layouts must preserve readable line height and a v
 style packs may compress spacing but must not hide status or action affordances.
 
 Keyboard traversal comes from the tree rather than from each pane. Each kit node's focus role is fixed
-in `ui/kit/focusRoles.ts` and a plugin sets none of it, and the ARIA follows from the role: a `Rows`
+in `kit/tokens/focusRoles.ts` and a plugin sets none of it, and the ARIA follows from the role: a `Rows`
 renders `listbox` or `tree` with `aria-activedescendant`, a tab strip renders `tablist`, a modal
 renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is never load-bearing:
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
@@ -829,9 +949,9 @@ pull list owned a virtualizer, a scroll element, two animation frames and a pair
 
 ## What the kit and layouts must never do
 
-Twelve standing constraints. Each one keeps open a door that a mobile PWA
-([docs/future/remote.md](./future/remote.md)) or a terminal renderer
-([docs/future/terminal/](./future/terminal/README.md)) walks through later, and each is cheap to hold now
+Twelve standing constraints. Each one keeps open a door that the terminal renderer
+([docs/tui.md](./tui.md)) already walked through and a mobile PWA
+([docs/future/remote.md](./future/remote.md)) walks through later, and each is cheap to hold now
 and expensive to reopen. The arguments are in [What the kit refuses](#what-the-kit-refuses) above and
 in [docs/security.md](./security.md).
 
@@ -859,7 +979,7 @@ a different shell. What the kit and the layouts owe it:
   ([docs/panes.md § Layout model](./panes.md#layout-model)).
 - **Breakpoints are style tokens**, not numbers inside a layout, so the mobile shell can set them.
   Nothing in a layout reads the window width; a drag clamps against the layout's own element.
-- **`formFactor` on surfaces stays** (`packages/protocol/src/pluginContract.ts`). A rectangle that
+- **`formFactor` on surfaces stays** (`packages/protocol/src/plugin/contract.ts`). A rectangle that
   only makes sense wide says `['desktop']`, and the mobile shell hides it rather than mangling it.
 - **No kit node carries a desktop-only assumption without a support row.** Hover is never
   load-bearing and every tooltip has a focus equivalent.
@@ -870,23 +990,45 @@ Host-owned layouts make a focused mobile subset cheap; they do not decide what i
 ### What a terminal renderer needs from this
 
 A terminal host cannot run the web renderer, so it needs the tree, the kit, the layouts and the
-keymap to be honest about intent. The host that reads these is the programme in
-[docs/future/terminal/](./future/terminal/README.md); this list is what the kit already holds for it:
+keymap to be honest about intent. The host that reads these is `acorn`
+([docs/tui.md](./tui.md)), which shipped on 2026-08-31 and draws the whole kit in cells.
+Drawing all seventy-four nodes cost the kit one prop:
+`Markdown` had an `onClick` beside its `onSelect`, handing over a DOM event that a remote tree cannot
+receive and a terminal has no way to raise. Its two callers wanted the link's href and the browser on
+a miss, so `onSelect` returns `false` for "I did not take it" and `onClick` is gone. Nothing else
+moved. This is what the kit holds for it:
 
 - **Every kit node has an 80×24 monochrome sentence** below and a `tui` level in
-  `packages/client-core/src/ui/kit/support.ts`, tested for presence even though nothing reads it.
+  `packages/client-core/src/kit/tokens/support.ts`, and both are read: the TUI host draws every node
+  from its sentence, and a `reduced` one says what it loses beside its level.
+  `tools/arch/kitTable.test.ts` fails if the appendix, the matrix and either host's component table
+  disagree about which nodes exist.
 - **Every layout has a terminal projection** in [docs/panes.md](./panes.md#layout-model).
 - **Role tokens never expose pixels.** Each role has a documented terminal value, including
-  `ignored`, in `packages/client-core/src/ui/kit/roles.ts`.
-- **The keymap core is host-agnostic.** `@opentui/keymap`'s terminal adapter is in the same package,
-  and acorn adds no key handling outside it. Nodes handle `next`, not `ArrowDown`.
+  `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`, and `roleCell()` beside `roleVar()`
+  hands the same answer to a cell renderer. A role names a colour slot, never a colour: which
+  sixteenth or which hex is the appearance layer's (`apps/tui/src/appearance.ts`).
+- **The keymap core is host-agnostic.** One engine, `@opentui/keymap`, and an adapter per host: the
+  package's HTML one on the desktop, and the terminal client's own
+  (`apps/tui/src/keys/keymapHost.ts`). acorn adds no key handling outside them. Nodes handle `next`,
+  not `ArrowDown`.
 - **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`
   the same way.
 - **The tree protocol names nothing about the DOM.** The same mutations apply to a retained tree of
-  any kind ([docs/plugins.md § The tree contract](./plugins.md#the-tree-contract)).
+  any kind ([docs/plugins.md § The tree contract](plugins/descriptors.md#the-tree-contract)).
 - **Rectangles are the only DOM-only thing**, and `kind="pty"` and `kind="editor"` are native there.
-  What crosses to a terminal plugin by plugin is in
-  [docs/future/terminal/01-why.md](./future/terminal/01-why.md).
+  A `pty` rectangle is filled through `attachPty`, which takes the channel rather than handing back a
+  box: an xterm on the DOM, `@xterm/headless` in cells, one source in the plugin
+  ([docs/terminal.md § Client](./terminal.md)). What crosses to a terminal plugin by plugin is in
+  [docs/first-party-plugins.md](./first-party-plugins.md) § What each of these loses in a terminal.
+- **A prop type is declared once and both hosts compile against it.** `ButtonProps`, `InputProps`,
+  `SelectProps`, `PickerProps` and `MentionTextareaProps` are exported from the DOM kit and imported by
+  the terminal one, because a node's props are one contract and a hand-written second copy loses a prop
+  without anybody noticing. The pane sweep found four that had.
+- **Nothing in the kit shrinks to make room.** Yoga answers a height deficit by taking it out of every
+  child that will give, and a one-line row given half a line lands on the line above it. Every block
+  node and every row refuses to shrink; the region around them clips, and a pane taller than the screen
+  is the normal case at 24 rows.
 
 ## Every node at 80 by 24
 
@@ -896,29 +1038,40 @@ column can be filled in honestly rather than guessed.
 
 A node's props are its exported type in `@acorn/plugin-api/ui` and are not restated here, because a
 second copy would be wrong within a release and nothing would catch it. The focus column is
-`ui/kit/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
+`kit/tokens/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
 disagree about which nodes exist or what each one does with focus.
+
+Every row here has a case in `apps/tui/src/kit/kit.test.tsx` that draws the node and reads the cells
+back, and every node the focus column calls a stop, a collection or a conditional stop also has a
+case that presses it or a written reason why the press is driven in a suite of its own. The reason
+sentences are in `NOT_DRIVEN_HERE` in that file, and the list cannot grow quietly: a node cannot join
+the kit as a stop without somebody deciding whether this host presses it.
 
 ### Grouping
 
+The DOM `Fold` mounts its body on first open and retains it thereafter. Native `<details>` alone
+only hides an already-rendered body; deferring that first mount avoids building hidden transcripts
+and code blocks while preserving child state on subsequent toggles.
+
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines |
+| `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
 | `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
-| `Section` | conditional | label in dim uppercase, children below |
+| `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` pins the view to the last |
-| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
-| `Toolbar` | none | children on one line |
-| `Modal` | trap | a centred box over dimmed content; Escape dismisses |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `viewKey` is dropped: this host keeps one offset per mounted viewport rather than a map of remembered ones. `Timeline.Turn` is a node of its own on both hosts |
+| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
+| `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
+| `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
 | `Menu` | trap | a vertical list in a box |
-| `Popover` | none | reduced: the panel opens as a full-width block under its anchor, not floating |
-| `ListDetail` | none | reduced: two columns above 80 cells, one at a time below it |
+| `Popover` | none | reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
+| `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
 | `DetailColumn` | none | the right column, or the whole width |
+| `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
 | `SectionHeader` | none | a bold line with its actions right-aligned |
@@ -929,57 +1082,62 @@ disagree about which nodes exist or what each one does with focus.
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Text` | none | plain text; `mono` is a no-op, `muted` is dim, `strong` is bold |
-| `Heading` | none | eyebrow in dim uppercase, heading in bold |
-| `Rows` | collection | its items on successive lines; `virtual` is the scroll window and changes nothing else |
-| `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room |
+| `Text` | none | plain text; `mono` is a no-op, `muted` is the palette grey, `strong` is bold |
+| `Link` | stop | the text, underlined, pressable |
+| `Heading` | none | eyebrow in grey uppercase, heading in bold |
+| `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
+| `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
-| `StatusDot` | none | `●` in colour, `○` for neutral |
-| `Facts` | none | two columns, labels dim; `grouping="rows"` is one pair per line |
+| `StatusDot` | none | `●` in colour, `○` for muted |
+| `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line; `wide` on an item is a desktop-only full-row tile |
 | `DescriptionList` | none | as `Facts`, one pair per line |
-| `Table` | none | reduced: box-drawn, truncating columns by priority |
+| `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
+| `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and a line under the table names the columns that went |
+| `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
+| `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
+| `Graph` | collection | reduced: the indented list, one line per card — glyph, label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
 | `Meter` | none | `████░░░░ 62%` |
-| `CodeBlock` | none | monospace lines, a dim rule above and below |
+| `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
-| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables |
-| `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row |
+| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in grey |
+| `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row; windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
-| `NonCodeRow` | none | reduced: a dim line saying what is not being shown, such as `binary file` |
+| `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
-| `EmptyState` | none | centred dim text |
+| `EmptyState` | none | centred grey text |
 | `Alert` | none | one line prefixed with the tone's glyph |
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | reduced: initials in brackets; no image |
-| `Icon` | none | reduced: a glyph from a small name table, or nothing |
+| `Icon` | none | reduced: a glyph from a small name table, an emoji as itself, or nothing for a name the table has no glyph for |
 
 ### Asking
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic |
+| `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
-| `Input` | stop | an underlined field; owns keys while focused |
-| `Textarea` | stop | a boxed multi-line field; owns keys |
+| `Input` | stop | a field taking the room its row has left; owns keys while focused |
+| `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
 | `Picker` | stop | a field that opens a `Menu` filtered by typing |
-| `PickerRow` | item | one line in that menu: glyph, label, dim hint |
+| `PickerRow` | item | one line in that menu: glyph, label, grey hint |
 | `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
 | `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | the label above its child |
-| `CopyButton` | stop | fallback: the host prints the value on its own line to copy by hand |
-| `ModelConnectionPicker` | stop | a `Picker` over the connected models, grouped by provider |
+| `CopyButton` | stop | fallback: the button copies over OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
+| `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 
 ### Pixels, and the host wrappers
 

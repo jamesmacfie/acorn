@@ -41,6 +41,35 @@ fn plugin_worker_hash(path: &str) -> Option<&str> {
     if lowercase_hex { Some(hash) } else { None }
 }
 
+/// How long a content-hashed asset may be cached. A year, which is the conventional spelling of
+/// "forever" for a name that changes when its bytes do.
+const IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
+/// The bundler's digest length. Every file it writes under `assets/` is `<name>-<8 chars>.<ext>`, so
+/// the length is what separates a hash from a hyphen somebody put in a filename.
+const ASSET_HASH_LEN: usize = 8;
+
+/// A content-hashed asset: `/assets/<name>-<hash>.<ext>`, and nothing nested under a directory.
+///
+/// These are the only responses that may be cached, because the name is the version — a rebuild emits
+/// a different one and `index.html` names it. `index.html` itself is excluded by construction (it is
+/// not under `/assets/`), and it has to be: it is the one file whose name never changes, so a cached
+/// copy would keep pointing the window at the previous build's chunks forever.
+fn hashed_asset(pathname: &str) -> bool {
+    let Some(name) = pathname.strip_prefix("/assets/") else { return false };
+    if name.contains('/') {
+        return false;
+    }
+    let Some((stem, extension)) = name.rsplit_once('.') else { return false };
+    if extension.is_empty() {
+        return false;
+    }
+    let Some((before, hash)) = stem.rsplit_once('-') else { return false };
+    !before.is_empty()
+        && hash.len() >= ASSET_HASH_LEN
+        && hash.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
 /// `connect-src` names the helper's exact loopback WebSocket origin as well as `'self'`. No wildcard
 /// port: the handler knows the port because the helper reported it, so no other local service becomes
 /// reachable. The renderer still cannot reach a node directly, because a node needs the pinned agent
@@ -184,13 +213,19 @@ pub fn serve(source: &Source, frames: Option<&Frames>, helper_port: u16, request
         },
     } };
 
+    // A packaged build's `/assets/*` names are content-hashed, so the webview may keep them for
+    // good and a warm launch reads a hundred fewer files off disk. `pnpm dev` gets `no-store` from
+    // the same branch that widens the policy: Vite rewrites those files under the same names while
+    // the developer works, so a cached copy there is a stale module with no way to notice.
+    // `index.html` is `no-store` in both, which is what makes the packaged case safe — a new build's
+    // hashes are always read.
+    let cache = if dev.is_none() && hashed_asset(&pathname) { IMMUTABLE } else { "no-store" };
+
     Response::builder()
         .status(status)
         .header("content-type", mime)
         .header("content-security-policy", csp)
-        // The renderer is rebuilt on every launch and its filenames are content-hashed, so a cache
-        // saves nothing the disk read does not already give.
-        .header("cache-control", "no-store")
+        .header("cache-control", cache)
         .body(body)
         .unwrap_or_else(|_| refuse(500))
 }
@@ -319,6 +354,52 @@ mod tests {
         // Parseable, because whatever reached here is a JSON client by construction.
         let parsed: serde_json::Value = serde_json::from_slice(&body).expect("the refusal is JSON");
         assert_eq!(parsed["error"]["code"], "not_found");
+    }
+
+    /// Only a content-hashed name under `/assets/`, and only in a packaged build. Everything else
+    /// keeps `no-store`, above all `index.html`, which is the one name a rebuild does not change.
+    #[test]
+    fn a_packaged_build_caches_hashed_assets_and_nothing_else() {
+        let root = tempdir();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("assets/index-B1a2_c3d.js"), b"export default 1").unwrap();
+        std::fs::write(root.join("index.html"), b"<!doctype html>").unwrap();
+
+        let cache_of = |source: &Source, path: &str| -> String {
+            let request = Request::builder().uri(format!("app://acorn{path}")).body(Vec::new()).unwrap();
+            let response = serve(source, None, 51234, &request);
+            response.headers().get("cache-control").unwrap().to_str().unwrap().to_string()
+        };
+
+        let packaged = Source::Files(root.clone());
+        assert_eq!(cache_of(&packaged, "/assets/index-B1a2_c3d.js"), IMMUTABLE);
+        assert_eq!(cache_of(&packaged, "/index.html"), "no-store");
+        // A client-side deep route is answered with index.html, so it must not be cached either.
+        assert_eq!(cache_of(&packaged, "/owner/repo/12"), "no-store");
+
+        // `pnpm dev` rewrites its files under the same names, so nothing it serves may be kept. The
+        // proxy is unreachable from a test, and a 502 carries no cache header, so the predicate is
+        // asserted directly for the dev branch.
+        assert!(!hashed_asset("/index.html"));
+        assert!(hashed_asset("/assets/index-B1a2_c3d.js"));
+        // A hyphen in a filename is not a hash: too short, and there is a real one to compare against.
+        assert!(!hashed_asset("/assets/plugin-frame.css"));
+        assert!(!hashed_asset("/assets/-B1a2_c3d.js"));
+        assert!(!hashed_asset("/assets/nested/index-B1a2_c3d.js"));
+        assert!(!hashed_asset("/assets/index-B1a2_c3d"));
+        assert!(!hashed_asset("/plugin-worker/index-B1a2_c3d.js"));
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// A directory under the OS temp root, without pulling in a crate for it. Named by process and a
+    /// counter so two tests in the same binary cannot collide.
+    fn tempdir() -> PathBuf {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static NEXT: AtomicU32 = AtomicU32::new(0);
+        let dir = std::env::temp_dir().join(format!("acorn-app-scheme-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
+        std::fs::create_dir_all(&dir).expect("a temp directory");
+        dir
     }
 
     #[test]

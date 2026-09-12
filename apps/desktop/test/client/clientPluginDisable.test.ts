@@ -1,27 +1,32 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
-import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
-import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
-import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
-import { collectionRegistry } from '@acorn/client-core/registries/collections.ts'
-import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
-import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
-import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
-import { clientScheduleRegistry } from '@acorn/client-core/registries/schedules.ts'
-import { railMarkerRegistry } from '@acorn/client-core/registries/railMarkers.ts'
-import { refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
-import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
-import { uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
-import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
-import { brandMarkRegistry } from '@acorn/client-core/ui/brandMarks.ts'
-import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
-import { clientPlugins } from '../../src/app/client/plugins'
+import { agentContextRegistry } from '@acorn/client-core/host/registries/sources/agentContexts.ts'
+import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
+import { collectionRegistry } from '@acorn/client-core/host/registries/sources/collections.ts'
+import { commandRegistry } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { nodeStatRegistry } from '@acorn/client-core/host/registries/rail/nodeStats.ts'
+import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell/schedules.ts'
+import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
+import { refPanelRegistry } from '@acorn/client-core/host/registries/panes/refPanels.ts'
+import { settingsRegistry } from '@acorn/client-core/host/registries/shell/settings.ts'
+import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { persistedStateRegistry } from '@acorn/client-core/infra/persistence/persistedState.ts'
+import { contentLinkRegistry } from '@acorn/client-core/host/registries/panes/contentLinks.ts'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens/brandMarks.ts'
+import { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
+import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
 
 const REGISTRIES = {
   panes: paneRegistry,
+  // The command graph, from 2026-09-03. A plugin's commands are the one contribution kind that can
+  // hold each other: a group and the searches under it are registered together, and a disable has to
+  // take the whole subtree, not the parent and a set of orphans
+  // (docs/plugins.md § Command kinds).
+  commands: commandRegistry,
   sources: sourceRegistry,
   settingsPages: settingsRegistry,
   slots: uiSlotRegistry,
@@ -30,7 +35,6 @@ const REGISTRIES = {
   extensionPoints: extensionPointRegistry,
   extensions: extensionRegistry,
   refPanels: refPanelRegistry,
-  paletteRows: paletteRowRegistry,
   agentContexts: agentContextRegistry,
   schedules: clientScheduleRegistry,
   railMarkers: railMarkerRegistry,
@@ -114,7 +118,7 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 // change. It did: `github-pull` is github's own pull-request panel, so a PR link clicked inside
 // someone else's content can be glanced at instead of leaving the app. Linear's panel is still absent
 // from this ledger and still correct, because linear is a loaded package and its panel reaches the
-// registry through the manifest adapter in client-core/plugins/frames/register.ts rather than through
+// registry through the manifest adapter in client-core/host/frames/register.ts rather than through
 // a compiled roster line.
 //
 // Derived, but not therefore toothless: a snapshot you can regenerate looks like one you can launder a
@@ -164,6 +168,11 @@ describe('disabling a client plugin', () => {
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
     // contributing nothing would make its own case below pass vacuously; this fails instead.
     expect(Object.keys(OWNED).sort()).toEqual([...OPTIONAL].sort())
+    // Onboarding contributes no command, and it is meant to: "restart onboarding" would need a reset
+    // contract nobody owns (docs/command-palette-and-shortcuts.md). Browser is
+    // absent from this roster entirely — it is node-only — so it cannot appear here at all.
+    expect(OWNED.onboarding.commands).toBeUndefined()
+    expect(NAMES).not.toContain('browser')
     for (const name of OPTIONAL) {
       const owned = OWNED[name]
       expect(REGISTRY_NAMES.reduce((sum, key) => sum + (owned[key]?.length ?? 0), 0), name).toBeGreaterThan(0)

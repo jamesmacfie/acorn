@@ -2,17 +2,17 @@
 //
 // The twin of contract/sessions.ts, which declares the same two verbs as a node capability for the same
 // consumer. Both exist because plugins/agents' terminal handoff needs to start a shell running a
-// provider's `resume` command, on the node when the runtime does it and in the renderer when the user
+// provider's `resume` command, on the node when the runtime does it and in the client when the user
 // clicks a roster row.
 //
-// A contract file rather than client/, because `client/terminalClient.ts` is the renderer's full PTY
+// A contract file rather than client/, because `client/terminalClient.ts` is the client's full PTY
 // surface (eight verbs including `write`, `attach`, `kill` and `resize`) and importing it was the whole
 // agents-to-terminal coupling edge. A consumer that wants to open a session shouldn't thereby get the
 // ability to type into every session on the node.
 //
 // Only `create` and `list`. Streams, input, teardown and profile enumeration stay terminal's own: a
 // plugin that needs those is describing a slot, not a capability.
-import { terminalSessionsRoute } from './routes'
+import { terminalSessionsRoute } from '../shared/api'
 import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 

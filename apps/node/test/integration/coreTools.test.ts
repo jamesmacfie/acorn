@@ -49,7 +49,7 @@ describe('agent note contributions', () => {
 // every contribution reaches the assembled surface; package-level tests cover each projection.
 //
 // Names, not shapes: risk tiers, schemas and the three projections are covered by
-// packages/node-core/src/server/routes/agentTools.test.ts and mcp/server.test.ts over a fixture.
+// packages/node-core/src/server/routes/plugins/agentTools.test.ts and mcp/server.test.ts over a fixture.
 describe('the full agent-tool manifest', () => {
   const CORE_TOOLS = [
     'task_current',
@@ -64,8 +64,11 @@ describe('the full agent-tool manifest', () => {
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
+    // Core owns the stable cross-provider tool; the provider-specific read belongs to whichever
+    // integration answers (docs/agent-tools.md § issue_detail).
+    'issue_detail',
   ]
-  // Preview tools remain an Electron capability exposed through the same assembled tool manifest.
+  // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
   const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
@@ -77,7 +80,7 @@ describe('the full agent-tool manifest', () => {
     try {
       const core = { tasks: { load: async () => undefined } } as never
       const names = [
-        ...buildAgentTools({ db: testDb.db }).map((tool) => tool.name),
+        ...buildAgentTools({ db: testDb.db, secrets: testDb.secrets }).map((tool) => tool.name),
         ...browserAgentTools({} as never).map((tool) => tool.name),
         ...localGitAgentTools(core).map((tool) => tool.name),
         ...memoryAgentTools({} as never, {} as never, core).map((tool) => tool.name),

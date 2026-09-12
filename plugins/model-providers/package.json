@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-model-providers",
   "version": "0.1.0",
+  "description": "Adapters for the text-generation providers core resolves credentials for. No client half.",
   "private": true,
   "type": "module",
   "exports": {

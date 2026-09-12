@@ -6,7 +6,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
-import { parsePullRef } from '../contract/pullRef'
+import { parsePullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
 // GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
@@ -18,7 +18,7 @@ import { pullDetailOptions } from './queries'
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
-  // `owner/repo#number`, parsed by the module that also spells it (../contract/pullRef.ts), so this
+  // `owner/repo#number`, parsed by the module that also spells it (../shared/pullRef.ts), so this
   // panel, the collection row, and the URL recogniser name the same thing.
   const parts = createMemo(() => parsePullRef(props.target.displayId))
 

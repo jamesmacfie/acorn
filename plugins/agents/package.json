@@ -1,12 +1,12 @@
 {
   "name": "@acorn/plugin-agents",
   "version": "0.1.0",
+  "description": "Managed coding agents: sessions, harnesses, drivers, pricing, and plan usage.",
   "private": true,
   "type": "module",
   "exports": {
     "./node/index.ts": "./src/node/index.ts",
     "./client/index.ts": "./src/client/index.ts",
-    "./main/index.ts": "./src/main/index.ts",
     "./contract/*": "./src/contract/*",
     "./testkit": "./src/testkit/index.ts",
     "./testkit/client": "./src/testkit/client.ts"
@@ -16,8 +16,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
@@ -33,6 +31,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",

@@ -4,7 +4,7 @@ import { mintInternalToken } from './auth/internalTokens'
 import { schema } from './db'
 import { createApp } from './index'
 import { makeTestDb, testSecretEnv, type TestDb } from '../testkit/db'
-import type { Env } from '../main/bindings'
+import type { Env } from './bindings'
 
 // What an agent's own credential can reach, asserted end to end through the real mount table rather
 // than through a hand-built router. Every route below was reachable by a task-scoped internal token

@@ -17,7 +17,7 @@ export default defineConfig({
     ssr: true,
     rollupOptions: {
       external,
-      input: resolve(import.meta.dirname, 'src/shell/helperMain.ts'),
+      input: resolve(import.meta.dirname, 'src/helper/helperMain.ts'),
       output: { entryFileNames: 'helper.js', format: 'es' },
     },
   },

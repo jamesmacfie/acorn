@@ -1,5 +1,5 @@
 import type { ContextBudget, TaskContext } from '@acorn/protocol/api.ts'
-import { formatContextBlock } from '../contract/contextBlock'
+import { formatContextBlock } from '../shared/contextBlock'
 
 export type TraySelection = Record<string, boolean>
 

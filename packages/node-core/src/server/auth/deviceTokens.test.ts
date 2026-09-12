@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { deviceService, type DeviceService } from './deviceTokens'
 
@@ -99,6 +99,50 @@ describe('device tokens', () => {
     const later = clock
     await devices.authenticate(token)
     expect(await seenAt()).toBe(later)
+  })
+
+  // Every authenticated request used to run this `SELECT` on the node's single event loop, which on a
+  // client holding a live socket makes it the most-executed statement in the process
+  // (docs/performance.md § 2026-09-03 — phase 5).
+  it('answers a warm token from memory, with no read of the devices table', async () => {
+    const { token, device } = await devices.issue('laptop')
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+
+    const select = vi.spyOn(harness.db, 'select')
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+    expect(select).not.toHaveBeenCalled()
+
+    // And it is a window, not a memory: past the minute the row is read again.
+    clock += 61_000
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+    expect(select).toHaveBeenCalled()
+    select.mockRestore()
+  })
+
+  // Getting this wrong is a security bug, not a performance one: a revoked bearer that keeps working
+  // for the rest of the window is a credential the owner believes they took away.
+  it('forgets a warm token the moment its device is revoked', async () => {
+    const { token, device } = await devices.issue('laptop')
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+
+    await devices.revoke(device.id)
+
+    expect(await devices.authenticate(token)).toBeNull()
+  })
+
+  it('does not warm an entry for a token that failed', async () => {
+    const { token, device } = await devices.issue('laptop')
+    const [, , id] = token.split('_')
+    const wrongSecret = `acorn_dt_${id}_${'z'.repeat(43)}`
+
+    expect(await devices.authenticate(wrongSecret)).toBeNull()
+    const select = vi.spyOn(harness.db, 'select')
+    expect(await devices.authenticate(wrongSecret)).toBeNull()
+    // Read again rather than answered from a cache, so a wrong secret can never become a warm one.
+    expect(select).toHaveBeenCalled()
+    select.mockRestore()
+    expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
   })
 
   it('lists devices newest first', async () => {

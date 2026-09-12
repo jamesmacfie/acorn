@@ -9,6 +9,7 @@ import type {
 import type { ExtensionPointKind, HookMode } from './extensionPoints.ts'
 import type { Cadence } from './schedules.ts'
 import type { NodeAttachment } from './node.ts'
+import type { TelemetryRecord } from './telemetry.ts'
 
 // The one error envelope every route returns, defined in ./errors.ts and re-exported here because
 // `ApiError` is the name 250-odd call sites know. See docs/api-reference.md § Errors.
@@ -192,6 +193,9 @@ export type ContextItem = {
   details?: string[]
   jump?: ContextPaneIntent
   origin?: { author: 'user' | 'agent' | 'workflow' } // notes section only, for provenance badges
+  // Reference data supplied by a section. Loaded contributors cannot supply a renderer or an action;
+  // consumers may show these as provenance labels.
+  sources?: { label: string; uri?: string }[]
 }
 export type ContextSectionResult = {
   id: string
@@ -201,7 +205,7 @@ export type ContextSectionResult = {
   items: ContextItem[]
   compact: string
   omitted: number
-  absent?: { reason: 'missing-cache'; detail: string }
+  absent?: { reason: 'missing-cache' | 'unavailable' | 'timeout' | 'invalid-response'; detail: string }
 }
 export type TaskContext = {
   task: { id: string; title: string; projectId: string; repo?: string; branch: string | null; worktreePath: string | null; pullNumber: number | null }
@@ -226,7 +230,7 @@ export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/cor
 
 
 // Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
-// run tools use (server/routes/harness.ts). Replaced the `run:*` IPC channels.
+// run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
@@ -253,7 +257,7 @@ export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
 // What every plugin has to say about archiving this task, asked once when the dialog opens
-// (node-core/server/plugin/taskChecks.ts).
+// (node-core/server/pluginHost/taskChecks.ts).
 export const taskArchiveConcernsRoute = (id: string) => `/v2/core/tasks/${id}/archive-concerns`
 export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
@@ -262,6 +266,38 @@ export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/sta
 
 
 export const prefsRoute = '/v2/core/prefs'
+// Where every runtime that is not the node posts its telemetry (docs/telemetry.md § Other runtimes).
+// Device-only, because a record admitted here reaches every sink, and a sink can send it off the
+// machine.
+export const coreTelemetryRoute = '/v2/core/telemetry'
+// What Settings → Telemetry draws: counters, never records (docs/telemetry.md § What the page
+// shows). Device-only, like the route above, and for a smaller reason: it names which plugins are
+// reading the stream, which is a fact about this machine's installation.
+export const coreTelemetrySummaryRoute = '/v2/core/telemetry/summary'
+
+/** The node's own account of what it has collected since it started.
+ *
+ *  Counters rather than a window over the ring. The ring holds 5,000 records and a sink may have
+ *  drained it a second ago, so a page built on the ring would answer "what is being collected" with
+ *  whatever happened in the last five seconds. */
+export type TelemetrySummary = {
+  /** The `telemetry.enabled` preference, as the collector last read it. */
+  enabled: boolean
+  /** The preference on and at least one sink subscribed, which is what it takes to build a record. */
+  collecting: boolean
+  /** When this node's collector started, in epoch milliseconds. Every count below is since then. */
+  since: number
+  /** When a batch last went to the sinks, or null when none has. */
+  lastFlushAt: number | null
+  /** Records the ring dropped at its cap, and attributes cut at theirs. */
+  dropped: number
+  truncated: number
+  /** Who is reading the stream, by plugin id. `core` is the node's own, such as the `ACORN_PERF`
+   *  printer. */
+  sinks: string[]
+  /** One row per owner and kind, so the page can say what each plugin is producing. */
+  records: Array<{ owner: string; kind: TelemetryRecord['kind']; count: number }>
+}
 // Settings → Plugins (docs/plugins.md § Activation). Per node, since which plugins a node runs
 // decides which routes exist and which SQLite files open. `running` and `disabled` answer different
 // questions: a toggle takes effect at the node's next start, so the page shows the gap between saving
@@ -272,6 +308,8 @@ export const prefsRoute = '/v2/core/prefs'
 // `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
 export type NodePluginRow = {
   name: string
+  /** Events this running or installed plugin declares for cross-plugin subscribers. */
+  emits?: readonly import('./plugin/contract.ts').PluginEmit[]
   required: boolean
   disabled: boolean
   running: boolean
@@ -287,7 +325,7 @@ export type NodePluginRow = {
   // persisted response type would need a bumped query key (docs/caching.md).
   //
   // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
-  // markup. The node caps it in node-core/server/plugin/pluginState.ts.
+  // markup. The node caps it in node-core/server/pluginHost/state.ts.
   reason?: string
   // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
   stage?: 'load' | 'init' | 'ready'
@@ -314,7 +352,7 @@ export type NodePluginRow = {
 // the types below are `z.infer` of it. This file used to carry a hand-written twin, ~330 lines kept in
 // step by nothing at all. Re-exported rather than moved so the 134 importers keep working; new code
 // should import from ./pluginContract.ts directly.
-export { PLUGIN_API_MAJOR } from './pluginApiVersion.ts'
+export { PLUGIN_API_MAJOR } from './plugin/apiVersion.ts'
 export type {
   NodePluginPermissions,
   PluginAgentContextDescriptor,
@@ -324,6 +362,7 @@ export type {
   PluginCommandAction,
   PluginCommandCategory,
   PluginCommandDescriptor,
+  PluginCommandSelectAction,
   PluginContentLinkDescriptor,
   PluginContributions,
   PluginDocumentCompletions,
@@ -338,12 +377,22 @@ export type {
   PluginSourceDescriptor,
   PluginSourceEmptyState,
   PluginThemeDescriptor,
-} from './pluginContract.ts'
+} from './plugin/contract.ts'
 
-// The two grants the device derives from a manifest's frame surfaces and records against a trust
+// The frame grants the device derives from a manifest's surfaces and records against a trust
 // decision. Not manifest shapes: they're what the owner consented to, one row per surface.
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
+// A host-mediated jump from this package's UI into a target another client plugin owns. The target is
+// a notice kind, never a pane id or route; storing it makes a newly added cross-owner destination
+// visible in the update prompt.
+export type PluginNavigationDestinationGrant = {
+  surface: string
+  label: string
+  destination: string
+  targetKind: string
+  noticeKind?: string
+}
 
 // The third grant: what this package's manifest says about other packages and about core's own
 // surfaces (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three
@@ -375,7 +424,7 @@ export type PluginExtensionGrant = {
 export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence }
 
 // The fifth grant: a check this package runs when the owner archives a task, and whether it offers to
-// clean up after it (node-core/server/plugin/taskChecks.ts). Recorded for the same reason as the
+// clean up after it (node-core/server/pluginHost/taskChecks.ts). Recorded for the same reason as the
 // fourth: `cleansUp` in the key is what lets the update prompt say a package that used to only warn
 // now does something.
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
@@ -395,6 +444,29 @@ export type PluginHarnessGrant = {
   run: string
   // Config variables carried from the node's environment into the agent, by name or glob.
   env: string[]
+  // The second invocation, when the harness declares a one-shot text mode: the same command line the
+  // Generate lists spend. Absent means the harness runs only as a session.
+  oneShot?: string
+}
+
+// Loaded tool and context descriptors are executable/data-bearing surfaces in the same trust
+// snapshot as schedules and harnesses. Routes are intentionally absent: manifest validation binds
+// those to the declaring package, while these fields capture every way an update can widen what the
+// host will expose or return.
+export type PluginAgentToolGrant = {
+  id: string
+  description: string
+  risk: 'read' | 'write' | 'execute'
+  requiresSession: boolean
+  maxOutputBytes: number
+}
+
+export type PluginContextSectionGrant = {
+  id: string
+  label: string
+  defaultIncluded: boolean
+  maxBytes: number
+  maxTokens: number
 }
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
@@ -410,8 +482,9 @@ export type PluginRailTask = {
   origin?: string
   title?: string
   branch?: string
-  // Reserved seed text. The task model has no body column; keeping it on the descriptor contract lets
-  // a future task-seed extension consume it without changing tracker row routes.
+  // The item's own text: a Linear issue's description, a Rollbar item's facts. The task model has no
+  // body column, so nothing is written with it; what reads it is the workflow start from a row menu,
+  // which puts the title and this under an `issue` input (docs/workflows.md § Starting a run).
   body?: string
   link?: Pick<TaskLinkSeed, 'connectionId' | 'identifier' | 'ref'>
 }
@@ -425,7 +498,11 @@ export type PluginRailItem = {
   /** Ordered secondary facts, one per column. The host reserves the same track width for each, so
    *  the Nth fact lines up down the whole list. Wins over `subtitle` when both are present. */
   fields?: string[]
+  /** Draw the aligned fields between the leading icon and title. The default keeps the title first. */
+  fieldsFirst?: boolean
   icon?: string
+  /** Semantic severity for the icon; the host owns its actual colour. */
+  severity?: 'info' | 'warn' | 'danger'
   badge?: string
   task?: PluginRailTask
 }
@@ -479,16 +556,16 @@ export type InstalledPluginRow = {
   // (docs/plugins.md § Forward compatibility). This is the reporting half: the device raises one
   // attention row per entry, on the same path a surface that failed to register takes.
   unknown?: readonly string[]
-  permissions: import('./pluginContract.ts').NodePluginPermissions
-  contributions: import('./pluginContract.ts').PluginContributions
+  permissions: import('./plugin/contract.ts').NodePluginPermissions
+  contributions: import('./plugin/contract.ts').PluginContributions
   // What the plugin declared other plugins may hear (docs/plugins.md § Hearing another plugin). Optional
   // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
   // and a required field would need a bumped key.
-  emits?: readonly import('./pluginContract.ts').PluginEmit[]
+  emits?: readonly import('./plugin/contract.ts').PluginEmit[]
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/ui/brandMarks.ts and docs/ui-design.md § Icons.
+  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
@@ -564,7 +641,7 @@ export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeU
 export const corePluginReloadRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/reload`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
-// an install route the agent can reach (client-core/plugins/frames/scopes.ts).
+// an install route the agent can reach (client-core/host/frames/scopes.ts).
 export const corePluginRequestRoute = (requestId: string) => `/v2/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
@@ -678,6 +755,11 @@ export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
 export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
 export const integrationMappingsRoute = (id: string) => `/v2/core/integrations/${id}/mappings`
+// The read half of the model seam: every backend a Generate control can spend, which is every
+// connected key plus every agent CLI installed on this machine (./modelProviders.ts § ModelBackend).
+// Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v2/core/*` has no
+// bridge scope (docs/integrations.md § Model providers).
+export const modelBackendsRoute = '/v2/core/models/backends'
 
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and stop unrelated query data sharing keys.
@@ -689,3 +771,7 @@ export const tasksKey = ['tasks', 'v3'] as const
 // v3 adds descriptor metadata and normalized connection summaries. A distinct key stops a persisted v2
 // `{ provider, connected }` row from hiding registry-driven sources and settings.
 export const integrationsKey = ['integrations', 'v3'] as const
+// The backends list. New in plugin API major 11, so there is no earlier shape a persisted snapshot
+// could be holding under this key; the suffix is here so the next change to the response has somewhere
+// to move (the persisted query cache has no other buster).
+export const modelBackendsKey = ['model-backends', 'v1'] as const

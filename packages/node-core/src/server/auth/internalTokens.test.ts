@@ -9,11 +9,18 @@ describe('scoped internal tokens', () => {
       scope: 'service',
       taskId: undefined,
       sessionId: undefined,
+      toolCeiling: undefined,
     })
-    expect(verifyInternalToken(KEY, mintInternalToken(KEY, { scope: 'task', taskId: 'task-1', sessionId: 'sess-1' }))).toEqual({
+    expect(verifyInternalToken(KEY, mintInternalToken(KEY, {
       scope: 'task',
       taskId: 'task-1',
       sessionId: 'sess-1',
+      toolCeiling: { allow: ['notes_list', 'notes_list'], maxRisk: 'read' },
+    }))).toEqual({
+      scope: 'task',
+      taskId: 'task-1',
+      sessionId: 'sess-1',
+      toolCeiling: { allow: ['notes_list'], maxRisk: 'read' },
     })
   })
 

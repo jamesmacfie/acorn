@@ -23,7 +23,7 @@ import {
   linearError,
   linearFetch,
 } from './'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderItemDetail, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>
@@ -190,8 +190,11 @@ const linearCodec: CachedItemCodec<LinearIssueSummary, LinearIssueDetail, Linear
 
 export type LinearResourceInput = { kind: 'detail'; identifier: string }
 
+// One spelling, because the routes, the TTL lookup and the detail read below all name it.
+export const LINEAR_ISSUES_RESOURCE = 'linear.issues'
+
 const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, LinearIssueDetail> = {
-  id: 'linear.issues',
+  id: LINEAR_ISSUES_RESOURCE,
   ttlMs: 10 * 60_000,
   merge: 'summary-preserves-detail',
   key: (connectionId, input) => `provider:linear:${connectionId}:issues:${input.identifier}`,
@@ -222,6 +225,19 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }
     }
   },
+}
+
+// What `issue_detail` returns for a Linear ticket: the description, the comments, the activity, the
+// labels and the relations, which is the whole of `LinearIssueDetail`. One resource call, because one
+// resource holds all of it.
+//
+// Core asks every connected workspace in turn, so a ticket that lives in another one is null rather
+// than an error. Anything else is this workspace refusing, and that is worth saying out loud.
+const linearItemDetail: ProviderItemDetail = async (context, identifier) => {
+  const result = await context.resource<LinearResourceInput, LinearIssueDetail>(LINEAR_ISSUES_RESOURCE, { kind: 'detail', identifier })
+  if (result.ok) return result.value
+  if (result.failure.status === 404) return null
+  throw new Error(result.failure.error)
 }
 
 // The projects a Linear workspace offers, for the host's workspace-mapping picker. It sits on the
@@ -307,6 +323,7 @@ export const linearProvider = publicProvider({
   resources: [linearIssuesResource],
   projects: linearProjectSource,
   codec: linearCodec,
+  detail: linearItemDetail,
   taskContext: {
     summarize(ref, item, state) {
       const parsed = item as LinearCached | null

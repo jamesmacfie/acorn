@@ -218,7 +218,7 @@ export const isDrawnViewKind = (kind: string): kind is PanelViewKind =>
 // ── Refresh ───────────────────────────────────────────────────────────────────────────────────
 
 // The manifest's own bound, re-spelled because it is declared inline on the descriptor schema
-// (@acorn/protocol/pluginContract.ts) rather than exported. A user-set panel refresh is held to the
+// (@acorn/protocol/plugin/contract.ts) rather than exported. A user-set panel refresh is held to the
 // same range a plugin's declared one is: below 30s a panel is a poller, above a day it is a page load.
 export const MIN_PANEL_REFRESH_SECONDS = 30
 export const MAX_PANEL_REFRESH_SECONDS = 86_400

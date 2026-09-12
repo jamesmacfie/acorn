@@ -97,6 +97,21 @@ export class ConnectionProviderRegistry {
     return [...this.#providers.values()]
   }
 
+  /**
+   * The gate on spending a stored credential: this plugin registered this provider.
+   *
+   * Wider than `IntegrationProviderRegistry.assertOwnedBy` and deliberately so. Every integration
+   * provider is registered here too, and a provider that owns a credential but mirrors nothing
+   * (the model providers, the Sentry exporter) is registered *only* here, so asking the narrower
+   * registry would refuse a plugin the use of its own connection.
+   */
+  assertOwnedBy(id: string, plugin: string): void {
+    if (!this.#providers.has(id)) throw new Error(`Plugin provider runtime names unregistered connection provider '${id}'.`)
+    if (this.#owners.get(id) !== plugin) {
+      throw new Error(`Plugin '${plugin}' cannot use connection provider '${id}' because it does not own it.`)
+    }
+  }
+
   /** Provider ids contributed by one loaded plugin. Ownership is bound by the host at registration;
    * the plugin never gets to choose the value used for this lookup. */
   idsForOwner(owner: string): readonly string[] {

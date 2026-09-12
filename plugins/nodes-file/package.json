@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-nodes-file",
   "version": "0.1.0",
+  "description": "Nodes declared in a file on disk, offered to the fleet as a provider.",
   "private": true,
   "type": "module",
   "exports": {

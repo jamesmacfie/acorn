@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, previewViews } from '@acorn/plugin-api/client'
-import { Button, EmptyState, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -42,12 +42,11 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       syncRect()
       checkOcclusion()
     })
+    // The box and the page. A window resize moves the box in viewport coordinates even when the box
+    // itself does not change size, and the shell positions the view in those coordinates — so the
+    // page is observed too, in place of the `window` resize listener this used to carry.
     ro.observe(host)
-    const onResize = () => {
-      syncRect()
-      checkOcclusion()
-    }
-    window.addEventListener('resize', onResize)
+    ro.observe(document.documentElement)
     const poll = setInterval(checkOcclusion, 200)
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
@@ -59,15 +58,14 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     onCleanup(() => {
       ensureVersion += 1 // invalidate any in-flight ensure before it can re-show this disposed pane
       ro.disconnect()
-      window.removeEventListener('resize', onResize)
       clearInterval(poll)
       offEvent()
       preview.hide() // leaving the preview pane hides the native view; main keeps it alive
     })
   })
 
-  // Reconciles the task's main-owned view against the host element (docs/shell.md § Host-owned
-  // webviews covers positioning and hide-on-cover). Main owns home identity across renderer
+  // Reconciles the task's shell-owned view against the host element (docs/shell.md § Host-owned
+  // webviews covers positioning and hide-on-cover). The shell owns home identity across client
   // remounts, so a changed run target updates the view while an ordinary pane or task switch
   // preserves whatever the user was browsing.
   createEffect(() => {
@@ -98,44 +96,39 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   }
 
   return (
-    <section class="pane workspace-preview" style={{ 'grid-column': '1 / 3' }}>
-      <Show when={preview} fallback={
-        <EmptyState title="The browser preview needs the desktop app">
-          Server-backed panes (PR review, workspaces, tasks) work in browser mode, but the preview
-          surface is a desktop-only capability.
+    <>
+      {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
+          without the seam never offers it (./PreviewTaskPane.tsx). */}
+      <Show when={props.url} fallback={
+        <EmptyState title="No preview URL yet">
+          Declare a run target with a <Text emphasis="mono">url</Text> — in{' '}
+          <Text emphasis="mono">.acorn/config.toml</Text> or the workspace's run targets — and start it
+          from the pane switcher's ▶ button, or set a preview URL in Settings → workspace.
         </EmptyState>
       }>
-        <Show when={props.url} fallback={
-          <EmptyState title="No preview URL yet">
-            Declare a run target with a <code>url</code> (in <code>.acorn/config.toml</code> or the
-            workspace's run targets) and start it from the pane switcher's ▶ button, or set a preview
-            URL in Settings → workspace.
-          </EmptyState>
-        }>
-          {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
-              the address box is an `Input`, so it takes the reader's style pack like every other box
-              in the app instead of the three rules this plugin used to ship for it. */}
-          <Toolbar size="sm" ariaLabel="Preview">
-            <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
-            <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
-            <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
-            <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
-            <Input
-              size="sm"
-              label="Preview address"
-              assist={false}
-              value={addr()}
-              onInput={(value) => setAddr(value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') go() }}
-            />
-            <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
-            <Show when={loading()}><Spinner label="Loading page" /></Show>
-          </Toolbar>
-        </Show>
+        {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
+            the address box is an `Input`, so it takes the reader's style pack like every other box
+            in the app instead of the three rules this plugin used to ship for it. */}
+        <Toolbar size="sm" ariaLabel="Preview">
+          <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
+          <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
+          <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
+          <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
+          <Input
+            size="sm"
+            label="Preview address"
+            assist={false}
+            value={addr()}
+            onInput={(value) => setAddr(value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') go() }}
+          />
+          <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
+          <Show when={loading()}><Spinner label="Loading page" /></Show>
+        </Toolbar>
       </Show>
       {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
           the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}
       <Rectangle kind="webview" label="Preview" mount={(element) => { host = element }} />
-    </section>
+    </>
   )
 }

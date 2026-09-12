@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { openPane } from '@acorn/plugin-api/client'
 import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { agentSessionsCollection, sessionRow } from './collectionContribution'
-import { activateManagedAgentPaneIntents, selectedManagedSession } from './managedSelection'
+import { activateManagedAgentPaneIntents, selectedManagedSession } from './sessions/managedSelection'
 
 const session: AgentSession = {
   id: 's1',
@@ -30,7 +30,7 @@ const session: AgentSession = {
   },
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [],
+  subagents: [], queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,

@@ -5,7 +5,7 @@ import { aggregateRows, shapeRows } from './shaping'
 // The panel's measure: the one number a stat shows, as a function of the source pages.
 //
 // Its own module because two callers need the same answer: the renderer composes these four steps as
-// memos (client-core/dashboards/data.ts § createPanelData) and the node's measure sampler composes
+// memos (client-core/features/dashboards/data.ts § createPanelData) and the node's measure sampler composes
 // them once per pass with no reactivity in sight. Written twice, they would drift, and a stored
 // history is only honest if it means what the number on screen means (docs/dashboards.md §
 // Sampling and retention).

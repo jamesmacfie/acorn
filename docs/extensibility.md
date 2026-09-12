@@ -67,6 +67,13 @@ actually the second — it is a rectangle the host places, so it sandboxes fine.
 looks first-party-only, check whether it is genuinely a component inside another component, or
 just a rectangle with an owner.
 
+The panel is the worked example rather than the thought experiment. github's `PullDetail` used to
+render linear's panel beside a PR, which is what B looks like; now github calls
+`openRefPanel({ providerId, displayId })` and the shell draws it in one place. A plugin holding
+another plugin's component became a plugin naming an item, which is data, and Linear ships its panel
+as a sandboxed frame today. The coupling could be deleted rather than defended, which is the point:
+the list is for components that *must* sit in someone else's tree, and a panel never had to.
+
 When a third-party plugin needs something on the first list, the answer is review and adoption into
 first-party — not a wider sandbox. Ergonomics is never a reason to widen it.
 
@@ -143,7 +150,7 @@ providers is what the feature *is* — two plugins' rows can share one board onl
 them draws anything. The same budget discipline applies with the same words: a field type added is a
 rendering rule every provider inherits forever, and the overflow path is a frame pane. Both feeders —
 `contributions.collections` in a manifest and `ctx.collections` from a compiled plugin — land in one
-client registry (`client-core/src/registries/collections.ts`), and nothing downstream can tell which
+client registry (`client-core/src/host/registries/sources/collections.ts`), and nothing downstream can tell which
 supplied a collection. That is the strongest form of the descriptor argument: a stranger's plugin gets
 panels that ship no client bundle, raise no trust prompt, and are pixel-identical to a first-party
 one's under every appearance pack.
@@ -215,7 +222,7 @@ Two earlier decisions are what make this possible, and neither was made for this
   guards against — a frame has a different document and a different bundle, a worker is a different
   thread, and neither shares a reactive graph with the shell. The hazard only exists when two Solids
   share one realm.
-- **The design system is enforced-pure.** `client-core/src/ui/` is props-in, DOM-out with no
+- **The design system is enforced-pure.** `client-core/src/kit/` is props-in, DOM-out with no
   data-layer imports, checked by the boundaries test. That rule was written for contract hygiene;
   its payoff is that those components drop into a sandbox with no query client, no shell context and
   no host services.
@@ -264,24 +271,18 @@ exploitable in a dramatic way. All three were the same mistake.
 
 If you are adding a plugin surface, assume this is the failure you are about to make.
 
-## The node half is disclosed, not contained
+## The node half is isolated
 
-A loaded plugin's server code runs **in the Node's process** and can do anything the Node can. Its
-declared `permissions.node` block shapes the context it receives, which is real least-privilege for
-cooperative code and makes the trust prompt truthful for the honest majority — but it is not a
-boundary, because that code can ignore the context entirely.
+A loaded plugin's server code runs in a dedicated permission-scoped worker realm. Its
+`permissions.node` block shapes the owner-bound context sent over RPC and the worker's network and
+child-process grants. The worker can read its package and, when it owns migrations, its exact SQLite
+files; it cannot directly load `node:sqlite`, open core or peer databases, create raw sockets, load
+native addons, or start nested workers.
 
-Every surface that renders those permissions says *declared*, not *enforced*. The trust prompt
-defines the word in its legend, and that legend carries one sentence that must not be softened:
-"This plugin's server code runs with the same access as acorn itself." The UI half genuinely is
-contained, and keeping the two lists visually separate is deliberate — a strong claim must not lend
-credibility to a weaker one sitting next to it.
-
-The route to a real boundary is written down in `security.md` § Node-half plugin security: move
-loaded plugins out of process, under the platform's own permission model, with the context becoming
-authorized calls rather than an object. Nothing shipped forecloses it, and a few decisions exist
-only to keep it buildable — the fetch-shaped route handler is the main one, because a live server
-object cannot cross a process boundary and a request/response function can.
+Every surface renders those host and runtime grants as *enforced*. Plugin-authored schedule and task
+check behavior stays *declared*: acorn controls when and where it executes, but cannot verify intent.
+The route to an OS adversarial and crash boundary remains rung 3 in `security.md`; the current worker
+boundary deliberately preserves the public plugin API, including its synchronous registration seams.
 
 ## Bundled plugins: shipped, but loaded
 
@@ -356,14 +357,14 @@ Roughly in order of how much they matter:
 2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
    http moved first with tables; database followed over the **document surface** — the host owns one
    editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,
-   design record `third-party/monaco.md`). That surface exists because a Monaco frame measurably cannot be
+   design record `editor.md`). That surface exists because a Monaco frame measurably cannot be
    served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
    outright by the one-file origin and a CSP with no `worker-src`
    (docs/first-party-plugins.md § First-party only by history) — the first surface class the sandbox
    demonstrably does not serve, answered by widening nothing. Editor itself stays compiled for that
    reason and no other: both its surfaces are host layouts filled with kit nodes now.
    linear, earlier, was the one that found a capability the tier cannot carry rather than merely
-   reshape (docs/third-party/README.md § What is still owed).
+   reshape (docs/loaded-plugin-migration.md § What is still owed).
 3. **The carriers that were missing have answers.** `agentContexts` has a form and real callers;
    `overlay` is a frame target opened by the `openOverlay` verb (unexercised end to end until a plugin
    declares one); `persistedState` deliberately gets no manifest form — the frame's
@@ -379,7 +380,8 @@ Roughly in order of how much they matter:
    fleet (`docs/plugins.md § Node providers`). Both seams exist and both are inert unless configured.
    The rule they were built under is the one this document's "unexercised seams rot" section predicts:
    a first-party control-plane plugin gets no host privilege a third party lacks, and the reference
-   provider (`plugins/nodes-file`) is deliberately a loaded plugin whose manifest grants it nothing, so
+   provider (`plugins/nodes-file`) is deliberately a loaded plugin whose manifest grants only its
+   environment-configured inventory file, so
    the seam has a consumer before it has a business behind it.
 6. **Web and mobile**, analysed in `future/remote.md`. The plugin work quietly prepared for it —
    the sandbox is standard web platform, and the client's platform-specific access sits behind one
@@ -393,11 +395,11 @@ Roughly in order of how much they matter:
 - `first-party-plugins.md` — which shipped plugins are first-party because they must be.
 - `security.md` — trust boundaries, the node-half threat model, and the containment ladder.
 - `command-palette-and-shortcuts.md` — commands, shortcuts, and plugin bindings.
-- `third-party/` — the review record from the first migration out of the binary.
+- `loaded-plugin-migration.md` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
-- `future/terminal/` — the terminal client programme: `acorn` in a terminal as a second host for the same component tree, and the node + tui deployable.
-- `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
-  the refusals shipped into `plugins.md § Hearing another plugin`.
-- `third-party/monaco.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
-  "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
+- `tui.md` — the terminal client: `acorn` in a terminal as a second host for the same component tree.
+- `docs/plugins/forward-compatibility.md` — the event catalogue, admission rule, shipped lifecycle
+  contracts, and deliberate refusals.
+- `editor.md` — a host-owned document surface: the concrete instance of the terminal client's
+  "one host-owned template" conclusion. Built through step 6 (database ships on it); editor's move is the step
   that remains.

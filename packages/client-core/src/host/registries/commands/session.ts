@@ -1,0 +1,921 @@
+import { createEffect, createMemo, createSignal, getOwner, onCleanup, untrack, type Accessor } from 'solid-js'
+import {
+  DEFAULT_COMMAND_SEARCH_DEBOUNCE_MS,
+  DEFAULT_COMMAND_SEARCH_MIN_QUERY,
+  MAX_COMMAND_SEARCH_ITEMS,
+  MAX_COMMAND_SEARCH_QUERY,
+  type CommandSearchItem,
+  type CommandSettingOption,
+} from '@acorn/protocol/commands.ts'
+import { fuzzyScore } from '../../../kit/lib/fuzzy'
+import {
+  commandRegistry,
+  commandScope,
+  executeCommand,
+  isActionCommand,
+  type CommandContribution,
+  type CommandExecutionContext,
+  type CommandOutcome,
+  type InputCommand,
+  type SearchCommand,
+  type SettingCommand,
+} from './commands'
+import { buildCommandGraph, type CommandGraph, type CommandNode } from './graph'
+import { setCommandPresenter } from './presenter'
+
+// The palette session: what is open, where in the tree it is, what is under the cursor, and what
+// happens when somebody presses Enter (docs/command-palette-and-shortcuts.md).
+//
+// One of these per client, and the same one for both. Before this, the desktop
+// (../../palette/CommandPalette.tsx) and the terminal (apps/tui/src/chrome/Palette.tsx) each fetched
+// the contributed rows, composed them with the actions and the task and workspace lists, filtered
+// them, tracked which source owned which row, and invoked it — the same seven decisions, written
+// twice, in two languages of component. Now they render this and bind keys to it. A renderer draws
+// `rows()`, marks `selectedIndex()`, prints `breadcrumb()` and `status()`, and calls `activate()`,
+// `move()` and `back()`. It fetches nothing and invokes nothing.
+//
+// **Every row in this list comes from the command registry.** There was a second way in until
+// 2026-09-03 — a row provider the host handed the session, holding the `paletteRows` contributions —
+// and it is gone with its last contributor. That matters beyond the deletion: a row source that is not
+// a command has no owner, no capability gate, no disposal and no shortcut, so each of those had to be
+// arranged for it separately.
+//
+// Solid, but not DOM: signals and memos only, no JSX, so a bare-Node test and a cell renderer can
+// both hold one. `tools/arch/boundaries.test.ts` keeps that line for the whole folder.
+//
+// Search and input arrived on 2026-09-03 into the shape phase 1 left for them: the frame stack holds
+// their state, the generation counter decides whose answer is still wanted, and the abort controller
+// belongs to whatever the top frame has in flight. A setting arrived the same day and is the fifth: it
+// asks its owner what the value is when the frame opens, marks that choice, writes the one that is
+// picked, and marks whatever the write says was stored.
+
+/** What activating a row does. Owned by whoever produced the row, so the session never switches on
+ *  what kind of thing a row is about. */
+export type SessionRowAction =
+  /** Push this command's own frame. A group, a search, an input or a setting. */
+  | { effect: 'enter'; commandId: string }
+  /** Run something. A leaf action, a search result and a setting choice are all this. */
+  | { effect: 'run'; run: (context: CommandExecutionContext) => Promise<CommandOutcome | void> | CommandOutcome | void }
+  /** Nothing. An error line: visible, because it explains why a row somebody expected is missing,
+   *  and never the selection. */
+  | { effect: 'none' }
+
+export type SessionRow = {
+  /** Stable across a refresh: the selection is kept by this and not by an index. */
+  readonly id: string
+  readonly label: string
+  readonly hint?: string
+  /** A short marker beside the label: a count, a state, a severity. Only a search result has one so
+   *  far, because only a search result comes from somewhere that knows one. */
+  readonly badge?: string
+  /** The ancestor titles, without the row's own, when a root search reached a descendant. Absent
+   *  everywhere else, because inside a group the breadcrumb is already the frame's. */
+  readonly breadcrumb?: readonly string[]
+  readonly action: SessionRowAction
+}
+
+export const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
+
+/** What the top frame is for. The root, a group and a setting list rows; the other two own the field
+ *  above the list rather than filtering it. */
+export type SessionFrameKind = 'root' | 'group' | 'search' | 'input' | 'setting'
+
+/** Where a search frame is between "nothing typed" and "here are the rows". */
+export type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
+
+/** One row a provider answered with, and the world it answered in. */
+export type SessionSearchResult = {
+  /** The row id, which is the item's own, namespaced by node under a fleet fan-out: two nodes may
+   *  answer with the same issue key, and a bare item id would make one of them unreachable. */
+  readonly rowId: string
+  readonly item: CommandSearchItem
+  /**
+   * The identity this row was fetched under, which is what selecting it runs against.
+   *
+   * Its own rather than the session's, because a fleet query asks several nodes and a row from node B
+   * picked in a session whose active node is A must still act on B.
+   */
+  readonly context: CommandExecutionContext
+  readonly nodeLabel?: string
+}
+
+/**
+ * A search frame's current answer.
+ *
+ * On the frame rather than on the session, for the same reason the query and the cursor are: the frame
+ * object is kept whole on push and restored on pop, so a reader who leaves and comes back finds what
+ * was there. `results` is emptied the moment a new query starts — a row fetched for `ro` is not a
+ * result for `rol`, and leaving it selectable would let Enter act on the wrong thing.
+ */
+export type SessionSearchState = {
+  readonly phase: SessionSearchPhase
+  /** The one explanatory line when there are no rows: the minimum-length instruction, the loading
+   *  line, or "no results". Empty when rows are showing. */
+  readonly message: string
+  readonly results: readonly SessionSearchResult[]
+  /** Per-node failures. A fleet query that lost one node keeps the other's rows and says so, which is
+   *  the convention every other fan-out surface already follows (infra/node/fanout.ts). */
+  readonly errors: readonly { source: string; message: string }[]
+}
+
+/** Where a setting frame is between "asking the owner what it is" and "here are the choices". */
+export type SessionSettingPhase = 'loading' | 'ready' | 'error'
+
+/**
+ * A setting frame's current value.
+ *
+ * Read from the owner when the frame opens and re-read from what a write answered, never guessed: the
+ * marker beside a choice is the whole point of the frame, and a value the palette assumed rather than
+ * asked for is a marker that can be wrong (docs/command-palette-and-shortcuts.md).
+ *
+ * `value` is `null` while it is unknown — still loading, the read failed, or the owner answered with a
+ * value none of the declared choices names. The choices are still drawn in that last case; nothing is
+ * marked, which says "not one of these" rather than picking one at random.
+ */
+export type SessionSettingState = {
+  readonly phase: SessionSettingPhase
+  /** The one explanatory line when there are no choices to draw: the loading line, or why the read
+   *  failed. Empty once the choices are showing. */
+  readonly message: string
+  readonly value: string | null
+}
+
+/**
+ * One level of the stack.
+ *
+ * The whole object is kept on push and restored on pop, which is the difference between "Escape goes
+ * back" and "Escape goes back to exactly where you were": the query you had typed and the row you
+ * were on are fields of this and not of the session.
+ */
+export type SessionFrame = {
+  readonly kind: SessionFrameKind
+  /** The command being shown, or `null` at the root. */
+  readonly commandId: string | null
+  readonly title: string | null
+  /** Titles from the top level down to and including this frame's own. Empty at the root. */
+  readonly breadcrumb: readonly string[]
+  readonly query: string
+  /** The row the cursor is on. `null` means "the first selectable one", which is what a fresh frame
+   *  and a query that just changed both mean. */
+  readonly selectedId: string | null
+  /** A line under the field: what a `stay` outcome said, or what an activation threw. */
+  readonly status: string
+  /** What this frame's own field asks for. Empty on the root and a group, where the host's own
+   *  placeholder still describes the list. */
+  readonly placeholder: string
+  /** Present exactly on a search frame. */
+  readonly search?: SessionSearchState
+  /** Present exactly on a setting frame. */
+  readonly setting?: SessionSettingState
+}
+
+export type CommandSession = {
+  open: Accessor<boolean>
+  /** The identity captured when it opened, or `null` while closed. */
+  context: Accessor<CommandExecutionContext | null>
+  frames: Accessor<readonly SessionFrame[]>
+  /** The frame on top, or `null` while closed. */
+  frame: Accessor<SessionFrame | null>
+  /** Where this frame is, from the top level down to and including its own title. Empty at the root,
+   *  which is the one frame that is not a command. */
+  breadcrumb: Accessor<readonly string[]>
+  /** What the top frame is: the root, a group, a search, an input or a setting. A renderer draws the
+   *  same field and list for all five and reads this only to label the field and to know that Enter
+   *  submits. */
+  kind: Accessor<SessionFrameKind>
+  query: Accessor<string>
+  /** The top frame's own placeholder, or empty where the host's own still describes the list. */
+  placeholder: Accessor<string>
+  status: Accessor<string>
+  /** Something is being fetched or invoked. `aria-busy`, and the terminal's spinner. */
+  busy: Accessor<boolean>
+  rows: Accessor<readonly SessionRow[]>
+  selectedIndex: Accessor<number>
+  selectedRow: Accessor<SessionRow | null>
+  openRoot: () => void
+  /** Open at a command: a group at its own frame, a leaf at its parent's with the cursor on it. */
+  openAt: (commandId: string) => void
+  setQuery: (query: string) => void
+  /** Put the cursor on a row by id. The renderer's hover and click path. */
+  select: (id: string) => void
+  /** Move the cursor, skipping the rows that are not selectable. Clamps at both ends, which is what
+   *  both palettes do today. */
+  move: (delta: number) => void
+  /** Enter on the selected row. */
+  activate: () => void
+  /** Enter on a named row, for a click. */
+  activateRow: (id: string) => void
+  /** Escape: pop a frame, or close at the root. `true` when it popped. */
+  back: () => boolean
+  close: () => void
+  /**
+   * A composition is in progress, or has just ended.
+   *
+   * An IME builds one character out of several keystrokes, and each of them reaches the field as an
+   * input event. Searching on those spends a request per keystroke on text the reader has not typed
+   * yet, so nothing is scheduled while this is true and the end of the composition schedules once
+   * (docs/command-palette-and-shortcuts.md).
+   */
+  setComposing: (composing: boolean) => void
+  /** Run a failed search again, now. The error row is not selectable, so Enter on a failed frame comes
+   *  here instead of activating it. */
+  retry: () => void
+}
+
+/** One node a `fleet` search reaches, as the host's fan-out sees it. */
+export type CommandFleetNode = { readonly nodeId: string; readonly label: string }
+
+export type CommandSessionOptions = {
+  /** The identity to capture, read once per open. An external change to the node, workspace, project
+   *  or task in it closes the session. */
+  context: () => CommandExecutionContext
+  /**
+   * The nodes a `fleet`-scoped search asks, from the host's own fan-out.
+   *
+   * A host that supplies none is not refused: its answer is the one node it captured, which is what a
+   * single-node client's whole fleet is (apps/tui). Nothing fans out without a command asking for it
+   * (docs/command-palette-and-shortcuts.md § What the palette refuses).
+   */
+  fleet?: () => readonly CommandFleetNode[]
+  /** The host's half of opening: claim focus, raise the overlay. Runs only on a closed-to-open
+   *  transition, so opening at a command while already open does not re-capture the focus target. */
+  onOpen?: () => void
+  /** The host's half of closing: hand focus back, drop the overlay. Runs once per close, and never on
+   *  an intermediate pop. */
+  onClose?: () => void
+}
+
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+const isAbort = (error: unknown): boolean => (error as { name?: string } | null)?.name === 'AbortError'
+
+const ROOT: SessionFrame = {
+  kind: 'root', commandId: null, title: null, breadcrumb: [], query: '', selectedId: null, status: '', placeholder: '',
+}
+
+const frameKind = (command: CommandContribution): SessionFrameKind =>
+  command.kind === 'search' || command.kind === 'input' || command.kind === 'setting' ? command.kind : 'group'
+
+/** How much has to be typed before a search asks anybody. Zero is legitimate and is what a provider
+ *  that loads once on entry and filters locally declares (./localSearch.ts). */
+const minQueryOf = (command: SearchCommand): number =>
+  Math.max(0, command.minQueryLength ?? DEFAULT_COMMAND_SEARCH_MIN_QUERY)
+
+const debounceOf = (command: SearchCommand): number =>
+  Math.max(0, command.debounceMs ?? DEFAULT_COMMAND_SEARCH_DEBOUNCE_MS)
+
+/** What a search frame says before it has been asked anything. */
+const instructionState = (command: SearchCommand): SessionSearchState => {
+  const minimum = minQueryOf(command)
+  return {
+    phase: 'instruction',
+    message: minimum > 0 ? `Type at least ${minimum} characters to search.` : '',
+    results: [],
+    errors: [],
+  }
+}
+
+/** What a setting frame says before the owner has answered. A choice list with nothing marked would
+ *  read as "none of these", so the choices wait until there is something true to say about them. */
+const SETTING_LOADING: SessionSettingState = { phase: 'loading', message: 'Loading\u2026', value: null }
+
+const frameFor = (node: CommandNode): SessionFrame => ({
+  kind: frameKind(node.command),
+  commandId: node.id,
+  title: node.title,
+  breadcrumb: node.breadcrumb,
+  query: '',
+  selectedId: null,
+  status: '',
+  // A setting's field narrows the choices rather than asking for anything, and it says so: the root's
+  // own placeholder is about running commands, which is not what this list holds.
+  placeholder: node.command.kind === 'setting'
+    ? 'Filter the choices…'
+    : (node.command.kind === 'search' || node.command.kind === 'input' ? node.command.placeholder : '') ?? '',
+  ...(node.command.kind === 'search' ? { search: instructionState(node.command) } : {}),
+  ...(node.command.kind === 'setting' ? { setting: SETTING_LOADING } : {}),
+})
+
+/** The four identities a session is about. A pane or a surface moving under it is not a reason to
+ *  close — opening a palette moves the focus itself — but the task, project, workspace or node it
+ *  captured moving is: every row in the list was fetched for the old one. */
+const sameIdentity = (a: CommandExecutionContext, b: CommandExecutionContext): boolean =>
+  a.nodeId === b.nodeId && a.workspaceId === b.workspaceId && a.projectId === b.projectId && a.taskId === b.taskId
+
+export function createCommandSession(options: CommandSessionOptions): CommandSession {
+  const [open, setOpen] = createSignal(false)
+  const [captured, setCaptured] = createSignal<CommandExecutionContext | null>(null)
+  const [frames, setFrames] = createSignal<readonly SessionFrame[]>([])
+  const [pending, setPending] = createSignal(false)
+
+  // A generation per request. Abort is the optimisation and the generation is the correctness: a
+  // provider that ignores its signal still cannot write into a session that has moved on
+  // (docs/command-palette-and-shortcuts.md).
+  let generation = 0
+
+  // Two lifetimes, because there are two kinds of work. `whileOpen` lasts as long as the palette is
+  // open and is what a setting write runs under: typing does not cancel a write, and closing does.
+  // `work` is whatever the top frame has in flight — one search, or one submission, never both — and
+  // a keystroke that cancels a search must not reach the other one.
+  let whileOpen: AbortController | null = null
+  let work: AbortController | null = null
+  let timer: ReturnType<typeof setTimeout> | null = null
+  // Not a signal: nothing renders from it, and it is read only when a keystroke asks whether to
+  // schedule.
+  let composing = false
+
+  /** Cancel whatever the top frame had going, and make its answer unwanted if it arrives anyway. */
+  const abortWork = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+    }
+    work?.abort()
+    work = null
+    generation++
+  }
+
+  // The graph is projected against the identity this session captured, so a command about a task is
+  // simply not in a session that opened over no task (./graph.ts). Closed, there is no world to hold
+  // the scopes against and the projection is the plain one.
+  const graph = createMemo<CommandGraph>(() =>
+    buildCommandGraph(commandRegistry.entries(), captured() ?? undefined))
+  const frame = (): SessionFrame | null => frames()[frames().length - 1] ?? null
+
+  const patchFrame = (patch: Partial<SessionFrame>): void => {
+    setFrames((stack) => (stack.length ? [...stack.slice(0, -1), { ...stack[stack.length - 1], ...patch }] : stack))
+  }
+
+  // ── The rows ────────────────────────────────────────────────────────────────────────────────────
+
+  const commandRow = (node: CommandNode, trail: boolean): SessionRow => ({
+    id: node.id,
+    label: node.title,
+    hint: node.hint,
+    breadcrumb: trail && node.breadcrumb.length > 1 ? node.breadcrumb.slice(0, -1) : undefined,
+    action: isActionCommand(node.command)
+      ? { effect: 'run', run: (context) => executeCommand(node.id, context) }
+      : { effect: 'enter', commandId: node.id },
+  })
+
+  const rootRows = (query: string): SessionRow[] => {
+    const trimmed = query.trim()
+    // Empty: the top level, in the graph's own sibling order. Typed: every available command at any
+    // depth, ranked, each hit showing the trail it came from — so hierarchy reduces noise without
+    // making a command undiscoverable (./graph.ts).
+    if (!trimmed) return graph().top().map((node) => commandRow(node, false))
+    return graph().ranked(trimmed).map((hit) => commandRow(hit.node, true))
+  }
+
+  const groupRows = (commandId: string, query: string): SessionRow[] => {
+    const trimmed = query.trim()
+    if (!trimmed) return graph().children(commandId).map((node) => commandRow(node, false))
+    // Its own children only. The root is the place that searches the whole tree; inside a group the
+    // query narrows what is in front of you.
+    return graph().ranked(trimmed)
+      .filter((hit) => hit.node.parentId === commandId)
+      .map((hit) => commandRow(hit.node, false))
+  }
+
+  // ── The interactive frames ──────────────────────────────────────────────────────────────────────
+
+  /** The command a frame is showing, when it is the kind the frame says it is. A frame outlives
+   *  nothing — a disposed contribution simply stops answering — so every reader checks. */
+  type InteractiveKind = { search: SearchCommand; input: InputCommand; setting: SettingCommand }
+  const commandFor = <K extends keyof InteractiveKind>(frameAt: SessionFrame | null, kind: K): InteractiveKind[K] | null => {
+    if (!frameAt?.commandId || frameAt.kind !== kind) return null
+    const command = commandRegistry.get(frameAt.commandId)
+    if (!command || command.kind !== kind) return null
+    return command as InteractiveKind[K]
+  }
+
+  const searchRow = (result: SessionSearchResult): SessionRow => ({
+    id: result.rowId,
+    label: result.item.title,
+    hint: [result.item.subtitle, result.nodeLabel].filter(Boolean).join(' · ') || undefined,
+    ...(result.item.badge ? { badge: result.item.badge } : {}),
+    action: {
+      effect: 'run',
+      // The context the row was fetched under, not the one handed in: under a fleet fan-out those are
+      // different nodes, and the row belongs to the one that answered with it.
+      run: () => {
+        const command = commandFor(untrack(frame), 'search')
+        return command ? command.select(result.item, result.context) : undefined
+      },
+    },
+  })
+
+  const searchRows = (state: SessionSearchState): SessionRow[] => {
+    const failures = state.errors.map((error, at) => ({
+      id: `error:${error.source}:${at}`,
+      label: `${error.source}: ${error.message}`,
+      action: { effect: 'none' } as const,
+    }))
+    const found = state.results.map(searchRow)
+    if (failures.length || found.length) return [...failures, ...found]
+    // One explanatory line, and never a selectable one: it says why the list is empty rather than
+    // offering something to press Enter on.
+    return state.message ? [{ id: 'search:message', label: state.message, action: { effect: 'none' } }] : []
+  }
+
+  const inputRows = (submitting: boolean): SessionRow[] => [{
+    id: 'input:hint',
+    // The pending state, visible in both hosts without either of them branching on a frame kind.
+    label: submitting ? 'Submitting…' : 'Press Enter to submit.',
+    action: { effect: 'none' },
+  }]
+
+  /** The word beside the choice the owner reports as current. A badge rather than a tick, because both
+   *  renderers already draw one and neither has a column for a glyph (../palette/PaletteSurface.tsx,
+   *  apps/tui/src/chrome/Palette.tsx). */
+  const CURRENT_BADGE = 'current'
+
+  /**
+   * One choice, and what picking it does.
+   *
+   * The write is the row's own `run`, so it goes through the ordinary activation path: one at a time,
+   * a `stay` outcome keeps the frame open, and a rejection leaves the message under the field. What is
+   * particular to a setting is the answer — the owner says which value it actually stored, and that is
+   * what moves the marker. Nothing is marked optimistically, so a write that failed leaves the list
+   * saying what is really set (docs/command-palette-and-shortcuts.md).
+   */
+  const settingRow = (command: SettingCommand, option: CommandSettingOption, current: string | null): SessionRow => ({
+    id: `setting:${option.value}`,
+    label: option.label,
+    ...(option.value === current ? { badge: CURRENT_BADGE } : {}),
+    action: {
+      effect: 'run',
+      run: async (context): Promise<CommandOutcome> => {
+        // The session's own controller, not a keystroke's: a write is not cancelled by typing, and it
+        // is abandoned when the session closes, which is the only reason left to stop caring.
+        const signal = whileOpen?.signal ?? new AbortController().signal
+        const canonical = await command.write(option.value, context, signal)
+        // Refused rather than shown, and refused here so a compiled provider and a manifest route are
+        // held to the same rule: a value naming no declared choice would leave a list where nothing is
+        // marked and no way to tell whether the write landed.
+        const stored = command.options.find((choice) => choice.value === canonical)
+        if (!stored) throw new Error(`'${canonical}' is not one of the choices`)
+        patchFrame({ setting: { phase: 'ready', message: '', value: canonical } })
+        return { effect: 'stay', status: `Set to ${stored.label}.` }
+      },
+    },
+  })
+
+  const settingRows = (command: SettingCommand, state: SessionSettingState, query: string): SessionRow[] => {
+    // One explanatory line and no choices while the current value is unknown for a reason the reader
+    // can do something about. Enter on the failed frame reads again (./retry).
+    if (state.phase !== 'ready') {
+      return state.message ? [{ id: 'setting:message', label: state.message, action: { effect: 'none' } }] : []
+    }
+    const trimmed = query.trim()
+    if (!trimmed) return command.options.map((option) => settingRow(command, option, state.value))
+    // The same scorer the rest of the palette narrows a list with, over the label and whatever extra
+    // words the option declared. A theme list is long enough to want it.
+    return command.options
+      .map((option, at) => ({
+        option,
+        at,
+        score: [option.label, ...(option.keywords ?? [])]
+          .map((text) => fuzzyScore(trimmed, text))
+          .reduce<number | null>((best, hit) => (hit === null ? best : best === null ? hit : Math.max(best, hit)), null),
+      }))
+      .filter((row): row is { option: CommandSettingOption; at: number; score: number } => row.score !== null)
+      .sort((a, b) => b.score - a.score || a.at - b.at)
+      .map((row) => settingRow(command, row.option, state.value))
+  }
+
+  const rows = createMemo<readonly SessionRow[]>(() => {
+    if (!open()) return []
+    const current = frame()
+    if (!current) return []
+    if (current.kind === 'search') return current.search ? searchRows(current.search) : []
+    if (current.kind === 'input') return inputRows(pending())
+    if (current.kind === 'setting') {
+      const command = commandFor(current, 'setting')
+      return command && current.setting ? settingRows(command, current.setting, current.query) : []
+    }
+    return current.commandId === null ? rootRows(current.query) : groupRows(current.commandId, current.query)
+  })
+
+  // ── The cursor ──────────────────────────────────────────────────────────────────────────────────
+
+  const selectedIndex = createMemo(() => {
+    const list = rows()
+    const id = frame()?.selectedId ?? null
+    const at = id === null ? -1 : list.findIndex((row) => row.id === id)
+    // Kept by id where the row survived the refresh, and clamped to the first selectable row where it
+    // did not — never left pointing at an error line.
+    if (at >= 0 && rowSelectable(list[at])) return at
+    return list.findIndex(rowSelectable)
+  })
+
+  const selectedRow = createMemo(() => rows()[selectedIndex()] ?? null)
+
+  const select = (id: string): void => {
+    const row = untrack(rows).find((candidate) => candidate.id === id)
+    if (row && rowSelectable(row)) patchFrame({ selectedId: id })
+  }
+
+  const move = (delta: number): void => {
+    const list = untrack(rows)
+    const from = untrack(selectedIndex)
+    const step = delta < 0 ? -1 : 1
+    let at = from < 0 ? (step > 0 ? -1 : list.length) : from
+    for (let left = Math.abs(delta); left > 0; left--) {
+      let next = at + step
+      while (next >= 0 && next < list.length && !rowSelectable(list[next])) next += step
+      if (next < 0 || next >= list.length) break
+      at = next
+    }
+    const row = list[at]
+    if (row && rowSelectable(row)) patchFrame({ selectedId: row.id })
+  }
+
+  // ── Searching ───────────────────────────────────────────────────────────────────────────────────
+
+  /** Which worlds one query is asked in: the captured one, or one per capable node under `fleet`. */
+  const searchTargets = (command: SearchCommand, base: CommandExecutionContext): readonly { context: CommandExecutionContext; label?: string }[] => {
+    if (commandScope(command) !== 'fleet') return [{ context: base }]
+    const fleet = options.fleet?.() ?? []
+    if (!fleet.length) return [{ context: base }]
+    return fleet.map((node) => ({ context: { ...base, nodeId: node.nodeId }, label: node.label }))
+  }
+
+  const applySearch = (state: SessionSearchState): void => patchFrame({ search: state, selectedId: null })
+
+  /**
+   * Ask, once the reader has stopped typing.
+   *
+   * The generation is taken here rather than when the answer lands, and every path back into the frame
+   * checks it. A provider that ignores its signal — a fetch already past the network, a cache that
+   * resolves from memory — still cannot write rows for `ro` into a frame that now says `rol`.
+   */
+  const runSearch = (command: SearchCommand, text: string): void => {
+    const base = untrack(captured)
+    if (!base) return
+    abortWork()
+    const controllerForQuery = new AbortController()
+    work = controllerForQuery
+    const mine = generation
+    const targets = searchTargets(command, base)
+    // A fan-out is what carries node labels, and it is what namespaces a row id — including a fleet of
+    // one, so the id a row has does not depend on how many machines happen to be paired today.
+    const fleet = targets.some((target) => target.label !== undefined)
+    void Promise.all(targets.map(async (target) => {
+      try {
+        return { target, items: await command.query(text, target.context, controllerForQuery.signal) }
+      } catch (error) {
+        return { target, error }
+      }
+    })).then((settled) => {
+      // Both, and in this order: a stale generation means somebody else owns the frame now, and an
+      // aborted controller means this answer was already given up on.
+      if (mine !== generation || controllerForQuery.signal.aborted) return
+      const results: SessionSearchResult[] = []
+      const errors: { source: string; message: string }[] = []
+      for (const outcome of settled) {
+        const label = outcome.target.label
+        if ('error' in outcome) {
+          // An abort is silent. It is this session cancelling its own work, and reporting it back to
+          // the reader as a failure would put an error line under every keystroke.
+          if (!isAbort(outcome.error)) errors.push({ source: label ?? 'search', message: messageOf(outcome.error) })
+          continue
+        }
+        for (const item of outcome.items) {
+          if (results.length >= MAX_COMMAND_SEARCH_ITEMS) break
+          results.push({
+            rowId: fleet ? `${outcome.target.context.nodeId ?? ''}:${item.id}` : item.id,
+            item,
+            context: outcome.target.context,
+            ...(label ? { nodeLabel: label } : {}),
+          })
+        }
+      }
+      // A partial failure keeps the rows it did get: one node that went away must not erase the other's
+      // answers (infra/node/fanout.ts § the same rule for every aggregate surface).
+      const failedOutright = !results.length && errors.length > 0
+      applySearch({
+        phase: failedOutright ? 'error' : 'ready',
+        message: results.length || errors.length ? '' : 'No results.',
+        results,
+        errors,
+      })
+    })
+  }
+
+  /**
+   * A keystroke, an entry, or a composition ending.
+   *
+   * Whatever was in flight is dropped first and the rows go with it, because a row fetched for the
+   * previous query is not an answer to this one and leaving it selectable would let Enter act on the
+   * wrong thing. What replaces it is a state, not a row: too short is an instruction, in flight is a
+   * loading line, and only a landed answer is a list.
+   */
+  const scheduleSearch = (): void => {
+    const current = untrack(frame)
+    const command = commandFor(current, 'search')
+    if (!current || !command) return
+    abortWork()
+    const text = current.query.trim().slice(0, MAX_COMMAND_SEARCH_QUERY)
+    if (text.length < minQueryOf(command)) return applySearch(instructionState(command))
+    // Mid-character. The composition's end schedules once, with whatever the field says then.
+    if (composing) return applySearch({ ...instructionState(command), message: '' })
+    applySearch({ phase: 'loading', message: 'Searching…', results: [], errors: [] })
+    const mine = generation
+    timer = setTimeout(() => {
+      timer = null
+      if (mine !== generation) return
+      runSearch(command, text)
+    }, debounceOf(command))
+  }
+
+  const retry = (): void => {
+    const current = untrack(frame)
+    if (current?.kind === 'setting') return loadSetting()
+    const command = commandFor(current, 'search')
+    if (!current || !command) return
+    const text = current.query.trim().slice(0, MAX_COMMAND_SEARCH_QUERY)
+    if (text.length < minQueryOf(command)) return applySearch(instructionState(command))
+    applySearch({ phase: 'loading', message: 'Searching…', results: [], errors: [] })
+    runSearch(command, text)
+  }
+
+  // ── Reading a setting ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Ask the owner what the setting currently is.
+   *
+   * Once on entry and again on a retry, and never on a keystroke: the query on a setting frame narrows
+   * the choices the owner already declared, so typing costs nothing. Guarded by the same generation the
+   * interactive frames use, so an answer that arrives after a pop has nowhere to land.
+   */
+  const loadSetting = (): void => {
+    const current = untrack(frame)
+    const command = commandFor(current, 'setting')
+    const context = untrack(captured)
+    if (!current || !command || !context) return
+    abortWork()
+    const controllerForRead = new AbortController()
+    work = controllerForRead
+    const mine = generation
+    patchFrame({ setting: SETTING_LOADING, selectedId: null })
+    void Promise.resolve()
+      .then(() => command.read(context, controllerForRead.signal))
+      .then((value) => {
+        if (mine !== generation || controllerForRead.signal.aborted) return
+        // A value none of the choices names leaves the list unmarked rather than empty: the choices are
+        // still the choices, and "not one of these" is a true thing to show.
+        const known = command.options.some((option) => option.value === value)
+        patchFrame({ setting: { phase: 'ready', message: '', value: known ? value : null } })
+      })
+      .catch((error: unknown) => {
+        if (mine !== generation) return
+        if (isAbort(error)) return
+        patchFrame({ setting: { phase: 'error', message: messageOf(error), value: null } })
+      })
+  }
+
+  // ── Submitting ──────────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Enter on an input frame, once.
+   *
+   * Never debounced and never implicit: the reader types a line and presses Enter, and a second Enter
+   * while the first is in flight is a slip rather than a second submission. A failure keeps the frame,
+   * the text and the message, because the whole point of typing it was not to have to type it again.
+   */
+  const submitInput = (): void => {
+    if (untrack(pending)) return
+    const current = untrack(frame)
+    const command = commandFor(current, 'input')
+    if (!current || !command) return
+    const text = current.query.trim()
+    if (!text) return
+    const problem = command.validate?.(text)
+    if (problem !== undefined) return patchFrame({ status: problem })
+    const context = untrack(captured)
+    if (!context) return
+    abortWork()
+    const controllerForSubmit = new AbortController()
+    work = controllerForSubmit
+    const mine = generation
+    patchFrame({ status: '' })
+    setPending(true)
+    // Called now, not on the next microtask: the reader pressed Enter, and the request, its signal and
+    // the pending row all have to exist by the time the second Enter arrives.
+    void (async (): Promise<void> => {
+      try {
+        const outcome = await command.submit(text, context, controllerForSubmit.signal)
+        // Somebody else owns the frame now — a pop, a close, the world moving. Whatever this was going
+        // to say, there is nowhere to say it.
+        if (mine !== generation) return
+        setPending(false)
+        if (!outcome || outcome.effect === 'close') return close()
+        patchFrame({ status: outcome.status ?? '' })
+      } catch (error) {
+        if (mine !== generation) return
+        setPending(false)
+        if (isAbort(error)) return
+        patchFrame({ status: messageOf(error) })
+      }
+    })()
+  }
+
+  // ── Opening, fetching, closing ──────────────────────────────────────────────────────────────────
+
+  /** Landing on a frame. A search asks straight away, which is what a provider with no minimum and no
+   *  debounce means by "loads once on entry" (./localSearch.ts); everything else has nothing to ask. */
+  const entered = (): void => {
+    const kind = untrack(frame)?.kind
+    if (kind === 'search') scheduleSearch()
+    else if (kind === 'setting') loadSetting()
+  }
+
+  const start = (stack: readonly SessionFrame[]): void => {
+    const wasOpen = untrack(open)
+    abortWork()
+    if (!wasOpen) {
+      whileOpen?.abort()
+      whileOpen = new AbortController()
+      setCaptured(untrack(options.context))
+    }
+    setFrames(stack)
+    if (!wasOpen) {
+      setOpen(true)
+      options.onOpen?.()
+    }
+    entered()
+  }
+
+  const openRoot = (): void => start([ROOT])
+
+  const openAt = (commandId: string): void => {
+    // The graph as this session is about to see it. A shortcut arrives before anything has been
+    // captured, and a command the identity would hide — a task command with no task open — is not one
+    // this session can open at, so the projection it is looked up in is the one it will live in.
+    const projected = untrack(open)
+      ? untrack(graph)
+      : buildCommandGraph(commandRegistry.entries(), untrack(options.context))
+    const node = projected.nodes.get(commandId)
+    if (!node || !node.available) return openRoot()
+    const chain: CommandNode[] = []
+    for (let at: CommandNode | undefined = node; at; at = at.parentId ? projected.nodes.get(at.parentId) : undefined) {
+      chain.unshift(at)
+    }
+    // A group is entered at its own frame; a leaf has no frame of its own, so it is entered at its
+    // parent's with the cursor on it. Both are "open the palette where this command is", which is what
+    // a shortcut aimed at one means.
+    const leaf = isActionCommand(node.command)
+    start([ROOT, ...(leaf ? chain.slice(0, -1) : chain).map(frameFor)])
+    if (leaf) patchFrame({ selectedId: node.id })
+  }
+
+  const close = (): void => {
+    if (!untrack(open)) return
+    abortWork()
+    whileOpen?.abort()
+    whileOpen = null
+    setOpen(false)
+    setPending(false)
+    setFrames([])
+    setCaptured(null)
+    options.onClose?.()
+  }
+
+  const back = (): boolean => {
+    if (untrack(frames).length > 1) {
+      // Whatever the frame being left had in flight goes with it. A search whose answer arrives after
+      // Escape has nowhere to put it, and the generation makes sure it cannot find one. The pending
+      // flag goes with it too, or the frame underneath would refuse the next Enter forever.
+      abortWork()
+      setPending(false)
+      // The parent frame object was never rebuilt, so its query and its cursor come back exactly as
+      // they were. Focus is not handed back here: a pop is still inside the palette.
+      setFrames((stack) => stack.slice(0, -1))
+      return true
+    }
+    close()
+    return false
+  }
+
+  // ── Activation ──────────────────────────────────────────────────────────────────────────────────
+
+  const activateRow = (id: string): void => {
+    if (untrack(pending)) return // one Enter at a time; a second while one is in flight is a slip
+    const row = untrack(rows).find((candidate) => candidate.id === id)
+    if (!row) return
+    if (row.action.effect === 'none') return
+    if (row.action.effect === 'enter') {
+      const node = untrack(graph).nodes.get(row.action.commandId)
+      if (!node) return
+      setFrames((stack) => [...stack, frameFor(node)])
+      entered()
+      return
+    }
+    const context = untrack(captured)
+    if (!context) return
+    patchFrame({ status: '' })
+    setPending(true)
+    const run = row.action.run
+    void Promise.resolve()
+      .then(() => run(context))
+      .then((outcome) => {
+        setPending(false)
+        if (!outcome || outcome.effect === 'close') return close()
+        patchFrame({ status: outcome.status ?? '' })
+      })
+      .catch((error: unknown) => {
+        // An error keeps the frame open with the message on it. Before this the palette closed first
+        // and set the message afterwards, into a surface nobody could see any more.
+        setPending(false)
+        patchFrame({ status: messageOf(error) })
+      })
+  }
+
+  const activate = (): void => {
+    const current = untrack(frame)
+    // Enter means "submit" on an input frame, whatever the list underneath says: its rows are
+    // explanatory and none of them is selectable.
+    if (current?.kind === 'input') return submitInput()
+    const row = untrack(selectedRow)
+    if (row) return activateRow(row.id)
+    // A failed search or a setting whose read failed has an error row and no selectable one, so Enter
+    // is the retry. Nothing else has a meaning for Enter with nothing under the cursor.
+    if (current?.kind === 'search' && current.search?.phase === 'error') retry()
+    else if (current?.kind === 'setting' && current.setting?.phase === 'error') retry()
+  }
+
+  // ── The world moving underneath ─────────────────────────────────────────────────────────────────
+
+  createEffect(() => {
+    if (!open()) return
+    const was = captured()
+    if (!was) return
+    if (sameIdentity(was, options.context())) return
+    // A command that navigates gets to finish: it closes through its own outcome, and only then does
+    // this see the move. Without the wait the observer would close first and the outcome would land on
+    // a session that no longer exists, taking the error it was about to report with it.
+    //
+    // Read reactively rather than untracked, which is the whole of the mechanism: when the command
+    // settles this runs again, and either the session has already closed on its outcome — in which
+    // case the first line here is the answer — or it stayed open over an identity that has moved, and
+    // then it closes.
+    if (pending()) return
+    close()
+  })
+
+  const session: CommandSession = {
+    open,
+    context: captured,
+    frames,
+    frame,
+    breadcrumb: () => frame()?.breadcrumb ?? [],
+    kind: () => frame()?.kind ?? 'root',
+    query: () => frame()?.query ?? '',
+    placeholder: () => frame()?.placeholder ?? '',
+    status: () => frame()?.status ?? '',
+    // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.
+    busy: () => pending() || frame()?.search?.phase === 'loading' || frame()?.setting?.phase === 'loading',
+    rows,
+    selectedIndex,
+    selectedRow,
+    openRoot,
+    openAt,
+    // A new query means a new list, so the cursor goes back to whatever is first rather than to a row
+    // that may no longer be there. On a search frame it also means a new question, which is the one
+    // place a keystroke reaches the network.
+    setQuery: (query) => {
+      patchFrame({ query, selectedId: null, status: '' })
+      scheduleSearch()
+    },
+    select,
+    move,
+    activate,
+    activateRow,
+    back,
+    close,
+    setComposing: (value) => {
+      const was = composing
+      composing = value
+      if (was && !value) scheduleSearch()
+    },
+    retry,
+  }
+
+  // The session is what a shortcut aimed at a group reaches (./presenter.ts). Registered here rather
+  // than by each host, because a host that forgot would break the shortcut path silently.
+  const presenting = setCommandPresenter({ openAt })
+  if (getOwner()) {
+    onCleanup(() => {
+      presenting.dispose()
+      // A session going away takes its work with it: the host that owned it is unmounting, and a
+      // provider still holding the signal is the one thing that could keep talking to a node about a
+      // window nobody is looking at.
+      abortWork()
+      whileOpen?.abort()
+      whileOpen = null
+    })
+  }
+
+  return session
+}

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
-import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 import {
   ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,

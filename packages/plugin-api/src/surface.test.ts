@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
 // The plugin API is a contract: this test pins the exported names of every entrypoint against a
 // committed list, so a surface change is always something someone decided rather than something
@@ -26,11 +26,11 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 const ENTRYPOINTS = {
-  node: 'node/index.ts',
-  client: 'client/index.ts',
+  node: 'node.ts',
+  client: 'client.ts',
   // The test seam is a contract too, and a more fragile one: a plugin's suite is the first thing that
   // breaks when it moves, and third-party authors have no other door into the host from a test.
-  testkit: 'testkit/index.ts',
+  testkit: 'testkit.ts',
   ui: 'ui/index.ts',
   'ui/diff': 'ui/diff.ts',
   'ui/editor': 'ui/editor.ts',

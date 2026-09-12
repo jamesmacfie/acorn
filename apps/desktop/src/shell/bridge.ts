@@ -1,17 +1,25 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { decodeIdFrame } from '@acorn/protocol/ws.ts'
 import {
   decodeBytes,
   encodeBytes,
   isPush,
   type HelperMessage,
   type HelperMethod,
+  type HelperReplyTiming,
   type WireFetchBody,
   type WireFetchRequest,
 } from './wire'
+import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+
+import type { ResponsivenessPulse } from '@acorn/client-core/infra/telemetry/responsiveness.ts'
+
+const log = createLogger('helper')
 
 // The window's initialization script: it assembles the object the platform seam reads and installs
-// it before any page script runs. The seam (`packages/client-core/src/platform/index.ts`) is the only
+// it before any page script runs. The seam (`packages/client-core/src/infra/platform/index.ts`) is the only
 // module allowed to read it, which an arch rule enforces.
 //
 // Two transports feed it. Everything about nodes and plugins goes over one WebSocket to the desktop
@@ -24,13 +32,39 @@ import {
 // serves both, and the key prefix is what picks the policy on the Rust side
 // (src-tauri/src/webviews.rs).
 
-type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void }
+type ReplyReceipt = {
+  receivedAt: number
+  parseMs: number
+  payloadChars: number
+}
+type Pending = {
+  resolve: (value: unknown, receipt: ReplyReceipt, helper?: HelperReplyTiming) => void
+  reject: (error: Error, receipt?: ReplyReceipt, helper?: HelperReplyTiming) => void
+}
+
+// A slow helper line has to identify the API family that caused it. `node-fetch` alone describes
+// nearly every renderer read, while the raw path would put session and task ids into logs. Keep the
+// same coarse route vocabulary as the API span and add the existing request id so adjacent bridge,
+// renderer and node records can be joined without minting another identifier.
+const callContext = (method: HelperMethod, params: unknown): string => {
+  if (method !== 'node-fetch' || !params || typeof params !== 'object') return ''
+  const request = (params as { request?: unknown }).request
+  if (!request || typeof request !== 'object') return ''
+  const { path, requestId } = request as { path?: unknown; requestId?: unknown }
+  if (typeof path !== 'string') return ''
+  const segments = path.split('?')[0].split('/').filter(Boolean)
+  const keep = segments[0] === 'v2' && segments[1] === 'p' ? 4 : 3
+  const route = `/${segments.slice(0, keep).join('/')}`
+  return ` route=${route}${typeof requestId === 'string' ? ` request=${requestId}` : ''}`
+}
 
 const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
+const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
 const statusListeners = new Set<(status: unknown) => void>()
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
+let liveSocket: WebSocket | null = null
 
 // One socket, opened on first use and reopened if it drops. Calls made before it is up wait on the
 // same promise rather than failing, which is what lets the bridge be installed synchronously while
@@ -42,7 +76,7 @@ const connect = (): Promise<WebSocket> => {
         // The secret rides in the query string because a browser cannot set headers on a WebSocket
         // handshake. It is the gate; the helper checks the Origin too, but only as a second lock.
         const ws = new WebSocket(`ws://127.0.0.1:${port}/helper?secret=${encodeURIComponent(secret)}`)
-        ws.onopen = () => resolve(ws)
+        ws.onopen = () => { liveSocket = ws; resolve(ws) }
         ws.onerror = () => reject(new Error('acorn could not reach its desktop helper.'))
         ws.onclose = () => {
           // Every in-flight call is answered rather than left hanging: a query that never settles
@@ -51,15 +85,32 @@ const connect = (): Promise<WebSocket> => {
             pending.delete(id)
             call.reject(new Error('The connection to the desktop helper closed.'))
           }
+          liveSocket = null
           socket = null
         }
-        ws.onmessage = (event) => receive(JSON.parse(String(event.data)) as HelperMessage)
+        // Terminal output arrives as bytes rather than as a JSON push (./wire.ts § The binary push),
+        // so the socket is asked for buffers instead of the default blobs, which would only be
+        // readable asynchronously.
+        ws.binaryType = 'arraybuffer'
+        ws.onmessage = (event) => {
+          if (event.data instanceof ArrayBuffer) return receiveBytes(new Uint8Array(event.data))
+          const receivedAt = Date.now()
+          const parseFrom = performance.now()
+          const payload = String(event.data)
+          const message = JSON.parse(payload) as HelperMessage
+          const parsedAt = performance.now()
+          receive(message, {
+            receivedAt,
+            parseMs: parsedAt - parseFrom,
+            payloadChars: payload.length,
+          })
+        }
       }),
   )
   return socket
 }
 
-const receive = (message: HelperMessage): void => {
+const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
   if (isPush(message)) {
     if (message.push === 'node-frame') for (const cb of frameListeners) cb(message.nodeId, message.frame)
     else if (message.push === 'node-status') for (const cb of statusListeners) cb(message.status)
@@ -72,23 +123,76 @@ const receive = (message: HelperMessage): void => {
   const call = pending.get(message.id)
   if (!call) return
   pending.delete(message.id)
-  if (message.ok) call.resolve(message.value)
-  else call.reject(new Error(message.error))
+  // Replies always arrive through the string branch above. The fallback keeps this pure function
+  // tolerant in tests and if another host calls it directly.
+  const observed = receipt ?? { receivedAt: Date.now(), parseMs: 0, payloadChars: 0 }
+  if (message.ok) call.resolve(message.value, observed, message.timing)
+  else call.reject(new Error(message.error), observed, message.timing)
 }
 
+// The node id is this end's business; the frame inside still holds the session id and is passed on
+// whole, so the format is read in one place on this side of the wire
+// (@acorn/client-core/infra/node/wsClient.ts).
+const receiveBytes = (frame: Uint8Array): void => {
+  const tagged = decodeIdFrame(frame)
+  if (!tagged) return
+  for (const cb of byteListeners) cb(tagged.id, tagged.payload)
+}
+
+// A histogram and not a span. Every node read the renderer makes crosses this socket, so it is far
+// past ten a second while a person is scrolling, and the span that describes the same round trip is
+// already `api.request` one layer up (docs/telemetry.md § Renderer seams). What this adds is the
+// helper's own leg of it: a slow `bridge.call` with a fast node says the broker is the problem.
+//
+// `method` is the label, which is a fixed vocabulary of about thirty names rather than a per-call
+// value, so it is one series each and nothing near the 200 the window holds.
 const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   const ws = await connect()
   const id = nextId++
-  return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (value: unknown) => void, reject })
+  const context = callContext(method, params)
+  const from = performance.now()
+  type Completion = {
+    value: T
+    receipt: ReplyReceipt
+    helper?: HelperReplyTiming
+    resolvedAt: number
+    receivedMs: number
+  }
+  const completion = await new Promise<Completion>((resolve, reject) => {
+    pending.set(id, {
+      resolve: (value: unknown, receipt, helper) => {
+        const resolvedAt = performance.now()
+        const receivedMs = resolvedAt - from
+        if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
+        resolve({ value: value as T, receipt, helper, resolvedAt, receivedMs })
+      },
+      reject: (error: Error, receipt, helper) => {
+        const receivedMs = performance.now() - from
+        if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
+        if (receipt && receivedMs >= 1_000) {
+          const deliveryMs = helper ? Math.max(0, receipt.receivedAt - helper.repliedAt) : -1
+          log.info(`slow bridge error id=${id} method=${method}${context} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
+        }
+        reject(error)
+      },
+    })
     ws.send(JSON.stringify({ id, method, params: params ?? null }))
   })
+  const continuationMs = performance.now() - completion.resolvedAt
+  const totalMs = completion.receivedMs + continuationMs
+  if (totalMs >= 1_000) {
+    const deliveryMs = completion.helper
+      ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt)
+      : -1
+    log.info(`slow bridge call id=${id} method=${method}${context} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`)
+  }
+  return completion.value
 }
 
 // Fire-and-forget from the seam's point of view: the reply still comes back, and a rejection is logged
 // rather than thrown, because nobody is awaiting `nodeAbort` or `tunnelClose`.
 const tell = (method: HelperMethod, params?: unknown): void => {
-  void call(method, params).catch((error: unknown) => console.warn(`[helper] ${method} failed:`, error))
+  void call(method, params).catch((error: unknown) => log.warn(`${method} failed`, error, { 'helper.method': method }))
 }
 
 const subscribe = <T>(set: Set<T>, cb: T): (() => void) => {
@@ -138,6 +242,10 @@ const toWireBody = (body: unknown): WireFetchBody | undefined => {
 }
 
 const acorn = {
+  // No async boundary: the context leaves before the renderer starts synchronous work.
+  reportResponsiveness: (params: ResponsivenessPulse) => {
+    if (liveSocket?.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ id: nextId++, method: 'renderer-pulse', params }))
+  },
   desktop: true,
   // Rust writes this into the page before any script runs, because the seam reads it synchronously
   // and every other way of asking is a round trip. Sniffing the user agent would be a guess about
@@ -159,11 +267,16 @@ const acorn = {
     const { body, ...rest } = request as { body?: unknown }
     const wire: WireFetchRequest = { ...(rest as Omit<WireFetchRequest, 'body'>), ...(body ? { body: toWireBody(body) } : {}) }
     const response = await call<{ status: number; headers: Record<string, string>; body: string }>('node-fetch', { nodeId, request: wire })
-    return { status: response.status, headers: response.headers, body: decodeBytes(response.body) }
+    const decodeFrom = performance.now()
+    const decoded = decodeBytes(response.body)
+    const decodeMs = performance.now() - decodeFrom
+    if (decodeMs >= 250) log.info(`slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`)
+    return { status: response.status, headers: response.headers, body: decoded }
   },
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),
   nodeSend: (nodeId: string, frame: unknown) => tell('node-send', { nodeId, frame }),
   onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameListeners, cb),
+  onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteListeners, cb),
   onNodeStatus: (cb: (status: unknown) => void) => subscribe(statusListeners, cb),
 
   // Owner-initiated fleet mutations. Every one is a request, never a write: the helper owns fleet.json
@@ -200,6 +313,31 @@ const acorn = {
   },
 
   folderPath: { pick: () => invoke<string | null>('pick_folder') },
+
+  // The native file dialogs. Bytes ride base64 in both directions, the same spelling the helper
+  // socket uses, because Tauri's channel is JSON and a byte array through it is an array of numbers.
+  files: {
+    pick: async (options: { accept?: readonly string[] }) => {
+      const picked = await invoke<{ name: string; type: string; bytes: string }[]>('pick_files', { accept: options.accept ?? [] })
+      return picked.map((file) => ({ name: file.name, type: file.type, bytes: decodeBytes(file.bytes) }))
+    },
+    save: (request: { bytes: Uint8Array; suggestedName: string; mimeType: string }) =>
+      invoke<boolean>('save_file', { bytes: encodeBytes(request.bytes), suggestedName: request.suggestedName }),
+  },
+
+  // Telling somebody something happened while they were not looking, and the number on the dock
+  // icon. The shell's and not the helper's: a banner and a badge belong to the window's process, and
+  // the helper has no window and no icon.
+  //
+  // No sound and no `silent` flag to ask for: the Rust command never sets one, because the chime is
+  // the client's and plays whether or not the OS agreed to show a banner.
+  notify: {
+    show: (request: { title: string; body?: string; tag: string }) => invoke<boolean>('show_notification', request),
+    // `tauri-plugin-notification` gives desktop no activation callback, so Rust approximates one from
+    // a window focus soon after a banner (src-tauri/src/commands.rs).
+    onActivate: (cb: (tag: string) => void) => onEvent<string>('acorn:notification-activated', cb),
+    setBadge: (count: number | null) => void invoke('set_badge', { count }),
+  },
 
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
   // and `hide` names no task because what the caller means is "no preview right now".

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/node",
   "version": "0.1.0",
+  "description": "The Node service: the composition root that wires core, the plugins, and the HTTP and WebSocket surface.",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,8 +12,9 @@
     "test": "vitest run",
     "build": "vite build",
     "build:plugin": "node scripts/build-plugin.mjs",
+    "measure:editor-bundle": "node scripts/measure-editor-bundle.mjs",
     "dev:plugin": "node scripts/dev-plugin.mjs",
-    "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/standalone.ts"
+    "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/entries/standalone.ts"
   },
   "dependencies": {
     "@acorn/node-core": "workspace:*",
@@ -21,6 +23,7 @@
     "@acorn/plugin-changes": "workspace:*",
     "@acorn/plugin-docker": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-findings": "workspace:*",
     "@acorn/plugin-github": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
@@ -42,6 +45,7 @@
     "@acorn/plugin-model-providers": "workspace:*",
     "@acorn/plugin-nodes-file": "workspace:*",
     "@acorn/plugin-rollbar": "workspace:*",
+    "@acorn/plugin-sentry-telemetry": "workspace:*",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

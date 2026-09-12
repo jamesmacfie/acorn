@@ -1,0 +1,787 @@
+import { spawn, type IPty } from 'node-pty'
+import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { dirname, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { eq } from 'drizzle-orm'
+import { buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, invalidateWorktreeStatus, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { terminalSessions } from '../node/schema'
+import type { TerminalBridge } from './routes/terminal'
+import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { SendSubmit } from '../shared/send'
+import { AgentSender } from './agentSend'
+import {
+  clampDim,
+  computeIdle,
+  FIRST_IDLE_MS,
+  IDLE_MS,
+  launchCommandLine,
+  matchBlockedPrompt,
+  parseTmuxSessions,
+  resolveBackend,
+  tmuxAttachArgs,
+  tmuxName,
+  tmuxNewSessionArgs,
+  OutputRing,
+} from './terminalUtils'
+import { fileURLToPath } from 'node:url'
+import type { RunSessionGlue } from './runChannel'
+import { TerminalDisplay } from './terminalDisplay'
+
+// This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
+// rather than bound by the host (docs/plugin-authoring.md § Telemetry and logging).
+const log = createLogger('terminal', 'terminal')
+
+// PTYs live in the node utility service. Sessions run on one of two backends:
+//  - node-pty: spawn the command directly. Survives a window reload, since the PTY is in the service,
+//    but not an app restart. In-memory only.
+//  - tmux: a detached `tmux` session drives the command and a PTY attaches to it. Survives an app
+//    restart, because the tmux daemon is separate, and can be attached from a real terminal. Persisted
+//    to SQLite so startup can reconcile rows against `tmux list-sessions` and re-attach survivors.
+//
+// Terminal output is never persisted (docs/terminal-and-agents.md).
+//
+// This module is the session engine. HTTP bridges and WebSocket handlers are installed at the bottom;
+// cross-feature wiring stays in the app composition root.
+
+type Session = {
+  meta: TerminalSession
+  pty: IPty
+  ring: OutputRing
+  display: TerminalDisplay
+  lastActivityAt: number
+  sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
+  // PTY output coalescing (docs/terminal-and-agents.md § Sessions).
+  pendingOut: string
+  flushTimer: ReturnType<typeof setTimeout> | null
+}
+
+// About one frame at 60 fps, the coalescing target (docs/terminal-and-agents.md § Sessions).
+const OUTPUT_COALESCE_MS = 16
+
+const sessions = new Map<string, Session>()
+
+// What this engine needs from core, now that it can't read core's tables: resolve a taskId to a row and
+// to the cwd its commands run in, and read the project's setup script. `proc` and
+// `projects.assertConfigTrusted` are for the run-target service built over this engine (runChannel.ts).
+export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc'>
+
+// This engine is a process singleton by construction (one PTY table, one idle watch, one session map
+// per node), so its database handle and core services live in module state rather than being threaded
+// through fourteen signatures. init() installs them and dispose() removes them, so a second
+// startServiceRuntime in one process replaces the first boot's handle instead of stacking a second
+// engine beside it.
+//
+// `store` is nulled before the file is closed, which is what makes the persistence helpers below safe: a
+// tmux PTY that exits after teardown has begun sees no store and writes nothing, rather than throwing
+// from a `void`-called update against a closed SQLite handle.
+let store: PluginDatabase | null = null
+let core: TerminalCoreServices | null = null
+
+// Every caller runs inside a request, a spawn or a reconcile, all strictly after init, so an absent
+// value here is a programming error rather than a degraded mode. The HTTP surface's degraded mode is
+// the unfilled bridge slot answering 503.
+function services(): TerminalCoreServices {
+  if (!core) throw new Error('The terminal engine has not been initialized.')
+  return core
+}
+
+// sendToAgent (docs/terminal-and-agents.md § Sending text to an agent), with 'after-ready' queued
+// on the idle edge below. One instance over the live session map.
+const agentSender = new AgentSender((id) => {
+  const s = sessions.get(id)
+  if (!s) return null
+  return { write: (data: string) => s.pty.write(data), running: () => s.meta.status === 'running', idle: () => s.meta.idle }
+})
+
+export function sendToAgent(sessionId: string, text: string, submit: SendSubmit): void {
+  void agentSender.send(sessionId, text, submit)
+}
+
+// Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability
+// (contract/sessions.ts). A two-method object rather than a reach into the TerminalBridge, because
+// the bridge is the route layer's dependency: it gets nulled on dispose, and a capability consumer
+// resolving it would be reading this plugin's HTTP wiring.
+//
+// Its one consumer is plugins/agents' terminal handoff, the only cross-plugin caller that needs to
+// start a PTY. It shares the bridge's list and create implementations, and not the other six.
+//
+// Named `sessionControl`, not `terminalSessions`, because that name is already the Drizzle table
+// this module imports, and shadowing it would silently rebind every query below.
+export const sessionControl = {
+  create: (opts: CreateOpts): Promise<TerminalSession> => create(opts),
+  list: async (): Promise<TerminalSession[]> => [...sessions.values()].map((s) => s.meta),
+}
+
+let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
+let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
+let reviewBoundary: ((input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>) | null = null
+let archiveReviewBoundary: ((input: { taskId: string; transcriptTail: string | null }) => Promise<void>) | null = null
+let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
+let internalEnv: InternalEnvFactory = () => ({})
+let bootReconciled: Promise<void> = Promise.resolve()
+let statusBroadcast: () => void = () => {}
+let worktreeBroadcast: (taskId: string) => void = () => {}
+const runSessionExitListeners = new Set<(sessionId: string, exitCode: number | null) => void>()
+
+// A session's command went quiet, exited, or finished setting up. Whatever it was doing to the files in
+// its worktree, it has stopped doing it, so drop the coalesced `git status` for that directory and tell
+// every client to re-read the dirty markers. This is what keeps a `git commit` typed into a terminal
+// showing up immediately without a filesystem watcher (docs/performance.md).
+function worktreeSettled(s: Session): void {
+  invalidateWorktreeStatus(s.meta.cwd)
+  worktreeBroadcast(s.meta.taskId)
+}
+
+// PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip between working
+// and idle with the silence detector, and 'blocked' lands with the prompt-pattern scan.
+const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
+  kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
+
+// Flush any coalesced PTY output as one 'output' frame. Called on the ~16ms tick, and eagerly before any
+// non-output frame or a new attachment snapshot, so ordering stays exact.
+function flushOutput(s: Session) {
+  if (s.flushTimer) {
+    clearTimeout(s.flushTimer)
+    s.flushTimer = null
+  }
+  if (!s.pendingOut) return
+  const data = s.pendingOut
+  s.pendingOut = ''
+  s.display.publish({ type: 'output', data })
+}
+
+// Non-output frames flush pending output first: exit must not overtake buffered bytes.
+function emit(s: Session, msg: ServerMsg) {
+  flushOutput(s)
+  s.display.publish(msg)
+}
+
+// Buffer PTY output. The raw ring feeds transcript-tail analysis and, since phase 6 of the
+// performance programme, rebuilds the display emulator whenever a client attaches; the live wire frame
+// is coalesced onto the next tick.
+function queueOutput(s: Session, data: string) {
+  s.ring.push(data)
+  s.display.write(data) // a no-op while nobody is attached: there is no emulator to feed
+  s.pendingOut += data
+  if (!s.flushTimer) s.flushTimer = setTimeout(() => flushOutput(s), OUTPUT_COALESCE_MS)
+}
+
+// --- tmux process plumbing. execFileSync with arg arrays, so no shell: the command is a fixed profile
+// binary, the cwd is validated, and the name is acorn-<uuid>. ---
+
+function ensureTmuxSession(name: string, cwd: string, command: string, env: Record<string, string>) {
+  // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works, and env
+  // such as PORT is inherited by that shell (docs/workspaces-and-tasks.md).
+  execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command, env), { env, stdio: 'ignore' })
+  execFileSync('tmux', ['set-option', '-t', name, 'status', 'off'], { env, stdio: 'ignore' })
+}
+
+function attachTmuxPty(name: string, cols: number, rows: number): IPty {
+  return spawn('tmux', tmuxAttachArgs(name), { name: 'xterm-256color', cols, rows, cwd: homedir(), env: childEnv() })
+}
+
+function killTmuxSession(name: string) {
+  try {
+    execFileSync('tmux', ['kill-session', '-t', name], { stdio: 'ignore' })
+  } catch {
+    // Already gone.
+  }
+}
+
+function listTmuxSessions(): Set<string> {
+  try {
+    const out = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8', env: childEnv() })
+    return parseTmuxSessions(out)
+  } catch {
+    return new Set() // no tmux server running → no sessions
+  }
+}
+
+// --- SQLite persistence, tmux-backed sessions only ---
+//
+// This plugin's own database (<data-root>/plugins/terminal.sqlite), not core's. Every helper tolerates
+// an absent store: the write path is only reachable after init, but the exit path is driven by a live
+// PTY and can fire at any moment, including after teardown has nulled the handle.
+
+async function persistSession(m: TerminalSession) {
+  if (!store) return
+  await store.insert(terminalSessions).values({
+    id: m.id,
+    title: m.title,
+    kind: m.kind,
+    profileId: m.profileId,
+    backend: m.backend,
+    status: m.status,
+    cwd: m.cwd,
+    taskId: m.taskId,
+    agentSessionId: m.agentSessionId ?? null,
+    command: m.command,
+    argvJson: '[]',
+    tmuxSession: m.tmuxSession ?? null,
+    cols: m.cols,
+    rows: m.rows,
+    createdAt: m.createdAt,
+    exitedAt: null,
+    exitCode: null,
+  })
+}
+
+// Called with `void` from the PTY's exit handler, so it must not be able to produce an unhandled
+// rejection: a session that exits during teardown races the store being closed under it, and the row it
+// wanted to update is about to be irrelevant either way.
+async function markExited(id: string, exitCode: number | null) {
+  if (!store) return
+  try {
+    await store
+      .update(terminalSessions)
+      .set({ status: 'exited', exitCode, exitedAt: Date.now() })
+      .where(eq(terminalSessions.id, id))
+  } catch (error) {
+    log.warn(`could not record the exit of session ${id}: ${describeError(error).message}`)
+  }
+}
+
+const deleteRow = async (id: string): Promise<void> => {
+  if (!store) return
+  await store.delete(terminalSessions).where(eq(terminalSessions.id, id))
+}
+
+function rowToMeta(row: typeof terminalSessions.$inferSelect, ctx: Pick<TerminalSession, 'repo' | 'pull'>, isWorktree: boolean): TerminalSession {
+  return {
+    id: row.id,
+    title: row.title,
+    kind: row.kind as TerminalSession['kind'],
+    profileId: row.profileId,
+    backend: row.backend as TerminalSession['backend'],
+    status: 'running', // only called for sessions whose tmux is alive
+    idle: false,
+    agentState: ptyState(row.kind as TerminalSession['kind'], 'running', false),
+    isWorktree, // recomputed from the task join (cwd === tasks.worktreePath) — never persisted
+    taskId: row.taskId,
+    agentSessionId: row.agentSessionId ?? undefined,
+    cwd: row.cwd,
+    command: row.command,
+    tmuxSession: row.tmuxSession ?? undefined,
+    repo: ctx.repo,
+    pull: ctx.pull,
+    cols: row.cols,
+    rows: row.rows,
+    createdAt: row.createdAt,
+    exitCode: null,
+  }
+}
+
+// --- session lifecycle ---
+
+function wireSession(meta: TerminalSession, pty: IPty): Session {
+  const s: Session = {
+    meta,
+    pty,
+    ring: new OutputRing(),
+    display: new TerminalDisplay(meta.cols, meta.rows),
+    lastActivityAt: Date.now(),
+    sawIdle: false,
+    pendingOut: '',
+    flushTimer: null,
+  }
+  sessions.set(meta.id, s)
+  pty.onData((data) => {
+    s.lastActivityAt = Date.now()
+    if (s.meta.idle) {
+      s.meta.idle = false // output resumed → no longer waiting
+      s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
+      statusBroadcast()
+    }
+    queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
+  })
+  pty.onExit(({ exitCode, signal }) => {
+    s.meta.status = 'exited'
+    s.meta.idle = false
+    s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
+    s.meta.exitCode = exitCode
+    agentSender.clear(s.meta.id) // queued sends can never fire now
+    emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
+    if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
+    worktreeSettled(s)
+    for (const listener of runSessionExitListeners) listener(s.meta.id, exitCode)
+    // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
+    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') {
+      const transcriptTail = s.ring.tail(16_000)
+      if (reviewBoundary) void reviewBoundary({ taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, transcriptTail }).catch(() => undefined)
+      else void memoryReviewTrigger?.(s.meta.taskId, transcriptTail)
+    }
+    statusBroadcast()
+  })
+  return s
+}
+
+let idleWatch: ReturnType<typeof setInterval> | null = null
+function startIdleWatch() {
+  if (idleWatch) return // registered once; a second boot must not stack a second timer
+  const timer = setInterval(() => {
+    const now = Date.now()
+    for (const s of sessions.values()) {
+      if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now, s.sawIdle ? IDLE_MS : FIRST_IDLE_MS) && !s.meta.idle) {
+        s.meta.idle = true
+        s.sawIdle = true
+        // An idle session showing an input prompt in its tail is blocked, not done.
+        s.meta.agentState = matchBlockedPrompt(s.ring.tail(4000)) ? 'blocked' : 'idle'
+        agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
+        // The OS toast lives in the client now, focus-gated with cooldown and dedup there.
+        statusBroadcast()
+        worktreeSettled(s)
+      }
+    }
+  }, 3000)
+  // unref'd because nothing should be kept alive by this timer: the node is held open by its HTTPS
+  // listener, and a test that initializes the plugin without tearing it down would otherwise hang vitest
+  // three seconds at a time, forever.
+  timer.unref?.()
+  idleWatch = timer
+}
+
+// Run the workspace setup script as a "Setup" session in the freshly-created worktree, unless it's blank
+// or disabled. Registered as the taskWorktree onWorktreeCreated hook, so it fires exactly once whichever
+// path creates the worktree. Ordered before any requested session, so a setup spawned from create() is
+// tab #1.
+async function maybeRunSetup(t: TaskRef, cwd: string): Promise<void> {
+  if (!t.projectId) return
+  const { script, trigger } = await services().projects.setup(t.projectId)
+  if (trigger === 'off' || !script?.trim()) return
+  await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
+  statusBroadcast() // panel re-lists to show the Setup tab even when no other spawn follows
+  invalidateWorktreeStatus(cwd)
+  worktreeBroadcast(t.id) // a setup script installs dependencies, which is a dirty worktree
+}
+
+async function create(opts: CreateOpts): Promise<TerminalSession> {
+  // The client passes the base checkout as opts.cwd, validated at the boundary, and the worktree is
+  // derived from it. Lazy worktree on first terminal, reused after. A first-ever worktree fires the
+  // onWorktreeCreated hook inside resolveTaskCwd, which runs maybeRunSetup.
+  const baseCheckout = rendererBaseCheckout(opts.cwd)
+  const t = await services().tasks.load(opts.taskId)
+  const { cwd, isWorktree } = await services().tasks.resolveCwd(t, baseCheckout)
+  return spawnOne(opts, cwd, isWorktree, taskContext(t), t)
+}
+
+// Build the session meta, spawn the PTY (tmux or node-pty) in the already-resolved cwd, and wire it.
+async function spawnOne(
+  opts: CreateOpts,
+  cwd: string,
+  isWorktree: boolean,
+  ctx: Pick<TerminalSession, 'repo' | 'pull'>,
+  task?: TaskRef,
+): Promise<TerminalSession> {
+  const profile = getProfile(opts.profileId)
+  // Dev-server pane: a command override runs via the user's shell with env merged in; otherwise the
+  // profile's binary. resolveCommand stays the path for shells and agents.
+  const command = opts.command?.trim() || resolveCommand(profile)
+  const id = randomUUID()
+  const project = task?.projectId ? await services().projects.byId(task.projectId) : null
+  // Every task-scoped session carries the ACORN_* identity vars, including the session id, which MCP
+  // notes and memory writes use for `author: agent` provenance (docs/notes-and-memory.md).
+  const env = buildSessionEnv({
+    taskId: opts.taskId,
+    cwd,
+    task: task && project
+      ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
+      : null,
+    env: { ...internalEnv({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...opts.env },
+  })
+  const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
+  const cols = clampDim(opts.cols, 80)
+  const rows = clampDim(opts.rows, 24)
+
+  const meta: TerminalSession = {
+    id,
+    title: opts.title?.trim() || profile.label,
+    kind: profile.kind,
+    profileId: profile.id,
+    backend,
+    status: 'running',
+    idle: false,
+    agentState: ptyState(profile.kind, 'running', false),
+    isWorktree,
+    taskId: opts.taskId,
+    agentSessionId: opts.agentSessionId,
+    cwd,
+    command,
+    tmuxSession: backend === 'tmux' ? tmuxName(id) : undefined,
+    repo: ctx.repo,
+    pull: ctx.pull,
+    cols,
+    rows,
+    createdAt: Date.now(),
+    exitCode: null,
+  }
+
+  if (profile.mcpRegistration && !mcpRegistered.has(profile.id)) {
+    void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
+  }
+
+  // Profile launchArgs apply only to the profile's own binary; a command override is a different
+  // program. meta.command stays the bare line the UI shows, and the args are launch-only.
+  const launchArgs = opts.command ? [] : (profile.launchArgs ?? [])
+
+  let pty: IPty
+  if (backend === 'tmux') {
+    ensureTmuxSession(meta.tmuxSession!, cwd, launchCommandLine(command, launchArgs), env)
+    pty = attachTmuxPty(meta.tmuxSession!, cols, rows)
+    await persistSession(meta)
+  } else if (opts.command) {
+    // No tmux: run the command line through a login shell so PATH and nvm resolve "pnpm" and friends.
+    pty = spawn(env.SHELL || '/bin/sh', ['-lc', command], { name: 'xterm-256color', cols, rows, cwd, env })
+  } else {
+    pty = spawn(command, launchArgs, { name: 'xterm-256color', cols, rows, cwd, env })
+  }
+  wireSession(meta, pty)
+  // A fresh agent session gets the combined task-context and repo-memory block queued for its idle edge
+  // (docs/notes-and-memory.md), unless the profile was launched with a pull instruction, in which case
+  // it fetches the same material itself and a racing push would duplicate it.
+  if (profile.kind === 'agent' && !launchArgs.length) void launchInjector?.(opts.taskId, id)
+  return meta
+}
+
+// Profiles whose MCP registration succeeded this app run, so spawnOne can skip the CLI round trip.
+const mcpRegistered = new Set<string>()
+
+// The acorn MCP server launcher and build-flavoured name. Whether and how a CLI registers it is declared
+// by that profile contribution rather than a second profile-id lookup table.
+let configuredMcp: { name: string; launcher: Launcher } | null = null
+
+export function configureTerminalMcp(name: string, launcher: Launcher): void {
+  configuredMcp = { name, launcher }
+}
+
+// The fallback name is the packaged one: a plain Node process has no build flavour of its own, and the
+// composition root passes the real one through configureTerminalMcp before any session spawns.
+const mcpName = () => configuredMcp?.name ?? serverName(true)
+const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+
+// Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
+// this covers restored and tmux-reattached sessions, which never respawn. Idempotent (remove then
+// add), failures swallowed.
+export async function refreshAcornMcpRegistrations(): Promise<void> {
+  const name = mcpName()
+  const launcher = mcpLauncher()
+  await Promise.all(
+    listProfileDefs()
+      .filter((p) => p.mcpRegistration)
+      .map((p) =>
+        p.mcpRegistration!(name, launcher)
+          .then((res) => {
+            if (res.ok) mcpRegistered.add(p.id)
+          })
+          .catch(() => undefined),
+      ),
+  )
+}
+
+// Killing a tmux session's attach PTY only detaches it and the session keeps running. Stopping a tmux
+// agent means killing the tmux session itself, which then EOFs the PTY and fires onExit.
+function killSession(s: Session) {
+  if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession)
+  s.pty.kill()
+}
+
+// On startup, re-attach tmux sessions that are still alive and drop DB rows whose tmux is gone. Run by
+// the composition root's reconcile() step, off the paint-critical path.
+export async function reconcileTmux() {
+  if (!store) return
+  let rows: (typeof terminalSessions.$inferSelect)[]
+  try {
+    rows = await store.select().from(terminalSessions)
+  } catch {
+    return
+  }
+  if (!rows.length) return
+  const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
+  let reattached = 0
+  for (const row of rows) {
+    // Per-row guard: one corrupt row or failed attach must not abort the remaining rows, or the rest of
+    // the reconcile pass.
+    try {
+      if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
+        const task = await services().tasks.load(row.taskId)
+        // isWorktree is derived, not persisted: tasks.worktreePath is the truth, so recompute it here and
+        // a session that survives an app restart keeps its worktree affordance.
+        const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
+        wireSession(rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
+        reattached++
+      } else {
+        await deleteRow(row.id)
+      }
+    } catch (e) {
+      log.warn(`tmux reconcile failed for session ${row.id}: ${describeError(e).message}`)
+    }
+  }
+  // This runs after the window, so the client's initial term:list has already fired. Ping it to
+  // re-list, or resurrected sessions stay invisible until some unrelated broadcast.
+  if (reattached) statusBroadcast()
+}
+
+// The session-engine glue the run-target service (runChannel) needs: spawn a target's command as a terminal
+// session in the task worktree, and observe or kill it. Exported so the plugin's init can build the
+// RuntimeService without this engine importing the run domain.
+export function terminalRunGlue(): RunSessionGlue {
+  return {
+    startSession: async (taskId: string, target: { id: string; command: string }, cwd: string) => {
+      const t = await services().tasks.load(taskId)
+      const meta = await spawnOne({ taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
+      statusBroadcast()
+      return meta.id
+    },
+    isRunning: (sessionId: string) => sessions.get(sessionId)?.meta.status === 'running',
+    onExit: (listener) => {
+      runSessionExitListeners.add(listener)
+      return () => runSessionExitListeners.delete(listener)
+    },
+    exitCode: (sessionId: string) => sessions.get(sessionId)?.meta.exitCode,
+    killSession: (sessionId: string) => {
+      const s = sessions.get(sessionId)
+      if (s) killSession(s)
+    },
+  }
+}
+
+export type TerminalChannelDeps = {
+  internalEnv: InternalEnvFactory
+  launchInjector: (taskId: string, sessionId: string) => Promise<void>
+  memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
+  reviewBoundary?: (input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>
+  archiveReviewBoundary?: (input: { taskId: string; transcriptTail: string | null }) => Promise<void>
+  seedTaskNotes: (task: TaskRef) => Promise<void>
+  // Resolves when the composition root's post-window reconcile pass is done, including on failure.
+  // Mutating surfaces that read the sessions map await it.
+  reconciled: Promise<void>
+  // "The session roster moved": created, exited, or flipped between working and idle. Machine rate on
+  // the working edge, which is why it says only that (@acorn/protocol/nodeEvents.ts).
+  status?: () => void
+  // "Something under this task's worktree may have changed." Fired on the human-rate edges only — a
+  // command going quiet, a session exiting, a setup script finishing — because those are the moments a
+  // person's `git commit` in a shell is done. A working edge is not one of them
+  // (docs/performance.md § 2026-09-03 — phase 5).
+  worktreeChanged?: (taskId: string) => void
+  streams?: (handlers: Parameters<CompiledPluginBroadcast['streams']>[0]) => void
+}
+
+// Release everything registerTerminalChannel installed. Called from the plugin's dispose
+// (node/index.ts), which runs before the data root's lock is dropped. Idempotent, so it's safe after
+// a partial boot that never started the idle watch.
+//
+// Clearing the session map matters: without it, a second startServiceRuntime in one process inherits
+// the previous boot's sessions, so `list()` reports PTYs owned by a torn-down engine and the WS hub's
+// task-scope guard resolves stream ids against them. The PTYs themselves are not killed, because a
+// tmux session outliving the app is what the tmux backend is for.
+export function disposeTerminal(): void {
+  if (idleWatch) {
+    clearInterval(idleWatch)
+    idleWatch = null
+  }
+  for (const [id, session] of sessions) {
+    session.display.dispose()
+    agentSender.clear(id) // queued 'after-ready' blocks can never fire against a disposed engine
+  }
+  sessions.clear()
+  // Back to the "never initialized" state, so nothing that survives teardown (a PTY exit callback, a late
+  // bridge call) can reach the previous boot's database handle or core services.
+  store = null
+  core = null
+  internalEnv = () => ({})
+  launchInjector = null
+  memoryReviewTrigger = null
+  reviewBoundary = null
+  archiveReviewBoundary = null
+  seedNotes = null
+  bootReconciled = Promise.resolve()
+  statusBroadcast = () => {}
+  worktreeBroadcast = () => {}
+  runSessionExitListeners.clear()
+}
+
+export type TerminalChannelRegistrations = {
+  terminal: TerminalBridge
+  taskSessions: TaskSessionsBridge
+  taskCreated: TaskCreatedHook
+  worktreeCreated: (taskId: string, cwd: string) => Promise<void>
+}
+
+export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalChannelDeps): TerminalChannelRegistrations {
+  store = pluginDb
+  core = coreServices
+  internalEnv = deps.internalEnv
+  launchInjector = deps.launchInjector
+  memoryReviewTrigger = deps.memoryReviewTrigger
+  reviewBoundary = deps.reviewBoundary ?? null
+  archiveReviewBoundary = deps.archiveReviewBoundary ?? null
+  seedNotes = deps.seedTaskNotes
+  bootReconciled = deps.reconciled
+  statusBroadcast = deps.status ?? (() => {})
+  worktreeBroadcast = deps.worktreeChanged ?? (() => {})
+
+  // Every worktree creation funnels through core's resolveTaskCwd, so this handler makes the setup
+  // script run whichever surface created the worktree.
+  //
+  // It takes the task id rather than the row, because it is reached through core's `core:worktree-created`
+  // hook now and a hook payload is scalars (docs/plugins.md § Hooks). Loading the row here costs one
+  // read on a path that is about to spawn a shell.
+  const worktreeCreated = async (taskId: string, cwd: string): Promise<void> => {
+    const task = await services().tasks.load(taskId)
+    if (task) await maybeRunSetup(task, cwd)
+  }
+
+  // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
+  // routes (server/routes/terminal.ts). The stream half is the WebSocket hub (setStreamHandlers below).
+  // The bridge closes over the engine internals.
+  const terminal: TerminalBridge = {
+    // Same lookup the WS hub gets as `streamTaskId` below, off the same map.
+    taskIdFor: (id) => sessions.get(id)?.meta.taskId ?? null,
+    list: async () => [...sessions.values()].map((s) => s.meta),
+    profiles: async () => listProfiles(),
+    create: (opts) => create(opts ?? ({} as CreateOpts)),
+    // sendToAgent (docs/terminal-and-agents.md § Sending text to an agent).
+    sendToAgent: async (sessionId, text, submit) => {
+      if (!sessionId || !text) return { ok: false, reason: 'Invalid payload.' }
+      return agentSender.send(sessionId, text, submit)
+    },
+    kill: async (id) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      killSession(s)
+      return true
+    },
+    interrupt: async (id) => {
+      const s = sessions.get(id)
+      if (!s || s.meta.status !== 'running') return false
+      s.pty.write('\x03') // Ctrl-C to the foreground process
+      return true
+    },
+    // Close a session in one shot: kill it if still running, then drop it.
+    remove: async (id) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      if (s.meta.status === 'running') killSession(s)
+      s.display.dispose()
+      sessions.delete(id)
+      if (s.meta.backend === 'tmux') await deleteRow(id)
+      return true
+    },
+    resize: async (id, cols, rows) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      const c = clampDim(cols, s.meta.cols)
+      const r = clampDim(rows, s.meta.rows)
+      s.meta.cols = c
+      s.meta.rows = r
+      s.display.resize(c, r)
+      if (s.meta.status === 'running') s.pty.resize(c, r)
+      return true
+    },
+  }
+
+  // The PTY half of archive (@acorn/node-core/server/routes/projects/worktree.ts owns the route and the
+  // orchestration). These four are the only parts of tearing a task down that need a pseudo-terminal:
+  // the running-session guard, killing this task's sessions, dropping their rows, and streaming teardown
+  // output into a "Teardown" tab. An unfilled slot answers 503.
+  const taskSessions: TaskSessionsBridge = {
+    // The reconcile gate the route awaits before the running-session guard.
+    ready: () => bootReconciled,
+    captureArchiveReviewInput: async (taskId) => {
+      const output = [...sessions.values()]
+        .filter((session) => session.meta.taskId === taskId && session.meta.title !== 'Teardown')
+        .map((session) => session.ring.tail(4_000))
+        .filter(Boolean)
+        .join('\n\n')
+        .slice(-16_000)
+      await archiveReviewBoundary?.({ taskId, transcriptTail: output || null })
+    },
+    runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
+    killRunning: (taskId) => {
+      for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
+    },
+    // Drop any lingering exited sessions for this task so their rows don't outlive it.
+    dropTaskSessions: async (taskId) => {
+      for (const [sid, s] of sessions) {
+        if (s.meta.taskId === taskId) {
+          s.display.dispose()
+          sessions.delete(sid)
+          if (s.meta.backend === 'tmux') await deleteRow(sid)
+        }
+      }
+    },
+    // Teardown streams to the task drawer as a "Teardown" tab, and its exit code plus ring buffer are the
+    // result. A ~2 min timeout kills it, surfacing exitCode null as a timeout.
+    runTeardown: async (script, cwd, env, taskId) => {
+      const t = await services().tasks.load(taskId)
+      const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
+      const s = sessions.get(meta.id)
+      if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
+      statusBroadcast()
+      return new Promise((resolveTeardown) => {
+        const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
+        s.pty.onExit(({ exitCode }) => {
+          clearTimeout(timer)
+          resolveTeardown({ exitCode, output: s.ring.tail() })
+        })
+      })
+    },
+  }
+
+  // Seeding PR and ticket notes on task creation is core's route now, but the composition root injects
+  // the notes store here, so this hands core the hook rather than moving the dependency.
+  const taskCreated: TaskCreatedHook = async (taskId) => {
+    const task = await services().tasks.load(taskId)
+    if (task) await seedNotes?.(task)
+  }
+
+  // The stream half. The terminal engine's PTY input, output, attach and detach ride the one
+  // authenticated WebSocket (server/transport/wsHub.ts) instead of per-session IPC channels. The hub routes client
+  // frames here and hands each attachment a sink to fan output to.
+  deps.streams?.({
+    // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries to
+    // attach to or type into another task's pseudo-terminal (server/transport/wsHub.ts § mayDriveStream).
+    streamTaskId: (id) => sessions.get(id)?.meta.taskId ?? null,
+    input: (id, data) => {
+      const s = sessions.get(id)
+      if (s && s.meta.status === 'running' && typeof data === 'string') s.pty.write(data)
+    },
+    // attach is subscribe plus restore. The subscription is an attachment, not the session itself, so
+    // detaching or reloading never kills the PTY or tmux. TerminalDisplay serializes its canonical
+    // framebuffer and buffers concurrent live frames, preserving snapshot-before-live ordering.
+    attach: (id, sink) => {
+      const s = sessions.get(id)
+      if (!s) return
+      flushOutput(s)
+      // The ring is what a cold attach rebuilds the screen from, and it is read only when there is no
+      // emulator yet (./terminalDisplay.ts § TerminalDisplay).
+      s.display.attach(sink, s.meta, () => s.ring.tail())
+    },
+    detach: (id, sink) => {
+      sessions.get(id)?.display.detach(sink)
+    },
+    // Backpressure, at the producer. The hub calls this when a client's socket has buffered past its
+    // mark; `pause()` stops node-pty reading the pseudo-terminal, which lets the kernel's pipe fill and
+    // the program writing into it block, which is what "slow down" means to a build
+    // (docs/terminal.md § Backpressure). The alternative the hub used to take was throwing frames away,
+    // which the client could only recover from by reconnecting and re-attaching every session.
+    //
+    // A pause is not visible to the session's state: the idle watch reads `lastActivityAt`, and a paused
+    // PTY simply stops advancing it, which is indistinguishable from a quiet program and equally true.
+    flowControl: (id, paused) => {
+      const s = sessions.get(id)
+      if (!s || s.meta.status !== 'running') return
+      try {
+        if (paused) s.pty.pause()
+        else s.pty.resume()
+      } catch {
+        // A PTY that exited between the hub's decision and this call. Nothing to slow down.
+      }
+    },
+  })
+
+  // Durable-state reconciliation (reconcileTmux) is driven by the composition root's reconcile() step,
+  // off the paint-critical path. The idle watch is engine-owned and starts here.
+  startIdleWatch()
+  return { terminal, taskSessions, taskCreated, worktreeCreated }
+}

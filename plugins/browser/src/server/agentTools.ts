@@ -3,7 +3,7 @@ import type { AgentToolContribution } from '@acorn/plugin-api/node'
 import type { BrowserPool } from './driver'
 
 // The six browser tools, contributed through the agent-tool registry like any other plugin's, which
-// projects them to MCP, the harness route, and the renderer. See docs/agent-tools.md § Browser tools.
+// projects them to MCP, the harness route, and the client. See docs/agent-tools.md § Browser tools.
 
 const empty = z.object({})
 

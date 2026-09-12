@@ -1,0 +1,396 @@
+# Notifications
+
+One reading of what an agent is doing, three changes worth interrupting somebody for, and one gate
+that decides what each change does. Sound, a system notification, the number on the app icon, and
+the terminal's own escape sequences all hang off that gate, and a Settings page switches each.
+
+This document owns the model. [plugin-map.md](./plugin-map.md) § Notifications owns the decision a
+plugin author makes, which call to reach for. [shell.md](./shell.md) § The renderer bridge owns the
+desktop half of the `notify` seam group and [tui.md](./tui.md) § What is drawn bespoke owns the
+terminal client's chrome.
+
+## A notice is not an attention item
+
+The top bar's bell draws two kinds of row, and the difference decides where a thing belongs.
+
+A **notice** is an event that already happened: a run finished, a build failed, an agent asked a
+question. It is client-local, it carries a `read` flag, and it is gone once the 50-row ring rolls
+over it. `packages/client-core/src/features/notifications/notifications.ts` is the ring.
+
+An **attention item** is a state that lasts until something changes on the node. A pending approval
+is still pending after you dismiss it, so it comes back on the next fetch. That is why items are
+fetched per node rather than pushed, why they carry no `read` flag, and why a plugin contributes
+them through `ctx.attentionSources`
+(`packages/client-core/src/host/registries/rail/attention.ts`,
+[contribution-kinds.md](./contribution-kinds.md)). The bell's "Needs you" section is those rows,
+merged across every node.
+
+Both kinds have to say where a click lands, and for an attention item `target` is a required field.
+A row in the inbox is an invitation to go and deal with something, so one that swallows the click
+teaches the reader that the whole section is decorative. Plugin failures shipped without a target and
+did exactly that; making it a type rather than a convention is what stops the next source repeating
+it. A source with nowhere to send the reader has no row to draw.
+
+The click was gated on the row's task as well, which is the same bug wearing a second hat: an item
+about the node rather than a task could not fire its target even once it had one. Both the bell and
+the terminal's inbox now dispatch on the target alone.
+
+Both come from the same reading of a session.
+
+## Five states
+
+`packages/client-core/src/features/notifications/attention.ts` collapses every agent session,
+managed or PTY, onto one of five states:
+
+| State | Meaning |
+| --- | --- |
+| `working` | The agent is doing something, or has produced output nobody has asked about. |
+| `blocked` | The agent is waiting on the owner: a permission, a question, a workflow gate. |
+| `finished` | The turn ended and the owner has not spoken again. |
+| `error` | The session failed or the process exited non-zero. |
+| `idle` | Nothing is running and there is nothing to report. |
+
+A snapshot is `{ nodeId, sessionId, taskId, title, state, kind }`, where `kind` is `interactive`,
+`workflow`, `imported`, or `pty`. The key is node plus session, because session ids are node-minted
+and two nodes may hold the same one.
+
+**The managed adapter** reads `AgentSession` rows as `agent:session` frames upsert them
+(`plugins/agents/src/client/sessions/managedStore.ts`). Attention wins over runtime state: the node
+sets `attention` from the driver's own events, and a session asking for a permission is blocked
+whatever its process is doing ([managed-agents.md](./managed-agents.md) owns that projection).
+
+| `attention` | `runtimeState` | State |
+| --- | --- | --- |
+| `permission`, `question`, `workflow_gate` | any | `blocked` |
+| `completed` | any | `finished` |
+| `error` | any | `error` |
+| `none`, `unread` | `working`, `waiting`, `cancelling`, `reconnecting`, `connecting`, `replaying`, `creating` | `working` |
+| `none`, `unread` | `ready`, `stopped`, `archived` | `idle` |
+| `none`, `unread` | `failed` | `error` |
+
+**The PTY adapter** reads `TerminalSession` snapshots as `refreshSessions` produces them
+(`packages/client-core/src/features/tasks/agentSessions.ts`), for sessions with `kind: 'agent'`
+only. A plain shell exiting is not an agent needing you.
+
+| `status` | `agentState` | `idle` | `exitCode` | State |
+| --- | --- | --- | --- | --- |
+| `running` | `blocked`, `permission` | any | | `blocked` |
+| `running` | anything else | `false` | | `working` |
+| `running` | anything else | `true` | | `finished` |
+| `exited` | | | `0` or null | `idle` |
+| `exited` | | | non-zero | `error` |
+
+## Three edges
+
+An edge is a pair of consecutive snapshots for one session. Three of the 25 pairs are news:
+
+| Edge | Notice kind | Title |
+| --- | --- | --- |
+| anything to `blocked` | `agent-needs-input` | "<title> needs you" |
+| `working` to `finished` | `agent-completed` | "<title> finished" |
+| anything to `error` | `agent-error` | "<title> failed" |
+
+Everything else is silence. `blocked` to `working` means you answered, `finished` to `working` means
+you spoke, and a first snapshot with no predecessor describes a session that was already in that
+state before the app opened.
+
+`working` to `finished` is news only when `kind` is `interactive` or `pty`. A workflow or automation
+turn is one step of a run, and the workflows plugin sends `run-done` for the run
+([workflows.md](./workflows.md)). Ten steps used to mean ten "finished" rows.
+
+The three kinds carry their glyphs and severities in
+`packages/client-core/src/features/notifications/kindContributions.ts`. There are no PTY-only kinds:
+a terminal agent and a managed agent read the same way in the bell.
+
+## What a row points at
+
+A target is `{ kind, resourceId, subresourceId? }`, resolved through the handler table in
+`packages/client-core/src/features/notifications/notifications.ts`. The kind decides who answers, and
+each owner registers its own: the terminal plugin opens a drawer on a tab, the agents plugin opens a
+session in the Agent pane, the workflows plugin opens the run pane at a node, and the memory plugin
+opens the Memory page on the proposal in question. Its proposal-gate notice is about however many are
+waiting rather than one of them, so that one targets the page through core's `source` kind instead.
+
+The workflows one is `workflow-run`: `resourceId` is the run and `subresourceId` the node, and the
+handler opens the task's Workflows pane there ([workflows.md](./workflows.md) § The run pane). Every
+notice a run raises carries it, because the plugin turns its own `ref` into that target when it raises
+the row. A gate is also an attention row — `warn`, so it stays until somebody answers it — with the same target
+and the id `workflow:gate:<stepId>`. A run that ends `failed` or `safety-rail` raises a `run-failed`
+notice; a run that ends well keeps its `run-done` one. An agent's permission question inside a run
+stays the agents plugin's row and opens the Agent pane. That is still the right target now that the
+run pane draws the conversation too: the question is the session's, the row is the one the agents
+plugin raised for it, and a reader who wants the run instead has the chip in the pane's header.
+
+Two kinds are core's, because what they open is not any plugin's:
+
+| Kind | `resourceId` | Who answers |
+| --- | --- | --- |
+| `settings` | a settings page id | The shell, which owns the modal (`apps/desktop/src/client/activate.ts`) |
+| `source` | a rail source id | `host/chrome/chromeRegister.ts`, where the target is minted, so both hosts answer |
+
+A loaded plugin's rows carry display strings only. An attention descriptor names no target, and a
+notice's target is dropped at the node, because naming one means naming another plugin's handler and
+any resource id it likes — the impersonation `events.send` already refuses. So the host supplies the
+honest answer for that tier — the plugin's own rail source, or, for a plugin that offers none, the
+Settings page that lists it. Neither is a guess about what the row means, and both are better than a
+click that does nothing. One function computes it for both readers,
+`host/plugins/rowTargets.ts`, because they arrive at different times: the attention source asks during
+the registration pass that worked it out, and a notice arrives off the socket with only a plugin id.
+
+### Raising one from a plugin
+
+`ctx.events.notice({ taskId?, title, detail?, kind?, target? })`, on the node. Core's, and available
+whether or not any other plugin is enabled.
+
+This member existed, went to the `workflows.notices` capability in the API-4 batch, and came back. The
+objection then was to the vocabulary rather than the surface: what sat on the context all
+twenty-one plugins receive was a `'gate' | 'run-done'` kind and a `runId`/`stepId` pair, one plugin's
+nouns. A `target` is core's own and is shared with the attention inbox, so nothing on the shared
+context knows what a workflow run is.
+
+The plugins that wanted a bell row borrowed that capability in the meantime, and the memory-proposal
+gate is what the borrow cost: `workflows.notices` can only say "a run, at this node", so the proposal
+notice named nothing, and clicking it — in the bell or on the desktop banner it raised — did nothing
+at all. It cost two smaller things as well. A node with workflows disabled raised no row, and the row
+drew as a `gate`: a ban glyph in warn tone, for a nudge.
+
+A compiled plugin writes the whole row, names its own target kind, and registers the handler for it
+with `registerNoticeTargetHandler` from `@acorn/plugin-api/client`. That client half was always
+there; the node half is what was missing. A loaded plugin writes the title, the detail and the task,
+and the host fills in the rest.
+
+`kind` names a registered notice kind, and an unregistered one resolves to `plugin` rather than to
+nothing. Unresolved, the bell drew an unlabelled circle in warn tone, which says "something is wrong"
+about a row that might be good news.
+
+### Getting there before the target runs
+
+Opening a row is a ladder, and the order is the whole point:
+
+1. **The node**, when the row belongs to another one. Every path resolves against the active node, so
+   navigating first looks up an id that is not there, or finds a different thing that shares a name.
+2. **The task**, from `taskId`, or **the project**, from `projectId`. A row carries one or the other.
+   A task route carries no project, so a row naming both would have to pick, and the task is the more
+   specific.
+3. **The target**, last, because a target that selects a `projectScoped` rail source draws whatever
+   project is routed. Arriving on the wrong one opens the page with the row's own subject filtered out
+   of it, which is worse than not moving at all. The memory rows are why this rung exists.
+
+One ceiling worth naming. Routing to a project in another workspace changes the active workspace,
+and the per-workspace view memory in `apps/desktop/src/client/App.tsx` then restores that workspace's
+last view over the source the target just selected. Only an explicit task jump has an escape from
+that today (`features/workspaces/workspaceViewTransition.ts`, `keep-task`). So a cross-workspace row
+lands you in the right workspace on the wrong surface; the row is still in the bell, and clicking it
+again from there works. A `keep-source` twin is the fix, and it belongs to that machinery rather than
+to this one.
+
+### What a row is drawn with
+
+`glyph` is a Lucide name a source may put on its own rows. Without one the inbox draws the pair it
+always has, `info` or `alert-triangle`, chosen by `severity`.
+
+The tone stays with the severity either way. What a row is and how urgent it is are two different
+questions: a memory proposal is a nudge whether or not it is drawn with the memory mark, and a source
+that could dim its own warning by choosing a friendly glyph would make the section unreadable.
+
+Findings review bundles are passive by default. Publishing a bundle emits the plugin invalidation
+used by the Memory and Context surfaces. It does not create one notice per proposal. If the owner
+enables **Notify me when a prepared review bundle is ready**, findings emits one informational notice
+for that bundle and records its bundle ID before delivery so a retry does not emit another.
+
+After migration cutover, memory filters mapped legacy proposals from its per-proposal attention
+source. If findings is disabled or migration is unsafe, that source and the legacy aggregate notice
+remain available. The two producers therefore do not announce the same suggestion at once.
+
+## Archiving a task takes its notices with it
+
+A notice is a pointer at a task. Archive the task and the row is still in the ring, still counting
+toward the pill, and clicking it navigates to an id that resolves to nothing. So the ring listens for
+`runtime:task-archived` and drops that task's rows, wired in `deliver.ts` beside the node-switch
+eviction because both answer the same question: what does this client forget when the thing it was
+about goes away.
+
+Active-node rows only. The event carries no node id and two nodes may hold one task id by
+construction, which is the same filter `markTaskRead` keeps.
+
+This covers what the client watched happen. A task archived from another device is still in the ring
+at the next boot, because notices rehydrate from a prefs blob that nobody re-checks. That row is
+stale rather than wrong, and re-checking would mean asking the node about 50 task ids before the bell
+can draw.
+
+Attention items need none of this. They are refetched per node, so a row whose state has gone stops
+coming back on its own.
+
+## The gate
+
+`packages/client-core/src/features/notifications/deliver.ts` holds it. Each adapter calls
+`observeAttention(snapshots)` with what it has; the gate folds them into one map, raises the edges,
+and keeps the result for the re-check below. `deliver(edge, context)` then decides, where the context
+is focus, the active task, the settings, and the clock.
+
+**Hold.** An edge waits `HOLD_MS`, one second, and is checked against the latest snapshot before
+anything fires. A session that has moved to a different state in that second drops its edge. This is
+what swallows a permission that policy auto-answers and a turn that a queued message immediately
+follows. A newer edge for the same session replaces a held one, so there is at most one in flight per
+session.
+
+**Seen.** An edge is seen when the window is focused and the edge's task is the active task, asked
+at the moment the hold releases rather than when the edge arrived. Coming back to the window during
+that second counts as watching. Focus is `document.hasFocus()` on the desktop; a host that is not a
+document installs its own answer through `setHostFocused`, and unknown counts as focused, which is
+the quiet answer.
+
+A seen edge lands in the bell as a notice with `read: true`. The history stays complete and the pill
+does not move. It fires no sound, no system notification, no terminal notification, and changes no
+badge. An unseen edge lands unread and wakes every channel its settings allow.
+
+Channels beyond the bell row are sinks, registered with `registerNoticeSink`. A sink only ever sees
+an unseen notice, so no channel repeats the seen rule.
+
+`deliverNotice` is the half of the gate without the hold: the seen rule and the channels, for a
+notice with no session behind it. `pushManagedAgentNotice` and `initWorkflowNotices` both go through
+it, so a run that finishes on the task you are watching is quiet for the same reason an agent turn is.
+
+## Acknowledging an attention row
+
+A finished turn is a state the node keeps until the owner speaks again, so it sits in "Needs you"
+long after they have read it. So does a memory proposal nobody has reviewed. Looking at the session,
+in a focused window, retires it, and so does "Mark all read" in the bell.
+
+`packages/client-core/src/features/notifications/attentionInbox.ts` holds a session-only set keyed by
+node id and the row's own id. A row whose key is in the set is hidden from the inbox and from the pill.
+
+The key does not carry the row's `at`, and that is the whole of a bug worth remembering. A timestamped
+key looked like it bought re-arming, so that a session completing a second time was news again. For the
+source that raises almost every row it bought the opposite: `at` there is the session's `updatedAt`, and
+the node bumps that on every event it records, including the usage report that lands after the turn
+ended and the controller change a reconnect writes. The key moved when nothing had happened, the ack
+stopped matching, and every row the owner had just cleared came back with the next frame — so the bell's
+number climbed back past where it started. A session that completes again now keeps its cleared row
+hidden, and the completion still raises its own unread notice through the gate, so the pill still moves.
+
+Only a nudge can be retired this way, and `severity` is the word for it: `info` means nothing is
+blocked. A permission, a question, a workflow gate, or an error is `warn` or `danger`, and describes a
+block that reading about it does not lift — those stay in "Needs you", and in the pill, until the
+owner lifts them. The set clears on a node switch, like every other node-scoped signal
+([state-ownership.md](./state-ownership.md) § Scope rules).
+
+"Mark all read" is therefore about the whole number the bell shows, not just its lower section: it
+marks every notice read and acknowledges every nudge on show. It cannot empty a bell that is holding
+a real block, which is the point of the block.
+
+## The channels
+
+| Channel | Fires when |
+| --- | --- |
+| Bell row | Always. Read if seen. |
+| Sound | Not seen, and `sound` is on. |
+| System notification | Not seen, the kind's `toast` is true, `system` is on, and the host has a `notify` seam or the page fallback. |
+| Badge | Whenever the pill changes, if `badge` is on and the host can draw one. |
+| Terminal notification | The terminal client's spelling of the last two: an escape sequence, and BEL for the sound. |
+
+**Sound.** `packages/client-core/src/features/notifications/chime.ts` synthesises two chimes from
+sine notes and a gain envelope. No audio file ships, which leaves no format, player, or bundling
+question, and lets a test assert a chime without an `AudioContext`. `attention` rises a fourth, E5 to
+A5, for `blocked` and `error`; `done` falls the same fourth back, for `finished`. Both land inside
+320 ms at a gain of 0.1 to 0.12, so a burst of edges reads as separate chimes rather than a chord.
+Two tones and not three: `blocked` and `error` both mean "come here", and a third is something to
+learn for a distinction the title already draws. `initSoundNotices` registers the sink and resumes a
+suspended audio context on the first click or keypress.
+
+**System notification and badge.** Both go through the platform seam's `notify` group,
+`showNotification`, `onNoticeActivated`, `canSetBadge`, and `setBadge` in
+`packages/client-core/src/infra/platform/index.ts`. A page has `Notification`, so the seam carries
+its own fallback: it asks permission once, shows a silent banner tagged with the notice id, and holds
+the object until it closes so the click handler survives collection. Its `canSetBadge` answers false
+and Settings hides the app-icon row. A shell that installs the group takes the banner over and gains
+the badge. For the desktop half, the two Tauri commands and the focus approximation that stands in
+for a click callback, see [shell.md](./shell.md) § The renderer bridge.
+
+`toast` is the kind's own answer to "may this reach the desktop", beside the owner's, and both have to
+say yes. It went unread for as long as it existed: every kind declared one, three declared `false` with
+a comment saying why, and the banner fired regardless. Reading it stops `background-error` and
+`disk-unencrypted` from raising one, which is what those comments always claimed — a standing
+condition and a swallowed background error belong in the bell. It also makes the loaded tier's rule
+real rather than decorative: a loaded plugin's notice is forced to the `plugin` kind, which is
+`toast: false`, so third-party code cannot put text on the owner's desktop.
+
+The banner's body is the notice's `detail` and nothing else. A title is already free of prompt text,
+responses, filenames, and paths (`pushManagedAgentNotice`), and the notification centre keeps what it
+is shown. An OS banner is the one surface where "what happened" must not become "what it said".
+
+The badge is the pill: `packages/client-core/src/features/notifications/badge.ts` puts
+`unreadCount()` plus the attention rows on the icon, the same accessor the bell draws. One number
+with one meaning, on the dock and in the terminal client's topbar alike.
+
+The icon keeps whatever it was last told, which is why the tracking clears it when its own scope
+ends. Marking everything read already writes the icon, because the pill it mirrors moved; what needed
+saying was the other case. The desktop tracks the badge from the bell, so a window closing, a shell
+rebuilt on a node switch, a dev reload, or the bell's own contribution boundary catching a render
+error all end the tracking — and without the clear the dock kept a count no surface in the app could
+reach, which reads as "marking them read did nothing".
+
+**Terminal.** `apps/tui/src/kit/notify.ts` writes an escape sequence and lets the emulator decide
+what a notification is. OSC 9 for iTerm2, Ghostty, WezTerm, and Warp; OSC 99 for kitty; OSC 777 for
+rxvt; wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set. Title and body are
+stripped of anything that could end the sequence early. A terminal on none of those lists gets the
+BEL from `apps/tui/src/kit/bell.ts` and nothing else. Whether the terminal is the window the reader
+is looking at comes from DEC 1004, which the input parser reports as `focus` and `blur` events;
+`apps/tui/src/main.tsx` feeds them to `setHostFocused`.
+
+## Settings
+
+One JSON device preference under `PrefKeys.notifications`, listed in `DEVICE_KEYS`
+(`packages/client-core/src/infra/persistence/prefKeys.ts`,
+`packages/client-core/src/infra/persistence/devicePrefs.ts`):
+
+```json
+{
+  "sound": true,
+  "system": true,
+  "badge": true,
+  "events": { "blocked": true, "finished": true, "error": true }
+}
+```
+
+One key holding six booleans rather than six keys, because a value that is read together is stored
+together. Every field that is missing, or is not a boolean, reads as `true`, so a fresh install and a
+blob written by an older build both behave as the design intends. Only an explicit `false` turns a
+channel off.
+
+The three event switches turn an edge off entirely, row included. Off means the owner does not want
+to hear about it, and a row that lands silently but still counts in the pill is hearing about it.
+
+Settings shows five checkboxes, plus the app-icon row where `canSetBadge()` is true, and a
+**Send a test notification** button that runs a synthetic unseen edge through `deliverNotice`
+(`packages/client-core/src/features/settings/NotificationSettings.tsx`). The button is also where the
+browser asks for notification permission.
+
+The gate reads `localStorage` directly rather than the prefs query. It is a plain module with no
+component around it and no query client to hand, and this key never reaches a node. The Settings page
+reads through the query, because it wants the reactivity.
+
+The terminal client has no device preference store, so the environment is the switch:
+`ACORN_TUI_NOTIFY` takes `off`, `bell`, `terminal`, or `both`, and defaults to `both`, the same shape
+as `ACORN_TUI_OSC52`. Its badge is always on: there is nothing to switch, and the count is in your
+own topbar rather than interrupting you. See [tui.md](./tui.md) § Doors left open for the file-backed
+store that would let the Settings page work there.
+
+## The invariants
+
+`packages/client-core/src/features/notifications/invariants.test.ts` holds these as properties over
+generated sequences, so an adapter or sink added later cannot break one quietly. Each part of the
+model also has its own tests with worked examples.
+
+1. **Standing still is not news.** Two consecutive snapshots with the same state produce nothing.
+2. **A first sighting is not news.** A snapshot with no predecessor produces nothing.
+3. **Three edges only.** Over every pair of the five states, exactly the transitions into `blocked`,
+   into `error`, and `working` to `finished` produce a notice.
+4. **Seen means quiet.** Focused, on the edge's own task, implies `read: true` and no channel.
+5. **A held edge that changes is dropped.** A snapshot arriving inside the hold with a different
+   state cancels the held edge.
+6. **The badge is the pill.** The number on the icon is the number in the bell, or there is no badge
+   because the host cannot draw one.
+7. **Off means off.** A disabled event produces no row and no channel.
+8. **Both adapters, one vocabulary.** A managed `permission` and a PTY `blocked` produce a notice of
+   the same kind, with the same glyph and severity.

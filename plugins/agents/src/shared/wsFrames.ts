@@ -8,4 +8,6 @@
 export type AgentServerFrame =
   | { channel: 'agent:event'; event: unknown }
   | { channel: 'agent:session'; session: unknown }
+  | { channel: 'agent:turn'; turn: unknown }
+  | { channel: 'agent:request'; request: unknown }
   | { channel: 'agent:deleted'; sessionId: string }

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { NodeAttachmentState } from '@acorn/protocol/api.ts'
-import { readNodeAttachment, recordNodeAttachment } from '../../main/dataRoot'
+import { readNodeAttachment, recordNodeAttachment } from '../storage/dataRoot'
 import { auditActor, auditRequest } from '../auditRequest'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -13,7 +13,7 @@ import { respondError } from '../respond'
 // revokes a credential.
 //
 // There is no attach route, and that is not an omission. Attaching happens once, at first boot, from
-// the environment the provisioner set (main/enrollment.ts). An HTTP attach would be a way to hand a
+// the environment the provisioner set (server/enrollment.ts). An HTTP attach would be a way to hand a
 // stranger a durable credential for this node with one request, which is precisely the thing the
 // single-use enrollment token exists to bound.
 

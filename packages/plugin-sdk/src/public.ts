@@ -18,6 +18,10 @@ export type PluginFrameContext = {
   /** The row a declarative rail source was selected on, present only when that selection is what
    * created this frame. Later selections arrive through `onSelect`. */
   item?: string
+  /** Overlay surfaces only, and only when a remote tree opened this one as its companion: what the
+   * opener handed over, under 64 KiB. An overlay that needs a file gets its id here and fetches the
+   * bytes through its own plugin's route. */
+  input?: unknown
   theme: string
   style: string
   /** The chords this frame may keep, as the host validated them. `keys.claim` can narrow this set and
@@ -42,15 +46,26 @@ export declare class AcornBridgeError extends Error {
 export type AcornBridge = {
   /** What this frame was opened to look at. Throws if read before `connect()` resolves. */
   readonly context: PluginFrameContext
-  /** Five methods, matching what the host's route table accepts. Your own `/v2/p/<id>/` namespace is
-   * always allowed; anything else needs a scope your manifest declared, and another plugin's namespace
-   * is always denied. */
+  /** Five JSON methods and two byte methods, matching what the host's route table accepts. Your own
+   * `/v2/p/<id>/` namespace is always allowed; anything else needs a scope your manifest declared, and
+   * another plugin's namespace is always denied, byte call or not. */
   readonly api: {
     get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
     post<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
     put<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
     patch<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
     del<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
+    /** Read a route of your own whose answer is bytes. The JSON methods above stringify and parse
+     * everything, so an image through one costs a third more on the wire and a decode at each end.
+     * Capped at 12 MiB. */
+    getBytes(path: string, options?: { signal?: AbortSignal }): Promise<PluginByteResponse>
+    /** Send bytes to a route of your own. `type` and `filename` are advisory; whatever receives them
+     * decides what they really are. */
+    postBytes<T>(
+      path: string,
+      body: { bytes: Uint8Array; type: string; filename?: string },
+      options?: { signal?: AbortSignal },
+    ): Promise<T>
   }
   events: {
     /** Subscribe to a shell channel the manifest declared. Returns the unsubscribe. Subscribing does
@@ -71,14 +86,20 @@ export type AcornBridge = {
     copy(text: string): Promise<void>
     /** Open another of this plugin's own panes. */
     openPane(paneId: string): Promise<void>
+    /** Open a cooperative destination explicitly declared by this surface. */
+    openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
     /** Hand an `https` URL to the host. Anything else is refused, and resolving says only that the host
      * accepted it: where it lands is the host's business, because the frame does not know which surface
      * it is. */
     openUrl(url: string): Promise<void>
     /** Importer surfaces only: finish, letting the host close the modal and refresh. */
     done(): Promise<void>
-    /** Importers and overlays only. A pane does not get to close itself. */
-    close(): Promise<void>
+    /** Importers and overlays only. A pane does not get to close itself.
+     *
+     * An overlay a remote tree opened as its companion may pass a JSON `result` under 64 KiB, which
+     * resolves that tree's `openOverlay` call. Closing without one resolves it with `null`, and so does
+     * every dismissal acorn owns. */
+    close(result?: unknown): Promise<void>
   }
   /** The document this frame shares its pane with, when its manifest declared a `document-over-frame`
    * layout. Denied from any other surface, structurally. Nothing about the editor crosses: no cursor,
@@ -100,6 +121,35 @@ export type AcornBridge = {
   keys: {
     /** Replace the active claim set with a subset of this surface's manifest declaration. */
     claim(chords: readonly string[]): void
+  }
+  /**
+   * Say what your frame is doing: the same six verbs acorn's own plugins have on the node.
+   *
+   * Every one is fire and forget. Nothing returns a promise, nothing throws, and nothing tells you
+   * whether the reader has collection turned on, which is off by default. The owner on each record
+   * is stamped by the host from this frame's binding, so there is no plugin id to pass and no way
+   * to file one under another plugin's name.
+   *
+   * Each call is one bridge message against the port's budget of 1,000 per 10 seconds, so emit per
+   * action rather than per frame of a render loop.
+   */
+  telemetry: {
+    event(name: string, attrs?: PluginTelemetryAttrs): void
+    count(name: string, value?: number, attrs?: PluginTelemetryAttrs): void
+    gauge(name: string, value: number, attrs?: PluginTelemetryAttrs): void
+    error(error: { name: string; message?: string; attrs?: PluginTelemetryAttrs }): void
+    /** Time one call and hand back its own result untouched. Promise-aware, timed to settlement. */
+    measure<T>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T
+    /** For work whose start and end do not fit one closure. `end` is idempotent. */
+    startSpan(name: string, attrs?: PluginTelemetryAttrs): { end(status?: 'ok' | 'error'): void }
+  }
+  /** A log line with your plugin id already on it. It prints to your frame's own console as well,
+   * so it says something whether or not the reader is collecting. */
+  log: {
+    debug(message: string, attrs?: PluginTelemetryAttrs): void
+    info(message: string, attrs?: PluginTelemetryAttrs): void
+    warn(message: string, attrs?: PluginTelemetryAttrs): void
+    error(message: string, attrs?: PluginTelemetryAttrs): void
   }
   /** Fires on every appearance change and once on connect. The tokens are already applied to `:root`
    * by the time it runs; this is for anything you draw yourself that has to be repainted. */
@@ -175,7 +225,37 @@ export type TreeMount = {
   onProps(listener: (props: unknown) => void): void
   /** Your teardown, run when acorn unmounts this slot. */
   onUnmount(dispose: () => void): void
+  /**
+   * The two things a tree may ask acorn for, as opposed to describe to it.
+   *
+   * On the mount rather than on the bridge, because one worker serves every tree your bundle draws and
+   * holds one bridge: four attachment previews are four trees and one port, so a request sent over the
+   * bridge could not say which of them sent it. These carry the slot as part of their address.
+   */
+  readonly host: {
+    /** Call one action the owning extension point declared and that slot's owner bound. Payload and
+     * result are JSON under 64 KiB; eight may be outstanding at once. The owner decides whether to do
+     * it, which is why this is a request and not a setter. */
+    invoke<TResult = unknown>(action: string, payload?: unknown): Promise<TResult>
+    /**
+     * Present the one overlay your manifest descriptor associated with this contribution, and wait.
+     *
+     * Resolves with whatever the overlay passed to `bridge.ui.close(result)`, or `null` for every
+     * dismissal. Acorn accepts it only while focus is inside this tree and at most once a second, so
+     * call it from a click or key handler. A host with no overlay frames, which is what a terminal is,
+     * rejects with `unsupported_host`; draw your static fallback and carry on.
+     */
+    openOverlay<TResult = unknown>(overlayId: string, input?: unknown): Promise<TResult | null>
+  }
 }
+
+/** What a telemetry attribute may be: a scalar, and nothing else. An object would be a place for a
+ * request body to hide, and no sink can index one. */
+export type PluginTelemetryAttrs = Record<string, string | number | boolean | null>
+
+/** What `api.getBytes` resolves to. `filename` is whatever the route's `Content-Disposition` named, or
+ * null when it named nothing. */
+export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: string | null }
 
 export type TreeRender = (bridge: AcornBridge, mount: TreeMount) => void
 

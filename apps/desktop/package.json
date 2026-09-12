@@ -1,10 +1,14 @@
 {
   "name": "@acorn/desktop",
   "version": "0.1.0",
+  "description": "The desktop app: the Tauri shell, the Solid renderer it hosts, and the Node helper Rust supervises.",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "pnpm run stage && ACORN_DEV_SERVER=http://localhost:4319 tauri dev --config src-tauri/tauri.dev.json",
+    "dev:agent": "node scripts/agent/session.mjs",
+    "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
+    "dev:agent:ui": "node scripts/agent/ui.mjs",
     "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax",
     "dist": "pnpm run build && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
     "stage": "pnpm run build:service && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
@@ -47,7 +51,6 @@
     "idb-keyval": "^6.2.5",
     "jose": "^6.2.3",
     "lucide-static": "^1.27.0",
-    "monaco-editor": "^0.55.1",
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",
     "pg": "^8.22.0",
@@ -60,7 +63,7 @@
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
-    "@acorn/desktop-helper": "workspace:*",
+    "@acorn/custody": "workspace:*",
     "@acorn/node": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",

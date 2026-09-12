@@ -14,6 +14,12 @@ and untrusted provider/preview content rather than implementing multi-user roles
   tools, so a compromised Node account is outside the application threat model.
 - Node child: task-scoped internal caller. It receives only an allowlisted environment and scoped
   token; its routes and task identity are checked by the Node.
+- Terminal client (`acorn`, `docs/tui.md`): the first two collapsed into one process. UI code
+  and the broker share a realm, so what the desktop holds as a process boundary this holds as a module
+  boundary: the device token lives in the broker's module, the plugin cache and the acknowledgement
+  file live in one custody module, and an arch rule refuses an import of either from anything in
+  `apps/tui` that draws a cell. A loaded plugin still gets a realm of its own — a worker thread under
+  `--permission` — so the boundary that matters most is the one that did not move.
 
 The application does not defend against root/other-user access to the host, a compromised Node
 account, or malicious first-party plugin code. Those are OS/deployment concerns.
@@ -23,6 +29,12 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
+- The bearer rides the `/v2/events` upgrade request's headers, which a browser cannot set. On the
+  desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
+  (`docs/tui.md`) is one process running under Node, so it sets the header itself: equal to
+  the desktop, easier than a browser. What the desktop holds as a process boundary the terminal holds
+  as a module boundary, and an arch rule keeps it — nothing in `apps/tui` that draws a cell may
+  import custody.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
@@ -31,6 +43,14 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Revoking a device (`DELETE /v2/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
   itself.
+- A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token,
+  so a client holding a live socket does not run a `SELECT` and a constant-time compare per request
+  (`packages/node-core/src/server/auth/deviceTokens.ts`). Only a token that resolved is remembered: a
+  wrong secret and an unknown id read the row every time, so neither can become a warm entry.
+  **Revoking a device drops its entries before it notifies anyone.** Without that, a revoked bearer
+  would keep working for the rest of the window, which is a credential the owner believes they took
+  away. The 60-second window matches the socket sweep's, so the only way an entry can outlive its
+  device is a revoke this process never saw. `isActive`, which that sweep reads, is never cached.
 - There is no cookie or ambient browser credential, so CSRF middleware is not part of the protocol.
 
 `requireUser` is the single gate mounted over `/v2/*`. It accepts either credential kind, device or
@@ -107,7 +127,7 @@ unguarded `/devices` route. One ordering rule matters too: a missing PTY engine 
 one wired) must still answer with the bridge's 503, not the ownership guard's 404, because the
 client's degraded-mode handling keys on the 503 and the two failures are not interchangeable.
 
-The WebSocket hub (`main/wsHub.ts`) had the same class of gap. `authorize()` verified a task-scoped
+The WebSocket hub (`server/transport/wsHub.ts`) had the same class of gap. `authorize()` verified a task-scoped
 internal token and returned its claims, but the connection object built afterward discarded them, so
 the `term:` dispatch routed by session id alone and every other channel, plus the broadcast path, ran
 with no scope check at all. A task-scoped credential could open the socket itself and reach
@@ -132,9 +152,36 @@ returned in API responses, client persistence, logs, events, or error envelopes.
 read only by the GitHub plugin's credential accessor. The HTTP client is device-principal-only and
 does not expose encrypted request material to internal callers.
 
+**A Sentry DSN is a credential, and it is the only one the exporter asks for.** `sentry-telemetry`
+stores it through the connection seam, so it is encrypted at rest with `SESSION_ENC_KEY`, submitted
+write-only, and lent back to the plugin for the length of one flush through
+`ctx.providers.withConnection`. The manifest declares `secrets: false`, which is Rollbar's and
+Linear's posture and is accurate: the plugin never calls `ctx.core.secrets`, because core resolves
+the row inside its own secret scope. The DSN authenticates ingestion into one project and can read
+nothing, which is why an organisation token is not asked for: release health and source-map upload
+would need one, and both are out of scope
+([integrations.md](./integrations.md) § Sentry). The exporter puts the DSN in the request's
+`X-Sentry-Auth` header and in the envelope's own header, and nowhere in a payload; the connection's
+label is host and project, never the key.
+
 Child environments are built by the process broker. They do not inherit `SESSION_ENC_KEY`, GitHub
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.
+
+**A harness generate spends the CLI's own login, and never a key acorn holds.** A Generate control
+can be pointed at an agent CLI installed on the machine instead of at a stored API key
+([integrations.md](./integrations.md) § Model providers), and the child that runs it gets no
+credential at all. Its environment is the broker's base allowlist plus `AGENT_TOOL_PASSTHROUGH`
+(`server/agentProfiles/toolEnv.ts`), which is configuration only: `XDG_CONFIG_HOME`, the npm prefix,
+the proxy variables, and the TLS trust files. `ANTHROPIC_*` and `OPENAI_*` are absent from that list
+deliberately, because those globs would carry API keys, and a CLI authenticates through its own
+stored login under `XDG_CONFIG_HOME`. The child also gets no acorn token, no task, and no MCP server,
+so a key held on this node cannot reach it and a tool cannot ask for one. A CLI that is installed but
+signed out fails the generate, which is the honest outcome.
+
+The stderr of a failed harness generate goes to the node log with the profile id, the status and the
+duration, and never to the client. A CLI writes its own diagnostics there, and those can quote a
+config file path, a home directory, or whatever else it read while failing.
 
 Internal tokens are stateless HMAC credentials. A signing key persists across restarts so a
 tmux-reattached agent session can keep authenticating after the Node restarts; rotating the key
@@ -143,7 +190,8 @@ the only lifetime controls. Two scopes exist: `service`, for the node's own loop
 firing schedule, the measure sampler, notes seeding), minted in-process and never placed in a
 child's environment; and `task`, for everything handed to a child process, PTYs, agent sessions,
 workflow steps, the MCP server. A `task`-scoped token carries the task id it was minted for, and
-route handlers compare that id against the task named in the URL before acting.
+route handlers compare that id against the task named in the URL before acting. It may also carry a
+session id and a server-computed tool ceiling. Both claims are covered by the signature.
 
 Minting a token is not exposed on `CoreServices`: any plugin could then request a token for any
 scope, which defeats the point of scoping them at all. Instead the composition root builds a scoped
@@ -151,7 +199,15 @@ credential factory and hands it to the plugins that spawn children, terminal and
 constructor dependency. The factory closes over the signing key and the listener's own address,
 neither of which exists until every plugin's `init` has run, so only the composition root can build
 it, and only after the fact. A plugin calls it once per child with the scope that child needs, for
-example `{ scope: 'task', taskId, sessionId }` for one managed-agent session.
+example `{ scope: 'task', taskId, sessionId, toolCeiling }` for one managed-agent session. Workflow
+and delegated sessions persist the ceiling in their session configuration before the runtime mints
+the token. Later general configuration updates retain that field rather than accepting a wider value.
+
+The agent-tool route reads session identity and tool limits only from the verified principal. The
+`x-acorn-session-id` and `x-acorn-tool-ceiling` headers are transport metadata and grant no authority.
+Session-required orchestration tools disappear from `tools/list` without a signed session claim. A
+per-call UUID is transport metadata too, but it is used only after the signed owner and tool name
+scope it as an idempotency key.
 
 The node-owner identity is opaque, explicit, and persisted at first boot. It is independent of
 provider connections, and internal auth fails closed if it is unset. A task-scoped token cannot use
@@ -163,7 +219,7 @@ Routes that administer or spend a provider connection use a middleware gate one 
 provider reads to warm a mirror. A `task`-scoped token still cannot reach these routes.
 
 Core's own code reads a stored secret through `SecretService.use()`
-(`packages/node-core/src/main/core/security/secrets.ts`), not through a raw decrypt call. Before this
+(`packages/node-core/src/server/core/secrets.ts`), not through a raw decrypt call. Before this
 existed, `decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)` appeared at six sites across core and
 three plugins, and each site both held the plaintext and had `SESSION_ENC_KEY` itself in scope.
 `use()` passes the plaintext into a caller-supplied function and, if that function throws, scrubs the
@@ -182,8 +238,8 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 
 - Plugins use CoreServices for filesystem access and Git. The filesystem service applies one
   symlink-aware data-root/worktree confinement policy
-  (`packages/node-core/src/main/core/filesystem/confinement.ts`). Four call sites used to each check
-  this on their own: `taskWorktree.ts`'s lexical-plus-symlink check, `pathGuards.ts`'s lexical-only
+  (`packages/node-core/src/server/core/fs.ts`). Four call sites used to each check
+  this on their own: `server/worktrees/taskWorktree.ts`'s lexical-plus-symlink check, `server/worktrees/pathGuards.ts`'s lexical-only
   check, the agents plugin's own realpath-and-relative pass, and the editor plugin's `confine()`
   wrapper. Lexical-only is not enough on its own: a worktree holds arbitrary checked-out content,
   including a symlink an untrusted branch added that points at `~/.ssh`, and a lexical check lets that
@@ -204,13 +260,32 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 - Executable configuration is hash-gated: the repository's own files (`.acorn/config.toml`, workflow
   files, and URL scripts) **and the project row's script columns**. The exact snapshot must be
   acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
+- A workflow definition stored as a `workflow_defs` row is executable configuration with no committed
+  bytes, so it is owner-typed instead of hashed. Every route under `/v2/p/workflows/defs` is
+  device-only, and a start by id refuses a row to a task-confined caller while still allowing a
+  committed file, which the snapshot does cover. Save to repo turns the row into a file and hands it
+  back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
+  by `resolveInRoot`, and the next start from that file asks for the acknowledgement
+  ([workflows.md](./workflows.md) § Database definitions).
 - Docker matching configuration is declarative; Docker and run-target execution remains subject to
   the appropriate trust gate.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
 
+**Force push, and the abort verb.** The Changes pane's branch bar can replace what a branch's upstream
+points at, and it does so with `--force-with-lease` and never a bare `--force`
+(`plugins/changes/src/server/localDiff.ts` § `pushArgs`). The lease compares the remote ref against
+this node's remote-tracking ref, so a commit somebody else pushed since the last fetch makes the push
+fail with a reason rather than disappear. Three things have to agree before a remote commit is
+replaced: the reader arms the menu item and presses it a second time, the lease holds, and no
+`changes:before-push` handler vetoes — the payload carries `force`, so a branch-protection plugin can
+refuse that push alone ([plugins.md](./plugins.md) § Hooks). The abort verb beside it is offered only
+while the node's own status read says a merge or a rebase is in flight, and which of the two to abort
+is read off the worktree rather than taken from the request: `merge` and `rebase` are argv, and a
+subcommand chosen over HTTP is one the panel cannot vouch for.
+
 The untrusted input the trust gate hashes is the repo config **and the project row**
-(`main/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
+(`server/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
 database is trusted, and that premise only holds while nothing but the owner can write the database.
 `PUT /v2/core/projects/:id/config` is device-only now, so it holds again; the row is in the snapshot as
 the belt behind that gate. A write the owner did not make changes the hash, and the next thing that
@@ -235,7 +310,7 @@ nothing consumed the result, so a repo could declare a setup script and watch it
 not wired instead of dropped because wiring them would make a committed file run a command on worktree
 creation and on archive, and neither path asks this gate first — that is a new execution surface, not a
 fix. The `[docker]` table is still read without the gate; the comment on
-`plugins/docker/src/main/dockerConfig.ts` now names the two invariants that make that safe, which are
+`plugins/docker/src/server/dockerConfig.ts` now names the two invariants that make that safe, which are
 that exec is ref-addressed rather than matcher-addressed and that the WebSocket hub refuses docker
 channels to a task-confined socket. If either changes, that table needs the gate.
 
@@ -245,14 +320,14 @@ symlink in the window between them. Real, hard to hit, and the honest fix is an 
 open rather than a tighter check, so it is recorded here rather than papered over. The per-task sandbox
 (`docs/future/sandbox/sandbox.md`) is the layer that eventually subsumes it.
 
-Before the broker (`packages/node-core/src/main/core/exec/proc.ts`) existed, about sixteen call sites
+Before the broker (`packages/node-core/src/server/core/proc.ts`) existed, about sixteen call sites
 spawned or exec'd children with their own ad hoc handling, and the inconsistency was not cosmetic.
 `plugins/terminal`'s preview capture ran a repo-configured script through `/bin/sh -c` with no `env`
 option, so it inherited the node's full environment, `SESSION_ENC_KEY` and `INTERNAL_TOKEN` included,
 and had no output cap. The agents plugin's Claude driver spread `process.env` into its child the same
 way. The Docker plugin denylisted six named secrets, and the "keep in sync" comment above the list
 pointed at a file that no longer existed; a denylist silently misses any binding nobody remembered to
-add. Only one site, `main/headless.ts`, killed the child's process group, so everywhere else a hung
+add. Only one site, `server/headless.ts`, killed the child's process group, so everywhere else a hung
 child's grandchildren survived and kept the stdio pipes open. The broker fixes this by building a
 caller's environment from an allowlist and never spreading `process.env`; a caller that needs more
 passes `passthrough: ['DOCKER_*']`, visible at the call site and additive rather than "everything
@@ -328,6 +403,29 @@ hashes what arrived, and stores it content-addressed under that hash. A mismatch
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
 plugin id to a hash no one but this device computed.
 
+The terminal client has no helper to do that, so it does it itself, with the same two stores
+(`@acorn/custody`'s `PluginCache` and `PluginTrustStore`, pointed at `$XDG_CONFIG_HOME/acorn/plugins/`
+instead of the app's data directory). Same schemas, same `(pluginId, hash)` key, same refusal on a
+mismatch, same file discipline of a `0700` directory and `0600` files. A second implementation would
+have been a second set of security decisions, so there is one — and `apps/tui/src/plugins/custody.ts`
+is the only file in that package permitted to name either class.
+
+**Storing a bundle is idempotent, and the application's own bundles go through the same door.** The
+shell caches and acknowledges the bundles in its own resource directory at every launch, because that
+grant covers bytes the build produced and nothing else writes there. Doing it at every launch does not
+mean writing at every launch. `putBundled` hashes the bytes, and when the cache already holds that
+hash and the file is on disk it returns and touches nothing. The index is rewritten only when a row is
+added, the boot sweep rewrites it only when it evicted something, and the trust store compares the
+stored acknowledgement field by field, ignoring `decidedAt`, and writes only on a difference. So five
+bundled plugins cost five bundle writes and ten fsynced rewrites on the launch after an app update, and
+zero on every launch after that. The two disagreement cases still self-heal: a row whose file is gone
+is rewritten because the file is checked as well as the row, and a file with no row is deleted by the
+sweep.
+
+Skipping a write is not skipping a decision. The hash is still computed from the bytes on every
+launch, so a bundle whose contents changed produces a hash the cache does not hold and takes the full
+path, and an acknowledgement whose permissions moved is written and re-prompted the same as before.
+
 **Consent is per device and per bundle.** First sight of a `(plugin, hash)` pair prompts, naming the
 Node it came from and the permissions the manifest declared. An update arrives as a new hash and
 prompts again, showing what the permissions gained. A rejection is remembered. Pairing a new machine
@@ -337,7 +435,7 @@ a config the Node will execute and is stored on the Node; this binds a plugin to
 the device will execute and is stored beside the device token.
 
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
-sentence (`packages/client-core/src/plugins/permissions.ts`). The update diff compares keys, not
+sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
 copy, so tightening a sentence's wording never re-prompts an existing owner as though the plugin had
 grown its reach. Only a key that did not exist before does that. A grant's severity (`icon`, `high`)
 rides beside the key as data, not something parsed back out of the copy.
@@ -346,10 +444,11 @@ The threats this closes, and the ones it does not:
 
 - **A compromised or hostile paired Node serving malicious JavaScript** — hash-verified bytes, a
   per-device acknowledgement that names the Node, and (phase 3) the sandbox the bundle runs in.
-  Nothing a Node pushes runs unprompted. The sandbox is one of two, and the trust decision covers both
-  because both are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws its own
-  pixels, and a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`). Neither
-  path asks a second question, and neither can start without an accepted hash.
+  Nothing a Node pushes runs unprompted. The sandbox is one of three, and the trust decision covers all
+  of them because they are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws
+  its own pixels, a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`), and — in
+  the terminal, where there is no iframe and no CSP — a `node:worker_threads` thread under
+  `--permission`. No path asks a second question, and none can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
   bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
   there also controls the bytes, so the containment rather than the disclosure is what bounds it.
@@ -375,11 +474,12 @@ The threats this closes, and the ones it does not:
   widening a glob all read as newly requested. What this does not bound is the agent itself: an agent
   CLI a person installed and acorn started is code that person is running, which is the same trust class
   as running it in their own terminal (`docs/managed-agents.md § Harnesses`).
-- **Not closed: the Node half.** A loaded plugin's node code runs in the Node's process, disclosed and
-  acknowledged — the same trust class as an editor extension. Its declared `node` permissions shape
-  the context it is handed; they are not enforced against a bundle that imports `node:fs` directly.
-  Every surface that renders them says *declared*. `docs/security.md` holds the full
-  model and the route to a hard boundary.
+- **The Node half is isolated.** Each loaded node bundle runs in its own permission-scoped worker
+  realm. Its context is an owner-bound RPC projection, its package is read-only, and only its own
+  database paths plus explicitly accepted local-file resources are writable. Its environment is
+  scrubbed to a credential-free base plus individually accepted names. Direct `node:sqlite`, raw
+  network modules, nested workers, native addons, and undeclared child processes are unavailable.
+  `docs/security.md` holds the full model and the remaining OS-isolation ceiling.
 
 The only way a package reaches a Node's install directory is the owner-authenticated install route
 (`POST /v2/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
@@ -431,9 +531,8 @@ what an attacker gains:
   the mode and should not pretend to; a mode check would be a boundary shaped like advice, and the owner
   chose the path. What it does instead is say so — the install form carries its own sentence about a
   folder being linked rather than copied. **Point acorn at a directory only you can write.**
-- The **node half** is uncontained for every source, not just this one — that is the disclosure recorded
-  above and in § Node-half plugin security, and rung 2 fixes it for all of them at once. `{ path }` is not
-  a hole in a boundary; it arrives at the same place a `{ url }` install does.
+- The **node half** gets the same isolated realm for every source. `{ path }` is not a hole in that
+  boundary; it receives the same manifest-shaped RPC context and runtime grants as a `{ url }` install.
 - The **client half** is genuinely unaffected. Device consent is keyed on the hash of the bytes that
   arrive, computed by the device, so editing the client file in place produces a new hash and re-prompts.
   The one mechanism that could have been undermined here already handles it.
@@ -467,11 +566,9 @@ row is marked `dev` so revocation can find it, and `partial` because nobody read
 never become the baseline of a later "what changed" diff.
 
 **The honest cost, stated so it is weighed rather than discovered: while a plugin is in dev mode, the node
-half the agent writes runs with the Node's own access on next load, without a per-save human read.** That
-is exactly the risk the owner accepted by entering dev mode, and it is bounded to plugins they chose — but
-it is the same in-process access described under "Node-half plugin security" below, arriving without a
-prompt. If rung 2 (out-of-process node halves) ships first, dev mode inherits its containment, which is a
-good reason to watch that ordering.
+half the agent writes is accepted on next load without a per-save human read.** It still runs in the same
+permission-scoped worker realm as any other loaded plugin, but the owner has waived the bundle-by-bundle
+review for this `(plugin, node)` pair. That is exactly the risk the owner accepted by entering dev mode.
 
 Three things keep it bounded:
 
@@ -505,20 +602,24 @@ choose the URL but cannot inspect or operate the page.
 
 ## Node-half plugin security
 
-The section above is about bundles a Node distributes to a device. This one is about the code a
-loaded plugin runs *inside the Node*, which is a different trust class and the weaker of the two.
+The section above is about bundles a Node distributes to a device. This one is about the isolated
+worker realm that runs a loaded plugin's node half.
 
-Stated once and bluntly: **a loaded plugin's node bundle runs in-process in the Node and can do
-anything the Node process can do.** Everything that shapes or displays its `permissions.node` block
-is least privilege for cooperative code and honest disclosure for users — not a security boundary.
-Every surface that renders those permissions must label them *declared*, never *enforced*, and must
-keep them in a group of their own — a strong claim must not lend credibility to a weaker one sitting
-beside it. In the trust prompt the label is the group's name and the legend defines it, carrying two
-statements: that the list is unverified ("the plugin's own description of what it touches; acorn
-can't check it") and the canonical wording for what that means — "This plugin's server code runs
-with the same access as acorn itself." The second must not be softened or dropped; it is drawn at
-full contrast rather than as fine print, and `e2e/twoNode.spec.ts` asserts it so its removal cannot
-pass as a copy tidy-up.
+The manifest's `permissions.node` block is now an enforced ceiling. The host serializes only the
+already owner-bound, permission-shaped context; functions cross as RPC references, so the worker
+never receives a core database, registry, or service implementation. Node starts the realm with its
+permission model enabled. The plugin package is readable but not writable, only that plugin's three
+SQLite paths are writable, network calls go through a hostname-checking `fetch`, and child processes
+are absent unless `exec` was declared. Native addons, nested workers, raw sockets, and direct
+`node:sqlite` stay unavailable. The worker inherits only the process broker's credential-free base
+environment plus explicitly named `env` and `files` grants. A file grant resolves an absolute path
+from the named environment variable and is refused inside acorn's data root. The trust prompt therefore puts node grants under *Enforced* beside
+the client broker's grants. Scheduled work and task checks remain *Declared*: acorn confines when and
+where they run, but cannot verify what plugin-authored code intends to do.
+
+This is a resource boundary, not an OS security claim. Node describes its permission model as a
+seat belt rather than a sandbox for hostile code, and a worker is not crash isolation. Rung 3 remains
+the answer for a deployment that needs an operating-system adversarial boundary.
 
 ### The broadcast namespace
 
@@ -527,10 +628,9 @@ plugin's `ctx.events.send` used to accept any channel name, which meant it could
 or `workflow:` and impersonate core's own streams — a renderer cannot tell a forged `term:out` from a
 real one, because the WS envelope is deliberately open and core routes on the channel alone.
 
-It is now confined to `plugin:<its-id>:*`, and naming anything else throws. This is a real check rather
-than a disclosure, and it is cheap precisely because it does not pretend to be more: the same bundle can
-still `import('node:net')` and open its own socket. What the confinement buys is that a plugin cannot
-lie to the renderer *through core's own transport*, which is a different thing from being contained.
+It is confined to `plugin:<its-id>:*`, and naming anything else throws. The worker boundary now backs
+that context check: raw network modules are unavailable and the only network global checks its
+manifest hostname list before connecting.
 
 A built-in is unaffected. It owns real channel prefixes through `ctx.events.channel`, is compiled into
 the binary, and is not the trust class this section is about.
@@ -557,32 +657,59 @@ Assets, concretely, on a machine running a Node:
   per-project shell commands the Node executes (`setup_script`, `dev_script`,
   `teardown_script`, `db_url_script`) and the local filesystem path of every mapped codebase.
 - **Provider secrets**: encrypted at rest, decrypted in the Node's memory when used
-  (`packages/node-core/src/main/core/secrets.ts`).
+  (`packages/node-core/src/server/core/secrets.ts`).
 - **The user's account**: `~/.ssh`, `~/.aws`, browser profiles, anything user-readable, plus the
   ability to spawn processes (the Node legitimately owns PTYs, Git, Docker).
 - **The fleet**: a plugin's routes and broadcasts reach every device paired with the Node.
 - **Agents**: plugin-contributed agent tools execute inside agent sessions that read untrusted
   content.
 
-What in-process JS can reach today: all of the above. `ctx` gating does not change that — a
-bundle can `import('node:fs')`, `import('node:child_process')`, open `core.sqlite` directly, or
-monkeypatch globals shared with core. In-process realms share ambient authority; there is no
-permission check you can write around that.
+The isolated realm cannot reach those assets directly. It can reach only what its RPC context and
+launch grants name. The loader tests execute both ESM-import and `process.getBuiltinModule` attempts
+to open `core.sqlite` and another plugin's database; both fail before `DatabaseSync` is obtained.
 
 ### The containment ladder
 
-Each rung is real, additive, and independently shippable. Rung 0 is the client sandbox, already
-shipped; the phases implement rung 1; rungs 2–3 are the "Future work" node-sandbox entry, specified
-here so nothing in the shipped phases forecloses them.
+Each rung is real and additive. Rungs 0–2 are shipped; rung 3 is the remaining OS boundary.
 
 #### Rung 0 — The client sandbox (shipped)
 
 Before the node-side ladder starts, the client half of a loaded plugin is already contained, and there
-are two containers rather than one. A bundle that draws pixels runs in an iframe on its own
+are three containers rather than one. A bundle that draws pixels runs in an iframe on its own
 hash-addressed origin under `plugin_scheme.rs`'s policy. A bundle that draws a tree runs in a Web
 Worker with no DOM at all, under `PLUGIN_WORKER_CSP` (`docs/shell.md § The plugin worker`). Both have
 `connect-src 'none'`, so the transferred `MessagePort` is the only way out, and both reach the host
 through the same broker, which decides every call from the manifest's scopes.
+
+**The third is the terminal's**, and it exists because a terminal has no iframe and no CSP to put one
+under (`docs/tui.md` § The sandbox). A tree bundle runs in a `node:worker_threads` thread
+started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>', '--allow-fs-read=<bundle>']`,
+and the two transferred ports are the only way out of it. Three things are worth stating, because two
+of them correct what the design expected:
+
+- **A worker thread's grants are its own.** The design assumed `--permission` was process-wide and
+  inherited, and planned a child process per plugin with the ports over IPC as the fallback. Measured
+  on Node 24 and 26, `execArgv` applies the permission model to the thread: the worker is denied a read
+  the parent is allowed. So the fallback is not needed, and the TUI process itself runs with no
+  permission flags at all.
+- **The terminal grants no network access.** The CSP gave the DOM worker that default for free; the
+  Node worker also starts without a network grant. Its bootstrap
+  (`apps/tui/src/plugins/pluginWorker.js`) runs before a stranger's module scope and installs a
+  `module.registerHooks` resolver that refuses
+  `net`, `http`, `https`, `http2`, `tls`, `dgram`, `dns`, `quic`, `child_process`, `worker_threads`,
+  `cluster`, `module`, `vm`, `inspector` and `repl`, and deletes `fetch`, `WebSocket`,
+  `XMLHttpRequest`, `EventSource` and `navigator`. `module` is on that list so a bundle cannot register
+  a hook of its own and undo this one; `worker_threads` so it cannot start a thread that inherited
+  none of it.
+- **The permission grants are real paths.** Node compares resolved paths, so a grant naming one that
+  goes through a symlink matches nothing and the worker cannot read the bundle it was started for.
+  Both grants are `realpathSync`'d.
+
+Everything above the sandbox is shared with the desktop: the same worker host, the same handshake, the
+same heartbeat and grace, the same whole-batch pre-flight check and prop sanitiser
+(`packages/client-core/src/host/tree/treeState.ts`), and the same broker deciding every bridge call
+from the manifest's scopes. Two shells over one set of rules, which is why the terminal added no
+security decision of its own beyond the two bullets above.
 
 The tree path is the stricter of the two, and worth stating as a security property rather than a UI
 one: the sandbox never produces markup. It produces names of the host's own components and props that
@@ -591,6 +718,34 @@ have nowhere to be. A prop that fails validation is dropped and the node still r
 fails is dropped whole and recorded; a node name this build does not know draws a labelled
 placeholder. What a worker that misbehaves can do to the surface around it is nothing — it is
 terminated and its trees show placeholders.
+
+**Two messages cross the tree channel in the other direction**, and both are bounded requests rather
+than an RPC door (`docs/plugins.md § Asking the owner`). `owner.invoke` calls one action the owning
+extension point declared *and* the owner's `Slot` bound a handler for; `overlay.open` presents the one
+overlay this contribution's own manifest descriptor named. Everything about their addressing is the
+host's: a request is scoped by the slot it arrived on, so plugin code supplies no plugin, point, owner,
+overlay or slot id and there is nothing to forge. Payload and reply are each capped at 64 KiB, eight
+may be outstanding per slot, an owner has ten seconds to answer, and the failure arm is a code and a
+sentence with no host stack in it. `overlay.open` additionally needs focus inside that exact tree and
+is throttled to one a second, so a modal stays a person's act rather than something a timer can do.
+
+**Binary bridge calls change no permission.** `api.bytes` is a second wire kind beside `api`, added so
+a plugin moving a file does not have to base64 it through a JSON envelope. It runs the identical
+`allowApi` decision at the identical point — before the body is touched at all — so your own
+`/v2/p/<id>/` namespace is reachable and another plugin's is refused whichever kind asks. The desktop
+end-to-end suite pins that by spying at the broker: a denied path must produce no request, not merely
+a discarded response. Both directions are capped at 12 MiB, and `type` and `filename` are advisory,
+because a sandbox saying what its bytes are decides nothing downstream.
+
+**Cooperative destinations are manifest allowlists.** A loaded frame cannot name another plugin's
+pane or route. A surface may declare up to eight local destination IDs, each mapped to one host target
+kind. `ui.openDestination` accepts only a declared ID and resource IDs of at most 300 characters. The
+host resolves the target through its notification navigation registry. The same declaration may name
+one notification kind; `ctx.events.notice` keeps a loaded plugin's target and kind only when both match
+that declaration. Every other loaded notice falls back to the plugin's own source and the non-toast
+`plugin` kind. Each destination appears as an enforced line in the trust prompt, and its surface,
+local ID, target kind, and optional notice kind form the update-diff key. Adding or retargeting one
+therefore requires a new decision.
 
 **Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
 reasonable:
@@ -621,18 +776,16 @@ CoreServices facets are absent from `ctx.core`; `secrets` and `exec` (the proces
 individually gated and default-off; `ctx.events.streams()`/`channel()` are never present for
 loaded plugins regardless of manifest. Built-ins keep the full context.
 
-What it buys: honest plugins cannot over-reach by accident, the trust prompt is truthful for the
-well-behaved majority, and the ecosystem learns to write minimal manifests from day one — which
-matters because rung 2 turns those same declarations into hard grants, and manifests that were
-always minimal migrate without breakage. What it does not buy: any defense against rung-0
-adversaries (1) and (2) above.
+What it buys: honest plugins cannot over-reach by accident, the trust prompt is truthful, and the
+ecosystem learns to write minimal manifests from day one. Rung 2 now turns those same declarations
+into host and runtime grants.
 
 Implementation notes: gate by **omission**, not by throwing — an absent facet fails at
 development time with a TypeError the author sees immediately, and the shape of `ctx` becomes
 documentation of the grant. Keep the facet→permission mapping in one module with exhaustive
 tests (phase-1 test list).
 
-`ctx.core.projects` (`packages/node-core/src/main/core/projects.ts`) is the model every facet
+`ctx.core.projects` (`packages/node-core/src/server/core/projectRefs.ts`) is the model every facet
 should copy, and also the clearest illustration of rung 1's limit. It is built for plugins rather
 than merely exposed to them: identity and write methods use `ProjectRef` projections, so a plugin
 can resolve project identity without seeing the config columns on the row and without ever holding
@@ -657,57 +810,78 @@ prompt. Keep identity, executable config and writes split (`projects:read` / `pr
 same grant as a plugin that only wants to label a row, and neither silently gains the scripts acorn
 will execute.
 
-#### Rung 2 — Out of process (the future hard boundary)
+##### Telemetry sinks
 
-The acorn-native design already exists as a pattern: the MCP server is a stdio child that calls
-the Node over loopback with a **task-scoped internal token** and "can use only task-addressed
-routes and cannot read provider credentials or administer the Node"
-(docs/architecture-overview.md, docs/mcp.md). Apply the same shape to plugins:
+`ctx.telemetry` and `ctx.log` are on every node context with no grant at all, and that is deliberate:
+a plugin measuring its own work reads nobody else's, the host binds the owner rather than taking one,
+and the records go nowhere unless the owner turned telemetry on and something subscribed.
 
-- Each loaded plugin's node half runs as a **child process** (one per plugin: crash isolation is
-  a free and valuable side effect — a segfault no longer takes the Node down).
-- The child holds a **plugin-scoped internal token** whose scope IS the manifest's permission
-  list. Enforcement moves to the auth middleware
-  (`packages/node-core/src/server/middleware/auth.ts`), where a `Principal` already carries
-  scope — server-side, where it is strong, instead of in the plugin's realm, where it is
-  cooperative.
-- `ctx` becomes an RPC proxy over stdio/loopback. CoreServices facets and capabilities are async
-  calls the Node authorizes per token scope. (They are async-shaped already; see "Design rules"
-  below for keeping them so.)
-- Route contributions: the plugin process serves its own handlers; the Node proxies
-  `/v2/p/<id>/*` to it. This requires the **fetch-shaped route handler** decision from phase 1 —
-  a Hono instance cannot cross a process boundary; a `(Request) → Response` shape can.
-- The plugin's SQLite is opened **by the plugin process** against its own file only.
-- Launch flags from Node's permission model (verify exact flag set against the Node version in
-  use at implementation time; the model was stabilizing across Node 20–23):
-  - `--permission` — deny-by-default posture;
-  - `--allow-fs-read=<pluginDir>,<pluginDataDir>` and `--allow-fs-write=<pluginDataDir>` — the
-    fs jail. `~/.ssh`, `core.sqlite`, and other plugins' databases become unreachable;
-  - child processes and worker threads denied unless the manifest declares `exec`
-    (`--allow-child-process` / `--allow-worker` granted only then);
-  - **never grant `--allow-addons`**: with `--permission`, native addons are blocked by default,
-    which closes the "ship a `.node` binary inside the bundle" escape hatch around all of the
-    above. If a plugin legitimately needs a native dependency, that is a first-party-adoption
-    conversation, not a flag.
-- Network egress is the honest gap: Node's network permission was still experimental at design
-  time. Blocking `exec` and jailing fs makes exfiltration require deliberate raw-socket use from
-  the plugin process, and the credential broker (next section) removes the main *reason* to
-  allow direct egress — but real network enforcement is rung 3. Do not present rung 2 as closing
-  it.
+Reading the stream is the opposite, and it is the one facet on `ctx.core` that returns other
+packages' data by design. A sink registered through `ctx.core.telemetry.onBatch` sees every record
+from every owner: core's request timings and route patterns, another plugin's schedule and hook
+runs, and the log lines of packages the owner installed for a completely different reason. So it is
+its own `telemetry` token, and the trust prompt draws it **high**, with a sentence that says whose
+records they are rather than "read telemetry".
 
-Costs to accept: per-call loopback latency (noise for this traffic), registration becomes a
-declarative announcement over RPC at child startup, and capabilities/broadcasts are async-only
-across the boundary. Streams/WS-channel ownership cannot cross — already excluded from the
-third-party surface by the two-tier rule.
+Three things bound what a sink can learn ([telemetry.md](./telemetry.md) § What never leaves the
+machine). Attributes are allowlisted scalars chosen at each seam, so there is no field a body, a
+diff or a query could arrive in. Names are patterns and ids ride as attributes, so a route reads as
+`/v2/core/tasks/:id`. And every message passes a scrubber that strips control characters, collapses
+the owner's home directory and the data root, and replaces credential-shaped runs. A boundary that
+already withholds a message keeps withholding it: `onServerError` sends a name and a code because
+drivers embed bound values in `err.message`, and its record carries the same and no more.
+
+The telemetry token remains a rung-1 disclosure decision: an owner can grant or refuse the stream,
+and the host scopes the RPC surface accordingly. The worker boundary prevents a plugin from walking
+around that decision by importing the host's telemetry graph or opening `core.sqlite` directly.
+
+#### Rung 2 — Isolated Node realm (shipped)
+
+Each loaded plugin's node half runs in its own `node:worker_threads` realm. The worker starts with
+Node's permission model enabled and reaches the host only through one `MessagePort`. The host exports
+an already owner-bound, manifest-shaped `ctx` over that port; registrations, fetch-shaped route
+handlers, capabilities, and the few synchronous public calls all retain their published signatures
+through structured-clone RPC.
+
+The launch grant is intentionally narrow:
+
+- the worker may read the installed plugin package and the trusted bootstrap/runtime dependencies;
+- a plugin with migrations may read and write only its pre-created database, WAL, and SHM paths;
+- the worker environment starts from the process broker's credential-free base. Explicit `env`
+  names add individual values; `files` resolves individual absolute paths from named values and
+  refuses anything under acorn's data root;
+- the worker opens that database itself, validates the applied migration history, and never receives
+  the host database or storage service;
+- direct `node:sqlite` access is refused, including the `process.getBuiltinModule` path that would
+  otherwise bypass Node's filesystem permission checks;
+- raw socket modules are refused. `fetch` exists only when `permissions.node.net` is non-empty,
+  checks the destination hostname against that exact set before connecting, and returns redirects
+  unfollowed so the next request re-enters the same check;
+- child processes exist only with the explicit `exec` grant. Nested workers and native addons are
+  never granted.
+
+Reload preserves the existing candidate-then-commit contract. A candidate gets a fresh realm and
+module graph, buffers its host registrations, and replaces the previous realm only after import,
+dependency validation, and `init` succeed. A rejected or failed candidate is terminated; after a
+successful commit the previous realm is disposed and terminated.
+
+The acceptance test uses two deliberately hostile plugins. One imports `node:sqlite`; the other asks
+`process.getBuiltinModule` for it. They attempt to open `core.sqlite` and a peer plugin database and
+both fail before obtaining `DatabaseSync`.
+
+This rung narrows ambient authority and turns the manifest into an enforced host/realm boundary. It
+does not claim OS-grade hostile-code isolation: Node describes its permission model as a seat belt,
+workers do not provide crash isolation, and an explicitly granted child process is an intentional
+escape hatch. Those are rung 3 concerns.
 
 #### Rung 3 — OS-level sandboxing (the last door)
 
-Per-platform confinement of the plugin child process: Seatbelt profiles on macOS,
+Per-platform confinement of a plugin process: Seatbelt profiles on macOS,
 Landlock/namespaces on Linux, AppContainer on Windows. This is what actually enforces a
 `net` host allowlist and closes raw sockets. Substantial per-platform work; only worth it if the
 ecosystem grows plugins that need direct egress. Design nothing that assumes it; foreclose
-nothing that enables it (a child process per plugin, rung 2, is the shape all three platforms'
-mechanisms confine).
+nothing that enables it. Moving the shipped RPC contract from a worker to a process is the migration
+path if crash isolation or an OS policy becomes necessary.
 
 ### Secrets: narrow, use-scoped access
 
@@ -768,6 +942,25 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   **disabled or ask-every-time until the owner enables them**, regardless of the plugin being
   trusted for everything else. Trusting a plugin's code and trusting an agent to call its tools
   autonomously are different decisions; keep them separate in the UI.
+- **Findings has no workflow-gate authority today.** Observations and memory candidates remain
+  advisory, and findings contributes no `workflows:policy`. A future opted-in policy must evaluate
+  only decision requests explicitly bound by the workflow definition, against the exact evidence
+  revision at execution time. Missing policy code, stale evidence, and incomplete obligations fail
+  closed. Clearing a required fix is a device-authenticated decision—addressed, explicit risk
+  waiver, or verified not applicable—and is never an agent tool. Acknowledgement, snooze,
+  withdrawal, dismissal, or a model-assigned severity grants no authority.
+- **A reviewer prompt is not a sandbox.** Before a provider can be advertised for a read-only
+  reviewer preset, conformance tests must prove both the Acorn tool ceiling and the provider-native
+  restriction on edits, shell commands, and other write paths. A provider that cannot enforce both
+  is unavailable for that preset. This is separate from CI or repository merge enforcement, which
+  would need its own versioned check receipt and integration.
+- **Loaded tool and context routes inherit task authority, never device authority.** Manifest
+  `agentTools[].handler` and `contextSections[].read` paths are confined to the declaring package at
+  parse time. Core invokes them with an internal principal whose user, task, session and signed tool
+  ceiling came from the authorized caller; IDs in the body cannot widen it. The task principal is
+  deliberately unable to enter device-only approval, memory-authority or cross-plugin routes. Tool
+  schemas, responses, deadlines and output sizes are bounded before data reaches MCP or prompt
+  assembly, and one failed context section is recorded as unavailable without failing its siblings.
 - **The `execute` tier denies by default.** A tier the owner has never expressed an opinion about
   falls back to `TOOL_TIER_DEFAULTS` (`@acorn/protocol/toolPermissions.ts`), where `execute` is
   `false`. The fallback used to be `true` for every tier, which meant shipping a new execute tool
@@ -776,6 +969,16 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   rather than left implicit, so the next tier added has to say which it is. The node and the settings
   page read the same constant, so an untouched tier draws as off in Settings → Agent tools and is
   denied on the wire.
+- **Delegation authority is direct and fail-closed.** The Agents plugin records each spawn's signed
+  owner task and session before it creates a child. Prompt, wait, read, and cancel require that exact
+  owner and child pair. Missing, foreign, sibling, ancestor, descendant, and cross-task identifiers
+  all return the same `not_found` result. A managed child cannot approve its own permission or
+  question request through the orchestration tools.
+- **Tool ceilings only narrow.** A delegated child receives the intersection of its parent's signed
+  ceiling and an optional requested ceiling. A workflow-owned managed session cannot spawn a child,
+  because workflow budget accounting does not include delegated descendants. The execute permission,
+  depth-two limit, 12-live-descendant limit, and managed runtime concurrency ceilings remain separate
+  gates.
 - **Broadcast hygiene.** `ctx.events.status()` is content-free by design; keep every
   third-party-reachable broadcast content-free or plugin-self-scoped so one plugin's events can
   never carry another's data to a subscribed frame (phase-3 bridge filters by declared channel;
@@ -784,9 +987,9 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 ### Storage
 
 - **Migrations** run in the Node at boot against the plugin's own file only
-  (`packages/node-core/src/main/pluginMigrations.ts`). SQL is data, not code, but verify the
-  plugin database factory (`main/pluginStorage.ts`) keeps `load_extension` unavailable
-  (the default `main/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
+  (`packages/node-core/src/server/plugins/migrations.ts`). SQL is data, not code, but verify the
+  plugin database factory (`server/plugins/storage.ts`) keeps `load_extension` unavailable
+  (the default `server/storage/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
   database is a cross-plugin read the boundary rules exist to prevent.
 - **Backups.** Backup snapshots scrub core credentials and device rows
   (docs/architecture-overview.md), but a plugin that stashes tokens in its own SQLite defeats
@@ -804,7 +1007,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 ### Supply chain
 
 - npm's published `dist.integrity` is compared against the downloaded bytes, and a mismatch fails the
-  install with nothing written (`main/pluginInstaller.ts`). It used to be recorded into provenance and
+  install with nothing written (`server/plugins/installer.ts`). It used to be recorded into provenance and
   never checked, which made it a note about the package rather than a statement about what ran. A
   package the registry publishes no integrity string for still installs — refusing would break every
   older package that only ever published a shasum — and the lockfile records the archive hash either
@@ -827,16 +1030,13 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Resource abuse
 
-The UI side has the phase-3 bridge rate limiter. The node side has nothing until rung 2, where
-the child process gets OS-level memory/CPU limits essentially for free. Accepted gap; one line
-in the threat model, no interim machinery — an in-process watchdog can't stop a hostile plugin
-anyway (it shares the event loop it would be policing).
+The UI side has the phase-3 bridge rate limiter. The node half now has a separate event loop, so a
+busy plugin does not share core's loop, but a worker still shares the process's memory and CPU budget.
+Per-plugin operating-system resource limits require rung 3 or a move from workers to processes.
 
-### Design rules (keep the boundary buildable)
+### Design rules (keep the boundary intact)
 
-Everything above gets cheaper or free once plugins are out of process. These are the rules that
-keep rung 2 a refactor instead of a redesign; each is already stated in its phase, collected
-here as the checklist reviewers should hold PRs against:
+These are the rules that made rung 2 possible and now keep later API work from punching around it:
 
 1. **Fetch-shaped route handlers** for loaded plugins (phase 1) — a Hono instance cannot cross a
    process boundary. Shipped for both a plugin's own namespace and loaded provider routes:
@@ -845,38 +1045,40 @@ here as the checklist reviewers should hold PRs against:
    connection work goes through `PluginProviderRuntime`, never through `c.env.DB`.
 2. **No `streams`/`channel` for loaded plugins, ever** (phase 1) — the one contribution that
    cannot survive the boundary.
-3. **Async-shaped `ctx` surfaces only** on the public plugin-api — no new synchronous
-   CoreServices facet or capability signature on the third-party surface; sync calls die at a
-   process boundary.
+3. **Prefer async-shaped `ctx` surfaces** on the public plugin API. Existing synchronous
+   registration and codec calls are supported by the worker RPC transport, but a new synchronous
+   cross-realm call must justify blocking both realms and staying within the bounded reply size.
 4. **No general secret read path** on the public surface. The current provider callback is scoped to
-   one host-controlled connection visit and must become a broker protocol at rung 2; do not add a
-   persistent secret-returning method.
+   one host-controlled connection visit; do not add a persistent secret-returning method.
 5. **Structured-clone-safe arguments/results** for every capability exposed to loaded plugins — no
-   live objects or class instances across the seam. Callback-shaped, use-scoped operations must have
-   an explicit request/response visitor protocol before the process boundary ships.
-6. **Honest wording everywhere** the `node` permission block is rendered: *declared*, not
-   enforced, until rung 2 ships — then the same UI flips to *enforced* with no vocabulary
-   change, which is the payoff for declaring the schema now.
+   live objects or class instances across the seam. Callback-shaped, use-scoped operations need an
+   explicit request/response visitor protocol.
+6. **Honest wording everywhere** the `node` permission block is rendered: filesystem, network,
+   child-process, and host-context ceilings are *enforced*. Plugin-authored timing and intent remain
+   *declared*.
 
 ### Summary table
 
-| Asset | Exposure today (in-process) | Mitigation | When |
+| Asset | Loaded-plugin exposure today | Mitigation | When |
 | --- | --- | --- | --- |
-| User files (`~/.ssh`, …) | Full read/write | fs jail via `--permission` flags | Rung 2 |
-| Other plugins' SQLite, `core.sqlite` | Direct open | fs jail + token-scoped core routes | Rung 2 |
-| Provider secrets | Importable/decryptable in-realm; provider runtime lends one per connection callback | Owner/provider-bound callback today; credential-injecting broker at rung 2 | Rung 1 scoped, rung 2 absolute |
-| Process spawning | Unrestricted | `exec` grant → `--allow-child-process` | Declared rung 1, enforced rung 2 |
-| Native code loading | `.node` addon in bundle | `--permission` blocks addons; never `--allow-addons` | Rung 2 |
-| Network egress | Unrestricted | Broker allowlist (brokered traffic); OS sandbox (raw sockets) | Rung 1 partial, rung 3 full |
+| User files (`~/.ssh`, …) | No access unless an owner accepts an explicit environment-backed file grant | exact-path `--permission` grants; data-root paths refused | Rung 2 |
+| Node environment | Credential-free base plus individually declared names | scrubbed worker `env`; each inherited name is a high-risk trust line | Rung 2 |
+| Other plugins' SQLite, `core.sqlite` | Direct open refused | exact plugin DB/WAL/SHM grant; direct `node:sqlite` refused | Rung 2 |
+| Provider secrets | Provider runtime lends one per owner-bound connection callback | scoped RPC callback; future credential-injecting broker can remove plaintext from the plugin realm | Rung 1 scoped, rung 2 contained |
+| Process spawning | Refused unless `exec` is declared | `exec` grant → `--allow-child-process` | Rung 2 |
+| Native code loading | Refused | `--permission` blocks addons; never `--allow-addons` | Rung 2 |
+| Network egress | `fetch` only to declared hostnames; raw network modules refused | realm allowlist today; OS sandbox for an adversarial boundary | Rung 2 enforced, rung 3 hardened |
 | Webview hosts | Loads remote content the plugin chooses | Manifest host allowlist enforced across redirects; no CDP; isolated ephemeral partition | Webview phases 1/2 |
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
 | Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
-| Project config scripts (`setup_script`, `dev_script`, …) | Readable through `core.projects.config()` and writable via the core config route; the Node executes them | Separate `projects:config` read grant; config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Rung 1 (node facet); phase 3 (frames); rung 2 (node half) |
-| Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
+| Project config scripts (`setup_script`, `dev_script`, …) | Available only through `core.projects.config()` when granted; config writes remain unmapped | Separate `projects:config` read grant; project config trust acknowledgement | Rung 2 (node half); phase 3 (frames) |
+| Project folder paths | Available through `core.projects.checkouts()` only when granted | split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 2 |
+| Every other owner's telemetry | A sink sees core's request timings and every plugin's spans, logs and error names | Its own `telemetry` token, drawn high; allowlisted scalar attributes; route patterns rather than URLs; a scrubber on every message; off unless the owner turned it on | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
 | Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
-| A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |
+| A plugin in dev mode | New bundle hashes load without individual review | Same isolated realm; bounded to one `(plugin, node)` the owner chose; badged, revocable, audited | Shipped |
+| The terminal client's device token and plugin consent files | A process on this machine running as the user can read them | `0700` directory, `0600` files, the same discipline as the node's own keys; the token stays in the broker module and the consent file in the custody module, held by an arch rule | Shipped |
 
 ## The renderer's policy and its dangerous sinks
 
@@ -894,16 +1096,16 @@ What the policy is a second layer behind. The renderer displays text this app di
 transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and two
 bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
 
-- `packages/client-core/src/registries/ProviderHtml.tsx`, the host component every provider-rendered
+- `packages/client-core/src/host/components/ProviderHtml.tsx`, the host component every provider-rendered
   body now goes through: github's description, its comments and its review threads
-- `packages/client-core/src/ui/diff/DiffRows.tsx`
+- `packages/client-core/src/kit/diff/DiffRows.tsx`
 
 The first was three hand-written bindings inside the github plugin until phase 7 of the layout
 programme. Neither is a known bug. They are listed because each one is a place where a sanitizer being wrong once
 would put script in a webview that can call into Rust, and the policy is what stands behind them if
 that ever happens.
 
-The Markdown renderer (`packages/client-core/src/ui/markdown.ts`) is the other sink, and it is the app's
+The Markdown renderer (`packages/client-core/src/kit/lib/markdown.ts`) is the other sink, and it is the app's
 own. It escapes first and builds tags afterwards, which holds. What did not hold was its sentinel: it
 reserved U+E000 to protect code spans and images across the escaping pass, on the stated grounds that
 real text never contains it. The input decides what is in it, so a source that spelled the sentinel
@@ -1018,7 +1220,7 @@ which is an approval gate and denies on timeout: a gate that opens when its keep
 one.
 
 Secret *use* is not recorded, only creation, replacement and deletion. Every credential read goes
-through `SecretService.use` (`main/core/secrets.ts`), which holds only an encryption key and nothing
+through `SecretService.use` (`server/core/secrets.ts`), which holds only an encryption key and nothing
 else, no database, no request, no connection id, so a row written from there could only name the
 credential by a hash of its ciphertext. Recording every read would also turn the table into a request
 log, since a mirror refresh reads a provider token on a timer, and would bury the handful of decisions

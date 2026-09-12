@@ -43,7 +43,14 @@ export default {
     // OPENAI_BASE_URL and `@anthropic-ai/sdk` reads ANTHROPIC_BASE_URL — and since `net` is
     // disclosure rather than enforcement, that is worth saying here rather than leaving a reader to
     // conclude the list is exhaustive.
-    node: { core: [], capabilities: [], secrets: false, exec: false, net: ['api.openai.com', 'api.anthropic.com'] },
+    node: {
+      core: [],
+      capabilities: [],
+      secrets: false,
+      exec: false,
+      net: ['api.openai.com', 'api.anthropic.com'],
+      env: ['OPENAI_BASE_URL', 'ANTHROPIC_BASE_URL'],
+    },
   },
   contributions: {},
 }

@@ -12,16 +12,28 @@
 // The projects a content-link `path` resolver will see. Production code reads this list through
 // `allProjects` and never writes it; the composition root installs the real reader. A test needs the
 // writer, and reaching for it deep in client-core is what this entrypoint exists to stop.
-export { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
+export { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 // The row shape those fixtures have to satisfy. A type, so it costs nothing at runtime, and it is the
 // difference between a fixture that fails when `Project` changes and one that silently drifts.
-export type { Project } from '@acorn/client-core/queries.ts'
+export type { Project } from '@acorn/client-core/infra/queries.ts'
 
 // The two registries a cooperative extension is registered through, for a test that renders one of
 // its own plugin's slots and needs somebody on the other side of it (docs/plugins.md § Cooperative
 // extension points). Production code never writes these — the chrome pass does, from a roster row —
 // which is exactly why they belong here rather than on ./client.
-export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
-export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/registries/extensionPoints.ts'
+export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // What every registry hands back, so a suite can put its registrations away again.
-export type { Disposable } from '@acorn/client-core/registries/registry.ts'
+export type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
+
+// The writer behind `ctx.capabilities.provide`, for a test that renders a surface belonging to one
+// plugin and needs another plugin on the other end of a capability. `clientCapability` is on ./client
+// because plugins read capabilities in production; providing one outside `init` is test scaffolding,
+// which is what this file is. It hands back a disposable, so a suite puts its provider away again.
+export { provideClientCapability } from '@acorn/client-core/infra/node/clientCapabilities.ts'
+
+// A tree driven offline: the root `solidTree` renders into, with the mutations it emits handed to the
+// test. This is how a pane test sees exactly what the sandbox would post, with no worker and no host on
+// the other side. Production code never builds one; the SDK's `mountTree` does, per slot.
+export { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
+export type { RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'

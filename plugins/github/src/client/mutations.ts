@@ -1,11 +1,11 @@
 // PR write actions. Routed through the broker, which attaches the device bearer in the helper, so
-// there's no cookie and therefore no CSRF check (server/index.ts explains why). Throws the structured
+// there's no cookie and therefore no CSRF check (server/githubApi.ts explains why). Throws the structured
 // error code on failure so callers can branch on merge_failed, reauth and the rest.
 //
 // GitHub verbs only. Workspace and repo-visibility writes live in core's workspaces/mutations.ts, task
 // and review-note writes in core's tasks/mutations.ts, and prefs behind core's settings/savePref.ts.
 import { postJson, writeJson } from '@acorn/plugin-api/client'
-import { autoMergeRoute, createPullRoute, pullRoute, rerunFailedRoute, requestedReviewersRoute, resolveThreadRoute } from '../contract/api'
+import { autoMergeRoute, createPullRoute, pullRoute, rerunFailedRoute, requestedReviewersRoute, resolveThreadRoute } from '../shared/api'
 
 export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>
   postJson<{ number: number }>(createPullRoute(o, r), input)

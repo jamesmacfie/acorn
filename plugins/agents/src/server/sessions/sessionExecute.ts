@@ -1,0 +1,210 @@
+// The agents.sessionExecute implementation (contract/sessionExecute.ts).
+//
+// Moved from apps/node/src/wiring/managedWorkflowStep.ts, which existed in the app only because
+// workflows couldn't import agents. It's agents' code: every line touches ManagedAgentRuntime, its
+// session store and its turn lifecycle.
+import { randomUUID } from 'node:crypto'
+import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
+import type { ManagedAgentRuntime } from './runtime'
+import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
+
+// The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
+// calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
+export { managedProviderForProfile }
+
+function turnEvents(snapshot: AgentSessionSnapshot, turnId: string): StreamEvent[] {
+  return snapshot.events
+    .filter((record) => record.turnId === turnId)
+    .map((record) => ({
+      type: 'managed-agent',
+      sequence: record.seq,
+      event: record.event,
+    }))
+}
+
+function resultFromSnapshot(
+  snapshot: AgentSessionSnapshot,
+  turnId: string,
+  schema: object | undefined,
+): HeadlessResult | null {
+  const turn = snapshot.turns.find((candidate) => candidate.id === turnId)
+  if (!turn || !['completed', 'failed', 'cancelled', 'interrupted'].includes(turn.status)) return null
+  const events = turnEvents(snapshot, turnId)
+  const result = assistantResult(snapshot.events.filter((record) => record.turnId === turnId))
+  const structuredOutput = result ? parseStructuredResult(result, schema) : null
+  const capture = {
+    result,
+    structuredOutput,
+    sessionId: snapshot.session.providerSessionRef,
+    costUsd: turn.usage?.cost?.currency.toUpperCase() === 'USD' ? turn.usage.cost.amount : null,
+    usage: turn.usage
+      ? {
+          inputTokens: turn.usage.inputTokens,
+          outputTokens: turn.usage.outputTokens,
+          cachedInputTokens: turn.usage.cachedInputTokens,
+        }
+      : undefined,
+    events,
+  }
+  if (turn.status === 'cancelled') {
+    return { status: 'cancelled', exitCode: null, capture, stderrTail: '', agentSessionId: snapshot.session.id }
+  }
+  if (turn.status === 'failed' || turn.status === 'interrupted') {
+    return {
+      status: 'error',
+      exitCode: null,
+      capture,
+      stderrTail: turn.error?.message ?? turn.stopReason ?? 'Managed agent turn failed.',
+      agentSessionId: snapshot.session.id,
+    }
+  }
+  if (!result || (schema && structuredOutput == null)) {
+    return {
+      status: 'malformed',
+      exitCode: 0,
+      capture,
+      stderrTail: schema ? 'Managed agent returned no parseable structured result.' : 'Managed agent returned no response.',
+      agentSessionId: snapshot.session.id,
+    }
+  }
+  return { status: 'ok', exitCode: 0, capture, stderrTail: '', agentSessionId: snapshot.session.id }
+}
+
+async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExecuteRequest, providerId: string) {
+  if (request.managedSessionId) {
+    const session = await runtime.store.requireSession(request.managedSessionId)
+    if (session.taskId !== request.taskId || session.providerId !== providerId || session.kind !== 'workflow') {
+      throw new Error('The persisted managed workflow session does not match this step.')
+    }
+    return session
+  }
+  return runtime.createSession(
+    {
+      taskId: request.taskId,
+      providerId,
+      profileId: request.profileId ?? providerId,
+      kind: 'workflow',
+      title: request.title,
+      config: {
+        workflowRunId: request.runId,
+        workflowStepId: request.stepId,
+        toolCeiling: request.tools ?? {},
+      },
+    },
+    `workflow-session:${request.stepId ?? randomUUID()}`,
+  )
+}
+
+// How long to wait for the provider to report its option list before applying a step's requested
+// config. `wait` hands back the current snapshot on expiry, so a slow provider costs the step this
+// much and then runs on the provider's own settings.
+const CONFIG_READY_TIMEOUT_MS = 30_000
+
+/** The provider options a step asked for, applied to its session. Ordered after the provider's
+ *  `session_metadata` because that list is the only thing a value can be validated against, and
+ *  before the turn is enqueued because the Claude driver reads a switch through `setConfig` only. */
+async function applyRequestedConfig(runtime: ManagedAgentRuntime, sessionId: string, wanted: Record<string, string> | undefined): Promise<void> {
+  if (!wanted || !Object.keys(wanted).length) return
+  await runtime.wait(sessionId, 0, 'ready', CONFIG_READY_TIMEOUT_MS)
+  await runtime.applyRequestedConfig(sessionId, wanted)
+}
+
+export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSessionExecute {
+  return async (request) => {
+    const providerId = managedProviderForProfile(request.profileId)
+    if (!providerId) return null
+    const session = await sessionFor(runtime, request, providerId)
+    await applyRequestedConfig(runtime, session.id, request.configOptions)
+    const beforeSeq = session.lastEventSeq
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: promptWithResultContract(request.prompt, request.schema) }],
+      source: 'workflow',
+      effectivePolicy: {
+        // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
+        // them only through the session config above. Both are written so the two drivers see one
+        // request, and `configOptions` wins over the older `model` field where a file sets both.
+        model: request.configOptions?.model ?? request.model,
+        ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
+        ...(request.configOptions ? { configOptions: request.configOptions } : {}),
+        workflowRunId: request.runId,
+        workflowStepId: request.stepId,
+        schema: request.schema,
+        toolCeiling: request.tools ?? {},
+      },
+      idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
+    })
+    let lastForwardedSeq = beforeSeq
+    const unsubscribe = runtime.subscribe((frame) => {
+      if (frame.channel !== 'agent:event' || frame.event.sessionId !== session.id || frame.event.turnId !== turn.id) return
+      if (frame.event.seq <= lastForwardedSeq) return
+      lastForwardedSeq = frame.event.seq
+      // The session id rides along, because the caller's row has nowhere else to learn it: the outcome
+      // below carries it, and that arrives when the step is over. A workflow step wants it while it is
+      // still running, so the run can hand a reader the conversation.
+      request.onEvent?.({
+        type: 'managed-agent',
+        sessionId: session.id,
+        sequence: frame.event.seq,
+        event: frame.event.event,
+      })
+    })
+    const startedAt = Date.now()
+    const timeoutMs = request.timeoutMs ?? HEADLESS_TIMEOUT_MS
+    let cancelled = request.signal?.aborted ?? false
+    const abort = () => {
+      cancelled = true
+      void runtime.cancelTurn(session.id, turn.id)
+    }
+    request.signal?.addEventListener('abort', abort, { once: true })
+    try {
+      for (;;) {
+        if (cancelled) {
+          const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
+          return (
+            resultFromSnapshot(snapshot, turn.id, request.schema) ?? {
+              status: 'cancelled',
+              exitCode: null,
+              capture: {
+                result: null,
+                structuredOutput: null,
+                sessionId: snapshot.session.providerSessionRef,
+                costUsd: null,
+                usage: undefined,
+                events: turnEvents(snapshot, turn.id),
+              },
+              stderrTail: '',
+              agentSessionId: session.id,
+            }
+          )
+        }
+        const elapsed = Date.now() - startedAt
+        if (elapsed >= timeoutMs) {
+          await runtime.cancelTurn(session.id, turn.id)
+          const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
+          return {
+            status: 'timeout',
+            exitCode: null,
+            capture: {
+              result: assistantResult(snapshot.events),
+              structuredOutput: null,
+              sessionId: snapshot.session.providerSessionRef,
+              costUsd: null,
+              usage: undefined,
+              events: turnEvents(snapshot, turn.id),
+            },
+            stderrTail: `Managed workflow turn exceeded ${timeoutMs}ms.`,
+            agentSessionId: session.id,
+          }
+        }
+        const snapshot = await runtime.wait(session.id, beforeSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed))
+        const result = resultFromSnapshot(snapshot, turn.id, request.schema)
+        if (result) return result
+      }
+    } finally {
+      unsubscribe()
+      request.signal?.removeEventListener('abort', abort)
+    }
+  }
+}

@@ -11,12 +11,12 @@ the README's invariant holds, and that is the test that this is the right shape 
 
 ## What is actually missing
 
-**A connection.** `resolveDbUrl` (`plugins/database/src/main/database.ts`) loads a task, takes that
+**A connection.** `resolveDbUrl` (`plugins/database/src/server/database.ts`) loads a task, takes that
 task's **worktree**, and resolves the URL in layers against it: a committed `[database].url_script` run
 in the worktree, then the worktree's `.env`, then `process.env.DATABASE_URL`. Pools are keyed by task
 id. Every layer but the last needs a `root`, and a `root` is a worktree. Panels carry no task at all —
 not on Home, and not in the `pane.aside` regions (`docs/dashboards.md § Placements`); there is no task
-id anywhere in `packages/client-core/src/dashboards/`.
+id anywhere in `packages/client-core/src/features/dashboards/`.
 
 So the saved query *rows* exist in the form run-once-and-pin assumes — project-scoped
 `db_saved_queries`, `id`/`name`/`notes`/`sql` — and the *execution* does not. Reading the storage
@@ -42,7 +42,7 @@ composing a dashboard to name something they think of as temporary, which is the
 wrong six weeks later without anybody having done anything wrong.
 
 **A connection string stored on the project row.** Refused, and this is the one worth being explicit
-about. `main/database.ts` resolves the URL per connect and *never persists it* — that is a stated
+about. `server/database.ts` resolves the URL per connect and *never persists it* — that is a stated
 property of the pane, not an accident. A dashboard panel is not a good enough reason to start keeping
 database credentials at rest.
 

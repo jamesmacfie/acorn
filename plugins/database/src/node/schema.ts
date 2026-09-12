@@ -22,7 +22,7 @@ export const dbSavedQueries = sqliteTable(
   (t) => [uniqueIndex('db_saved_queries_project_name_idx').on(t.projectId, t.name)],
 )
 
-// The task's query editor, as a document (docs/third-party/monaco.md § Composed panes: decided). A
+// The task's query editor, as a document (docs/editor.md § Composed panes: decided). A
 // document surface is a route that reads text and a route that writes it, so the text has to live
 // somewhere the plugin can serve it from.
 //

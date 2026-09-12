@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { memoryIdentityStore } from '../../main/activeIdentity'
-import { createCoreServices, SecretService } from '../../main/core'
-import type { NodePermissions, PluginCommandDescriptor } from '../../main/pluginManifest'
+import { memoryIdentityStore } from '../activeIdentity'
+import { createCoreServices, SecretService } from '../core'
+import type { NodePermissions, PluginCommandDescriptor } from '../plugins/manifest'
 import { makeTestDb, testEnv } from '../../testkit/db'
-import { CapabilityRegistry } from '../plugin/capabilities'
-import { clearRegistrations, initPlugins } from '../plugin/host'
-import type { HostPluginContext, NodePlugin, PluginStorage } from '../plugin/types'
-import { nodeActions } from '../nodeActions/registry'
+import { CapabilityRegistry } from '../pluginHost/capabilities'
+import { clearRegistrations, initPlugins } from '../pluginHost/host'
+import type { HostPluginContext, NodePlugin, PluginStorage } from '../pluginHost/types'
+import { nodeActions } from '../nodeActions'
 import { consentStillCovers, registerNodeActionTarget } from './nodeAction'
 import { type Clock, Scheduler } from './scheduler'
 
@@ -52,7 +52,7 @@ function fakeClock() {
 
 afterEach(() => clearRegistrations(PLUGIN))
 
-// `nodeActions` is a host seam, not a plugin one (server/plugin/types.ts § HostPluginContext): in
+// `nodeActions` is a host seam, not a plugin one (server/pluginHost/types.ts § HostPluginContext): in
 // production the only feeder is a manifest command with the `runNodeAction` verb. This suite needs the
 // risk tier, which no manifest declares yet, so it registers the way the host does and says so with a
 // cast rather than putting the member back on the authoring type.

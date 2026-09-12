@@ -1,18 +1,16 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { PaneLayoutContribution, Task } from '@acorn/plugin-api/client'
+import type { Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, DetailColumn, EmptyState, Fold, Icon, ListColumn, ListDetail, Menu,
-  SectionHeader, Stack,
+  Alert, Button, EmptyState, Icon, Menu, Only, Sections, Stack, Tabs,
 } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
 import ChecksPanel from '../checks/ChecksPanel'
 import { DiffForPull } from '../DiffForPull'
-import { PrConversation } from './Conversation'
-import { PrFileList } from './PrFiles'
 import { PrOverview } from './PrOverview'
+import { prSections } from './prSections'
 import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
@@ -21,128 +19,114 @@ import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 // column beside the diff (../GithubBrowse.tsx). Browse reaches the same pair through its own pull
 // list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
 //
-// A `single` layout holding the kit's split, not the host's `list-detail`: the two columns are one
-// surface with a shared model rather than two regions, which is exactly the case the kit's ListDetail
-// exists for, and it is what makes this look like browse rather than like a second design
-// (docs/panes.md § Layout model).
+// A `single` layout holding one kit node, not the host's `list-detail`: the halves are one surface
+// with a shared model rather than two regions, and `Sections` is the node that arranges them — folds
+// beside the diff on a desktop, a strip of tabs in a terminal
+// (client-core/kit/components/layout/Sections.tsx). It is what makes this look like browse rather
+// than like a second design, because browse draws the same node from the same list.
 //
 // A task can be about more than one pull — the one it was made from, the ones that mention it, the
 // ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
+//
+// The registration is next door in ./paneContribution.ts, which is what keeps this file — and the
+// pull-request model behind it — out of the renderer's first paint.
 
-const PANE_ID = 'pr'
+// A destination a related pull has and this pane does not. The mark on the tab says which one, and
+// the control beside the strip is how a reader takes it.
+const DESTINATION_ICON = { task: 'list-checks', agent: 'bot', mention: 'link-2', stack: 'git-branch' } as const
 
 /** The strip of pull requests this task is about, and the offer to make a task for one of them. */
 function PullStrip(props: { tabs: PrTabsModel }) {
   const tabs = () => props.tabs
   const taskId = () => tabs().task.id
+  // Rebuilt when the strip's contents change and never when the selection does. `Tabs` draws with
+  // `For`, which remounts a tab it is handed a new object for, and a remount under a keyboard user
+  // drops the focus they were moving (docs/ui-design.md).
+  const defs = createMemo(() => tabs().tabs().map((tab) => {
+    const kind = destinationKind(tab, taskId())
+    return {
+      id: pullRefKey(tab.pull),
+      label: `#${tab.pull.number}`,
+      title: taskPullTabTooltip(tab, taskId()),
+      ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
+    }
+  }))
+  const selected = () => tabs().selected()
+  const kind = () => {
+    const tab = selected()
+    return tab ? destinationKind(tab, taskId()) : null
+  }
+  const linked = () => {
+    const tab = selected()
+    return tab ? tabs().linkedTaskRows(tab) : []
+  }
   return (
     <Stack gap="row">
-      <Show when={tabs().tabs().length > 1}>
-        <ChipRow ariaLabel="Task pull requests">
-          <For each={tabs().tabs()}>
-            {(tab) => {
-              const kind = () => destinationKind(tab, taskId())
-              const linked = () => tabs().linkedTaskRows(tab)
-              const glyph = () => kind() === 'mention' ? 'link-2' : kind() === 'stack' ? 'git-branch' : null
-              return (
-                <>
-                  <Chip
-                    selected={tabs().selectedKey() === pullRefKey(tab.pull)}
-                    title={taskPullTabTooltip(tab, taskId())}
-                    leading={<Show when={glyph()}>{(name) => <Icon name={name()} size={12} />}</Show>}
-                    onPress={() => tabs().selectTab(tab)}
-                  >#{tab.pull.number}</Chip>
-                  <Show when={kind() === 'task' && linked().length === 1}>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
-                      label={`Open ${linked()[0].title}`}
-                      onPress={() => tabs().openTask(linked()[0])}
-                    ><Icon name="list-checks" size={13} /></Button>
-                  </Show>
-                  <Show when={kind() === 'task' && linked().length > 1}>
-                    <Menu
-                      ariaLabel={`Tasks linked to #${tab.pull.number}`}
-                      trigger={({ toggle }) => (
-                        <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
-                          <Icon name="list-checks" size={13} />
-                        </Button>
-                      )}
-                    >
-                      {(menu) => (
-                        <For each={linked()}>
-                          {(linkedTask) => (
-                            <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
-                              {linkedTask.title}
-                            </Menu.Item>
-                          )}
-                        </For>
-                      )}
-                    </Menu>
-                  </Show>
-                  <Show when={kind() === 'agent'}>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
-                      label="Open creating agent session"
-                      onPress={() => tabs().openAgent(tab)}
-                    ><Icon name="bot" size={13} /></Button>
-                  </Show>
-                </>
-              )
-            }}
-          </For>
-          <Show when={tabs().offersTaskCreation()}>
-            <Button
-              size="sm"
-              disabled={tabs().creatingTask() || !tabs().canCreateTask()}
-              tip={tabs().taskCreationTitle()}
-              onPress={() => void tabs().createSelectedTask()}
-            >{tabs().creatingTask() ? 'Creating…' : '+ Task'}</Button>
-          </Show>
-        </ChipRow>
-      </Show>
-      <Show when={tabs().taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
-    </Stack>
-  )
-}
-
-/** The navigator column: the same three trees browse stacks, over the pull strip. */
-function PrNavigator(props: {
-  model: PrModel
-  current: () => string | undefined
-  onSelect: (path: string) => void
-  onLinkClick: (event: MouseEvent) => void
-}) {
-  const model = () => props.model
-  return (
-    <Stack gap="section">
-      <PrOverview model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
-      <Fold persistKey="files" defaultOpen label="Files" count={model().files().length}>
-        <PrFileList model={model()} current={props.current} onSelect={props.onSelect} />
-      </Fold>
-      <Fold
-        persistKey="conversation"
-        defaultOpen
-        label="Comments/Commits"
-        count={model().conversationEntries().length}
-      >
-        <PrConversation model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
-      </Fold>
-      {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
-      <Show when={model().openCheck()}>
-        {(check) => (
-          <ChecksPanel
-            owner={model().scope.owner}
-            repo={model().scope.repo}
-            runId={check().runId}
-            jobName={check().name}
-            onClose={() => model().setOpenCheck(null)}
+      {/* Desktop only. In a terminal the strip is a second row competing with the section tabs for
+          the same few lines, and the related pulls it switches to are reachable from the pull
+          list. */}
+      <Only hosts={['dom']}>
+        <Show when={tabs().tabs().length > 1}>
+          <Tabs
+            tabs={defs()}
+            active={selected() ? pullRefKey(selected()!.pull) : ''}
+            onChange={(id) => tabs().selectTab(id)}
+            idPrefix="github-task-pulls"
+            ariaLabel="Task pull requests"
+            actions={
+              <>
+                <Show when={kind() === 'task' && linked().length === 1}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label={`Open ${linked()[0].title}`}
+                    onPress={() => tabs().openTask(linked()[0])}
+                  ><Icon name="list-checks" size={13} /></Button>
+                </Show>
+                <Show when={kind() === 'task' && linked().length > 1}>
+                  <Menu
+                    ariaLabel={`Tasks linked to #${selected()!.pull.number}`}
+                    trigger={({ toggle }) => (
+                      <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
+                        <Icon name="list-checks" size={13} />
+                      </Button>
+                    )}
+                  >
+                    {(menu) => (
+                      <For each={linked()}>
+                        {(linkedTask) => (
+                          <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
+                            {linkedTask.title}
+                          </Menu.Item>
+                        )}
+                      </For>
+                    )}
+                  </Menu>
+                </Show>
+                <Show when={kind() === 'agent'}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Open creating agent session"
+                    onPress={() => tabs().openAgent(selected()!)}
+                  ><Icon name="bot" size={13} /></Button>
+                </Show>
+                <Show when={tabs().offersTaskCreation()}>
+                  <Button
+                    size="sm"
+                    disabled={tabs().creatingTask() || !tabs().canCreateTask()}
+                    tip={tabs().taskCreationTitle()}
+                    onPress={() => void tabs().createSelectedTask()}
+                  >{tabs().creatingTask() ? 'Creating…' : '+ Task'}</Button>
+                </Show>
+              </>
+            }
           />
-        )}
-      </Show>
+        </Show>
+      </Only>
+      <Show when={tabs().taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
     </Stack>
   )
 }
@@ -178,53 +162,61 @@ export function PrPane(props: { task: Task }) {
   }
 
   return (
-    <ListDetail split listWidth="wide">
-      {/* No "Navigator" header: the tree under it opens with the pull's own heading, which names the
-          column better than a label ever did. The same call browse makes. */}
-      <ListColumn scroll label="Pull request">
-        <PullStrip tabs={tabs} />
-        <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-          {(loaded) => (
-            <PrNavigator
-              model={loaded()}
-              current={changedFiles.currentFile}
-              onSelect={select}
-              onLinkClick={onLinkClick}
-            />
-          )}
-        </Show>
-      </ListColumn>
-      <DetailColumn>
-        <SectionHeader>Diff</SectionHeader>
-        <Show when={tabs.selected()?.pull} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-          {(pull) => (
-            <DiffForPull
-              route={{
-                owner: pull().owner,
-                repo: pull().repo,
-                number: pull().number,
-                key: routeKey(pull().owner, pull().repo, pull().number),
-              }}
-              router={false}
-              taskId={props.task.id}
-              readOnly={!tabs.isPrimary()}
-            />
-          )}
-        </Show>
-      </DetailColumn>
-    </ListDetail>
+    <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+      {(loaded) => (
+        <>
+          <Sections
+            id="github.pull"
+            ariaLabel="Pull request"
+            header={{
+              id: 'details',
+              label: 'Details',
+              render: () => (
+                <Stack gap="section">
+                  <PullStrip tabs={tabs} />
+                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} />
+                </Stack>
+              ),
+            }}
+            sections={prSections({
+              model: loaded(),
+              currentFile: changedFiles.currentFile,
+              onOpenFile: select,
+              onLinkClick,
+            })}
+            main={{
+              id: 'diff',
+              label: 'Diff',
+              render: () => (
+                <DiffForPull
+                  route={{
+                    owner: loaded().scope.owner,
+                    repo: loaded().scope.repo,
+                    number: loaded().scope.number,
+                    key: routeKey(loaded().scope.owner, loaded().scope.repo, loaded().scope.number),
+                  }}
+                  router={false}
+                  taskId={props.task.id}
+                  readOnly={!tabs.isPrimary()}
+                />
+              ),
+            }}
+          />
+          {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
+          <Show when={loaded().openCheck()}>
+            {(check) => (
+              <ChecksPanel
+                owner={loaded().scope.owner}
+                repo={loaded().scope.repo}
+                runId={check().runId}
+                jobName={check().name}
+                onClose={() => loaded().setOpenCheck(null)}
+              />
+            )}
+          </Show>
+        </>
+      )}
+    </Show>
   )
 }
 
-export const prPaneContribution: PaneLayoutContribution = {
-  id: PANE_ID,
-  label: 'PR review',
-  glyph: 'git-pull-request',
-  description: 'Overview, files & diff',
-  order: 10,
-  defaultChord: 'meta+shift+r',
-  when: (task) => task.pullNumber != null,
-  minWidth: 520,
-  layout: 'single',
-  regions: { body: PrPane },
-}

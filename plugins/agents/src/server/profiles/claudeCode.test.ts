@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest'
+import { claudeCodeProfile } from './claudeCode'
+
+// The argv this profile hands the process broker.
+//
+// These arrays are the command line acorn spawns, so a renamed or dropped flag changes the invocation
+// silently instead of failing a boot check. The rest of the descriptor is data, and `streamJson` is
+// core's shared adapter with its own suite.
+
+describe('the claude-code profile', () => {
+  it('declares the identity terminal and workflows resolve it by', () => {
+    // `id` is persisted; see docs/managed-agents.md § Harnesses.
+    expect(claudeCodeProfile).toMatchObject({ id: 'claude-code', label: 'Claude Code', kind: 'agent', command: 'claude', transport: 'pty' })
+  })
+
+  // Asserts the whole array, not `toContain` per flag. A per-flag check missed a dropped `-p`, which
+  // leaves the headless runner waiting forever on a prompt, and a dropped `--verbose`, which
+  // `-p --output-format stream-json` requires. It also let an inserted
+  // `--dangerously-skip-permissions --add-dir /` through, widening what a headless agent may do.
+  //
+  // Only the no-options invocation gets full equality, because it is the one case with a fixed answer.
+  // The option-threading cases below test presence or absence, not order.
+  it('builds a headless turn that streams JSON and never prompts for permission', () => {
+    const { file, args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'do the thing' })
+    expect(file).toBe('claude')
+    // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; `auto` is why
+    // a headless agent neither blocks on the first tool approval with nobody there to answer it nor has every
+    // acorn tool denied out from under it, which is what `dontAsk` did. The prompt is last and positional; a
+    // flag inserted after it would be read as part of it.
+    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'do the thing'])
+  })
+
+  it('resumes a headless turn by prepending --resume, leaving the rest of the invocation identical', () => {
+    // The one branch the no-options equality above cannot cover, and it comes first: after `-p`
+    // claude reads the session ref as part of the prompt.
+    const { args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'again', resumeSessionId: 'sess-1' })
+    expect(args).toEqual(['--resume', 'sess-1', '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto', 'again'])
+  })
+
+  it('threads an optional model and schema through, and omits them when absent', () => {
+    const withBoth = claudeCodeProfile.headlessArgv!('claude', { prompt: 'p', model: 'opus', schema: { type: 'object' } })
+    expect(withBoth.args).toContain('--model')
+    expect(withBoth.args).toContain('opus')
+    expect(withBoth.args).toContain('--json-schema')
+    expect(withBoth.args).toContain(JSON.stringify({ type: 'object' }))
+    const withNeither = claudeCodeProfile.headlessArgv!('claude', { prompt: 'p' })
+    expect(withNeither.args).not.toContain('--model')
+    expect(withNeither.args).not.toContain('--json-schema')
+  })
+
+  it('resumes by session reference, which is what the terminal handoff spawns', () => {
+    // plugins/agents' handoff runs this in a real PTY (contract/sessionsClient.ts § create), so the shape has
+    // a second consumer beyond the headless runner.
+    expect(claudeCodeProfile.resumeArgv!('claude', 'sess-1')).toEqual({ file: 'claude', args: ['--resume', 'sess-1'] })
+  })
+
+  it('disables tools for a one-shot turn, so a decision or a generate cannot act', () => {
+    // `aiArgv` is the one-shot path: a workflow gate policy, an AI SQL draft, a commit message. An
+    // empty `--tools` plus `--strict-mcp-config` is the whole difference from a headless turn, because
+    // neither caller edits anything — the first empties the tool list, the second stops the owner's own
+    // MCP servers from being started for a turn that could not call them anyway. Pinned as a whole
+    // array, since `args[indexOf('--tools') + 1] === ''` would still pass with a second non-empty
+    // `--tools` or an inserted `--add-dir` appended later. This is also the one path that keeps
+    // `dontAsk`: with no tools to call, denying is the right answer for anything that tries.
+    const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
+    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', '--strict-mcp-config', 'decide'])
+  })
+
+  it('replaces the CLI persona with the caller system prompt, and omits the flag without one', () => {
+    // `--system-prompt`, not `--append-system-prompt`: a generate wants "answer with SQL only" to be
+    // the whole instruction, with the coding-agent persona gone. It sits before the prompt, which stays
+    // last and positional.
+    const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'write it', system: 'Answer with SQL only.' })
+    expect(args).toEqual([
+      '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '',
+      '--strict-mcp-config', '--system-prompt', 'Answer with SQL only.', 'write it',
+    ])
+    expect(claudeCodeProfile.aiArgv!('claude', { prompt: 'p' }).args).not.toContain('--system-prompt')
+  })
+
+  it('offers the CLI aliases as its model catalog, so a picker has something to draw', () => {
+    // Aliases rather than dated ids: the CLI resolves `sonnet` to whatever it ships with.
+    expect(claudeCodeProfile.models?.map((model) => model.id)).toEqual(['sonnet', 'opus', 'fable', 'haiku'])
+    expect(claudeCodeProfile.defaultModelId).toBe('sonnet')
+    expect(claudeCodeProfile.glyph).toBe('brand:agents/claude')
+  })
+})

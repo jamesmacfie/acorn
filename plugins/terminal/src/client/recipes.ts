@@ -15,7 +15,7 @@ export type RecipeServices = {
   setLayout(taskId: string, layout: TaskLayout): void
   startTarget(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string }>
   targetUrl(taskId: string, targetId: string): Promise<string | undefined>
-  setBrowserUrl(taskId: string, url: string): void
+  setBrowserUrl(taskId: string, url: string): void | Promise<void>
   openTerminal(taskId: string): void
 }
 
@@ -42,7 +42,7 @@ export async function invokeLayoutRecipe(taskId: string, recipe: RecipeSpec, svc
     // Ensure the target is up so a url_command can resolve; start is idempotent for running ones.
     if (targetId !== recipe.terminal) await svc.startTarget(taskId, targetId)
     const url = await svc.targetUrl(taskId, targetId)
-    if (url) svc.setBrowserUrl(taskId, url)
+    if (url) await svc.setBrowserUrl(taskId, url)
   }
   return { ok: true }
 }

@@ -44,7 +44,7 @@ provisioning record that produced it.
 
 ## The four steps
 
-At first boot, given both variables, the node (`packages/node-core/src/main/enrollment.ts`):
+At first boot, given both variables, the node (`packages/node-core/src/server/enrollment.ts`):
 
 1. mints its TLS certificate exactly as it always does,
 2. issues itself a device token — a device row of its own, separate from the launcher's, so detaching
@@ -74,7 +74,7 @@ development control plane are.
 
 Version 1. The schema is `packages/protocol/src/enrollment.ts` and the published form is
 [docs/schemas/enrollment-v1.json](./schemas/enrollment-v1.json), generated from it and pinned by
-`packages/node-core/src/main/enrollmentSchema.test.ts`.
+`packages/node-core/src/server/enrollmentSchema.test.ts`.
 
 ```json
 {
@@ -161,8 +161,8 @@ enrollment, spends the token once, and remembers what it was told. It validates 
 posts fails there rather than in a green suite. If the stub can be written from this document, so can
 somebody else's real one.
 
-Two suites use it. `packages/node-core/src/main/enrollment.test.ts` covers the unconfigured path, the
-happy path, the retry, the refusals, and enroll-once. `apps/node/test/integration/enrollment.test.ts`
+Two suites use it. `packages/node-core/src/server/enrollment.test.ts` covers the unconfigured path, the
+happy path, the retry, the refusals, and enroll-once. `apps/node/test/integration/lifecycle/enrollment.test.ts`
 boots a real standalone node against it and asserts the node appears in the inventory with the endpoint
 and fingerprint it actually bound — and that a node booted without the variables writes nothing about a
 control plane at all.

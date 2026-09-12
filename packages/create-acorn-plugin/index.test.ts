@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { parsePluginManifest } from '@acorn/node-core/main/pluginManifest.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { parsePluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
 import { API_VERSION, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'
@@ -17,6 +17,17 @@ const REPO = join(PACKAGES, '..')
 // tsc and @types/node, resolved out of the workspace store so the out-of-repo check below needs no
 // network. Both are pnpm-shaped paths, which is the one thing about this test that is not portable.
 const CLI = join(HERE, 'index.mjs')
+
+const documentedExample = (heading: string, language: string): string => {
+  const source = readFileSync(join(REPO, 'docs/plugin-authoring/installing-a-hand-written-package.md'), 'utf8')
+  const marker = `### \`${heading}\``
+  const section = source.indexOf(marker)
+  const open = source.indexOf(`\`\`\`${language}\n`, section)
+  const start = open + language.length + 4
+  const end = source.indexOf('\n```', start)
+  if (section < 0 || open < 0 || end < 0) throw new Error(`Could not find documented ${heading} example`)
+  return `${source.slice(start, end)}\n`
+}
 
 /** Run the scaffolder the way a person does, in a fresh directory, and read back what it wrote. */
 function runCli(...args: string[]): { dir: string; manifest: Record<string, unknown> } {
@@ -30,7 +41,7 @@ function runCli(...args: string[]): { dir: string; manifest: Record<string, unkn
 const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
 const NODE_TYPES = (() => {
   const store = join(REPO, 'node_modules', '.pnpm')
-  const entry = readdirSync(store).find((name) => /^@types\+node@/.test(name))
+  const entry = readdirSync(store).find((name) => name.startsWith('@types+node@'))
   if (!entry) throw new Error('@types/node is not in the pnpm store')
   return join(store, entry, 'node_modules')
 })()
@@ -85,7 +96,7 @@ it('emits a tree plugin by default, filling a slot and an annotation point', () 
   // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
   // and the author's first run is a mystery. The annotation route has to exist for the same reason.
   expect(files['client.js']).toContain("entries: ['toolCard']")
-  expect(files['node/routes.js']).toContain("pathname === '/marks'")
+  expect(files['server/routes.js']).toContain("pathname === '/marks'")
 })
 
 it('emits a rectangle plugin under --rectangle, as a layout with a frame region', () => {
@@ -196,6 +207,58 @@ it("type-checks its node half against the published declarations, from outside t
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+it('type-checks the complete documented plugin example outside the workspace', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'documented-plugin-'))
+  try {
+    const files = {
+      'acorn-plugin.json': documentedExample('acorn-plugin.json', 'json'),
+      'node/index.js': documentedExample('node/index.js', 'js'),
+      'server/routes.js': documentedExample('server/routes.js', 'js'),
+      'client.js': documentedExample('client.js', 'js'),
+    }
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+
+    const manifest = JSON.parse(files['acorn-plugin.json'])
+    const parsed = parsePluginManifest(manifest)
+    expect(parsed.ok ? null : parsed.reason).toBe(null)
+
+    const types = join(dir, 'node_modules', 'acorn-plugin-types')
+    mkdirSync(join(types, 'dist'), { recursive: true })
+    copyFileSync(join(PACKAGES, 'plugin-types', 'src', 'public.ts'), join(types, 'dist', 'index.d.ts'))
+    copyFileSync(join(PACKAGES, 'plugin-types', 'package.json'), join(types, 'package.json'))
+    cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2023',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        lib: ['ES2023', 'DOM'],
+        types: ['node'],
+        allowJs: true,
+        checkJs: true,
+        noEmit: true,
+        strict: true,
+        skipLibCheck: false,
+      },
+      include: ['node', 'server'],
+    }))
+
+    try {
+      execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
+      execFileSync(process.execPath, ['--check', join(dir, 'client.js')], { stdio: 'pipe' })
+    } catch (error) {
+      throw new Error(String((error as { stdout?: Buffer; stderr?: Buffer }).stdout
+        ?? (error as { stderr?: Buffer }).stderr
+        ?? error))
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 20_000)
 
 // The one flag the CLI has, exercised through the CLI. Every other test here calls `scaffoldFiles`
 // directly, which skips the argv reading entirely — so the flag could have stopped being read and

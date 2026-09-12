@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { memoryIdentityStore } from '../../main/activeIdentity'
+import { memoryIdentityStore } from '../activeIdentity'
 import { makeTestDb, testEnv, type TestDb } from '../../testkit/db'
 import { idempotencyStore } from '../auth/idempotency'
 import { schema } from '../db'

@@ -8,9 +8,18 @@ import type { HttpRequest } from '../shared/model'
 // Layout model). A compiled pane gets the equivalent from the host's `model` seam.
 
 const selects: ((item: string) => void)[] = []
-const bridge = () => ({
+const actions: ((command: string) => void)[] = []
+// `context` is the host's snapshot at connect, and `item` in it is the row that OPENED the pane: a task
+// pane has no URL to hold a selection, so a click or the palette's curl import arrives this way
+// (docs/plugins.md § The tree contract).
+const bridge = (item?: string) => ({
+  context: { surface: 'http', target: 'remote', nodeId: 'node-a', ...(item ? { item } : {}) },
   onSelect: (handler: (item: string) => void) => {
     selects.push(handler)
+    return () => {}
+  },
+  onSurfaceAction: (handler: (command: string) => void) => {
+    actions.push(handler)
     return () => {}
   },
   ui: { copy: vi.fn() },
@@ -26,6 +35,7 @@ const subject = (over: Partial<PanelSubject> = {}): PanelSubject => ({
 afterEach(() => {
   _resetHttpPanelModel()
   selects.length = 0
+  actions.length = 0
 })
 
 describe('the model both regions share', () => {
@@ -48,6 +58,28 @@ describe('the model both regions share', () => {
     httpPanelModel(subject())
     httpPanelModel(subject())
     // Two regions mounted, one bridge, one handler. Two would open the same request twice.
+    expect(selects).toHaveLength(1)
+  })
+
+  // The palette's `New request` row. It is a surface action rather than a node route because a new
+  // request is a draft in the pane, not a row on the node — the same thing the "+ Request" button does.
+  it('starts a new draft on the palette’s new-request command, and ignores any other', () => {
+    const model = httpPanelModel(subject({ taskId: 't1' }))
+    model.setSelection({ kind: 'variables' })
+    expect(actions).toHaveLength(1)
+    actions[0]('something-else')
+    expect(model.selection()).toEqual({ kind: 'variables' })
+    actions[0]('new-request')
+    expect(model.selection()).toEqual({ kind: 'new' })
+    expect(model.draft()).toMatchObject({ name: 'New request', method: 'GET', url: '', taskId: 't1' })
+  })
+
+  // The curl import answers with the row it created and the success action opens the pane. On a pane
+  // that was closed there is no `select` message to catch, so the id rides in `context`.
+  it('takes the selection that opened the pane from the bridge context', () => {
+    const model = httpPanelModel(subject({ bridge: bridge('request-9') }))
+    expect(model.selection()).toEqual({ kind: 'new' })
+    // Nothing is open yet: the row it names arrives with the list, and the model's effect waits for it.
     expect(selects).toHaveLength(1)
   })
 })

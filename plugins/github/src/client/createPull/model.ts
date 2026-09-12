@@ -1,4 +1,5 @@
-import type { CompareCommit } from '../../contract/api'
+import { clearLocal, readLocal, writeLocal } from '@acorn/plugin-api/client'
+import type { CompareCommit } from '../../shared/api'
 
 // Branch name → human title: last path segment, dashes/underscores to spaces, first letter upper.
 // `feature/add-foo` → "Add foo".
@@ -19,7 +20,7 @@ export function prefillFromCompare(commits: CompareCommit[], headRef: string): {
 }
 
 // An in-progress new-PR form, kept in localStorage per repo so navigating away does not lose it, the
-// same per-device scope as the comment drafts in @acorn/client-core/lib/draftState.ts. base and head
+// same per-device scope as the comment drafts in @acorn/client-core/kit/lib/draftState.ts. base and head
 // are stored too: they live in the URL while the form is mounted, but a fresh visit to
 // /:owner/:repo/new carries no query params.
 export type PullDraft = { base: string; head: string; title: string; body: string; draft: boolean; touched: boolean }
@@ -45,13 +46,13 @@ export function parsePullDraft(raw: string | null): PullDraft | null {
 }
 
 export const readPullDraft = (owner: string, repo: string): PullDraft | null =>
-  parsePullDraft(localStorage.getItem(draftKey(owner, repo)))
+  parsePullDraft(readLocal(draftKey(owner, repo)))
 
 // An untouched form with no head chosen is indistinguishable from a fresh one, so do not leave a key
 // behind.
 export function writePullDraft(owner: string, repo: string, d: PullDraft): void {
-  if (d.head || d.touched || d.draft) localStorage.setItem(draftKey(owner, repo), JSON.stringify(d))
+  if (d.head || d.touched || d.draft) writeLocal(draftKey(owner, repo), JSON.stringify(d))
   else clearPullDraft(owner, repo)
 }
 
-export const clearPullDraft = (owner: string, repo: string): void => localStorage.removeItem(draftKey(owner, repo))
+export const clearPullDraft = (owner: string, repo: string): void => clearLocal(draftKey(owner, repo))

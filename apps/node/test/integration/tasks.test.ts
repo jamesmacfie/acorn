@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../registerProviders'
+import '../helpers/registerProviders'
 import type { Task, TaskLink } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { tasks } from '@acorn/node-core/server/routes/tasks.ts'
+import { tasks } from '@acorn/node-core/server/routes/projects/tasks.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()

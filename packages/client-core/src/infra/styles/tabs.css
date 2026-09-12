@@ -1,0 +1,53 @@
+/* Reusable tab strip (core/client/ui/Tabs.tsx). Generalized from the Rollbar item panel. */
+/* Wraps rather than overflowing. A tab holds an 88px floor so a word label is readable, and github's
+   pull strip puts four or more `#20982` tabs in a navigator column narrower than their sum: without
+   this the tabs past the edge were drawn outside the strip with nothing to scroll them back. */
+.ui-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  min-height: var(--tab-h);
+  padding: 0 var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+.ui-tab {
+  position: relative;
+  /* A row, so a tab can carry a mark before its label without the svg sitting on the text baseline. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 88px;
+  padding: 0 var(--space-6);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: var(--tab-active-w) solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.active.ui-tab { color: var(--text); border-bottom-color: var(--accent); }
+.ui-tab:active { background: var(--bg-selected); }
+.ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.ui-tab-count {
+  padding: 1px 5px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  background: var(--bg-selected);
+  border-radius: var(--radius-pill);
+}
+@media (hover: hover) {
+  .ui-tab:hover { color: var(--text); background: var(--bg-hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-tab { transition: none; }
+}
+
+/* Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to bolt these on. */
+.ui-tabs-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+.ui-tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.ui-tab-panel[hidden] { display: none; }

@@ -3,6 +3,7 @@
     "10 pr meta+shift+r",
     "15 agents meta+shift+a",
     "20 changes meta+shift+g",
+    "25 workflows -",
     "30 notes meta+shift+d",
     "40 context meta+shift+x",
     "50 editor meta+shift+e",
@@ -14,6 +15,8 @@
     "1 fleet",
     "10 github",
     "40 docker",
-    "60 agents"
+    "50 workflows",
+    "60 agents",
+    "70 memory"
   ]
 }

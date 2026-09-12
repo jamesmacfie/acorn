@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-onboarding",
   "version": "0.1.0",
+  "description": "The first-run wizard, opened when a ready node has no projects yet.",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,12 +12,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
     "solid-js": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

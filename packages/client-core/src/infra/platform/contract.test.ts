@@ -1,0 +1,176 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
+import { canPickFolder, canSetBadge, fleetBridge, nodeTransport, pickFiles, pickFolder, saveFile, setBadge, showNotification } from './index'
+
+// The seam contract against a mock host. Each shell runs the same checker against its real host
+// object (apps/desktop/src/shell/bridge.test.ts). That half catches a renamed preload key, this half
+// pins the semantics.
+
+// A host that implements everything, shaped as the preload is: flat members for the transport and
+// fleet groups, nested objects for the rest.
+const fullHost = () => ({
+  desktop: true,
+  platform: 'darwin',
+  onClosePane: vi.fn(() => () => {}),
+  onWillQuit: vi.fn(() => () => {}),
+  nodeFetch: vi.fn(async () => ({ status: 200, headers: {}, body: new Uint8Array() })),
+  nodeAbort: vi.fn(),
+  nodeSend: vi.fn(),
+  onNodeFrame: vi.fn(() => () => {}),
+  onNodeBytes: vi.fn(() => () => {}),
+  onNodeStatus: vi.fn(() => () => {}),
+  fleetList: vi.fn(async () => ({ nodes: [], statuses: [] })),
+  nodeProbe: vi.fn(),
+  nodePair: vi.fn(),
+  nodeRename: vi.fn(),
+  nodeForget: vi.fn(),
+  nodeReconnect: vi.fn(),
+  nodeRestartLocal: vi.fn(),
+  nodeTunnelOpen: vi.fn(),
+  nodeTunnelClose: vi.fn(),
+  plugins: { state: vi.fn(), cachePut: vi.fn(), trustRecord: vi.fn(), devGrant: vi.fn() },
+  recovery: { openDataFolder: vi.fn(), quit: vi.fn() },
+  folderPath: { pick: vi.fn(async () => '/tmp/picked') },
+  files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
+  notify: { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() },
+  preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn() },
+  webview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn(), onBlocked: vi.fn() },
+})
+
+const install = (acorn: unknown): void => {
+  vi.stubGlobal('window', { acorn })
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('the platform seam contract', () => {
+  it('holds for a host that implements every group', () => {
+    install(fullHost())
+    expect(seamProblems(SEAM_GROUPS)).toEqual([])
+  })
+
+  it('holds for no host at all, which is a plain browser served by a node', () => {
+    install(undefined)
+    expect(seamProblems([])).toEqual([])
+  })
+
+  // The shape a phase-2 Tauri shell ships in: no preview panes, no plugin webviews.
+  it('holds for a host without the webview groups', () => {
+    const { preview: _preview, webview: _webview, ...host } = fullHost()
+    install(host)
+    expect(seamProblems(SEAM_GROUPS.filter((g) => g !== 'preview' && g !== 'webviews'))).toEqual([])
+  })
+
+  it('fails a group the host claims but the seam cannot resolve', () => {
+    const { plugins: _plugins, ...host } = fullHost()
+    install(host)
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['plugins: implemented by the host but the seam resolved null'])
+  })
+
+  it('fails a notify group missing the badge', () => {
+    const host = fullHost()
+    const { setBadge: _setBadge, ...notify } = host.notify
+    install({ ...host, notify })
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['notify.setBadge: not a function'])
+  })
+
+  it('fails a group the host half-builds', () => {
+    const host = fullHost()
+    const { onEvent: _onEvent, ...preview } = host.preview
+    install({ ...host, preview })
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['preview.onEvent: not a function'])
+  })
+
+  it('fails a group that resolves on a host which does not declare it', () => {
+    install(fullHost())
+    expect(seamProblems(SEAM_GROUPS.filter((g) => g !== 'recovery'))).toEqual(['recovery: resolved on a host that does not implement it'])
+  })
+
+  // The discriminator rules the groups are built on, since the checker above only sees whole groups.
+  describe('the discriminators', () => {
+    it('makes nodeFetch alone stand up the transport, with the rest degrading to no-ops', () => {
+      install({ nodeFetch: vi.fn() })
+      const transport = nodeTransport()
+      expect(transport).not.toBeNull()
+      expect(() => transport?.abort('r1')).not.toThrow()
+      expect(() => transport?.send('n1', { channel: 'x' } as never)).not.toThrow()
+      expect(transport?.onFrame(() => {})).toBeTypeOf('function')
+      expect(transport?.onBytes(() => {})).toBeTypeOf('function')
+      expect(transport?.onStatus(() => {})).toBeTypeOf('function')
+    })
+
+    it('lets a host read the fleet without being able to change it', async () => {
+      install({ nodeFetch: vi.fn(), fleetList: vi.fn(async () => ({ nodes: [], statuses: [] })) })
+      const fleet = fleetBridge()
+      expect(fleet).not.toBeNull()
+      expect(() => fleet?.probe('https://1.2.3.4')).toThrow(/cannot pair/)
+      await expect(fleet?.restartLocal()).rejects.toThrow(/does not supervise/)
+      // A rename or a forget the host cannot perform is not an error: the caller learns nothing changed.
+      await expect(fleet?.rename('n1', 'x')).resolves.toBeNull()
+      await expect(fleet?.forget('n1', false)).resolves.toBeUndefined()
+    })
+
+    it('falls back to nothing for the file dialogs when there is no host and no page', async () => {
+      install({})
+      await expect(pickFiles()).resolves.toEqual([])
+      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.txt', mimeType: 'text/plain' })).resolves.toBe(false)
+    })
+
+    it('hands the file dialogs to the host when it installs them', async () => {
+      const picked = [{ name: 'a.md', type: 'text/markdown', bytes: new Uint8Array([1]) }]
+      const files = { pick: vi.fn(async () => picked), save: vi.fn(async () => true) }
+      install({ files })
+      await expect(pickFiles({ accept: ['md'] })).resolves.toEqual(picked)
+      expect(files.pick).toHaveBeenCalledWith({ accept: ['md'] })
+      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.md', mimeType: 'text/markdown' })).resolves.toBe(true)
+    })
+
+    it('leaves the badge to a host that can draw one', async () => {
+      install({})
+      expect(canSetBadge()).toBe(false)
+      // A page has no app icon, so asking is a no-op rather than a throw.
+      expect(() => setBadge(3)).not.toThrow()
+      const notify = { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() }
+      install({ notify })
+      expect(canSetBadge()).toBe(true)
+      setBadge(null)
+      expect(notify.setBadge).toHaveBeenCalledWith(null)
+      await expect(showNotification({ title: 'x', tag: 'n1' })).resolves.toBe(true)
+      expect(notify.show).toHaveBeenCalledWith({ title: 'x', tag: 'n1' })
+    })
+
+    it('shows nothing when there is no host and no page notifier', async () => {
+      install({})
+      await expect(showNotification({ title: 'x', tag: 'n1' })).resolves.toBe(false)
+    })
+
+    it('answers the folder picker the same way whether it is missing or dismissed', async () => {
+      install({})
+      expect(canPickFolder()).toBe(false)
+      await expect(pickFolder()).resolves.toBeNull()
+      install({ folderPath: { pick: async () => null } })
+      expect(canPickFolder()).toBe(true)
+      await expect(pickFolder()).resolves.toBeNull()
+    })
+  })
+
+  it('names every group in the seam, so a new one cannot be added without a decision here', () => {
+    const expected: SeamGroup[] = [
+      'desktop',
+      'transport',
+      'fleet',
+      'pairing',
+      'plugins',
+      'desktopExtras',
+      'folderPicker',
+      'files',
+      'notify',
+      'recovery',
+      'preview',
+      'webviews',
+    ]
+    expect(SEAM_GROUPS).toEqual(expected)
+  })
+})

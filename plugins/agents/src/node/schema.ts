@@ -3,7 +3,7 @@
 //
 // The companion FTS5 virtual table (`agent_events_fts` and its three triggers over `agent_events`) is
 // hand-written into the migration rather than declared here. See docs/data-layer.md § Migrations.
-// migrations/0000_*.sql is the only place its shape is stated, main/sessionRepository.ts reads it with
+// migrations/0000_*.sql is the only place its shape is stated, server/sessions/sessionRepository.ts reads it with
 // raw SQL, and node/ftsSchema.test.ts keeps the two in step.
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
@@ -30,10 +30,15 @@ export const agentSessions = sqliteTable(
     parentSessionId: text('parent_session_id'),
     parentTurnId: text('parent_turn_id'),
     // The subagent roster, projected from this session's own `subagent` events by
-    // main/sessionRepository.ts. On the row rather than in a table of its own because the row is
+    // server/sessions/sessionRepository.ts. On the row rather than in a table of its own because the row is
     // already broadcast to every client after every event, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),
+    // How many turns are queued and waiting to dispatch. On the row for the same reason as the subagent
+    // roster: the row is broadcast after every event, so the task sidebar can mark a session whose only
+    // sign of a waiting prompt is this count. Kept current by server/sessions/store.ts on every turn that
+    // enters or leaves the queue.
+    queuedTurns: integer('queued_turns').notNull().default(0),
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
     archivedAt: integer('archived_at'),
@@ -193,6 +198,41 @@ export const agentOperations = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('agent_operations_created_idx').on(t.createdAt)],
+)
+
+// Durable authority and provisioning ledger for managed sessions created by another signed
+// task-scoped session. Runtime state remains on agent_sessions; this row answers who may address the
+// child, where it sits in the delegation tree, and whether spawn provisioning can be replayed.
+export const agentSpawns = sqliteTable(
+  'agent_spawns',
+  {
+    id: text('id').primaryKey(),
+    rootTaskId: text('root_task_id').notNull(),
+    rootSessionId: text('root_session_id').notNull(),
+    ownerTaskId: text('owner_task_id').notNull(),
+    ownerSessionId: text('owner_session_id').notNull(),
+    parentSpawnId: text('parent_spawn_id'),
+    childTaskId: text('child_task_id').notNull(),
+    childSessionId: text('child_session_id'),
+    childTurnId: text('child_turn_id'),
+    depth: integer('depth').notNull(),
+    isolation: text('isolation').notNull(), // shared | worktree
+    provisioningState: text('provisioning_state').notNull(), // creating | provisioned | failed
+    // Immutable input needed to finish a worktree spawn after the Node exits between core task,
+    // managed session, and initial-turn writes. Shared spawns predate this recovery path and keep it
+    // null.
+    provisioningJson: text('provisioning_json'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    error: text('error'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('agent_spawns_owner_session_idx').on(t.ownerSessionId),
+    index('agent_spawns_child_session_idx').on(t.childSessionId),
+    index('agent_spawns_root_state_idx').on(t.rootTaskId, t.rootSessionId, t.provisioningState),
+    uniqueIndex('agent_spawns_owner_idempotency_idx').on(t.ownerTaskId, t.ownerSessionId, t.idempotencyKey),
+  ],
 )
 
 export const agentWebhooks = sqliteTable(

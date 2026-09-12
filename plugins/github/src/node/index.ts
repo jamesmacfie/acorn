@@ -1,40 +1,44 @@
-import { type NodePlugin, pullRequestSection } from '@acorn/plugin-api/node'
+import type { NodePlugin } from '@acorn/plugin-api/node'
+import { pullRequestSection } from '../server/contextSection'
 import { GITHUB_MIRROR } from '../contract/mirror'
-import { actions } from '../server/routes/actions'
-import { PULLS_COLLECTION_ID, pullsCollectionRoute } from '../contract/collections'
-import { collections } from '../server/routes/collections'
+import { actions } from '../server/routes/checks/actions'
+import { PULLS_COLLECTION_ID, pullsCollectionRoute } from '../shared/collections'
+import { collections } from '../server/routes/pulls/collections'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
-import { githubImport } from '../server/routes/import'
+import { githubImport } from '../server/routes/repos/import'
 import { githubProvider } from '../server/provider'
-import { mentions } from '../server/routes/mentions'
-import { pins } from '../server/routes/pins'
-import { prActions } from '../server/routes/prActions'
-import { prCreate } from '../server/routes/prCreate'
-import { pullBlob } from '../server/routes/pullBlob'
-import { pullConflicts } from '../server/routes/pullConflicts'
-import { pullDetail } from '../server/routes/pullDetail'
-import { pullFiles } from '../server/routes/pullFiles'
-import { pulls } from '../server/routes/pulls'
-import { pullsBatch } from '../server/routes/pullsBatch'
-import { repoLabels } from '../server/routes/repoLabels'
-import { repos } from '../server/routes/repos'
+import { mentions } from '../server/routes/pulls/mentions'
+import { pins } from '../server/routes/pulls/pins'
+import { prActions } from '../server/routes/pulls/prActions'
+import { prCreate } from '../server/routes/pulls/prCreate'
+import { pullBlob } from '../server/routes/pulls/pullBlob'
+import { pullConflicts } from '../server/routes/pulls/pullConflicts'
+import { pullDetail } from '../server/routes/pulls/pullDetail'
+import { pullFiles } from '../server/routes/pulls/pullFiles'
+import { pulls } from '../server/routes/pulls/pulls'
+import { pullsBatch } from '../server/routes/pulls/pullsBatch'
+import { repoLabels } from '../server/routes/repos/repoLabels'
+import { repos } from '../server/routes/repos/repos'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
-import { githubClientId } from './config'
-import { githubAgentTools } from '../main/agentTools'
-import { taskPulls } from '../server/routes/taskPulls'
+import { githubClientId } from '../server/config'
+import { githubAgentTools } from '../server/agentTools'
+import { taskPulls } from '../server/routes/pulls/taskPulls'
 import { githubEmitter } from '../server/events'
+import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 
 export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
     required: false,
-    // What other plugins may hear from this one (docs/plugins.md § Hearing another plugin,
-    // subscriptions.md § The cross-plugin grant). workflows hears `checks-changed`.
+    // What other plugins may hear from this one
+    // (docs/plugins/forward-compatibility.md § Hearing another plugin). workflows hears
+    // `checks-changed`.
     emits: [
       { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
-      { verb: 'pr-synced', description: 'A pull request’s mirror was refreshed' },
+      { verb: 'pr-synced', description: 'A pull request’s mirror was committed or invalidated' },
       { verb: 'pulls-changed', description: 'A repository’s open pull request list was refreshed' },
+      { verb: 'repos-changed', description: 'The repository mirror changed' },
     ],
     // This module's own URL, so the host can walk from here for the migration chain (docs/plugins.md
     // § Data ownership).
@@ -50,7 +54,7 @@ export const githubPlugin = (): NodePlugin => {
       // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Runs
       // before any route registers, matching where the composition root used to call it.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)
-      if (removedPulls) console.log(`[github] pruned ${removedPulls} orphaned mirrored pull request(s)`)
+      if (removedPulls) ctx.log.info(`pruned ${removedPulls} orphaned mirrored pull requests`)
 
       // Registers the provider in both the connection and integration registries. Required:
       // connectProvider looks github up in the connection registry, so without it the device-flow
@@ -65,8 +69,8 @@ export const githubPlugin = (): NodePlugin => {
       // /v2/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
       // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono
       // matches them. Reshuffling it changes which handler wins.
-      ctx.routes.register(repos(store), { prefix: '/repos' })
-      ctx.routes.register(repoLabels(store), { prefix: '/repos', note: '/:owner/:repo/labels' })
+      ctx.routes.register(repos(store, emit), { prefix: '/repos' })
+      ctx.routes.register(repoLabels(store, emit), { prefix: '/repos', note: '/:owner/:repo/labels' })
       // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
       // local-first task on that branch (Flow B). `tasks` is core's table, so that write goes through
       // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
@@ -75,14 +79,14 @@ export const githubPlugin = (): NodePlugin => {
       // The one github router with no plugin database handle: it shells out to git in the mapped project
       // checkout, and the path comes from CoreServices.projects through the core git seam.
       ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
-      ctx.routes.register(pullFiles(store), { prefix: '/repos' })
-      ctx.routes.register(pullBlob(store), { prefix: '/repos' })
+      ctx.routes.register(pullFiles(store, emit), { prefix: '/repos' })
+      ctx.routes.register(pullBlob(store, emit), { prefix: '/repos' })
       ctx.routes.register(pullsBatch(store, emit), { prefix: '/repos' })
-      ctx.routes.register(prActions(store), { prefix: '/repos' })
+      ctx.routes.register(prActions(store, emit), { prefix: '/repos' })
       // Workflow-run and job reads and re-runs. It resolves everything from the GitHub API and the
       // URL, so it holds no mirror state and takes no handle.
       ctx.routes.register(actions, { prefix: '/repos' })
-      ctx.routes.register(prCreate(store), { prefix: '/repos' })
+      ctx.routes.register(prCreate(store, emit), { prefix: '/repos' })
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
       ctx.routes.register(mentions(store), { prefix: '/repos' })
       // `pinned_repos` moved out of core, so /v2/core/pins became /v2/p/github/pins. The repo
@@ -106,9 +110,10 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
       ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
 
-      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status())) ctx.tools.register(tool)
+      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit)) ctx.tools.register(tool)
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
+        repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
         // Resolving the task itself is core's job (`tasks` is core's table and this plugin has no
         // handle to it), so the taskId round-trips through CoreServices before the mirror is consulted.

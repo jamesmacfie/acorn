@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from './middleware/auth'
-import type { PluginFetchHandler } from './plugin/types'
+import type { PluginFetchHandler } from './pluginHost/types'
 
 // The two current HTTP namespaces (docs/api-reference.md § Transport). Core owns
 // `/v2/core/*`; every plugin gets `/v2/p/<plugin>/*`. Both live under the one `/v2/*` middleware

@@ -37,7 +37,7 @@ key and rows left behind are invisible in every rail and impossible to remove. T
 the task count first. Nothing on disk is touched: the folder and any task worktrees remain.
 
 A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
-projects by folder or GitHub, name them and their workspace, done. Its gate is `shouldShowOnboarding`,
+projects by folder or GitHub, name them and their workspace, pick what to generate text with, done. Its gate is `shouldShowOnboarding`,
 meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
 preference, so it never opens twice. Everything it offers is also in Settings → Projects.
 
@@ -92,7 +92,9 @@ A task contains:
 
 - One required `projectId`.
 - An optional branch and optional worktree path.
-- An origin: `github-pr`, `linear`, `rollbar`, or `local`.
+- An origin: a source id the owning plugin declared, or `local` for a task core made itself. The
+  source that tracks a task also says which pane it opens on the first time it is activated
+  (`defaultPane`); a task no source claims lands on the layout reducer's default.
 - Optional primary pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
 - Task links to external items, and feature-owned terminal, agent, and pane state.
 - Zero or more durable `task_pulls` relations for PRs Acorn created in the task. The scalar primary
@@ -104,6 +106,12 @@ owner and name pair, is the source of task identity.
 
 Tasks created from external items retain a `task_links` record tied to the exact provider connection.
 This avoids collisions when two Linear or Rollbar connections expose the same visible identifier.
+
+Core creates workflow and delegated-agent child tasks through `CoreServices.tasks.createChild()`.
+The caller may reserve the child ID before creation. Replaying the same parent, title, branch seed,
+and intended ID returns the same task; reusing that ID for another parent or seed fails. Branch
+deduplication still considers every other task, because two tasks cannot share one branch worktree.
+Creating the task does not create its worktree.
 
 ## Worktrees and setup
 
@@ -129,6 +137,29 @@ without a setup script. Missing sources warn rather than fail worktree creation,
 are never overwritten, and a repo's list wins over a personal one outright rather than merging with
 it.
 
+### Worktree status reads
+
+The rail and footer show a dirty marker and a changed-file count per task, and both come from
+`git status --porcelain=v2 --branch` in each active worktree. Every connected client asks for that
+sweep independently, and the changes pane asks the same question of the same directory for its own
+list, so two clients over four worktrees used to be 16 `git status` processes per ping.
+
+`packages/node-core/src/server/worktrees/worktreeStatus.ts` answers from one process per worktree per
+two seconds: concurrent callers join the run in flight, and a caller just behind one gets what that
+run produced. The changes pane's local-changes read takes the same output, which is why the command
+carries `--branch` that only the rail needs. The node drops a path's entry when it writes under it,
+which covers a stage, a commit, a discard, a push, an editor save, a worktree created, and a terminal
+session's command going quiet. A change made outside acorn shows up on the next poll past the window.
+There is no filesystem watcher, and [performance.md](./performance.md) holds the argument and the
+condition that would change it.
+
+**The cache serves reads, never a refusal.** `removeWorktree` refuses to delete a worktree with
+uncommitted changes unless the caller forces it, and a stale "clean" reaching that guard would destroy
+somebody's work. So `worktreeDirty` passes `fresh: true`, which skips the in-flight promise and the
+window and runs git. A failure is never remembered either: "we could not tell" must not become
+"clean" for the next two seconds. `worktreeStatus.test.ts` holds the test that says so, which writes
+a file, waits 100 milliseconds, and expects the removal to be refused.
+
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
 failures instead of pretending removal succeeded. Its order is guard, repo teardown script, stop
 sessions, plugin cleanups, remove worktree, mark archived. The two teardown steps sit before removal
@@ -141,7 +172,7 @@ that dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails na
 the task is archived anyway.
 
 The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
-whichever of the two started the archive. One shared flag in `client-core/tasks/archiveLifecycle.ts`
+whichever of the two started the archive. One shared flag in `client-core/features/tasks/archiveLifecycle.ts`
 holds it, cleared when the archive finishes or fails. On the rail row the teardown is the
 highest-priority marker and it takes the slot under the task's glyph
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). It no longer blanks the row's
@@ -151,6 +182,13 @@ marker that loses its corner should lose the pixels, never the state.
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
 machine-local values.
+
+The node publishes `workspace:changed { workspaceId }` after create, rename, and deletion. Project
+membership remains `project:changed`; a deletion that reassigns projects announces each affected
+project. Provider-owned workspace mappings have their own batch invalidation,
+`workspace-projects:changed { providerId, workspaceIds }`, whose workspace ids are the union of the
+old and new scopes. Connection deletion uses the same event after its cascade. Plugins re-read the
+owner-filtered `projects.externalProjects` capability instead of receiving one frame per mapping.
 
 The `dev` run target layers in this order, each entry overriding the last: `workspaces.devScript`
 and `devRestartScript` as a base target, then `projects.run_targets` (the per-project Settings
@@ -167,7 +205,11 @@ right, unknown or duplicate pane ids are dropped, and a recipe naming no valid p
 ## Task creation and navigation
 
 The rail creates local tasks from a project and derives a branch from the title when the project is
-Git-backed. An explicitly entered branch is preserved. Ticking "Use the project folder and its
+Git-backed. An explicitly entered branch is preserved. The promote-to-task modal follows the same
+rule from the other direction: a branch a provider seeded is used exactly as given, because a pull
+request's head branch already exists on the remote and a rewritten name could never be pushed back to
+that PR. Only a name a person types is slugged, and either way a name git would refuse leaves the
+button disabled. Ticking "Use the project folder and its
 current branch" creates the task with no branch, so it works in the project folder on whatever is
 already checked out and never gets a worktree. PR, Linear, and Rollbar promotions resolve or
 create the appropriate project and task link, then reuse an existing task when that exact link is
@@ -175,3 +217,7 @@ already present.
 
 The desktop stores task ordering, layout, last pane/source, and drafts per Node. `⌘1`–`⌘9` activates
 the corresponding visible task. A task can be archived without deleting its historical row.
+
+The desktop and terminal rails group a child after its parent from `Task.parentId`, while retaining
+the original order among roots and siblings. The child remains a normal selectable task with its own
+panes. An orphan or a lineage cycle stays visible as a top-level row instead of being dropped.

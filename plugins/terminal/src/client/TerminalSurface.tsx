@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, onMount } from 'solid-js'
+import { createEffect, onCleanup, untrack } from 'solid-js'
 import { Rectangle } from '@acorn/plugin-api/ui'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -6,8 +6,10 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, monoFont, xtermTheme } from './theme'
-import { isAppDark, watchAppearance } from '@acorn/plugin-api/client'
+import { isAppDark, watchAppearance, telemetryFor } from '@acorn/plugin-api/client'
 import { TERMINAL_LINE_HEIGHT } from './preferences'
+
+const telemetry = telemetryFor('terminal')
 
 // xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another
 // workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
@@ -23,20 +25,43 @@ function installScrollAreaGuard() {
   }, true)
 }
 
-// One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session
-// id in the parent, so switching tabs unmounts this (detach, keep PTY running) and remounts a fresh
-// xterm restored from main's canonical headless framebuffer.
-export default function TerminalSurface(props: { sessionId: string; fontSize: number; onExit?: (exitCode: number | null) => void }) {
+// One xterm bound to one live session over WebSocket (docs/terminal.md). One per open tab, and it
+// outlives a tab switch: the parent draws every session's surface and hides the ones nobody is looking
+// at, so switching back is a repaint rather than a fresh xterm, a fresh WebGL context, a `term:attach`
+// and a full framebuffer serialize on the node (docs/performance.md).
+//
+// The xterm is still built lazily, on the first frame this surface is shown on. Two reasons: a session
+// nobody has opened yet costs nothing, and xterm measures its cell size from a laid-out element, which
+// a `display: none` box is not. After that it stays until the tab closes for real.
+export default function TerminalSurface(props: { sessionId: string; fontSize: number; hidden?: boolean; onExit?: (exitCode: number | null) => void }) {
   const api = terminalApi()
   let host!: HTMLElement
   let applyFontSize: ((fontSize: number) => void) | undefined
+  let shown: (() => void) | undefined
+  let teardown: (() => void) | undefined
 
   createEffect(() => {
     const fontSize = props.fontSize
     applyFontSize?.(fontSize)
   })
 
-  onMount(() => {
+  // Built once, then re-fitted and re-focused every time this tab comes back. On the next frame,
+  // because the `hidden` attribute is written by its own effect and xterm cannot measure a box that
+  // is still display:none when this one runs.
+  createEffect(() => {
+    if (props.hidden) return
+    // `props.hidden` is the only thing this effect follows. `start()` reads the font size and the
+    // session id on its way past, and tracking those would rebuild nothing but would re-run `shown()`
+    // — which focuses the terminal, so a font-size preference change would steal the caret.
+    untrack(() => {
+      teardown ??= start()
+      requestAnimationFrame(() => shown?.())
+    })
+  })
+
+  onCleanup(() => teardown?.())
+
+  function start(): () => void {
     installScrollAreaGuard()
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
     // TUI (Claude/Codex) drives the cursor itself. Rewriting bare \n to \r\n injects stray carriage
@@ -59,12 +84,12 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
       term.loadAddon(webgl)
-    } catch { /* no WebGL context (rare in Electron) — DOM renderer still works, just fuzzier */ }
+    } catch { /* no WebGL context (rare on a desktop) — DOM renderer still works, just fuzzier */ }
     // fit() reaches into xterm's render service, which is torn down on dispose and momentarily
     // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
     // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
     let disposed = false
-    const safeFit = () => { if (!disposed) { try { fit.fit() } catch { /* term detached mid-resize */ } } }
+    const safeFit = () => { if (!disposed) { try { telemetry.measure('terminal.fit', () => fit.fit()) } catch { /* term detached mid-resize */ } } }
     applyFontSize = (fontSize) => {
       if (disposed || term.options.fontSize === fontSize) return
       term.options.fontSize = fontSize
@@ -89,13 +114,22 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     applyAppearance()
     const unwatchAppearance = watchAppearance(applyAppearance)
 
+    let pendingOutput = 0
     let detach: (() => void) | undefined
     // Size the PTY and main-owned framebuffer to the fitted dims before attaching, so the serialized
     // screen and subsequent TUI redraws share the renderer's width.
     void api.resize(props.sessionId, term.cols, term.rows).then(() => {
       if (disposed) return
       detach = api.attach(props.sessionId, (m) => {
-        if (m.type === 'output') term.write(m.data)
+        if (m.type === 'output') {
+          const size = m.data.length
+          pendingOutput += size
+          telemetry.observe('terminal.output.size', size)
+          telemetry.observe('terminal.pending.size', pendingOutput)
+          void telemetry.measure('terminal.write', () => new Promise<void>((resolve) => {
+            term.write(m.data, () => { pendingOutput -= size; resolve() })
+          }))
+        }
         else if (m.type === 'exit') {
           term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
           props.onExit?.(m.exitCode)
@@ -125,19 +159,31 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     // ResizeObserver catches the drawer-height change that window 'resize' would miss.
     const ro = new ResizeObserver(() => safeFit())
     ro.observe(host)
-    onCleanup(() => {
+
+    // Coming back into view. A hidden box has no dimensions, so `fit()` declines to resize while this
+    // tab is away (@xterm/addon-fit returns early on a NaN proposal) and the ResizeObserver has
+    // nothing useful to report either. One fit on the way back in covers whatever changed meanwhile,
+    // and the focus is what a reader who clicked a tab is asking for.
+    shown = () => {
+      if (disposed) return
+      safeFit()
+      term.focus()
+    }
+
+    return () => {
       disposed = true
       applyFontSize = undefined
+      shown = undefined
       detach?.()
       unwatchAppearance()
       ro.disconnect()
       term.dispose()
-    })
-  })
+    }
+  }
 
   // A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way in and
   // out of it with the keyboard, and xterm owns everything inside (docs/terminal-and-agents.md §
   // Client). `mount` is the element xterm attaches to, drawn by the host, which is why this file spells
   // no element and carries no stylesheet.
-  return <Rectangle kind="pty" label="Terminal" mount={(element) => { host = element }} />
+  return <Rectangle kind="pty" label="Terminal" hidden={props.hidden} mount={(element) => { host = element }} />
 }

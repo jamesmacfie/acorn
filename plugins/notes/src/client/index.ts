@@ -2,6 +2,7 @@
 // live on the node under <data-root>/notes/, and the context pane's notes section is context's
 // own contribution.
 import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { notesCommands } from './commands'
 import { notesPaneContribution } from './NotesTaskPane'
 
 export const notesClientPlugin: ClientPlugin = {
@@ -9,5 +10,7 @@ export const notesClientPlugin: ClientPlugin = {
   required: true,
   init: (ctx) => {
     ctx.panes.register(notesPaneContribution)
+    // Find a note across all three scopes, and start one on this task (./commands.ts).
+    for (const contribution of notesCommands) ctx.commands.register(contribution)
   },
 }

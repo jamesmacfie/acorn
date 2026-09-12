@@ -1,8 +1,8 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { dockerArchiveConcern } from '../main/archiveCheck'
-import { dockerBridge } from '../main/dockerBridge'
-import { disposeDocker } from '../main/dockerService'
-import { registerDockerWsChannel } from '../main/wsChannel'
+import { dockerArchiveConcern } from '../server/archiveCheck'
+import { dockerBridge } from '../server/dockerBridge'
+import { disposeDocker } from '../server/dockerService'
+import { registerDockerWsChannel } from '../server/wsChannel'
 import { docker, DOCKER } from '../server/routes/docker'
 
 export const dockerPlugin = (): NodePlugin => {

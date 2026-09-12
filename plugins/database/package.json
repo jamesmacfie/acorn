@@ -1,19 +1,20 @@
 {
   "name": "@acorn/plugin-database",
   "version": "0.1.0",
+  "description": "A SQL console for a repo's database: saved queries, schema browsing, and AI-assisted drafting.",
   "private": true,
   "type": "module",
   "exports": {
-    "./node/index.ts": "./src/node/index.ts"
+    "./node/index.ts": "./src/node/index.ts",
+    "./contract/*": "./src/contract/*"
   },
   "scripts": {
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-virtual": "^3.13.29",
     "drizzle-orm": "catalog:",
@@ -23,6 +24,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",

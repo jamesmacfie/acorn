@@ -1,5 +1,5 @@
 import { and, eq, like } from 'drizzle-orm'
-import { pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import * as schema from './schema'
 import type { AppDatabase } from './index'
 

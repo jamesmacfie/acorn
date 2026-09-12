@@ -1,0 +1,449 @@
+import type { Terminal as HeadlessTerminal } from '@xterm/headless'
+import { colorOr, toColor, type Color } from '../colour'
+import { measuredRun } from '../layout/measure'
+import { isFieldKind, laysOut, type Node } from '../tree/node'
+import { sliceToWidth } from '../width'
+import { measuredField, toVisual } from '../wrap'
+import {
+  ATTRS, clipOf, fill, inside, intersect, isEmptyClip, put, wholeOf, writeRun,
+  type Buffer, type Clip, type Style,
+} from './buffer'
+
+// The tree into the cells: one depth-first walk, and every behaviour the old renderables had.
+//
+// This is where the rendering fault class ends, because the three things a `Renderable` did wrong are
+// all decisions this file makes instead:
+//
+//   a `#text` under a box     is a one-line run at the box's content origin. It was an error thrown
+//                             from inside whatever signal had just moved, and four crashes in one
+//                             week were a bare `{count()}` under a `<Stack>`.
+//   a `span`'s colour         is read here, off the span, and inherited from its parent `text` where
+//                             it names none. A span that dropped its colour drew every line of every
+//                             diff in the parent's — which was white, on a white terminal.
+//   a rectangle we mistrust   is clipped rather than believed. A node's rectangle says where its
+//                             content goes and the clip says which cells may show it, and the two
+//                             differ exactly when something overflows.
+//
+// **Clipping is unconditional.** A child is clipped to its parent's content box whatever `overflow`
+// says, which is stricter than the CSS meaning of `visible`. Nothing in the kit positions a child
+// outside its parent — there is no `position` setter in `../layout/props.ts` at all — so the only way
+// to be outside one is to overflow it, and a run drawn over a sibling is never the answer we want.
+// The early-out on an empty clip is also what makes a subtree scrolled off screen free.
+//
+// **Every kind but `box` and `text` is a box plus one thing.** A `scrollbox` is a box plus one column
+// of bar, because the offset is the read-back's and there is nothing to translate here (§ drawBar).
+// An `input` and a `textarea` are a box plus their own content and the caret (§ drawField). A `pty`
+// is a box plus a copy of an emulator's cells (§ drawPty).
+
+/** The six characters a border draws with, and there is one set because there is one style.
+ *
+ *  `../kit/roles.ts § boxBorder` answers `borderStyle: 'single'` for every box, always. What the
+ *  border role decides is the *sides*: `surface` is a box, so it draws all four, and `divider` is a
+ *  glyph, so a `Rule` asks for `['top']` or `['left']` and gets one line or one column
+ *  (client-core kit/tokens/roles.ts § border). A second set — heavy, rounded — is a second const and
+ *  a lookup on `borderStyle` on the day a style pack asks for one, and not before. */
+const SINGLE = { h: '─', v: '│', tl: '┌', tr: '┐', bl: '└', br: '┘' } as const
+
+/** A scroll bar's two cells: the run the viewport covers, and the rest of the content under it. The
+ *  same pair `../kit/showing.tsx` draws beside a virtual `Rows`, because there is one bar in this app
+ *  and lazygit's is the shape a reader already knows (§ drawBar). */
+const THUMB = '█'
+const TRACK = '│'
+
+type Sides = { top: boolean; right: boolean; bottom: boolean; left: boolean }
+
+const NO_SIDES: Sides = { top: false, right: false, bottom: false, left: false }
+
+/** A run with nothing said about it: the terminal's own foreground, no attributes, and the background
+ *  it is drawn onto left alone. */
+const PLAIN: Style = { fg: 'default', attrs: 0 }
+
+/** The four bits we can actually emit. A mask a role hands us may carry more — OpenTUI's italic and
+ *  strikethrough live in the same number — and a bit paint cannot write is a bit the diff should not
+ *  think changed. */
+const KNOWN_ATTRS = ATTRS.bold | ATTRS.dim | ATTRS.underline | ATTRS.inverse
+
+/** Which sides a `border` prop asks for. `true` is a box, an array is the edges a `Rule` names, and
+ *  anything else is no border — including the `false` `boxBorder` returns where a role draws none. */
+function sidesOf(value: unknown): Sides {
+  if (value === true) return { top: true, right: true, bottom: true, left: true }
+  if (!Array.isArray(value)) return NO_SIDES
+  const sides = { ...NO_SIDES }
+  for (const side of value as unknown[]) {
+    if (side === 'top' || side === 'right' || side === 'bottom' || side === 'left') sides[side] = true
+  }
+  return sides
+}
+
+const anySide = (sides: Sides): boolean => sides.top || sides.right || sides.bottom || sides.left
+
+const maskOf = (value: unknown): number =>
+  typeof value === 'number' && Number.isInteger(value) ? value & KNOWN_ATTRS : 0
+
+/** A node's own run style, over the one it inherits.
+ *
+ *  Two shapes, because a `span` and a `text` do not take the same props yet: a `text` gets `fg` and
+ *  an attribute mask, and a `span` gets one `style` object with the attributes as booleans, which is
+ *  what `../kit/roles.ts § spanStyle` still answers. The slice that merges the two leaves this
+ *  reading one shape; until then reading both is what keeps a styled word inside a sentence its own
+ *  colour. Attributes accumulate down the run and a colour replaces, which is what nesting a
+ *  `strong` inside a muted line means. */
+function styleOf(node: Node, inherited: Style): Style {
+  const props = node.props
+  const bag = typeof props.style === 'object' && props.style !== null
+    ? (props.style as Record<string, unknown>)
+    : undefined
+  let attrs = inherited.attrs | maskOf(props.attributes)
+  if (bag) {
+    for (const name of Object.keys(ATTRS) as (keyof typeof ATTRS)[]) if (bag[name] === true) attrs |= ATTRS[name]
+  }
+  return { fg: colorOr(props.fg ?? bag?.fg, inherited.fg), attrs }
+}
+
+type Segment = { text: string; style: Style }
+
+/** A run's children as styled stretches, in order.
+ *
+ *  Concatenated, these are exactly the string `../layout/measure.ts` measured, which is the invariant
+ *  that keeps the run paint draws the run that was wrapped. A `box` cannot appear here: `insertNode`
+ *  refuses one under a `text`. */
+function segmentsOf(children: readonly Node[], style: Style, into: Segment[]): Segment[] {
+  for (const child of children) {
+    if (child.kind === '#text') into.push({ text: child.text ?? '', style })
+    else if (!laysOut(child.kind)) segmentsOf(child.children, styleOf(child, style), into)
+  }
+  return into
+}
+
+/** The stretches covering one slice of the run, in order, each cut to the slice. */
+function piecesOf(segments: readonly Segment[], from: number, to: number): Segment[] {
+  const pieces: Segment[] = []
+  let at = 0
+  for (const segment of segments) {
+    const end = at + segment.text.length
+    if (end > from && at < to) {
+      pieces.push({ text: segment.text.slice(Math.max(0, from - at), Math.min(segment.text.length, to - at)), style: segment.style })
+    }
+    at = end
+    if (at >= to) break
+  }
+  return pieces
+}
+
+/** A `text`: the lines its measure produced, each drawn in the styles of the spans that own it.
+ *
+ *  The rectangle and the run are two different widths and paint needs both. A column container
+ *  stretches its children across, so a seven-cell run inside a nine-cell box has a `rect.w` of 9 and
+ *  a measured width of 7: the rectangle is what we clip to, and the run is what we place
+ *  (../layout/layout.test.ts § the text measure).
+ *
+ *  Each line is a contiguous slice of the run, so its offset is found by looking for it from where the
+ *  last line ended — the only thing between two lines is the space or the newline the wrap consumed.
+ *  Reconstructing the offset rather than carrying it is what keeps `measuredRun` the single answer
+ *  about where the breaks are; a second opinion here would be a line out on every wrapped paragraph. */
+function drawText(node: Node, buffer: Buffer, clip: Clip): void {
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+  const style = styleOf(node, PLAIN)
+  const segments = segmentsOf(node.children, style, [])
+  const flat = segments.reduce((text, segment) => text + segment.text, '')
+  const { lines } = measuredRun(node, node.rect.w)
+
+  let at = 0
+  for (let row = 0; row < lines.length; row += 1) {
+    const line = lines[row]!
+    const found = flat.indexOf(line, at)
+    const from = found < 0 ? at : found
+    let x = node.rect.x
+    for (const piece of piecesOf(segments, from, from + line.length)) {
+      x += writeRun(buffer, own, x, node.rect.y + row, piece.text, piece.style)
+    }
+    at = from + line.length
+  }
+}
+
+/** The caption in the top edge, cut to the room between the corners.
+ *
+ *  A cell of edge either side of it, which is what a bordered panel reads as: `┌─Keys──────┐`.
+ *  `left` is the only alignment this app asks for (`../panel.tsx`) and the other two are here because
+ *  the prop offers them. */
+function drawTitle(
+  buffer: Buffer, clip: Clip, node: Node, sides: Sides, title: string, style: Style,
+): void {
+  const rect = node.rect
+  const from = rect.x + (sides.left ? 1 : 0)
+  const to = rect.x + rect.w - (sides.right ? 1 : 0)
+  const room = to - from - 2
+  if (room <= 0) return
+  const caption = sliceToWidth(title, room)
+  if (caption.text === '') return
+  const spare = room - caption.width
+  const alignment = node.props.titleAlignment
+  const offset = alignment === 'center' ? Math.floor(spare / 2) : alignment === 'right' ? spare : 0
+  writeRun(buffer, clip, from + 1 + offset, rect.y, caption.text, style)
+}
+
+/** The edges a border draws, and a corner only where the two edges that meet it are both drawn. A
+ *  `Rule` is one edge with no corners at all, which is how a single line becomes the divider between
+ *  two regions. */
+function drawBorder(buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides, style: Style): void {
+  if (rect.w <= 0 || rect.h <= 0) return
+  const glyphs = SINGLE
+  const right = rect.x + rect.w - 1
+  const bottom = rect.y + rect.h - 1
+  if (sides.top) for (let x = rect.x; x <= right; x += 1) put(buffer, clip, x, rect.y, glyphs.h, style)
+  if (sides.bottom) for (let x = rect.x; x <= right; x += 1) put(buffer, clip, x, bottom, glyphs.h, style)
+  if (sides.left) for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, rect.x, y, glyphs.v, style)
+  if (sides.right) for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, right, y, glyphs.v, style)
+  if (sides.top && sides.left) put(buffer, clip, rect.x, rect.y, glyphs.tl, style)
+  if (sides.top && sides.right) put(buffer, clip, right, rect.y, glyphs.tr, style)
+  if (sides.bottom && sides.left) put(buffer, clip, rect.x, bottom, glyphs.bl, style)
+  if (sides.bottom && sides.right) put(buffer, clip, right, bottom, glyphs.br, style)
+}
+
+/** A box, and every kind that is still a box: its background, its border, its caption, any run
+ *  directly under it, and then its children inside the border. */
+function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+  const props = node.props
+
+  if (props.backgroundColor !== undefined) fill(buffer, own, clipOf(node.rect), toColor(props.backgroundColor))
+
+  const sides = sidesOf(props.border)
+  if (anySide(sides)) {
+    const style: Style = { fg: toColor(props.borderColor), attrs: 0 }
+    drawBorder(buffer, own, node.rect, sides, style)
+    if (sides.top && typeof props.title === 'string') drawTitle(buffer, own, node, sides, props.title, style)
+  }
+
+  // Inside the border, which is where a child is and where a loose run goes. Clipped to it as well,
+  // so an overflowing child eats its own frame rather than the box's.
+  const content = {
+    x: node.rect.x + (sides.left ? 1 : 0),
+    y: node.rect.y + (sides.top ? 1 : 0),
+    w: Math.max(0, node.rect.w - (sides.left ? 1 : 0) - (sides.right ? 1 : 0)),
+    h: Math.max(0, node.rect.h - (sides.top ? 1 : 0) - (sides.bottom ? 1 : 0)),
+  }
+  const inner = intersect(own, clipOf(content))
+
+  // A `#text` or a `span` directly under a box, which nothing laid out, drawn as one line at the
+  // content origin. The orphan-text rule made unnecessary rather than moved.
+  const loose = node.children.filter((child) => !laysOut(child.kind))
+  if (loose.length > 0) {
+    const text = segmentsOf(loose, PLAIN, [])
+    let x = content.x
+    for (const piece of text) x += writeRun(buffer, inner, x, content.y, piece.text, piece.style)
+  }
+
+  for (const child of node.children) if (laysOut(child.kind)) drawNode(child, buffer, inner)
+}
+
+/**
+ * The one-column bar down a viewport's right edge, where its content is taller than it is.
+ *
+ * The offset itself is not drawn here: the read-back has already moved the content's rectangles by it
+ * and the clip above has already cut them to the viewport, so all a scroll viewport needs of paint is
+ * the bar (../layout/pass.ts § A viewport moves its children).
+ *
+ * **Drawn over the last column rather than given one.** OpenTUI's bar was a sibling of the viewport,
+ * so it took a cell of layout while it was visible — and that is a cycle: the content's height
+ * depends on the width it wraps at, the width depends on whether the bar is showing, and the bar
+ * depends on the height. A frame that resolves that cycle by iterating is a frame that can fail to
+ * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
+ * frame the old painter drew held a visible bar, so nothing measured the difference either way.
+ *
+ * The two characters and the thumb's size and place are `../kit/showing.tsx § THUMB`'s, which is the
+ * bar a virtual `Rows` draws down its own edge. There is one bar in this app and it should look like
+ * itself.
+ */
+function drawBar(node: Node, buffer: Buffer, clip: Clip): void {
+  const content = node.children.find((child) => laysOut(child.kind))
+  const fits = node.rect.h
+  const total = content?.rect.h ?? 0
+  if (fits <= 0 || total <= fits) return
+  const offset = Math.max(0, Math.min(Math.round(Number(node.props.offset) || 0), total - fits))
+  const size = Math.max(1, Math.round((fits * fits) / total))
+  const at = Math.round((offset * (fits - size)) / (total - fits))
+  const x = node.rect.x + node.rect.w - 1
+  for (let row = 0; row < fits; row += 1) {
+    put(buffer, clip, x, node.rect.y + row, row >= at && row < at + size ? THUMB : TRACK, PLAIN)
+  }
+}
+
+/** A prop that should be a whole number of cells, and nought where it is anything else.
+ *
+ *  The zero comes first rather than last, and that is not a style choice: `../keys/tiers.test.ts`
+ *  greps every file in this package for a bare number after a closing bracket, because that is how a
+ *  keymap priority spelled outside the tier table looks, and a floor written the other way round
+ *  reads as one. */
+const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value) || 0))
+
+/**
+ * An `input` or a `textarea`: its rows, or its placeholder, and the caret where it has the keys.
+ *
+ * Everything drawn here comes off the node as a prop, because the state is the component's — the
+ * value the model holds, the caret's offset into it, how far the field has scrolled, and whether the
+ * region store has given it the keys. Nothing on the node knows how to edit, so nothing on the node
+ * can be in a state the component disagrees with (../kit/asking.tsx).
+ *
+ * **The rows are the ones Yoga measured**, out of the same cache, which is what keeps the caret on a
+ * row the reader can see (../wrap.ts § measuredField).
+ *
+ * **`scroll` means one thing per kind and one number says it**, the way `offset` does on a viewport:
+ * cells left for an `input`, whose one row is wider than its box, and rows up for a `textarea`, whose
+ * content is taller. The component clamps it so the caret is inside the box, and a field with room
+ * for all of itself scrolls to nought.
+ *
+ * **The two colours are the component's, said out loud.** A field's text colour and its placeholder's
+ * are both props here, for the reason `../kit/asking.tsx` already gives about the first: an edit
+ * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
+ * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
+ * read it (docs/ui-design.md § Roles, and what each host makes of them).
+ */
+function drawField(node: Node, buffer: Buffer, clip: Clip): void {
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+  const line = node.kind === 'input'
+  const value = typeof node.props.value === 'string' ? node.props.value : ''
+  const scroll = cellsOf(node.props.scroll)
+  const { rows } = measuredField(node, node.rect.w)
+
+  if (value === '') {
+    const hint = typeof node.props.placeholder === 'string' ? node.props.placeholder : ''
+    const style: Style = { fg: toColor(node.props.placeholderColor), attrs: 0 }
+    if (hint !== '') writeRun(buffer, own, node.rect.x, node.rect.y, hint, style)
+  } else {
+    const style: Style = { fg: toColor(node.props.textColor), attrs: 0 }
+    const first = line ? 0 : scroll
+    for (let at = first; at < rows.length && at - first < Math.max(node.rect.h, 1); at += 1) {
+      const row = rows[at]!
+      writeRun(buffer, own, node.rect.x - (line ? scroll : 0), node.rect.y + at - first,
+        value.slice(row.from, row.to), style)
+    }
+  }
+
+  // The caret, which is the terminal's own rather than a character of ours, and only for the one
+  // field at most that has the keys (./flush.ts § SHOW).
+  //
+  // Through the same function the model's own Up and Down go through, because a soft break gives one
+  // offset two homes and the tie-break between them is `assoc`: a second implementation of that rule
+  // here would draw the caret on the row the reader is not on, one press in three
+  // (../wrap.ts § toVisual).
+  if (node.props.focused !== true) return
+  const cursor = Math.min(cellsOf(node.props.cursor), value.length)
+  const { row, col } = toVisual(value, rows, cursor, Number(node.props.assoc) || 0)
+  const x = node.rect.x + col - (line ? scroll : 0)
+  const y = node.rect.y + row - (line ? 0 : scroll)
+  if (inside(own, x, y)) buffer.cursor = { x, y }
+}
+
+/** One of the 256 indexed colours as something a terminal can be asked for.
+ *
+ *  The first sixteen are the reader's own slots and stay indexes, which is the whole point of the
+ *  `Color` type (../colour.ts). Above that xterm's palette is arithmetic rather than a table — a
+ *  6×6×6 cube and then a 24-step grey ramp — and there is nothing in `Color` between a slot and a
+ *  triple, so the arithmetic is done here and the answer is a triple. A program that asked for cube
+ *  colour 141 gets the colour, on a terminal that takes 24-bit; on one that does not, `../flush.ts`
+ *  has nowhere to put it either way. */
+function paletteColor(index: number): Color {
+  if (index < 16) return index
+  if (index < 232) {
+    const at = index - 16
+    const level = (part: number): number => (part === 0 ? 0 : 55 + part * 40)
+    return [level(Math.floor(at / 36)), level(Math.floor(at / 6) % 6), level(at % 6)]
+  }
+  const grey = 8 + (index - 232) * 10
+  return [grey, grey, grey]
+}
+
+/** A cell's foreground or background as the emulator reports it: a 24-bit triple packed into one
+ *  number, one of the 256 indexed colours, or the terminal's own. The three are exclusive and
+ *  "neither of the first two" is what `isFgDefault` means, so the third needs no question. */
+function cellColor(value: number, indexed: boolean, rgb: boolean): Color {
+  if (rgb) return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+  return indexed ? paletteColor(value) : 'default'
+}
+
+/**
+ * A `pty`: the emulator's own cells, copied into the rectangle.
+ *
+ * The emulator is a component's, held on the node as a prop, and this is the only place its buffer is
+ * read (../kit/rectangle.tsx § handedOwn). Copied rather than drawn from: the emulator has already
+ * done the hard half — parsing, wrapping, scrolling its own region, tracking every attribute a
+ * program set — and what is left is one cell per cell.
+ *
+ * **The viewport rather than the buffer.** `buffer.active` is the whole of the scrollback and
+ * `viewportY` is the row the emulator is showing at the top, so a program that scrolled its own
+ * region has moved that number and the rectangle follows it. There is no offset of ours: a
+ * rectangle's viewport is the rectangle, which is why a `pty` wants none of the `scroll` prop the
+ * fields and the viewport carry.
+ *
+ * **A wide glyph is a pair here too**, and the emulator says so the same way our buffer does: the
+ * glyph reports a width of two and the cell after it reports nought characters. So the pair is
+ * written as the pair `./buffer.ts` expects, and the continuation marker keeps the diff and
+ * the flush treating the two as one thing.
+ */
+function drawPty(node: Node, buffer: Buffer, clip: Clip): void {
+  const term = node.props.terminal as HeadlessTerminal | undefined
+  if (!term) return
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+
+  const screen = term.buffer.active
+  const rows = Math.min(node.rect.h, term.rows)
+  const cols = Math.min(node.rect.w, term.cols)
+  // One cell object for the whole copy, which is what `getNullCell` is for: `getCell(x, cell)` fills
+  // it in place, and a fresh object per cell would be 4,800 allocations a frame at 120 by 40.
+  const cell = screen.getNullCell()
+
+  for (let row = 0; row < rows; row += 1) {
+    const line = screen.getLine(screen.viewportY + row)
+    if (!line) continue
+    const y = node.rect.y + row
+    let at = 0
+    while (at < cols) {
+      line.getCell(at, cell)
+      const width = cell.getWidth()
+      const style: Style = {
+        fg: cellColor(cell.getFgColor(), cell.isFgPalette(), cell.isFgRGB()),
+        bg: cellColor(cell.getBgColor(), cell.isBgPalette(), cell.isBgRGB()),
+        attrs: (cell.isBold() ? ATTRS.bold : 0)
+          | (cell.isDim() ? ATTRS.dim : 0)
+          | (cell.isUnderline() ? ATTRS.underline : 0)
+          | (cell.isInverse() ? ATTRS.inverse : 0),
+      }
+      const chars = cell.getChars()
+      put(buffer, own, node.rect.x + at, y, chars === '' ? ' ' : chars, style)
+      if (width === 2) put(buffer, own, node.rect.x + at + 1, y, '', style)
+      at += width === 2 ? 2 : 1
+    }
+  }
+
+  // The emulator's own caret, where the rectangle is entered. The other writer of this is a focused
+  // field, and at most one of the two can be true at a time because at most one thing has the keys —
+  // but nothing enforces that, so the last writer in this walk wins (§ drawField, ./flush.ts § SHOW).
+  if (node.props.focused !== true) return
+  const x = node.rect.x + screen.cursorX
+  const y = node.rect.y + screen.cursorY
+  if (inside(own, x, y)) buffer.cursor = { x, y }
+}
+
+function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
+  // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
+  // two agree without a rule between them (../layout/props.ts § visible).
+  if (node.props.visible === false) return
+  if (node.kind === 'text') { drawText(node, buffer, clip); return }
+  drawBox(node, buffer, clip)
+  // A field's own content and caret go inside the box it also is, so a bordered or coloured field
+  // draws both. Nothing in the kit gives one a border, and the box half costs one branch.
+  if (isFieldKind(node.kind)) drawField(node, buffer, clip)
+  if (node.kind === 'pty') drawPty(node, buffer, clip)
+  // After the children, because the bar is drawn over the last column of whatever they put there.
+  if (node.kind === 'scrollbox') drawBar(node, buffer, intersect(clip, clipOf(node.rect)))
+}
+
+/** The whole tree into the whole buffer. Called once a frame, after layout. */
+export function paint(root: Node, buffer: Buffer): void {
+  drawNode(root, buffer, wholeOf(buffer))
+}
