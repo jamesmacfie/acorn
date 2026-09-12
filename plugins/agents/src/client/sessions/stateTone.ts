@@ -53,7 +53,6 @@ export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'ci
  *  reads as stuck. The word for each status lives in subagentDisplay.ts. */
 export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
   if (status === 'running' || status === 'pending') return 'accent'
-  if (status === 'completed') return 'ok'
   if (status === 'failed') return 'danger'
   return 'muted'
 }
