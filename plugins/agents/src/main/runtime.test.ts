@@ -935,6 +935,13 @@ describe('managed agent runtime conformance', () => {
         currentValue: 'medium',
         values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
       },
+      {
+        id: 'mode',
+        label: 'Mode',
+        category: 'mode',
+        currentValue: 'default',
+        values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
+      },
     ]
     const session = await runtime.createSession({
       taskId: seed.taskId,
@@ -948,6 +955,7 @@ describe('managed agent runtime conformance', () => {
         configOptions: [
           { ...configOptions[0], currentValue: 'opus' },
           { ...configOptions[1], currentValue: 'high' },
+          { ...configOptions[2], currentValue: 'plan' },
         ],
       },
     })
@@ -957,6 +965,7 @@ describe('managed agent runtime conformance', () => {
       record.event.type === 'diagnostic' ? [record.event.message] : [])
     expect(messages).toContain('Model changed to Opus 5')
     expect(messages).toContain('Reasoning effort changed to High')
+    expect(messages).toContain('Mode changed to Plan')
 
     // Re-patching the same values is not a change, so it must not add another row.
     await runtime.patchSession(session.id, {
@@ -964,14 +973,15 @@ describe('managed agent runtime conformance', () => {
         configOptions: [
           { ...configOptions[0], currentValue: 'opus' },
           { ...configOptions[1], currentValue: 'high' },
+          { ...configOptions[2], currentValue: 'plan' },
         ],
       },
     })
     const after = await runtime.store.snapshot(session.id, 0)
-    expect(after.events.filter((record) => record.event.type === 'diagnostic')).toHaveLength(2)
+    expect(after.events.filter((record) => record.event.type === 'diagnostic')).toHaveLength(3)
   })
 
-  // Two advertised options, matching what a provider reports when a session starts. Seeded through
+  // Three advertised options, matching what a provider reports when a session starts. Seeded through
   // `config` because FakeAgentDriver advertises none of its own, and its `session_metadata` carries no
   // `configOptions`, so what is seeded here is what the session runs with.
   const advertised = () => [
@@ -988,6 +998,13 @@ describe('managed agent runtime conformance', () => {
       category: 'reasoning' as const,
       currentValue: 'medium',
       values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+    },
+    {
+      id: 'mode',
+      label: 'Mode',
+      category: 'mode' as const,
+      currentValue: 'default',
+      values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
     },
   ]
 
@@ -1051,9 +1068,15 @@ describe('managed agent runtime conformance', () => {
       config: { configOptions: advertised() },
     })
     await runtime.patchSession(first.id, {
-      config: { configOptions: advertised().map((option) => option.id === 'reasoning' ? { ...option, currentValue: 'high' } : option) },
+      config: { configOptions: advertised().map((option) => {
+        if (option.id === 'reasoning') return { ...option, currentValue: 'high' }
+        if (option.id === 'mode') return { ...option, currentValue: 'plan' }
+        return option
+      }) },
     })
-    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({ fake: { reasoning: 'high' } })
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({
+      fake: { reasoning: 'high', mode: 'plan' },
+    })
 
     const second = await runtime.createSession({
       taskId: seed.taskId,
@@ -1064,6 +1087,8 @@ describe('managed agent runtime conformance', () => {
     })
     expect((second.config.configOptions as Array<{ id: string; currentValue: string }>)
       .find((option) => option.id === 'reasoning')?.currentValue).toBe('high')
+    expect((second.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === 'mode')?.currentValue).toBe('plan')
 
     // A workflow step names the model it wants in its own policy, and a fork continues the session it
     // came from, so neither takes the owner's interactive picks.
@@ -1080,6 +1105,8 @@ describe('managed agent runtime conformance', () => {
       })
       expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
         .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+      expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
+        .find((option) => option.id === 'mode')?.currentValue).toBe('default')
     }
   })
 })
