@@ -324,7 +324,7 @@ export default function AgentCenter() {
                           meta={
                             <>
                               <Inline>
-                                <RuntimeStateIcon state={current().session.runtimeState} />
+                                <RuntimeStateIcon state={current().session.runtimeState} queued={current().session.queuedTurns} />
                                 <Text emphasis="muted">
                                   {current().session.runtimeState}
                                   {current().session.attention === 'none'

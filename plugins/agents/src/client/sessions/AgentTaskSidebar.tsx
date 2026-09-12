@@ -9,7 +9,7 @@ import type { AgentPaneModel } from './agentPaneModel'
 import { sessionModelLabel } from '../settings/agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
-import { attentionMark, queuedMark } from './stateTone'
+import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { delegationSummary } from './sessionRoster'
@@ -168,14 +168,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           density="compact"
                           depth={found()?.depth}
                           selected={selected()}
-                          leading={<RuntimeStateIcon state={current().runtimeState} />}
+                          leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
                           trailing={
                             <>
                               <Show when={!['none', 'unread'].includes(current().attention)}>
                                 <Icon {...attentionMark(current().attention)} />
-                              </Show>
-                              <Show when={current().queuedTurns > 0}>
-                                <Icon {...queuedMark(current().queuedTurns)} />
                               </Show>
                               <RowActions ariaLabel="Session actions">
                                 {(menu) => (
