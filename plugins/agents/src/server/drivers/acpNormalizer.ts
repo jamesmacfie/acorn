@@ -223,6 +223,8 @@ function unfenced(text: string): string {
 type ClaudeToolMeta = {
   toolName?: string
   parentToolUseId?: string
+  /** A progress ping rather than a call. See the early return in normalizeAcpUpdate. */
+  heartbeat?: boolean
   subagent?: {
     agentId: string
     agentType?: string
@@ -251,6 +253,9 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
   return {
     toolName: str(claude.toolName),
     parentToolUseId: str(claude.parentToolUseId),
+    // The heartbeat is the one toolResponse that reports elapsed time and nothing else. A real result
+    // that happens to carry a duration also names its agent, so the two cannot be confused.
+    heartbeat: agentId == null && num(response?.elapsedTimeSeconds) != null,
     subagent: agentId
       ? {
         agentId,
@@ -333,6 +338,15 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
         : []
     case 'tool_call':
     case 'tool_call_update': {
+      const meta = claudeToolMeta(update._meta)
+      // A heartbeat is Claude Code saying a call it already told us about is still going: the CLI pings
+      // every 30 seconds for any tool still running, and the adapter forwards it as a tool_call_update
+      // under an id it made up, `<the real id>-heartbeat-<n>`. Reading that as a call mints a fresh
+      // card every 30 seconds, and when the tool is `Agent` it mints a fresh subagent row too, which
+      // nothing can ever settle: that id never appears on the wire again, so the completion lands on
+      // the real call and the row sits at "Working" for good. We already show the call as running, so
+      // the ping has nothing to add.
+      if (meta.heartbeat) return []
       const blocks = update.content ?? []
       // A command's stdout arrives as inline text blocks, because Acorn declines ACP's terminal
       // capability, so this is the only place it can be picked up. The card renders it behind a
@@ -342,7 +356,6 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           ? [unfenced(content.content.text)]
           : [])
         .join('\n')
-      const meta = claudeToolMeta(update._meta)
       const status = toolStatus(update.status)
         ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
       // A spawning call belongs to the subagent it starts, not to the parent. That is what makes the

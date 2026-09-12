@@ -261,6 +261,14 @@ Reading Claude's `_meta.claudeCode` namespace in the shared ACP normalizer is de
 harness quirk: another harness's namespace is simply absent, so the branch costs nothing, and a quirk
 joins `HarnessQuirks` when a *second* harness needs one.
 
+One Claude update is dropped on the floor. The CLI pings every 30 seconds for any tool still running,
+and the adapter forwards the ping as a `tool_call_update` under an id it made up,
+`<the real call id>-heartbeat-<n>`, carrying the real tool's name and a `toolResponse` of nothing but
+`elapsedTimeSeconds`. Only that shape reports an elapsed time without naming an agent, which is how the
+normalizer recognises it. Reading a ping as a call mints a new card every 30 seconds, and when the tool
+is `Agent` it mints a subagent row keyed on an id that never appears again, so the completion lands on
+the real call and the row sits at "Working" for good.
+
 Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
 `turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's
 runtime state mid-turn. `drivers/codexChildRouting.ts` owns it, keyed on the root thread id the driver
