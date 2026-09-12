@@ -50,7 +50,7 @@ One page per topic, each a user-facing split of the matching internal doc:
 | Page | Source |
 | --- | --- |
 | Workspaces and tasks | `docs/workspaces-and-tasks.md` |
-| Terminal and agents | `docs/terminal-and-agents.md` + `docs/managed-agents.md` |
+| Terminal and agents | `docs/terminal.md` + `docs/managed-agents.md` |
 | Dashboards | `docs/dashboards.md` (59K internal; the public page is the using-it subset, not the design record) |
 | Schedules | `docs/schedules.md` |
 | Notes and memory | `docs/notes-and-memory.md` |
@@ -76,14 +76,14 @@ is in [plugin-reference.md](./plugin-reference.md).
 | Why plugins work this way | distilled from `docs/extensibility.md` |
 | Build your first plugin | `docs/plugin-authoring.md` §§ scaffold → package → complete example |
 | The package and manifest | `docs/plugin-authoring.md` § the manifest |
-| Manifest reference | **generated** from `packages/protocol/src/pluginContract.ts` |
-| Contribution points (catalogue, one page per key) | `pluginContract.ts` + the owning feature docs |
-| The node half | `docs/plugin-authoring.md` § the node half + `packages/node-core/src/server/plugin/types.ts` |
+| Manifest reference | **generated** from `packages/protocol/src/plugin/contract.ts` |
+| Contribution points (catalogue, one page per key) | `plugin/contract.ts` + the owning feature docs |
+| The node half | `docs/plugin-authoring.md` § the node half + `packages/node-core/src/server/pluginHost/types.ts` |
 | The client half and the frame SDK | `docs/plugin-authoring.md` §§ client half, reaching the bridge + `packages/plugin-sdk/src/public.ts` |
 | Permissions and security | `docs/plugin-authoring.md` § permissions + `docs/security.md` (trust model subset) |
 | Storage and migrations | `docs/plugin-authoring.md` § storage and migrations |
 | Examples | teaching plugins (new) + the first-party-as-loaded plugins as real-world cases |
-| Compatibility and versioning | `docs/plugins.md` § what is published + `packages/protocol/src/pluginApiVersion.ts` |
+| Compatibility and versioning | `docs/plugins.md` § what is published + `packages/protocol/src/plugin/apiVersion.ts` |
 
 ### Help
 
@@ -95,7 +95,7 @@ is in [plugin-reference.md](./plugin-reference.md).
 
 - `docs/plugins.md` as a whole — it is the internal reference manual and design record; the
   public tree takes the authoring-facing subset only.
-- `docs/first-party-plugins.md`, `docs/third-party/`, `docs/future/` — tier audits, migration
+- `docs/first-party-plugins.md`, `docs/loaded-plugin-migration.md`, `docs/future/` — tier audits, migration
   records, and design notes. The public compatibility and security pages state the conclusions
   these files argue for, without the argument.
 - Anything about unshipped work. The public docs describe what loads today; roadmap talk stays

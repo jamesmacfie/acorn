@@ -1,0 +1,105 @@
+import { createMemo, For, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '@acorn/protocol/api.ts'
+import { readJson } from '../../infra/node/apiClient'
+import { prefsOptions } from '../../infra/queries'
+import { saveJsonPref } from './savePref'
+import { PrefKeys } from '../../infra/persistence/prefKeys'
+import { TOOL_TIER_DEFAULTS, toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
+import { Checkbox } from '../../kit/components/primitives'
+
+// Settings → Agent tools (docs/agent-tools.md § Projections): the permission surface over the
+// agent-tool registry. Tools are grouped by risk tier (read, write, execute); a tier toggle and
+// per-tool toggles persist as one prefs slice. Turning a tier or tool off removes it from every
+// projection (MCP tools/list and a direct harness call); the manifest re-reads these on each fetch.
+type ToolPerms = ToolPermissions
+
+const TIERS: { risk: ToolRisk; label: string; blurb: string }[] = [
+  { risk: 'read', label: 'Read', blurb: 'Inspect context, notes, memory, git and the PR. No side effects.' },
+  { risk: 'write', label: 'Write', blurb: 'Create or edit notes and propose memory (proposals stay human-gated).' },
+  { risk: 'execute', label: 'Execute', blurb: 'Drive the preview browser and run targets in the worktree. Off until you turn it on, including for tools added by a later release.' },
+]
+
+export default function AgentToolsSettings() {
+  const qc = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const catalog = createQuery(() => ({
+    queryKey: ['agent-tools-catalog'],
+    queryFn: () => readJson<{ tools: AgentToolCatalogEntry[] }>(agentToolsCatalogRoute).then((r) => r.tools),
+  }))
+
+  const perms = createMemo<ToolPerms>(() => {
+    const raw = prefs.data?.[PrefKeys.agentToolPermissions]
+    if (!raw) return {}
+    try {
+      const parsed = toolPermissionsSchema.safeParse(JSON.parse(raw))
+      return parsed.success ? parsed.data : {}
+    } catch {
+      return {}
+    }
+  })
+
+  // Same fallback the node applies (node-core/server/agentTools/registry.ts § isToolPermitted), so an
+  // untouched execute tier draws as off here and is denied there rather than the two disagreeing.
+  const tierOn = (risk: ToolRisk) => (risk === 'read' ? true : (perms().tiers?.[risk] ?? TOOL_TIER_DEFAULTS[risk]))
+  const toolOn = (t: AgentToolCatalogEntry) => perms().tools?.[t.name] ?? tierOn(t.risk)
+
+  const write = (next: ToolPerms) => saveJsonPref(qc, PrefKeys.agentToolPermissions, next)
+  const setTier = (risk: ToolRisk, on: boolean) => {
+    const names = new Set(toolsFor(risk).map((tool) => tool.name))
+    const tools = Object.fromEntries(Object.entries(perms().tools ?? {}).filter(([name]) => !names.has(name)))
+    return write({ ...perms(), tiers: { ...perms().tiers, [risk]: on }, tools })
+  }
+  const setTool = (name: string, on: boolean) => write({ ...perms(), tools: { ...perms().tools, [name]: on } })
+
+  const toolsFor = (risk: ToolRisk) => (catalog.data ?? []).filter((t) => t.risk === risk)
+  const tierState = (risk: ToolRisk): 'on' | 'off' | 'mixed' => {
+    const values = toolsFor(risk).map(toolOn)
+    if (!values.length || values.every(Boolean)) return 'on'
+    return values.every((value) => !value) ? 'off' : 'mixed'
+  }
+
+  return (
+    <>
+      <p class="muted">
+        Which tools the acorn MCP server exposes to agents. Changes apply on the next availability evaluation; live sessions receive a tool-list update.
+        Proposed memory always stays behind the human review gate regardless of these toggles.
+      </p>
+      <For each={TIERS}>
+        {(tier) => (
+          <div class="settings-field">
+            <Show
+              when={tier.risk !== 'read'}
+              fallback={<div class="settings-field-row"><span class="settings-label">{tier.label} tools · tier always available</span></div>}
+            >
+              <Checkbox
+                label={`${tier.label} tools`}
+                indeterminate={tierState(tier.risk) === 'mixed'}
+                checked={tierState(tier.risk) !== 'off'}
+                onChange={(checked) => void setTier(tier.risk, checked)}
+              />
+            </Show>
+            <p class="muted" style={{ 'margin-top': '0' }}>
+              {tier.blurb}
+            </p>
+            <For each={toolsFor(tier.risk)}>
+              {(t) => (
+                <Checkbox
+                  nested
+                  checked={toolOn(t)}
+                  onChange={(checked) => void setTool(t.name, checked)}
+                  label={
+                    <>
+                      <code>{t.name}</code> — {t.description}
+                      <Show when={t.availability}><span class="muted"> {t.availability}</span></Show>
+                    </>
+                  }
+                />
+              )}
+            </For>
+          </div>
+        )}
+      </For>
+    </>
+  )
+}

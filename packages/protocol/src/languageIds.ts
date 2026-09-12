@@ -1,7 +1,7 @@
-// The language-id vocabulary, published once (docs/third-party/monaco.md § Naming).
+// The language-id vocabulary, published once (docs/editor.md § Naming).
 //
 // Three parties need the same words and no two share a package: the node parses a manifest that names
-// one, the renderer maps it onto a Monaco language, and the diff highlighter maps it onto a shiki
+// one, the renderer maps it onto a CodeMirror language, and the diff highlighter maps it onto a shiki
 // grammar. Before this file there were two maps with two vocabularies and two different fallbacks,
 // `plaintext` in the editor pane and `text` in the highlighter.
 //
@@ -10,7 +10,7 @@
 // to follow and a second engine maps onto the same words rather than inventing a third set.
 //
 // Per-engine mapping isn't here. This package names no renderer, so `plaintext -> 'text'` for shiki and
-// `shellscript -> 'shell'` for Monaco live beside the engines that need them.
+// `shellscript -> 'shell'` for the editor live beside the engines that need them.
 
 export const LANGUAGE_IDS = [
   'plaintext',

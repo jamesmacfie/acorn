@@ -4,6 +4,8 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { nextRunAt } from './cadence'
 import { type Clock, Scheduler } from './scheduler'
+import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
+import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../telemetry/collector'
 
 // The loop takes a clock, so nothing here sleeps. `advance` moves the fake now forward and drains the
 // single armed timer until nothing is due, which is exactly what the real event loop does, only
@@ -318,6 +320,67 @@ describe('scheduler', () => {
     await scheduler.start()
     for (let i = 0; i < 25; i++) await time.advance(60_000)
     expect(await scheduler.runs('core:sample')).toHaveLength(20)
+    await scheduler.stop()
+  })
+})
+
+describe('the schedule.run span', () => {
+  let test: TestDb
+  let seen: TelemetryRecord[]
+
+  beforeEach(async () => {
+    test = makeTestDb()
+    resetTelemetryForTest()
+    seen = []
+    startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
+    onTelemetryBatch((batch) => seen.push(...batch.records))
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+  })
+  afterEach(() => {
+    resetTelemetryForTest()
+    test.cleanup()
+  })
+
+  const spans = (): TelemetrySpan[] => {
+    flushTelemetry()
+    return seen.filter((record): record is TelemetrySpan => record.kind === 'span')
+  }
+
+  it('takes its owner from the key prefix, like the cadence floor and the settings badge', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    scheduler.register({ key: 'github:refresh', name: 'Refresh', cadence: { every: 300 }, run: async () => {} })
+    scheduler.register({ key: 'core:sweep', name: 'Sweep', cadence: { every: 300 }, run: async () => {} })
+    await scheduler.start()
+    await time.advance(300_000)
+
+    const runs = spans().filter((span) => span.name === 'schedule.run')
+    expect(runs.map((span) => [span.attrs['schedule.key'], span.attrs.owner]).sort()).toEqual([
+      ['core:sweep', 'core'],
+      ['github:refresh', 'github'],
+    ])
+    expect(runs.every((span) => span.attrs['schedule.reason'] === 'due')).toBe(true)
+    expect(runs.every((span) => span.status === 'ok')).toBe(true)
+    await scheduler.stop()
+  })
+
+  it('marks a failed run as an error and keeps the reason off the span', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    scheduler.register({
+      key: 'github:refresh',
+      name: 'Refresh',
+      cadence: { every: 300 },
+      run: async () => {
+        throw new Error('token ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa expired')
+      },
+    })
+    await scheduler.start()
+    await time.advance(300_000)
+    const [span] = spans().filter((candidate) => candidate.name === 'schedule.run')
+    expect(span).toMatchObject({ status: 'error', attrs: { owner: 'github', status: 'error' } })
+    // The run row carries the detail for the owner to read; the record carries the status only.
+    expect(JSON.stringify(span)).not.toContain('ghp_')
     await scheduler.stop()
   })
 })

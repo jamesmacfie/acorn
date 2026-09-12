@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '7'
+export const API_VERSION = '12'
 
 /**
  * Where the manifest JSON Schema is published. Same reason as the constant above: this package is
@@ -47,7 +47,7 @@ export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
   return {
     'acorn-plugin.json': manifest(id, name, rectangle),
     'node/index.js': nodeIndex(id),
-    'node/routes.js': nodeRoutes(),
+    'server/routes.js': nodeRoutes(),
     'client.js': rectangle ? client(id, name) : remoteClient(id, name),
     'README.md': readme(id, name),
   }
@@ -69,7 +69,7 @@ function manifest(id, name, rectangle = false) {
         client: './client.js',
         // `api: []` is correct, not an omission: a frame's own `/v2/p/<id>/` namespace needs no scope.
         // Add one of the six grantable scopes only when you call a core route. `core: ['tasks']` is
-        // here because node/routes.js resolves a task.
+        // here because server/routes.js resolves a task.
         permissions: {
           api: [],
           events: [],
@@ -116,7 +116,7 @@ function manifest(id, name, rectangle = false) {
 }
 
 function nodeIndex(id) {
-  return `import { handle } from './routes.js'
+  return `import { handle } from '../server/routes.js'
 
 // Relative paths and \`node:\` builtins only. An installed plugin is a bare directory with no
 // node_modules beside it. A bare specifier that resolves in a dev checkout (Node walks ancestor
@@ -133,6 +133,11 @@ export default {
    * @param {import('acorn-plugin-types').NodePluginContext} ctx
    */
   init(ctx) {
+    // A stderr line with your plugin id on it, and a telemetry log record when the owner has
+    // collection on. Prefer it to \`console\`: the id is bound by the host, the message is scrubbed,
+    // and a sink can see it. \`ctx.telemetry\` beside it carries events, counts, gauges and spans.
+    ctx.log.info('starting')
+
     // The portable carrier. A Hono instance cannot cross a process boundary; a
     // (Request, PluginRequestContext) => Response function can. The host strips the mount, so
     // /v2/p/${id}/greeting arrives here as /greeting.
@@ -332,7 +337,7 @@ An acorn plugin. No build step: these files are what runs.
 \`\`\`text
 acorn-plugin.json   the manifest — the only file the loader trusts about this directory
 node/index.js       default-exports the NodePlugin
-node/routes.js      imported with a relative specifier
+server/routes.js    imported with a relative specifier
 client.js           one file, plain JS, no imports
 \`\`\`
 
@@ -373,7 +378,7 @@ each device asks its own owner before running client bytes, keyed by \`(pluginId
 If an **agent** is writing this plugin, it never reaches the install route: it asks with the
 \`plugin_request\` tool and you approve in the shell. Approving with \`dev: true\` turns the loop into
 edit → reload instead of edit → prompt → restart. Note that a reload re-evaluates **only the entry
-module**, so a change in \`node/routes.js\` still needs a restart — a plugin being iterated on hard
+module**, so a change in \`server/routes.js\` still needs a restart — a plugin being iterated on hard
 wants its node half in one file.
 
 ## Change it

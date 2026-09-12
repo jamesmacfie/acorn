@@ -1,4 +1,5 @@
 import solid from 'vite-plugin-solid'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 // Two projects, because they need different environments and only one of them can compile JSX.
@@ -24,7 +25,12 @@ export default defineConfig({
           // server build from the `node` condition and every reactive primitive renders once, dead.
           conditions: ['browser', 'development'],
         },
-        test: { name: 'hosts', environment: 'jsdom', include: ['src/**/*.test.tsx'] },
+        test: {
+          name: 'hosts',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          setupFiles: [fileURLToPath(new URL('../../vitest.browser.setup.ts', import.meta.url))],
+        },
       },
     ],
   },

@@ -3,12 +3,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
-import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
-import { NODE_CORE_FACETS, scopeCore } from '../../main/pluginPermissions.ts'
+import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
 import { getContextSections } from './contextSections.ts'
 import {
   PLUGIN_AUTHORING_SECTION,
@@ -18,7 +18,7 @@ import {
   pluginAuthoringVocabulary,
   renderPluginAuthoring,
 } from './pluginAuthoring.ts'
-import type { CoreServices } from '../../main/core/index.ts'
+import type { CoreServices } from '../core/index.ts'
 
 // This file is about drift: every test below re-derives an answer from the source of truth and
 // compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).
@@ -95,20 +95,25 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(v.manifest.themeTokens).toEqual([...THEME_PALETTE_TOKENS])
     // And the three the host writes from `dark` are not in it. They are not colours, and a manifest
     // that could spell them could tell the terminal it was dark while rendering a light palette.
-    for (const name of ['--is-dark', '--color-scheme', '--syntax-fg']) {
+    for (const name of ['--is-dark', '--color-scheme']) {
       expect(v.manifest.themeTokens).not.toContain(name)
     }
     for (const token of v.manifest.themeTokens) expect(renderPluginAuthoring(v)).toContain(`\`${token}\``)
   })
 
   it('reads the two action-verb unions off the descriptors that carry them', () => {
+    type Member = { properties?: Record<string, { oneOf?: { properties: { verb: { const: string } } }[] }> }
+    type Items = Member & { anyOf?: Member[] }
     const json = z.toJSONSchema(pluginManifestShape, { target: 'draft-7', io: 'input', unrepresentable: 'any' }) as {
-      properties: Record<string, { properties: Record<string, { items: { properties: Record<string, { oneOf?: { properties: { verb: { const: string } } }[] }> } }> }>
+      properties: Record<string, { properties: Record<string, { items: Items }> }>
     }
-    const union = (descriptor: string, field: string) =>
-      (json.properties.contributions.properties[descriptor].items.properties[field].oneOf ?? [])
-        .map((option) => option.properties.verb.const)
-        .sort()
+    // A command is four shapes, so the field is looked for across the union's members the way the
+    // vocabulary itself looks for it.
+    const union = (descriptor: string, field: string) => {
+      const items = json.properties.contributions.properties[descriptor].items
+      const carrier = items.properties?.[field] ?? items.anyOf?.map((member) => member.properties?.[field]).find(Boolean)
+      return (carrier?.oneOf ?? []).map((option) => option.properties.verb.const).sort()
+    }
     const v = pluginAuthoringVocabulary()
     expect(v.actions.railOnSelect).toEqual(union('sources', 'onSelect'))
     expect(v.actions.commandsAndBadges).toEqual(union('commands', 'action'))
@@ -130,7 +135,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
   const core = {
     fs: {}, git: {}, tasks: {}, context: {}, models: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
     projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
-    secrets: {}, proc: {},
+    secrets: {}, proc: {}, telemetry: { onBatch: () => ({ dispose: () => {} }) },
   } as unknown as CoreServices
   const scope = (token: string) =>
     scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [] }, 'p', { idsForOwner: () => [] })
@@ -146,7 +151,15 @@ describe('the permission facets are the ones scopeCore honours', () => {
   })
 
   it('names the permissions.node blocks the schema declares', () => {
-    expect(pluginAuthoringVocabulary().permissions.node).toEqual(['core', 'capabilities', 'secrets', 'exec', 'net'])
+    expect(pluginAuthoringVocabulary().permissions.node).toEqual([
+      'core',
+      'capabilities',
+      'secrets',
+      'exec',
+      'net',
+      'env',
+      'files',
+    ])
   })
 })
 
@@ -179,8 +192,24 @@ describe('the two doors', () => {
     // A text read, not an import: node must not import the client, and this is the only way a rename
     // here can go red over there. The seeded prompt is the entry point to the loop, so a stale tool
     // name fails the first thing a new plugin author's agent does.
-    const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/settings/PluginsSettings.tsx')
+    const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/features/settings/PluginsSettings.tsx')
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
+  })
+
+  it('names the telemetry token, the two ctx members, and the frame verb', () => {
+    // What a plugin author asks first about telemetry: can I write one, what does reading cost, and
+    // what does a frame do instead (docs/plugin-authoring.md § Telemetry and logging). The token
+    // itself is derived from NODE_CORE_FACETS, so this is about the guide saying what it grants.
+    const guide = renderPluginAuthoring()
+    expect(guide).toContain('`ctx.log`')
+    expect(guide).toContain('`ctx.telemetry`')
+    expect(guide).toContain('`ctx.core.telemetry.onBatch`')
+    expect(guide).toContain('permissions.node.core: ["telemetry"]')
+    // The line that used to be here said there is no `ctx.log` and to use `console`. It was true
+    // until 2026-09-10 and is the kind of stale instruction an agent follows for a whole session.
+    expect(guide).not.toContain('There is no `ctx.log`')
+    expect(pluginAuthoringVocabulary().permissions.core).toContain('telemetry')
+    expect(Object.keys(pluginAuthoringVocabulary().bridge.kinds)).toContain('telemetry')
   })
 
   it('tells the agent the things about the loop it cannot derive', () => {

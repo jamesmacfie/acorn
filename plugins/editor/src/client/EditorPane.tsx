@@ -1,24 +1,63 @@
-import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
-import * as monaco from 'monaco-editor'
-import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs } from '@acorn/plugin-api/ui'
-import { MONACO_THEME, monacoLanguageForPath, watchMonacoTheme } from '@acorn/plugin-api/ui/editor'
-import { editorApi } from './editorClient'
+import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { basicSetup } from 'codemirror'
+import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
+import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, type Task } from '@acorn/plugin-api/client'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
+import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import SearchPanel from './search/SearchPanel'
 
-// The extension-to-language map and the Monaco theme live in the host
-// (docs/third-party/monaco.md § Status).
+// Only ever mounted in terminal mode, and it drags xterm in with it.
+const EditorTerminal = lazy(() => import('./EditorTerminal'))
+const log = createLogger('editor', 'editor')
+const telemetry = telemetryFor('editor')
 
-// The Monaco editor pane: a lazy file tree on the left, a file tab bar and one reused Monaco
-// instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
-// double-click promotes it. Cmd+S saves; a dirty dot marks the tab; reload-on-focus with a dirty
-// guard, since the agent and the human share the worktree.
+/** One open file, as this pane keeps it while the task is open. */
+type PooledFile = {
+  /** Text, undo history and the file's own grammar — what a Monaco model used to be. */
+  state: EditorState
+  /** Kept beside the state so a later mount can rebuild the extensions without a second download. */
+  language: Extension
+  /** Which mount built the extensions in `state`. See `adopt` below for why that matters. */
+  mount: object
+}
+
+/**
+ * Everything the pane's own mounts share, held by the host per task
+ * (client-core registries/paneModels.ts, docs/panes.md § Layout model).
+ *
+ * It used to be three maps in the component, cleared in its cleanup, so toggling the pane off and on
+ * threw away every open file's text, undo history and cursor and read them all back. The model
+ * outlives a mount and is disposed with the task, which is the same lifetime the reader assumes.
+ */
+type EditorPool = {
+  files: Map<string, PooledFile>
+  /** The document as last loaded or written, for the dirty derivation. */
+  saved: Map<string, Text>
+  /** Reads in flight for this mount, so its warm-up and first `show()` share one request. */
+  reading: Map<string, { mount: object; run: Promise<EditorState | null> }>
+}
+
+// The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
+
+// The editor pane: a lazy file tree on the left, a file tab bar and one reused CodeMirror instance
+// on the right. Single-click opens an ephemeral (italic) preview tab; editing or double-click
+// promotes it. Cmd+S saves; a dirty dot marks the tab; reload-on-focus with a dirty guard, since the
+// agent and the human share the worktree.
+//
+// A reader who lives in vim can have the same box hold `$EDITOR` in a throwaway PTY instead
+// (docs/editor.md § Editing in your own editor). One device preference switches it, graphical is the
+// default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
+  const queryClient = useQueryClient()
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
@@ -27,23 +66,47 @@ export default function EditorPane(props: { task: Task }) {
   const [side, setSide] = createSignal<'files' | 'search'>('files')
   let treeRevealRevision = 0
 
-  let host: HTMLElement | undefined
-  let editor: monaco.editor.IStandaloneCodeEditor | undefined
+  let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
-  // One Monaco instance reused across tab switches, with the current path tracked explicitly rather
-  // than read off props or signals mid-swap. Without that, a stale model write lands in the wrong
-  // file. Models are kept per path and disposed on tab close.
+  // One CodeMirror instance reused across tab switches, with the current path tracked explicitly
+  // rather than read off props or signals mid-swap. Without that, a stale write lands in the wrong
+  // file.
   let currentPath: string | null = null
-  const models = new Map<string, monaco.editor.ITextModel>()
-  const savedVersion = new Map<string, number>() // alternativeVersionId at last load/save
+  // The per-file documents, held by the host for as long as the task is (see EditorPool above). They
+  // need no disposing, so closing a tab is a delete.
+  const pool = paneModel<EditorPool>('editor', taskId, () => ({ files: new Map(), saved: new Map(), reading: new Map() }))
+  const saved = pool.saved
+  // This mount's identity. A pooled state carries extensions — the update listener, the save chord —
+  // that close over the mount that built them, and after a remount those closures point at a
+  // destroyed view: typing would derive "not dirty" and never autosave. So a state built by an
+  // earlier mount is reconfigured before it goes on screen, which keeps the document and the undo
+  // history (both live in state fields that survive a reconfigure) and replaces the closures.
+  const mountToken = {}
 
   const files = () => openFiles(taskId)
   const active = () => activeFile(taskId)
   let disposed = false
 
-  // Cmd/Ctrl+W closes the active file tab when focus is inside this pane.
-  let paneRef: HTMLElement | undefined
-  onClosePaneWithin(() => paneRef, () => {
+  /** Put a file's live state back in the pool. Only for a file still open: `close()` deletes its
+   *  entry after flushing it, and re-adding it there would keep a closed file's text forever. */
+  const remember = (path: string, state: EditorState) => {
+    const entry = pool.files.get(path)
+    if (!entry) return
+    entry.state = state
+    entry.mount = mountToken
+  }
+
+  /** A pooled state, made this mount's own. Cheap and synchronous when it already is. */
+  const adopt = (path: string, entry: PooledFile): EditorState => {
+    if (entry.mount === mountToken) return entry.state
+    entry.state = entry.state.update({ effects: StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
+    entry.mount = mountToken
+    return entry.state
+  }
+
+  // Cmd/Ctrl+W closes the active file tab when this pane is the focused one. The pane draws no
+  // element of its own to test containment against, so it asks the host which pane has focus.
+  onClosePaneWhen(() => focusedPane(taskId) === 'editor', () => {
     const p = active()
     if (p) void close(p)
   })
@@ -77,78 +140,218 @@ export default function EditorPane(props: { task: Task }) {
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
   const scheduleSave = debounce((p: string) => void save(p), 1500)
 
+  const isDirty = (path: string): boolean => {
+    const was = saved.get(path)
+    return !!view && !!was && !view.state.doc.eq(was)
+  }
+
   // Stash the current file's scroll/cursor so it can be restored after a tab swap or a remount.
   const saveViewState = () => {
-    if (editor && currentPath) {
-      const vs = editor.saveViewState()
-      if (vs) rememberEditorViewState(taskId, currentPath, vs)
-    }
+    if (view && currentPath) rememberEditorViewState(taskId, currentPath, captureViewState(view))
+  }
+
+  // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
+  // explicit-flush chord. Built per path, because the language is the file's and the update listener
+  // has to name the file it is reporting on.
+  //
+  // The grammar is passed in rather than fetched here, because fetching it is a network round trip
+  // (client-core features/editor/language.ts downloads one grammar per file) and `stateFor` below
+  // already awaits the file's text. One `Promise.all` there, and this stays synchronous.
+  const perFile = (path: string, language: Extension): Extension[] => [
+    basicSetup,
+    editorTheme(),
+    language,
+    EditorView.updateListener.of((update) => {
+      if (!update.docChanged) return
+      // Dirty derives from the text versus the last saved text, so undoing back to the saved state
+      // clears it.
+      const dirty = isDirty(path)
+      editorSetDirty(taskId, path, dirty)
+      if (dirty) scheduleSave(path)
+    }),
+    EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
+    // Highest precedence so the explicit flush wins over anything the library binds to the chord;
+    // autosave still runs either way.
+    Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void save(path); return true } }])),
+  ]
+
+  // An empty read-only state until a file is opened: the view always has one, so "no file" is a
+  // document with nothing in it rather than a special case in every handler below.
+  const emptyState = () => EditorState.create({ extensions: [basicSetup, editorTheme(), EditorState.readOnly.of(true)] })
+
+  // The graphical editor is built and torn down with its rectangle, because terminal mode replaces
+  // that rectangle rather than hiding it. Nothing is lost across the swap: the per-file states stay in
+  // the cache, so coming back restores the text, the undo history and the cursor.
+  const mountEditor = (element: HTMLElement) => {
+    view = new EditorView({ state: emptyState(), parent: element })
+    stopTheme = watchEditorTheme(view)
+    const restore = active()
+    if (restore) void show(restore)
+    onCleanup(() => {
+      scheduleSave.flush()
+      saveViewState()
+      if (view && currentPath) remember(currentPath, view.state)
+      currentPath = null
+      stopTheme?.()
+      stopTheme = undefined
+      view?.destroy()
+      view = undefined
+    })
+  }
+
+  // Reload-on-focus, where there is a window to lose focus. A host without one — the terminal client
+  // runs this pane under Node — has nothing to listen to, and reaching for the listener took the whole
+  // pane down: the throw landed inside the mount and the pane drew nothing at all
+  // (docs/tui.md). The agent and the human still share the worktree
+  // there; what a reader gets instead of the automatic reload is the pane's own refetch.
+  const watchFocus = (add: boolean): void => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
+    if (add) window.addEventListener('focus', onFocus)
+    else window.removeEventListener('focus', onFocus)
   }
 
   onMount(() => {
     onCleanup(() => {
-      saveViewState() // pane unmounting (task/workspace switch), remember where we were
-      disposed = true
+      // Flush first, then mark this mount gone: the flush is a save, and `save` below finishes its
+      // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
-      stopTheme?.()
-      for (const m of models.values()) m.dispose()
-      models.clear()
-      editor?.dispose()
-      window.removeEventListener('focus', onFocus)
+      disposed = true
+      // A pane replaced during navigation must not leave its remembered-file warm-up owning later
+      // renderer work. The request may still finish, but `readFile` drops it before CodeMirror state
+      // creation; removing its entry lets a new mount start a read that belongs to the visible pane.
+      for (const [path, reading] of pool.reading) {
+        if (reading.mount === mountToken) pool.reading.delete(path)
+      }
+      // The pool stays: it belongs to the task, not to this mount (see EditorPool above).
+      watchFocus(false)
     })
     void (async () => {
       if (!api) return setRoot(null)
-      const r = await api.root(taskId)
+      // Opening this pane used to be three steps in a row — read the root, mount the rectangle the
+      // root gated, read the file — of which two are requests. The file the reader left open does not
+      // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
+      // (docs/editor.md § One round trip to text).
+      const remembered = active()
+      if (remembered) void stateFor(remembered).catch(() => {})
+      // A checkout path already in the cache paints the rectangle in this tick, and the fetch below
+      // returns it without a request while it is fresh. An absent root is never painted from the
+      // cache: "no checkout yet" is the one thing that changes, so it is always awaited.
+      const cached = queryClient.getQueryData<string | null>(editorRootKey(taskId))
+      if (cached) setRoot(cached)
+      const r = await queryClient.fetchQuery({
+        queryKey: editorRootKey(taskId),
+        queryFn: () => api.root(taskId),
+        staleTime: EDITOR_ROOT_STALE_MS,
+      }).catch(() => null)
       if (disposed) return
-      setRoot(r) // renders the host div synchronously when truthy
-      if (!r || !host) return
-      stopTheme = watchMonacoTheme()
-      editor = monaco.editor.create(host, {
-        automaticLayout: true,
-        theme: MONACO_THEME,
-        readOnly: true, // until a file is opened
-        minimap: { enabled: false },
-      })
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save()) // explicit flush; autosave still runs
-      editor.onDidBlurEditorText(() => scheduleSave.flush())
-      window.addEventListener('focus', onFocus)
-      const restore = active()
-      if (restore) void show(restore)
+      setRoot(r) // renders the rectangle synchronously when truthy, and `mountEditor` builds the view
+      if (!r) return
+      watchFocus(true)
     })()
   })
 
-  async function modelFor(relPath: string): Promise<monaco.editor.ITextModel | null> {
-    if (disposed) return null
-    let model = models.get(relPath)
-    if (model) return model
-    const content = (await api?.read(taskId, relPath).catch(() => '')) ?? ''
-    if (disposed) return null
-    model = monaco.editor.createModel(content, monacoLanguageForPath(relPath))
-    savedVersion.set(relPath, model.getAlternativeVersionId())
-    model.onDidChangeContent(() => {
-      // Dirty derives from the version id versus the last saved one, so undoing back to the saved
-      // state clears it.
-      const dirty = model!.getAlternativeVersionId() !== savedVersion.get(relPath)
-      editorSetDirty(taskId, relPath, dirty)
-      if (dirty) scheduleSave(relPath)
+  // Which editor draws an open file, and the one it is drawing right now. `on` re-fires on identity
+  // rather than value, so its source is a memo and not an inline getter.
+  const prefs = createQuery(() => prefsOptions(true))
+  const mode = createMemo(() => readEditorMode(prefs.data))
+  const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
+  const [ptyPath, setPtyPath] = createSignal<string | null>(null)
+
+  // Whatever `$EDITOR` was pointed at is no longer what this pane has cached, so the cached state goes
+  // and the graphical view reads the file back off disk when it next shows it. That is the whole
+  // refresh contract: the editor in the PTY owned the buffer, and the pane never guessed at it.
+  const forget = (path: string) => {
+    pool.files.delete(path)
+    saved.delete(path)
+    editorSetDirty(taskId, path, false)
+  }
+
+  createEffect(on(wantsTerminal, (path, previous) => {
+    if (previous) forget(previous) // left mid-edit: the pref was flipped, or the reader changed tabs
+    setPtyPath(path)
+  }))
+
+  const onEditorExit = (path: string, code: number) => {
+    forget(path)
+    setPtyPath(null)
+    setSaveErr(code ? `Your editor exited with status ${code}.` : '')
+  }
+
+  // The pane's own read, deduplicated within this mount: the warm-up and the first `show()` ask for
+  // the same file in the same tick, and one of them has to be the request. An unmounted pane's read
+  // is deliberately not shared with its successor; its CodeMirror extensions close over this mount.
+  function stateFor(relPath: string): Promise<EditorState | null> {
+    const cached = pool.files.get(relPath)
+    if (cached) return Promise.resolve(adopt(relPath, cached))
+    const inFlight = pool.reading.get(relPath)
+    if (inFlight?.mount === mountToken) return inFlight.run
+    let entry: { mount: object; run: Promise<EditorState | null> }
+    const run = readFile(relPath).finally(() => {
+      if (pool.reading.get(relPath) === entry) pool.reading.delete(relPath)
     })
-    models.set(relPath, model)
-    return model
+    entry = { mount: mountToken, run }
+    pool.reading.set(relPath, entry)
+    return run
+  }
+
+  async function readFile(relPath: string): Promise<EditorState | null> {
+    const [content, language] = await Promise.all([
+      api?.read(taskId, relPath).catch(() => '').then((text) => text ?? '') ?? Promise.resolve(''),
+      // No highlighting beats no file, so a grammar that will not download is an empty extension
+      // rather than a throw that takes `show()` down with it.
+      languageForPath(relPath).catch(() => [] as Extension),
+    ])
+    // Navigation can replace this pane while the bridge response is in flight. Parsing syntax and
+    // constructing an EditorState here would block the renderer for a pane nobody can see, and the
+    // state carries listeners bound to this destroyed mount in any case.
+    if (disposed) {
+      telemetry.observe('editor.state.skipped', content.length, 'character', { reason: 'pane-unmounted' })
+      return null
+    }
+    const pooled = pool.files.get(relPath)
+    if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
+    const highlighted = shouldHighlightDocument(content.length)
+    if (!highlighted) telemetry.observe('editor.syntax.skipped', content.length, 'character', { reason: 'document-size' })
+    let activeLanguage: Extension = highlighted ? language : []
+    let state: EditorState
+    try {
+      state = telemetry.measure('editor.state.create', () => EditorState.create({
+        doc: content,
+        extensions: perFile(relPath, activeLanguage),
+      }), { highlighted })
+    } catch (error) {
+      // A grammar is optional presentation. If a parser rejects ordinary-sized input, keep the file
+      // usable and report one bounded failure instead of rejecting `show()` into the window handler.
+      if (!highlighted) throw error
+      log.warn('syntax parser failed; opening the document as plain text', error, {
+        'document.characters': content.length,
+      })
+      activeLanguage = []
+      state = EditorState.create({ doc: content, extensions: perFile(relPath, activeLanguage) })
+    }
+    saved.set(relPath, state.doc)
+    pool.files.set(relPath, { state, language: activeLanguage, mount: mountToken })
+    return state
   }
 
   // Swaps the reused instance to a path. The only place currentPath changes.
   async function show(relPath: string) {
-    if (!editor) return
+    if (!view) return
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
-    saveViewState() // remember the outgoing file's scroll/cursor before we swap models
+    saveViewState() // remember the outgoing file's scroll/cursor before we swap states
     setSaveErr('')
-    const model = await modelFor(relPath)
-    if (disposed || !editor || !model) return
+    // The outgoing file's state, with whatever the reader typed in it. `setState` hands the view a
+    // new one, so the old instance is what has to go back in the cache.
+    if (currentPath) remember(currentPath, view.state)
+    const state = await stateFor(relPath)
+    if (disposed || !view || !state) return
     currentPath = relPath
-    editor.setModel(model)
-    const vs = editorViewState(taskId, relPath)
-    if (vs) editor.restoreViewState(vs)
-    editor.updateOptions({ readOnly: false })
+    view.setState(state)
+    // A cached state carries the theme it was built with, so a file opened before a theme change
+    // comes back wearing the old one until this line.
+    refreshEditorTheme(view)
+    const remembered = editorViewState(taskId, relPath)
+    if (remembered) applyViewState(view, remembered)
     editorActivate(taskId, relPath)
     maybeReveal(relPath)
   }
@@ -158,12 +361,12 @@ export default function EditorPane(props: { task: Task }) {
   // switch.
   function maybeReveal(relPath: string) {
     const r = pendingReveal()
-    if (!editor || !r || r.path !== relPath) return
-    const requested = { lineNumber: Math.max(1, r.line), column: Math.max(1, r.column ?? 1) }
-    const position = editor.getModel()?.validatePosition(requested) ?? requested
-    editor.setPosition(position)
-    editor.revealPositionInCenter(position)
-    editor.focus()
+    if (!view || !r || r.path !== relPath) return
+    const doc = view.state.doc
+    const line = doc.line(Math.min(Math.max(1, r.line), doc.lines))
+    const pos = Math.min(line.from + Math.max(0, (r.column ?? 1) - 1), line.to)
+    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) })
+    view.focus()
     setPendingReveal(null)
   }
 
@@ -193,137 +396,158 @@ export default function EditorPane(props: { task: Task }) {
     editorOpen(taskId, relPath, ephemeral) // the active() effect swaps the surface
   }
 
+  // The document for a path, which is the live view's when that path is the one on screen and the
+  // cached state's otherwise. A debounced save can land after a tab swap, so this is not always the
+  // file the reader is looking at.
+  const docFor = (path: string): Text | undefined =>
+    (view && path === currentPath ? view.state.doc : pool.files.get(path)?.state.doc)
+
   async function save(p: string | null = currentPath) {
-    const model = p ? models.get(p) : undefined
-    if (!api || !p || !model) return
-    const version = model.getAlternativeVersionId() // snapshot: the value we're about to write
-    const res = await api.write(taskId, p, model.getValue())
-    if (disposed) return
+    const doc = p ? docFor(p) : undefined
+    if (!api || !p || !doc) return
+    const res = await api.write(taskId, p, doc.toString())
+    // Not guarded on `disposed`. What follows is the pool's and the open-files store's, both of which
+    // outlive this mount, and a write that lands after the pane closed still happened: bailing here
+    // left the file marked dirty on disk-clean content until something else re-read it.
     if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
-    savedVersion.set(p, version)
+    saved.set(p, doc)
     // Still-dirty if the user typed more during the async write.
-    editorSetDirty(taskId, p, model.getAlternativeVersionId() !== version)
+    editorSetDirty(taskId, p, !docFor(p)?.eq(doc))
   }
 
   async function close(relPath: string) {
     scheduleSave.cancel()
-    await save(relPath) // autosave: persist before we discard the model
+    await save(relPath) // autosave: persist before we discard the state
     if (disposed) return
     editorClose(taskId, relPath) // active() moves to the neighbour; the effect swaps the surface
-    models.get(relPath)?.dispose()
-    models.delete(relPath)
-    savedVersion.delete(relPath)
+    pool.files.delete(relPath)
+    saved.delete(relPath)
   }
 
-  // External-change reload on window focus: the agent edits the same worktree. A clean model
+  // External-change reload on window focus: the agent edits the same worktree. A clean document
   // reloads silently; a dirty one is guarded so it never clobbers unsaved human edits.
+  //
+  // A raw window listener, and it stays one: this is a desktop-host fact about the app regaining
+  // focus, the platform seam carries no signal for it, and it is the same rectangle-adjacent
+  // territory as the editor's own DOM (docs/editor.md § Reload on focus).
   async function onFocus() {
     const p = currentPath
-    const model = p ? models.get(p) : undefined
-    if (!api || !p || !model) return
+    const doc = p ? docFor(p) : undefined
+    if (!api || !p || !doc || !view) return
     const file = files().find((x) => x.path === p)
     if (file?.dirty) return
     const disk = await api.read(taskId, p).catch(() => null)
-    if (!disposed && disk != null && disk !== model.getValue()) {
-      model.setValue(disk)
-      savedVersion.set(p, model.getAlternativeVersionId())
-      editorSetDirty(taskId, p, false)
-    }
+    if (disposed || !view || disk == null || currentPath !== p || disk === view.state.doc.toString()) return
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } })
+    saved.set(p, view.state.doc)
+    editorSetDirty(taskId, p, false)
   }
 
-  // Single driver for the reused Monaco surface. The model swaps here whenever the active file
-  // changes, whether from a task switch, a tree click, a tab close, or the quick-open palette.
-  // Deferred so onMount owns the first paint.
+  // Single driver for the reused surface. The state swaps here whenever the active file changes,
+  // whether from a task switch, a tree click, a tab close, or the quick-open palette. Deferred so
+  // onMount owns the first paint.
   createEffect(
     on(active, (next) => {
-      if (!editor) return
+      if (!view) return
       if (next && next !== currentPath) void show(next)
       else if (!next) {
+        if (currentPath) remember(currentPath, view.state)
         currentPath = null
-        editor.setModel(null)
+        view.setState(emptyState())
       }
     }, { defer: true }),
   )
 
   return (
-    <section ref={paneRef} class="pane editor-pane">
-      <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
-        <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
-          <ListDetail
-            listLabel="Editor sidebar"
-            list={
-              <>
-                <Tabs
-                  tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
-                  active={side()}
-                  onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
-                  idPrefix="editor-side"
-                  ariaLabel="Editor sidebar"
+    <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
+      <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
+        <ListDetail
+          listLabel="Editor sidebar"
+          list={
+            <>
+              <Tabs
+                tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
+                active={side()}
+                onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
+                idPrefix="editor-side"
+                ariaLabel="Editor sidebar"
+              />
+              {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results.
+                  `TabPanel` owns the hidden-but-mounted half, which this pane used to spell as an
+                  inline `display: none` beside six hand-written tab attributes. */}
+              <TabPanel idPrefix="editor-side" id="files" active={side()}>
+                <FileTree
+                  taskId={taskId}
+                  onOpen={(p) => openPath(p, true)}
+                  openPath={active()}
+                  reveal={treeReveal()}
+                  onRevealed={(revision) => {
+                    setTreeReveal((request) => request?.revision === revision ? null : request)
+                  }}
                 />
-                {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results.
-                    `TabPanel` owns the hidden-but-mounted half, which this pane used to spell as an
-                    inline `display: none` beside six hand-written tab attributes. */}
-                <TabPanel idPrefix="editor-side" id="files" active={side()}>
-                  <FileTree
-                    taskId={taskId}
-                    onOpen={(p) => openPath(p, true)}
-                    openPath={active()}
-                    reveal={treeReveal()}
-                    onRevealed={(revision) => {
-                      setTreeReveal((request) => request?.revision === revision ? null : request)
+              </TabPanel>
+              <SearchPanel taskId={taskId} active={side() === 'search'} />
+            </>
+          }
+        >
+          {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
+              button was mouse-only, and there were no arrow keys. */}
+          <DocumentTabs
+            idPrefix="editor"
+            ariaLabel="Open files"
+            active={active() ?? ''}
+            onActivate={(path) => void show(path)}
+            onClose={(path) => void close(path)}
+            onPromote={(path) => editorPromote(taskId, path)}
+            tabs={files().map((file) => ({
+              id: file.path,
+              label: file.path.split('/').pop() ?? file.path,
+              title: file.path,
+              dirty: file.dirty,
+              ephemeral: file.ephemeral,
+            }))}
+            actions={
+              <>
+                <ToggleButton
+                  variant="bare"
+                  size="sm"
+                  tip="Edit in $EDITOR, in a terminal inside this pane"
+                  pressed={mode() === 'terminal'}
+                  onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
+                >$EDITOR</ToggleButton>
+                <Show when={active()}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    tip="Add file/selection reference to the agent composer"
+                    onPress={() => {
+                      const p = currentPath
+                      if (!p || !view) return
+                      const range = view.state.selection.main
+                      const doc = view.state.doc
+                      const ref = range.empty
+                        ? formatFileReference(p)
+                        : formatFileReference(p, doc.lineAt(range.from).number, doc.lineAt(range.to).number)
+                      void sendReferenceToAgent(taskId, ref).then((r) => {
+                        if (!r.ok && r.reason) setSaveErr(r.reason)
+                        else setSaveErr('')
+                      })
                     }}
-                  />
-                </TabPanel>
-                <SearchPanel taskId={taskId} active={side() === 'search'} />
+                  >→ agent</Button>
+                </Show>
+                <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
               </>
             }
-          >
-            {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
-                button was mouse-only, and there were no arrow keys. */}
-            <DocumentTabs
-              idPrefix="editor"
-              ariaLabel="Open files"
-              active={active() ?? ''}
-              onActivate={(path) => void show(path)}
-              onClose={(path) => void close(path)}
-              onPromote={(path) => editorPromote(taskId, path)}
-              tabs={files().map((file) => ({
-                id: file.path,
-                label: file.path.split('/').pop() ?? file.path,
-                title: file.path,
-                dirty: file.dirty,
-                ephemeral: file.ephemeral,
-              }))}
-              actions={
-                <>
-                  <Show when={active()}>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      tip="Add file/selection reference to the agent composer"
-                      onPress={() => {
-                        const p = currentPath
-                        if (!p) return
-                        const sel = editor?.getSelection()
-                        const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
-                        void sendReferenceToAgent(taskId, ref).then((r) => {
-                          if (!r.ok && r.reason) setSaveErr(r.reason)
-                          else setSaveErr('')
-                        })
-                      }}
-                    >→ agent</Button>
-                  </Show>
-                  <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
-                </>
-              }
-            />
-            {/* Monaco owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
-                pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
-                the host (ui/Rectangle.tsx). */}
-            <Rectangle kind="editor" label="Editor" mount={(element) => { host = element }} />
-          </ListDetail>
-        </Show>
+          />
+          {/* CodeMirror owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
+              pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
+              the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor
+              instead, keyed on the path so switching tabs starts a new one. */}
+          <Show when={ptyPath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+            {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => onEditorExit(path, code)} />}
+          </Show>
+        </ListDetail>
       </Show>
-    </section>
+    </Show>
   )
 }

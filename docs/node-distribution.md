@@ -6,8 +6,9 @@ workspace production dependencies, and native modules.
 
 ## Runtime
 
-The standalone entry uses `ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints
-one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
+`apps/node/src/entries/` holds all three build entries — `standalone.ts`, `service.ts`, and the MCP
+server — and `apps/node/src/composition/` holds what any two of them share. The standalone entry uses
+`ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
 device token for the launcher/first client. It also runs plugin initialization, reconciliation,
 WebSocket/tunnel listeners, and bounded shutdown.
 
@@ -17,6 +18,65 @@ on its pairing screen. That comparison is what makes pairing safe. A code opens 
 while no device is paired. `kill -USR1 <pid>` opens another without restarting the node and killing
 its live agent and terminal sessions. `SIGUSR1` does not exist on Windows, so pairing a second device
 there means a restart.
+
+## Boot order
+
+The node binds its listener at the end of one chain: open the data root and take its lock, reconcile
+bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run
+every plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, listen.
+Three things that used to be in that chain for history rather than dependency are not any more.
+
+The login-shell `PATH` probe starts at the first mark and nothing waits on it. On a packaged macOS
+build a window-launched process inherits a minimal `PATH`, so the node asks the owner's login shell
+what theirs is with `$SHELL -lic 'printf %s "$PATH"'`. That costs 520 ms on this developer's machine
+and up to 2 seconds on a profile with a version manager in it, and the answer is needed to spawn
+agents and build commands, not to migrate a database or bind a listener. The probe keeps its
+five-second ceiling, and the first process the node spawns waits for it: `runProcess` and
+`runHeadless` both await the gate in `packages/node-core/src/server/core/loginShellPath.ts` before
+they call `spawn`. A spawn that arrives after the probe has settled waits for nothing.
+
+Two spawn paths do not go through that gate, and both are deliberate. A terminal session runs
+`$SHELL -lc`, which reads the profile itself, so the probe would tell it nothing it does not already
+know. The managed-agent drivers under `plugins/agents/src/server/` call `spawn` directly, so an agent
+started in the first two seconds of a packaged launch can see the inherited `PATH`. Move them onto
+`spawnsReady()` if that ever shows up as a missing-binary report.
+
+Plugin `init` runs for every plugin at once, and so does `ready`. See
+[docs/plugins.md](./plugins.md) § Activation for what that means for a plugin author.
+
+Opening the blob cache no longer chmods every file in it. The sweep is a permission migration for
+files an older build wrote, it is synchronous, and it sat inside the `migrate` step
+([caching.md](./caching.md) § Immutable blob cache).
+
+Reconciliation runs behind the listener, not in front of it. `startServiceRuntime` returns as soon as
+the node is listening, and the tmux, worktree, workflow, and agent reconcile steps continue after
+that.
+
+`[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, unconditionally, so a node
+that took 11 seconds to bind says so without anyone having asked. Per-request timing is the opposite
+and sits behind `ACORN_PERF=1`. Read the labels as wall-clock slices rather than per-plugin costs
+once the passes overlap: with 16 plugins initialising together, a plugin's line says when it
+finished, not how long it worked.
+
+## Reaching a node with `acorn`
+
+`acorn` is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the
+workspace for the node this machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root
+if the app is installed here, else the dev checkout's. It reads the root's lock to decide what to do.
+A node already holds it, so `acorn` attaches, reading the endpoint from `node.json` and the
+certificate to pin from `tls/cert.pem`; nothing holds it, so `acorn` starts one and owns its
+lifetime, draining it on the way out. A second `acorn` in a second terminal finds the lock and
+attaches, and leaves the node running when it quits. The one that started it owns it, which is the
+desktop's rule too.
+
+Attaching needs a device token, and `acorn` keeps its own — in its config directory, at mode 0600,
+never in the node's data root. A node the desktop started is a node whose token belongs to the
+desktop, so the first `acorn` against one asks for a pairing code the same way any other client
+does: `kill -USR1 <pid>` opens one.
+
+`acorn --node https://host:4317` pairs with a node elsewhere: the fingerprint as six words to compare
+against what that node printed, then the code. It remembers what it pairs with, so the second time is
+`acorn --node <name>`.
 
 ## Reaching a node from another machine
 
@@ -59,14 +119,14 @@ management are unavailable. The standalone composition wires the terminal, manag
 workflow engines when their dependencies are present. Unsupported native adapters report an explicit
 unavailable state.
 
-Standalone and desktop-supervised Node hosts use the same `apps/node/src/server/composition.ts` graph,
+Standalone and desktop-supervised Node hosts use the same `apps/node/src/composition/composition.ts` graph,
 post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
 native capability injection, not a second plugin assembly.
 
 ## Plugins
 
 Both hosts build the `PLUGIN_STATE` bridge, meaning the roster, the installer, and the owner's
-disabled list, through one builder: `apps/node/src/server/pluginState.ts`. One thing differs on
+disabled list, through one builder: `apps/node/src/composition/pluginState.ts`. One thing differs on
 purpose. Bundled packages have nothing to be reconciled from. The desktop ships every built plugin as
 app resources and copies them into the writable data root before discovery. A standalone node has no
 `resourcesPath`, so the step does nothing and plugins arrive only through the owner-authenticated

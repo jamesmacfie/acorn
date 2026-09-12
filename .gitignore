@@ -1,6 +1,7 @@
 node_modules/
 .turbo/
 dist/
+.pnpm-store/
 .env
 .env*.local
 *.log

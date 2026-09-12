@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export type { ToolRisk }
 export type ToolCeiling = { allow?: string[]; maxRisk?: ToolRisk }
-const toolCeilingSchema = z.object({
+export const toolCeilingSchema = z.object({
   allow: z.array(z.string()).optional(),
   maxRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
@@ -13,6 +13,12 @@ export const RISK_ORDER: Record<ToolRisk, number> = { read: 0, write: 1, execute
 export function normalizeToolCeiling(ceiling: ToolCeiling | undefined): ToolCeiling {
   const allow = ceiling?.allow ? [...new Set(ceiling.allow.map((value) => value.trim()).filter(Boolean))] : undefined
   return { ...(allow ? { allow } : {}), ...(ceiling?.maxRisk ? { maxRisk: ceiling.maxRisk } : {}) }
+}
+
+/** Parse an untrusted persisted or transport value into the one normalized ceiling shape. */
+export function parseToolCeiling(value: unknown): ToolCeiling | undefined {
+  const parsed = toolCeilingSchema.safeParse(value)
+  return parsed.success ? normalizeToolCeiling(parsed.data) : undefined
 }
 
 export function riskWithinCeiling(risk: ToolRisk, ceiling: ToolCeiling | undefined): boolean {
@@ -69,9 +75,41 @@ export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefi
 export type WorkflowDefSummary = {
   id: string
   name: string
-  source: 'repo' | 'user'
+  // 'database' is a row the owner typed in the app rather than a file somebody committed
+  // (docs/workflows.md § Database definitions). The three layers are read as one list and a repo id
+  // wins a collision.
+  source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
-  steps: { name: string; kind?: string }[]
+  inputs?: WorkflowInput[]
+  steps: { name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+  // The project this definition belongs to: the one whose checkout holds the file, or the one a row
+  // is bound to. Null on a row that any project in the workspace may run.
+  projectId?: string | null
+  // Why this one cannot be run as it stands, when the merged read already knows.
+  problems?: string[]
+}
+
+// A definition stored as a row (docs/workflows.md § Database definitions). `def` is the plugin's own
+// `WorkflowDef`; it is `unknown` here because that shape lives in plugins/workflows and protocol may
+// not depend on a plugin. The editor narrows it there.
+export type WorkflowDefRow = {
+  id: string
+  workspaceId: string
+  projectId: string | null
+  name: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+  def: unknown
+}
+
+// A value a run is started with. The palette asks for one before it starts a definition that declares
+// any, and the editor lists them (docs/workflows.md § Execution model).
+export type WorkflowInput = {
+  name: string
+  description?: string
+  required?: boolean
+  default?: string
 }
 
 export type WorkflowRunRow = {
@@ -83,6 +121,10 @@ export type WorkflowRunRow = {
   error: string | null
   createdAt: number
   updatedAt: number
+  // The definition this run froze at start, as JSON. On the wire since the runs route answered with
+  // the row; declared here because the run pane draws its nodes in graph order, and only the
+  // definition knows what each step waits on.
+  defJson?: string
 }
 
 export type WorkflowStepRow = {
@@ -105,4 +147,9 @@ export type WorkflowStepRow = {
   createdAt: number
   updatedAt: number
   resumeCommand?: string | null
+  // The bundle handed to the step: the rendered prompt, and `childTaskId` for a step the runner gave
+  // its own task and checkout. The run pane reads the second to link to that task.
+  inputsJson?: string | null
+  // Which fan-out step spawned this one, when one did. The run pane draws a child under its parent.
+  parentStepId?: string | null
 }

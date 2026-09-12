@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { publicConnectionProvider } from './providers/shared'
+import { publicConnectionProvider } from './providerShared'
 import { ConnectionProviderRegistry } from './connectionRegistry'
 
 const provider = (id = 'test-provider') =>

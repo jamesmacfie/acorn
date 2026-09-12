@@ -3,11 +3,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { z } from 'zod'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 
 // The JSON Schema for `acorn-plugin.json`, generated from the Zod contract in
-// `packages/protocol/src/pluginContract.ts` and committed beside this package's declarations, with this
+// `packages/protocol/src/plugin/contract.ts` and committed beside this package's declarations, with this
 // test as the sync check. It ships in the published package, so an author who installs the types gets
 // the schema too. Regenerate with `UPDATE_PLUGIN_SCHEMA=1 pnpm test`.
 //

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-rollbar",
   "version": "0.1.0",
+  "description": "Rollbar items as a source: occurrences, master-detail browsing, and turning one into a task.",
   "private": true,
   "type": "module",
   "exports": {

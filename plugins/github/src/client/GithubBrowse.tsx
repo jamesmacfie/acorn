@@ -1,26 +1,28 @@
 // The GitHub browse surface behind the `github` rail Source (docs/github-integration.md § Reads and
-// writes).
+// writes), as two regions rather than one component.
 //
-// Two splits, one inside the other: the pull list beside everything else, and inside that the
-// navigator beside the diff. The host draws both, and the three hand-drawn `.pane-left` /
-// `.pane-mid` / `.pane-right` sections that used to be here are gone with them.
+// It used to be one `ListDetail split` here, with the pull list in one column and everything else in
+// the other. That is still what the desktop draws — `SourceSurface` composes exactly this from the
+// two exports below — but the columns are now named, because the terminal shell puts the list in a
+// panel of its own down the left and the detail in the main panel, and no host can pull two columns
+// apart from inside an opaque component (client-core § SourceContribution.regions).
 //
-// Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes
-// exist only to populate params. That is why this component takes no props for three columns.
+// Params-driven, like the components it hosts: `PullList` reads `useParams()` itself, and the routes
+// exist only to populate params. That is why neither export takes props.
 //
 // The routed project is all this surface needs to render, the same gate every other Source applies
 // (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins.md § Frame
 // authoring and the UI kit): the routes address a pull, they do not decide whether the surface
 // renders.
-import { createSignal, lazy, Show } from 'solid-js'
+import { createSignal, lazy, Show, Suspense, type JSX } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
-import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { forceRefreshPull } from './queries'
-import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../contract/api'
-import { projectsOptions, readJson } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
+import { pullsKey, pullsRoute, type Pull } from '../shared/api'
+import { readJson } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
-import { githubCreateRoute } from './routes'
+import { createBrowseScope } from './browseScope'
+import { githubCreateRoute } from './clientRoutes'
 import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, SectionHeader } from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
@@ -29,131 +31,98 @@ import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, SectionHeader
 const PullDetail = lazy(() => import('./PullDetail'))
 const CreatePullForm = lazy(() => import('./CreatePullForm'))
 const ComparePreview = lazy(() => import('./ComparePreview'))
-const DiffView = lazy(() => import('./DiffView'))
 
-export default function GithubBrowse() {
-  const params = useParams()
+/** The gate both regions share. Drawn once per region rather than once for the surface, because the
+ *  two regions no longer have a common parent to put it on — and a list that renders while its detail
+ *  says "no GitHub remote" is the disagreement `createBrowseScope` exists to prevent. */
+function WhenLinked(props: { scope: ReturnType<typeof createBrowseScope>; children: JSX.Element }) {
+  return (
+    <Show when={props.scope.linked()} fallback={
+      <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
+        {(message) => <EmptyState align="start">{message()}</EmptyState>}
+      </Show>
+    }>
+      {props.children}
+    </Show>
+  )
+}
+
+/** The `list` region: the pulls, with the new-PR and refresh actions that belong to the whole list. */
+export function GithubBrowseList() {
+  const scope = createBrowseScope()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const projects = createQuery(() => projectsOptions(true))
-  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
-  const owner = () => project()?.github?.owner ?? ''
-  const repo = () => project()?.github?.name ?? ''
-  // Pull requests need the GitHub facet, not only a project. A project with no github.com remote has
-  // no pulls to list, and without this gate PullList sits on "Loading…" forever, because its queries
-  // never enable.
-  const linked = () => !!project()?.github
-  // Create mode: the static route is contributed ahead of the parameter route.
-  const newMatch = useMatch(() => githubCreateRoute)
-  const isNew = () => !!newMatch()
-
-  // Why the routed project is missing. `undefined` while the projects query is in flight, so the
-  // first paint shows the mark rather than flashing "select a project".
-  const emptyMessage = () => {
-    if (!projects.data) return undefined
-    const selected = project()
-    if (!selected) return 'Select a project from the project menu to browse pull requests.'
-    return `${selected.name} has no GitHub remote.`
-  }
-
-  const [refreshingPulls, setRefreshingPulls] = createSignal(false)
-  const [refreshingPull, setRefreshingPull] = createSignal(false)
+  const [refreshing, setRefreshing] = createSignal(false)
 
   async function refreshAllPulls() {
-    if (!owner() || !repo()) return
-    setRefreshingPulls(true)
+    if (!scope.owner() || !scope.repo()) return
+    setRefreshing(true)
     try {
-      const data = await readJson<Pull[]>(`${pullsRoute(owner(), repo(), 'open')}&force=true`)
-      queryClient.setQueryData(pullsKey(owner(), repo(), 'open'), data)
+      const data = await readJson<Pull[]>(`${pullsRoute(scope.owner(), scope.repo(), 'open')}&force=true`)
+      queryClient.setQueryData(pullsKey(scope.owner(), scope.repo(), 'open'), data)
     } finally {
-      setRefreshingPulls(false)
-    }
-  }
-
-  async function refreshCurrentPull() {
-    if (!owner() || !repo() || !params.number) return
-    setRefreshingPull(true)
-    try {
-      const { detail, files } = await forceRefreshPull(owner(), repo(), params.number)
-      queryClient.setQueryData(pullKey(owner(), repo(), params.number), detail)
-      queryClient.setQueryData(filesKey(owner(), repo(), params.number), files)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
-        // Linked tickets, both list enrichment and any open detail, refetch too. Keyed by string
-        // rather than by importing the plugin that supplies them, so a force-refresh of a pull does
-        // not make this plugin depend on whichever providers enrich it. The host's one prefix covers
-        // every provider (client-core/registries/refResolvers.ts).
-        queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
-      ])
-    } finally {
-      setRefreshingPull(false)
+      setRefreshing(false)
     }
   }
 
   return (
-    <Show
-      when={linked()}
-      fallback={
-        <Show when={emptyMessage()} fallback={<Acorn />}>
-          {(message) => <EmptyState align="start">{message()}</EmptyState>}
-        </Show>
-      }
-    >
-      <ListDetail split>
-        <ListColumn label="Reviews">
-          <SectionHeader
-            actions={
-              <>
-                <Button
-                  tip="New pull request"
-                  onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}
-                >+ New PR</Button>
-                <Button variant="bare" iconOnly tip="Refresh reviews" label="Refresh reviews" busy={refreshingPulls()} onPress={refreshAllPulls}>↻</Button>
-              </>
-            }
-          >
-            Reviews
-          </SectionHeader>
-          <PullList />
-        </ListColumn>
-        <DetailColumn>
-          <Show
-            when={isNew()}
-            fallback={
-              <Show when={params.number} fallback={<Acorn />}>
-                <ListDetail split listWidth="wide">
-                  {/* No "Navigator" header: the tree under it opens with the pull's own heading,
-                      which names the column better than a label ever did. */}
-                  <ListColumn scroll label="Pull request">
-                    <PullDetail />
-                  </ListColumn>
-                  <DetailColumn>
-                    <SectionHeader
-                      actions={
-                        <Button variant="bare" iconOnly tip="Refresh diff" label="Refresh diff" busy={refreshingPull()} onPress={refreshCurrentPull}>↻</Button>
-                      }
-                    >
-                      Diff
-                    </SectionHeader>
-                    <DiffView />
-                  </DetailColumn>
-                </ListDetail>
-              </Show>
-            }
-          >
-            <ListDetail split listWidth="wide">
-              <ListColumn scroll label="New pull request">
-                <SectionHeader>New pull request</SectionHeader>
-                <CreatePullForm />
-              </ListColumn>
-              <DetailColumn>
-                <SectionHeader>Compare</SectionHeader>
-                <ComparePreview />
-              </DetailColumn>
-            </ListDetail>
+    <WhenLinked scope={scope}>
+      <SectionHeader
+        actions={
+          <>
+            <Button
+              tip="New pull request"
+              onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(scope.projectId())))}
+            >+ New PR</Button>
+            <Button variant="bare" iconOnly tip="Refresh reviews" label="Refresh reviews" busy={refreshing()} onPress={refreshAllPulls}>↻</Button>
+          </>
+        }
+      >
+        Reviews
+      </SectionHeader>
+      <PullList />
+    </WhenLinked>
+  )
+}
+
+/** The `detail` region: the pull that is open, or the create form. */
+export function GithubBrowseDetail() {
+  const scope = createBrowseScope()
+  const params = useParams()
+  // Create mode: the static route is contributed ahead of the parameter route.
+  const newMatch = useMatch(() => githubCreateRoute)
+  const isNew = () => !!newMatch()
+
+  return (
+    <WhenLinked scope={scope}>
+      {/* A `Suspense` round each `lazy()` below, which is the ordinary thing to put round one: it is
+          what decides what the region shows while a chunk is loading, on either host. They arrived as
+          a workaround for a cell host refusing the empty string a pending `lazy()` resolves to, and
+          they are no longer that — the terminal paints a loose string as a one-line run
+          (docs/tui.md § Rendering). They stay because a boundary at a lazy mount is correct
+          either way. */}
+      <Show
+        when={isNew()}
+        fallback={
+          <Show when={params.number} fallback={<Acorn />}>
+            {/* No split written here any more. A pull request is a header, its sections and its diff,
+                and `Sections` is the node that says so — so this region is the gate and `PullDetail`
+                is the surface (client-core/kit/components/layout/Sections.tsx). */}
+            <Suspense fallback={null}><PullDetail /></Suspense>
           </Show>
-        </DetailColumn>
-      </ListDetail>
-    </Show>
+        }
+      >
+        <ListDetail split listWidth="wide">
+          <ListColumn scroll label="New pull request">
+            <SectionHeader>New pull request</SectionHeader>
+            <Suspense fallback={null}><CreatePullForm /></Suspense>
+          </ListColumn>
+          <DetailColumn>
+            <SectionHeader>Compare</SectionHeader>
+            <Suspense fallback={null}><ComparePreview /></Suspense>
+          </DetailColumn>
+        </ListDetail>
+      </Show>
+    </WhenLinked>
   )
 }

@@ -2,8 +2,8 @@
 
 acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
 registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
-and are trusted like the rest of the app. Linear, rollbar, model-providers and nodes-file remain in the workspace as
-source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
+and are trusted like the rest of the app. Database, findings, http, linear, model-providers, nodes-file, rollbar, and sentry-telemetry remain in the
+workspace as source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
 [extensibility.md](./extensibility.md) covers why the two tiers exist and what the line between
@@ -31,19 +31,11 @@ extension point with two render paths now, and a loaded plugin fills one by nami
 host mounts. What is left on this list is the places the host has not opened as a point, plus the
 places that hold a live stream rather than a tree.
 
-The test is *embedded in a render tree*, not *rendered by another plugin*. A **ref panel** is the
-case worth being careful about: it used to look like the strongest counter-example on this page —
-github's `PullDetail` rendered linear's panel beside a PR, which sounds like B — and it was not, because
-the panel is a rectangle the host places. So `refPanel` is one of the frame targets and a loaded plugin
-contributes one as a sandboxed frame (`packages/client-core/src/plugins/frames/register.ts`). Linear
-ships that way, so this is observed rather than argued.
-
-The argument is now stronger than "not B", because github does not render the panel at all. It calls
-`openRefPanel({ providerId, displayId })` and the shell draws it in one place
-(`client-core/registries/refPanelHost.tsx`). What was a plugin holding another plugin's component in its
-own JSX is a plugin naming an item, which is data. That the coupling could be deleted rather than
-defended is the point: reason B is about components that *must* be in someone else's render tree, and a
-panel never had to be.
+The test is *embedded in a render tree*, not *rendered by another plugin*, and the reference panel is
+the case that gets it wrong — a panel looks like the first and is really the second.
+[extensibility.md](./extensibility.md) § Two tiers, permanently makes that argument in full; the
+outcome for this list is that `refPanel` is one of the frame targets
+(`packages/client-core/src/host/frames/register.ts`) and Linear ships as one, so B does not cover it.
 
 Three of `RefPanelProps` do not survive the boundary, and the third was found by shipping it.
 `onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing
@@ -82,7 +74,7 @@ exists before any plugin is trusted.
 What has no sanctioned alternative, ever, is the *uncooperative* half — B reaching into A without A
 saying so. See [plugins.md](./plugins.md) § There is no uncooperative extension.
 
-**C. Code that runs in the desktop shell itself** — a `src/main/` half that names a shell binding.
+**C. Code that runs in the desktop shell itself** — a plugin half that names a shell binding.
 The shell surface is enumerated and boundary-tested; a loaded plugin has no presence there at all.
 
 This category is empty. Showing a web page stopped being an instance of it when the view service
@@ -98,13 +90,16 @@ plugins: they cannot be disabled, so they cannot be optional, so they cannot be 
 **E. Registries with no manifest form** — `persistedStateSlices`, non-`footer` component slots, and
 the generic `ctx.contribute(registry, entry)` escape hatch. These take functions or components. Some
 are inherently first-party (B); others simply have no declarative equivalent yet, which is a gap
-rather than a law — noted per row where that is the case. `agentToolRenderers` was on this list and
+rather than a law — noted per row where that is the case. On both sides the line is a type rather than
+a paragraph: what a loaded plugin gets is `NodePluginContext` and `ClientPluginContext`, and everything
+in this reason sits on `CompiledNodePluginContext` or `CompiledClientPluginContext` beside them
+(docs/plugins.md § The two contexts, one per tier). `agentToolRenderers` was on this list and
 is not: a tool card is `agents:tool-card`, an ordinary `remote` point, so a loaded plugin declares
 one in its manifest like any other extension (docs/contribution-kinds.md).
 
 **F. Constructor arguments from the composition root** — the `NodePluginDeps` bag in
-`apps/node/src/server/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
-is handed one thing, its `NodePluginContext`. It is never called with arguments, so anything the
+`apps/node/src/composition/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
+is handed one thing, its `NodePluginContext` — the loaded one. It is never called with arguments, so anything the
 root passes positionally pins the plugin to the compiled tier no matter what else it uses. Four
 plugins take a dependency bag — **agents**, **notes**, **terminal**, and **workflows** — and three
 take the data root as a first argument — **agents**, **memory**, and **notes** — for the files they
@@ -146,7 +141,7 @@ Two things that are **not** on this list, deliberately:
   loaded plugins do not get — but that is a seam gap, not a privilege. See "The honest asterisk"
   below.
 - **Owning a SQLite file, agent tools, integration providers, panes, ref panels, sources, settings
-  pages, palette rows, slots, attention items, node stats, content links, and a host-owned
+  pages, slots, attention items, node stats, content links, and a host-owned
   webview.** All available to loaded plugins today, through the manifest, the frame bridge, or
   `ctx`. The webview is the newest and the one most likely to be assumed unavailable: a plugin
   declares a surface with a host allowlist and drives it with four verbs, while the
@@ -160,44 +155,47 @@ Ordered by how strong the first-party claim is.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes six capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `TASK_CREATED`, …) that four other plugins consume, handles the `core:worktree-created` hook, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D, F |
+| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes six capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `TASK_CREATED`, …) that four other plugins consume, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin in the tree. | A, B, D, F |
 | **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because the `agents:tool-card` point's props name it. | D, E, F |
 | **docker** | Owns a WS channel prefix for container log and event streams. Its footer badge and rail slot are component contributions. | A, B |
 | **preview** | Its display lifecycle calls the host-owned webview service any plugin surface can use, and its node half owns the preview page rules the shell enforces, delivered over the service protocol. The browser agent tools left for `plugins/browser`, which drives a browser of the node's own. Supplying shell-enforced policy—not merely showing a page—is why preview remains first-party. | C |
 | **memory** | `required`. Publishes `KNOWLEDGE`/`MEMORY_KNOWLEDGE` and contributes two task-context sections that core's assembler depends on existing. | D, F |
 | **notes** | `required`. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins; contributes a context section. `notes.ts` remains in protocol because `NoteLocation` is core's own task/workspace/global addressing scheme. | D, F |
-| **onboarding** | A component in the `overlay` slot: a full-screen first-run wizard, opened when the node is ready and has zero projects. Sandboxing the first-run experience behind a trust prompt for a plugin the user never installed is circular. | B, D |
+| **onboarding** | A component in the `overlay` slot: a full-screen first-run wizard, opened when the node is ready and has zero projects. Sandboxing the first-run experience behind a trust prompt for a plugin the user never installed is circular. Its **Generate with AI** step is the one place it reads a core route directly, `GET /v2/core/models/backends`, to say which agent CLIs the machine has and which are not there, and it offers a key form per model provider without knowing that OpenAI or Anthropic exist ([integrations.md](./integrations.md) § Model providers). The step never blocks: **Next** is live whether or not anything is installed or connected. | B, D |
 
 ### First-party for one specific reason
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point a loaded plugin can fill, and everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) was already available. It stays compiled by preference: it is one of the four panes a task always has. | — |
+| **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point a loaded plugin can fill, and everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) was already available. The commit-message route it gained consumes `core.models`, which does not change the answer: the database plugin consumes the same seam as a loaded plugin, through the `ctx.core` every plugin has ([integrations.md](./integrations.md) § Model providers). It stays compiled by preference: it is one of the four panes a task always has. | — |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. Every one of its five surfaces is a host layout filled with kit nodes and it ships no stylesheet, so nothing about how it draws itself keeps it here: what does is `GITHUB_MIRROR` having a consumer. | D |
-| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E, F |
+| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability, one settings page, a rail source with a `list-detail` pair of regions, the project surface at `/p/:projectId/x/workflows/:id` that its editor draws in, the `workflows` task pane its runs are watched in, the gate attention source, and the `workflow-run` notice target every bell row about a run lands on. All of it is kit-pure and ships no stylesheet. Opens the three extension points other plugins add step kinds, policies, and triggers through, and answers the catalog those kinds describe themselves into. Its editor's **Generate** consumes `core.models` the way changes and database do, and reads the same catalog to teach the model, so a contributed step kind is generatable with no change here. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
+| **editor** | Owns the `editor:pty:*` WS channel that carries the `$EDITOR` mode, and contributes the persisted open-file slice. Its file tree is also a dynamic multi-document surface, while the loaded-plugin `document` layout describes one host-owned document at a time. The shared `ui/editor` contract still owns desktop CodeMirror behavior and the terminal's read-only/`$EDITOR` behavior; extraction must extend that contract instead of moving either implementation into plugin code. | A, E |
 
 ### First-party only by history
 
-These use nothing a loaded plugin could not be given. They are in the binary because they were
-written before the loader existed.
-
-| Plugin | What it uses | Portable? |
-| --- | --- | --- |
-| **editor** | Monaco pane with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. Both surfaces are host layouts filled with kit nodes and it ships no stylesheet. | **One blocker, and it is Monaco's size rather than a question.** A Monaco frame bundle measured 7.93 MiB against the 8.00 MiB cap with no editor UI in it, and its four language-service workers, another 14.58 MiB, cannot be delivered at all: a plugin origin serves one file and the frame CSP has no `worker-src`. So a Monaco frame would run with no TypeScript, JSON, CSS or HTML diagnostics, which for an editor is a different product rather than a degraded mode. Neither capability has an outside consumer. |
+There are none at present. The editor was the last entry, and the 2026-09-11 reassessment moved it
+to the table above for concrete reasons A and E. Its standalone pane is no longer a size blocker:
+`pnpm --filter @acorn/node measure:editor-bundle` produces 1,271,605 raw bytes (265,587 gzip), well
+under the 8 MiB client-bundle ceiling. `EDITOR` and `SEARCH` have no consumers outside the editor's
+own route adapters; an eventual extraction should delete those two private indirections rather than
+turn them into cross-realm capabilities.
 
 **http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
 it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
 tested — a migration arriving through an installer update against a populated database — now has a test.
-Read [docs/third-party/README.md](./third-party/README.md) for what it cost and what it found —
+Read [docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) for what it cost and what it found —
 including two bugs that had nothing to do with the tier; the per-finding detail is in `git log`.
 
 **database** followed it, and it is the more interesting of the two. It was the entry that read "no, on
-the client half" here, because the pane embeds Monaco and Monaco does not fit a frame. The answer was
+the client half" here, because the pane embedded Monaco and Monaco does not fit a frame. The answer was
 not to widen the sandbox: the host now owns one editor and lends it through a declarative contract, so
-the pane still has a real editor while the plugin ships 156 KB and no Monaco at all
-([docs/third-party/README.md](./third-party/README.md) § database has moved). Its `DATABASE` capability turned out to be
-an indirection with nothing on the other side of it and was deleted rather than ported.
+the pane still has a real editor while the plugin ships 156 KB and no editor library at all
+([docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) § database has moved). Its `DATABASE` capability turned out to be
+an indirection with nothing on the other side of it and was deleted rather than ported. It publishes
+one capability now, `database.query`, inside its own namespace, and contributes the `database:query`
+and `database:generate` workflow step kinds through it.
 
 **model-providers** also used to be on this table and has moved: it is a loaded package now, in neither
 composition list. It was the easiest possible second move and worth saying why — no client half, so
@@ -212,21 +210,51 @@ genuinely lost rather than reshaped. Its answer to "portable? yes, fully" turned
 right. The pane, the ref panel, the recognisers, the rail rows and host-owned promotion all crossed;
 the browse's **workspace project picker** did not, because choosing which Linear projects a workspace
 follows writes core's workspace state, and that write is unmappable on the frame bridge and absent
-from `CoreServices`. [third-party/README.md](./third-party/README.md) carries the summary.
+from `CoreServices`. [loaded-plugin-migration.md](./loaded-plugin-migration.md) carries the summary.
 
 Its **project-scoped issue view** was the other loss, and that one is closed. Every frame target the
 manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
 through a `SourceRouteContribution` had no manifest form, and every rail row click outside a task was
 refused with "open a task first". Panes now declare a `scope`, a manifest may declare `routes` under a
-host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` may `navigate` to a
-project-scoped surface — so the capability is carried by the tier rather than by a compiled exception.
+host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` — or a search command's,
+which has the same selected row and the project its scope was resolved against — may `navigate` to a
+project-scoped surface, so the capability is carried by the tier rather than by a compiled exception.
 The picker remains open.
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
 package serves provider routes through
 `ctx.providers.integration` with a fetch handler; it can create a task from an item and link the
 item to it through the host-owned descriptor promotion flow. Everything Rollbar does, an outside
-author can now do. Review findings from the move are in [third-party/](./third-party/).
+author can now do. Review findings from the move are in [loaded-plugin-migration.md](./loaded-plugin-migration.md).
+
+## What each of these loses in a terminal
+
+The terminal client draws the same panes from the same source ([tui.md](./tui.md)).
+A plugin writes no terminal UI and learns nothing about the host, so what follows is not a second
+implementation: it is what the kit's own `reduced` and `absent` levels come to once a pane is read at 80
+by 24. Only the plugins that lose something are listed.
+
+| Plugin | What a reader loses |
+| --- | --- |
+| **editor** | CodeMirror. The `editor` rectangle draws a box and says the file opens there; the reader's own `$EDITOR` runs in the box instead on one device preference, and that is the better half of the pane in a terminal anyway. The file tree, the search and the tabs are unchanged. |
+| **terminal** | The drawer. It is a place on the desktop's screen between two icon rails, and there is neither. A PTY still draws — natively, in cells, wherever a pane mounts one. |
+| **docker** | Nothing of the pane. It is offered only on a task that has containers, as on the desktop, and `exec` is a native PTY. |
+| **preview** | The pane. It asks for the `preview` seam and the terminal installs none, so it is absent from the strip rather than present and empty. |
+| **agents** | Attaching a file at all, and saving one back out. `[Attach]`, both **Export** rows and an artifact's download go through the platform seam's `pickFiles`/`saveFile`, which answer empty and false where the host installs no `files` group and there is no `document` to fall back to — so each is a control that presses and does nothing rather than one that says why (`client-core/infra/platform/index.ts`). One seam, three affordances. Also **Continue in terminal**, which hands the session to a drawer this host does not draw and leaves it with no composer until **Return to managed mode** is picked; and the three settings pages, which have nowhere to be drawn. Running an agent is untouched: opening a session, answering what it is blocked on, sending a turn, and starting a new one all work ([tui.md](./tui.md) § Tests). |
+| **github** | Nothing of the five surfaces. There is no URL, so a content link resolves to a pane or a reference panel and stops there rather than falling through to a route, and the create-PR form's own draft is per device as it is everywhere. |
+| **workflows** | Its settings page has nowhere to be drawn: the terminal client has no settings surface yet. The rail source, the editor and the run pane cross whole: the source's two regions are the Browse panel and the main one, the editor draws its node list beside its inspector inside the second, and the run pane draws the same list with what the selected node is doing beside it. An agent node there is the agents plugin's own conversation, so it works exactly as far as that plugin does on this host: the transcript, the queue and the composer cross, and attaching a file does not. |
+
+What another plugin brings *into* these panes crosses too: github's diff-line marks and the badges
+beside a pull request's state draw in cells, and the changes pane's own diff point behaves the same
+way. What is still absent is the host UI slots — the terminal drawer, and the two `overlay` entries
+github and agents use to mount router- and query-client-scoped command registrations — and that is one
+row of [tui.md](./tui.md) § What a plugin loses here rather than a property of any plugin here. The
+editor's ⌘P file palette used to be on that list; it is a command on the shared palette session now,
+so it draws here like everything else.
+
+Nothing is missing from **changes**, **context**, **memory**, **notes** or **onboarding**. The four
+plugins that ship only a tree bundle — **http**, **linear**, **rollbar**, **database** — reach the
+terminal through the worker sandbox instead, drawing the same nodes into cells.
 
 ## The honest asterisk
 
@@ -261,7 +289,7 @@ nothing broke.
 **When an existing one should stay put.** Always, unless there is a reason beyond proving a point.
 Converting a working integration to exercise a seam confounds "did the seam work" with "did the
 port work", and costs a working integration while you find out. Prove seams with a plugin that has to keep working —
-see [third-party/](./third-party/), which weighs that trade per candidate.
+see [loaded-plugin-migration.md](./loaded-plugin-migration.md), which weighs that trade per candidate.
 
 **When a third-party plugin asks for a first-party privilege.** The escalation path is review and
 adoption into first-party, not a wider sandbox. The two tiers are permanent, and the line is
@@ -281,19 +309,19 @@ plugin can be: a manifest with two egress hosts and an empty `contributions`, an
 half.
 
 **nodes-file** — smaller than model-providers, and the only plugin here that contributes nodes rather
-than data. One registration through `ctx.providers.nodes`, a manifest that grants it nothing at all
-(`core: []`, `secrets: false`, `exec: false`, `net: []`), no routes, no tables, no client half. It reads
-nodes out of a JSON file named by `ACORN_NODES_FILE` and does nothing when that is unset. Build it with
+than data. One registration through `ctx.providers.nodes`, no core, secret, process, or network
+grants, one read-write file grant resolved from `ACORN_NODES_FILE`, and no routes, tables, or client
+half. It does nothing when that variable is unset. Build it with
 `pnpm --filter @acorn/node build:plugin nodes-file`.
 
 Read it for the acceptance argument rather than the feature: a first-party control-plane plugin gets no
-host privilege a third party lacks ([plugins.md](./plugins.md) § Node providers), and this is what
-"no privilege" looks like written down. It is not in the bundled roster, so a shipped install has no
+host privilege a third party lacks ([plugins.md](./plugins.md) § Node providers), and this is what a
+narrow explicit resource grant looks like written down. It is not in the bundled roster, so a shipped install has no
 node providers at all.
 
 **rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,
 and its client half is a sandbox bundle rather than a `ClientPlugin`. Build it with
-`pnpm --filter @acorn/node build:plugin rollbar`; [third-party/](./third-party/) records what the
+`pnpm --filter @acorn/node build:plugin rollbar`; [loaded-plugin-migration.md](./loaded-plugin-migration.md) records what the
 move exposed. The provider registration remains conceptually:
 
 ```ts

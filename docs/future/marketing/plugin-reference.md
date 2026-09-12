@@ -4,7 +4,7 @@ The design for the Plugins section of the public site — the reason the site ex
 a reference that answers three questions for an author and for the maintainer: what goes in the
 manifest, what the node half can do, and how a node-side contribution ends up as client UI.
 Almost none of it needs writing from scratch: `docs/plugin-authoring.md` is already a public
-authoring guide that needs splitting, `packages/protocol/src/pluginContract.ts` is a heavily
+authoring guide that needs splitting, `packages/protocol/src/plugin/contract.ts` is a heavily
 commented single source of truth the manifest reference can be generated from, and
 `packages/plugin-sdk/src/public.ts` is a hand-written published declaration file that already
 is the SDK reference for both render paths.
@@ -49,7 +49,7 @@ manifest, a two-file node half, and a `client.js` with the handshake inlined.
 The one piece of real build machinery, and the reason the site lives in-repo.
 
 A build script in `apps/site` imports the zod schema from
-`packages/protocol/src/pluginContract.ts` and emits two artifacts:
+`packages/protocol/src/plugin/contract.ts` and emits two artifacts:
 
 1. **A structured JSON document** — sections, keys, types, caps, defaults, and the schema's own
    comments as descriptions — rendered by a client-filterable component. Herdr's
@@ -63,7 +63,7 @@ A CI check regenerates both and diffs against the committed output, so the schem
 from the docs without a red build — herdr's `config_reference_check` discipline.
 
 Two things generation cannot carry, and prose must: the cross-field refinements that live in
-`packages/node-core/src/main/pluginManifest.ts` (route confinement, surface reachability, id
+`packages/node-core/src/server/plugins/manifest.ts` (route confinement, surface reachability, id
 uniqueness — stated as rules on the reference page), and the load-time path checks
 (`resolveInRoot` re-verifies lexical and symlink confinement, which the schema alone cannot
 express).
@@ -99,7 +99,7 @@ panes) rather than re-explaining the feature.
 ## The node half
 
 From `docs/plugin-authoring.md` § the node half, backed by
-`packages/node-core/src/server/plugin/types.ts`. The page documents the `NodePlugin` lifecycle
+`packages/node-core/src/server/pluginHost/types.ts`. The page documents the `NodePlugin` lifecycle
 (`init`, `ready`, `dispose`) and each `NodePluginContext` facet in reference style: `routes`,
 `tools`, `schedules`, `collections`, `taskChecks`, `contextSections`, `providers`, `capabilities`,
 `storage`, `core` (the confined filesystem, git, process broker, and secrets services), `events`.
@@ -140,11 +140,9 @@ The page every trust prompt links to. Three lists, and where each is enforced ve
   grantable scopes (`core.projects:config|read|write`, `core.tasks:read|write`,
   `core.workspaces:read`); a plugin's own namespace is always allowed, another plugin's never.
 - `permissions.events` — names the shell channels a frame may subscribe to.
-- `permissions.node` (and `net`, `secrets`, `exec`) — **declared, not enforced**. The node half
-  runs in-process; these shape the context handed to cooperative code and inform the trust
-  prompt, and the page says so in those words. This is the "disclosed, not contained" honesty
-  constraint from [README.md](./README.md), stated where authors and users will actually read
-  it.
+- `permissions.node` (and `net`, `secrets`, `exec`) — **enforced** by the isolated worker's
+  manifest-shaped RPC context and runtime grants. Scheduled and task-check behavior remains
+  **declared**, because the host controls placement and timing but cannot verify plugin intent.
 
 Plus the trust model: install is per-node and owner-authenticated, trust is per-device with a
 prompt that renders the permission lists, and bundled plugins ride the identical

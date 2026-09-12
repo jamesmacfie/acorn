@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { bytesOf, formatSize, handlePluginContentLinkClick, openPane, type Task } from '@acorn/plugin-api/client'
+import { bytesOf, formatSize, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
   Alert, Button, Checkbox, EmptyState, Input, Markdown, Row, Rows, Section, Stack, Text, Textarea,
@@ -200,7 +200,7 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                 <Markdown
                   text={model().body()}
                   copy
-                  onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
+                  onSelect={(href) => openInAppUrl(href, { taskId: props.task.id })}
                 />
               }>
                 <Textarea

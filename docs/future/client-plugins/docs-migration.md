@@ -8,14 +8,14 @@ rewrites it. Paths were checked on 2026-08-29.
 
 | Document | Section | Phase | Change |
 | --- | --- | --- | --- |
-| `docs/plugins.md` | § Loaded plugins: the client half | 0 | A second provenance. "Nodes hold plugins" becomes "nodes hold plugins with a node half; a device may hold a client-only plugin." The resolution rule (device wins). |
+| `docs/plugins.md` | § The client half of a loaded plugin | 0 | A second provenance. "Nodes hold plugins" becomes "nodes hold plugins with a node half; a device may hold a client-only plugin." The resolution rule (device wins). |
 | `docs/plugins.md` | § Replacing a core surface | 1, 2 | The slot list grows; core is a provider; the contract-per-surface rule; the nested-slot allowance for `rail` and `topbar`. |
 | `docs/plugins.md` | new § Device-held plugins | 0 | Install sources, the no-node-half rule, device-scoped state, uninstall, the Settings section. |
 | `docs/security.md` | § Third-party plugin bundles | 0 | Provenance on the acknowledgement row; the prompt's provenance line; the device dev grant. The `(pluginId, hash)` key is unchanged and the doc says so. |
 | `docs/security.md` | § The containment ladder | 0 | One sentence: a device-held bundle sits on the same rung as a node-held one because it renders through the same path. |
 | `docs/security.md` | § The dev grant | 0 | The grant key gains a device form. |
-| `docs/state.md` | § Device | 0 | `plugin:<device-plugin-id>:*` joins the device set by prefix rule; why. |
-| `docs/state.md` | § Device | 4 | The config file as a second door onto device prefs. |
+| `docs/state-ownership.md` | § Device | 0 | `plugin:<device-plugin-id>:*` joins the device set by prefix rule; why. |
+| `docs/state-ownership.md` | § Device | 4 | The config file as a second door onto device prefs. |
 | `docs/frontend.md` | § Composition | 1, 2 | The shell's chrome is providers of exclusive slots. `App.tsx` and `TabRail.tsx` become hosts. |
 | `docs/frontend.md` | § Registries and plugins | 1 | `exclusiveSlots.ts` no longer has a `core` prop special case. |
 | `docs/ui-design.md` | § Shell hierarchy | 2 | Rail and topbar are slots. |
@@ -32,7 +32,7 @@ rewrites it. Paths were checked on 2026-08-29.
 | `docs/testing.md` | smoke checklist | 0, 1, 2 | Install a device plugin, pick a replacement switcher, break it, watch core return. |
 | `docs/architecture-overview.md` | the plugin paragraph | 0 | One sentence on device provenance. |
 | `docs/future/remote.md` | § Browser-side fan-out | 0 | `WebBroker` owes a `PluginCustody`; pointer to 07-hosts.md. |
-| `docs/future/terminal/06-isolation.md` | § Custody | 0 | The file-backed custody; pointer to 07-hosts.md. |
+| `docs/tui.md` (was `docs/future/terminal/06-isolation.md`, deleted) | § Custody | 0 | The file-backed custody; pointer to 07-hosts.md. |
 | `docs/future/ecosystem/README.md` | the programmes | 0 | One line: device provenance does not change signing or discovery. |
 | `docs/future/compiled-tier.md` | the map | 1 | The switcher and rail chrome are no longer reasons a plugin stays compiled. |
 | `docs/future/README.md` | the programmes table | now | This folder's row. |

@@ -3,4 +3,4 @@
 // own testkit: one barrel carrying both halves puts DOM types into a node-only program.
 //
 //   apps/node/test/integration/harnessContribution.test.ts   agentDriverRegistry
-export { agentDriverRegistry } from '../main/drivers/registry'
+export { agentDriverRegistry } from '../server/drivers/registry'

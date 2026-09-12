@@ -1,10 +1,11 @@
 import { join } from 'node:path'
-import { type InternalEnvFactory, type NodePlugin, notesSection } from '@acorn/plugin-api/node'
+import type { InternalEnvFactory, NodePlugin } from '@acorn/plugin-api/node'
+import { notesSection } from '../server/contextSection'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import { NOTES_SEED_TASK, NOTES_STORE } from '../contract/store'
-import { notesAgentTools } from '../main/agentTools'
-import { NotesStore } from '../main/notes'
-import { seedTaskNotes } from '../main/seedTaskNotes'
+import { notesAgentTools } from '../server/agentTools'
+import { NotesStore } from '../server/notes'
+import { seedTaskNotes } from '../server/seedTaskNotes'
 import { notes } from '../server/routes/notes'
 
 export type NotesPluginDeps = { internalEnv: InternalEnvFactory }

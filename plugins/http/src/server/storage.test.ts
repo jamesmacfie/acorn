@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 import { HttpStorageError, openHttpValue, protectHttpValue } from './storage'
 
 const SECRETS = new SecretService('0'.repeat(64))

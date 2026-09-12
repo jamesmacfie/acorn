@@ -1,0 +1,44 @@
+name: Lint and test
+
+# The gate every pull request has to pass. Until this existed the architecture rules, the path
+# checker, and every unit suite ran only on whoever remembered to run them: build-desktop.yml has no
+# pull_request trigger and runs the desktop package alone.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Linux, not macOS, for the two things the suite needs that a macOS runner does not have: Docker,
+    # which the container probes look for, and a /var that is not a symlink to /private/var, which one
+    # http test compares paths against (docs/testing.md § Known pre-existing failures).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          # The major from node-runtime.json. node:sqlite sets the floor, so an older major does not
+          # boot the service at all.
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # oxlint, then `tsc --noEmit` in every package. Two halves in one script: an oxlint failure
+      # means tsc never ran, so read which half went red before trusting the types.
+      - run: pnpm lint
+
+      # `pnpm test`, not `turbo run test`: the root script rebuilds node-pty for this ABI first and
+      # bounds Turborepo's concurrency, and without the bound the suites that spawn processes or mint
+      # certificates time out under the load while passing in isolation (CLAUDE.md).
+      #
+      # @acorn/desktop is excluded because its `test` stages the whole bundle and then runs cargo.
+      # build-desktop.yml already has the Rust toolchain and the staged inputs, and runs it there.
+      - run: pnpm test --filter='!@acorn/desktop'

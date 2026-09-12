@@ -20,10 +20,10 @@ different value alphabet, so the phase is small.
 
 In:
 
-- `contributions.styles: [{ id, label, description?, tokens }]` in `pluginContract.ts`, with the
+- `contributions.styles: [{ id, label, description?, tokens }]` in `plugin/contract.ts`, with the
   per-family validator from [05-appearance-and-icons.md](./05-appearance-and-icons.md) as one
   function in `@acorn/protocol`.
-- - `packages/client-core/src/plugins/chrome/styles.ts` (new) beside `themes.ts`: `pluginStyleId`,
+- - `packages/client-core/src/host/registries/shell/styles.ts` (new) beside `themes.ts`: `pluginStyleId`,
   `pluginStyleBlock`, `registerPluginStyle`, `pluginStyleStyleSheet`.
 - The node validates on install; the device validates on manifest read; both call the one function.
 - `styleRegistry` entries from plugins; Settings → Appearance lists them under the plugin's label.
@@ -38,7 +38,7 @@ Out: icon sets (parked), any new style token, any change to the theme contributi
 
 ## Design detail
 
-**The validator as a table.** `STYLE_TOKEN_FAMILIES` in `ui/tokenAxes.ts` maps each `STYLE_TOKENS`
+**The validator as a table.** `STYLE_TOKEN_FAMILIES` in `kit/tokens/tokenAxes.ts` maps each `STYLE_TOKENS`
 entry to a family name, and `styleValueAlphabet` in `@acorn/protocol` maps a family to a predicate.
 A token with no family is a test failure, so a new style token cannot be added without deciding its
 alphabet. This is the shape the parked icon door asks for: an `icon` family later is a row.
@@ -62,16 +62,16 @@ projection reads computed values.
 
 ## Code touched
 
-- `packages/protocol/src/pluginContract.ts`: `contributions.styles`.
+- `packages/protocol/src/plugin/contract.ts`: `contributions.styles`.
 - `packages/protocol/src/styleValues.ts` (new): the family predicates.
-- `packages/client-core/src/ui/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
-- `packages/client-core/src/styles/tokenAxes.test.ts`: every style token has a family; the cap is
+- `packages/client-core/src/kit/tokens/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
+- `packages/client-core/src/infra/styles/tokenAxes.test.ts`: every style token has a family; the cap is
   first-party only; the shadow-colour indirection invariant.
-- `packages/client-core/src/plugins/chrome/styles.ts` (new).
-- `packages/client-core/src/plugins/contributions.ts` and `frames/register.ts`: register styles per
+- `packages/client-core/src/host/registries/shell/styles.ts` (new).
+- `packages/client-core/src/host/plugins/contributions.ts` and `frames/register.ts`: register styles per
   plugin, gated on trust like themes.
-- `packages/node-core/src/main/pluginManifest.ts`: the validator on install.
-- `packages/client-core/src/settings/AppearanceSettings.tsx` (or wherever the style picker lives;
+- `packages/node-core/src/server/plugins/manifest.ts`: the validator on install.
+- `packages/client-core/src/features/settings/AppearanceSettings.tsx` (or wherever the style picker lives;
   verify): plugin packs listed.
 - `packages/plugin-types/acorn-plugin.schema.json`: regenerated.
 - `docs/plugin-authoring.md`, `docs/ui-design.md`, `docs/contribution-kinds.md`.
@@ -107,14 +107,14 @@ function with no DOM dependency, so the terminal host can validate a pack it wil
 
 ## Verify before building
 
-- `packages/client-core/src/registries/styles.ts` exports `styleRegistry` with `StyleContribution =
+- `packages/client-core/src/host/registries/shell/styles.ts` exports `styleRegistry` with `StyleContribution =
   { id, label, description? }` and no writer other than `settings/uiStyles.ts`.
-- `packages/client-core/src/plugins/chrome/themes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
+- `packages/client-core/src/host/chrome/chromeThemes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
   `registerPluginTheme`, `pluginThemeStyleSheet`; copy its shape.
-- `packages/client-core/src/ui/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
+- `packages/client-core/src/kit/tokens/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
   `--space-*`, `--font-*`, `--shadow-*`, `--fs-*`, `--lh*`, `--fw-*`, `--*-transform`,
   `--*-tracking` entries; check the exact list before writing the families.
-- `packages/client-core/src/styles/tokenAxes.test.ts` has the 25-selector cap.
+- `packages/client-core/src/infra/styles/tokenAxes.test.ts` has the 25-selector cap.
 - The built-in packs' shadows reference a theme token for colour. If any uses a literal, fix that
   first or the alphabet's shadow rule is a lie about the built-ins.
 - Phase 0 of this folder has shipped.

@@ -13,7 +13,7 @@ provides the UIs."
 
 Six plugins are loaded (database, http, linear, model-providers, nodes-file, rollbar) with **zero
 production import edges** into them. A compiled plugin costs one roster line per side
-(`apps/desktop/src/app/client/plugins.ts`, `apps/node/src/server/plugins.ts`) and registers
+(`apps/desktop/src/client/plugins.ts`, `apps/node/src/composition/plugins.ts`) and registers
 itself through `ctx`. A loaded plugin can shadow a built-in by id (`composition.ts`) — the
 migration hatch is already wired. The registration-point sprawl this review expected to find was
 already fixed.
@@ -41,7 +41,7 @@ last consumer leaves.
 One blocker the table does not spell out per row, because it applies to five of them at once: the
 composition root calls `agents`, `notes`, `terminal`, and `workflows` with a `NodePluginDeps` bag,
 and `agents`, `memory`, and `notes` with the data root as a first argument
-(`apps/node/src/server/plugins.ts`). The loader activates a loaded plugin with its context and
+(`apps/node/src/composition/plugins.ts`). The loader activates a loaded plugin with its context and
 nothing else, so every one of those arguments has to become a capability, a route, or a
 `ctx.storage` path before the plugin can move. `docs/first-party-plugins.md` lists it as reason F.
 
@@ -108,7 +108,7 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
 
 - **Dead slot ids** `topbar.left` and `task.switcher.extra` — zero consumers anywhere (the
   manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them). Still
-  present in `client-core/src/registries/slots.ts` on 2026-08-28, and they outlived the cleanup that
+  present in `client-core/src/host/registries/extensionPoints/slots.ts` on 2026-08-28, and they outlived the cleanup that
   would have taken them. Delete them the next time that file is opened.
 - ~~The `themes` registry~~ — resolved: manifest-declared token themes shipped
   (`docs/ui-design.md § Plugin themes`), so that registry now has its plugin feeder. `styles`
@@ -128,7 +128,7 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
 ## Verify before building
 
 Re-run the census: which plugins have `acorn-plugin.config.mjs`; current consumers of each
-host-only registry (`registries/plugin.ts` vs the manifest's contribution block in
-`pluginContract.ts`); whether the memory/context tray coupling and `WORKFLOW_CONTROL` still
+host-only registry (`registries/extensionPoints/plugin.ts` vs the manifest's contribution block in
+`plugin/contract.ts`); whether the memory/context tray coupling and `WORKFLOW_CONTROL` still
 exist; whether the projects row still carries `github_*` columns; and the current ratchet numbers
 in `tools/arch/boundaries.test.ts`.

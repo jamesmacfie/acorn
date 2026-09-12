@@ -4,16 +4,17 @@ The shared diff viewer is in client-core and is used by the GitHub PR pane and C
 renders provider patches and local Git diffs through the same row model.
 
 It arrives in two layers, and the split is enforced (`tools/arch/boundaries.test.ts`, "client-core
-ui/ is pure presentation"):
+kit/ is pure presentation"):
 
-- `ui/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
+- `kit/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
   hydrator. Props in, DOM out, no application state, so a plugin can reach for a piece of it to build
   a simpler surface. The compare preview does exactly that.
-- `diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads preferences,
-  registers a command and a keybinding, and keeps session scroll state, none of which `ui/` may do.
+- `features/diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads
+  preferences, registers a command and a keybinding, and keeps session scroll state, none of which
+  `kit/` may do.
 
 `DiffPane` is the whole viewer as one component, and a caller drives it through a `DiffSource`
-(`diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
+(`features/diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
 type on `@acorn/plugin-api/ui/diff`.
 
 ## The source port
@@ -32,10 +33,22 @@ working tree needs the two apart, because an agent saving a file mid-review move
 poll and treating that as a new diff would throw the reader back to the top each time. A pull request
 does not: a new commit is both, so the GitHub pane sets only `signature`.
 
+Behind the changes pane's two signatures is one resource, `LocalStatus`, which carries the branch, its
+upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
+can describe different trees. It is one `git status --porcelain=v2 --branch` call plus two numstats and
+a filesystem check for a half-finished merge or rebase. Two reads would disagree for a poll interval,
+which is why the header's totals, the groups, the branch bar's counts and the banner all derive from
+this one record.
+
 Two members exist for what a caller draws that the viewer has no concept of: `lineExtra` puts content
 under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
 affordance on a code line. The changes pane uses the first for review notes and the second for
 Alt-click to send a line reference to the agent.
+
+Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
+sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not
+note ids, paths, snippets, or bodies, so badges and delivery gates can react without receiving review
+content. Consumers that need the notes themselves continue to use the task-authorized route.
 
 `plugins/github/src/client/DiffForPull.tsx` and `plugins/changes/src/client/ChangesPane.tsx` are the
 two implementations, and both are short enough to read in one sitting. That is the measure of whether
@@ -48,13 +61,34 @@ loaded lazily from the blob route. The Changes plugin obtains a local diff throu
 service. Both paths normalize into file/hunk/line rows before rendering.
 
 The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
-scroller and clicking a row scrolls to it, the way the pull-request pane's list works. The per-file
-git actions stay on the rows.
+scroller and clicking a row scrolls to it, the way the pull-request pane's list works. Staging is a
+checkbox, one per row and one per group; the two verbs that are not staging, Discard and Send to
+agent, are in the row's overflow menu.
+
+The panel's footer reads top to bottom in the order things happen: the banner while a merge or rebase
+is in flight, the branch bar, the `changes:push-actions` slot where another plugin says what to do next
+([plugins.md](./plugins.md) § Cooperative extension points), the commit editor, and the button row. The
+bar's primary button carries one verb, and which one is a function of the one status read: **Publish** with
+no upstream, **Pull** when the branch is behind, **Push** when it is ahead, and **Fetch** when the two
+are level. Behind wins over ahead, because a push from behind fails and a pull from ahead does not, so
+the button offered is the one that can work.
+
+Nothing here watches the filesystem. The panel re-reads on its own mutations, on the rail's status poll
+every 10 seconds, and on `head:changed` ([api-reference.md](./api-reference.md) § Events). An agent's
+file save shows up within 10 seconds and an agent's commit within one poll, which is the same freshness
+the rail's dirty marker has.
+
+The list draws three groups: Conflicts, Tracked, and Untracked. An unmerged file has its own status
+rather than reading as a modification, it has no line counts, and it has no checkbox, because git's
+answer to "stage a conflict" is "mark it resolved" and there is no half of one that can sit in the
+index while the rest does not. Its overflow menu says so. A tracked file staged and then edited again
+is one row with an indeterminate checkbox, and ticking that stages the rest.
 
 It stacks one staging area at a time, and `stackFor` in `plugins/changes/src/client/model.ts` says
-why: a file staged and then edited again appears in both groups, and the row model keys a file by its
-path alone, so a combined stack would hold two files claiming the same identity. Which area is on
-screen is the group the highlighted row sits in, and the default is the first unstaged change, because
+why: git reports a file staged and then edited again twice, once per area, and the row model keys a
+file by its path alone, so a combined stack would hold two files claiming the same identity. Which
+area is on screen is the one the highlighted row's checkbox names — checked stacks the index, checked
+partly or not at all stacks the working tree — and the default is the first unstaged change, because
 one staged file should not hide twenty unstaged ones from a reader who has not clicked anything.
 
 Filling a gap needs the new side of the diff, and for a working tree that is not a ref: `git show`
@@ -65,10 +99,10 @@ the staging area in `DiffFile.sha`, which the viewer never reads and hands strai
 `fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
 of a file that is gone.
 
-The row types (`DiffFile`, `DiffThread`, and their siblings, in `ui/diff/model.ts`) are structural
+The row types (`DiffFile`, `DiffThread`, and their siblings, in `kit/diff/diffModel.ts`) are structural
 rather than named after either plugin's wire types. GitHub's `PullFile` and `Thread` and Changes'
 local rows all satisfy them without either plugin importing the other, so the renderer describes what
-it needs rather than one caller's type. `ui/diff/synth.ts` follows the same reasoning. A GitHub
+it needs rather than one caller's type. `kit/diff/synth.ts` follows the same reasoning. A GitHub
 per-file patch is hunks-only, so it synthesizes a header for gitdiff-parser, and it lives here
 because both GitHub's PR file payloads and local `git diff` output reach that parser.
 
@@ -79,21 +113,21 @@ Syntax highlighting is performed with Shiki on demand. Visible files and lines a
 viewer does not parse or highlight every file before first paint. Virtualizers keep long diffs within
 the renderer budget.
 
-Highlighting runs in `highlighter.worker.ts` (`client-core/src/highlight/`), off the thread that
+Highlighting runs in `highlighter.worker.ts` (`client-core/src/infra/highlight/`), off the thread that
 draws. Tokenizing a 45-file diff on the main thread cost about 2 seconds, in unbroken per-file blocks
 of up to 325ms.
 
 The worker also solves a content security policy problem. Shiki's fast path compiles Oniguruma to
 WebAssembly, and `WebAssembly.instantiate` is gated by `script-src`. The renderer's policy is
-`'self'` with no `wasm-unsafe-eval` (`main/appScheme.ts`), so the WASM engine throws at startup there
-and Shiki falls back to its JavaScript regex engine, measured at 4.6x slower on the same input. A
-worker loaded from a same-origin URL takes its policy from that script's own response headers rather
-than from the document, so `appScheme.ts` serves `highlighter.worker.ts`, and only that file, with
-`wasm-unsafe-eval` added. Nothing else widens: the worker's own policy is stricter than the
-document's in every other direction (`default-src 'none'`, `connect-src 'none'`), because it has no
-DOM, no bridge to main, and no network, and it only takes strings and returns colours. Keep
-`shiki/wasm` on the inlined build (622 KB of base64 inside the module); a build that fetches its
-`.wasm` at runtime would need a network permission the worker is better off without.
+`'self'` with no `wasm-unsafe-eval` (`apps/desktop/src-tauri/src/app_scheme.rs`), so the WASM engine
+throws at startup there and Shiki falls back to its JavaScript regex engine, measured at 4.6x slower
+on the same input. A worker loaded from a same-origin URL takes its policy from that script's own
+response headers rather than from the document, so `app_scheme.rs` serves `highlighter.worker.ts`,
+and only that file, with `wasm-unsafe-eval` added. Nothing else widens: the worker's own policy is
+stricter than the document's in every other direction (`default-src 'none'`, `connect-src 'none'`),
+because it has no DOM, no bridge to the shell, and no network, and it only takes strings and returns
+colours. Keep `shiki/wasm` on the inlined build (622 KB of base64 inside the module); a build that
+fetches its `.wasm` at runtime would need a network permission the worker is better off without.
 
 Every call into the worker sends a whole document, never a line. A `postMessage` per line is roughly
 2,600 round trips for a 45-file diff, slower than the main-thread code it replaces. Batching by
@@ -115,9 +149,26 @@ see.
 Grammars load lazily. They total about 1.7 MB across the set, and a given diff touches two or three,
 so a TypeScript-only pull request does not pay for the C++ grammar (419 KB, the largest single one).
 `protocol.ts` defines the wire format the worker and the main thread share, and imports nothing from
-either side. The worker must not pull in `ui/diff/model.ts`, which would drag `diff` and
+either side. The worker must not pull in `kit/diff/diffModel.ts`, which would drag `diff` and
 `gitdiff-parser` into the worker bundle, and the client must not pull in the worker's Shiki imports,
 which would put the WASM engine back on the main thread.
+
+**Hydration state is per file, and read per row.** The hydrator keeps each file's status —
+`idle`, `queued`, `loading`, `loaded`, `error` — in a Solid store keyed by path, and a load row reads
+its own key. It used to keep them in a `Map` behind one version counter, which made every publish look
+like a change to every file: `DiffPane` reads a status per file, so each of the two or three publishes
+per file rebuilt the row model for the whole diff. On a 200-file pull request that was 226 rebuilds of
+every file's rows during load, against 102 now — one per file that actually arrives, which is the floor
+for a row model built over all files ([performance.md](./performance.md) § 2026-09-03 — phase 8).
+
+The hydrator keeps a plain `Map` beside the store for its own queue, and that is deliberate: its pump
+reads statuses synchronously from whatever reactive scope called `reset()`, and reading the store there
+would subscribe that scope to every path in the diff.
+
+Parsed files are keyed the same way, one store key per path, because the map used to be copied whole on
+every parse — one full copy per file in the diff. The one full copy left is the expanded-gap map, which
+is written once per gap a reader clicks open and is handed to `buildRenderableRows`, a published
+function that takes a `Map`.
 
 ## Row geometry
 
@@ -202,3 +253,65 @@ The pull-request navigator keeps no scroll entry of its own any more. It used to
 `reviewViewState.ts` beside the pane; the navigator is a region of a host layout now, and the diff
 column's own position and collapsed files are still the viewer's, in `diff/viewState.ts`, keyed by the
 same scope.
+
+## What the Changes panel refuses
+
+Ten decisions from the programme that built the panel, each with what would reopen it. They are here
+rather than in a design folder because every one of them is a thing the panel will keep being asked
+for.
+
+**A branch picker in the bar.** Refused. Zed's `acorn / main` opens a branch list, and checking one out
+is how you move between pieces of work in an editor. In acorn a task *is* the piece of work and its
+branch is part of its identity: the worktree directory is keyed by owner, repo and branch, and a
+worktree's HEAD is checked against its task's branch before it is handed out
+([workspaces-and-tasks.md](./workspaces-and-tasks.md) § Worktrees and setup). Checking out another
+branch inside a task's worktree is the exact state the `worktree-stale` refusal catches, and it would
+hand that task's agent another branch's files. The branch in the bar is a label. To work on another
+branch, start a task.
+
+**Hunk and line staging.** Deferred, with the door named. The viewer is shared with the pull-request
+pane, renders unified rows through one virtualizer, and has no gutter control. Adding one means a kit
+affordance on a diff row, a `git apply --cached` path built from the viewer's row model, and a terminal
+rendering for the control, and each of those is its own design. `DiffSource` already has `lineAction`,
+and a `hunkAction` beside it is where a stage-this-hunk verb would land.
+
+**Other remotes.** Refused for now. A task's worktree is created from `origin`, its pull request opens
+against `origin`, and the branch prefix and base ref are project settings. A second remote is a project
+decision, and the day one is needed it belongs on the project row beside the base ref rather than in a
+per-push picker. Until then every remote verb says `origin` and means it.
+
+**Chords on the remote verbs.** Refused. The keymap is one shared registry with user overrides and
+conflict resolution, so a chord costs every other plugin a chord
+([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Plugin shortcuts). Fetch,
+pull and push are used a few times a day and have palette rows. Commit and amend are used many times a
+day and have the two chords the `commit` intent already reserves. Force push has neither: arming is its
+prompt, and a palette row that ran on Enter would have none.
+
+**A split button in the kit.** Refused. Zed's **Stage All**, **Pull** and **Commit** are split buttons.
+A `Button` that opens a menu, drawn beside a `Menu`, draws the same thing out of two nodes that already
+exist, and the admission rule asks for two surfaces that cannot be expressed in what exists
+([ui-design.md](./ui-design.md) § The closed kit). This is one surface that can.
+
+**A separate Git pane.** Refused. It would put the file list and the checkbox that stages a file in one
+pane and the diff of that file in another. The list column of the Changes pane is the rectangle Zed's
+dock occupies, and the model behind it is already built once per task.
+
+**A git surface on the rail.** Refused. The rail takes marker data and nothing else, and
+`tabrail.task-row` was removed on purpose
+(`packages/client-core/src/host/registries/extensionPoints/slots.ts`). The dirty marker keeps saying how
+many files changed. An ahead count there would be a marker through the same registry, and it is a
+separate change.
+
+**Git write tools for agents.** Not refused on principle, and not built. `local_changes`, `local_diff`
+and `git_log` are read-only and share `plugins/changes/src/server/localDiff.ts` with the bridge so the
+agent and the person see one tree. An agent has a terminal and uses it, and a write tool defaults
+denied under the permission tiers anyway ([agent-tools.md](./agent-tools.md)).
+
+**A commit history in the panel.** Refused. `git_log` exists for the agent and the pull-request pane
+shows commits once there is a pull request. A log view is a fourth region or a new pane, and neither is
+what the panel is for.
+
+**A warning on archive about unpushed commits.** Refused. The archive check warns about uncommitted
+files, and with `ahead` known it could warn about unpushed commits too. Archiving removes the worktree
+and not the branch, so those commits survive in the main checkout. A warning that says "your work is
+safe" is noise.

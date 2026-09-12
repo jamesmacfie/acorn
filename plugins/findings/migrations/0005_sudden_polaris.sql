@@ -1,0 +1,1 @@
+ALTER TABLE `finding_legacy_imports` ADD `migration_version` integer DEFAULT 1 NOT NULL;

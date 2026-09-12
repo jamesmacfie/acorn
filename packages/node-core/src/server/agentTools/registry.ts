@@ -1,10 +1,17 @@
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 export type ToolRisk = SharedToolRisk
 
-export type ToolContext = { taskId: string; userLogin: string; sessionId?: string }
+export type ToolContext = {
+  taskId: string
+  userLogin: string
+  sessionId?: string
+  callId?: string
+  toolCeiling?: ToolCeiling
+}
 
 export type AgentToolContribution = {
   name: string
@@ -15,6 +22,9 @@ export type AgentToolContribution = {
   risk: ToolRisk
   // Renderer projection is opt-in: a tool only gets a typed renderer client when it says so.
   exposeToRenderer?: boolean
+  // Orchestration mutates managed sessions on behalf of a particular caller. Hide such tools unless
+  // authentication supplied a signed session claim; transport attribution headers do not satisfy it.
+  requiresSession?: boolean
   // Dynamic availability, such as run targets appearing mid-session. Absent means always available.
   // Permission tiers are applied separately and uniformly by the projection, not here.
   when?: (ctx: ToolContext) => boolean | Promise<boolean>
@@ -25,7 +35,7 @@ export type AgentToolContribution = {
 // A handler throws ToolError to classify a domain failure; anything else it throws is 'failed'.
 export class ToolError extends Error {
   constructor(
-    public readonly kind: 'not_found' | 'bad_request' | 'needs-trust' | 'failed',
+    public readonly kind: 'not_found' | 'bad_request' | 'conflict' | 'needs-trust' | 'timeout' | 'failed',
     message: string,
   ) {
     super(message)
@@ -90,6 +100,10 @@ class AgentToolRegistry {
   list(): readonly AgentToolContribution[] {
     return this.#registrations.map((r) => r.tool)
   }
+
+  ownerOf(name: string): string {
+    return this.#registrations.find((r) => r.tool.name === name)?.owner ?? 'core'
+  }
 }
 
 const registry = new AgentToolRegistry()
@@ -97,3 +111,6 @@ const registry = new AgentToolRegistry()
 export const registerAgentTool = (owner: string, tool: AgentToolContribution): void => registry.register(owner, tool)
 export const removeAgentTools = (owner: string): void => registry.remove(owner)
 export const agentToolContributions = (): readonly AgentToolContribution[] => registry.list()
+/** Who contributed the tool of this name, for the `tool.call` span. `core` for a name nobody
+ *  registered, which is also what a caller with no match gets from `list()`. */
+export const agentToolOwner = (name: string): string => registry.ownerOf(name)

@@ -62,7 +62,7 @@ These were decided with the owner and are settled. A phase file may not reopen t
 | A device-held plugin has **no node half**. A package with a `node` entry is refused at device install. | The node/shell boundary is where acorn's containment stops (`docs/security.md`). Adding a second place that runs node code would double the disclosure-only surface. | Device plugins cannot add routes, schedules, tools, or storage. They are client-only by construction. |
 | A device-held plugin renders through the **same paths** as a node-held one: a sandboxed iframe today, the remote root worker after layout phase 3. Nothing is added to the shell's own bundle. | The trust decision covers bytes the device hashed. A third render path would be a third thing to contain. | No "trusted local plugin" tier that runs in the shell. Omarchy's model is refused, on the record, in [refused.md](./refused.md). |
 | **Nothing here starts before layout phase 4 ships**, except phase 0 of this folder, which needs no layout work. | A replacement switcher has to drive focus, intents, and collection state. Only the remote root can, and only phase 4 has the `replace` arbitration and the trust copy for it. | This folder waits. Phase 0 is the one thing that can land early. |
-| Replaceable surfaces are added **one at a time, each with a written contract**. | A slot opened is hard to close (`registries/slots.ts`). The contract is the cost; the mechanism is cheap. | No generic "replace anything" API. `CORE_EXCLUSIVE_SLOTS` grows by named entries. |
+| Replaceable surfaces are added **one at a time, each with a written contract**. | A slot opened is hard to close (`registries/extensionPoints/slots.ts`). The contract is the cost; the mechanism is cheap. | No generic "replace anything" API. `CORE_EXCLUSIVE_SLOTS` grows by named entries. |
 | A device plugin's state is **device-scoped**. | Its `plugin:<id>:*` prefs have no node to live on, and following the active node would make a device plugin's settings change when the user switches nodes. | No cross-device sync of a device plugin's state. Install it twice, configure it twice. |
 | Icon sets are **parked**. | The owner's call, 2026-08-29. The shape is written down so the door stays open. | Nothing. No phase builds it. |
 
@@ -141,7 +141,7 @@ two rules apply:
 - It does not build the remote root, the worker, or the `replace` arbitration. Those are layout
   phases 3 and 4 and this folder consumes them.
 - It does not build the PWA or the terminal host. [07-hosts.md](./07-hosts.md) says what each owes
-  the custody contract; `docs/future/remote.md` and `docs/future/terminal/` own the hosts.
+  the custody contract; `docs/future/remote.md` and `docs/tui.md` own the hosts.
 - It does not change signing, discovery, or the marketplace stance. `docs/future/ecosystem/` owns
   those, and a device install from a URL is exactly as unsigned as a node install from one.
 - It does not build icon sets. It keeps the name.

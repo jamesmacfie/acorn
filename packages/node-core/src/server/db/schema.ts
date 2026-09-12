@@ -15,7 +15,7 @@ export const syncState = sqliteTable(
 // ── App-state tables: data GitHub does not have, so acorn is the source of truth ────────────────
 //
 // `user_id` on `prefs` is the single canonical user id: the node's opaque owner id, minted at boot
-// (main/core/identity/identity.ts). Installs that predate boot-minting carry their old GitHub login as
+// (server/core/identity.ts). Installs that predate boot-minting carry their old GitHub login as
 // the value, same column, same semantics, never rewritten. Single-user app, so the column is not
 // multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
 
@@ -155,7 +155,7 @@ export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(), // opaque uuid
   title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
   icon: text('icon'), // optional Lucide icon name; null = derive from origin (see ui/Icon.tsx)
-  origin: text('origin').notNull(), // 'github-pr' | 'linear' | 'rollbar' | 'local'
+  origin: text('origin').notNull(), // a plugin-declared source id, or 'local' for core's own
   projectId: text('project_id').notNull(),
   branch: text('branch'), // null = run in the project root; non-null = isolated Git worktree
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)

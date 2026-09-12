@@ -1,0 +1,72 @@
+/** @jsxImportSource @acorn/tui/jsx */
+import { Show, type JSX } from 'solid-js'
+import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens/support.ts'
+import { Line, slot } from './cells'
+import { boxBorder } from './roles'
+import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'
+
+// The kit's one admission that not everything is a tree, and the two wrappers that let a plugin write
+// for a host it has never seen.
+
+/** Four kinds, and this host answers each differently.
+ *
+ *  `pty` is native and is the thing a terminal does better than the desktop: a real emulator in cells
+ *  with the PTY's bytes going straight into it, one tab stop from outside, Enter in, Escape out
+ *  (./rectangle.tsx). `editor` is a box naming the file, and the `$EDITOR` handoff is the editor
+ *  pane's own terminal mode drawing a PTY through the kind above.
+ *
+ *  `webview` and `frame` draw their `<Fallback>` child, or a line naming what is missing. Neither
+ *  grows: what is inside cannot be drawn, so the box says so on one line and gives the room to the
+ *  regions that can use it. A rectangle that fills a pane it cannot fill is a placeholder pretending
+ *  to be the thing. */
+export function Rectangle(props: {
+  kind: 'pty' | 'webview' | 'frame' | 'editor'
+  label: string
+  /** Drawn but off the screen. Honoured for `pty`, which is the kind that costs something to rebuild
+   *  and the reason the prop exists (docs/terminal.md § Client); the other three are cheap enough
+   *  that a caller hiding one would unmount it. */
+  hidden?: boolean
+  mount?: (handle: HTMLElement) => void
+  children?: JSX.Element
+}) {
+  return (
+    <Show when={props.kind === 'pty'} fallback={
+      <Show when={props.kind === 'editor'} fallback={
+        <box
+          flexDirection="column"
+          flexShrink={0}
+          {...boxBorder('surface')}
+          title={props.label}
+        >
+          {slot(props.children) ?? <Line role="muted">{`${props.label} needs pixels, so it is not drawn here.`}</Line>}
+        </box>
+      }>
+        <EditorRectangle label={props.label}>{slot(props.children)}</EditorRectangle>
+      </Show>
+    }>
+      {/* The caller is handed a terminal rather than an element, which is the whole difference between
+          the two hosts here. The prop keeps the kit's own type — the DOM's `HTMLElement` — because a
+          node's props are one contract on both hosts and a pane compiles against one of them; what
+          arrives is this host's filler, and `attachPty` is the one thing that reads it (./pty.ts). A
+          rectangle is the kit's single admission that a host draws something of its own, and this is
+          where it is admitted. */}
+      <PtyRectangle label={props.label} hidden={props.hidden} mount={props.mount as ((terminal: CellTerminal) => void) | undefined} />
+    </Show>
+  )
+}
+
+/** Children exist on the named hosts and nowhere else; no fallback wanted. Written here rather than
+ *  imported so this package's table is its own, but it reads the same `HOST` and the same matrix, so
+ *  the two hosts cannot disagree about what a node's level is. */
+export function Only(props: { hosts: readonly Host[]; children: JSX.Element }) {
+  return <Show when={props.hosts.includes(HOST)}>{props.children}</Show>
+}
+
+/** What to draw where the matrix says this host cannot draw the node it is inside. */
+export function Fallback(props: { forNode: KitNode; children: JSX.Element }) {
+  const short = () => {
+    const level = NODE_SUPPORT[props.forNode][HOST]
+    return level === 'fallback' || level === 'absent'
+  }
+  return <Show when={short()}>{props.children}</Show>
+}

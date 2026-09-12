@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 import { registerRoute, removePluginRoutes } from '../routeRegistry'
 import { clearRunSources, readRuns, registerRunSource } from './registry'
 

@@ -1,0 +1,32 @@
+/* Copy-on-hover button (CopyButton.tsx). Hidden until a `.copyable` ancestor is hovered. */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+/* `data-always` is for a button with no `.copyable` ancestor to hover: a bar of its own, or a plugin
+   tree, which cannot set a class on anything. */
+.copyable:hover .copy-btn,
+.copy-btn[data-always],
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+.copy-btn:hover {
+  color: var(--text);
+}
+.comment-card {
+  position: relative;
+}
+/* PR number + its copy button sit inline together. */
+.pr-num.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}

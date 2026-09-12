@@ -1,9 +1,9 @@
 {
-  // Both halves in one program: `src/app/client` is the renderer (DOM) and `src/shell` is the Tauri
+  // Both halves in one program: `src/client` is the renderer (DOM) and `src/shell` is the Tauri
   // shell's TypeScript — the injected bridge and the desktop helper process (node).
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "test", "vite.config.ts", "vite.bridge.config.ts", "vite.helper.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "scripts/**/*.ts", "vite.config.ts", "vite.bridge.config.ts", "vite.helper.config.ts", "vitest.config.ts"]
 }

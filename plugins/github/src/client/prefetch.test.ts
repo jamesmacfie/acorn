@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileSummariesKey, filesKey, pullKey } from '../contract/api'
+import { fileSummariesKey, filesKey, pullKey } from '../shared/api'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 // Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.
@@ -67,7 +67,9 @@ describe('open PR warmup', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // `objectContaining`, because `apiClient.send()` names every request with an
+      // `x-request-id` header now (docs/telemetry.md § The renderer).
+      headers: expect.objectContaining({ 'content-type': 'application/json' }),
       signal,
     }))
     expect(batchBodyOf(fetchMock, 1)).toEqual({ numbers: [42], files: 'summary' })
@@ -87,7 +89,9 @@ describe('open PR warmup', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // `objectContaining`, because `apiClient.send()` names every request with an
+      // `x-request-id` header now (docs/telemetry.md § The renderer).
+      headers: expect.objectContaining({ 'content-type': 'application/json' }),
       signal,
     }))
     expect(batchBodyOf(fetchMock, 0)).toEqual({ numbers: [42], files: 'summary' })

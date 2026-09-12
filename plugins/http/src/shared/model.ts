@@ -17,7 +17,7 @@ export type AuthMode = AuthConfig['mode']
 
 export type HttpRequest = {
   id: string
-  // Project is the renderer identity. GitHub is an optional facet on the Project and is not a
+  // Project is the client identity. GitHub is an optional facet on the Project and is not a
   // second storage key for HTTP data.
   projectId: string
   folder: string // slash path, '' = tree root
@@ -37,7 +37,7 @@ export type HttpRequest = {
 export type VariableKind = 'value' | 'secret' | 'command'
 export const variableKinds = ['value', 'secret', 'command'] as const
 
-// `value` is masked to '' by the server for secret rows: plaintext never reaches the renderer.
+// `value` is masked to '' by the server for secret rows: plaintext never reaches the client.
 export type HttpVariable = {
   id: string
   name: string
@@ -100,7 +100,7 @@ export const missingVars = (input: string, vars: Record<string, string>): string
 export type AuthApplied = { headers: KeyValue[]; queryParams: KeyValue[] }
 
 // btoa is Latin-1 only and throws on any character above U+00FF, so UTF-8 encode first. Buffer
-// isn't an option here: this module also runs in the renderer.
+// isn't an option here: this module also runs in the client.
 const base64Utf8 = (s: string): string => {
   const bytes = new TextEncoder().encode(s)
   let binary = ''

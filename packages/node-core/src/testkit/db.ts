@@ -1,22 +1,27 @@
-// Test-only helper: a real SQLite DB (node:sqlite, main/sqlite.ts) in a tmp dir with all Drizzle
+// Test-only helper: a real SQLite DB (node:sqlite, server/storage/sqlite.ts) in a tmp dir with all Drizzle
 // migrations applied, no native build to match whichever runtime hosts the tests. See
 // docs/testing.md § Testkit for why this lives in its own directory.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { openDb, type Env } from '../main/bindings'
-import { SecretService } from '../main/core/secrets'
-import { openPluginDb, type PluginDatabase } from '../main/pluginStorage'
+import { openDb, type Env } from '../server/bindings'
+import { memoryIdentityStore } from '../server/activeIdentity'
+import { createCoreServices } from '../server/core'
+import { SecretService } from '../server/core/secrets'
+import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
 
-export type TestDb = { db: AppDatabase; cleanup: () => void }
+export type TestDb = { db: AppDatabase; secrets: SecretService; cleanup: () => void }
 
 export function makeTestDb(): TestDb {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-test-'))
   const db = openDb(join(dir, 'test.sqlite'))
   return {
     db,
+    // The same binding `testEnv` puts on `c.env`, minted from the same key, for the node-side callers
+    // that take a SecretService directly instead of a request context.
+    secrets: new SecretService(TEST_ENCRYPTION_KEY),
     cleanup: () => {
       try {
         db.close()
@@ -32,8 +37,19 @@ export function makeTestDb(): TestDb {
   }
 }
 
+// Build the same core service graph the node gives a built-in plugin, using a test database's
+// matching secret service. Plugin tests should reach this through @acorn/plugin-api/testkit instead
+// of importing the node's composition internals directly.
+export function makeTestCoreServices(testDb: TestDb, userId: string | null = null) {
+  return createCoreServices({
+    db: testDb.db,
+    secrets: testDb.secrets,
+    activeIdentity: memoryIdentityStore(userId),
+  })
+}
+
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
-// credential read goes through (main/core/secrets.ts). docs/testing.md § Testkit has why these are
+// credential read goes through (server/core/secrets.ts). docs/testing.md § Testkit has why these are
 // minted together.
 export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService } {
   return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey) }

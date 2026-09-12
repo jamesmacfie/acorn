@@ -6,7 +6,7 @@ import { linearProjectIssuesRoute } from './api'
 // can't see: a retyped route template compiles fine and 404s.
 //
 // The batch query key that used to be pinned here is gone with `contract/issues.ts`. The host owns one
-// key for every provider's resolver now, and client-core/registries/refResolvers.ts carries the
+// key for every provider's resolver now, and client-core/host/registries/panes/refResolvers.ts carries the
 // persisted-cache warning that came with it.
 describe('linear wire contract', () => {
   it('sorts the id set in the project-issues route so cache identity is order-independent', () => {

@@ -1,5 +1,6 @@
 {
   "name": "acorn",
+  "description": "The acorn monorepo: an agent workspace built as a desktop shell, a Node service, and a tree of plugins.",
   "private": true,
   "packageManager": "pnpm@11.0.0",
   "//engines": "The same floor the packed standalone artifact declares (scripts/pack-node.mjs). Two things need it: the node:sqlite surface the DB shim uses, and apps/node/scripts/build-plugin.mjs importing a .ts file directly, which relies on Node's own type stripping.",
@@ -14,6 +15,9 @@
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
     "db:reset": "node scripts/db-reset.mjs",
     "dev": "turbo run dev",
+    "dev:agent": "pnpm --filter @acorn/desktop dev:agent",
+    "dev:agent:smoke": "pnpm --filter @acorn/desktop dev:agent:smoke",
+    "dev:agent:ui": "pnpm --filter @acorn/desktop dev:agent:ui",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
     "dist": "pnpm --filter @acorn/desktop dist",

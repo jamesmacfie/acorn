@@ -17,6 +17,7 @@ type Principal = {
   scope?: 'service' | 'task'
   taskId?: string
   sessionId?: string
+  toolCeiling?: ToolCeiling
 }
 ```
 
@@ -86,13 +87,20 @@ The Node persists an internal signing key in `internal-token`. It mints stateles
 these scopes:
 
 - `service`: Node-owned loopback orchestration; never injected into a child process.
-- `task`: a PTY, agent, workflow step, or MCP process bound to one `taskId` and optionally a
-  `sessionId`.
+- `task`: a PTY, agent, workflow step, or MCP process bound to one `taskId`, optionally a
+  `sessionId`, and optionally a server-owned effective tool ceiling.
 
 Task tokens are checked at task route mounts, stream upgrades, and task-owned operations. They cannot
 pair devices, administer devices or plugins, read the HTTP client's encrypted request material, or
-use the renderer-facing agent-tool projection. The tokens do not expire; rotating the signing key is
-the revocation mechanism needed for tmux sessions that survive a Node restart.
+use the renderer-facing agent-tool projection. The session claim authorizes session-required tools
+such as managed-agent orchestration. The Node reads it from the verified token, never from
+`x-acorn-session-id`.
+
+A workflow or delegated managed session persists its effective tool ceiling, and the runtime includes
+that value when it mints the token. The agent-tool route enforces only the signed ceiling;
+`ACORN_TOOL_CEILING` and `x-acorn-tool-ceiling` remain compatibility metadata and cannot widen
+authority. The tokens do not expire; rotating the signing key is the revocation mechanism needed for
+tmux sessions that survive a Node restart.
 
 The GitHub credential is an integration secret, not part of `Principal`. GitHub routes read it
 through `plugins/github/src/server/githubToken.ts`, so an internal caller that can reach a GitHub

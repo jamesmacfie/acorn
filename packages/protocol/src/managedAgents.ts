@@ -24,8 +24,8 @@ export type AgentAttentionReason =
 
 export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
-export type AgentSessionKind = 'interactive' | 'workflow' | 'imported'
-export type AgentTurnSource = 'interactive' | 'workflow' | 'automation' | 'import'
+export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'automation' | 'import'
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'
@@ -267,6 +267,11 @@ export type AgentSession = {
   /** Projected from the session's own `subagent` events by the repository, so every surface that reads
    *  a session row sees the live roster without loading its transcript. */
   subagents: AgentSubagent[]
+  /** How many follow-up turns are queued and waiting to dispatch. Counted onto the list read model so a
+   *  row can mark a waiting prompt without loading the transcript; a queued turn leaves `runtimeState`
+   *  at `ready` or `working`, so it has no other sign on the row. Snapshot reads leave it 0, since the
+   *  open pane derives its queue from the turns it already holds. */
+  queuedTurns: number
   lastEventSeq: number
   lastReadSeq: number
   archivedAt: number | null
@@ -326,8 +331,24 @@ export type AgentSessionSnapshot = {
   requests: AgentRequest[]
 }
 
+/** Display-only delegation lineage projected by the Agents plugin for sessions in a list page.
+ *
+ * The managed parent id is useful navigation within the same task. A terminal owner is deliberately
+ * represented by a label and profile only: its authority id is neither needed nor exposed to the
+ * renderer.
+ */
+export type AgentSessionDelegation = {
+  sessionId: string
+  depth: number
+  isolation: 'shared' | 'worktree'
+  owner:
+    | { kind: 'managed'; parentSessionId: string }
+    | { kind: 'terminal'; label: string; profileId: string | null }
+}
+
 export type AgentSessionList = {
   sessions: AgentSession[]
+  delegations: AgentSessionDelegation[]
   nextCursor: string | null
 }
 
@@ -342,9 +363,15 @@ export type AgentDeleteResult = {
   detail?: string
 }
 
+// `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
+// Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
+// per row — to learn that one turn had closed or one permission request had been answered
+// (docs/managed-agents.md § The transcript store).
 export type AgentWsFrame =
   | { channel: 'agent:event'; event: AgentEventRecord }
   | { channel: 'agent:session'; session: AgentSession }
+  | { channel: 'agent:turn'; turn: AgentTurn }
+  | { channel: 'agent:request'; request: AgentRequest }
   | { channel: 'agent:deleted'; sessionId: string }
 
 export const agentEventSearchText = (event: AgentNormalizedEvent): string | null => {

@@ -49,4 +49,18 @@ describe('the capture store', () => {
 
     expect(await store.read(quiet.id)).not.toBeNull()
   })
+
+  it('announces the readable retained collection before the compatibility id event', async () => {
+    const frames: Array<{ channel: string } & Record<string, unknown>> = []
+    const store = captureStore(db, (frame) => frames.push(frame))
+    const { id } = await store.put({ taskId: 'task-1', mime: 'image/png', bytes: png(1) })
+
+    expect(await store.list('task-1')).toEqual([
+      expect.objectContaining({ id, taskId: 'task-1', mime: 'image/png', bytes: png(1).byteLength }),
+    ])
+    expect(frames).toEqual([
+      { channel: 'plugin:browser:captures-changed', taskId: 'task-1' },
+      { channel: 'plugin:browser:capture-created', taskId: 'task-1', captureId: id },
+    ])
+  })
 })

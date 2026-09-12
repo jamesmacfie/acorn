@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { desc, lt } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
+import { emitEvent } from './telemetry/collector'
+import { createLogger, describeError } from './telemetry/logger'
+
+const log = createLogger('audit')
 
 // The audit trail's write side (docs/security.md § Audit, docs/data-layer.md § Core DB).
 //
@@ -77,7 +81,7 @@ export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string;
 
 // A module singleton, like the route, collection, node-action and task-check registries beside it, with
 // the same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/plugin/host.ts § clearRegistrations).
+// (server/pluginHost/host.ts § clearRegistrations).
 const declared = new Map<string, DeclaredAuditAction>()
 
 /** Declare one verb for a plugin. The host binds `pluginId`; a plugin never passes it. */
@@ -107,6 +111,10 @@ export const auditVocabulary = (): DeclaredAuditAction[] =>
 export const isKnownAuditAction = (action: string): boolean =>
   action.includes(':') ? declared.has(action) : true
 
+/** Whose verb this is. A plugin's actions are `<pluginId>:<actionId>` and no core action contains a
+ *  colon, which is the same split `isKnownAuditAction` reads. */
+const auditOwner = (action: string): string => (action.includes(':') ? action.slice(0, action.indexOf(':')) : 'core')
+
 export type AuditActor = { actor: 'device' | 'internal' | 'system'; actorId?: string | null }
 
 export type AuditEntry = AuditActor & {
@@ -129,9 +137,15 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
   // reached for a verb it never declared. A warning and no row: this is fire-and-forget, and throwing
   // would fail the action being described.
   if (!isKnownAuditAction(entry.action)) {
-    console.warn('[audit] refusing an undeclared action', entry.action)
+    log.warn(`refusing an undeclared action ${entry.action}`)
     return
   }
+  // The same row, as an event, so a sink sees "this node paired a device" without being handed read
+  // access to the trail. The vocabulary is closed, so the name is a pattern by construction. The
+  // actor rides along and `details` does not: those scalars are chosen for a reviewer reading one
+  // node's own trail, not for a record leaving the machine (docs/telemetry.md § What never leaves
+  // the machine). The owner is the plugin whose verb it is, and core's own verbs contain no colon.
+  emitEvent(auditOwner(entry.action), `audit.${entry.action}`, { seam: 'audit', actor: entry.actor })
   void (async () => {
     try {
       await db.insert(schema.audit).values({
@@ -144,7 +158,7 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
         details: entry.details ? JSON.stringify(entry.details) : null,
       })
     } catch (error) {
-      console.warn('[audit] failed to record', entry.action, error)
+      log.warn(`failed to record ${entry.action}: ${describeError(error).message}`)
     }
   })()
 }

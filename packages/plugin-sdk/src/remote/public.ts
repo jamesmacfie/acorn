@@ -6,7 +6,7 @@
 // against, and its names are Solid's; they are exported because the preset imports them by name, not
 // because you write them.
 import type { JSX } from 'solid-js'
-import type { AcornBridge, TreeRender } from 'acorn-plugin-sdk'
+import type { AcornBridge, TreeMount, TreeRender } from 'acorn-plugin-sdk'
 
 /**
  * What a kit node takes: anything, checked on arrival.
@@ -48,6 +48,7 @@ export declare const SectionHeader: (props: KitNodeProps) => JSX.Element
 export declare const TabPanel: (props: KitNodeProps) => JSX.Element
 export declare const ToolbarSpacer: (props: KitNodeProps) => JSX.Element
 export declare const Text: (props: KitNodeProps) => JSX.Element
+export declare const Link: (props: KitNodeProps) => JSX.Element
 export declare const Heading: (props: KitNodeProps) => JSX.Element
 export declare const Rows: (props: KitNodeProps) => JSX.Element
 export declare const Row: (props: KitNodeProps) => JSX.Element
@@ -60,6 +61,9 @@ export declare const StatusDot: (props: KitNodeProps) => JSX.Element
 export declare const Facts: (props: KitNodeProps) => JSX.Element
 export declare const DescriptionList: (props: KitNodeProps) => JSX.Element
 export declare const Table: (props: KitNodeProps) => JSX.Element
+export declare const TableHead: (props: KitNodeProps) => JSX.Element
+export declare const TableRow: (props: KitNodeProps) => JSX.Element
+export declare const TableCell: (props: KitNodeProps) => JSX.Element
 export declare const Grid: (props: KitNodeProps) => JSX.Element
 export declare const Meter: (props: KitNodeProps) => JSX.Element
 export declare const CodeBlock: (props: KitNodeProps) => JSX.Element
@@ -91,7 +95,7 @@ export declare const KeyValueEditor: (props: KitNodeProps) => JSX.Element
 export declare const FindBar: (props: KitNodeProps) => JSX.Element
 export declare const Field: (props: KitNodeProps) => JSX.Element
 export declare const CopyButton: (props: KitNodeProps) => JSX.Element
-export declare const ModelConnectionPicker: (props: KitNodeProps) => JSX.Element
+export declare const ModelBackendPicker: (props: KitNodeProps) => JSX.Element
 export declare const Only: (props: KitNodeProps) => JSX.Element
 export declare const Fallback: (props: KitNodeProps) => JSX.Element
 /** Every node above, keyed by name, for code that picks one at runtime. */
@@ -109,9 +113,13 @@ export declare const KIT_NODE_COMPONENTS: Record<string, (props: KitNodeProps) =
  *
  * The props acorn mounted with arrive as a store, so a redraw reconciles rather than tearing the tree
  * down: a card whose data gains a line re-renders that line.
+ *
+ * `bridge` and `host` arrive beside them. `host` is the two things a tree may ask acorn for — call an
+ * action the owning extension point declared, open the overlay your descriptor associated — and both
+ * are stable for the mount's life, so a redraw does not invalidate a handler mid-await.
  */
 export declare function solidTree<P extends Record<string, unknown>>(
-  component: (props: P & { bridge: AcornBridge }) => JSX.Element,
+  component: (props: P & { bridge: AcornBridge; host: TreeMount['host'] }) => JSX.Element,
 ): TreeRender
 
 // The universal-renderer surface. Solid's compiler emits calls to these; you do not.

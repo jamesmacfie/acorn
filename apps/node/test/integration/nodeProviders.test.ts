@@ -10,14 +10,14 @@ import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
 import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { loadExternalPlugins } from '@acorn/node-core/main/pluginLoader.ts'
-import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
-import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
-import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
-import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { loadExternalPlugins } from '@acorn/node-core/server/plugins/loader.ts'
+import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { nodeProviders } from '@acorn/node-core/server/nodeProviders/registry.ts'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The node-provider seam end to end, against the reference provider loaded off disk
 // (docs/plugins.md § Node providers).
@@ -39,6 +39,7 @@ const CLOUD_NODE_ID = '99999999-8888-4777-8666-555555555555'
 
 describe('a loaded plugin that contributes a node provider', () => {
   let dataRoot = ''
+  let resourceRoot = ''
   let nodesFile = ''
   let core: TestDb
   let env: Env
@@ -72,7 +73,8 @@ describe('a loaded plugin that contributes a node provider', () => {
 
   beforeAll(() => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-node-providers-'))
-    nodesFile = join(dataRoot, 'nodes.json')
+    resourceRoot = mkdtempSync(join(tmpdir(), 'acorn-node-provider-files-'))
+    nodesFile = join(resourceRoot, 'nodes.json')
     // The provider reads its path from the environment, so it has to be set before the plugin's init
     // runs. Set for the whole file rather than per test: a plugin registers once, at boot.
     process.env.ACORN_NODES_FILE = nodesFile
@@ -87,6 +89,7 @@ describe('a loaded plugin that contributes a node provider', () => {
     await running?.dispose()
     delete process.env.ACORN_NODES_FILE
     rmSync(dataRoot, { recursive: true, force: true })
+    rmSync(resourceRoot, { recursive: true, force: true })
   })
 
   beforeEach(async () => {
@@ -178,7 +181,7 @@ describe('a loaded plugin that contributes a node provider', () => {
   it('creates and destroys a node through the provider', async () => {
     await boot()
     const created = await call('/v2/core/nodes/create', asOwner({ providerId: 'nodes-file:file', label: 'New one', options: {} }))
-    expect(created.status).toBe(200)
+    expect(created.status, await created.clone().text()).toBe(200)
     const row = (await created.json()) as { providerNodeId: string; state: string }
     expect(row.state).toBe('provisioning')
 

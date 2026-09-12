@@ -1,0 +1,345 @@
+/* Shell layout: the tab rail, the three-pane grid, and pane chrome (docs/ui-design.md).
+ * Extracted from the old tokens-layout.css. Every value here is a style token, so a pack can turn
+ * the flat full-bleed grid into inset rounded cards without touching App.tsx.
+ */
+
+/* Shell: workspace tab rail on the far left, the app to its right. */
+.shell { display: flex; height: 100%; }
+
+/* Three-pane layout: top bar + independently-scrolling panes. */
+.app { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100%; }
+
+.topbar {
+  display: grid;
+  /* `minmax(0, …)` rather than a bare `1fr`: a `1fr` track will not go below the min-content width
+     of what is in it, and the two side clusters are rows of buttons that do not shrink, so on a
+     narrow window the bar grew past the window and took the notification bell and the settings menu
+     with it. The tracks give way instead, and each cluster clips at its inner edge below. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); /* dropdown | centered brand | auth */
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  font-size: var(--fs-sm);
+}
+.brand { color: var(--text-muted); text-align: center; }
+
+.panes {
+  display: grid;
+  grid-template-columns: var(--left, clamp(320px, 28vw, 420px)) clamp(360px, 23vw, 430px) minmax(0, 1fr);
+  min-height: 0;
+  padding: var(--shell-pad);
+  gap: var(--pane-gap);
+}
+
+/* Empty state: no repo selected, single full-width column for the centered acorn. */
+.panes-empty { grid-template-columns: 1fr; }
+.pane-empty { display: flex; }
+
+/* Node gate: no app chrome yet, so center the mark in the full viewport. */
+.node-gate { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: var(--space-4); }
+.node-gate-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
+.node-gate-reason {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.acorn-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 0;
+}
+.acorn-art {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  line-height: 1.1;
+  white-space: pre;
+}
+.acorn-word {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+}
+
+/* Left-pane collapse: zero the left column and hide the pane entirely (no stray border). A
+   zero-width grid column still emits a `gap` (docs/ui-design.md § Style packs), so any pack that
+   sets --pane-gap must also collapse it here or a sliver appears where the left pane was. */
+.app.left-collapsed .panes { grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr); }
+.app.left-collapsed .pane-left { display: none; }
+
+.pane {
+  background: var(--pane-bg);
+  border: var(--pane-bw) solid var(--border);
+  border-right: var(--pane-divider-w) solid var(--border);
+  border-radius: var(--pane-radius);
+  box-shadow: var(--elev-pane);
+  padding: 0;
+  overflow: auto;
+  contain: layout paint; /* isolate reflow per pane (docs/ui-design.md) */
+}
+/* Right-most pane: drops the trailing border, and is a flex column so the sticky header stays put
+   while the diff scroller below owns the viewport. Sole owner of .pane-right, was split with diff.css. */
+.pane-right { border-right: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Left pane is a flex column so a list inside it scrolls independently of the chrome above it. */
+.pane-left { display: flex; flex-direction: column; overflow: hidden; }
+
+/* Host-owned document surface: the editor a loaded plugin declares instead of bundling
+   (docs/editor.md). Core CSS rather than a plugin stylesheet, since the plugin ships no code for this
+   pane and has nowhere to put a rule. Same flex-column shape as .pane-right: an editor needs a
+   definite box to fill.
+
+   `flex: 1; min-height: 0` is the line that makes that box definite. Without it this section is a
+   plain flex item at `flex: 0 1 auto`, so its height comes from its content, and its content is a
+   host div at `flex: 1` holding an editor that measures nothing until it is told a height. The
+   editor collapsed to a sliver at the top of an otherwise empty 200px region: the SQL was there,
+   clipped, with the rest of the drag height blank under it. */
+.document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── The host's pane layouts ────────────────────────────────────────────────────────────────
+   One block per layout in client-core/src/layouts (docs/panes.md § Layout model). These rules are
+   the host's, and in a composed pane that matters twice over: the splitter is the boundary between
+   two realms, so neither side could style it alone.
+
+   Every layout root also carries `.pane`, because the pane's background, border and radius are the
+   host's whichever way the pane draws itself. These rules follow `.pane` in this file so the
+   overflow below wins over its `auto`.
+
+   Nothing here reads the window width. Breakpoints are style tokens, so a narrower host can set
+   them differently without touching a layout (docs/ui-design.md § What the kit and layouts must never do). */
+.layout-single,
+.layout-hbf,
+.layout-tabs,
+.layout-wizard,
+.layout-list-detail,
+.layout-stack-split,
+.layout-document-split {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.layout-single,
+.layout-hbf,
+.layout-tabs,
+.layout-wizard,
+.layout-stack-split { flex-direction: column; }
+.layout-document-split[data-axis='y'] { flex-direction: column; }
+
+.layout-wizard-body,
+.layout-region-detail,
+.layout-region-frame,
+.layout-region-top { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* `tabs`. The visible panel is the scroller, for the same reason `single`'s body is: a tab whose
+   content is a plain run grows past the pane and has to scroll, and a tab that manages its own
+   scrolling fills the box instead. Same `padding-inline` rule and the same escape. */
+.layout-tabs-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-inline: var(--pane-pad);
+}
+.layout-tabs-panel:has(> .ui-listdetail) { padding-inline: 0; }
+
+/* `header-body-footer`'s two pinned strips. The body already takes the pane's inline padding; these
+   did not, so a chip row or a summary line sat flush against the pane's border with the scrolling
+   content below it inset — the mismatch read as a bug rather than as a design. The header carries the
+   rule under it, which is what a strip above a scroller is for. */
+.layout-hbf-header,
+.layout-hbf-footer { flex: none; min-width: 0; padding-inline: var(--pane-pad); }
+.layout-hbf-header { padding-block: var(--space-3); border-bottom: var(--chrome-divider); }
+
+/* `header-body-footer`. The body is the scroller and the other two are pinned, which is the whole
+   difference between this layout and `single`. Same `padding-inline` rule and the same reason. */
+.layout-hbf-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-inline: var(--pane-pad);
+}
+/* A region that manages its own scrolling fills the box instead of overflowing it, and a split's
+   divider has to reach the pane's edge. Same escape as `single`'s. */
+.layout-hbf-body:has(> .ui-listdetail) { padding-inline: 0; }
+
+/* `single`. The one region is the scroller; see the comment in layouts/Single.tsx for why the layout
+   root cannot be. `padding-inline` rather than `padding`, because the vertical rhythm inside a region
+   is the kit's `gap` roles and a top pad would double the first one. */
+.layout-single-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-inline: var(--pane-pad);
+}
+/* Except when the region is a split. Its divider is the two columns' shared edge and has to reach the
+   pane's, and its list column does its own padding. */
+.layout-single-body:has(> .ui-listdetail) { padding-inline: 0; }
+/* Or a rectangle. Somebody else's pixels fill the box edge to edge — the browser preview's
+   `WebContentsView`, positioned from this element's own rect — and an inline pad would letterbox it.
+   The `Toolbar` above it carries its own padding, as chrome always does. */
+.layout-single-body:has(> .ui-rect) { padding-inline: 0; }
+
+/* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
+.layout-region-document,
+.layout-region-bottom { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* The detail column holds a pane's content rather than a list, so it takes the pane's inline padding
+   the same way every scrolling body above does. What takes it back is the shared block below. */
+/* The block end and the gap are the same argument one step further: the column's last child is a
+   composer or a row of actions, and with neither it sat on the pane's bottom border with the
+   transcript above it touching it. */
+.layout-region-detail {
+  padding-inline: var(--pane-pad);
+  padding-block-end: var(--space-4);
+  row-gap: var(--gap-stack);
+}
+/* ── Chrome takes the inline padding back ───────────────────────────────────────────────────
+   Every padded region above insets its contents, which is right for a paragraph and wrong for a bar:
+   a `Toolbar`, a `Tabs` strip, a pane-level `SectionHeader` and a `Row` each carry `--pane-pad`
+   themselves and each have a background that belongs to the pane's edge. Inset, they were padded
+   twice and their backgrounds stopped short of the border — which is docs/panes.md § The host owns a
+   region's inset promising something only `list-detail` delivered, and only to its own children.
+
+   A `Row` is in the set for the same two reasons, one of them quieter: its selected tint and its left
+   accent marker are the rail's full-bleed look, and inset they read as a different component from the
+   identical row in the rail beside them.
+
+   Descendants, not children. A plugin's tree is one `Stack` at its root and its bars hang off that, so
+   `>` reached almost none of them: Linear's header, its tab strip and its branch bar were all a
+   `Stack` away (plugins/linear/src/tree/LinearIssueView.tsx).
+
+   A region whose child pads itself is skipped rather than pulled back, because there is no padding
+   there to take. Those are the same `:has()` escapes each rule above already spells out.
+
+   `:where()` round the regions so the whole selector weighs what the chrome list alone weighs, which
+   is what lets the two cancels below out-specify it on one class. */
+:where(
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail)),
+  .layout-hbf-header,
+  .layout-hbf-footer,
+  .layout-tabs-panel:not(:has(> .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .ui-listdetail-detail[data-scroll]
+) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row) {
+  margin-inline: calc(-1 * var(--pane-pad));
+  /* `Row` is the one of the four with a `width: 100%`, and a percentage resolves against the padded
+     box: pulled left by a pane-pad it kept its old width and hung a pane-pad short on the right.
+     `auto` hands the width back to the flex stretch it was there to stand in for. */
+  width: auto;
+}
+/* A scroller in the middle hands the padding on rather than clipping it. `overflow` clips at the
+   padding box, and a bar pulled a pane-pad left of a scroller's content box lands outside it: the
+   first character of Linear's branch name was cut in half and there was nothing to scroll to, because
+   a browser will not scroll to negative inline-start. So each of these takes the region's padding over
+   — out by a pane-pad, in by a pane-pad — which leaves a bar inside it sitting exactly on the clip
+   edge. It nests: a `Rows` scroller inside a `TabPanel` does the same trick against the panel. */
+:where(
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail)),
+  .layout-tabs-panel:not(:has(> .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .ui-listdetail-detail[data-scroll],
+  .ui-tab-panel,
+  .ui-rows-scroll
+) :is(.ui-tab-panel, .ui-rows-scroll, .ui-timeline-scroll, .ui-grid-scroll) {
+  margin-inline: calc(-1 * var(--pane-pad));
+  padding-inline: var(--pane-pad);
+}
+
+/* One bar pads itself by less than the pane does: `sm`, at `--space-4`. Bled, that hung Linear's
+   branch name six pixels left of the facts above it, which reads as a misprint rather than as a
+   tighter bar. At the pane's edge it takes the pane's own pad; inside a card it keeps `--space-4`,
+   because a card's inset is smaller and a byline bar should sit inside it. `:is()` rather than
+   `:where()` here, because `.ui-toolbar[data-size='sm']` in primitives.css loads after this file and
+   a weightless selector would lose the tie. Every region is named by its bare class for the same
+   reason in reverse: one `[data-scroll]` in the list would out-weigh the card rule below it. */
+:is(
+  .layout-single-body,
+  .layout-hbf-body,
+  .layout-hbf-header,
+  .layout-hbf-footer,
+  .layout-tabs-panel,
+  .layout-region-detail,
+  .ui-listdetail-detail
+) .ui-toolbar[data-size='sm'] { padding-inline: var(--pane-pad); }
+:is(.ui-card, .ui-listdetail-list) .ui-toolbar[data-size='sm'] { padding-inline: var(--space-4); }
+
+/* Three exceptions. A card owns its own inset, so a bar or a row inside it belongs to the card's edge
+   and not the pane's — Linear draws every comment as a card with a byline bar in it. A list column is
+   flush already. And an `actions` toolbar is a footer with no background and no padding of its own,
+   so it has nothing to take back. */
+:is(.ui-card, .ui-listdetail-list) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row),
+.ui-toolbar[data-variant='actions'] { margin-inline: 0; }
+
+/* The reading column stops at `--pane-measure` and sits in the middle of whatever is left. A pane
+   is as wide as the display someone gave it, and on a 3700px one a transcript line runs to about
+   480 characters, which is a line nobody reads. Chrome is exempt, because a bar's background has to
+   reach the pane's edge either way, and so is a scroller: capping the scroller instead of the list
+   inside it puts a dead gutter on each side that the wheel does nothing over. `width` is spelled
+   out because an auto inline margin turns a flex item's stretch off, and without it a short card
+   would shrink to the width of its own text. */
+.layout-region-detail > *:not(.ui-toolbar, .ui-tabs, .ui-timeline-scroll),
+.layout-region-detail > .ui-timeline-scroll > .ui-timeline {
+  width: 100%;
+  max-width: var(--pane-measure);
+  margin-inline: auto;
+}
+/* Two children are edge-to-edge by nature and opt the whole column out: a split, whose divider is its
+   columns' shared edge and whose columns pad themselves, and a diff, which is a canvas. */
+.layout-region-detail:has(> .ui-listdetail),
+.layout-region-detail:has(> .diff-toolbar) { padding: 0; row-gap: 0; }
+.layout-region-detail:has(> .ui-listdetail) > *,
+.layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
+
+/* `list-detail`. The list column's width is a style token until someone drags the handle, which
+   writes a pixel value onto the container. The divider is the handle's, so the column carries no
+   border of its own. */
+.layout-region-list {
+  flex: none;
+  width: var(--listdetail-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.layout-list-scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* `wizard`. The host draws the indicator and the two controls; the step is the plugin's. */
+.layout-wizard-steps {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--pane-pad);
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  border-bottom: var(--chrome-divider);
+}
+.layout-wizard-step[data-state='current'] { color: var(--text); font-weight: var(--fw-semibold); }
+.layout-wizard-step[data-state='done'] { color: var(--accent); }
+.layout-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--pane-pad);
+  border-top: var(--chrome-divider);
+}

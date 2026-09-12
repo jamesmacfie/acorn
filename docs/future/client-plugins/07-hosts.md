@@ -6,11 +6,11 @@ measured against, and it says which host owns what.
 
 ## The contract is `PluginCustody`
 
-`packages/client-core/src/platform/index.ts` declares it with four members: `state()`, `cachePut()`,
+`packages/client-core/src/infra/platform/index.ts` declares it with four members: `state()`, `cachePut()`,
 `trustRecord()`, `devGrant()`. Phase 0 adds provenance to its types and a device fill path to
 `cachePut`. After that, "a plugin installed on this device" means: this host's custody returned a
 cache entry with `source.kind === 'device'` and an accepted acknowledgement for its hash. Every host
-answers the same question with its own storage, and `packages/client-core/src/plugins/host.ts` is
+answers the same question with its own storage, and `packages/client-core/src/host/plugins/host.ts` is
 the one client module that asks.
 
 The rest of the client does not know which host it is on. That is the property to keep.
@@ -37,7 +37,7 @@ this folder adds to that list:
 
 - **A `PluginCustody` implementation over IndexedDB.** Bundles as blobs, hashed with `crypto.subtle`
   before storage, acknowledgements as rows. The renderer's
-  `packages/client-core/src/plugins/host.ts` header already names this as the plan.
+  `packages/client-core/src/host/plugins/host.ts` header already names this as the plan.
 - **Device install from the browser.** `{ github }`, `{ npm }`, and `{ url }` need CORS or a proxy;
   `remote.md` already needs a proxy story for TLS, and the same hop serves this. `{ path }` does not
   exist on the web and the Settings row is not drawn, following the folder-picker rule in
@@ -51,18 +51,27 @@ this folder adds to that list:
 
 ## The terminal
 
-`docs/future/terminal/` owns the host, and
-[06-isolation.md](../terminal/06-isolation.md) there owns what this section used to say: a
-`PluginCustody` over files beside the terminal's own config, device as the natural provenance with
-`{ path }` allowed, the trust prompt as a kit tree, and the terminal's column in the trust model.
+[docs/tui.md](../../tui.md) owns the host, and its §§ Custody and The trust prompt own what this
+section used to say: a `PluginCustody` over files beside the terminal's own config, device as the
+natural provenance with `{ path }` allowed, the trust prompt as a kit tree, and the terminal's column
+in the trust model.
 Phase 0's resolution rule (device wins) applies there unchanged, and phase 4 of this folder, the
 config file, is built for that host first.
+
+**The host exists**, as of that folder's phase 5 (2026-08-31), and its custody is the design above
+rather than a variation on it: `apps/tui/src/plugins/custody.ts` builds `@acorn/custody`'s own
+`PluginCache` and `PluginTrustStore` against `$XDG_CONFIG_HOME/acorn/plugins/`, so the schemas, the
+`(pluginId, hash)` key and the refusal on a hash mismatch are the desktop's. It is the only file in
+that package that may name either class, and `client-core/host/plugins/host.ts` is still the only
+caller of `pluginCustody()`, which is checklist items 1 and 2 held on a second host. What that phase
+did **not** build is a device-held install: there is no surface to reach one from yet, so `{ path }`
+is a form the custody accepts and nothing offers. That is this folder's phase 0 on this host.
 
 ## The checklist
 
 Each phase's "doors left open" section names which of these it touched and how it held them:
 
-1. No client module outside `packages/client-core/src/plugins/host.ts` calls `pluginCustody()`.
+1. No client module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`.
 2. No cache or acknowledgement type is defined in a host package. They are protocol types.
 3. No source form is assumed to exist on every host. `{ path }` is desktop and terminal only.
 4. No replaceable-surface contract carries a DOM type, a `MouseEvent`, or a shell callback that a

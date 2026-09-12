@@ -1,0 +1,9 @@
+{
+  // Node types only. This package is the custody stack a desktop shell supervises: it runs in the
+  // helper's Node process, never in a renderer, so it must not be able to reach for a DOM global.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

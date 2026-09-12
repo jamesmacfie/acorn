@@ -2,7 +2,7 @@
 // build the bundles and generate `acorn-plugin.json`. It lives here, not in the build script, so the
 // plugin's declared surface is visible from the plugin's own directory.
 //
-// THE FIRST CONSUMER OF `document-over-frame` (docs/third-party/monaco.md § Sequence, step 5), and that is
+// THE FIRST CONSUMER OF `document-over-frame` (docs/editor.md § Sequence, step 5), and that is
 // why this plugin moved rather than because the migration bought it anything on the storage path. It was
 // stuck first-party for one measured reason: the pane embedded Monaco, a single-file Monaco frame comes
 // to 7.93 MiB against an 8.00 MiB cap with a stub UI, and its four language-service workers (14.58 MiB)
@@ -24,14 +24,16 @@
 //     exactly what this plugin does, and the declaration is honest disclosure rather than an
 //     over-declaration. Contrast rollbar/linear's `secrets: false`, the opposite case, where the plugin
 //     genuinely never touches the host service.
-//   core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models'] — `tasks.load` to validate a task and
+//   core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'] — `tasks.load` to validate a task and
 //     resolve its project, `tasks.root` for the worktree the script runs in, `projects.byId` for the
 //     checkout path, `projects.config` for the connection script, the schema mode/value and the schema
 //     notes, and `projects.assertConfigTrusted` before running any of it — cloning a repo must not be
 //     enough to run its commands. `fs.resolveInRoot` confines the `file`-mode schema path to the
 //     worktree. `models` is the AI generate feature: `models.available` for the connection dropdown and
 //     `models.generateText` for the SQL itself — core still resolves the provider key, this plugin only
-//     ever sees ids and labels. The brief listed `prefs`; nothing reads or writes one, so it is not here.
+//     ever sees ids and labels. `identity` is the `database:generate` workflow step: a step has no
+//     request to read an owner from, and a model connection is spent as somebody. The brief listed
+//     `prefs`; nothing reads or writes one, so it is not here.
 //   secrets: false — the brief sketched `true`. It is wrong, and the reason is the nicest property this
 //     plugin has: the connection URL is resolved per connect and NEVER PERSISTED, so there is no
 //     credential at rest for the host secret service to hold. Postgres credentials live in the reader's
@@ -56,7 +58,14 @@ export default {
   permissions: {
     api: ['core.tasks:read'],
     events: [],
-    node: { core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models'], capabilities: [], secrets: false, exec: true, net: [] },
+    node: {
+      core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'],
+      capabilities: [],
+      secrets: false,
+      exec: true,
+      net: [],
+      env: ['DATABASE_URL'],
+    },
   },
   contributions: {
     frames: [{
@@ -74,9 +83,9 @@ export default {
       // the button bar, the table sidebar, the result grid and its two modals below.
       //
       // What the client DELETED in the move, which is the argument for the whole contract in one list:
-      // `monaco.editor.create` and all its options, the theme application and its appearance
-      // subscription, the `addCommand(⌘Enter)` binding, the `editorH` signal and the splitter's pointer
-      // handlers — and the `monaco-editor` dependency itself.
+      // constructing an editor and all its options, the theme application and its appearance
+      // subscription, the ⌘Enter binding, the `editorH` signal and the splitter's pointer handlers —
+      // and the editor dependency itself.
       layout: 'document-over-frame',
       regions: {
         document: {
@@ -110,17 +119,80 @@ export default {
         id: 'open',
         title: 'Database: open pane',
         category: 'pane',
+        // Not in the group below, and not renamed: it is invisible in the palette, so the only place
+        // this title is read is the shortcut editor, where it stands on its own next to a chord.
         palette: false,
         action: { verb: 'openPane', pane: 'database' },
       },
       {
+        // The group the three visible rows hang under. Grouping is what keeps four rows saying
+        // "Database" out of the palette root; the root search still finds a child by its own words,
+        // because the breadcrumb is one of the terms a node is indexed under
+        // (client-core/host/registries/commands/graph.ts).
+        //
+        // `db` rather than `database`, which is the pane's id: contribution ids are unique across the
+        // whole manifest, so a group cannot be named after the surface it is about.
+        id: 'db',
+        title: 'Database',
+        kind: 'group',
+        category: 'action',
+      },
+      {
         id: 'execute',
-        title: 'Database: run query',
+        // Was 'Database: run query'. The id and the chord are unchanged, which is what a reader's
+        // muscle memory and a stored override are keyed on; the prefix went because the group above now
+        // says it.
+        title: 'Run query',
+        parentId: 'db',
         category: 'action',
         // Reachable from the palette as well as from the chord, which is what naming the surface on the
         // action rather than deriving it from the keybinding buys.
         palette: true,
         action: { verb: 'surfaceAction', surface: 'database' },
+      },
+      {
+        // This project's saved queries, searched from the palette
+        // (docs/database.md § From the command palette).
+        //
+        // `scope: 'task'` although a saved query belongs to a project, and that is deliberate rather
+        // than a compromise: every saved-query route in this plugin is addressed through a task,
+        // because the task is what core resolves a project from. The host sends the task the palette
+        // session captured; the route turns it into exactly one project's rows.
+        //
+        // `openPane`, not `navigate`: a saved query has no detail surface of its own. Picking one loads
+        // its SQL into the pane's editor through the same path the pane's own picker uses, and running
+        // it stays the reader's next keystroke (../tree/DatabasePanel.tsx).
+        id: 'find-query',
+        title: 'Find a saved query',
+        parentId: 'db',
+        hint: 'saved queries in this repository',
+        keywords: ['sql', 'query', 'saved', 'database'],
+        category: 'navigation',
+        kind: 'search',
+        scope: 'task',
+        route: '/v2/p/database/palette/queries',
+        placeholder: 'Find a saved query…',
+        onSelect: { verb: 'openPane', pane: 'database' },
+      },
+      {
+        // Describe a query in words and get SQL in the editor, without opening the modal
+        // (docs/database.md § From the command palette).
+        //
+        // One text field, so the three choices the modal offers are all made for the reader: the first
+        // connected model provider, that provider's own default model, and no worked examples. Choosing
+        // any of them remains the modal's job. The route writes the scratch document before it answers,
+        // so by the time this pane opens the SQL is already the document it loads.
+        id: 'generate',
+        title: 'Generate SQL',
+        parentId: 'db',
+        hint: 'describe a query and get SQL in the editor',
+        keywords: ['ai', 'sql', 'generate', 'database'],
+        category: 'action',
+        kind: 'input',
+        scope: 'task',
+        route: '/v2/p/database/palette/generate',
+        placeholder: 'Describe the query — e.g. the 10 most recent orders with the customer’s email',
+        onSuccess: { verb: 'openPane', pane: 'database' },
       },
     ],
     keybindings: [

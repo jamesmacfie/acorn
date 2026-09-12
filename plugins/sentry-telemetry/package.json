@@ -1,0 +1,25 @@
+{
+  "name": "@acorn/plugin-sentry-telemetry",
+  "version": "0.1.0",
+  "description": "Ships this node's telemetry to Sentry: errors, transactions, logs, metrics, and cron check-ins, behind a DSN the owner pastes in.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node/index.ts": "./src/node/index.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

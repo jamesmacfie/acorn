@@ -13,11 +13,11 @@ import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRe
 import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
-  Alert, Badge, Button, ConfirmButton, EmptyState, Input, ListColumn, ListDetail, Row, Rows, Section,
+  Alert, Badge, Button, ConfirmButton, EmptyState, Input, ListDetail, Row, Rows, Section,
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { containerTone } from './dockerViewState'
+import { consumeDockerReveal, containerTone, dockerReveal } from './dockerViewStore'
 
 type SectionId = 'containers' | 'images' | 'volumes' | 'networks'
 const SECTIONS: { id: SectionId; label: string }[] = [
@@ -67,6 +67,18 @@ export default function DockerBrowse() {
   onMount(() => {
     wireDockerRefresh()
     void refreshDocker()
+  })
+
+  // A resource the palette named (./commands.ts). An effect rather than a read at mount, because the
+  // surface may already be on screen when the pick happens: `dockerReveal` is tracked, and taking it
+  // clears it so a later remount does not jump somewhere the reader has since left.
+  createEffect(() => {
+    if (!dockerReveal()) return
+    const reveal = consumeDockerReveal()
+    if (!reveal) return
+    setSection(reveal.scope)
+    setSelected(reveal.id)
+    setFilter('')
   })
 
   // Object lists load on section entry and refresh on their docker:changed scope.
@@ -460,7 +472,7 @@ export default function DockerBrowse() {
   )
 
   return (
-    <ListDetail listLabel="Docker objects" list={<ListColumn>{list}</ListColumn>}>
+    <ListDetail listLabel="Docker objects" list={list}>
       <Show
         when={section() === 'containers' && selected()}
         fallback={<EmptyState align="start">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</EmptyState>}

@@ -8,7 +8,7 @@
 // http ships as a loaded plugin, so these routes run behind `portableCarrier`. A loaded bundle sits
 // outside the host's Hono stack, so the identity comes off the request context rather than
 // `owner(c)` or `c.get('principal')`.
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Hono, type Context } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
@@ -21,11 +21,13 @@ import {
   type SecretService,
 } from '@acorn/plugin-api/node'
 import type { PluginRailItems } from '@acorn/protocol/api.ts'
+import type { CommandInputResult } from '@acorn/protocol/commands.ts'
 import { httpRequests, httpVariables } from '../../node/schema'
-import { bodyModes, httpMethods, variableKinds, type AuthConfig, type BodyMode, type HttpRequest, type HttpVariable, type KeyValue } from '../../shared/model'
+import { bodyModes, fromCurl, httpMethods, variableKinds, type AuthConfig, type BodyMode, type HttpMethod, type HttpRequest, type HttpVariable, type KeyValue } from '../../shared/model'
 import { SendError, send, type SendCoreServices } from '../send'
 import { HttpStorageError, openHttpValue, protectHttpValue } from '../storage'
 import { MAX_CONTEXT_REQUESTS, requestOption, requestSnapshot } from '../agentContext'
+import { importedRequestName, savedRequestSearchItems } from '../paletteSearch'
 
 // The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
 // wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
@@ -110,7 +112,7 @@ const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretS
   }
 }
 
-// Secret values never leave the server. The renderer gets '' and shows a "set" placeholder; saving
+// Secret values never leave the server. The client gets '' and shows a "set" placeholder; saving
 // an unchanged secret means sending '' back, which the PUT handler treats as "keep what's stored".
 const toVariable = async (row: typeof httpVariables.$inferSelect, secrets: SecretService): Promise<HttpVariable> => ({
   id: row.id,
@@ -137,6 +139,33 @@ const contextCaptureBody = z.object({
   taskId: z.string().min(1),
   optionIds: z.array(z.string().min(1)).max(MAX_CONTEXT_REQUESTS).optional(),
 })
+
+// The command palette's input body. `input` is the pasted cURL command and `taskId` is the scope the
+// HOST derived from the session it captured — neither the manifest nor a previous answer writes it
+// (client-core/host/chrome/chromeCommands.ts § commandRouteScope). Bounded here because a palette field
+// has no length of its own and a pasted file must not become a parse.
+const paletteImportBody = z.object({
+  input: z.string().trim().min(1).max(100_000),
+  taskId: z.string().min(1),
+})
+
+// The palette's view of the same set, selected down to the four columns the node did NOT encrypt.
+//
+// A projection rather than a filter after the fact: the URL, the headers, the body, the auth block and
+// the variables are the five encrypted columns, and this query does not ask for any of them, so the
+// search path never holds a plaintext secret to leak (../paletteSearch.ts).
+const savedRequestSummaries = async (db: PluginDatabase, userId: string, projectId: string) =>
+  db
+    .select({
+      id: httpRequests.id,
+      name: httpRequests.name,
+      folder: httpRequests.folder,
+      method: httpRequests.method,
+    })
+    .from(httpRequests)
+    .where(and(inProject(userId, projectId), isNull(httpRequests.taskId)))
+    .orderBy(asc(httpRequests.folder), asc(httpRequests.name))
+    .limit(MAX_CONTEXT_REQUESTS)
 
 // This project's saved tree: the rows with no task, which is what the rail lists.
 const projectRequests = async (db: PluginDatabase, userId: string, projectId: string) =>
@@ -204,7 +233,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
 
     // The rail's list of this project's saved requests (docs/http-client.md § Client, "the rail
     // source"). `?project=` is minted by the host from the shell's routed project
-    // (client-core/plugins/chrome/data.ts § scopedSourceItemsPath).
+    // (client-core/host/chrome/chromeData.ts § scopedSourceItemsPath).
     //
     // No `task` block on a row, and that absence is the contribution: it tells the host there is
     // nothing to promote, so no task-creation affordance is drawn.
@@ -223,6 +252,99 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
           ...(row.folder ? { subtitle: row.folder } : {}),
         })),
       } satisfies PluginRailItems)
+    })
+
+    // ── The command palette's rows (docs/plugins.md § Command kinds) ──
+
+    // The `Find a saved request` command's rows, over the same set the rail lists.
+    //
+    // `projectId` is the project the palette session captured, sent by the host; a manifest names the
+    // scope and never the value. The rows are filtered in SQL by owner AND project, exactly as every
+    // other read in this file is (`inProject`), so an unmapped project or another login's rows are not
+    // narrowed out after the fact — they are never selected.
+    //
+    // What comes back cannot carry a secret, and not because it was scrubbed: the query above asks for
+    // four plaintext columns and none of the five the node encrypted (../paletteSearch.ts).
+    .get('/palette/requests', async (c) => {
+      const projectId = c.req.query('projectId')
+      // No routed project is an empty list rather than an error: the command is project-scoped, so the
+      // host only offers it with one, and losing a race is not worth a red line.
+      if (!projectId) return c.json({ items: [] })
+      const project = await core.projects.byId(projectId)
+      if (!project) return c.json({ items: [] })
+      const rows = await savedRequestSummaries(db, owner(c), project.id)
+      return c.json({ items: savedRequestSearchItems(rows, c.req.query('q') ?? '') })
+    })
+
+    // The `Import a curl command` input: paste a command line, get a saved request.
+    //
+    // NOTHING IS SENT. The parser is ../../shared/model.ts's `fromCurl`, which reads flags out of a
+    // token list and never executes anything, over `tokenizeShell`, which is a quote-and-escape reader
+    // and not a shell — no `child_process`, no `bash -lc`, no `fetch`. The only outbound request this
+    // plugin makes is `/send`, and nothing here reaches it. Sending remains a separate act the reader
+    // takes in the pane, with the request in front of them.
+    //
+    // Task-scoped, unlike the search above, and for one reason: an input's `onSuccess` is the
+    // context-free verb set, whose only way to show the reader what was created is `openPane` — and a
+    // pane belongs to a task. So the import lands where a new request in a task lands anyway: on the
+    // task, ad-hoc, until the reader files it (../../tree/draft.ts § emptyDraft).
+    //
+    // The parsed command goes through `requestBody`, the same schema the pane's own save posts through,
+    // so an import can never store what a save could not, and then through `protectedRequestFields`,
+    // the same encryption. The row is answered only after the insert resolves.
+    .post('/palette/import-curl', async (c) => {
+      const parsed = paletteImportBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      const task = await core.tasks.load(parsed.data.taskId)
+      if (!task?.projectId) return respondError(c, 404, 'not_found')
+      const project = await core.projects.byId(task.projectId)
+      if (!project) return respondError(c, 404, 'not_found')
+      const curl = fromCurl(parsed.data.input)
+      // `null` is "that is not a curl command with a URL in it", which is the reader's typo rather than
+      // a fault. The palette keeps their text and shows this line under it.
+      if (!curl) return respondError(c, 400, 'bad_request', ['That is not a curl command with a URL in it.'])
+      const method = (httpMethods as readonly string[]).includes(curl.method) ? curl.method as HttpMethod : 'GET'
+      const draft = requestBody.safeParse({
+        folder: '',
+        taskId: parsed.data.taskId,
+        name: importedRequestName(method, curl.url),
+        method,
+        url: curl.url,
+        headers: curl.headers,
+        bodyMode: curl.bodyMode,
+        body: curl.body,
+        auth: curl.auth,
+        vars: {},
+      })
+      if (!draft.success) return respondError(c, 400, 'bad_request', draft.error.issues.map((i) => i.message))
+      const protectedFields = await protectedRequestFields(draft.data, secrets)
+      const row = {
+        id: crypto.randomUUID(),
+        userId: owner(c),
+        projectId: project.id,
+        folder: draft.data.folder,
+        taskId: draft.data.taskId,
+        name: draft.data.name,
+        method: draft.data.method,
+        url: protectedFields.url,
+        headers: protectedFields.headers,
+        bodyMode: draft.data.bodyMode,
+        body: protectedFields.body,
+        auth: protectedFields.auth,
+        vars: protectedFields.vars,
+        encrypted: true,
+        createdAt: now(),
+        updatedAt: now(),
+      }
+      await db.insert(httpRequests).values(row)
+      savedRequestsChanged(emit, project.id)
+      // Answered after the write, and with the same summary a search row carries: an id, a name and a
+      // method, and none of what was just encrypted. The success action opens the pane, which reads
+      // this id off the row and selects it (../../tree/panelModel.ts).
+      return c.json({
+        ok: true,
+        item: { id: row.id, title: row.name, badge: row.method },
+      } satisfies CommandInputResult)
     })
 
     // The agent composer's option list and capture, for the task the composer named
@@ -407,7 +529,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
         .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, id)))
       if (!existing.length) return respondError(c, 404, 'not_found')
 
-      // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
+      // The client never sees a secret's plaintext, so it sends '' to mean "leave it alone".
       const unchangedSecret = d.kind === 'secret' && existing[0].kind === 'secret' && d.value === ''
       const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, secrets)
 

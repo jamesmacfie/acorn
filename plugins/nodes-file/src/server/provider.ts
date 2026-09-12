@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { z } from 'zod'
 import type { NodeProviderContribution, NodeSpec, ProvidedNodeRecord } from '@acorn/plugin-api/node'
 import { providedNodeStateSchema } from '@acorn/protocol/nodeProviders.ts'
@@ -63,8 +62,9 @@ const read = (path: string): FileNode[] => {
 // Temp file then rename, so a crash mid-write cannot leave a truncated inventory behind. Same posture
 // as the data root's own writes, for the same reason.
 const write = (path: string, nodes: FileNode[]): void => {
-  mkdirSync(dirname(path), { recursive: true })
-  const temporary = join(dirname(path), `.${process.pid}.nodes.tmp`)
+  // The fixed sidecar is part of the manifest's exact read-write file grant. A pid-shaped name would
+  // require granting the whole directory, which could expose unrelated files beside the inventory.
+  const temporary = `${path}.acorn-tmp`
   writeFileSync(temporary, `${JSON.stringify({ nodes }, null, 2)}\n`, { mode: 0o600 })
   renameSync(temporary, path)
 }

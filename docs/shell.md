@@ -12,20 +12,34 @@ deleted once every phase landed; git history holds that record.
 ## The shell process
 
 `apps/desktop/src-tauri/src/lib.rs` registers the `app://acorn` and `app-plugin://` schemes,
-supervises the helper, and opens the window. Boot order is the reverse of what a Tauri app usually
-does: `setup` blocks on the helper, so the broker is warm and the node is listening before the
-window exists. The renderer's first act is to ask for the fleet, and a window that opened first
-would have nothing to render but the recovery screen.
+supervises the helper, and opens the window. `setup` blocks on the helper and no further. The
+renderer's first act is to ask which nodes there are, the fleet is a file on the helper's disk, and a
+window that opened before the helper existed could not ask.
+
+**The ready line means "the helper is listening", not "the node is up.**" `boot()` in
+`apps/desktop/src/helper/helperMain.ts` adopts any legacy custody, loads the env files, builds the
+helper, binds the WebSocket server, and prints the ready line. Only then does it start the node, with
+`helper.startInBackground()`. So the window opens on a helper that can answer the fleet question, and
+the node's own boot — a few hundred milliseconds of plugin loading and migrations — happens behind the
+first frame and arrives as a `node-status` push the renderer already handles. The shell draws that
+node's persisted query cache in the meantime ([frontend.md](./frontend.md) § Painting before the node).
+
+`startInBackground` rather than a bare `void helper.start()`, and the difference is the failure path.
+A `start()` that rejects never spawned a child, so `unexpectedExit` cannot fire and nothing would
+retry; it routes that case into the same crash budget and recovery dialog a later crash reaches. The
+budget and the dialog are unchanged. What changed is where the dialog appears: over the shell, rather
+than instead of it. A helper that never becomes ready at all is still fatal, because nothing in the
+window can reach a node without one — Rust says why and quits.
 
 The Rust half is deliberately small. Three modules serve content (`app_scheme.rs`,
 `plugin_scheme.rs`, `webviews.rs`), one supervises the helper (`helper.rs`), one holds the data key
 (`keychain.rs`), and two carry the window's own surface (`commands.rs`, `menu.rs`). Custody is
 TypeScript.
 
-`packages/desktop-helper` is the other half, composed by its `main/index.ts`: service supervision and
+`packages/custody` is the other half, composed by its `src/index.ts`: service supervision and
 the restart policy, the connection broker and its fleet, device-token custody, the plugin cache and
 trust store, and the preview tunnels. It runs as its own process under the bundled Node, and
-`apps/desktop/src/shell/helperMain.ts` is its entry point. Rust talks to it over stdin and stdout in
+`apps/desktop/src/helper/helperMain.ts` is its entry point. Rust talks to it over stdin and stdout in
 lines: one handshake line in, one ready line out, then commands. Never through argv or the
 environment, because the handshake carries the data key and argv is world-readable.
 
@@ -50,9 +64,10 @@ inside the data directory, which wins. `SESSION_ENC_KEY` falls through to the no
 key if neither file supplies it, resolved before the listener starts accepting connections.
 
 `tauri_plugin_single_instance` makes a second launch focus the running window instead of starting a
-second process. The data root's own exclusive lock (`node-core/main/dataRoot.ts`) is the real mutual
+second process. The data root's own exclusive lock (`node-core/server/storage/dataRoot.ts`) is the real mutual
 exclusion; the single-instance lock only keeps a second launch from getting as far as contending for
-it.
+it. The automation-only debug build omits this convenience layer because each of its windows has a
+distinct data root; the Node lock still protects each root.
 
 Quitting negotiates with the renderer first. Quit is a custom menu item rather than
 `PredefinedMenuItem::quit`, because the predefined one routes through `[NSApp terminate:]` and skips
@@ -75,7 +90,7 @@ the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius
 `session.key`.
 
 A packaged build's first launch adopts an Electron-era custody root if it finds one:
-`packages/desktop-helper/src/main/legacyCustody.ts` copies `fleet.json`, the trust store, and the
+`packages/custody/src/custody/legacyCustody.ts` copies `fleet.json`, the trust store, and the
 content-addressed plugin cache, and re-encrypts the device tokens from Chromium's `os_crypt` under
 the data key. Rust reads the old keychain item and passes both in the handshake.
 
@@ -95,7 +110,7 @@ broker only after the listener is ready. Startup failures fail closed; a crash a
 retried with bounded exponential backoff and eventually shows the recovery screen without creating a
 new data root.
 
-The crash budget (`@acorn/desktop-helper/main/crashBudget.ts`) allows five restarts inside a
+The crash budget (`@acorn/custody/supervision/crashBudget.ts`) allows five restarts inside a
 ten-minute window, waiting 1, 2, 4, 8, then 16 seconds before each one. A sixth crash inside the
 window gives up and shows the recovery screen instead of restarting into the same fault. An earlier,
 tighter policy, roughly 250 ms doubling and capped at three crashes in sixty seconds, meant a service
@@ -114,9 +129,69 @@ processes, workflows, Docker, provider clients, reconciliation, and shutdown dra
 to close the listener, dispose plugin engines, close SQLite, and release the data-root lock with a
 30-second overall deadline.
 
-The supervised child and the standalone node consume the same `apps/node/src/server/composition.ts`
+The supervised child and the standalone node consume the same `apps/node/src/composition/composition.ts`
 graph and the same reconciliation and drain plan. The shell supplies supervision and native adapters;
 it does not assemble a parallel plugin graph.
+
+## What the helper reports
+
+Off by default, and on it is the same five record kinds every other runtime builds.
+[telemetry.md](./telemetry.md) owns the model, the switch and the collector; this section is what the
+helper and the Rust shell add to it.
+
+The helper uses the node's own collector (`packages/node-core/src/server/telemetry/collector.ts`)
+rather than the renderer's emitter. It is a Node process that already depends on `@acorn/node-core`,
+its logger writes to stderr, which is what a process whose stdout is a wire needs, and reusing the
+renderer's would put a package that draws on the helper's graph. The terminal client goes the other
+way for the same kind of reason: it runs client-core in process
+([tui.md](./tui.md) § What the terminal client reports).
+
+| Seam | Where | What it emits |
+| --- | --- | --- |
+| The boot account | `packages/custody/src/bootMarks.ts` | span `helper.boot` with a `helper.boot.mark` child per mark |
+| Every request to a node | `packages/custody/src/broker/nodeBroker.ts` | histogram `broker.request` with the node id and the method |
+| The socket's health | the same file | events `broker.reconnect`, `broker.degraded`, `broker.shed` and `broker.missed-pong`, each with the node id |
+| A node that died | `packages/custody/src/supervision/crashBudget.ts` | event `node.crash` with the count in the window; a fatal error when the budget is spent |
+| Every bridge call | `apps/desktop/src/shell/bridge.ts` | histogram `bridge.call` with the helper method, from the renderer |
+| Console lines | everywhere under `packages/custody/src` and `apps/desktop/src/helper` | log records through `createLogger(tag)` |
+
+`bridge.call` is the renderer's record and not the helper's: the bridge runs in the window. It
+measures the helper's leg of a round trip the renderer's `api.request` span already covers end to
+end, so a slow `bridge.call` beside a fast node says the broker is where the time went.
+
+### The switch, over the wire
+
+Collection needs the `telemetry.enabled` preference and a sink together, and the helper has no
+database to read the preference out of. So `packages/custody/src/telemetry.ts` asks the local node
+for it over the broker: once a minute while it is off, and every five seconds once it is on, because
+that is the collector's own flush tick and it re-reads the preference on each one. A switch flipped
+in Settings reaches the helper within a minute.
+
+The sink is registered when the answer is yes and dropped when it is no, so a helper nobody is
+collecting from has no flush timer at all. A batch that fails to post is kept and prepended to the
+next attempt, capped at 500 records: a node restarting is the case the queue exists for, and it is
+also the case that produces the records worth keeping.
+
+The boot marks become spans after the fact, for the same reason the terminal client's do: the answer
+arrives after the boot is over. They are held either way, because `ACORN_PERF=1` prints them
+([local-development.md](./local-development.md) § Timing a cold start).
+
+### What the shell reports
+
+One thing, and it arrives a launch late. A panic hook runs while the process is dying: it can write
+a file and nothing else, and the helper is this process's child and is going with it. So
+`apps/desktop/src-tauri/src/crash.rs` installs `std::panic::set_hook` as soon as `boot` has resolved
+the two roots, and a panic writes `shell-crash.json` into the custody root with the message, the
+file and line, the thread and the app version.
+
+The helper reads that file on its next boot, posts it as one fatal error with `runtime: shell`, and
+deletes it. Its own batch, because the node re-stamps the runtime from the batch onto every record in
+it, and only the helper can speak for the shell. The file is deleted whether or not the post
+succeeded: a record kept until a post happens to work is a record re-read on every boot for the life
+of the install.
+
+The file is the telemetry error record's own shape, minus the `kind` the reader adds. That is
+deliberate. A crash reporter in the shell, a native dialog offering to send it, reads the same file.
 
 ## Renderer origin and protocol handler
 
@@ -136,6 +211,21 @@ parses as JSON is the worst answer available.
 
 Development proxies the Vite dev server through this same handler rather than loading `devUrl`
 directly, so developers exercise the origin the shipped app uses.
+
+The handler is registered asynchronously and answers each request on its own thread. The synchronous
+form runs the whole response on the thread that delivered the request, which is the thread the webview
+draws on, and a cold window asks for well over a hundred module scripts: each blocking `fs::read` sat
+in front of the next request, and under `pnpm dev` each blocking HTTP call to Vite did the same. A
+thread per request is fine for the tens of reads a launch makes; a pool behind the same responder is
+the upgrade if that changes.
+
+**Cache headers depend on the build.** A packaged build serves `/assets/<name>-<hash>.<ext>` with
+`public, max-age=31536000, immutable`, because the bundler content-hashes every file it writes there —
+the name is the version, so a rebuild emits a different one. Everything else is `no-store`, and
+`index.html` above all: it is the one name a rebuild does not change, so a cached copy would keep
+pointing the window at the previous build's chunks forever. A dev build is `no-store` throughout, from
+the same branch that widens the policy, because Vite rewrites those files under the same names while
+the developer works. A Rust test asserts all four cases.
 
 The CSP is a response header rather than an `index.html` meta tag, because a header cannot be
 overridden by markup injected into the document, and a meta tag can be preceded by content it
@@ -157,7 +247,7 @@ preview pane is a child webview rather than a frame, so widening this for `http(
 nothing. Two more directives carry their own reason: `style-src 'unsafe-inline'` is required because
 Shiki emits `style="color:#…"` attributes into HTML that reaches `innerHTML`, and style attributes
 are gated independently of `el.style.x = v` assignments; `img-src https:` exists for GitHub avatars
-rendered in PR authorship (`ui/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
+rendered in PR authorship (`kit/components/content/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
 one-line change once nothing else renders a remote image.
 
 Development widens the policy in one branch: Vite's HMR socket and the inline preamble its plugins
@@ -191,8 +281,9 @@ stop applying and Oniguruma would fail inside it.
 (`apps/desktop/vite.config.ts`) is required, not cosmetic: Vite emits two files derived from
 `highlighter.worker.ts`, the worker entry itself and a roughly 270-byte main-thread wrapper that
 constructs it, and without a distinguishing prefix both would be named
-`highlighter.worker-<hash>.js` with no way to tell them apart. Monaco's five workers keep the plain
-`[name]` pattern, so they get their own names and the document's ordinary policy. If a future bundler
+`highlighter.worker-<hash>.js` with no way to tell them apart. It is the only worker the renderer
+bundles now that the editor is CodeMirror, which needs none; anything else that arrives keeps the
+plain `[name]` pattern and the document's ordinary policy. If a future bundler
 change renames the worker entry, the pattern stops matching, the worker falls back to the document's
 policy, Oniguruma fails inside it, and `highlight/worker.ts` logs the failure and falls back to the
 main thread: degraded and loud, which is the failure mode this area was built to have.
@@ -203,7 +294,7 @@ A loaded plugin has a second way to draw. Instead of an iframe whose pixels it o
 run in a dedicated Web Worker and emit a *tree*: names of the host's own components, with props, as a
 stream of mutations the renderer applies. The host mounts its components for those names, so what the
 reader gets has the shell's focus handling, keyboard model, ARIA and style pack, none of which an
-iframe can borrow. `docs/plugins.md` § Loaded plugins: the client half has the plugin-facing half;
+iframe can borrow. `docs/plugins.md` § The client half of a loaded plugin has the plugin-facing half;
 this section is the shell's.
 
 The worker script is the plugin's own bundle, served by `app_scheme.rs` at
@@ -227,7 +318,7 @@ from its own script's response headers. `PLUGIN_WORKER_CSP` is
 WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
 out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
 
-The renderer's half is `packages/client-core/src/plugins/tree/`: `workerHost.ts` owns one worker per
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
 bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
 unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
 into a function. A worker that misses two heartbeats is terminated and every tree it served shows a
@@ -238,17 +329,49 @@ labelled placeholder.
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface
 the platform seam reads: broker request and response bytes, stream frames and status, fleet
-operations, lifecycle actions, folder selection, and the webview commands. It never exposes a node
-token, a certificate, a database handle, or a process object.
+operations, lifecycle actions, the three file dialogs, the notification group, and the webview
+commands. It never exposes a node token, a certificate, a database handle, or a process object.
 
-The same bridge serves both render paths. `packages/client-core/src/plugins/frames/broker.ts` takes a `MessagePort` and knows
+One thing on that socket is not JSON: terminal output. The helper's push channel carries a binary
+frame beside the JSON messages, tagged with the node id, wrapping the frame the node sent, which is
+itself tagged with the session id (`packages/protocol/src/ws.ts` § The one binary frame). The bridge
+sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
+`packages/client-core/src/infra/node/wsClient.ts` through the seam's `onBytes`, which is the one module
+that reads the session id and the one place the bytes become text. So a busy build's output crosses two
+process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
+socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
+messages: nothing else on this wire is measured in frames per second
+([performance.md](./performance.md) § Replacing base64 on the helper
+wire ahead of a measurement).
+
+The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
+paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
+directions because the Tauri channel is JSON. Bytes rather than paths because the node this renderer
+talks to is not always on this machine, so a path would name a file the node cannot open. The shell
+owns the dialog and the read or write, and the renderer never learns where the file went.
+
+The `notify` group is a system notification, a click on one, and the number on the dock icon
+(`apps/desktop/src-tauri/src/commands.rs`). What decides that a banner is worth raising is
+[notifications.md](./notifications.md) § The gate. All three are the shell's rather than the helper's,
+because a banner and an app icon belong to the window's process. `tauri-plugin-notification` is
+initialised in `src-tauri/src/lib.rs` for `app.notification()` alone: the renderer never invokes the
+plugin's own commands, so `capabilities/default.json` still grants `core:default` and nothing else,
+and a page in the preview pane or a plugin webview cannot raise a banner wearing acorn's icon.
+
+The plugin gives desktop no activation callback, so `show_notification` records the notice id it
+raised a banner for and `window_focused` emits `acorn:notification-activated` when the main window
+comes back within 30 seconds. That is a guess, and a wrong one costs a task selection the owner did
+not ask for. Both halves of the alternative are worse: no click handling at all, or a second
+notifier process to shell out to.
+
+The same bridge serves both render paths. `packages/client-core/src/host/frames/broker.ts` takes a `MessagePort` and knows
 nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker
-gets one in its first message, and `packages/client-core/src/plugins/frames/scopes.ts` decides every call the same way for both. A tree
+gets one in its first message, and `packages/client-core/src/host/frames/scopes.ts` decides every call the same way for both. A tree
 binding carries `target: 'remote'`, which grants nothing — it has no document, no webview and no modal
 to dismiss, so the verbs that gate on those refuse it.
 
 That surface is the implementation of the platform seam, and the renderer never reads it directly.
-`packages/client-core/src/platform/` is the only module allowed to touch the global, enforced by
+`packages/client-core/src/infra/platform/` is the only module allowed to touch the global, enforced by
 `boundaries.test.ts`. The two are checked against each other rather than assumed to agree:
 `platform/contract.ts` states what a live capability group has to look like, and
 `src/shell/bridge.test.ts` runs it against the real bridge under stub Tauri bindings, so a renamed
@@ -268,7 +391,7 @@ storage, `'self'` resolves against it, and the per-response CSP is honoured.
 Only `/index.html`, generated by the shell so the plugin never controls its own head, `/client.js`,
 and the host-owned `/ui.css` presentation kit exist there. The stylesheet is a staged file the
 handler reads once at boot; `apps/desktop/scripts/stage.mjs` holds the ordered list of client-core
-modules that make it up, and `packages/client-core/src/styles/cssHygiene.test.ts` reads that list and
+modules that make it up, and `packages/client-core/src/infra/styles/cssHygiene.test.ts` reads that list and
 checks a frame is served a base rule for every class `primitives.css` styles. The handler resolves a
 bundle by path, `<userDataDir>/plugin-cache/<hash>.js`, because the store is content-addressed: a
 file whose name is a 64-hex hash is a bundle this device holds, and nothing else can be named.
@@ -319,7 +442,7 @@ scheme with no CORS.
 
 ## Connection broker
 
-`@acorn/desktop-helper/main/nodeBroker.ts` runs in the helper process. For each node it owns:
+`@acorn/custody/broker/nodeBroker.ts` runs in the helper process. For each node it owns:
 
 - endpoint and certificate fingerprint;
 - a pinned `https.Agent` and device token;
@@ -331,8 +454,21 @@ broker adds the bearer, validates the pinned certificate, and returns serializab
 Node states are `online`, `degraded`, `offline`, `incompatible`, and `revoked`.
 
 Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes the node stale and
-causes the client to reconnect and refetch. A mutation is never queued automatically while a node is
-offline.
+causes the client to reconnect and refetch, with one exception: a `ws:shed` marker says the node
+dropped invalidation frames because this socket was behind, which is congestion rather than loss, and
+the broker forwards it instead of closing. See [Backpressure](./terminal.md#backpressure).
+A mutation is never queued automatically while a node is offline.
+
+The helper forwards one node's frames, not the fleet's. The broker holds a socket to every paired
+node, and the renderer only ever draws one node's live surfaces, so the helper reads which node is
+active off the requests it is already answering: `node-fetch` and `node-send` both name a node id, and
+the last one named is the active one (`apps/desktop/src/helper/helperServer.ts`). Frames from any
+other node are dropped before they cross the process boundary, which is where a stringify and a parse
+per frame used to be spent on frames the renderer threw away. Every node's `node-status` is forwarded
+regardless, because the fleet list draws a row per node. A node switch changes the fact with the
+renderer's first request to the new node; the one frame that might be dropped in that gap is a
+`<noun>:changed` ping, and the switch's own refetch covers it. The renderer keeps its own filter as a
+belt.
 
 Nothing asks the webview engine to talk to a node, so there is no certificate-override path to get
 wrong. The window loads `app://acorn`, and every byte to or from a node goes through the broker's own
@@ -340,7 +476,7 @@ agent, which does its own pinning.
 
 ### Fleet membership
 
-`@acorn/desktop-helper/main/fleetStore.ts` holds which nodes this client knows, where they are, and
+`@acorn/custody/broker/fleetStore.ts` holds which nodes this client knows, where they are, and
 what certificate to pin, in `fleet.json`. It lives with the host because the host already holds the
 two things fleet membership is inseparable from: device tokens and pinned certificates. The renderer
 gets a token-free `NodeRecord` projection built by explicit field selection, not a spread with keys
@@ -408,12 +544,23 @@ navigation, including the ones page script drives, and the module marks the trav
 so they move the cursor instead of truncating the future. That is what lets the pane offer back and
 forward honestly rather than always-enabled.
 
-No webview is attached to a debugger. Agent browser automation is `plugins/browser`, which runs
-Playwright against a browser of the node's own, so an agent on a headless node has one too. The
-preview pane is the person's surface and nothing steers it but them.
+Normal development and packaged webviews expose no automation server. The explicit
+`agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
+so a local development agent can inspect and operate the renderer. The feature is absent from normal
+builds, and its launcher uses an isolated data root and dynamic ports. It does not drive the host-owned
+preview or loaded-plugin child webviews. Separately, agent browser automation is `plugins/browser`,
+which runs Playwright against a browser of the node's own, so an agent on a headless node has one too.
+
+The preview home is nevertheless node-owned. `preview.urls` resolves, in order, a layout recipe's
+selected target URL, the running default target, and the project's URL, port, or script setting;
+script discovery runs on the node in the task worktree. The pane reads `/v2/p/preview/tasks/:id/url`
+and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url` and `source` are
+`null` when the last preview disappears, so a headless node and every
+connected client agree on the answer. The terminal recipe picker reaches preview through the
+`preview.recipeSelection` client capability, avoiding a reverse package import.
 
 For a task whose dev server is served by another node process,
-`@acorn/desktop-helper/main/previewTunnel.ts` opens an authenticated loopback listener that forwards
+`@acorn/custody/supervision/previewTunnel.ts` opens an authenticated loopback listener that forwards
 raw bytes to the node's own tunnel endpoint over its pinned agent, so the preview pane can reach a
 dev server without the renderer ever touching the network directly. It binds `127.0.0.1` explicitly;
 binding `0.0.0.0` would publish another machine's dev server to the local network, the opposite of
@@ -536,3 +683,12 @@ is worse than none.
 Two release gates are owed to a person, and no script closes them: the smoke checklist
 ([docs/testing.md](./testing.md) § The smoke checklist), run against the DMG on a machine that never
 had the Electron build, and a developer soak window. Nothing ships to a person until both pass.
+
+### Active renderer responsiveness
+
+The optional `reportResponsiveness` platform capability sends `renderer-pulse` over the authenticated
+helper socket. The renderer owns the consent/visibility/focus decision and supplies only its current
+operation name, owner and trace IDs. The helper owns a watchdog per socket; it removes that state on
+socket close and clears its timer when the server closes. This deliberately runs outside the
+renderer so an unresolved render span is not the only evidence of a permanent UI stall.
+[Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns thresholds, exclusions, and interpretation.

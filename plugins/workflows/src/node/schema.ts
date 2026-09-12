@@ -62,3 +62,25 @@ export const workflowSteps = sqliteTable(
     index('workflow_steps_agent_session_idx').on(table.agentSessionId),
   ],
 )
+
+// A workflow definition typed by the owner rather than committed to a repository
+// (docs/workflows.md § Database definitions). The file layer and this one are read together and a
+// repo id wins, so a definition someone can review in a pull request always beats a local draft.
+//
+// `workspace_id` and `project_id` point into core's tables as plain IDs, the same way `task_id` above
+// does. A null `project_id` means "any project in this workspace"; a project that is deleted leaves
+// the row behind and the merged list marks it.
+export const workflowDefs = sqliteTable(
+  'workflow_defs',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(), // → core workspaces.id (plain ID)
+    projectId: text('project_id'), // → core projects.id (plain ID), null = any project here
+    name: text('name').notNull(),
+    defJson: text('def_json').notNull(), // the WorkflowDef, without node positions
+    revision: integer('revision').notNull().default(1), // bumped per save; a stale one is a 409
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [index('workflow_defs_workspace_idx').on(table.workspaceId, table.updatedAt)],
+)

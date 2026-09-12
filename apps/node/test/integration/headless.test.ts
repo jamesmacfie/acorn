@@ -3,14 +3,17 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildHeadlessArgv, parseStreamJson, runHeadless } from '@acorn/node-core/main/headless.ts'
+import { buildHeadlessArgv, parseStreamJson, runHeadless } from '@acorn/node-core/server/headless.ts'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles() // register the built-in profile plugins under test
 
-const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
+const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../__fixtures__/fake-agent.sh')
 
 describe('argv templates (docs/workflows.md — flags verified against installed CLIs)', () => {
+  // `auto`, not `dontAsk`: `dontAsk` denies anything outside a `permissions.allow` rule and acorn
+  // writes none, so a headless step listed every tool acorn projects and was refused all of them
+  // (the profile's own comment has the whole reasoning).
   it('claude-code: -p stream-json with permission pre-approval, model, inline schema, resume', () => {
     const argv = buildHeadlessArgv('claude-code', 'claude', {
       prompt: 'Review the change.',
@@ -28,7 +31,7 @@ describe('argv templates (docs/workflows.md — flags verified against installed
         'stream-json',
         '--verbose',
         '--permission-mode',
-        'dontAsk',
+        'auto',
         '--model',
         'opus',
         '--json-schema',

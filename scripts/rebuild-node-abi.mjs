@@ -4,7 +4,7 @@
 // isn't.
 //
 // node-pty is the only native module left. SQLite is the runtime's own `node:sqlite`
-// (packages/node-core/src/main/sqlite.ts), which has no ABI to get wrong. node-pty builds against
+// (packages/node-core/src/server/storage/sqlite.ts), which has no ABI to get wrong. node-pty builds against
 // node-addon-api (N-API), so on a platform where its prebuilt binary is used the probe below simply
 // succeeds and this exits immediately. That is deliberately left to the probe rather than asserted
 // here: the day it stops being true, this still does the right thing.

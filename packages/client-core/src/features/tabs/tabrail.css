@@ -1,0 +1,131 @@
+/* Workspace tab rail: far-left full-height column. Square tabs with no radius, matching panes, and a
+   bottom-pinned "+". The glyph popover anchors to the active tab. */
+.tabrail {
+  flex: none;
+  width: var(--tabrail-w);
+  display: flex;
+  flex-direction: column;
+  border-right: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+
+.tabrail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: visible;
+}
+
+.tabrail-item {
+  position: relative;
+}
+.tabrail-item[data-task-depth] {
+  padding-inline-start: calc(var(--task-depth) * 5px);
+}
+.tabrail-item[data-task-depth]::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc((var(--task-depth) - 0.5) * 5px);
+  border-inline-start: var(--divider);
+}
+
+.tabrail-tab {
+  width: 100%;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: var(--divider);
+  border-left: var(--tab-active-w) solid transparent;
+  cursor: pointer;
+  line-height: 1;
+  position: relative;
+}
+.tabrail-tab:hover { background: var(--bg-hover); color: var(--text); }
+.tabrail-tab.active {
+  background: var(--bg-selected);
+  color: var(--text);
+  border-left-color: var(--rail-accent, var(--accent));
+}
+/* Semantic tone. Only the hover colour differs; a rail control at rest is muted whatever it does. */
+.tabrail-tab[data-tone="danger"]:hover { color: var(--del-marker); }
+.tabrail-tab[data-tone="warn"]:hover { color: var(--warn); }
+
+/* The bottom-pinned action on either rail: the left "+" and the right "close task". Same 52px box
+   as everything above it, with the divider moved to the top edge. */
+.tabrail-tab.tabrail-bottom {
+  flex: none;
+  margin-top: auto;
+  border-bottom: 0;
+  border-top: var(--chrome-divider);
+}
+
+/* A second line under the glyph, for run targets. */
+.tabrail-tab-sub {
+  font-size: 8px;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status markers (railMarkers.ts). The host owns every position here; a feature or plugin
+   stylesheet positioning one of these is the regression signal that placement escaped the host.
+   Logical start/end, even though the app is left-to-right today.
+
+   A busy marker turns because its Icon carries `data-spin`, not because this span does. Keep it
+   that way: `.spin` on the wrapper is guarded by prefers-reduced-motion, so it stops dead for
+   anyone who turns that setting on, and it also fights the centring below. bottom-center centres
+   with inset and text-align rather than transform: translateX(-50%), because a translate
+   interpolated into rotate(360deg) goes through matrix decomposition, which reads a full turn as
+   no turn at all. The icon slid sideways instead of spinning. */
+.tabrail-marker {
+  position: absolute;
+  font-size: var(--fs-xs);
+  line-height: 1;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: var(--z-base);
+}
+.tabrail-marker[data-pos="top-start"] { top: 4px; inset-inline-start: 5px; }
+.tabrail-marker[data-pos="top-end"] { top: 4px; inset-inline-end: 5px; }
+.tabrail-marker[data-pos="bottom-start"] { bottom: 4px; inset-inline-start: 5px; }
+.tabrail-marker[data-pos="bottom-end"] { bottom: 4px; inset-inline-end: 5px; }
+.tabrail-marker[data-pos="bottom-center"] {
+  bottom: 4px;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  font-size: 9px;
+  text-align: center;
+}
+.tabrail-marker[data-tone="accent"] { color: var(--accent); }
+.tabrail-marker[data-tone="warn"] { color: var(--warn); }
+.tabrail-marker[data-tone="danger"] { color: var(--del-marker); }
+
+/* Sources zone (docs/workspaces-and-tasks.md): fixed browse entry points above the workspace roster. */
+.tabrail-zone { flex: none; }
+.tabrail-source { font-size: var(--fs-md); }
+
+/* Unicode source glyphs stay on the mono stack in every style pack: the box-drawing and dingbat
+   characters only have consistent metrics there. */
+.tabrail-source { font-family: var(--font-glyph); }
+.tabrail-sep {
+  flex: none;
+  height: 1px;
+  margin: var(--space-2) var(--space-4);
+  background: var(--border-strong);
+}
+
+/* Project identity accent (docs/workspaces-and-tasks.md): every task for a coloured project carries
+   its optional 3px strip, set as --rail-accent by RailTab. Uncoloured active tabs retain the normal
+   application accent above; `:not(.active)` matches `.tabrail-tab.active`'s specificity and comes
+   later, so an inactive coloured row keeps its strip. */
+.tabrail-task { border-left-width: var(--stripe-w); }
+.tabrail-task:not(.active) { border-left-color: var(--rail-accent, transparent); }

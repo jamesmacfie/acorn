@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { taskContextAgentContribution } from './agentContextContribution'
-import { evictContextSelection, setSectionSelection } from './selectionState'
+import { evictContextSelection, setSectionSelection } from './selectionStore'
 
 const context: TaskContext = {
   task: {

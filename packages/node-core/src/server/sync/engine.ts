@@ -1,4 +1,5 @@
 import { trackBackgroundRefresh } from '../background'
+import { emitMetric } from '../telemetry/collector'
 import { RATE_LIMIT_BACKOFF_MS } from './policy'
 
 export type RouteFailure = { error: string; status: 401 | 403 | 404 | 429 | 502; detail?: string[] }
@@ -41,10 +42,12 @@ const dedupe = (key: string, refresh: () => Promise<RefreshResult>): Promise<Ref
 
 const backoffUntil = new Map<string, number>()
 
-const scheduleBackgroundRefresh = (key: string, refresh: () => Promise<RefreshResult>, backoffMs: number): void => {
+const scheduleBackgroundRefresh = (key: string, resource: string, refresh: () => Promise<RefreshResult>, backoffMs: number): void => {
   if (Date.now() < (backoffUntil.get(key) ?? 0)) return // backed off — keep serving stale, skip the doomed call
+  // The dedupe key carries the userId and the label must not, so the two are passed separately
+  // rather than the caller reading an account out of a telemetry attribute.
   trackBackgroundRefresh(
-    key,
+    resource,
     dedupe(key, refresh).then((r) => {
       if (!r.ok && r.failure.status === 429) backoffUntil.set(key, Date.now() + backoffMs)
     }),
@@ -66,10 +69,15 @@ export async function serveThenRevalidate<T>(opts: {
   const key = `${opts.userId}:${opts.resource}`
   const cached = await opts.read()
   const decision = opts.force ? 'cold' : decideSync({ cached: cached != null, fetchedAt: cached?.fetchedAt ?? null, ttlMs: opts.ttlMs, now: Date.now() })
+  // One count per decision, with the resource as a label and the owner off the ambient context, so
+  // "this provider is serving cold every time" is a query rather than a hunch
+  // (docs/telemetry.md § Ambient attribution). A count and not a span: the decision itself takes no
+  // time, and the refresh behind it is already timed by whatever it spawns or requests.
+  emitMetric('core', { name: `sync.${decision}`, type: 'count', value: 1, attrs: { seam: 'sync', resource: opts.resource } })
 
   // Fresh, or stale: serve the cache. Stale also kicks a background revalidate (deduped, backoff-aware).
   if (cached && decision !== 'cold') {
-    if (decision === 'stale') scheduleBackgroundRefresh(key, opts.refresh, opts.backoffMs ?? RATE_LIMIT_BACKOFF_MS)
+    if (decision === 'stale') scheduleBackgroundRefresh(key, opts.resource, opts.refresh, opts.backoffMs ?? RATE_LIMIT_BACKOFF_MS)
     return { ok: true, value: cached.data }
   }
 

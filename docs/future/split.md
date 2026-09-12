@@ -32,7 +32,7 @@ facade. Fix the tests before http moves; it no longer has to move last.
 ## The kit is not a repo
 
 The first version of this file planned an `acorn-ui` repository: the Solid UI kit extracted from
-`client-core/src/ui`, published, and depended on by the host. That plan is withdrawn, and the reason
+`client-core/src/kit`, published, and depended on by the host. That plan is withdrawn, and the reason
 is what the kit became.
 
 The kit is **closed and host-owned** ([docs/ui-design.md](../ui-design.md) § The closed kit): a fixed node set

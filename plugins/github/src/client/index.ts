@@ -1,19 +1,25 @@
 import { lazy } from 'solid-js'
 import { type ClientPlugin, readJson, setSelectedSource } from '@acorn/plugin-api/client'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
-import { reposRoute } from '../contract/api'
-import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
-import { pullRefMatchesTask } from '../contract/pullRef'
+import { reposRoute } from '../shared/api'
+import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../shared/collections'
+import { pullRefMatchesTask } from '../shared/pullRef'
 import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
-import { prFiltersSlice } from './pullList/filterSlice'
-import { prPaneContribution } from './pullDetail/PrPane'
-import { pullFilePaletteSlotContribution } from './slotContribution'
+import { prFiltersSlice } from './pullList/filterStore'
+import { prPaneContribution } from './pullDetail/paneContribution'
+import { githubShortcutsSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
-import { githubBrowsePath, githubRouteContributions } from './routes'
+import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
+import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
+import { githubPullPromotion } from './pullTasks'
 import GithubImporter from './GithubImporter'
 
-const GithubBrowse = lazy(() => import('./GithubBrowse'))
+// Two lazy chunks off one module, because the source declares its list and its detail separately and
+// a terminal shell draws them in two different panels (./GithubBrowse.tsx). Both resolve the same
+// import, so the second is already in memory by the time it is asked for.
+const GithubBrowseList = lazy(() => import('./GithubBrowse').then((module) => ({ default: module.GithubBrowseList })))
+const GithubBrowseDetail = lazy(() => import('./GithubBrowse').then((module) => ({ default: module.GithubBrowseDetail })))
 // Lazy: a panel nobody has opened should not be in the first paint's bundle.
 const PullRefPanel = lazy(() => import('./PullRefPanel'))
 
@@ -29,11 +35,16 @@ export const githubClientPlugin: ClientPlugin = {
     // The PR rail is provider-owned and appears only once GitHub is connected. Core home stays the
     // default landing source, so a disconnected provider never becomes the startup view.
     //
-    // No `promotion`: github's browse creates a task inline from its PR list, seeding provider links
-    // as it goes, rather than through PromoteToTaskModal. The client host enforces `providerId` and
-    // gates the source on the GitHub integration.
+    // Its list still creates a task inline, seeding provider links as it goes; the `promotion` below
+    // is the thinner path the shared modal needs (./pullTasks.ts). The client host enforces
+    // `providerId` and gates the source on the GitHub integration.
     ctx.sources.register({
-      id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
+      id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', defaultPane: 'pr',
+      regions: { list: GithubBrowseList, detail: GithubBrowseDetail },
+      // The rail is `github`; the tasks it makes carry `github-pr` (client/pullTasks.ts). Core used to
+      // keep the glyph for that origin in a built-in table, which meant a task drawn by name here and
+      // by hand there (client-core/features/tasks/origin.ts).
+      origins: { 'github-pr': 'git-pull-request' },
       // GithubBrowse lists the routed project's pull requests, so the shell offers a project picker here.
       projectScoped: true,
       routes: githubRouteContributions,
@@ -45,6 +56,8 @@ export const githubClientPlugin: ClientPlugin = {
       // pull request as `pullNumber` on the task row; `links` holds the Linear tickets from the body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
+      // How a pull becomes a task for anyone but this plugin's own list (./pullTasks.ts).
+      promotion: githubPullPromotion,
     })
     ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: 'brand:github', component: GithubImporter })
     ctx.commands.register({
@@ -62,7 +75,7 @@ export const githubClientPlugin: ClientPlugin = {
       defaultChord: 'meta+0',
       when: 'global',
     })
-    // The compiled feeder for collections (client-core/registries/collections.ts). A loaded plugin
+    // The compiled feeder for collections (client-core/host/registries/sources/collections.ts). A loaded plugin
     // declares this in its manifest and the host synthesises the same contribution over its own
     // reader; github ships no manifest, so it supplies the fetch itself.
     //
@@ -80,7 +93,7 @@ export const githubClientPlugin: ClientPlugin = {
         { id: 'repo', name: 'Repository', type: 'enum' },
         // Unset means every open PR in every mirrored repo. Setting it hands the same columns from
         // a GitHub search, which is the only place two of the three answers exist
-        // (contract/collections.ts § involvement). `multiple`, because "assigned to me or waiting on
+        // (shared/collections.ts § involvement). `multiple`, because "assigned to me or waiting on
         // my review" is one question.
         { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: [...PULL_INVOLVEMENT] },
       ],
@@ -118,7 +131,20 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.extensionPoints.register({
       id: 'summary-badges', label: 'Pull request summary', kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX,
     })
-    ctx.slots.register(pullFilePaletteSlotContribution)
+    // The one place this plugin comes into somebody else's surface: "Open pull request" under the
+    // Changes pane's branch bar, offered on a task whose branch has an upstream and no pull request
+    // yet (./pushActions.tsx). The changes plugin opened the point; this is the line that fills it.
+    //
+    // No `matches`, which in a `stack` point means every key: there is one box here and everybody who
+    // has something to offer a pushed branch is in it.
+    ctx.extensions.register({
+      id: 'github.push-actions',
+      point: CHANGES_PUSH_ACTIONS_POINT,
+      label: 'Open pull request',
+      order: 10,
+      component: GithubPushActions,
+    })
+    ctx.slots.register(githubShortcutsSlotContribution)
     ctx.persistedStateSlices.register(prFiltersSlice)
   },
 }

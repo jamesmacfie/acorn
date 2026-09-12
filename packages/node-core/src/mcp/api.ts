@@ -68,4 +68,13 @@ async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
 }
 
 export const apiGet = (path: string): Promise<ApiResult> => apiCall(path)
-export const apiSend = (method: string, path: string, body: unknown): Promise<ApiResult> => apiCall(path, { method, body: JSON.stringify(body) })
+export const apiSend = (
+  method: string,
+  path: string,
+  body: unknown,
+  metadata?: { callId?: string },
+): Promise<ApiResult> => apiCall(path, {
+  method,
+  body: JSON.stringify(body),
+  headers: metadata?.callId ? { 'x-acorn-tool-call-id': metadata.callId } : undefined,
+})

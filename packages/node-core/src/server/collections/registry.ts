@@ -4,8 +4,8 @@ import {
   type PluginCollectionPage,
   type PluginCollectionParam,
 } from '@acorn/protocol/collections.ts'
-import type { Env } from '../../main/bindings'
-import { dispatchPluginRoute } from '../plugin/dispatch'
+import type { Env } from '../bindings'
+import { dispatchPluginRoute } from '../pluginHost/dispatch'
 
 // Reading a collection from the node with no client attached: docs/schedules.md § Reading a
 // collection from the node.

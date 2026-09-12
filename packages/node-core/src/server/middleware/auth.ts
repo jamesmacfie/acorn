@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory'
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 // The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
@@ -19,15 +20,21 @@ export type Principal = {
   // URL; before this existed, a token minted for task A could drive task B's tools.
   taskId?: string
   sessionId?: string
+  toolCeiling?: ToolCeiling
 }
 // `requestId` is set by requestIdMiddleware (server/respond.ts) before anything else, and read by
 // every error envelope. It is not optional in practice; a bare test Context is the only way to see
 // it missing, which respondError reports as 'unknown'.
-export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string } }
+//
+// `trace` is set by the same middleware and only while telemetry is collecting, which is why it is
+// the one optional variable here. It carries the request's own span so an error raised inside the
+// request lands in the same trace rather than starting a second one (docs/telemetry.md § Traces).
+export type TraceRef = { traceId: string; spanId: string }
+export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string; trace?: TraceRef } }
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
 // internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,
-// resolved from the explicit active-identity binding, minted at boot (main/core/identity/identity.ts),
+// resolved from the explicit active-identity binding, minted at boot (server/core/identity.ts),
 // so after first boot it is always present. The fail-closed null stays for the one context that can
 // still see an unbound store: a bare test Env built without ensureBoundIdentity.
 //
@@ -40,7 +47,16 @@ function internalPrincipal(c: { env: Env; req: { header(name: string): string | 
   const claims = verifyInternalToken(c.env.INTERNAL_TOKEN, token)
   if (!claims) return null
   const userId = c.env.ACTIVE_IDENTITY.get()
-  return userId ? { kind: 'internal', userId, scope: claims.scope, taskId: claims.taskId, sessionId: claims.sessionId } : null
+  return userId
+    ? {
+        kind: 'internal',
+        userId,
+        scope: claims.scope,
+        taskId: claims.taskId,
+        sessionId: claims.sessionId,
+        toolCeiling: claims.toolCeiling,
+      }
+    : null
 }
 
 // Device bearer: the client's connection broker authenticates with a paired device

@@ -8,24 +8,24 @@ a plugin's bundle can come from the device itself, not only from a node. Phase 0
 Every piece a device-held plugin needs is already on the device, because the fleet model put it
 there.
 
-- **Custody.** `packages/client-core/src/platform/index.ts` declares `PluginCustody` with four
+- **Custody.** `packages/client-core/src/infra/platform/index.ts` declares `PluginCustody` with four
   members: `state()`, `cachePut()`, `trustRecord()`, `devGrant()`.
-  `packages/client-core/src/plugins/host.ts` is the only client module that calls it, and its header
+  `packages/client-core/src/host/plugins/host.ts` is the only client module that calls it, and its header
   already names the future: "today it fronts the desktop helper's content-addressed store, and a
   future web client fronts IndexedDB."
-- **The cache.** `packages/desktop-helper/src/main/pluginCache.ts` stores bundles content-addressed
+- **The cache.** `packages/custody/src/plugins/pluginCache.ts` stores bundles content-addressed
   under `<userDataDir>/plugin-cache/<sha256>.js`, caps them at `MAX_BUNDLE_BYTES` (8 MiB), and
   hashes what arrived rather than trusting a claim. Its one fill path is `putFromNode(nodeId,
   pluginId, claim)`, which fetches `/v2/core/plugins/<id>/client.js` through the node broker.
-- **The trust store.** `packages/desktop-helper/src/main/pluginTrustStore.ts` keys acknowledgements
+- **The trust store.** `packages/custody/src/plugins/pluginTrustStore.ts` keys acknowledgements
   on `(pluginId, hash)`. A row carries `nodeId`, and the comment beside it says "did this come from.
   Not part of the key, because the same bundle from a second node is the same bundle." Dev grants
   are keyed on `(pluginId, nodeId)`.
-- **Resolution.** `packages/client-core/src/plugins/resolveBundles.ts` takes `BundleCandidate[]`
+- **Resolution.** `packages/client-core/src/host/trust/resolveBundles.ts` takes `BundleCandidate[]`
   (each with `pluginId`, `version`, `hash`, `nodeId`) and picks one `ActiveBundle` per plugin id:
   highest version whose `apiVersion` range covers `PLUGIN_API_MAJOR`, ties on hash. The winner
   records `nodeIds[]`, the nodes offering that exact bundle.
-- **The roster.** `packages/client-core/src/plugins/distribution.ts` builds candidates from each
+- **The roster.** `packages/client-core/src/host/plugins/distribution.ts` builds candidates from each
   node's `GET /v2/core/plugins` answer (`installedByNode`), keeps `pendingTrust`, and
   `syncPluginDistribution()` re-resolves after any change.
 - **The render paths.** `frames/register.ts` mounts a trusted bundle in an iframe at
@@ -54,9 +54,9 @@ holds.
 ### The device fill path
 
 `PluginCache` gains `putFromSource(pluginId, source)` beside `putFromNode`, where `source` is the
-node installer's four-form union from `packages/node-core/src/server/routes/plugins.ts`: `{ github,
+node installer's four-form union from `packages/node-core/src/server/routes/plugins/plugins.ts`: `{ github,
 tag? }`, `{ npm, version? }`, `{ url }`, `{ path }`. The helper resolves the source the way
-`packages/node-core/src/main/pluginInstaller.ts` does, and the resolution code moves to a shared
+`packages/node-core/src/server/plugins/installer.ts` does, and the resolution code moves to a shared
 package both import, so "what does `{ github }` mean" has one answer. The helper reads the manifest
 out of the package, refuses it if it declares a `node` entry (see the rule below), takes the client
 bundle, hashes it, and stores it. The answer is `{ hash }` or one of the existing `PutFailure`
@@ -100,7 +100,7 @@ pins it against the case that matters: node offers 2.0, device holds 1.9, device
 The trust prompt is the same three-tier prompt with a different provenance line. Today the copy says
 which node the bundle came from. For a device bundle it says "installed on this device from `<source
 as the user gave it>`", and the `declared` tier is empty because there is no node half to disclose.
-`packages/client-core/src/plugins/trustModel.ts` already builds lines from grant classes, so this is
+`packages/client-core/src/host/trust/trustModel.ts` already builds lines from grant classes, so this is
 one new line builder and one absent section, not a new prompt.
 
 Consent is still per `(pluginId, hash)`, still per device, still recorded on both accept and reject.
@@ -123,7 +123,7 @@ plugin has no node of its own to follow.
 ### The roster and Settings
 
 `GET /v2/core/plugins` is a node's roster and does not change. The client's roster view
-(`eligiblePlugins()` in `packages/client-core/src/plugins/contributions.ts`) merges the device's
+(`eligiblePlugins()` in `packages/client-core/src/host/plugins/contributions.ts`) merges the device's
 `PluginHostState.cached` entries whose `source.kind` is `device` as rows with no node. Settings →
 Plugins gains a section, "On this device", with install (the four sources), update, remove, enable
 and disable, and the dev grant toggle. The existing per-node section is unchanged. A plugin id that
@@ -141,7 +141,7 @@ named the plugin fall back to core through the existing resolver, because the pr
 ### Reconciliation and bundled packages
 
 None of this touches `reconcileBundledPackages` or the tombstone logic in
-`apps/node/src/server/composition.ts`. Bundled packages are node packages. A device never seeds a
+`apps/node/src/composition/composition.ts`. Bundled packages are node packages. A device never seeds a
 plugin on its own; every device plugin is one the user asked for.
 
 ## What does not change

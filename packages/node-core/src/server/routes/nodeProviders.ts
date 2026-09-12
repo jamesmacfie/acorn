@@ -25,7 +25,7 @@ import { respondError } from '../respond'
 // in (docs/future/phased-review-steps/cloud-guardrails.md rule 3).
 
 // Long enough for a cloud API round trip, short enough that one wedged provider does not hold the
-// response open past the client's own per-node deadline (5s in client-core/node/fanout.ts).
+// response open past the client's own per-node deadline (5s in client-core/infra/node/fanout.ts).
 const LIST_TIMEOUT_MS = 4_000
 // Provisioning is slower than listing, and by a lot. Still bounded: a caller that never gets an answer
 // cannot tell a slow create from a failed one.

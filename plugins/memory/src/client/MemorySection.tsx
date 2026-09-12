@@ -1,15 +1,17 @@
-import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, Show } from 'solid-js'
 import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
-import { Alert, Badge, Button, Card, Field, Inline, Input, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
+import ProposalList from './ProposalList'
+import { Alert, Button, Card, Field, Inline, Input, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
+import FindingsBundleReview from './FindingsBundleReview'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
 // The memory surfaces of the Context pane (docs/agent-tools.md), kept in the memory plugin so it owns
 // every memoryApi() call. Two things: the human gate over auto-generated proposals, where accept (with
-// an optional description edit) writes to the task worktree and index and reject leaves no trace, and
-// the manual "+ memory" form, where project scope goes to the task worktree and lands via its PR while
-// private scope goes to ~/.acorn/memory.
+// an optional description edit) writes the file and index and reject leaves no trace, and the manual
+// "+ memory" form. Both scopes write under ~/.acorn/memory and never into the repo, so the choice is
+// about reach: project scope applies to this project alone, private scope everywhere.
 //
 // This is a contribution to `context:section`, so context does not import it and memory does not import
 // context's pane: the host carries the props and draws whichever of the two render paths this happens
@@ -26,24 +28,6 @@ export default function MemorySection(props: {
     { initialValue: [] },
   )
   createEffect(() => props.onPendingChange?.((proposals() ?? []).length))
-  const [propEdits, setPropEdits] = createSignal<Record<string, string>>({})
-  const [proposalError, setProposalError] = createSignal('')
-
-  async function resolveProposal(id: string, approved: boolean) {
-    const m = memoryApi()
-    if (!m) return
-    const p = (proposals() ?? []).find((x) => x.id === id)
-    const editedDesc = propEdits()[id]
-    const res = await m.resolveProposal(
-      id,
-      approved,
-      approved && p && editedDesc && editedDesc !== p.description ? { name: p.name, type: p.type, description: editedDesc, body: p.body } : undefined,
-    )
-    if (!res.ok && res.reason) setProposalError(res.reason)
-    else setProposalError('')
-    await refetchProposals()
-    props.onChanged()
-  }
 
   const [memFormOpen, setMemFormOpen] = createSignal(false)
   const [memName, setMemName] = createSignal('')
@@ -77,38 +61,19 @@ export default function MemorySection(props: {
 
   return (
     <Stack gap="row">
-      <Show when={proposalError()}>{(text) => <Alert>{text()}</Alert>}</Show>
+      <Show when={props.task.projectId}>
+        {(projectId) => <FindingsBundleReview compact scope={{ kind: 'project', projectId: projectId() }} onChanged={props.onChanged} />}
+      </Show>
       <Show when={(proposals() ?? []).length}>
         <Stack gap="row">
-          <Text emphasis="muted">Memory proposals (auto-generated — review before they land):</Text>
-          <For each={proposals() ?? []}>
-            {(p) => (
-              <Card>
-                <Stack gap="row">
-                  <Inline gap="inline" wrap>
-                    <Text emphasis="muted">{p.type}</Text>
-                    <Text emphasis="strong">{p.name}</Text>
-                  </Inline>
-                  <Input
-                    label={`Description for ${p.name}`}
-                    value={propEdits()[p.id] ?? p.description}
-                    onInput={(value) => setPropEdits((prev) => ({ ...prev, [p.id]: value }))}
-                  />
-                  {/* Verification flags (structural `flags`, docs/notes-and-memory.md): warning badges
-                      beside the proposal, never folded into the description text. */}
-                  <Show when={p.flags.length}>
-                    <Inline gap="inline" wrap>
-                      <For each={p.flags}>{(flag) => <Badge tone="warn" shape="pill">⚠ {flag}</Badge>}</For>
-                    </Inline>
-                  </Show>
-                  <Toolbar variant="actions" size="sm">
-                    <Button size="sm" onPress={() => void resolveProposal(p.id, true)}>Accept</Button>
-                    <Button size="sm" onPress={() => void resolveProposal(p.id, false)}>Reject</Button>
-                  </Toolbar>
-                </Stack>
-              </Card>
-            )}
-          </For>
+          <Text emphasis="muted">Memory proposals for this task. Every pending proposal is on the Memory page.</Text>
+          <ProposalList
+            proposals={proposals() ?? []}
+            onResolved={() => {
+              void refetchProposals()
+              props.onChanged()
+            }}
+          />
         </Stack>
       </Show>
       <Show when={memoryApi()}>
@@ -131,7 +96,7 @@ export default function MemorySection(props: {
                 <Select
                   value={memScope()}
                   onChange={(value) => setMemScope(value as 'project' | 'private')}
-                  options={[{ value: 'project', label: 'project (worktree, committed)' }, { value: 'private', label: 'private (~/.acorn)' }]}
+                  options={[{ value: 'project', label: 'project (this project only)' }, { value: 'private', label: 'private (every project)' }]}
                 />
               </Field>
             </Inline>

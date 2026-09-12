@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-linear",
   "version": "0.1.0",
+  "description": "Linear issues as a source: browsing, ref panels, and promoting an issue into a task.",
   "private": true,
   "type": "module",
   "exports": {
