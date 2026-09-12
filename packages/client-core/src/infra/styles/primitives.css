@@ -263,7 +263,6 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-row[role='button'] { cursor: pointer; }
 .ui-row[role='button']:hover { background: var(--bg-hover); }
 .ui-row[data-selected] { background: var(--bg-selected); border-left-color: var(--accent); }
-.ui-row[data-nested] { padding-left: var(--space-9); }
 .ui-row[data-density='compact'] { min-height: var(--row-h-sm); }
 .ui-row[data-density='roomy'] { min-height: calc(var(--row-h) + var(--space-4)); }
 .ui-row:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
@@ -944,6 +943,39 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-row[data-depth='2'] { padding-left: var(--space-11); }
 .ui-row[data-depth='3'] { padding-left: calc(var(--space-11) + var(--space-6)); }
 .ui-row[data-depth='4'] { padding-left: calc(var(--space-11) + var(--space-9)); }
+/* An ownership branch starts on its parent's text column: row padding, the state mark, then the
+   row gap. Each deeper branch advances by exactly one nested row's rule, inset, mark, and gap, so
+   the rule remains aligned with both lines of its parent's stacked body. `--bw` is always 1px;
+   unlike the pack-controlled selection marker, this line carries hierarchy and cannot disappear. */
+.ui-row[data-nested] {
+  --row-owner-inset: calc(var(--marker-w) + var(--pane-pad) + 1em + var(--space-4));
+  width: calc(100% - var(--row-owner-inset));
+  margin-left: var(--row-owner-inset);
+  padding-left: var(--space-6);
+  border-left: var(--bw) solid var(--border);
+}
+.ui-row[data-nested][data-depth='2'] {
+  --row-owner-inset: calc(
+    var(--marker-w) + var(--pane-pad) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4)
+  );
+}
+.ui-row[data-nested][data-depth='3'] {
+  --row-owner-inset: calc(
+    var(--marker-w) + var(--pane-pad) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4)
+  );
+}
+.ui-row[data-nested][data-depth='4'] {
+  --row-owner-inset: calc(
+    var(--marker-w) + var(--pane-pad) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4) +
+    var(--bw) + var(--space-6) + 1em + var(--space-4)
+  );
+}
+.ui-row[data-nested][data-selected] { border-left-color: var(--accent); }
 .ui-row-twist {
   flex: none;
   width: 0;

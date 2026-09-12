@@ -110,11 +110,14 @@ describe('the delegated session sidebar', () => {
     })
 
     expect(rowNamed('Nested child').dataset.depth).toBe('1')
+    expect(rowNamed('Nested child').dataset.nested).toBe('')
+    expect(rowNamed('Parent').dataset.nested).toBeUndefined()
     expect(rowNamed('Nested child').textContent).toContain('waiting')
     // The attention mark is an icon now, so what a reader gets is its title rather than a pill's words.
     expect(rowNamed('Nested child').querySelector('svg > title')?.textContent).toBe('Wants permission')
     expect(rowNamed('Nested child').textContent).toContain('depth 1 · shared')
     expect(rowNamed('Terminal child').dataset.depth).toBeUndefined()
+    expect(rowNamed('Terminal child').dataset.nested).toBeUndefined()
     expect(rowNamed('Terminal child').textContent)
       .toContain('Delegated by Claude terminal (claude-code) · depth 1 · shared')
   })
@@ -148,6 +151,7 @@ describe('the delegated session sidebar', () => {
     })
 
     expect(rowNamed('Managed child').getAttribute('aria-selected')).toBe('true')
+    expect(rowNamed('Provider child').dataset.nested).toBe('')
     rowNamed('Provider child').click()
     expect(selectedManagedSession(taskId)).toBe(root.id)
     expect(selectedManagedSubagent(root.id)).toBe(nativeSubagent.id)

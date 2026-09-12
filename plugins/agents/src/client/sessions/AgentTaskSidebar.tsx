@@ -167,6 +167,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           variant="stacked"
                           density="compact"
                           depth={found()?.depth}
+                          nested={(found()?.depth ?? 0) > 0}
                           selected={selected()}
                           leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
                           trailing={
@@ -231,6 +232,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           variant="stacked"
                           density="compact"
                           depth={found()?.depth ?? 1}
+                          nested
                           selected={selected()}
                           leading={<SubagentStateIcon status={child().status} />}
                           onPress={() => openRow(item.key)}

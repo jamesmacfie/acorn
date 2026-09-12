@@ -40,7 +40,7 @@ describe('no phantom tokens', () => {
     // (docs/ui-design.md § Runtime-set custom properties).
     const locallyDeclared = new Set([
       '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
-      '--row-field-w',
+      '--row-field-w', '--row-owner-inset',
       '--kit-grid-col',
     ])
 

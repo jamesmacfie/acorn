@@ -655,6 +655,7 @@ export function Row(props: {
   /** Visually place meta after the leading content and before the title. DOM reading order stays intact. */
   metaFirst?: boolean
   selected?: boolean
+  /** Inset the row behind a left rule, so it reads as owned by the row above it. */
   nested?: boolean
   /** Indentation level. Generalises `nested` (which is depth 1) for TreeRow. */
   depth?: number
@@ -703,6 +704,7 @@ export function Row(props: {
         href={props.href}
         class="ui-row"
         data-selected={props.selected ? '' : undefined}
+        data-nested={props.nested ? '' : undefined}
         data-depth={props.depth ? String(props.depth) : undefined}
         data-reveal={props.reveal ? '' : undefined}
         data-density={props.density ?? 'default'}
