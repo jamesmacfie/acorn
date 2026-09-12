@@ -557,13 +557,11 @@ export type TaskPullRelation = AttachTaskPullInput & {
 
 export type CoreTaskService = {
   load(taskId: string): Promise<TaskRef | undefined>
-  /** The task's worktree root, creating it lazily. `null` when no checkout is mapped. Pass `userId`
-   *  when you hold an authorizing identity: creating a worktree reads a user-owned base-ref pref. */
-  root(taskId: string, userId?: string | null): Promise<string | null>
+  /** The task's worktree root, creating it lazily. `null` when no checkout is mapped. */
+  root(taskId: string): Promise<string | null>
   resolveCwd(
     task: TaskRef | undefined,
     baseCheckout: string | undefined,
-    userId?: string | null,
   ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   runConfig(taskId: string): Promise<HostOwned<'node-core/main/core/tasks/service.TaskRunConfig'>>
   active(): Promise<TaskRef[]>

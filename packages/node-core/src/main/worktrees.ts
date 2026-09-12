@@ -21,25 +21,6 @@ async function branchExists(checkout: string, branch: string): Promise<boolean> 
   }
 }
 
-// Any commit-ish (branch, remote ref, sha) that resolves in the checkout.
-async function refExists(checkout: string, ref: string): Promise<boolean> {
-  if (ref.startsWith('-')) return false // never let a ref be read as a flag
-  try {
-    await gitOrThrow(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { cwd: checkout, timeoutMs: 10_000 })
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Base-ref precedence for a new branch: docs/workspaces-and-tasks.md § Worktrees and setup.
-export async function resolveBaseRef(checkout: string, preferred?: string | null): Promise<string | null> {
-  for (const candidate of [...(preferred?.trim() ? [preferred.trim()] : []), 'origin/main', 'origin/master']) {
-    if (await refExists(checkout, candidate)) return candidate
-  }
-  return null
-}
-
 // A branch name safe to pass to git as a positional: no leading dash, so it cannot be read as a
 // flag, and only git-legal ref characters. The directory name is slugged separately. This guards the
 // git argument.
@@ -82,7 +63,6 @@ export async function ensureWorktree(
   repo: string,
   branch: string,
   pullNumber: number | null,
-  preferredBaseRef?: string | null,
 ): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
@@ -127,14 +107,15 @@ export async function ensureWorktree(
     return { ok: true, path, created: true }
   }
 
-  // Local-first workspace. Add a worktree on the branch, and start a new branch from the resolved
-  // base ref (docs/workspaces-and-tasks.md § Worktrees and setup). `--` ends option parsing so a
-  // branch or path cannot be read as a flag.
+  // Local-first workspace. Add a worktree on the branch, and start a new branch from the project
+  // checkout's HEAD (docs/workspaces-and-tasks.md § Worktrees and setup). Omitting a start point
+  // makes Git resolve HEAD in `checkout`, so the task inherits local commits even when origin's
+  // remote-tracking ref is stale. `--` ends option parsing so a branch or path cannot be read as a
+  // flag.
   const exists = await branchExists(checkout, branch)
-  const baseRef = exists ? null : await resolveBaseRef(checkout, preferredBaseRef)
   const args = exists
     ? ['worktree', 'add', '--', path, branch]
-    : ['worktree', 'add', '-b', branch, '--', path, ...(baseRef ? [baseRef] : [])]
+    : ['worktree', 'add', '-b', branch, '--', path]
   try {
     await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
   } catch {

@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { schema } from '../server/db'
 import { clearHooks, registerHookHandler } from '../server/plugin/hooks'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot } from './taskWorktree'
+import { computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot } from './taskWorktree'
 
 const broadcasts: Record<string, unknown>[] = []
 vi.mock('./wsHub', async (importOriginal) => ({
@@ -18,21 +18,6 @@ vi.setConfig({ testTimeout: 20_000 })
 
 const TASK = '88888888-8888-4888-8888-888888888888'
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' })
-
-describe('baseRefPref identity scope', () => {
-  it('returns only the authenticated identity preference and fails closed without one', async () => {
-    const t = makeTestDb()
-    await t.db.insert(schema.prefs).values([
-      { userId: 'alice', key: 'base_ref:project-web', value: 'origin/alice' },
-      { userId: 'bob', key: 'base_ref:project-web', value: 'origin/bob' },
-    ])
-
-    await expect(baseRefPref(t.db, 'alice', 'project-web')).resolves.toBe('origin/alice')
-    await expect(baseRefPref(t.db, 'bob', 'project-web')).resolves.toBe('origin/bob')
-    await expect(baseRefPref(t.db, null, 'project-web')).resolves.toBeNull()
-    t.cleanup()
-  })
-})
 
 // `core:worktree-created` is the single choke point that runs the workspace setup script: it must fire
 // exactly once per task, on whichever path creates the worktree first, including two surfaces (a pane
@@ -97,14 +82,14 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
 
   it('fires exactly once across concurrent creators, then never again on reuse', async () => {
     const task = await loadTask(t.db, TASK)
-    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout, null), resolveTaskCwd(t.db, task, checkout, null)])
+    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout), resolveTaskCwd(t.db, task, checkout)])
     expect(a.isWorktree).toBe(true)
     expect(b.cwd).toBe(a.cwd)
     expect(created).toEqual([`${TASK}:${a.cwd}`])
 
     // Reuse, both via the persisted worktreePath and via a stale row that predates it.
-    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
-    const stale = await resolveTaskCwd(t.db, task, checkout, null)
+    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    const stale = await resolveTaskCwd(t.db, task, checkout)
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
@@ -122,12 +107,12 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
         throw new Error('setup exploded')
       },
     })
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     expect(res).toMatchObject({ isWorktree: true, created: true })
   })
 
   it('computes status for active worktrees after the bounded fan-out refactor', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     writeFileSync(join(res.cwd, 'f.txt'), 'changed\n')
 
     await expect(computeTaskStatuses(t.db)).resolves.toEqual([
@@ -146,7 +131,7 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
   // The status poll is the HEAD observer (docs/plugins.md § Hearing a core event): the first
   // sighting seeds silently, a moved tip on the next pass broadcasts, an unmoved one does not.
   it('broadcasts head:changed when a worktree tip moves between polls', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     broadcasts.length = 0
     const [first] = await computeTaskStatuses(t.db)
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
@@ -170,19 +155,19 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
   // that wasn't its task's. Both drifts, wrong branch and pruned admin dir, must refuse rather than
   // degrade.
   it('refuses a worktree that has drifted onto another branch', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     git(res.cwd, 'checkout', '-b', 'someone-elses-branch')
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)).rejects.toThrow(
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(
       /checked out on 'someone-elses-branch', not 'feat-x'/,
     )
   })
 
   it('refuses a worktree directory whose git link is gone', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     rmSync(join(checkout, '.git', 'worktrees'), { recursive: true, force: true })
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)).rejects.toThrow(
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(
       /no longer a live git worktree/,
     )
     expect(res.isWorktree).toBe(true)
@@ -192,7 +177,7 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
   // no branch, so the task shares the checkout instead of getting a worktree.
   it('runs a branchless task in a Git project from the checkout without creating a worktree', async () => {
     await t.db.update(schema.tasks).set({ branch: null })
-    const result = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     expect(result).toEqual({ cwd: checkout, isWorktree: false, created: false })
     expect(created).toEqual([])
   })
@@ -207,7 +192,7 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
       createdAt: now, updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({ id: 'plain-task', title: 'Plain', origin: 'local', projectId: 'project-plain', branch: null, status: 'active', sort: 0, createdAt: now, updatedAt: now })
-    const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain, null)
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain)
     expect(result).toEqual({ cwd: plain, isWorktree: false, created: false })
     expect(created).toEqual([])
   })

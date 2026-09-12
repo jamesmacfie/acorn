@@ -112,8 +112,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         hooks: ctx.hooks,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
-        // Read per call, never captured. Creating a task's worktree consults that owner's per-repo
-        // `base_ref` preference, and an account switch must not be served from a cached value.
+        // Read per call, never captured. Agent records and credentials remain scoped to the active
+        // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
         publish: (frame) => ctx.events.send(frame),
         startTerminalHandoff: async (session) => {

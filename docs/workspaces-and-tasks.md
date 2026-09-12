@@ -118,11 +118,10 @@ with a `worktree-stale` 409, and a worktree that cannot be created is refused wi
 `worktree-unavailable` rather than falling back to the main checkout. Either fallback hands the task
 another branch's files, which is the tree its agent then reads and edits.
 
-A new branch is created from a base ref chosen in order: the project's preferred ref, an
-identity-scoped preference read from prefs key `base_ref:<projectId>`, then `origin/main`, then
-`origin/master`, falling back to the checkout's current HEAD if none of those exist. Resolving the
-preferred ref needs the caller's identity; a missing identity fails closed to the origin/main
-fallback rather than risk reading another login's preference.
+A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
+`git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
+current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
+If the task branch already exists, Acorn checks out that branch without changing its history.
 
 A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works

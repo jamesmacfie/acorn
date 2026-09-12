@@ -25,8 +25,6 @@ import { openHttpValue } from './storage'
 
 // What this module needs from core, now that it has no handle to core's database: resolve the execution
 // task and its worktree, find the project's folder for fallback cwd, and open its own ciphertext.
-// `tasks.root` is passed the request's identity because creating a worktree consults that login's
-// per-project base-ref preference.
 export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secrets'>
 
 const exec = promisify(execFile)
@@ -100,7 +98,7 @@ async function resolveVarsWithSensitivity(
     }
     // taskRoot is null until a worktree exists (and always under dev:node); fall back to the
     // project checkout, exactly as resolveDbUrl and the preview resolver do.
-    cwd = (await core.tasks.root(input.executionTaskId, userId)) ?? null
+    cwd = (await core.tasks.root(input.executionTaskId)) ?? null
     if (project) {
       vars.projectId = project.id
       vars.project = project.name
