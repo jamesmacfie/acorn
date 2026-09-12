@@ -193,6 +193,7 @@ export default function AgentEventCard(props: {
             <Fold
               label={subagent().title ?? 'Subagent'}
               level="sub"
+              nested
               open={open()}
               onOpenChange={setOpen}
               meta={

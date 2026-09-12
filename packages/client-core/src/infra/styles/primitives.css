@@ -730,6 +730,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 }
 .ui-fold[open] > .ui-fold-summary .ui-fold-marker { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .ui-fold-marker { transition: none; } }
+/* Inset behind a left rule, so header and body both read as owned by the card above. Width is
+   --stripe-w, which no pack zeros, because the rule carries the nesting, not decoration. */
+.ui-fold[data-nested] { padding-left: var(--space-6); border-left: var(--stripe-w) solid var(--border); }
 
 /* ── Input variants ─────────────────────────────────────────────────────────────────────────
    `bare` is `.palette-input` verbatim, so the palettes migrate with no visual change. `filter` is
