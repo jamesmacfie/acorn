@@ -98,7 +98,7 @@ if (!all.length) throw new Error('No drizzle.config.ts found under packages/ or 
 
 if (command === 'generate') for (const chain of all) generate(chain)
 
-// node:sqlite: same engine, no native build to keep in step with the runtime (main/sqlite.ts).
+// node:sqlite: same engine, no native build to keep in step with the runtime (server/storage/sqlite.ts).
 const { DatabaseSync: Database } = await import('node:sqlite')
 let ok = true
 console.log('')

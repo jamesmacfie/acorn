@@ -18,6 +18,14 @@ validation details when changing a contract.
 | Plugin | `/v2/p/<plugin>/*` | device or permitted internal principal |
 | Events/streams | `GET /v2/events` | authenticated WebSocket upgrade |
 
+A request that reaches a node through the desktop broker is killed after 30 seconds. That is less
+than one model call is allowed to take, so a caller that knows its route is slow passes `timeoutMs`
+on the request and the broker uses that instead. It is the exception: the default is what everything
+else runs on, and a route that needs more than half a minute usually wants an event rather than a
+longer wait. Workflow generation is the only route that asks, at 150 seconds for two model calls
+([workflows.md](./workflows.md) § Generating one from a description). A direct HTTP caller does not pass through the broker. `pnpm dev:node` starts the API service only;
+it serves no renderer assets.
+
 All responses carry `X-Request-Id`. Errors use:
 
 ```json
@@ -84,13 +92,11 @@ it cannot say why, and reports "this is not an acorn node" about something that 
 `strictObject` until 2026-08-15, so the first field any future node added would have broken every
 older client in exactly that way.
 
-The rules are this blunt this early because the client and node ship together, so any wire change is
-safe and none of this costs anything. Once a node is a download (`docs/future/bundle.md`), old nodes
-exist forever and that freedom is gone. There is deliberately no response-schema validation, no
-OpenAPI, and no codegen. For more information, see wire validation in
-[the architecture overview](./architecture-overview.md). There is no protocol export snapshot either.
-The plugin API has one because its authors are outside the repo, and the protocol's consumers are all
-inside it until standalone nodes ship.
+Standalone Nodes can upgrade independently of their clients. Keep wire changes additive within a
+protocol major and test compatibility at the probe and reconnect boundaries. The protocol has no
+export snapshot, OpenAPI document, or generated client. Route modules and protocol types own the
+request and response shapes. For more information, see
+[Node distribution](./node-distribution.md).
 
 The plugin bridge takes the same posture for the same reason. Frame-SDK verbs ship inside plugin
 bundles while the broker ships in the shell, so within a `PLUGIN_API_MAJOR` bridge verbs are additive
@@ -107,6 +113,13 @@ only. For more information, see the plugin API section in [the plugins doc](./pl
 5. Idempotency replay for device mutations.
 6. Device-only, task-scope, provider-scope, and route-specific gates.
 7. Core and plugin routers.
+
+`traceparent` is read, when the node is collecting telemetry, and it is the only header the request
+middleware reads besides `x-request-id` and the two credentials. A well-formed one makes the
+request's span a child of the caller's; anything else is ignored and the request starts its own
+trace. The parser takes exactly the W3C form and the raw header never reaches a log line, because it
+is attacker input like any other ([telemetry.md](./telemetry.md) § Traces). `x-request-id` is
+unchanged.
 
 `Idempotency-Key` is optional for most mutations and required by agent session creation, agent-turn
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
@@ -194,9 +207,33 @@ be denied. For more information, see approval-mediated install and teaching the 
 | `PATCH` | `/v2/core/integrations/:id` | Enable or disable a connection |
 | `POST` | `/v2/core/integrations/:id/test` | Test provider connectivity |
 | `DELETE` | `/v2/core/integrations/:id` | Disconnect and cascade provider data |
+| `GET` | `/v2/core/models/backends` | List the model backends this owner can generate with |
+| `POST` | `/v2/core/telemetry` | Take a batch of records another runtime collected |
+| `GET` | `/v2/core/telemetry/summary` | Counts of what this node has collected since it started |
 
 Integration administration is restricted to device and Node service principals. Secret values are
 write-only.
+
+`POST /v2/core/telemetry` is device-only, and it is the one door into the node's collector for a
+runtime outside the node, including the desktop renderer, terminal client, desktop helper, and Rust shell
+([telemetry.md](./telemetry.md) § Other runtimes). The body is `{ runtime, records }`, capped at one
+mebibyte and refused whole if any record is malformed. `runtime` names the sender and cannot say
+`node`, because the collector stamps that on its own records and a batch that could claim it would
+be indistinguishable from one at a sink. The answer is `202` with `{ accepted }`, which is `0` when
+the preference is off or no sink is subscribed; that is not an error, and the sender stops on its
+own when it next reads the preference.
+
+`GET /v2/core/telemetry/summary` is the other half of that router and is device-only for the same
+reason: it names which plugins are subscribed as sinks. It answers counters rather than records,
+per owner and kind since the node started, plus the drop and truncation totals, the last flush, and
+the sink list. Settings → Telemetry is the one caller
+([telemetry.md](./telemetry.md) § What the page shows).
+
+`GET /v2/core/models/backends` is device-only, and answers `backends` plus `missing`. A backend is a
+connected model provider or an agent CLI installed on this machine, projected to an id, a label and a
+model catalog; connections come first. `missing` names every agent CLI that declares a one-shot text
+mode whose command is not on this machine, which is what the onboarding wizard draws as "not found".
+For more information, see model providers in [the integrations doc](./integrations.md).
 
 ### Workspaces and tasks
 
@@ -209,6 +246,7 @@ write-only.
 | `DELETE` | `/v2/core/workspaces/:id` | Delete a non-default workspace |
 | `GET` | `/v2/core/projects` | List local projects and their facets |
 | `POST` | `/v2/core/projects` | Add or import a project |
+| `GET` | `/v2/core/projects/:id` | Read one project |
 | `PATCH` | `/v2/core/projects/:id` | Update project identity, colour, folder, or visibility |
 | `GET` | `/v2/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
 | `PUT` | `/v2/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
@@ -239,7 +277,7 @@ The core worktree router covers project configuration and task lifecycle surface
 /v2/core/tasks/:id/run/*
 ```
 
-The exact method/body contracts are in `packages/node-core/src/server/routes/worktree.ts`,
+The exact method/body contracts are in `packages/node-core/src/server/routes/projects/worktree.ts`,
 `configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
 used.
 
@@ -284,18 +322,110 @@ bodies use the shared immutable blob cache. GitHub writes update or invalidate t
 ```
 
 Sessions persist normalized event history and expose paged HTTP reads plus live WebSocket updates.
+`GET /v2/p/agents/sessions` also returns a bounded `delegations` projection for the sessions in that
+page. Each entry names the child session, depth, isolation, and either its managed parent ID or a
+display-safe terminal owner label and profile. The spawn authority row is not returned.
+
+Managed-agent orchestration uses the ordinary task tool routes rather than plugin-specific control
+routes. `GET /v2/core/tasks/:id/tools` lists `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`,
+and `agent_cancel` only for a task-scoped internal principal with a signed session claim and the
+required execute permission. `POST /v2/core/tasks/:id/tools/:name` invokes them. A direct-child
+authorization failure is indistinguishable from an unknown session and returns 404.
+
+### Findings
+
+```text
+/v2/p/findings/tasks/:id/observations
+/v2/p/findings/tasks/:id/observations/:observationId
+/v2/p/findings/tasks/:id/observations/:observationId/withdraw
+/v2/p/findings/observations
+/v2/p/findings/observations/batch
+/v2/p/findings/tasks/:id/review/prepare
+/v2/p/findings/review/bundles
+/v2/p/findings/review/bundles/:id/cancel
+/v2/p/findings/review/bundles/:id/outcomes/:observationId/restore
+/v2/p/findings/review/candidates/:id
+/v2/p/findings/review/candidates/:id/edit
+/v2/p/findings/review/candidates/:id/decision
+/v2/p/findings/review/candidates/:id/history
+/v2/p/findings/review/candidates/:id/split
+```
+
+These routes are device-only and support task history, explicit device-authored capture, atomic
+capture batches, withdrawal, explicit preparation, and exact-revision review history. They stamp
+scope from the URL and origin from the authenticated device. Task-scoped internal callers use the `findings_*` agent tools instead. For request bodies,
+limits, retry semantics, and pagination, see [Findings](./findings.md).
+
+Final findings-backed memory approval is separately device-gated at
+`POST /v2/p/memory/memory/findings/:id/approve`; memory, not findings, owns its durable receipt and
+file effect.
 
 ### Terminal, workflows, and execution
 
 ```text
 /v2/p/terminal/sessions*
+/v2/p/terminal/tasks/:taskId/run-targets
 /v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
+/v2/p/workflows/catalog
+/v2/p/workflows/defs[/*]
 /v2/p/workflows/tasks/:id/workflows*
-/v2/p/workflows/workflows/runs/:runId/*
+/v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry}
 ```
 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Workflows own durable definitions, runs, steps, gates, and reconciliation.
+
+`POST /v2/p/workflows/tasks/:id/workflows` takes `{ def, inputs? }` or `{ defId, inputs? }`, one or
+the other. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+anything else names a `workflow_defs` row, and a task-confined caller is refused that with a 403
+because a row skips the repository trust snapshot. `inputs` is a table of strings, one per input the
+definition declares; the runner refuses a required input with no value and a name the definition does
+not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
+device caller. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
+failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
+otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
+foreign or unknown run as a 404.
+
+`GET /v2/p/workflows/catalog` answers every step kind this node can run, with the form each one
+draws, plus the policies and the agent profiles
+([workflows.md](./workflows.md) § Contributed step kinds). It takes an optional `projectId` and
+ignores it: the answer is node-wide, and the parameter is there so a later per-project answer needs no
+second route. Two routes answer the option lists that a kind's `select` fields point at, both shaped
+`{ options: [{ value, label, description? }] }`:
+`GET /v2/p/terminal/tasks/:taskId/run-targets` and
+`GET /v2/p/database/projects/:projectId/saved-queries`. The second refuses a task-confined caller,
+because no task in the path means no scope gate.
+
+Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole family is device-only
+([workflows.md](./workflows.md) § Database definitions):
+
+| Route | Body or query | Answer |
+| --- | --- | --- |
+| `GET /defs?workspaceId=` | | The merged list: the workspace's rows, every project's committed files, and the user layer, each with its `source`, `projectId` and `problems`. A repo id wins a collision. |
+| `POST /defs` | `{ workspaceId, projectId?, def }` | The row. A definition the loader would reject is a 400 carrying its problems. |
+| `GET /defs/:id` | `?projectId=` | The row with its definition, or a 404. An `:id` of `repo:<fileId>` or `user:<fileId>` names a committed file instead, read from the named project's checkout, and answers `revision: 0` so the editor knows it has no row to save into. |
+| `PUT /defs/:id` | `{ def, revision }` | The row with `revision + 1`. A stale `revision` is a 409 whose `details` carry the row that won. |
+| `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
+| `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |
+| `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | `{ path }` after writing `.acorn/workflows/<slug>.toml`, deleting the row unless `keepRow`. |
+| `POST /defs/generate` | `{ backendId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }`: a whole definition written by whichever backend `backendId` names, what was taken out of the reply, and what the checker still says about it. |
+| `GET /defs/model-connections` | | The backends this owner can generate with, ids and labels only, connections before installed agent CLIs. The path keeps the older name because only this plugin's own code calls it. An empty list is why the editor draws no **Generate** button. |
+
+`POST /defs/generate` writes a definition from a sentence
+([workflows.md](./workflows.md) § Generating one from a description). `description` is capped at
+8,000 characters by the same constant the editor's textarea reads. `workspaceId` says whose
+definitions ride along as worked examples and `defId` names the one to leave out of them, since a
+definition is a poor worked example of itself. `notes` is a list of `{ code, message, step? }`, one
+per thing the reply named that this node does not have. `problems` is the checker's list, which the
+editor's footer draws anyway.
+
+It answers 422 `model_answer_unusable` when nothing in the reply could be read as a definition, with
+the reason in `message`, and that is the one failure with no definition to apply. A provider failure
+keeps the status the provider seam gave it, so `provider_not_connected` is a 404 and
+`provider_needs_auth` a 401, and anything else is 502 `provider_unavailable`. The route makes up to
+two model calls, which is longer than the broker's default request timeout, so the client sends its
+own `timeoutMs` (§ Transport). Neither route needs an owner check of its own: generation spends the
+owner's provider key, and the whole `/defs` family is already device-only, which is stricter.
 
 ### Notes and memory
 
@@ -313,7 +443,7 @@ aliases for one release and resolve through the same notes store.
 
 | Plugin | Route surface |
 | --- | --- |
-| `changes` | task-local Git actions and review notes |
+| `changes` | task-local Git actions, a model-written commit message, and review notes |
 | `database` | task-scoped PostgreSQL schema/query operations |
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
@@ -322,7 +452,39 @@ aliases for one release and resolve through the same notes store.
 | `notes` | task, workspace, and global note CRUD |
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
-| `preview` | preview rules and browser-agent operations |
+| `preview` | preview rules, node-owned URL resolution, and recipe selection |
+
+### Command palette routes
+
+A loaded plugin's `search`, `input` and `setting` commands name a route in the plugin's own
+namespace, and the host calls it with the query and the identifiers the declared scope owns
+([plugins.md](./plugins.md) § Command kinds). They are ordinary plugin routes with ordinary
+authentication and owner context; the only thing particular to them is that the answer is untrusted
+display data with no field that can choose a route, a URL or a verb.
+
+```text
+GET  /v2/p/rollbar/palette/issues        ?q&projectId
+GET  /v2/p/linear/palette/issues         ?q&projectId
+GET  /v2/p/database/palette/queries      ?q&taskId
+POST /v2/p/database/palette/generate     { input, taskId }
+GET  /v2/p/http/palette/requests         ?q&projectId
+POST /v2/p/http/palette/import-curl      { input, taskId }
+```
+
+### Loaded agent tools and context sections
+
+`contributions.agentTools` and `contributions.contextSections` are manifest carriers, not new route
+families. Each names a route under the package's existing `/v2/p/<pluginId>/` namespace. The host
+calls those routes with a verified task-scoped internal principal, adapts the bounded response into
+the existing agent-tool registry or context assembler, and removes the registration on reload or
+unload. Agent tools still project through `GET /v2/core/tasks/:id/tools` and
+`POST /v2/core/tasks/:id/tools/:name`; context still projects through
+`GET /v2/core/tasks/:id/context`. See [Agent tools](./agent-tools.md#loaded-manifest-carriers) for the
+descriptor and response shapes.
+
+Each search re-checks the project or task owner on the node and answers at most 50 rows. The two
+POSTs require an interactive owner and commit their write before answering success, so the reader is
+never navigated to something that is not there yet.
 
 ## WebSocket
 
@@ -333,7 +495,7 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
-The preview tunnel (`/v2/tunnel`, `packages/node-core/src/main/tunnel.ts`) is a separate upgrade on
+The preview tunnel (`/v2/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
 internal-token authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
@@ -350,32 +512,56 @@ host other than loopback adds nothing to the allowlist, because the client can a
 directly.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core owns nine, and every other prefix belongs to the plugin that registered it.
+both ends. Core owns twelve, and every other prefix belongs to the plugin that registered it.
 
-`term:` is transport on both ends and `workflow:` carries the notification bell's notices and step
-events. The other seven are the Node saying that something it owns has moved, and each is one frame:
+`term:` is transport on both ends and `workflow:` carries the notification bell's notices, per-step
+stream events, and `workflow:step-changed`, which names one step whose status moved so a run surface
+can redraw that node without re-reading the run. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
+them, described under [Backpressure](./terminal.md#backpressure). The other eleven are the Node saying
+that something it owns has moved, and each is one frame:
 
 - `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in
   [the plugins doc](./plugins.md).
-- `tasks:changed`, on every task write: create, patch, links, archive, cancel, and a project delete
-  taking its tasks with it.
+- `tasks:changed`, on every task write: create, patch, links, archive, cancel, worktree creation or
+  removal, relation changes, and a project delete taking its tasks with it. It carries the task id,
+  or `null` for a batch.
+- `workspace:changed`, after a workspace is created, renamed, or deleted. Its id remains useful on
+  deletion because absence from the list is the new state.
+- `workspace-projects:changed`, after a provider's external-project mapping replacement or a
+  connection deletion removes mappings. It carries the provider and the union of affected old and
+  new workspace ids.
 - `connection:changed`, on every write to a connection's status, including the demotions to
-  `needs-auth` that happen mid-request when a credential stops being readable.
+  `needs-auth` that happen mid-request when a credential stops being readable, and after deletion.
+  The deletion branch carries `deleted: true` in place of `status`.
 - `head:changed`, when a task worktree's tip moves. Detected by the task-status poll, so it fires
   within one status round trip of an in-app commit and within ten seconds of one made from a
   terminal, an agent, or an outside editor, while a client is attached.
-- `run:changed`, when a declared run target is started or stopped.
+- `run:changed`, when a declared run target starts, is stopped, or exits naturally.
 - `agent-session:changed`, when a managed agent session finishes a turn or asks for attention. The
   same two kinds the agent webhook delivers externally.
 - `project:changed`, on every project write: create, patch, re-detect, delete, and the config and
   run-target writes.
+- `terminal:sessions-changed`, when a terminal session is created, exits, or flips between working
+  and idle. The one channel here that fires at machine speed, which is why only the session roster
+  hears it.
+- `worktree:status-changed`, when something under a task's worktree changes: a stage, a commit, a
+  discard, a push, an editor write, a worktree created, a session's command going quiet. It carries
+  `taskId`, or `null` when the writer did not know which task it was working in. Separate from
+  `head:changed` because a stage or a discard moves the dirty markers without moving HEAD.
 
-The first two are content-free, because the list behind each is a fetchable route and a payload would
-be a second projection to keep in step. `connection:changed` carries `integrationId`, `providerId`,
-and the new `status`, because every integration plugin hears it and most of them are looking at a
-different provider. The three fields let a listener drop the frame without a round trip, and the
-client still re-reads the route. The last four carry a payload for the same reason; the shapes are in
-`@acorn/protocol/nodeEvents.ts`.
+`term:status` rides the `term:` prefix and is a narrower thing than its name suggests. It means
+"re-read this plugin's chrome descriptors", it carries the `pluginId` whose rows moved, and the
+plugin-chrome sweep is the only thing that hears it. A ping with no `pluginId` is core's own, and means
+every plugin's. The terminal's two former meanings are `terminal:sessions-changed` and
+`worktree:status-changed`.
+
+`plugins:changed` and `terminal:sessions-changed` are content-free, because the list behind each is a
+fetchable route and a payload would be a second projection to keep in step. `tasks:changed` carries
+only its addressable task scope. `connection:changed` carries `integrationId`, `providerId`, and
+either the new `status` or `deleted: true`, because every
+integration plugin hears it and most of them are looking at a different provider. The three fields let
+a listener drop the frame without a round trip, and the client still re-reads the route. The other
+payloads follow the same rule; their shapes are in `@acorn/protocol/nodeEvents.ts`.
 
 All of them are invalidation, not replay: a client that missed a frame is not owed a delta, which is
 why each field is what the thing now is rather than what changed about it.

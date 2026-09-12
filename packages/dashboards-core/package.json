@@ -1,6 +1,7 @@
 {
   "name": "@acorn/dashboards-core",
   "version": "0.1.0",
+  "description": "Pure dashboard shaping both runtimes read: layout, series, trends, and formatting, with no I/O.",
   "private": true,
   "type": "module",
   "exports": {

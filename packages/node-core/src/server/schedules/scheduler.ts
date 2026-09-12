@@ -15,6 +15,8 @@ import {
 import { BridgeError } from '../bridge'
 import { type AppDatabase, schema } from '../db'
 import { nextRunAt } from './cadence'
+import { runWithTelemetry, startSpan } from '../telemetry/collector'
+import { createLogger } from '../telemetry/logger'
 
 // The node's one scheduler (docs/schedules.md § Why the node, and only the node, for the cadence,
 // consent and catch-up rules).
@@ -92,6 +94,8 @@ const systemClock: Clock = {
 
 /** The node also serves interactive traffic; scheduled work queues behind this in nextRunAt order and
  *  never starves a person's request. */
+const log = createLogger('schedules')
+
 const CONCURRENCY = 4
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_TIMEOUT_MS = 300_000
@@ -375,6 +379,25 @@ export class Scheduler {
 
   async #runOnce(entry: Entry, reason: 'due' | 'manual' | 'catch-up'): Promise<void> {
     const startedAt = this.#clock.now()
+    // Unattended work starts its own trace: nobody asked for this, so there is no caller's trace to
+    // join (docs/telemetry.md § Traces). The owner comes off the key prefix, which is the same thing
+    // the cadence floor and the settings badge read.
+    const owner = keyOwner(entry.key)
+    const ownerId = owner.owner === 'plugin' ? owner.pluginId : 'core'
+    const span = startSpan(ownerId, {
+      name: 'schedule.run',
+      attrs: {
+        seam: 'schedule.run',
+        'schedule.key': entry.key,
+        'schedule.reason': reason,
+        // How often this is meant to run, and how long it may take. A sink turning runs into a cron
+        // monitor needs both to say "this one is late" (docs/telemetry.md § Node seams), and the
+        // run is the only place either is known: a sink sees records and nothing else. Neither adds
+        // cardinality, because both are constant per `schedule.key`, which is already an attribute.
+        'schedule.period.ms': cadencePeriodMs(entry.cadence),
+        'schedule.timeout.ms': entry.timeoutMs,
+      },
+    })
     const timeout = AbortSignal.timeout(entry.timeoutMs)
     const signal = AbortSignal.any([timeout, this.#abort.signal])
     let status: ScheduleStatus = 'ok'
@@ -383,10 +406,13 @@ export class Scheduler {
       // Failures are contained per run: the run row and lastError are the blast radius, never a crashed
       // node. A timed-out runner is not killed, since nothing here can kill it, so the signal is a contract
       // it is expected to honour, and the slot is released either way.
-      const result = await Promise.race([
-        entry.run!(signal),
-        new Promise<never>((_, reject) => timeout.addEventListener('abort', () => reject(new Error('timed out')), { once: true })),
-      ])
+      // The runner runs inside the run's own trace and owner, so the git spawns and SQL statements
+      // a refresh makes are that schedule's rather than core's (../telemetry/context.ts).
+      const result = await runWithTelemetry({ traceId: span.traceId, spanId: span.spanId, owner: ownerId }, () =>
+        Promise.race([
+          entry.run!(signal),
+          new Promise<never>((_, reject) => timeout.addEventListener('abort', () => reject(new Error('timed out')), { once: true })),
+        ]))
       if (typeof result === 'string' && result) detail = detail ? `${detail}; ${result}` : result
     } catch (error) {
       // A deliberate no-op is not a failure. It resumes on the normal cadence, no backoff and no red row,
@@ -394,8 +420,9 @@ export class Scheduler {
       // retrying more slowly would help with.
       status = error instanceof ScheduleSkipped ? 'skipped' : timeout.aborted ? 'timeout' : 'error'
       detail = oneLine(error)
-      if (status !== 'skipped') console.warn(`[schedules] ${entry.key} ${status}: ${detail}`)
+      if (status !== 'skipped') log.warn(`${entry.key} ${status}: ${detail}`)
     }
+    span.end(status === 'error' || status === 'timeout' ? 'error' : 'ok', { status })
     const finishedAt = this.#clock.now()
     await this.#recordRun(entry.key, { startedAt, finishedAt, status, detail })
     await this.#writeState(entry.key, await this.#afterRun(entry, status, finishedAt, detail))

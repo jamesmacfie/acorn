@@ -41,7 +41,7 @@ Workers app only pays off once a live registry endpoint exists — which
 
 **Location: in-repo, at `apps/site/`.** Matches the `apps/desktop` / `apps/node` convention,
 and it is the point of the whole exercise: the manifest reference is generated from
-`packages/protocol/src/pluginContract.ts` in the same build, with a CI check that regenerated
+`packages/protocol/src/plugin/contract.ts` in the same build, with a CI check that regenerated
 output matches committed output (herdr's `config_reference_check` pattern). A separate repo
 would turn that into a publish-and-consume pipeline for no benefit.
 
@@ -57,13 +57,14 @@ wait for it.
 
 The internal docs are unusually honest and the public docs must not launder that away:
 
-- The node half is **disclosed, not contained**. Surfaces rendering `permissions.node` or
-  `permissions.net` must say "declared", never "enforced". Only `permissions.api` — the six
-  grantable frame scopes — is genuinely enforced, by `frames/scopes.ts`.
+- The node half runs in a permission-scoped worker realm. Surfaces render understood
+  `permissions.node`, including network, environment, and file resources, as **enforced**.
+  Scheduled/check intent remains **declared**. `permissions.api` is enforced separately by the
+  frame broker.
 - There is no signing, no registry, no review, and no deprecation program. If discovery ever
   exists it will be explicitly unreviewed; trust is enforced on the user's devices.
 - The compatibility promise is exactly the `PLUGIN_API_MAJOR` promise (`4` at the time of writing,
-  exact string match; read it from `packages/protocol/src/pluginApiVersion.ts`): a plugin that loads
+  exact string match; read it from `packages/protocol/src/plugin/apiVersion.ts`): a plugin that loads
   under a major keeps loading under it. Nothing more is promised, and the compatibility page says so.
 - The plugin story changed shape in 2026-08, and this file predates it. "Rectangles get frames;
   chrome gets descriptors" is gone, replaced by host-owned layouts, a closed kit, remote component
@@ -82,7 +83,7 @@ source of truth; public pages are splits and distillations of them, per the mapp
 2. **Plugin docs.** Split `docs/plugin-authoring.md` and `docs/extensibility.md` into the
    public plugin tree per [plugin-reference.md](./plugin-reference.md).
 3. **Generated reference.** The manifest reference generated from
-   `packages/protocol/src/pluginContract.ts`, the JSON Schema published at
+   `packages/protocol/src/plugin/contract.ts`, the JSON Schema published at
    `/schemas/acorn-plugin.schema.json`, and the CI sync check. This phase is the reason the
    site is in-repo.
 4. **Agent-facing docs.** The llms.txt family via `starlight-llms-txt` (`/llms.txt`,

@@ -9,7 +9,7 @@ import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import {
   githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem,
   type GithubImportResponse, type Repo,
-} from '../contract/api'
+} from '../shared/api'
 import { reposOptions } from './queries'
 
 const connectedGithub = (integrations: IntegrationsResponse) =>

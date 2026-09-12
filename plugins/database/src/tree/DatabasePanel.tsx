@@ -5,6 +5,7 @@ import {
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
+import { SCRATCH_SELECT_ID } from '../shared/database'
 import {
   connectDb,
   deleteRow,
@@ -12,10 +13,11 @@ import {
   disconnectDb,
   insertRow,
   listColumns,
-  listModelConnections,
+  listModelBackends,
   listRows,
   listSavedQueries,
   listTables,
+  readScratch,
   runQuery,
   updateCell,
 } from './databaseClient'
@@ -26,7 +28,7 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// The SQL editor lives in the host, in the region above this frame (docs/third-party/monaco.md §
+// The SQL editor lives in the host, in the region above this frame (docs/editor.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Execute, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which the host has already called by the time a surface action arrives.
@@ -61,13 +63,14 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
-  // AI SQL generation is offered only when a model-provider key is connected. Read from this plugin's
-  // own route, because a frame cannot see core's integrations. See databaseClient.ts.
-  const [modelConnections] = createResource(
+  // AI SQL generation is offered only when there is something to spend: a connected model-provider
+  // key, or an agent CLI installed on this machine. Read from this plugin's own route, because a frame
+  // cannot see core's integrations. See databaseClient.ts.
+  const [modelBackends] = createResource(
     () => props.taskId,
-    (taskId) => listModelConnections(taskId).catch(() => []),
+    (taskId) => listModelBackends(taskId).catch(() => []),
   )
-  const connections = () => modelConnections() ?? []
+  const backends = () => modelBackends() ?? []
 
   // Saved queries are project-scoped, so they outlive this task, and the route resolves the project
   // from the task id. Failures land in the pane's error line rather than rejecting: a resource in an
@@ -178,6 +181,15 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     return Object.fromEntries(columns().filter((c) => c.isPk).map((c) => [c.name, set.rows[index][set.columns.indexOf(c.name)]]))
   }
 
+  // What the palette picked, when it picked something. Two ids arrive on this channel and they are two
+  // different questions: a saved query's own id, which loads that query, and the scratch sentinel,
+  // which the `Generate SQL` command sends because it wrote the document on the node and this pane may
+  // already have loaded the old text (../shared/database.ts).
+  //
+  // A signal rather than acting on arrival, because a saved-query id can land before the list it names:
+  // the pane opens and the row and the list are two round trips racing each other.
+  const [requested, setRequested] = createSignal<string | undefined>()
+
   onMount(() => {
     // The host's half of a composed pane resolved a surface-scoped chord and sent it across. There is
     // one command today; the switch is here rather than an `if` because a second one is a manifest row
@@ -185,6 +197,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     onCleanup(props.bridge.onSurfaceAction((command) => {
       if (command === 'execute') void execute()
     }))
+    // The selection that opened this pane rides in `context`; every later one is a message
+    // (docs/plugins.md § The tree contract). Both land in the same signal.
+    setRequested(props.bridge.context.item)
+    onCleanup(props.bridge.onSelect((item) => setRequested(item)))
     void connect()
   })
   onCleanup(() => void disconnectDb(props.taskId).catch(() => {}))
@@ -196,6 +212,22 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     writeSql(q.sql)
     setLoadedName(q.name)
   }
+
+  createEffect(() => {
+    const id = requested()
+    if (!id) return
+    if (id === SCRATCH_SELECT_ID) {
+      setRequested(undefined)
+      // Read the row, not the editor: this runs because the node wrote SQL the editor has not seen.
+      // Loading a generated query is not running it, exactly as picking a saved one is not.
+      void readScratch(props.taskId).then((sql) => sql && writeSql(sql), fail)
+      return
+    }
+    const q = savedList().find((candidate) => candidate.id === id)
+    if (!q) return
+    setRequested(undefined)
+    loadSaved(q)
+  })
 
   return (
     <Stack gap="row">
@@ -258,14 +290,14 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             />
             {/* The editor's content is on the other side of a port, so this cannot be
                 disabled-when-empty without polling it — an empty document just makes the click a
-                no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
+                no-op. Same trade the compiled version made against an editor document that was not a signal. */}
             <Button
               variant="solid"
               onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
             >
               Save
             </Button>
-            <Show when={connections().length}>
+            <Show when={backends().length}>
               <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
             </Show>
             <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
@@ -371,7 +403,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
           <Show when={generating()}>
             <GenerateSqlModal
               taskId={props.taskId}
-              connections={connections()}
+              backends={backends()}
               queries={savedList()}
               onDismiss={() => setGenerating(false)}
               onGenerated={writeSql}

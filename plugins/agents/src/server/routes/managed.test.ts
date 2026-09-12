@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { managedAgents, setManagedAgentsBridge, type ManagedAgentsBridge } from './managed'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
@@ -125,7 +125,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
   it('has its list and search pinned to its own task', async () => {
     const filters: unknown[] = []
     setManagedAgentsBridge(fake({
-      listSessions: async (filter) => (filters.push(filter), { sessions: [], nextCursor: null }),
+      listSessions: async (filter) => (filters.push(filter), { sessions: [], delegations: [], nextCursor: null }),
       search: async (_q, filter) => (filters.push(filter), []),
     }))
     const app = asTask1()
@@ -152,7 +152,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     const seen: string[] = []
     setManagedAgentsBridge(fake({
       snapshot: async (id) => (seen.push(id), { session: null } as never),
-      listSessions: async (filter) => (seen.push(JSON.stringify(filter)), { sessions: [], nextCursor: null }),
+      listSessions: async (filter) => (seen.push(JSON.stringify(filter)), { sessions: [], delegations: [], nextCursor: null }),
     }))
     for (const app of [authed(), asService()]) {
       expect((await app.fetch(req('/api/sessions/s2'), {} as Env)).status).toBe(200)

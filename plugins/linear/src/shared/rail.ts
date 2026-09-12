@@ -34,6 +34,9 @@ export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
       origin: 'linear',
       title: `${issue.identifier} ${issue.title}`,
       branch: issue.branchName || issue.identifier.toLowerCase(),
+      // The issue's description, already capped by the route (docs/workflows.md § Starting a run).
+      // Nothing draws it; a workflow started from this row's menu puts it in its `issue` input.
+      ...(issue.description ? { body: issue.description } : {}),
       link: {
         connectionId: issue.integrationId,
         identifier: issue.identifier,

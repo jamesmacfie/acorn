@@ -78,7 +78,9 @@ describe('github query options', () => {
       '/v2/p/github/repos/acorn/web/pulls/42/files/patches',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        // `objectContaining`, because `apiClient.send()` names every request with an
+        // `x-request-id` header now (docs/telemetry.md § The renderer).
+        headers: expect.objectContaining({ 'content-type': 'application/json' }),
         signal,
       }),
     )

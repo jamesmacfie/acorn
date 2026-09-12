@@ -10,10 +10,10 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
-import { sessionModelLabel } from './agentConfigOptions'
-import { managedAgentApi } from './managedClient'
+import { sessionModelLabel } from './settings/agentConfigOptions'
+import { managedAgentApi } from './sessions/managedClient'
 import { AGENT_PANE_ID } from './paneContribution'
-import { runtimeIcon, runtimeTone } from './stateTone'
+import { runtimeIcon, runtimeTone } from './sessions/stateTone'
 
 export const SESSIONS_COLLECTION_ID = 'sessions'
 
@@ -106,7 +106,7 @@ export const agentSessionsCollection = {
   // A session runs in a task, a task belongs to a workspace, and a board belongs to one workspace, so
   // the fleet on it is that workspace's. The host fills the `workspace` param from the board rather
   // than the panel naming one, because one definition is placed on a board in every workspace
-  // (client-core/dashboards/data.ts, `scopedQuery`).
+  // (client-core/features/dashboards/data.ts, `scopedQuery`).
   workspaceScoped: true,
   // Sessions move on the WebSocket, but a panel is a glance surface and nothing here subscribes; half a
   // minute is the same order as the Fleet stat's own freshness.

@@ -2,7 +2,7 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row'] as const
+export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row'] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -21,6 +21,11 @@ export const isContextMenuLocation = (value: unknown): value is ContextMenuLocat
 export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly string[]>> = {
   // `origin` is the task's origin ('local', 'github', …), `pinned` its rail-order state.
   'task.row': ['origin', 'projectId', 'pinned'],
+  // A row in an integration's list: a Rollbar error, a Linear issue, a GitHub pull request.
+  // `providerId` is the rail source it came from, so a row can be offered for one tracker and not
+  // another. The item itself is payload, not a fact: it is the provider's own shape and nothing a
+  // manifest could compare against.
+  'item.row': ['providerId', 'projectId'],
 }
 
 /** A declared `when`: every named fact must equal the value given. */

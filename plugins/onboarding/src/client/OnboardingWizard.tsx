@@ -21,17 +21,29 @@ import {
 import { saveOnboardingCompletion } from './onboardingCompletion'
 
 const GithubConnect = lazy(() => import('./GithubConnect'))
+const AiSetup = lazy(() => import('./AiSetup'))
 
-type Step = 'welcome' | 'add' | 'github' | 'organize' | 'done'
+type Step = 'welcome' | 'add' | 'github' | 'organize' | 'ai' | 'done'
 
 // The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
-// shares `add`'s place in the strip rather than adding a fifth entry — which is what the hand-drawn
-// dot strip's `DOT_OF` map used to say.
-const STEPS = [
+// shares `add`'s place in the strip rather than taking an entry of its own, which is what the
+// hand-drawn dot strip's `DOT_OF` map used to say.
+export const STEPS = [
   { id: 'add', label: 'Add a project' },
   { id: 'organize', label: 'Name it' },
+  { id: 'ai', label: 'Generate with AI' },
   { id: 'done', label: 'Ready' },
 ] as const
+
+/**
+ * Whether the host draws an enabled **Next** on a step.
+ *
+ * Exported so the check can see it. The rule is "a step whose only way forward is doing something on
+ * it says so", which is true of adding a project and of nothing else: the AI step offers a CLI it
+ * found and a key form, and someone who wants neither must still be able to leave.
+ */
+export const canAdvanceOn = (step: Step, addedCount: number): boolean =>
+  step === 'add' || step === 'github' ? addedCount > 0 : true
 
 const place = (step: Step): string => (step === 'github' ? 'add' : step)
 
@@ -165,7 +177,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
         if (Object.keys(patch).length) await patchProject(current.id, patch)
       }
       await refresh()
-      go('done')
+      go('ai')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save those changes.')
     } finally {
@@ -182,9 +194,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     if (step() === 'organize') return void saveNames()
     go(id as Step)
   }
-  // A step whose only way forward is doing something on it says so, rather than offering a Next that
-  // lands on an empty screen.
-  const canAdvance = () => (step() === 'add' || step() === 'github' ? added().length > 0 : true)
+  const canAdvance = () => canAdvanceOn(step(), added().length)
 
   const StepBody = () => (
     <Stack gap="section">
@@ -337,6 +347,19 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             <Button variant="solid" tone="accent" busy={busy()} onPress={() => void saveNames()}>Continue</Button>
           </Toolbar>
         </Stack>
+      </Show>
+
+      <Show when={step() === 'ai'}>
+        {/* Lazy for the same reason the GitHub screen is: it opens two queries of its own, and a run
+            that skips out before this step never pays for them. */}
+        <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
+          <Stack gap="row">
+            <AiSetup />
+            <Toolbar variant="actions" size="sm">
+              <Button variant="solid" tone="accent" onPress={() => go('done')}>Continue</Button>
+            </Toolbar>
+          </Stack>
+        </Suspense>
       </Show>
 
       <Show when={step() === 'done'}>

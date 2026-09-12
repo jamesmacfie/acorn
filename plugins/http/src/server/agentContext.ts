@@ -31,7 +31,7 @@ const TEMPLATE_ONLY = /^\{\{[A-Za-z0-9_.-]+\}\}$/
  * perfectly ordinary way for someone to have saved a request, and there is no way to recognise which
  * literal is a secret. Keys survive, so an agent still learns the endpoint takes `token`.
  *
- * Stricter than the renderer contribution it replaced, which sent the whole URL and leaked exactly
+ * Stricter than the client contribution it replaced, which sent the whole URL and leaked exactly
  * this way (docs/third-party/README.md § "http has moved").
  *
  * String surgery rather than `new URL()`: the stored URL is frequently a template

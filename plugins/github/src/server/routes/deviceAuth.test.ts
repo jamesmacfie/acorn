@@ -2,7 +2,7 @@ import { makeTestDb, schema, testGate, testSecretEnv, type TestDb } from '@acorn
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 // Core's schema: the device flow writes core's `integrations` row through core's own
 // connectProvider and touches none of this plugin's tables, so this test needs core's handle only.
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'

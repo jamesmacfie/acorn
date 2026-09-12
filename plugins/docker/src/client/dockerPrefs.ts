@@ -30,6 +30,24 @@ export function readDockerPrefs(prefs: Record<string, string> | undefined): Dock
 export const saveDockerPrefs = (qc: QueryClient, next: DockerPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.dockerPrefs, next)
 
+/**
+ * One switch, written as a merge onto the whole record.
+ *
+ * Both switches share one key, so writing either on its own would drop the other back to its default.
+ * One value on one persistence path: whatever writes a Docker switch comes through here, so a second
+ * writer cannot drift from Settings → Docker.
+ *
+ * This plugin registers no `setting` command, and the accessor is still worth having on its own —
+ * the merge is the part that is easy to get wrong. Adding one would be a product decision rather
+ * than plumbing (docs/docker.md § From the command palette).
+ */
+export const saveDockerPref = (
+  qc: QueryClient,
+  prefs: Record<string, string> | undefined,
+  key: keyof DockerPrefs,
+  value: boolean,
+): Promise<boolean> => saveDockerPrefs(qc, { ...readDockerPrefs(prefs), [key]: value })
+
 export const dockerPrefsSlice: PersistedStateSlice<Record<string, unknown>> = {
   id: 'docker.prefs',
   key: PrefKeys.dockerPrefs,

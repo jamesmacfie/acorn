@@ -1,6 +1,6 @@
 # Phase 4: the device config file
 
-Status: not started. Waits on a terminal host with a config directory (`docs/future/terminal/phase-3-process-and-auth.md`).
+Status: not started. The terminal host it wants has a config directory already (`docs/tui.md` § Where the TUI keeps things).
 
 ## Goal
 
@@ -11,7 +11,7 @@ executed. The terminal host reads the same file format from its own path.
 ## Why this phase, and why now
 
 It waits because until there is a terminal host, every user has Settings open and the file is a
-second surface for one audience. When the `acorn` command from `docs/future/terminal/phase-3-process-and-auth.md` exists, its first
+second surface for one audience. Now that the `acorn` command exists (`docs/tui.md`), its first
 user will want this on day one. Doing it then, rather than now, means the file's first reader is the
 person it is for.
 
@@ -43,7 +43,7 @@ what makes the change live. On a Settings write, the file is regenerated from th
 owns the file so the renderer never touches disk, following the rule that the renderer holds no
 files.
 
-**Write order.** `docs/state.md` and the memory of the device-pref write-order bug both say:
+**Write order.** `docs/state-ownership.md` and the memory of the device-pref write-order bug both say:
 `localStorage` before the query cache, or the new value is discarded. A file read goes through the
 same setter and inherits the order.
 
@@ -58,13 +58,13 @@ is terminal-specific except the path.
 ## Code touched
 
 - `packages/protocol/src/deviceConfig.ts` (new): the schema.
-- `packages/desktop-helper/src/main/deviceConfig.ts` (new): read, watch, write.
-- `apps/desktop/src/shell/{wire.ts,bridge.ts,helperServer.ts}`: `config-read`, `config-write`,
-  `config-changed`.
-- `packages/client-core/src/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
+- `packages/custody/src/config/deviceConfig.ts` (new): read, watch, write.
+- `apps/desktop/src/shell/{wire.ts,bridge.ts}` and `apps/desktop/src/helper/helperServer.ts`:
+  `config-read`, `config-write`, `config-changed`.
+- `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
   without a file (the PWA) has none and Settings hides the "Open config file" row.
-- `packages/client-core/src/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.
-- `packages/client-core/src/settings/`: "Open config file" and the parse-error notice.
+- `packages/client-core/src/infra/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.
+- `packages/client-core/src/features/settings/`: "Open config file" and the parse-error notice.
 - `packages/plugin-types/` or a sibling: the generated JSON schema.
 
 ## Tests
@@ -80,7 +80,7 @@ is terminal-specific except the path.
 
 ## Docs owed
 
-Per [docs-migration.md](./docs-migration.md), phase 4 rows: `docs/state.md § Device`, `docs/shell.md
+Per [docs-migration.md](./docs-migration.md), phase 4 rows: `docs/state-ownership.md § Device`, `docs/shell.md
 § Files on disk`.
 
 ## Doors left open
@@ -100,11 +100,11 @@ is nullable so the PWA is not a half-built host.
 ## Verify before building
 
 - A terminal host exists that reads config from a path. If not, this phase is not yet due.
-- `packages/client-core/src/persistence/devicePrefs.ts` has the setter every covered key goes
+- `packages/client-core/src/infra/persistence/devicePrefs.ts` has the setter every covered key goes
   through, and the write-order rule holds in it.
-- `packages/desktop-helper/src/main/fleetStore.ts` shows how the helper owns a `0600` file; copy its
+- `packages/custody/src/broker/fleetStore.ts` shows how the helper owns a `0600` file; copy its
   shape for `acorn.json` (which is not secret and needs no `0600`, but the read and write pattern is
   the same).
-- `packages/client-core/src/platform/contract.ts` lists groups as `members<T>()([...])`; add
+- `packages/client-core/src/infra/platform/contract.ts` lists groups as `members<T>()([...])`; add
   `config` the same way.
 - Phase 0 of this folder has shipped, so `plugins` entries have an install path to call.

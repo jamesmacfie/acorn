@@ -24,7 +24,7 @@ unit tests, so the boot test always exercises fresh artifacts.
 
 Suites that do that kind of real work carry a 20-second test and hook timeout instead of Vitest's
 5-second default, set in `packages/node-core/vitest.config.ts`,
-`packages/desktop-helper/vitest.config.ts`, `apps/node/vitest.config.ts`, and
+`packages/custody/vitest.config.ts`, `apps/node/vitest.config.ts`, and
 `plugins/vitest.shared.ts`. A genuine hang still fails; it takes longer to say so.
 
 ## Test layers
@@ -37,29 +37,130 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   `TaskSlotHost`, `RefPanelHost`, `ContextMenuHost`, `TaskPaneHost`, `ExtensionPointHost`, and
   `ExclusiveSlotHost`. Hosts rather than individual panes, because ordering, capability gating,
   arbitration and the error boundaries all live in the hosts and every plugin's UI rides on them. It
+  shares `vitest.browser.setup.ts` with plugin host suites; that setup installs jsdom's isolated
+  storage over Node 24's otherwise-undefined process-level `localStorage` property. It
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
-- the plugin invariants hold the closed kit closed at the call site. `ui/adoption.test.ts` fails on a
+- the palette session has one fixture suite and both hosts are held to it.
+  `host/registries/commands/session.test.tsx` drives the session directly and asserts what the reader
+  feels: what the empty root lists, what typing searches, what Enter does to a group, what Escape gives
+  back, what happens when the thing you opened over moves. None of it mentions a dialog or a cell,
+  which is the point — if either host needed a different answer to any of them, they would be two
+  products. The DOM half is `host/palette/paletteView.test.tsx` and the terminal half is
+  `apps/tui/src/chrome/chrome.test.tsx`; both drive the same operations through their own keys. A
+  loaded plugin's descriptors get a real registration pass rather than a parser test:
+  `host/chrome/chromeRegister.test.ts` § "a loaded plugin's setting, end to end" runs a two-choice
+  fixture setting through the real host and the real command registry — read, write, a value the
+  manifest never declared refused on the way out and ignored on the way back, gone when the node stops
+  running the plugin, registered-but-unavailable while it is disabled. Deliberately a fixture: no
+  first-party loaded plugin has a two-choice preference, and inventing one to be covered would be a
+  product decision made by a test;
+- the plugin invariants hold the closed kit closed at the call site. `kit/lib/adoption.test.ts` fails on a
   raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
   fail on a plugin stylesheet and on a plugin importing Solid's `render` in either spelling. These were
   a ledger of converted files until layout phase 9 finished the conversion; a ledger answers "has this
   file been done" and a rule answers "can this be written at all". All three exempt `.test.tsx` and
   assert their file lists are non-empty, because a rule over a list that came back empty is a rule
-  that passes on nothing;
-- `ui/kit/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
+  that passes on nothing. A second pair of rules scans for raw DOM directly, over both tiers a plugin
+  draws in: `plugins/*/src/tree`, where a raw element is markup the host cannot draw at all, and
+  `plugins/*/src/client`, where it works on a shell that draws to a document and is invisible to one
+  that draws to cells. They share one definition of raw DOM and differ in a single line, whether the
+  components barrel is banned or is the normal way to draw. The client half carries an empty baseline
+  and the test's comment says which seven files used to be in it;
+- `kit/tokens/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
   `:hover` has to reveal it on `:focus-within` too. Hover is never load-bearing, and jsdom computes no
   styles, so this is the only layer that can ask;
 - the three kit invariants hold the component set closed, and each one reads the contract rather
-  than the code that implements it. `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that
+  than the code that implements it. `kit/tokens/support.test.ts` reads the `/ui` barrel and asserts that
   the nodes it exports and the rows in `NODE_SUPPORT` are the same list, each with a terminal level.
-  `ui/kit/roles.test.ts` asserts that every role token has a value on both hosts, and that the DOM
-  value names a token `tokenAxes.ts` declares. `ui/kit/props.test-d.ts` has nothing to run: it is a
+  `kit/tokens/roles.test.ts` asserts that every role token has a value on both hosts, and that the DOM
+  value names a token `tokenAxes.ts` declares. `kit/tokens/props.test-d.ts` has nothing to run: it is a
   type-level test that no node's props accept `class`, `className`, `style`, or an arbitrary string
   where a role is meant, and `tsc --noEmit` under `pnpm lint` is the pass that checks it. See
   [ui design](./ui-design.md) § The closed kit;
+- the `tui` suite (`apps/tui`) renders the kit to a cell buffer instead of to a document. It runs the
+  bundle's own transform and opens the same renderer the app opens, with stdout as a buffer sink and
+  no terminal behind it, and it inherits the alias that points `@acorn/plugin-api/ui` at the terminal
+  kit — so a pane under test draws through the code path and imports the kit exactly as the shipped
+  bundle does. What it asserts is what a reader would look for on the screen — `Badge`
+  draws `[text]`, a `Fold` draws `▸ label` shut and `▾ label` open with its children indented two
+  cells, the caret moves when `j` is pressed — rather than a snapshot of every cell, which would fail
+  on every spacing decision anybody makes afterwards and name no broken promise. There is one case per
+  kit node, checked against the kit itself so a node cannot be drawn without being tested, and a pair
+  of whole-pane runs at 80 by 24 and at 120 by 40. One case per layout beside it, drawn from the
+  terminal projection in [panes.md](./panes.md) § Layout model and checked against the protocol's own
+  region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
+  adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
+  wrapping, activate reaching a row, the region cycle remembering its place, a modal holding the keys
+  against both of this host's keys for `nextRegion`, and a `pty` rectangle taking every key on Enter
+  and giving them back on Escape. Five cases beside those are the reported keyboard faults, kept as
+  regression tests where the rule they broke lives: the plugin trust prompt and the quit
+  confirmation each hold the keys through a Tab, the footer offers `tab` only where Tab goes
+  somewhere, and an entered rectangle stops taking keys the moment it goes off screen, both when
+  a bare `visible` hides it and when the tab it sits on is switched. A pane file
+  (`src/panes.test.tsx`) opens each first-party pane in the roster at exactly 80 by 24 with the chrome
+  around it and asks the three questions the pane sweep asks: is the thing the pane is for on the first
+  screen, is no line wider than the 80 cells the kit promises, and did the pane draw itself rather than
+  its error boundary. It names one string per pane rather than snapshotting the buffer, for the reason
+  the kit cases do. Two of its cases go further: the PR pane at 120 by 40, where a `list-detail` node
+  draws both columns, and an agent session opened from the sidebar, which is where the transcript, a
+  tool card, a pending approval and the composer all have to appear at once. Each case waits for the
+  string it is about rather than for a fixed time, because a pane's data is a route and a store rather
+  than a prop and the first render in a fresh worker also pays for compiling everything the pane
+  imports. A chrome
+  file drives the whole shell rather than a pane: the topbar, the rail and the footer at 80 by 24 and
+  at 120 by 40, Tab walking rail to pane strip to pane, the rail collapsing at 99 cells and coming
+  back at 100, the palette opening on its chord and giving the keys back where it found them, a
+  notification appearing above the footer without taking focus, and `q` asking before it stops a node
+  this `acorn` started. A reachability file (`src/reachability.test.tsx`) is the keyboard's property
+  rather than a scenario: it walks every stop on eight surfaces, which are the browse rail, the six
+  panes the pane sweep opens, and the browse rail again with the cheat sheet open over it. After
+  every press it asks that at most one caret is drawn, that focus is on a node still on screen, that
+  the word the footer puts beside each bare key is what that key does there, that the one focus value
+  names a node that is in the tree and can hold the keys, and that the keys have not reached out of
+  the open dialog.
+  At the end it asks that the walk landed on every stop `_allStops()` declared, that pressing `h` and
+  `l` on every kind of focused thing it met did what the footer said it would, and a second
+  block presses Escape out of each surface and asks that the climb ends in the rail. It runs at 80 by
+  24, and at 120 by 40 as well when `ACORN_TUI_WIDE` is set, which CI sets and a save does not: the
+  wide pass doubles a three-minute file to buy the layouts that split at 100 cells. Five files
+  alongside need no renderer at all: the focus invariants that are facts about the source
+  rather than about a render (`src/invariants.test.ts`, one deferred decision and no `super+` chord),
+  the palette's collapse from a theme to the terminal's slots, the clipboard sequence, the plugin
+  suite below, and the boot test after it.
+
+  The plugin suite (`src/plugins/plugins.test.tsx`) is the sandbox, tested for real. It starts a
+  `node:worker_threads` worker under `--permission`, hands it a bundle out of a real
+  content-addressed cache, and asserts both halves of the containment claim in one frame: the batch
+  the worker sent arrives and draws, and the file it was not granted does not open. Beside it, custody
+  on its own — a bundle whose bytes do not match the hash a node advertised is refused and never
+  cached, a decision is recorded only for bundles this device holds, and re-deciding the same bundle
+  replaces the row rather than appending one. None of that needs a terminal, so it runs on whatever
+  Node the repo is on; the one case that draws — the same tree fed as a batch and written as JSX,
+  asserted to produce identical cells, which is this host's twin of client-core's `twoPaths.test.tsx`
+  — draws like every other case here. Nothing in this suite skips and nothing asks for a flag: the
+  painter is the client's own TypeScript, so it runs on the Node the repo pins
+  ([docs/tui.md](./tui.md) § The runtime floor).
+
+  The boot test (`src/node/boot.test.ts`) is the third file that needs no renderer, and it is what
+  `apps/desktop/test/boot.test.ts` is for the shell: does `acorn`'s world come up. Against a fresh
+  data root and a fresh config directory it runs the real path — a real standalone node started and
+  supervised, the real fleet store and device-token files, the real broker over pinned TLS — and asks
+  what the renderer asks first: is there a node, does a `/v2` request reach it, did the event
+  socket's upgrade authenticate. Then the three things only this host has to answer: a second `acorn`
+  attaches rather than starting a second node, a token the node refuses reads as `revoked` and stops
+  retrying, and quitting drains the child and releases the root's lock. The two boot tests are shaped
+  differently because the desktop has a helper process to talk to over a wire and the TUI is one
+  process, so this one calls the functions directly;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
+- managed-agent delegation tests cover signed caller context, execute permissions, ceiling
+  inheritance, direct-child authorization, atomic depth and live-count limits, MCP retry
+  idempotency, shared and worktree provisioning recovery, bounded read projection, structured-result
+  validation, wait and attention states, cancellation, managed-parent navigation, session roster
+  nesting, and core task hierarchy. The provider runtime tests remain the contract for both managed
+  harness drivers; a real Claude Code or Codex login belongs to the manual checklist;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using
   package-local fixtures. Every plugin's `vitest.config.ts` is one line re-exporting
   `plugins/vitest.shared.ts`, and the testkit resolves a plugin's migration chain from its id —
@@ -72,6 +173,16 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
   boundaries.test.ts` § plugin tests holds the shrinking budget for that);
+- four arch rules read source text rather than the import graph, because what they police is a
+  global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
+  each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
+  against a handful of strings the predicate must still recognise, so a regex that stopped matching
+  fails instead of passing vacuously. The client's rule scans `packages/client-core/src`,
+  `apps/desktop/src/client`, `apps/desktop/src/shell` and `apps/tui/src`; the node's scans
+  `packages/node-core/src`, `apps/node/src`, `packages/custody/src` and `apps/desktop/src/helper`,
+  which is where the desktop helper's lines go; the plugins' rule scans `plugins/*/src` and its
+  baseline is empty rather than shrinking, because the exceptions the other two allow are arguments
+  no plugin can make ([telemetry.md](./telemetry.md) § Logging);
 - architecture tests scan the package graph for forbidden imports, undeclared dependencies, cycles,
   shell-binding leakage, protocol impurity, non-contract plugin edges, and route files that cast a
   request body instead of parsing it;
@@ -85,15 +196,17 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   ("deleted and `schedules.ts` added", "moved to …", "(new; exact placement may change)", "in git
   history").
   A path that names a live file and a line that admits a dead one both pass; a stale citation does
-  not;
+  not. The extension-less escape hatch is what let twelve source paths rot behind a folder rename, so
+  one narrow half of it is bought back: a denylist of the four directory names the 2026-08-30
+  reorganisation deleted — `src/main/`, `src/app/`, `src/wiring/`, `src/service/` — each of which may
+  appear only on a line that admits it is gone, as this one does;
 - loadability tests EXECUTE the two rules that keep the workspace bootable, because a rule about
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a
   node-environment vitest worker (the same shape a plugin's own suite runs in), and
-  `apps/node/test/integration/mainBarrelLoad.test.ts` imports every plugin main barrel in a plain Node
-  child. The arch suite's text checks stay as a fast, precise first line, but they are no longer the
+  the composition-root suites under `apps/node/test/integration/` boot every plugin's `node/index.ts`. The arch suite's text checks stay as a fast, precise first line, but they are no longer the
   only line — and neither owns a file allowlist any more;
-- the platform-seam contract suite is one checker run from both ends: `client-core/platform/contract.ts`
+- the platform-seam contract suite is one checker run from both ends: `client-core/infra/platform/contract.ts`
   states what a live capability group looks like, `platform/contract.test.ts` drives it against a mock
   host, and the shell's own suite drives it against the real object the shell installs
   (`apps/desktop/src/shell/bridge.test.ts`, under stub Tauri bindings). The seam's groups are
@@ -105,7 +218,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
 
 ## The desktop boot test
 
-`apps/desktop/test/boot.test.ts` is the shell's `mainBarrelLoad` analogue: it catches "the shell
+`apps/desktop/test/boot.test.ts` is the shell's loadability check: it catches "the shell
 cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
 which spawns the real `service.js` over the service protocol, then asks the helper the first two
 questions the renderer asks: which nodes are there, and can a `/v2` request reach one. A 200 from
@@ -140,6 +253,40 @@ console line the page logged with the value it saw. Opt-in through
 `pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
 tools reported why.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to
+`main`. Before it existed, the architecture rules and the path checker ran only on whoever remembered
+to run them: `.github/workflows/build-desktop.yml` has no `pull_request` trigger and tests the desktop
+package alone. That is how twelve doc paths rotted without anything going red.
+
+It runs on Linux, for two reasons that are both about the runner rather than the code. A macOS runner
+has no Docker for the container probes to find, and its `/var` is a symlink to `/private/var`, which is
+the artefact behind one of the pre-existing failures below.
+
+`@acorn/desktop` is filtered out of the test run. Its `test` script stages the whole bundle and then
+runs `cargo test`, and `build-desktop.yml` already has the Rust toolchain, the staged inputs, and the
+pinned-runtime cache to do it in. That does mean the boot test and the Rust suite gate `main` rather
+than the pull request.
+
+Nothing is cached between runs, so CI runs the suites a local `pnpm test` usually serves from
+Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
+changed.
+
+Two checks live in a `build` script rather than in a suite, because what they assert is a property of
+built output that no test process has. `@acorn/desktop`'s `build` runs
+`apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html`, and `@acorn/tui`'s
+`build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail the build over
+a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
+enforce.
+
+Neither runs in this workflow, which only runs `lint` and `test`: the renderer's runs in
+`build-desktop.yml`, which builds the bundle, and the terminal client's runs whenever somebody builds
+that package. So each has a fixture suite beside it that drives the same script against a directory it
+writes itself — `apps/desktop/test/scripts/` and `apps/tui/src/startupGraph.test.ts`. Those are what
+gate a pull request: they prove the rule, and the `build` invocation is what applies it to the real
+bytes.
+
 ## The smoke checklist
 
 Run this checklist per release. The automation-only development launcher covers main-renderer flows,
@@ -160,6 +307,12 @@ build, and nothing ships to a person until it passes (docs/shell.md § Signing g
    command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
    a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
    registry, and only a real CLI can prove the transcript.
+
+For managed-session naming, run one detailed first prompt with both Claude Code and Codex. Confirm the
+prompt fallback appears immediately and is replaced by a short title without interrupting the turn.
+Repeat while renaming the session before the generated result arrives, and confirm the user title
+wins. Signed-out CLIs and Aider must retain the fallback without adding a transcript warning.
+
 10. Build the reference node provider into the running node's data root
     (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
     node into that file, and from Settings → Nodes adopt it, run a task on it, then create and destroy
@@ -179,7 +332,7 @@ see, not the code to read:
     with sensible spacing, overflow, and empty state.
 14. Force a render throw in a plugin's `coreSlot` replacement; the surface falls back to core's own
     implementation rather than going blank.
-15. Select a plugin-contributed theme; the terminal and Monaco pick up the right light or dark
+15. Select a plugin-contributed theme; the terminal and CodeMirror pick up the right light or dark
     self-description. Disable the plugin; the fallback to Light or Dark happens without the stored
     preference being rewritten.
 16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
@@ -232,10 +385,283 @@ stylesheet; only a person can tell whether the result is usable.
 25. Scaffold the other shape with `--rectangle` and repeat the install. Its pane draws inside an
     iframe, and a network call from that iframe fails.
 
+The last item is older than the rest. `docs/next-review.md`, deleted in the 2026-08-30 hygiene pass,
+was a personal checklist with no inbound links. Every other line in it was already owned by this
+checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
+[caching.md](./caching.md). This one was not.
+
+26. Run the Rollbar pane against a live project rather than the recorded fixtures, and check that the
+    privacy allowlist holds on real payloads: no request header, cookie, or `person` field outside the
+    allowlist reaches the pane or the copied context
+    ([integrations.md](./integrations.md) § Rollbar). Then narrow the window to the smallest width the
+    context pane and the Notes pane still support, and make one context section answer slowly. Both
+    panes keep their layout, and the slow section reports itself without stalling the others
+    ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
+
+The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
+[tui.md](./tui.md) § Keys and focus. Every one of them needs a real terminal and none can be
+automated: both harnesses ask for the kitty keyboard protocol, the trust queue is stubbed, and a
+suite drives one task at a time.
+
+27. Answer the plugin trust prompt at boot, against a real node offering a bundle this device has
+    never decided about. The caret starts inside the dialog, Tab does not move it out, Enter on "Run
+    it" records the decision, and Escape drops the queue entry. The harness stubs `pendingTrust`; the
+    real flow comes through custody, which is the half no test sees
+    ([tui.md](./tui.md) § The trust prompt).
+28. Press Shift+Tab in a terminal that does not negotiate the kitty keyboard protocol. Both harnesses
+    ask for it and get it, so a legacy terminal's spelling of that chord is untested; check that the
+    region cycle still goes backwards, and that a lone Escape still leaves a rectangle without
+    waiting out the parser.
+29. Enter a PTY, then let a notification activate another task while the keys are inside it. Open the
+    palette with its chord from inside the PTY, close it, and type again. Run it with
+    `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `reason=no-match` on a key the
+    footer offers, and none may say `region=none` while the screen has regions
+    ([tui.md](./tui.md) § Seeing what the keys did).
+30. Walk the cross and page keys where five different rules used to live. In a `list-detail` pane,
+    Right crosses from the list to the detail, Left comes back, and PageDown lands on the last row
+    and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one
+    column left rather than doing nothing. In the editor's file tree, Right on a leaf reaches the
+    document beside the tree.
+
+The next twelve are the command palette's, owed since the graph and the shared session shipped on
+2026-09-03 and **not yet run**. The session has a fixture suite both hosts pass and every route has
+its own, and what none of them can see is the surface: the suites drive a store and assert its rows,
+while a palette is a thing a person opens over a task they are in the middle of. Run them on the
+desktop and in `acorn` in a terminal, and expect the two to agree.
+
+31. Open the palette on ⌘K with nothing typed. The top level lists the groups and the loose commands
+    and nothing else. Type a word that only a nested command matches — `archive`, `theme`, a run
+    target's name — and it appears with the trail it came from beside it.
+32. Enter a group, type inside it, enter a second group, then press Escape twice. Each frame comes
+    back with exactly the query and the cursor position it was left with, and the focus you had before
+    the palette opened comes back only on the last Escape.
+33. Press ⌘P with a task open. The palette opens straight at the editor's file search rather than at
+    the root, and picking a file opens it. Press `/` on a pull request; the same, at the changed-file
+    search. Neither chord opens a second dialog.
+34. Type quickly into a Rollbar or Linear issue search on a slow connection. One request goes out for
+    the text you stopped on, an earlier answer arriving late never replaces it, and Escape while it is
+    in flight leaves nothing behind.
+35. Submit `Generate SQL` with a prompt that fails — no model connection, or a database that is not
+    reachable. The frame stays open, your prompt is still in the field, the message says what to do,
+    and Enter tries again. A second Enter while the first is in flight does nothing.
+36. Change the theme from the Appearance setting command. The list marks the value that is set,
+    picking one restyles the app immediately, the frame stays open, and the marker moves to what was
+    actually stored. Open Settings → Appearance: it agrees.
+37. With the palette open over a task, switch node or task from another window or another pane. The
+    palette closes rather than acting on rows fetched for somewhere else.
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+    nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
+    everything under it come back, once.
+39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail
+    list shows that item, exactly as clicking the same row in the rail does.
+40. Run `Generate SQL` successfully with the Database pane already open and with it closed. Both end
+    with the generated SQL in the editor — the open pane re-reads the scratch document rather than
+    keeping the text it had loaded.
+41. Run and then stop a configured terminal target from the palette. The run/stop decision and the
+    error copy match what the drawer shows, and a broken `.acorn/config.toml` still explains itself in
+    the list rather than yielding an empty one.
+42. Launch a workflow definition from the palette. It starts exactly as launching it from its own
+    surface does, and no approve, cancel or kill row is offered anywhere in the palette.
+
+The next four are the Changes panel's ([diff-rendering.md](./diff-rendering.md) § Data flow). The
+pane's own suites cover the parser, the routes, the checkbox, the editor's state and every remote state
+of the bar against a bare repository in a temp directory. What they cannot see is which diff the column
+swaps to when a checkbox moves, whether a keystroke in the message field reaches a command, and what a
+real remote with real credentials does.
+
+43. Open the Changes pane on a task with both staged and unstaged edits. Tick a row's checkbox: the
+    file moves, the group checkbox above it follows, and the diff column switches to the staged side
+    of that file. Untick it and the column goes back. Tick a group checkbox that is showing the
+    indeterminate mark and only the unstaged files under it move. Then check the rail: its dirty count
+    and the header's totals agree after every one of those actions.
+44. On a task with two edited files and one untracked file and nothing staged, type a message in the
+    commit field. The button reads **Commit tracked**. Narrow the pane until the diff takes the whole
+    column and come back: the message is still there, and so is it after a relaunch. Press Cmd+Enter
+    with the keys still in the field, and both edited files land in one commit with the untracked file
+    untouched. Then open the options menu, turn Amend on with the field empty, and the last commit's
+    message appears; Cmd+Option+Enter from the field amends. Press the expand button and the same text
+    is in the modal, with room for a body.
+45. On a task whose branch has never been pushed, the bar above the commit editor names the project
+    and the branch, its button reads **Publish**, and the counts beside it read "no upstream". Press
+    it: the button reads **Fetch** and the counts go quiet. Commit something and the button reads
+    **Push** with **↑1** beside it; press that, then amend the commit from the options menu and press
+    **Push** again. It is refused, and the reason ends by pointing at Force push. Open the menu
+    beside the button, press **Force push** once — the item reads **Force push?** — and press it again;
+    the push lands. Then have somebody else, or a second clone, push to the same branch and press
+    **Fetch**: the counts read **↓1** and the button reads **Pull**. Copy the project folder from the
+    button beside the branch name, which used to be in the header. Pull a branch that has diverged and
+    the refusal names Pull with rebase; take it, and if it conflicts the banner reads **Rebase in
+    progress**, the Conflicts group is first in the list, the primary button is disabled, and **Abort**
+    puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
+    ahead count move without touching the pane.
+46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
+    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    Press the wand: it spins, and
+    within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
+    a message of your own and press the wand again: it reads **Replace?** and does nothing until a
+    second press. Connect a second provider, press the chevron beside the wand, pick the other one,
+    and press the wand: the tooltip and the message both come from the provider you picked, and the
+    pick survives a relaunch. Disconnect both providers and the wand goes.
+47. On a task in a GitHub-mirrored project whose branch has never been pushed, there is nothing under
+    the branch bar. Press **Publish**, and **Open pull request** appears there; press that, and the
+    create form opens with this branch already chosen as the head. Create the pull request and go back
+    to the Changes pane: the button is gone and the PR pane is in the switcher. Then disable the GitHub
+    plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
+    the plugin on, with no gap where the button was.
+
+The next six are the workflow editor's and the run pane's, owed since each shipped and **not yet
+run**. The draft rules have a unit suite, the inspector and the run pane have jsdom ones, and none of
+them can see what a person building and watching the owner's first workflow actually goes through.
+Run them on the desktop and in `acorn` in a terminal.
+
+48. Open Workflows in the left rail with a project chosen. Press **+ New**, then build the owner's
+    first workflow from the empty definition using only the editor: two agent nodes with no
+    predecessor, a `terminal:command` node, a third agent node waiting on both investigators, and a
+    human gate after it. Declare an input, put it in a prompt from the chip row, and rename one of the
+    investigators. Every reference to the old name follows it, and the footer reads valid. Press
+    **Save**, reload the surface, and the same nodes come back.
+49. From the same definition, press **Save to repo** on a task with a checkout. The file appears at
+    `.acorn/workflows/<slug>.toml` in that worktree. Open it from the rail: it draws the same nodes
+    read-only, with **Copy to database** where Save was. Start a run from it and the repo trust prompt
+    appears, because the snapshot now covers the file.
+50. Press **Run** in the editor. The dialog asks for the declared input and for a task, refuses to
+    confirm until the required one is filled, and starts the run. Then run the same definition from
+    ⌘K → **Run a workflow**: it opens the same dialog rather than starting with an empty input. In the
+    terminal client, the definition list is in the Browse panel, the editor is in the main one with
+    its node list beside its inspector, and the dialog is a modal the keys stay inside.
+51. Start that run on a task and open the **Workflows** pane on it. Both investigators show running at
+    once, with the same indentation the editor drew. Select one, while it is still working: its
+    transcript is here, following the newest turn, with the node's toolbar staying put above it and the
+    composer staying put below. The composer says a turn sent now runs after the step. The command
+    node's output tails as it runs and folds away with its exit code when it stops.
+    Then press **Show in Agent pane** and put the two panes side by side on that session: both
+    transcripts move together, a file attached in one appears in the other, and the "Workflow: …" chip
+    in the Agent pane's header comes back to this pane at that node. Last, run one with a fan-out or a
+    worktree-isolated agent step and check the conversation you get is the child task's.
+52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
+    and Reject in front of you; the inbox has the same row and it stays there until you answer.
+    Approve, and the run finishes and keeps a notice.
+53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
+    **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
+    running from that node. Then check the pane is not there at all on a task that has never run a
+    workflow, and that the agents pane draws no workflow step rows anywhere. In **Agent Center**, the
+    workflow session's row carries a **Run** chip: the row body opens the session and the chip opens
+    the run at that node.
+
+The next two are the start-from-an-item flow's ([workflows.md](./workflows.md) § Starting a run).
+Three lists moved onto one registry, and the only way to see that they still offer what they used to
+is to open all three menus.
+
+54. Open the row menu on a Rollbar error, a Linear issue and a GitHub pull request. Each has **Create
+    task** at the top doing exactly what it did before — a Rollbar row opens the promote modal, a
+    pull makes or finds the pull's task with its Linear links — and **Start workflow…** under it. On a
+    row with nothing to promote, and on a source whose click already makes a task, no menu appears at
+    all.
+55. Press **Start workflow…** on a Rollbar error. Pick the owner's first workflow: the `issue` input
+    arrives filled with the error's title and its facts, editable, and the button reads **Create &
+    run** and refuses while a required input is empty. Press it; the task opens on the Workflows pane
+    with both investigators running. Do the same from a pull request that already has a task: it runs
+    on that task rather than making a second one.
+
+Next is the graph view's ([ui-design.md](./ui-design.md) § The closed kit). A canvas is the one kit
+node whose whole point is what it looks like, so a suite can check the geometry and nothing else.
+
+56. Open the owner's first workflow and press **Graph**. It draws two roots joining into the
+    synthesis node, with the list column still beside it. Drag a card: it lands on the grid and its
+    wires follow. Drag from one card's bottom port onto another: the second now waits on the first,
+    and the footer agrees. Press the `×` on that wire and it goes. Select a card and press Backspace:
+    it is removed, and the same edit is in the JSON tab. Reload the surface and the cards are where
+    you left them. Then start a run and press **Graph** in the pane's Nodes header: a card recolours
+    as its step starts and finishes. In the terminal client, both **Graph** views are the indented
+    list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
+    the selected card.
+
+Next is the editor's **Generate** button
+([workflows.md](./workflows.md) § Generating one from a description). A pure suite pins the prompt
+and drives the reader from a table, and neither can see whether the teaching worked on a real model.
+
+57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
+    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    row, and press it.
+    Describe the owner's first workflow in words: two agents investigate one issue from different
+    angles at the same time, a third reads both and writes the synthesis, and somebody approves
+    before anything is pushed. The dialog counts seconds while it works, and a couple of minutes is
+    normal. What lands has two roots, a step whose `after` names both of them, and a human gate.
+    That is the check the rest of the item hangs off: a straight chain of five steps means the prompt
+    failed to teach the graph. Read the footer, press **Save**, then **Run**, and watch it
+    in the run pane. Press **Undo** once and the draft you had comes back whole. Then generate again
+    from a description that asks for a `code-review` step kind, which no node has: the definition
+    still applies, and the alert above the node list says what was taken out of it. Last, open a
+    committed file from the rail and confirm there is no **Generate** on that toolbar at all.
+
+Next is the first-run wizard's AI step
+([integrations.md](./integrations.md) § Model providers). The plugin's own jsdom suite draws the step
+against a fixture route, and what it cannot see is the route answering from a real `which` on a real
+machine, or the wizard's own flow around the step.
+
+58. Clear the `onboarded` preference on a node with no projects and walk the wizard end to end. On
+    **Generate with AI**, every agent CLI on that machine is a row saying it is installed, and every
+    one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
+    provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
+    step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
+    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    and **Next** still works.
+
+The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
+**not yet run** ([integrations.md](./integrations.md) § Model providers). The list builder, the
+dispatch, the containment and the picker all have suites, and none of them can spend a real CLI on a
+real machine, which is the whole point of the feature: the reader who has `claude` or `codex` on PATH
+and no API key at all. Run them with the keys disconnected first.
+
+59. With no model provider connected and `claude` installed, open the SQL dialog on a task with a
+    database connection, press the commit-message wand on a task with staged changes, and press
+    **Generate** in the workflow editor. All three offer Claude Code, and all three come back with an
+    answer. Then connect a key and run ⌘K → **Generate SQL**, the palette path that draws no picker:
+    it spends the key, not the CLI, because connections come first in the list and that fast path
+    takes the first backend. Last, sign out of the CLI (or rename it off PATH between the read and the
+    press) and generate again: the failure names Claude Code and says to run it once in a terminal,
+    and the node log has the stderr tail while the client gets none of it.
+60. Pick Codex in the commit wand and press it. The picker offers no model select for Codex, because
+    its model list lives in `~/.codex/config.toml` rather than here, and the message still arrives.
+    Then run a workflow with a `decide` step whose profile is `codex`: it reaches a verdict and the
+    run carries on past the gate, which is the check that Codex's own stream shape is being read
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
+    Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
+    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    follow any of this and to open on the first backend every time
+    ([state-ownership.md](./state-ownership.md) § Scope rules).
+62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
+    OpenCode plugin from [plugin-authoring.md](./plugin-authoring.md) § Harnesses alone, without
+    reading this repository, install it from a folder, and approve the trust prompt: it shows two
+    lines, the ACP spawn and `opencode run --model MODEL` to generate text. OpenCode then appears in
+    the Agent pane, in a task terminal, and in every Generate control, and generates a commit
+    message. That the doc is enough on its own is what is being checked, so a step that sent you to
+    the source is a failure of the doc.
+
+The next two items cover agent-driven delegation. They were not run for this implementation because
+the available checkout cannot launch the app without GitHub credentials. The automated suites cover
+the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
+acceptance pass.
+
+63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+    `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
+    paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
+    `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original
+    MCP call does not create another task, session, or turn; the shared child appears in the same task's
+    Agent pane; and the worktree child appears under its parent task and opens its own panes.
+64. Repeat the same flow from one managed Claude Code parent and one managed Codex parent. Confirm
+    that each child nests under its managed parent, the parent chip returns to that session,
+    provider-native subagents still render under their provider session, and a child can create one
+    directly owned grandchild but the next level is refused. Trigger a permission or question request
+    in a child and confirm `agent_wait` reports attention without giving the parent an approval action.
+    Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
+    workflow-owned session and confirm `agent_spawn` is absent.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
-`solarized-light` and `catppuccin-latte` tell xterm and Monaco they are dark while rendering light.
+`solarized-light` and `catppuccin-latte` tell xterm and CodeMirror they are dark while rendering light.
 The fix is two lines and changes shipped visual behaviour for users of those two themes; it belongs
 in its own change with its own note.
 
@@ -252,6 +678,14 @@ Tests that require populated plugin registries belong under `apps/node/test/inte
 desktop integration tree. Route protection must be tested through the real `createApp()` factory,
 not by mounting middleware only in the test. Standalone parity tests ensure `dev:node` wires the same
 pure-Node feature capabilities as the supervised Node.
+
+That integration tree is grouped by what a suite boots, because the whole directory used to be one
+flat list of 25 files and the only way to find the sibling of the test you were reading was to open
+it. `lifecycle/` starts and stops a node (spawn, shutdown, standalone parity, enrolment), `auth/`
+covers pairing and the token principals, `pluginSystem/` covers the loader, the disable path, the
+manifests, and `plugins/` holds the suites named for one plugin. Anything that
+belongs to none of the four stays flat. Helpers that are not themselves tests live in
+`apps/node/test/helpers/`, and the one shell fixture in `apps/node/test/__fixtures__/`.
 
 ## Testkit
 

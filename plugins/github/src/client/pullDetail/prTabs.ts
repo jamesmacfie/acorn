@@ -3,11 +3,11 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
   activateTaskSignals, clientEvents, consumePaneIntent, onScopeEvicted, openTarget, pathForTask,
-  projectsOptions, tasksOptions, type Task, wsOnStatus,
+  projectsOptions, tasksOptions, type Task,
 } from '@acorn/plugin-api/client'
 import { pullDetailOptions, pullsOptions, taskPullsOptions } from '../queries'
-import { parsePullRef, type PullRef } from '../../contract/pullRef'
-import { pullsKey, taskPullsKey } from '../../contract/api'
+import { parsePullRef, type PullRef } from '../../shared/pullRef'
+import { pullsKey, taskPullsKey } from '../../shared/api'
 import { buildTaskPullTabs, pullRefKey, type TaskPullTab } from './taskPullTabs'
 import { promotePullToTask } from '../pullTasks'
 
@@ -100,7 +100,12 @@ function build(task: Task) {
     consumePaneIntent(event.taskId, event.paneId)
     selectItem(event.intent.item)
   })
-  const offStatus = wsOnStatus(() => {
+  // `head:changed` for this task, not the old content-free `term:status` ping. Two pull-request keys
+  // were being invalidated on every terminal idle-to-working edge, on every connected client
+  // (docs/performance.md § 2026-09-03 — phase 5). What actually moves a pull is a
+  // commit landing in the task's worktree, which is what this event names.
+  const offStatus = clientEvents.on('head:changed', (event) => {
+    if (event.taskId !== task.id) return
     void queryClient.invalidateQueries({ queryKey: taskPullsKey(task.id) })
     const pull = primary()
     if (pull) void queryClient.invalidateQueries({ queryKey: pullsKey(pull.owner, pull.repo, 'open') })
@@ -159,11 +164,12 @@ function build(task: Task) {
       ...(agent.requestId ? { subresourceId: agent.requestId } : {}),
     })
   }
-  const selectTab = (tab: TaskPullTab) => {
-    const linked = linkedTaskRows(tab)
-    if (!tabIsPrimary(tab) && linked.length === 1) return openTask(linked[0])
+  // Selection only. The strip is a tablist and selection follows focus there, so a tab that also
+  // navigated would carry a reader off to another task as they arrowed past it. Opening the linked
+  // task, or the agent that made the pull, is a button beside the strip instead.
+  const selectTab = (key: string) => {
     setTaskError('')
-    setSelectedKey(pullRefKey(tab.pull))
+    setSelectedKey(key)
   }
 
   const offersTaskCreation = () => {

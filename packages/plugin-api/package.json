@@ -1,14 +1,15 @@
 {
   "name": "@acorn/plugin-api",
   "version": "0.1.0",
+  "description": "The facade a plugin imports the host through. Re-exports only, split by side so a bundle stays on one.",
   "private": true,
   "type": "module",
   "sideEffects": false,
   "exports": {
-    "./node": "./src/node/index.ts",
-    "./testkit": "./src/testkit/index.ts",
+    "./node": "./src/node.ts",
+    "./testkit": "./src/testkit.ts",
     "./testkit/client": "./src/testkit/client.ts",
-    "./client": "./src/client/index.ts",
+    "./client": "./src/client.ts",
     "./ui": "./src/ui/index.ts",
     "./ui/host": "./src/ui/host.ts",
     "./ui/tokens": "./src/ui/tokens.ts",

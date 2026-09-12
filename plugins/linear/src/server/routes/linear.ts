@@ -1,4 +1,4 @@
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
@@ -8,6 +8,7 @@ import {
   myIssuesFilter,
   PROJECT_ISSUES_QUERY,
   projectIssuesFilter,
+  projectIssueSearchFilter,
   issuesFilter,
   linearData,
   linearError,
@@ -30,6 +31,7 @@ import {
   type StoredConnection,
 } from '@acorn/plugin-api/node'
 import {
+  LINEAR_ISSUES_RESOURCE,
   linearNodeToDetail,
   linearProvider,
   linearRef,
@@ -49,6 +51,7 @@ import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
 import { LINEAR_ISSUES_COLLECTION_ID, linearIssuesCollection } from '../../shared/collections'
 import { linearRailItem } from '../../shared/rail'
 import { sortLinearIssues } from '../../shared/triage'
+import { linearSearchItems, type LinearSearchRow } from '../paletteSearch'
 
 // TTL policy: docs/caching.md § Provider mirrors. Linear's reads fan out across every connected
 // integration with per-item freshness, so they skip the serve-then-revalidate wrapper; this file owns
@@ -59,7 +62,7 @@ const PROVIDER = 'linear'
 // only to say that what arrived is a list of strings.
 const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) satisfies z.ZodType<LinearIssuesRequest, Partial<LinearIssuesRequest>>
 const commentBody = z.object({ body: z.string(), parentId: z.string().optional() })
-const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
+const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === LINEAR_ISSUES_RESOURCE)!.ttlMs
 
 // The only host /uploads will spend a credential against: docs/integrations.md § Linear. Exported and
 // pure so a branch carrying the owner's Linear key can be checked without standing up a request context.
@@ -123,11 +126,16 @@ async function resolveIssues(
   return null
 }
 
+// How much of an issue's prose a list row carries. Enough for a workflow's `issue` input to say what
+// the ticket is about, and short enough that a hundred of them is still a list.
+const DESCRIPTION_MAX = 2_000
+
 const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue => {
   const detail = linearNodeToDetail(node)
   return {
     ...linearSummaryOf(detail),
     integrationId: row.id,
+    description: detail.description ? detail.description.slice(0, DESCRIPTION_MAX) : null,
     branchName: detail.branchName ?? null,
     priority: detail.priority ?? null,
     priorityLabel: detail.priorityLabel ?? null,
@@ -148,9 +156,9 @@ type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProje
  */
 async function mappedProjects(
   c: Context<AppEnv>,
+  projectId: string | undefined,
   projects?: LinearProjectScope,
 ): Promise<Map<string, string[]> | null> {
-  const projectId = c.req.query('project')
   if (!projectId || !projects) return null
   const project = await projects.byId(projectId)
   if (!project) return null
@@ -198,7 +206,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
-    const mapped = await mappedProjects(c, projects)
+    const mapped = await mappedProjects(c, c.req.query('project'), projects)
     const issues: LinearProjectIssue[] = []
     for (const { row, key } of connections) {
       const projectIds = mapped?.get(row.id) ?? []
@@ -215,6 +223,53 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
       }
     }
     return c.json({ items: sortLinearIssues(issues).map(linearRailItem) } satisfies LinearRailItemsResponse)
+  })
+  // The `Find a Linear issue` command's rows (docs/plugins.md § Command kinds).
+  //
+  // Same scope as the rail above and by the same code: the routed project names its workspace, the
+  // workspace's links name the Linear projects, and a connection with nothing mapped is never asked.
+  // Both things this route is given are the host's — `projectId` is the project the palette session
+  // captured, `q` is the typed text — and neither the manifest nor a previous answer can write either.
+  //
+  // The narrowing goes to Linear rather than happening here, for the reason `projectIssueSearchFilter`
+  // gives: the mapping is already a filter that API supports, so the query can ride along with it and
+  // reach past the first page of active issues. It spends the same one request per mapped connection
+  // the rail does, through the same scheduler and the same budget.
+  //
+  // Unlike the rail, a total failure is reported. A rail that quietly empties is a list that looks
+  // finished; a search that quietly empties is a reader retyping a word that was never the problem.
+  .get('/palette/issues', async (c) => {
+    const connections = await linearConnections(c)
+    const mapped = await mappedProjects(c, c.req.query('projectId'), projects)
+    const filter = (projectIds: string[]) => projectIssueSearchFilter(projectIds, c.req.query('q') ?? '')
+    const rows: LinearSearchRow[] = []
+    let asked = 0
+    let failed = 0
+    let failure: { code: string; status: 401 | 502 } | null = null
+    for (const { row, key } of connections) {
+      const projectIds = mapped?.get(row.id) ?? []
+      if (!projectIds.length) continue
+      asked++
+      try {
+        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: filter(projectIds) })
+        const err = linearError(res)
+        if (err) {
+          failed++
+          failure ??= { code: err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: err.status }
+          continue
+        }
+        const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+        for (const node of issues.nodes) rows.push({ issue: triageRow(row, node), connectionLabel: row.label })
+      } catch {
+        failed++
+        failure ??= { code: 'provider_unavailable', status: 502 }
+      }
+    }
+    // Only a total wash is an error, the same line rollbar's palette route draws: a workspace that
+    // answered — even with nothing, which is a real answer to a typed word — is a partial success, and
+    // erasing it would be worse than the failure it reports.
+    if (asked > 0 && failed === asked) return respondError(c, failure!.status, failure!.code)
+    return c.json({ items: linearSearchItems(rows) })
   })
   // The declared collection's page (@acorn/protocol/collections.ts): the viewer's own active issues
   // across every connected workspace, as typed records the host renders. Same degrade-quietly posture
@@ -339,7 +394,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
       const result = await linearResource<LinearResourceInput, LinearIssueDetail>(c, {
         providerId: PROVIDER,
         connectionId: connection.id,
-        resourceId: 'linear.issues',
+        resourceId: LINEAR_ISSUES_RESOURCE,
         input: { kind: 'detail', identifier },
         force,
       })

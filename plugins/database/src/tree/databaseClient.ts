@@ -3,19 +3,20 @@
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope. Every
 // call is a message on the one MessagePort, and the host checks the path against this plugin's own
-// namespace before forwarding it (client-core/plugins/frames/scopes.ts).
+// namespace before forwarding it (client-core/host/frames/scopes.ts).
 //
 // `connect()` is awaited per call rather than threaded through every component, because it resolves
 // once per frame and memoizes.
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { connect } from '@acorn/plugin-api/ui/sdk'
 import {
   databaseActionRoute,
   databaseColumnsRoute,
-  databaseModelConnectionsRoute,
+  databaseModelBackendsRoute,
   databaseQueriesRoute,
   databaseQueryRoute,
   databaseRowsRoute,
+  databaseScratchRoute,
   databaseTablesRoute,
 } from '../shared/database'
 import type {
@@ -62,8 +63,14 @@ export const deleteRow = async (taskId: string, schema: string, name: string, pk
 
 export const generateSql = async (
   taskId: string,
-  body: { connectionId: string; modelId?: string; prompt: string; queryIds?: string[] },
+  body: { backendId: string; modelId?: string; prompt: string; queryIds?: string[] },
 ): Promise<DbGenerateResult> => (await api()).post(databaseActionRoute(taskId, 'generate'), body)
+
+// The stored scratch document, as the node holds it. Not `bridge.document.read()`, which answers with
+// what is in the editor right now: this is asked after the palette's `Generate SQL` wrote the row, so
+// the row is the question.
+export const readScratch = async (taskId: string): Promise<string> =>
+  (await (await api()).get<{ text?: string }>(databaseScratchRoute(taskId))).text ?? ''
 
 export const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> =>
   (await api()).get(databaseQueriesRoute(taskId))
@@ -75,9 +82,10 @@ export const deleteSavedQuery = async (taskId: string, queryId: string): Promise
   await (await api()).del(databaseQueryRoute(taskId, queryId))
 }
 
-// The Generate button's precondition, answered by this plugin's node half. A frame cannot read core's
-// integrations: there is no bridge scope for them, and minting one to serve a dropdown would hand
-// every installed plugin the whole connection roster. This returns ids and labels. The key never
+// The Generate button's precondition, answered by this plugin's node half: the backends this owner can
+// spend, which is every connected key plus every agent CLI installed on this machine. A frame cannot
+// read core's integrations — there is no bridge scope for them, and minting one to serve a dropdown
+// would hand every installed plugin the whole roster. This returns ids and labels. The key never
 // leaves the node.
-export const listModelConnections = async (taskId: string): Promise<AvailableModelConnection[]> =>
-  (await (await api()).get<{ connections: AvailableModelConnection[] }>(databaseModelConnectionsRoute(taskId))).connections
+export const listModelBackends = async (taskId: string): Promise<ModelBackend[]> =>
+  (await (await api()).get<{ backends: ModelBackend[] }>(databaseModelBackendsRoute(taskId))).backends

@@ -83,19 +83,20 @@ These plugins own SQLite files and migrations:
 
 | File | Main data |
 | --- | --- |
-| `plugins/agents.sqlite` | managed sessions, turns, event ledger, requests, attachments, artifacts, webhooks, FTS |
+| `plugins/agents.sqlite` | managed sessions, turns, event ledger, delegation spawn ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
+| `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, notification receipts, and legacy import mappings |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
-| `plugins/workflows.sqlite` | definitions, runs, steps, gates, and trigger state |
+| `plugins/workflows.sqlite` | `workflow_defs` (definitions typed in the app, scoped to a workspace and optionally a project), runs, steps, gates, and trigger state |
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no
 database either: task, workspace, and global notes are markdown files under `<data-root>/notes`, in
-`plugins/notes/src/main/notes.ts`. The row this table used to carry for `plugins/notes.sqlite`
+`plugins/notes/src/server/notes.ts`. The row this table used to carry for `plugins/notes.sqlite`
 described a store that no longer exists, and [notes and memory](./notes-and-memory.md) still repeats
 the old claim.
 
@@ -116,6 +117,12 @@ Plugin databases have independent migration chains. There are no cross-database 
 `ATTACH` queries, or transactions spanning files. A cross-plugin workflow uses IDs, capabilities,
 events, and durable operation state rather than joining tables.
 
+`agent_spawns` is the Agents plugin's authority relation for agent-driven delegation and its recovery
+record. It stores root and direct-owner IDs, stable child task and session IDs, depth, isolation,
+provisioning state, and an owner-scoped idempotency key. It does not mirror child runtime state. A
+worktree spawn crosses the Agents and core databases through stable IDs and replayable operations;
+there is no cross-file transaction.
+
 ## Database plugin: the Postgres pane
 
 The database plugin's pane connects to a Postgres database per task, for browsing and editing the
@@ -123,11 +130,11 @@ task's dev database. That connection is not part of acorn's own data root: it is
 database, reached over `pg`, and everything the pane shows is re-derived from it per call rather
 than cached in `plugins/database.sqlite`.
 
-`resolveDbUrl` (`plugins/database/src/main/database.ts`) resolves the connection URL for a task
+`resolveDbUrl` (`plugins/database/src/server/database.ts`) resolves the connection URL for a task
 without persisting it, trying in order: a committed `.acorn/config.toml [database].url_script`
 (run inside the worktree), then `<worktree>/.env`'s `DATABASE_URL`, then `process.env.DATABASE_URL`.
 A committed `url_script` is executable content from the checkout, so resolving it goes through the
-same repo-config trust gate as other repo-authored run targets (`core/main/repoConfigTrust.ts`).
+same repo-config trust gate as other repo-authored run targets (`server/repoConfigTrust.ts`).
 Cloning a repo, or checking out a PR that adds the script, must not be enough to run it. A script the
 user or the database authored (`dbUrlFromRepo` false) is the user's own input and is not gated.
 
@@ -143,7 +150,8 @@ visible one, and someone running a migration in the editor above the results gri
 would hit it.
 
 AI query generation sends the introspected schema, the repo's free-form schema notes
-(`projects.db_schema_notes`), and any saved queries picked as examples to a connected model provider.
+(`projects.db_schema_notes`), and any saved queries picked as examples to whichever backend the reader
+picked, a connected model provider or an installed agent CLI.
 The schema text is capped at 80,000 characters (`SCHEMA_CHAR_CAP`) and the notes and examples block
 at 16,000 (`GENERATE_MAX_CONTEXT_CHARS`), so the two together stay under the model runtime's
 100,000-character system prompt limit.
@@ -152,6 +160,23 @@ at 16,000 (`GENERATE_MAX_CONTEXT_CHARS`), so the two together stay under the mod
 behind the pane's editor. Saved queries outlive any one task worktree because they are written
 against a project's schema rather than a task's checkout. The scratch document is task-scoped because
 it holds whatever the reader is working on.
+
+Two of the pane's rows are also **palette commands**, under a Database group
+(`docs/command-palette-and-shortcuts.md`). Both are task-scoped, and the reason is the boundary above:
+saved queries are project-owned, but every route in this plugin reaches them through the task, because
+the task is what core resolves a project from. `/v2/p/database/palette/queries` answers that project's
+rows in the pane's own order, narrowed by what was typed and matching the name, the note and the SQL —
+the SQL because a table name lives nowhere else. Picking one loads it into the editor through the same
+path the pane's picker uses; running it is the reader's next keystroke and never the pick's own effect.
+
+`/v2/p/database/palette/generate` is the Generate SQL modal with every choice already made: the first
+connected model connection, that provider's own default model, and no worked examples. It validates
+the prompt against the modal's own bound, refuses a task-scoped agent token the way the modal's route
+does, loads the live schema, generates, **writes the scratch document, and only then answers**. That
+ordering is the contract rather than an implementation detail: the success action opens the pane, whose
+editor reads the scratch route on mount, so answering first would race the reader to their own result.
+Every failure returns before the write, which is what leaves the prompt in the palette field with the
+reason under it. Choosing a connection, a model or examples remains the modal's job.
 
 ## External-item read model
 
@@ -268,11 +293,13 @@ Every chain starts from a single baseline migration that creates the schema. The
 `(owner, name)` model and its one-way data migrations were squashed away with it, so a database
 written before that baseline cannot be upgraded. Start from a fresh data root.
 
-Native SQLite access is centralized, and both plugin tiers reach it the same way. `ctx.storage.open()`
-returns a migrated handle whose filename the host bound to the plugin id. Only the source of the
-chain differs: a loaded plugin's manifest names a directory confined to its package, and a built-in
-declares `migrationsModule: import.meta.url` on its `NodePlugin` so the host walks from there.
-`packages/node-core/src/main/pluginMigrations.ts` covers all three runtime layouts.
+Native SQLite access is centralized, and both plugin tiers reach it through `ctx.storage.open()`.
+The filename is bound to the plugin id. A loaded plugin opens that handle inside its isolated worker,
+whose filesystem grant names only that database, WAL, and SHM paths; a built-in opens it in the host.
+Only the source of the chain differs: a loaded plugin's manifest names a directory confined to its
+package, and a built-in declares `migrationsModule: import.meta.url` on its `NodePlugin` so the host
+walks from there.
+`packages/node-core/src/server/plugins/migrations.ts` covers all three runtime layouts.
 
 A built-in's chain lives in one of three places depending on how the node was run: a source checkout
 (`plugins/<name>/migrations/`), a built desktop app before packaging
@@ -286,13 +313,21 @@ package root, so a missing chain fails rather than silently adopting an ancestor
 plugin skips the walk entirely: its manifest names the directory, already confined to its package,
 and `pluginMigrationsChain` only validates that a Drizzle chain exists there.
 
-The host opens each file lazily on first use, hands out one handle per boot, and closes it
-immediately after that plugin's `dispose()`, so a plugin's dispose is about the resources the plugin
-itself owns and a plugin whose only resource was the database needs no dispose at all. Both tiers use
-`CoreServices` for core-owned operations. `apps/node/test/integration/httpLoaded.test.ts` covers what
+The host opens a built-in's file lazily on first use. For a loaded plugin with migrations, the loader
+privately prepares the three exact SQLite paths before starting the worker so it can grant files
+without granting the shared `plugins/` directory; the worker still opens the database lazily on first
+use. Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
+dispose is about the resources the plugin itself owns and a plugin whose only resource was the database
+needs no dispose at all. Both tiers use `CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
 happens when a loaded plugin's chain grows between versions, where the update applies at the next
 boot against a database that already has rows, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.
+
+Before applying anything, the loaded-plugin path compares every row already recorded in
+`__drizzle_migrations` with the corresponding journal entry: its timestamp, its position, and the
+SHA-256 of the SQL file. Editing applied SQL, reordering the journal, or removing an applied entry
+fails the plugin with an error that says to restore the original chain and add a new migration. The
+comparison happens on the same handle before Drizzle migrates, so the database is preserved unchanged.
 
 Drizzle-kit cannot model a virtual table, so a plugin that wants FTS5 search
 (`plugins/agents.sqlite`'s `agent_events_fts`, `plugins/memory.sqlite`'s `memories_fts`) writes the
@@ -301,7 +336,7 @@ the Drizzle schema. The schema file still declares the backing columns the trigg
 one there is a signal to update the migration, but the thing that actually catches a missed rename is
 a schema-drift test that opens the migrated database and checks the virtual table's shape against the
 schema, because the trigger body is plain SQL text with no type checker over it
-(`plugins/agents/src/node/ftsSchema.test.ts` is the pattern to copy).
+(`plugins/agents/src/server/ftsSchema.test.ts` is the pattern to copy).
 
 ## Backup and import
 

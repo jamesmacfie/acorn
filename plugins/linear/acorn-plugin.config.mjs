@@ -106,6 +106,9 @@ export default {
       // The rail route reads `?project=` (src/server/routes/linear.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
+      // A task with a Linear link and no pull request opens on the ticket. Core used to make that
+      // choice itself, by name, in client-core/features/tasks/activate.ts.
+      defaultPane: 'linear',
       // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
       onSelect: { verb: 'navigate', surface: 'linear-issue' },
@@ -114,7 +117,7 @@ export default {
       // state behind a client event with no descriptor form.
       //
       // It no longer offers to link projects either. The shell hides this source outright where the
-      // workspace links none (client-core/tabs/sources.ts), so the two empty lists left to explain are
+      // workspace links none (client-core/features/tabs/railSources.ts), so the two empty lists left to explain are
       // followed projects with nothing active in them, and a repository its workspace follows Linear
       // for but which follows no Linear project of its own.
       emptyState: { message: 'No active issues in the Linear projects this repository follows.' },
@@ -124,7 +127,7 @@ export default {
     //
     // Naming a pane here says an item can land in that pane; the `linear-ref` panel above says an
     // item can also be shown on its own, over whatever the reader was looking at. The clicking
-    // surface picks which (client-core/registries/contentLinks.ts § ContentLinkPresentation). A
+    // surface picks which (client-core/host/registries/panes/contentLinks.ts § ContentLinkPresentation). A
     // plugin with items but no task pane would omit `openPane` and get the panel alone.
     //
     // Two entries for one URL shape. The pattern grammar is exact-arity by design, a bounded
@@ -162,6 +165,27 @@ export default {
       category: 'pane',
       palette: false,
       action: { verb: 'openPane', pane: 'linear' },
+    }, {
+      // The routed project's mapped Linear issues, searched from the palette
+      // (docs/integrations.md § From the command palette).
+      //
+      // `scope: 'project'` is the whole boundary: the host sends the project the palette session
+      // captured, the route turns it into the workspace's Linear links, and a connection the routed
+      // project maps nothing of is never asked. The command is not offered at all where there is no
+      // routed project. A manifest names the scope; it never names the value.
+      //
+      // `navigate`, matching the source above: an issue's detail belongs to the project, so picking a
+      // row changes the URL and `linear-issue` draws beside the list.
+      id: 'find-issue',
+      title: 'Linear: find an issue',
+      hint: 'active issues in the Linear projects this repository follows',
+      keywords: ['issue', 'ticket', 'linear'],
+      category: 'navigation',
+      kind: 'search',
+      scope: 'project',
+      route: '/v2/p/linear/palette/issues',
+      placeholder: 'Find a Linear issue…',
+      onSelect: { verb: 'navigate', surface: 'linear-issue' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+l', when: 'task' }],
   },

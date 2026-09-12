@@ -11,7 +11,8 @@ export type KnowledgeBridge = {
   memorySearch(query: string, projectId?: string, type?: string): Promise<unknown>
   memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryProposals(taskId?: string): Promise<unknown>
-  memoryResolveProposal(id: string, approved: boolean, edited?: { name: string; type: string; description: string; body: string }): Promise<unknown>
+  memoryResolveProposal(id: string, approved: boolean, edited?: { name: string; type: string; description: string; body: string }, deviceId?: string): Promise<unknown>
+  memoryApproveFinding?(id: string, input: { revision: number; payloadHash: string; idempotencyKey: string; deviceId: string }): Promise<unknown>
   notesList(location: NoteLocation): Promise<unknown>
   notesRead(location: NoteLocation, slug: string): Promise<unknown>
   notesCreate(location: NoteLocation, title: string, kind?: string): Promise<unknown>
@@ -29,6 +30,7 @@ export const setKnowledgeBridge = (bridge: KnowledgeBridge | null): void => setR
 const editedShape = z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() })
 const addBody = z.object({ scope: z.enum(['project', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
 const resolveBody = z.object({ approved: z.boolean(), edited: editedShape.optional() })
+const approveFindingBody = z.strictObject({ revision: z.number().int().min(1), payloadHash: z.string().min(1), idempotencyKey: z.string().min(1).max(300) })
 const createBody = z.object({ title: z.string(), kind: z.string().optional() })
 const writeBody = z.object({ body: z.string() })
 const includedBody = z.object({ included: z.boolean() })
@@ -74,7 +76,12 @@ export const knowledge = new Hono<AppEnv>()
   .post('/memory/proposals/:id/resolve', requireDevice, async (c) => {
     const p = resolveBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, KNOWLEDGE, (b) => b.memoryResolveProposal(c.req.param('id'), p.data.approved, p.data.edited))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memoryResolveProposal(c.req.param('id'), p.data.approved, p.data.edited, c.get('principal')!.deviceId!))
+  })
+  .post('/memory/findings/:id/approve', requireDevice, async (c) => {
+    const parsed = approveFindingBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, KNOWLEDGE, (bridge) => bridge.memoryApproveFinding ? bridge.memoryApproveFinding(c.req.param('id'), { ...parsed.data, deviceId: c.get('principal')!.deviceId! }) : Promise.resolve({ ok: false, reason: 'Findings review is unavailable.' }))
   })
   .post('/tasks/:id/memory', async (c) => {
     const p = addBody.safeParse(await c.req.json().catch(() => null))

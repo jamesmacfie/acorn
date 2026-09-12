@@ -1,5 +1,5 @@
 // Wire types for the Docker surface (local daemon via the docker CLI), shared between the
-// main-process service (main/) and the renderer (client/) across the HTTP/bridge boundary.
+// node service (server/) and the client (client/) across the HTTP/bridge boundary.
 // Containers carry the standard compose labels; task↔container linking matches
 // `com.docker.compose.project.working_dir` against task worktree paths (docs/plugins.md).
 
@@ -86,7 +86,7 @@ export const dockerPruneKinds: readonly DockerPruneKind[] = ['containers', 'imag
 // Cache scopes, also the payload of the `docker:changed` WS frame.
 export type DockerScope = 'containers' | 'images' | 'volumes' | 'networks'
 
-// Container/image/network refs and compose project names reach argv in the main process, so this
+// Container/image/network refs and compose project names reach argv on the node, so this
 // validates shape and forbids a leading dash to keep a ref from being read as a flag
 // (privileged-boundary contract).
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$/

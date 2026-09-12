@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/plugin-api/node'
+import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
 // workflows.runner: the one method the composition root needs off the runner after init.
 //
@@ -8,6 +8,6 @@ import { capabilityId } from '@acorn/plugin-api/node'
 // `start`, `gate`, and `cancel` await so a run cannot start into the sweep.
 //
 // Lives in contract/ for the same reason as agents.runtime: the composition root reaches it through a
-// declared surface rather than a deep import of main/workflowRunner.ts.
+// declared surface rather than a deep import of server/workflowRunner.ts.
 export type WorkflowsRunnerHandle = { reconcile(): Promise<void> }
 export const WORKFLOWS_RUNNER = capabilityId<WorkflowsRunnerHandle>('workflows.runner')

@@ -1,6 +1,6 @@
 import { isAbsolute, join } from 'node:path'
-import { openDb } from '@acorn/node-core/main/bindings.ts'
-import { createProject } from '@acorn/node-core/main/projects.ts'
+import { openDb } from '@acorn/node-core/server/bindings.ts'
+import { createProject } from '@acorn/node-core/server/projects.ts'
 
 const args = Object.fromEntries(process.argv.slice(2).reduce<string[][]>((pairs, value, index, all) => {
   if (index % 2 === 0) pairs.push([value, all[index + 1] ?? ''])

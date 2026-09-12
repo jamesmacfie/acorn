@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dedupeBranch, normalizeBranchPrefix, slugifyBranch, withBranchPrefix } from './branch'
+import { dedupeBranch, isValidBranch, normalizeBranchPrefix, slugifyBranch, withBranchPrefix } from './branch'
 
 describe('slugifyBranch', () => {
   it('lowercases and strips illegal chars to [a-z0-9/-]', () => {
@@ -20,6 +20,19 @@ describe('slugifyBranch', () => {
   })
   it('returns empty for all-illegal input', () => {
     expect(slugifyBranch('!!!')).toBe('')
+  })
+})
+
+describe('isValidBranch', () => {
+  it('takes a name git takes, including the underscores slugifyBranch would eat', () => {
+    expect(isValidBranch('dependabot/npm_and_yarn/dev-dependencies-0e84c50104')).toBe(true)
+    expect(isValidBranch('release/v1.2.0')).toBe(true)
+  })
+
+  it('refuses a name that is empty, leading-dashed, or spaced', () => {
+    expect(isValidBranch('')).toBe(false)
+    expect(isValidBranch('--force')).toBe(false)
+    expect(isValidBranch('spaced out')).toBe(false)
   })
 })
 

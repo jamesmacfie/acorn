@@ -16,8 +16,8 @@ import type {
 import type { AppEnv } from '../middleware/auth'
 import type { StoredConnection } from './connections'
 import type { ExternalItemStore } from './itemStore'
-import type { Cached, RefreshResult } from '../sync/engine'
-import type { PluginFetchHandler } from '../plugin/types'
+import type { Cached, RefreshResult, RouteResult } from '../sync/engine'
+import type { PluginFetchHandler } from '../pluginHost/types'
 
 export type ProviderCredentials = Record<string, string>
 export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
@@ -82,6 +82,21 @@ export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unk
 export type LinkContextFormatter = {
   summarize(ref: ExternalRef, item: CachedExternalItem | null, state: CacheState): ContextItem
 }
+
+// What core lends a provider so it can answer `issue_detail` (docs/agent-tools.md § issue_detail).
+// One method, and it is the same resource runtime the provider's own routes go through, so the cache,
+// the TTL, the request budget and the credential scope are the ones already in place.
+export type ProviderDetailContext = {
+  resource<TInput, TOutput>(resourceId: string, input: TInput, force?: boolean): Promise<RouteResult<TOutput>>
+}
+
+// One item, in as much depth as the provider can give. The provider composes its own resources rather
+// than declaring a pointer at one, because only it knows how many the answer takes: Linear reads the
+// issue, and Rollbar reads the item, its occurrence list and the newest occurrence.
+//
+// Return null for "not in this connection". Core is calling it once per connected workspace and takes
+// the first that answers, so null is the ordinary case, not a failure.
+export type ProviderItemDetail = (context: ProviderDetailContext, identifier: string) => Promise<unknown | null>
 
 export type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
 export type ReferenceResolver = {
@@ -177,6 +192,9 @@ export type IntegrationProviderContribution = ConnectionProviderContribution & {
   resources: MirroredResourceContribution<any, any>[]
   codec?: CachedItemCodec<any, any, any>
   taskContext?: LinkContextFormatter
+  // The read behind core's `issue_detail` agent tool. Absent means this provider offers summaries
+  // only, and the tool says so rather than guessing at a resource input shape.
+  detail?: ProviderItemDetail
   refs?: ReferenceResolver
   mutations?: ProviderMutation[]
   budgets: ProviderBudgets

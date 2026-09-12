@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { schema } from '../db'
-import { SecretService } from '../../main/core/secrets'
+import { SecretService } from '../core/secrets'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { boundProviderProjects, listConnectionProjects, PROVIDER_PROJECT_LIMITS } from './projectSource'
-import { defaultBudgets, publicConnectionProvider } from './providers/shared'
+import { defaultBudgets, publicConnectionProvider } from './providerShared'
 import { ProviderOperationError, type ProviderProject, type ProviderProjectSource } from './types'
 
 const OWNER = 'project-source-owner'

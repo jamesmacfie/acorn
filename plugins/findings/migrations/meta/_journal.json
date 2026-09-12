@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789163006966,
+      "tag": "0000_normal_hedge_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789164700832,
+      "tag": "0001_modern_triathlon",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789167357173,
+      "tag": "0002_previous_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789167542350,
+      "tag": "0003_long_grandmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789172836471,
+      "tag": "0004_wide_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789173338011,
+      "tag": "0005_sudden_polaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789179636049,
+      "tag": "0006_long_bullseye",
+      "breakpoints": true
+    }
+  ]
+}

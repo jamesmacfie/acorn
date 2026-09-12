@@ -1,0 +1,245 @@
+/* The external-item side panel: right-anchored drawer over a dimmed backdrop, mirroring
+   checks-panel.css. Opened from the PR detail Integrations section, where the referenced item's own
+   plugin renders the body. */
+.integrations-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drawer-menu);
+  background: var(--scrim);
+}
+.integrations-panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: calc(var(--z-drawer-menu) + 1);
+  width: min(620px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: var(--control-border);
+  box-shadow: var(--shadow-drawer-l);
+}
+.integrations-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+}
+/* See docs/ui-design.md § Chrome and overlays for why a ref panel's iframe takes flex: 1 rather
+   than height: 100%. */
+.plugin-ref-panel > iframe {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.integrations-panel-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+/* Ticket switcher when a workspace links several Linear tickets (docs/workspaces-and-tasks.md). */
+.integrations-panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 6px var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+}
+.integrations-panel-tab {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-4);
+  cursor: pointer;
+}
+.integrations-panel-tab:hover { color: var(--text); border-color: var(--border-strong); }
+.integrations-panel-tab.active { color: var(--text); background: var(--bg-selected); border-color: var(--accent); }
+.integrations-panel-link {
+  flex: 1;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.integrations-panel-link:hover {
+  color: var(--accent);
+}
+.integrations-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--pane-pad);
+}
+/* Linear's own panel CSS used to live here, a plugin's feature stylesheet in the shell's, because
+   the panel was a compiled component. Linear is a loaded package now and its frame carries its own
+   layout (plugins/linear/src/frame/linear-frame.css), so all of it went. What stayed is what the
+   shell and other plugins still draw: the overlay above, the inline id link below, and the
+   provider logo tint. */
+
+/* Integrations settings (account menu → Integrations overlay). */
+.integration-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--pane-pad);
+}
+.integration-key-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+.integration-setting-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-5);
+}
+.integration-setting-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Integrations settings: card list + slide-down add panel --- */
+.integrations { display: flex; flex-direction: column; gap: var(--space-7); padding: var(--pane-pad); }
+.integrations-list { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.integration-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  background: var(--bg-subtle);
+  border: var(--surface-border);
+  border-radius: var(--radius);
+}
+
+/* Logo slot, a branded square; carries a real mark (SVG) or a monogram fallback. The square takes its
+   colour from `--brand`, which brandStyle() sets from the mark itself, so adding a provider later is
+   the mark alone and no rule here names it. */
+.integration-logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--brand, var(--bg-hover));
+  color: var(--brand-on, var(--text));
+}
+.integration-logo svg { width: 18px; height: 18px; display: block; }
+.integration-logo-mono { font-weight: 700; font-size: var(--fs-md); line-height: 1; font-family: var(--font-glyph); }
+
+.integration-meta { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
+.integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
+.integration-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
+.integration-badge {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  border: var(--control-bw) solid var(--badge-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) 9px;
+}
+
+/* A connection and its project map read as one unit, so the card and the map share an outer block
+   rather than the map floating as a sibling of the next connection's card. */
+.integration-entry { display: flex; flex-direction: column; gap: var(--space-3); }
+.integration-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  margin-left: var(--space-7);
+  border-left: var(--divider);
+}
+.integration-map-row { display: flex; align-items: center; gap: var(--space-4); }
+/* The external project's own name is the row's subject, so it takes the space and the target follows
+   it. Both truncate rather than wrap: a Linear project name can be a sentence. */
+.integration-map-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-map-target { flex: 1; min-width: 0; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-add-icon { font-size: var(--fs-lg); line-height: 1; transition: transform 0.18s ease; }
+
+/* Provider forms have variable height. The Settings pane owns scrolling; capping this panel
+   clips longer forms and makes their submit button unreachable. */
+.integration-add-panel {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+.integration-add-panel.open { max-height: none; opacity: 1; }
+.integration-add-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  background: var(--bg-subtle);
+  border: var(--surface-border);
+  border-radius: var(--radius);
+}
+.integration-provider-chips { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.integration-add-label { font-size: var(--fs-sm); color: var(--text); }
+.integration-add-hint { font-size: var(--fs-sm); margin: 0; }
+
+/* Device authorization grant (IntegrationsSettings.tsx): the code the owner types at the provider.
+   Big and monospaced because it is read off the screen and typed elsewhere, and its copy button is
+   always visible rather than hover-revealed for the same reason. */
+.integration-device { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+.integration-device-code {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.integration-device-code code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+.integration-device-code .copy-btn { opacity: 1; }
+
+/* Clickable ticket row in the PR detail Integrations list. */
+.integration-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+.integration-row:hover .integration-row-title {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.integration-row-id {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.integration-row-title {
+  flex: 1;
+  min-width: 0; /* allow the title to shrink (ellipsis) so the status pill stays inline, not pushed off-row */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A bare `CRA-404` the host linkified in rendered text, for any provider whose prefix was witnessed in
+   the same surface (registries/contentLinks.ts § REF_LINK_CLASS). */
+.ref-inline-link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.ref-inline-link:hover {
+  text-decoration: underline;
+}
+

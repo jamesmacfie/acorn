@@ -1,4 +1,4 @@
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 import { pruneAudit } from '../audit'
 import { routeCapability } from '../bridge'
 import { compactHistory } from '../dashboards/history'
@@ -16,7 +16,7 @@ export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, 
  *
  *  `register` is here for the plugin context, not for a route. `ctx.schedules.register` resolves the
  *  scheduler through this capability at call time rather than being threaded through initPlugins, the
- *  late binding every other cross-plugin need uses (server/plugin/host.ts). Not `start`, `stop` or the
+ *  late binding every other cross-plugin need uses (server/pluginHost/host.ts). Not `start`, `stop` or the
  *  constructor: the composition root owns the lifetime and nothing else may. */
 export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'confirm' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register'>
 export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')

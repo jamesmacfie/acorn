@@ -10,14 +10,14 @@ import {
   setConnectionDisabled,
   testConnection,
 } from './connections'
-import { publicConnectionProvider } from './providers/shared'
+import { publicConnectionProvider } from './providerShared'
 import { ProviderOperationError } from './types'
-import { SecretService } from '../../main/core/secrets'
+import { SecretService } from '../core/secrets'
 
 // The socket is the boundary worth stubbing: everything above it is the code under test, and a real hub
 // has no connections in a unit test, so a broadcast would be a silent no-op and prove nothing.
 const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
-vi.mock('../../main/wsHub', async (importOriginal) => ({
+vi.mock('../transport/wsHub', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
 }))
@@ -161,6 +161,27 @@ describe('connection-only provider lifecycle', () => {
     await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({ status: 'needs-auth' })
 
     expect(broadcasts).toEqual([{ channel: 'connection:changed', integrationId: connected.id, providerId: PROVIDER_ID, status: 'needs-auth' }])
+  })
+
+  it('announces deletion after cascading connection-owned mappings and task links', async () => {
+    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } }, SECRETS)
+    const now = Date.now()
+    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-one', name: 'One', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.projects).values({ id: 'project-one', name: 'One', path: null, workspaceId: 'workspace-one', sort: 0, hidden: false, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.tasks).values({ id: 'task-one', title: 'One', origin: 'local', projectId: 'project-one', status: 'active', sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.workspaceExternalProjects).values({ workspaceId: 'workspace-one', integrationId: connected.id, externalId: 'remote-one', projectId: '', createdAt: now })
+    await testDb.db.insert(schema.taskLinks).values({ taskId: 'task-one', integrationId: connected.id, provider: PROVIDER_ID, identifier: 'ITEM-1', createdAt: now })
+    broadcasts.length = 0
+
+    await disconnectConnection(testDb.db, 'alice', connected.id)
+
+    expect(await testDb.db.select().from(schema.workspaceExternalProjects)).toEqual([])
+    expect(await testDb.db.select().from(schema.taskLinks)).toEqual([])
+    expect(broadcasts).toEqual([
+      { channel: 'connection:changed', integrationId: connected.id, providerId: PROVIDER_ID, deleted: true },
+      { channel: 'workspace-projects:changed', providerId: PROVIDER_ID, workspaceIds: ['workspace-one'] },
+      { channel: 'tasks:changed', taskId: null },
+    ])
   })
 
   it('serializes concurrent creates when a provider limits connection count', async () => {

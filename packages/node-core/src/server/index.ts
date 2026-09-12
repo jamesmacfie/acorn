@@ -5,27 +5,29 @@ import { idempotency } from './middleware/idempotency'
 import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
-import { audit } from './routes/audit'
+import { audit } from './routes/security/audit'
 import { runs } from './routes/runs'
-import { backup } from './routes/backup'
-import { security } from './routes/security'
+import { backup } from './routes/security/backup'
+import { security } from './routes/security/security'
 import { attachment } from './routes/attachment'
 import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
+import { models } from './routes/models'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
-import { plugins } from './routes/plugins'
+import { plugins } from './routes/plugins/plugins'
 import { dashboards } from './routes/dashboards'
 import { schedules } from './routes/schedules'
-import { harness } from './routes/harness'
-import { agentTools, agentToolsCatalog } from './routes/agentTools'
-import { taskContext } from './routes/taskContext'
-import { projects } from './routes/projects'
-import { workspaces } from './routes/workspaces'
-import { tasks } from './routes/tasks'
-import { configTrust } from './routes/configTrust'
-import { worktree } from './routes/worktree'
-import { dispatchPluginFetch } from './plugin/fetchRoute'
+import { telemetry } from './routes/telemetry'
+import { harness } from './routes/plugins/harness'
+import { agentTools, agentToolsCatalog } from './routes/plugins/agentTools'
+import { taskContext } from './routes/projects/taskContext'
+import { projects } from './routes/projects/projects'
+import { workspaces } from './routes/projects/workspaces'
+import { tasks } from './routes/projects/tasks'
+import { configTrust } from './routes/security/configTrust'
+import { worktree } from './routes/projects/worktree'
+import { dispatchPluginFetch } from './pluginHost/fetchRoute'
 
 // One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v2/core. Every plugin-owned router arrives through the
@@ -113,6 +115,16 @@ export function createApp() {
     // service-scope calls (docs/security.md § Credential handling), never a task-scoped child.
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
+    // Which model backends the owner holds, and which agent CLI is installed here. Device-only: it is a
+    // roster of what this machine can spend, and no task-scoped child has any use for it.
+    .use(`${CORE_NAMESPACE}/models`, requireDevice)
+    .use(`${CORE_NAMESPACE}/models/*`, requireDevice)
+    // Telemetry another runtime collected. Device-only for a different reason from the rest of this
+    // group: it is a write, not a read. Everything admitted here reaches every subscribed sink, and a
+    // sink can post it off the machine, so a task-scoped agent must not be able to put words in one
+    // (docs/telemetry.md § Other runtimes).
+    .use(`${CORE_NAMESPACE}/telemetry`, requireDevice)
+    .use(`${CORE_NAMESPACE}/telemetry/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // /history: the measure series a stat's trend is drawn from
@@ -134,6 +146,8 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/tasks`, agentTools) // /:id/tools + /:id/tools/:name: the agent-tool registry projection (docs/agent-tools.md)
     .route(`${CORE_NAMESPACE}/agent-tools`, agentToolsCatalog) // static tool catalog for the permissions settings page
     .route(`${CORE_NAMESPACE}/integrations`, integrations) // connect/disconnect/status for third-party providers
+    .route(`${CORE_NAMESPACE}/models`, models) // /backends: the connections and installed CLIs a Generate control can spend
+    .route(`${CORE_NAMESPACE}/telemetry`, telemetry) // the batch route every other runtime posts to (docs/telemetry.md)
     // Provider-owned routes projected from the integration registry. Mounted at the plugin namespace
     // root rather than a core one, because the projection already prefixes each router with its
     // provider id (server/integrations/providerRoutes.ts).

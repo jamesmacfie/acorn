@@ -2,6 +2,7 @@ import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
 import { captureStore } from '../server/captures'
 import { browserAgentTools } from '../server/agentTools'
 import { BrowserPool } from '../server/driver'
+import { BROWSER_CAPTURES } from '../contract/captures'
 
 // The browser plugin's node part: an agent's browser, driven by Playwright against an installed
 // Chrome. See docs/agent-tools.md § Browser tools.
@@ -38,6 +39,10 @@ export const browserPlugin = (): NodePlugin => {
 
   return {
     name: 'browser',
+    emits: [
+      { verb: 'captures-changed', description: 'A task’s retained browser-capture collection changed' },
+      { verb: 'capture-created', description: 'A browser capture was created (compatibility event)' },
+    ],
     // This module's own URL. The host resolves the DDL chain from there, the same in a checkout, a
     // packaged app, and a standalone tarball.
     migrationsModule: import.meta.url,
@@ -46,6 +51,7 @@ export const browserPlugin = (): NodePlugin => {
       pool = new BrowserPool(captures.current)
       for (const tool of browserAgentTools(pool)) ctx.tools.register(tool)
       ctx.routes.fetch(serveCapture, { prefix: '/captures', note: '/captures/:captureId' })
+      ctx.capabilities.provide(BROWSER_CAPTURES, { list: (taskId) => captures.current?.list(taskId) ?? Promise.resolve([]) })
     },
     // A browser process outlives every request. Close it on the way down, or a node restart leaves a
     // headless Chrome behind holding its profile directory.

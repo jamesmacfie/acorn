@@ -4,15 +4,18 @@ import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
 import type { PanelSourcePage } from '@acorn/dashboards-core/mapping.ts'
 import { panelMeasure } from '@acorn/dashboards-core/measure.ts'
 import { measureSignature } from '@acorn/dashboards-core/signature.ts'
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 import { readCollection } from '../collections/registry'
 import { type AppDatabase, schema } from '../db'
 import { appendSample, hourBucket } from './history'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('dashboards')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards.md § Sampling and retention for what a pass does.
 
-/** The prefs key the dashboards slice writes under (client-core/persistence/prefKeys.ts § dashboards).
+/** The prefs key the dashboards slice writes under (client-core/infra/persistence/prefKeys.ts § dashboards).
  *  An `app`-scoped slice is stored unqualified, so this is the whole key. It duplicates the client's
  *  own constant, because the client is downstream of the node and cannot be imported here. */
 const DASHBOARDS_PREF_KEY = 'dashboards'
@@ -90,7 +93,7 @@ export async function runSamplePass(
         unavailable = `${query.pluginId} unavailable`
         // One line for the author. The run row gets the short form, because it is a settings list,
         // not a log.
-        console.warn(`[dashboards] ${panel.id} skipped: ${query.pluginId}:${query.collectionId}:`, error)
+        log.warn(`${panel.id} skipped: ${query.pluginId}:${query.collectionId}: ${describeError(error).message}`)
         break
       }
     }

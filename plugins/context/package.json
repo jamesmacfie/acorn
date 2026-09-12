@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-context",
   "version": "0.1.0",
+  "description": "What an agent is told: the task-context snapshot the composer assembles and keys.",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,12 +14,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "solid-js": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

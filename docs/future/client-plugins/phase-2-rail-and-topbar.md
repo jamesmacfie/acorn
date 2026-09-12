@@ -35,7 +35,7 @@ In:
 - `App.tsx` and the shell render `<ExclusiveSlotHost slot="rail" props={...} />` and the same for
   `topbar`, building props from the registries they read today.
 - Rail markers stay data: `RailMarker` is the existing marker description from
-  `registries/railMarkers.ts`, and a provider draws a marker with the kit's `StatusDot`, which is
+  `features/tabs/railMarkers.ts`, and a provider draws a marker with the kit's `StatusDot`, which is
   where the host's colour and spin rules live.
 - The Settings row for a provider that omits a nested slot says "hides the task list" or "hides
   plugin status items" before the user picks it.
@@ -50,7 +50,7 @@ contributed.
 
 ## Design detail
 
-**Sources are data.** `availableSources()` in `tabs/sources.ts` already applies four gates and an
+**Sources are data.** `availableSources()` in `features/tabs/railSources.ts` already applies four gates and an
 order. The host applies them and hands the provider the result, so a rail provider cannot show a
 source the user cannot open. `reorderSources` writes `PrefKeys.railOrder` through the host.
 
@@ -82,17 +82,17 @@ status items."
 
 - `packages/protocol/src/extensionPoints.ts`: the two slots.
 - `packages/protocol/src/chrome.ts` (new): `RailProps`, `TopbarProps`, `SlotRef`.
-- `packages/client-core/src/tabs/TabRail.tsx`: over `RailProps`; registered as `core`.
+- `packages/client-core/src/features/tabs/TabRail.tsx`: over `RailProps`; registered as `core`.
 - `packages/client-core/src/chrome/Topbar.tsx` (new, from `App.tsx`): over `TopbarProps`.
-- `apps/desktop/src/app/client/App.tsx`: builds both props objects; renders two
+- `apps/desktop/src/client/App.tsx`: builds both props objects; renders two
   `ExclusiveSlotHost`s.
-- `packages/client-core/src/registries/exclusiveSlots.ts`: per-slot props typing for the two new
+- `packages/client-core/src/host/registries/extensionPoints/exclusiveSlots.ts`: per-slot props typing for the two new
   slots; nested-slot minting.
-- `packages/client-core/src/plugins/ExclusiveSlotHost.tsx`: fills `SlotRef`s.
-- `packages/client-core/src/registries/slots.ts`: `topbar.right` gains a `SlotRef` path beside its
+- `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx`: fills `SlotRef`s.
+- `packages/client-core/src/host/registries/extensionPoints/slots.ts`: `topbar.right` gains a `SlotRef` path beside its
   `SlotHost`.
-- `packages/client-core/src/settings/PluginsSettings.tsx`: labels; the "hides" warnings.
-- `packages/plugin-api/src/client/index.ts` and the surface snapshot: the two props types.
+- `packages/client-core/src/features/settings/PluginsSettings.tsx`: labels; the "hides" warnings.
+- `packages/plugin-api/src/client.ts` and the surface snapshot: the two props types.
 
 ## Tests
 
@@ -134,11 +134,11 @@ write a selector.
 ## Verify before building
 
 - Phase 1 of this folder has shipped: core is a provider, `ExclusiveSlotHost` has no `core` prop.
-- `packages/client-core/src/tabs/TabRail.tsx` is the `<nav class="tabrail">` with `RailTab` children
+- `packages/client-core/src/features/tabs/TabRail.tsx` is the `<nav class="tabrail">` with `RailTab` children
   and one `ExclusiveSlotHost` for `rail.taskList`.
-- `apps/desktop/src/app/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
+- `apps/desktop/src/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
   project `Picker`, the breadcrumb, the node `Select`, `NodeChip`, and `AccountMenu`.
-- `packages/client-core/src/tabs/sources.ts` exports `availableSources()` with the four gates.
-- `packages/client-core/src/registries/slots.ts` has `UiSlotId` with `topbar.right` hosted and
+- `packages/client-core/src/features/tabs/railSources.ts` exports `availableSources()` with the four gates.
+- `packages/client-core/src/host/registries/extensionPoints/slots.ts` has `UiSlotId` with `topbar.right` hosted and
   `topbar.left` unhosted.
 - Layout phase 4's `Slot` node exists and supports a host-minted ref.

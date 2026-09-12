@@ -2,7 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { stageNodeRuntime, targetTriple } from './nodeRuntime.mjs'
+import { stageNodeRuntime, targetTriple } from './node-runtime.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -30,7 +30,7 @@ cpSync(dist, HELPER, { recursive: true })
 
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
 // Node means node-core walks up from the service module looking for a `migrations` directory, so this
-// is the first place it looks (packages/node-core/src/main/bindings.ts, pluginMigrations.ts).
+// is the first place it looks (packages/node-core/src/server/bindings.ts, server/plugins/migrations.ts).
 rmSync(resolve(HELPER, 'migrations'), { recursive: true, force: true })
 const chains = [{ plugin: null, dir: resolve(ROOT, 'packages/node-core/migrations') }]
 for (const entry of readdirSync(resolve(ROOT, 'plugins'), { withFileTypes: true })) {
@@ -45,7 +45,7 @@ for (const chain of chains) {
 // The bundled Node runtime, as a Tauri external binary: `binaries/node-<target triple>` is the name
 // `bundle.externalBin` resolves, and the triple comes from rustc rather than a guess about how
 // process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
-// developer's own Node no longer has to be the pinned one — see scripts/nodeRuntime.mjs.
+// developer's own Node no longer has to be the pinned one — see scripts/node-runtime.mjs.
 const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
 const triple = targetTriple()
 const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })
@@ -61,23 +61,23 @@ const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })
 // active theme and style axes, not from here.
 //
 // The order is the cascade, so it is the list rather than a directory scan.
-// packages/client-core/src/styles/cssHygiene.test.ts reads this array and checks that what a frame is
+// packages/client-core/src/infra/styles/cssHygiene.test.ts reads this array and checks that what a frame is
 // served covers every class primitives.css styles.
 const FRAME_STYLES = [
-  'styles/base.css',
-  'styles/primitives.css',
-  'styles/overlays.css',
-  'styles/copy.css',
-  'styles/tabs.css',
+  'infra/styles/base.css',
+  'infra/styles/primitives.css',
+  'infra/styles/overlays.css',
+  'infra/styles/copy.css',
+  'infra/styles/tabs.css',
   // The delegated tooltip bubble. A frame mounts its own listener, `mountFrameTips` from
-  // client-core/ui/frameTips.ts, because the shell's singleton cannot see into another document. It
-  // lives apart from ui/tips.tsx so a frame bundle does not pull Solid and the primitives in with it.
-  'ui/tips.css',
-  'styles/topbar.css',
-  'styles/diff.css',
-  'styles/style-modern.css',
-  'styles/style-cozy.css',
-  'styles/style-cute.css',
+  // client-core/kit/lib/frameTips.ts, because the shell's singleton cannot see into another document. It
+  // lives apart from kit/components/overlays/tips.tsx so a frame bundle does not pull Solid and the primitives in with it.
+  'kit/components/overlays/tips.css',
+  'infra/styles/topbar.css',
+  'infra/styles/diff.css',
+  'infra/styles/style-modern.css',
+  'infra/styles/style-cozy.css',
+  'infra/styles/style-cute.css',
 ]
 const frameStyles = FRAME_STYLES.map((rel) => readFileSync(resolve(ROOT, 'packages/client-core/src', rel), 'utf8'))
 mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })

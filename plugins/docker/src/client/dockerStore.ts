@@ -1,6 +1,6 @@
 // Signals-only store for the docker surface: the container list and daemon availability, refreshed on
 // demand and on the `docker:changed` WS edge. Event-driven, with no client polling loop, because the
-// main process's events watcher is the source of truth for freshness. Live daemon state deliberately
+// node's events watcher is the source of truth for freshness. Live daemon state deliberately
 // stays out of the persisted query cache.
 import { createSignal } from 'solid-js'
 import { latestOnly, type ClientScheduleContribution } from '@acorn/plugin-api/client'

@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { PLUGIN_API_MAJOR, parsePluginManifest, type PluginManifestResult } from '../main/pluginManifest'
+import { PLUGIN_API_MAJOR, parsePluginManifest, type PluginManifestResult } from '../server/plugins/manifest'
 
 export const PLUGIN_CONFIG_FILE = 'acorn-plugin.config.mjs'
 

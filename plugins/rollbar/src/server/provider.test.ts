@@ -54,3 +54,39 @@ describe('rollbar provider cache contract', () => {
     expect(merged).toMatchObject({ summary: { title: 'Updated' }, detail, detailFetchedAt: 10, listFetchedAt: 30, schemaVersion: 4 })
   })
 })
+
+// Three resource calls, and the two occurrence ones stay soft: an item whose occurrences cannot be
+// listed is still worth handing an agent (docs/agent-tools.md § issue_detail).
+describe('rollbar item detail', () => {
+  const metadata = { identifier: '142', itemId: '999', title: 'TypeError', level: 'error', environment: 'prod', status: 'active' }
+
+  const context = (answers: Record<string, unknown>) => ({
+    resource: async (resourceId: string) =>
+      resourceId in answers ? { ok: true, value: answers[resourceId] } : { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } },
+  }) as never
+
+  it('composes the item with its newest occurrence', async () => {
+    const detail = await rollbarProvider.detail!(context({
+      'rollbar.items': metadata,
+      'rollbar.item-occurrences': { occurrences: [{ id: 'occ-1' }, { id: 'occ-2' }] },
+      'rollbar.occurrence': { id: 'occ-1', framesText: 'at boom()' },
+    }), '142') as { identifier: string; latestOccurrence: { id: string } | null }
+
+    expect(detail.identifier).toBe('142')
+    expect(detail.latestOccurrence?.id).toBe('occ-1')
+  })
+
+  it('still answers when the occurrence list is unavailable', async () => {
+    const detail = await rollbarProvider.detail!(context({ 'rollbar.items': metadata }), '142') as {
+      identifier: string
+      latestOccurrence: unknown
+    }
+    expect(detail.identifier).toBe('142')
+    expect(detail.latestOccurrence).toBeNull()
+  })
+
+  // Core asks every connected project in turn, so "not here" has to be null rather than a throw.
+  it('returns null for an item this connection does not have', async () => {
+    await expect(rollbarProvider.detail!(context({}), '142')).resolves.toBeNull()
+  })
+})

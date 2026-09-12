@@ -103,7 +103,11 @@ beside the editor in a task, `CollectionContribution` for dashboard rows,
 
 ### Observability, errors, and logs
 
-- Sentry. Issues scoped to a service, a source-mapped stack trace, assign, resolve, link to a task.
+- Sentry, the integration. Issues scoped to a service, a source-mapped stack trace, assign, resolve,
+  link to a task: the Rollbar shape, under the id `sentry`, needing an organisation token. The
+  export half already ships as `sentry-telemetry`, which is a sink rather than an integration and
+  holds only a DSN ([integrations.md](../integrations.md) § Sentry). The two stay separate because
+  they disclose different things.
 - Bugsnag, Honeybadger, Airbrake, Raygun. The rollbar shape again.
 - Datadog. Log search, the APM service map, monitor state, an embedded dashboard, and a latency and
   error-rate row.

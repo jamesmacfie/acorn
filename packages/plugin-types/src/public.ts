@@ -35,6 +35,50 @@
  *  the reader and for the contract test; nothing reads it at runtime because there is no runtime. */
 export type HostOwned<T extends string> = { readonly __hostOwned?: T }
 
+// ── Manifest runtime contributions ───────────────────────────────────────────────────────────────
+
+/** The deliberately small JSON Schema language accepted by `contributions.agentTools`. Remote and
+ * recursive references, combinators and executable validators are not part of this contract. */
+export type PluginToolJsonSchema = {
+  type: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null'
+  description?: string
+  properties?: Record<string, PluginToolJsonSchema>
+  required?: string[]
+  additionalProperties?: boolean
+  items?: PluginToolJsonSchema
+  enum?: unknown[]
+  minLength?: number
+  maxLength?: number
+  minimum?: number
+  maximum?: number
+  minItems?: number
+  maxItems?: number
+}
+
+export type PluginAgentToolDescriptor = {
+  id: string
+  description: string
+  inputSchema: PluginToolJsonSchema
+  risk: 'read' | 'write' | 'execute'
+  scope?: 'task'
+  handler: string
+  requiresSession?: boolean
+  timeoutMs?: number
+  maxOutputBytes?: number
+}
+
+export type PluginContextSectionDescriptor = {
+  id: string
+  label: string
+  scope?: 'task'
+  order: number
+  read: string
+  defaultIncluded?: boolean
+  timeoutMs?: number
+  maxBytes: number
+  maxTokens: number
+}
+
 // ── The two entry points ──────────────────────────────────────────────────────────────────────────
 
 /** The default export of a loaded plugin's node entrypoint. `name` must equal the manifest's `id`. */
@@ -47,22 +91,26 @@ export type NodePlugin = {
   dispose?(): void | Promise<void>
 }
 
-/** Everything the host hands a loaded plugin.
+/** Everything the host hands a loaded plugin, and nothing it does not.
  *
- * This is the loaded tier's projection. A compiled plugin's context has three more members —
- * `routes.register`, `events.channel`, `events.streams` — which cannot survive a message-passing
- * boundary and are permanently first-party (docs/extensibility.md § Two tiers, permanently).
+ * This is the loaded tier's projection. A compiled plugin's context has six more members —
+ * `routes.register`, `tools`, `contextSections`, `providers.model`, `events.channel` and
+ * `events.streams` — each either a live object that cannot survive a message-passing boundary or a
+ * live object that cannot survive the message-passing boundary. Agent tools and context sections
+ * have manifest descriptor types above; they deliberately do not become live `ctx` registries.
+ *
+ * The host's own declaration of this type is
+ * `packages/node-core/src/server/pluginHost/types.ts § NodePluginContext`, and a test holds the two
+ * equal member for member, so this file cannot quietly fall behind.
  *
  * A facet under `core` is present only if the manifest asked for it. Reaching for one it did not
  * declare is an immediate "not a function", which is the intended failure. */
 export type NodePluginContext<Conn = unknown, Items = unknown> = {
   readonly name: string
   routes: PluginRouteRegistry<Conn, Items>
-  tools: PluginToolRegistry
   schedules: PluginScheduleRegistry
   collections: PluginCollectionRegistry
   taskChecks: PluginTaskCheckRegistry
-  contextSections: PluginContextSectionRegistry
   runs: PluginRunRegistry
   audit: PluginAuditRegistry
   extensionPoints: PluginExtensionPointRegistry
@@ -72,6 +120,8 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
   storage: PluginStorage
   core: CoreServices
   events: PluginBroadcast
+  telemetry: PluginTelemetry
+  log: Logger
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────────────────────────
@@ -147,12 +197,6 @@ export type PluginProviderRuntime<Conn = unknown, Items = unknown> = {
 
 // ── The registries ────────────────────────────────────────────────────────────────────────────────
 
-export type PluginToolRegistry = {
-  /** An agent tool. Its `input` is a Zod schema, which is why the contribution is opaque here: this
-   *  package promises no dependencies and Zod is one. */
-  register(tool: HostOwned<'node-core/server/agentTools/registry.AgentToolContribution'>): void
-}
-
 /** Periodic work the node runs, whether or not a client is attached (docs/schedules.md). A loaded
  *  plugin normally declares these in its manifest, which is what puts them in front of the owner at
  *  install; the host registers those through this same seam. Any `setInterval` in plugin code is a
@@ -201,17 +245,15 @@ export type PluginTaskCheck = {
   apply?(task: TaskRef, signal: AbortSignal): Promise<void>
 }
 
-export type PluginContextSectionRegistry = {
-  register(section: HostOwned<'node-core/server/agentTools/contextSections.PluginContextSection'>): void
-}
-
 export type PluginProviderRegistry = {
   integration(
     provider: HostOwned<'node-core/server/integrations/types.IntegrationProviderContribution'>,
     route?: PluginFetchHandler<never, never>,
   ): void
   connection(provider: HostOwned<'node-core/server/integrations/types.ConnectionProviderContribution'>): void
-  model(adapter: HostOwned<'node-core/server/modelProviders/types.ModelProviderAdapter'>): void
+  /** A provider that knows about nodes, and optionally can make and remove them
+   *  (docs/plugins.md § Node providers). */
+  nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
   withConnection<T>(userId: string, providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T | undefined>
 }
 
@@ -304,9 +346,15 @@ export type Extension<T> = {
  * is not an error and not a no-op forever: entries wait, and the owner sees them the moment it opens
  * the point, because init order is not a dependency contract. */
 export type PluginExtensionPointRegistry = {
-  open<T>(point: ExtensionPointId<T>, label: string): void
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  declare<T>(point: ExtensionPointId<T>, label: string): void
+  handle<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
   /** In declared order, ties broken by id. Resolve at call time, never at init. */
+  handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
+  /** @deprecated Renamed to `declare`. Removed in the next major of the plugin API. */
+  open<T>(point: ExtensionPointId<T>, label: string): void
+  /** @deprecated Renamed to `handle`. Removed in the next major of the plugin API. */
+  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  /** @deprecated Renamed to `handlers`. Removed in the next major of the plugin API. */
   entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 
@@ -408,10 +456,25 @@ export type PluginDatabase = HostOwned<'node-core/main/pluginStorage.PluginDatab
 export type PluginBroadcast = {
   /** Confined to your own `plugin:<yourId>:<verb>` namespace. Anything else throws. */
   send(frame: { channel: string } & Record<string, unknown>): void
-  /** The content-free ping the renderer re-pulls on. */
+  /** "Re-read my chrome descriptors": your rail rows, badges, collections and agent context. Scoped to
+   *  your plugin, so it costs nobody else a round trip. */
   status(): void
+  /** "Something under this task's worktree changed": a stage, a commit, a discard, a file written. The
+   *  dirty markers in the rail and footer come from a `git status` sweep, and this is what tells a
+   *  client to take it. `null` when you do not know the task. */
+  worktreeStatus(taskId: string | null): void
   /** "This repo's committed config changed and needs the owner's review." */
   repoConfigTrustNotice(taskId: string): void
+  /** Raise a row in the owner's notification bell.
+   *
+   *  `taskId` is optional: leave it off for something that is about the node rather than one task, such
+   *  as a connection that expired. Clicking the row opens your plugin's own rail source, or the
+   *  Settings page listing your plugin if you contribute no source.
+   *
+   *  Two fields you can pass are ignored for a plugin loaded from disk. `target` is dropped, because
+   *  naming one means naming another plugin's handler and any resource in it. `kind` is dropped, so the
+   *  row draws as a plugin row and stays in the bell instead of reaching the desktop. */
+  notice(notice: PluginNotice): void
   /** Hear a core event, or another plugin's declared verb, on this node, whether or not a client is
    *  attached. The event must be one your manifest named in `permissions.events`. Another plugin's
    *  `plugin:<id>:<verb>` works when that plugin lists the verb in its manifest's `emits`; if it is not
@@ -419,15 +482,31 @@ export type PluginBroadcast = {
   on(event: NodeEventChannel | `plugin:${string}:${string}`, listener: (frame: { channel: string } & Record<string, unknown>) => void): Disposable
 }
 
+/** A bell row you raise with `events.notice`.
+ *
+ * `target` and `kind` are honoured for a plugin compiled into acorn and dropped for one loaded from
+ * disk, which gets its own rail source instead. */
+export type PluginNotice = {
+  taskId?: string
+  title: string
+  detail?: string
+  kind?: string
+  target?: { kind: string; resourceId: string; subresourceId?: string }
+}
+
 /** Core events a node half may subscribe to. Each frame's fields are in `@acorn/protocol/nodeEvents.ts`. */
 export type NodeEventChannel =
   | 'plugins:changed'
   | 'tasks:changed'
+  | 'workspace:changed'
+  | 'workspace-projects:changed'
   | 'connection:changed'
   | 'head:changed'
   | 'run:changed'
   | 'agent-session:changed'
   | 'project:changed'
+  | 'terminal:sessions-changed'
+  | 'worktree:status-changed'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────────
 
@@ -448,6 +527,7 @@ export type CoreServices = {
   prefs: CorePrefService
   identity: CoreIdentityService
   projects: CoreProjectService
+  telemetry: CoreTelemetryService
 }
 
 export type CoreFsService = {
@@ -491,7 +571,7 @@ export type CoreProcService = {
   brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent?: Record<string, string | undefined>): Record<string, string>
   runProcess(spec: ProcSpec): Promise<ProcResult>
   runProcessOrThrow(spec: ProcSpec): Promise<ProcResult>
-  ProcessError: HostOwned<'node-core/main/core/exec/proc.ProcessError'>
+  ProcessError: HostOwned<'node-core/server/core/exec/proc.ProcessError'>
 }
 
 export type ProcSpec = {
@@ -528,7 +608,7 @@ export type ProcResult = {
 
 /** Use-scoped credential access. There is no "read this secret" call on this surface, and there will
  *  not be one: the plaintext is scoped to a callback and scrubbed out of anything thrown from it. */
-export type CoreSecretService = HostOwned<'node-core/main/core/security/secrets.SecretService'> & {
+export type CoreSecretService = HostOwned<'node-core/server/core/security/secrets.SecretService'> & {
   use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T>
   useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null>
   seal(plaintext: string): Promise<string>
@@ -565,7 +645,7 @@ export type CoreTaskService = {
     baseCheckout: string | undefined,
     userId?: string | null,
   ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
-  runConfig(taskId: string): Promise<HostOwned<'node-core/main/core/tasks/service.TaskRunConfig'>>
+  runConfig(taskId: string): Promise<HostOwned<'node-core/server/core/tasks/service.TaskRunConfig'>>
   active(): Promise<TaskRef[]>
   /** Throws when the task or its workspace membership is missing. */
   workspaceId(taskId: string): Promise<string>
@@ -577,7 +657,7 @@ export type CoreTaskService = {
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   /** Ask core to create a task rather than writing core-owned rows. The worktree is not created here. */
-  createChild(parentTaskId: string, seed: ChildTaskSeed): Promise<string>
+  createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>
   cancel(taskId: string): Promise<void>
 }
 
@@ -606,6 +686,9 @@ export type CoreProjectService = {
   byId(id: string): Promise<ProjectRef | null>
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
   checkouts(): Promise<{ id: string; path: string }[]>
+  /** Every project of one workspace, keeping the ones with no folder on disk. Not granted by
+   *  `projects:read` today: no loaded plugin has asked for it. */
+  byWorkspace(workspaceId: string): Promise<ProjectRef[]>
   /** Scoped to the provider ids the host registered for your plugin, so another provider's connection
    *  never crosses this boundary. `projectId` is `''` when the link covers the whole workspace. */
   externalProjects(
@@ -629,11 +712,17 @@ export type CoreContextService = {
 /** Text generation through a stored model-provider connection. You own the prompt; core owns
  *  credential resolution and the provider adapters. */
 export type CoreModelService = {
+  /** One turn of the backend the request names: a stored API key spent over HTTP, or one run of an
+   *  agent CLI installed on this machine with its tools off. The grant does not decide which; the
+   *  person who picked from the dropdown does, and your route passes their `backendId` through. */
   generateText(
-    request: HostOwned<'node-core/main/core/models/text.GenerateTextRequest'>,
+    request: HostOwned<'node-core/server/core/models.GenerateTextRequest'>,
   ): Promise<HostOwned<'node-core/server/modelProviders/types.GenerateTextResult'>>
-  /** Which connections this owner could generate with: ids and labels only. */
-  available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.AvailableModelConnection'>>>
+  /** Which backends this owner could generate with — a stored API key, or an agent CLI installed on
+   *  this machine — as ids and labels only. Connections come first, so a plugin that falls back to
+   *  `[0]` keeps spending the key the owner configured. The grant does not decide which backend runs;
+   *  the person picking from the dropdown does. */
+  available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.ModelBackend'>>>
 }
 
 /** One `(userId, key)` row. A loaded plugin's reads and writes are confined to `plugin:<yourId>:*`,
@@ -649,17 +738,150 @@ export type CoreIdentityService = {
   active(): string | null
 }
 
+/** One attachment on an agent turn, as `agents.draftAttachments` describes it.
+ *
+ * Written out rather than aliased to `HostOwned`, unlike most of the shapes another plugin's contract
+ * owns. The whole point of that capability is that a plugin outside this repository can use it, and an
+ * opaque brand would leave such a plugin casting the return value of every call. Six fields of plain
+ * data, and no path: where the bytes live is never something a consumer learns. */
+export type DraftAttachment = {
+  id: string
+  taskId: string
+  filename: string
+  /** What the bytes are, decided by the agents store from magic bytes rather than from what anyone
+   *  claimed on the way in. */
+  mediaType: string
+  byteSize: number
+  createdAt: number
+}
+
+/** Read one unsent image attachment of a task, and store an altered copy of it
+ *  (docs/managed-agents.md § Draft attachments).
+ *
+ * Two methods, and what is absent is the design. Neither replaces the draft nor deletes the source: the
+ * unsent draft is an array in the agent composer's client state, the node cannot transact with it, and
+ * deleting a source before the client has committed would lose the reader's only valid attachment. You
+ * produce a candidate; the composer commits it when your tree asks, through the `agents:attachment`
+ * point's declared `replace` action. */
+export type DraftAttachmentsCapability = {
+  /** One PNG or JPEG of this task that no turn has claimed, with its content.
+   *
+   * `null` covers every refusal — another task's, deleted, already sent, never existed — because
+   * saying which would answer questions about rows you may not see. */
+  read(input: { taskId: string; attachmentId: string }): Promise<{
+    attachment: DraftAttachment
+    bytes: Uint8Array
+  } | null>
+  /** Store an altered copy as a new attachment.
+   *
+   * Always a new row; stored bytes are never edited in place. The source is rechecked immediately
+   * before the write, so an attachment sent while your editor was open cannot be replaced after the
+   * fact. Magic bytes decide the media type whatever you claimed, the filename is normalized, and the
+   * store's own size ceiling holds.
+   *
+   * Storage is content addressed, so bytes identical to something this task already holds come back as
+   * that attachment. Re-applying an edit that changed nothing therefore returns the source itself, and
+   * a caller treats that as "no change" rather than as a replacement. */
+  createReplacement(input: {
+    taskId: string
+    sourceAttachmentId: string
+    filename: string
+    mediaType: 'image/png' | 'image/jpeg'
+    bytes: Uint8Array
+  }): Promise<DraftAttachment>
+}
+
+// ── Telemetry and logging ─────────────────────────────────────────────────────────────────────────
+
+/** What one record can carry beside its name: scalars, and nothing else.
+ *
+ * An object here would be a place for a request body to hide, and the rule is the audit trail's:
+ * a record that quotes what it saw is a second copy of the thing. Keys are dotted and lowercase,
+ * at most 64 characters; a string value is cut at 512; a record keeps at most 32 of them. */
+export type TelemetryAttrs = Record<string, string | number | boolean | null>
+
+/** A span you opened, for work whose start and end do not fit one closure. `end` is idempotent. */
+export type TelemetrySpanHandle = {
+  readonly traceId: string
+  readonly spanId: string
+  end(status?: 'ok' | 'error', attrs?: TelemetryAttrs): void
+}
+
+export type TelemetryErrorInput = {
+  name: string
+  /** Scrubbed by the host: control characters out, the owner's home directory and the data root
+   *  collapsed, credential-shaped runs replaced, and capped at 2,000 characters. */
+  message?: string
+  stack?: string
+  level?: 'error' | 'fatal'
+  /** `true` when you caught it and carried on, which is the usual case for a plugin. */
+  handled?: boolean
+  attrs?: TelemetryAttrs
+  traceId?: string
+  spanId?: string
+}
+
+/** Measure your own work (docs/plugin-authoring.md § Telemetry and logging).
+ *
+ * Every verb is stamped with your plugin id by the host, which is why there is no owner argument
+ * and why an `owner` attribute you set is dropped. Every verb is a no-op when the owner has
+ * telemetry off, and every verb is wrapped so that a full buffer or a throwing sink cannot reach
+ * your code.
+ *
+ * Nothing here needs a permission. Measuring your own work reads nobody else's; reading the stream
+ * is `core.telemetry` and that one is a token. */
+export type PluginTelemetry = {
+  /** Something happened, with no duration. */
+  event(name: string, attrs?: TelemetryAttrs): void
+  count(name: string, value?: number, attrs?: TelemetryAttrs): void
+  gauge(name: string, value: number, attrs?: TelemetryAttrs): void
+  error(error: TelemetryErrorInput): void
+  /** Times one call and hands back its own result untouched. Promise-aware, and timed to
+   *  settlement rather than to the call that started it. */
+  measure<T>(name: string, run: () => T, attrs?: TelemetryAttrs): T
+  startSpan(name: string, options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string }): TelemetrySpanHandle
+}
+
+/** A stderr line prefixed with your plugin id, and a log record with the owner bound when the owner
+ *  has telemetry on. Attributes are scalars; an object is refused at the type level. */
+export type Logger = {
+  debug(message: string, attrs?: TelemetryAttrs): void
+  info(message: string, attrs?: TelemetryAttrs): void
+  warn(message: string, attrs?: TelemetryAttrs): void
+  error(message: string, attrs?: TelemetryAttrs): void
+}
+
+/** Read this node's telemetry, behind the `telemetry` token in `permissions.node.core`.
+ *
+ * A sink sees everything from every owner, which is why it is a token and why the trust prompt
+ * draws it high. Return quickly: the collector calls sinks on a timer, awaits none of them and
+ * contains a throw, so buffering, retry and sampling are yours. */
+export type CoreTelemetryService = {
+  /** Node consent, refreshed within five seconds. Check before retrying queued exports. */
+  enabled(): boolean
+  onBatch(sink: (batch: TelemetryBatch) => void): Disposable
+}
+
+/** One flush window's worth of records. `node` and `version` are on the batch rather than on every
+ *  record, so a fleet with several nodes reads apart. The record shapes are in
+ *  `@acorn/protocol/telemetry.ts`, which a loaded plugin cannot import, so they are opaque here. */
+export type TelemetryBatch = {
+  node: string
+  version: string
+  records: readonly HostOwned<'protocol/telemetry.TelemetryRecord'>[]
+}
+
 // ── The capability id catalogue ───────────────────────────────────────────────────────────────────
 
 /** Every capability the first-party plugins publish, with its signature.
  *
- * Eleven of these are declared in `plugins/*​/src/contract/` modules a loaded plugin cannot import,
+ * These are declared in `plugins/*​/src/contract/` modules a loaded plugin cannot import,
  * which is why the catalogue is here. Consuming one means naming its id in
  * `permissions.node.capabilities` and resolving it at call time, never at init: plugin init order is
  * undefined, and the providing plugin may be disabled, in which case `get` returns undefined and you
  * degrade around it.
  *
- * A map rather than fourteen exported constants, because this package has no runtime: an `import
+ * A map rather than exported constants, because this package has no runtime: an `import
  * { NOTES_STORE }` that resolved to nothing at run time would be a worse trap than a cast. Write the
  * one line the cast needs and keep it beside your other ids:
  *
@@ -672,6 +894,15 @@ export type CapabilityCatalogue = {
   'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
   /** Ask the agent runtime to reconcile after a restart. */
   'agents.runtime': { reconcile(): Promise<void> }
+  /** Read durable turn lifecycle state within one task, without prompt or transcript content. */
+  'agents.turns': HostOwned<'plugins/agents/contract/lifecycle.AgentTurnsCapability'>
+  /** Rebuild one task's agent input-request inbox. */
+  'agents.requests': HostOwned<'plugins/agents/contract/lifecycle.AgentRequestsCapability'>
+  /** Rebuild one task's active and archived managed-session roster. */
+  'agents.sessions': HostOwned<'plugins/agents/contract/lifecycle.AgentSessionsCapability'>
+  /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
+   *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
+  'agents.draftAttachments': DraftAttachmentsCapability
   /** The host-declared slot whichever plugin owns agent sessions fills. */
   'agents.harnessRegistry': HostOwned<'node-core/server/plugin/harnesses.HarnessRegistry'>
   /** The host-declared hook fired when a task's worktree first exists. */
@@ -688,15 +919,23 @@ export type CapabilityCatalogue = {
   'notes.seedTask': HostOwned<'plugins/notes/contract/store.SeedTaskNotes'>
   /** The memory index and its launch-context hooks. */
   'memory.knowledge': HostOwned<'plugins/memory/contract/knowledge.MemoryLaunchHooks'>
+  /** Read the project or private memory library without exposing file paths or recall bookkeeping. */
+  'memory.library': HostOwned<'plugins/memory/contract/library.MemoryLibraryCapability'>
+  /** Read ordered metadata for one task's retained browser captures. */
+  'browser.captures': HostOwned<'plugins/browser/contract/captures.BrowserCapturesCapability'>
   /** The mirrored GitHub read model for a project. */
   'github.mirror': HostOwned<'plugins/github/contract/mirror.GithubMirrorCapability'>
   /** The page rules that decide what a task's preview pane shows. */
   'preview.rules': HostOwned<'plugins/preview/contract/rules.PreviewRulesCapability'>
+  /** Read the node-owned preview home selected from recipe, run target, or project config. */
+  'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
   /** Ask the workflow runner to reconcile after a restart. */
   'workflows.runner': { reconcile(): Promise<void> }
-  /** The renderer's notification bell and the per-step event stream. */
+  /** Rebuild a task's pending workflow approval inbox. */
+  'workflows.gates': HostOwned<'plugins/workflows/contract/events.WorkflowGatesCapability'>
+  /** The per-step event stream behind the run panel. For a bell row, use `events.notice`, which is
+   *  core's and works with workflows disabled. */
   'workflows.notices': {
-    notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
     stepEvent(runId: string, stepId: string, event: unknown): void
   }
 }

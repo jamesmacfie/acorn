@@ -2,7 +2,7 @@
 
 Design notes for constraining what an agent can reach when it runs inside a task. Nothing here is
 scheduled. This records the analysis so a future project starts from conclusions instead of
-re-deriving them, in the manner of [docs/future/events.md](../events.md) and
+re-deriving them, in the manner of [the event contract](../../plugins/forward-compatibility.md) and
 [docs/future/ecosystem/](../ecosystem/README.md).
 
 Two questions started this folder, and they turn out to be different problems with different answers.

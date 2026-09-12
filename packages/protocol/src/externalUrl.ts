@@ -4,7 +4,7 @@
 // packages that can't import each other, and one would eventually gain an exception the other didn't.
 //
 // `https` and nothing else, narrower than the shell's own external-URL allowlist
-// (node-core/main/urlGuards.ts, which also permits `http` and `mailto` because a GitHub body or a Linear
+// (node-core/server/urlGuards.ts, which also permits `http` and `mailto` because a GitHub body or a Linear
 // ticket legitimately contains both). That list decides what a person's click may reach; this one
 // decides what plugin code may hand the machine unprompted. Anything else is a downgrade or a scheme
 // handler, meaning an arbitrary application launch. `app-plugin://`, the frame's own origin, is refused

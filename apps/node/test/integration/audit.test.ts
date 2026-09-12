@@ -4,9 +4,9 @@ import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
 import { setRouteTestCapability } from '@acorn/node-core/server/bridge.ts'
-import { PLUGIN_STATE } from '@acorn/node-core/server/plugin/pluginState.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const ENC_KEY = '0'.repeat(64)
 

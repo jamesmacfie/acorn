@@ -4,7 +4,7 @@ import type { SearchResult } from '../../shared/search'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { search, setSearchBridge, type SearchOpts } from './search'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Route-test convention for a bridge-backed domain: fake the bridge (no real ripgrep),
 // mount the router, and exercise auth + body validation + the bridge-unavailable 503. The rg

@@ -3,15 +3,20 @@ import { assembleContext, parseInclude } from './contextSections.ts'
 import { pluginAuthoringTool } from './pluginAuthoring.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
+import { issueDetailTool } from './issueDetail.ts'
 import type { AppDatabase } from '../db/index.ts'
-import { broadcastPluginApprovalNotice } from '../../main/notify.ts'
-import { loadTask, projectForTask } from '../../main/taskWorktree.ts'
+import type { SecretService } from '../core/secrets.ts'
+import { broadcastPluginApprovalNotice } from '../notify.ts'
+import { loadTask, projectForTask } from '../worktrees/taskWorktree.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
 const OWNER = 'core'
 
 export type AgentToolsDeps = {
   db: AppDatabase
+  // Only `issue_detail` needs it, and only to hand a provider's own read the credential scope core
+  // already uses for the same resource on a route (./issueDetail.ts).
+  secrets: SecretService
 }
 
 async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<string>) {
@@ -96,6 +101,8 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     // The only tool that can put third-party code on this node, by asking rather than installing
     // (docs/agent-tools.md § plugin_request).
     pluginRequestTool(broadcastPluginApprovalNotice),
+    // The one read that leaves this node: a ticket or an error, from the tracker that owns it.
+    issueDetailTool(deps),
   ]
 }
 

@@ -13,7 +13,7 @@ export type DockerStatsSample = {
   pids: number
 }
 
-// Renderer to node. Refs are shape-validated at the handler (main/wsChannel.ts) before they reach argv.
+// Client to node. Refs are shape-validated at the handler (server/wsChannel.ts) before they reach argv.
 export type DockerClientFrame =
   | { channel: 'docker:logs:attach'; id: string }
   | { channel: 'docker:logs:detach'; id: string }
@@ -24,7 +24,7 @@ export type DockerClientFrame =
   | { channel: 'docker:exec:resize'; execId: string; cols: number; rows: number }
   | { channel: 'docker:exec:kill'; execId: string }
 
-// Node to renderer. `docker:changed` is the cache-dirty ping; its scopes are containers, images, volumes
+// Node to client. `docker:changed` is the cache-dirty ping; its scopes are containers, images, volumes
 // and networks.
 export type DockerServerFrame =
   | { channel: 'docker:changed'; scopes: string[] }

@@ -8,9 +8,9 @@
 // away in the background left the row looking idle.
 import { agentSessionsFor, type RailMarker, type RailMarkerContribution } from '@acorn/plugin-api/client'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { isActiveAgent, needsAttention } from './agentActivity'
-import { managedAgentStore } from './managedStore'
-import { runtimeIcon } from './stateTone'
+import { isActiveAgent, needsAttention } from './sessions/agentActivity'
+import { managedAgentStore } from './sessions/managedStore'
+import { runtimeIcon } from './sessions/stateTone'
 
 export type AgentRailState = { working: number; attention: number }
 

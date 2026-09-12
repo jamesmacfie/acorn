@@ -21,12 +21,12 @@ export {
   solidTree, KIT_NODE_COMPONENTS,
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
-  SectionHeader, TabPanel, ToolbarSpacer, Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
-  ChipRow, StatusDot, Facts, DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
+  SectionHeader, TabPanel, ToolbarSpacer, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
+  ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
   DiffLine, FileHead,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, CopyButton, ModelConnectionPicker, Only, Fallback,
+  KeyValueEditor, FindBar, Field, CopyButton, ModelBackendPicker, Only, Fallback,
 } from '@acorn/plugin-api/ui/tree'
 export type { KitNodeProps } from '@acorn/plugin-api/ui/tree'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write

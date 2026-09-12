@@ -59,7 +59,7 @@ export const createAgentSessionSchema = z.object({
   providerId: z.string().min(1).max(100),
   profileId: z.string().min(1).max(100),
   title: z.string().trim().min(1).max(500).optional(),
-  kind: z.enum(['interactive', 'workflow', 'imported']).default('interactive'),
+  kind: z.enum(['interactive', 'workflow', 'delegated', 'imported']).default('interactive'),
   resumeProviderSessionRef: z.string().min(1).max(2_000).optional(),
   parentSessionId: z.string().uuid().optional(),
   parentTurnId: z.string().uuid().optional(),
@@ -76,7 +76,7 @@ export const importAgentTranscriptSchema = z.object({
 
 export const enqueueAgentTurnSchema = z.object({
   input: z.array(agentInputPartSchema).min(1).max(32),
-  source: z.enum(['interactive', 'workflow', 'automation', 'import']).default('interactive'),
+  source: z.enum(['interactive', 'workflow', 'delegation', 'automation', 'import']).default('interactive'),
   effectivePolicy: z.record(z.string(), z.unknown()).default({}),
   idempotencyKey: z.string().min(8).max(200),
 })

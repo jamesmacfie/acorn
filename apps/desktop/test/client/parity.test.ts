@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
-import { THEMES } from '@acorn/client-core/settings/themes.ts'
-import { STYLES } from '@acorn/client-core/settings/uiStyles.ts'
-import { coreSourceContributions } from '../../src/app/client/sourceContributions'
-import { clientPlugins } from '../../src/app/client/plugins'
+import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { THEMES } from '@acorn/client-core/features/settings/builtInThemes.ts'
+import { STYLES } from '@acorn/client-core/features/settings/uiStyles.ts'
+import { coreSourceContributions } from '../../src/client/sourceContributions'
+import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
 
 initClientPlugins(clientPlugins)
@@ -36,7 +36,7 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // No `database` pane at 70 either, for a different reason: it left the compiled graph entirely. It is
 // a loaded package whose pane is a `document-over-frame` layout (the host draws the SQL editor, the
 // plugin's frame draws the grid), so it reaches the registry through the manifest adapter in
-// client-core/plugins/frames/register.ts. ⌘⏎ went with it, as a surface-scoped keybinding.
+// client-core/host/frames/register.ts. ⌘⏎ went with it, as a surface-scoped keybinding.
 //
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse
 // sources remain optional contributions.
@@ -127,9 +127,9 @@ const sourceOf = (relative: string): string =>
     .replace(/(^|\s)\/\/[^\n]*/g, '$1')
 
 describe('docs/ui-design.md § Parity — the shell chords', () => {
-  const tabRail = sourceOf('../../../../packages/client-core/src/tabs/TabRail.tsx')
-  const taskView = sourceOf('../../src/app/client/TaskView.tsx')
-  const app = sourceOf('../../src/app/client/App.tsx')
+  const tabRail = sourceOf('../../../../packages/client-core/src/features/tabs/TabRail.tsx')
+  const taskView = sourceOf('../../src/client/TaskView.tsx')
+  const app = sourceOf('../../src/client/App.tsx')
 
   it('binds ⌘⇧T to the terminal drawer and ⌘⇧N to a new task', () => {
     expect(taskView).toContain("'meta+shift+t'")
@@ -153,5 +153,15 @@ describe('docs/ui-design.md § Parity — the shell chords', () => {
     // cannot leave a stale copy in the shell. If this line ever stops being how TaskView binds them,
     // the ledger above stops covering what the app actually does.
     expect(taskView).toContain('pane.defaultChord')
+  })
+
+  it('holds a non-null task row until the task view has disposed', () => {
+    // Archiving removes the row from the live query before Solid has finished disposing TaskView.
+    // Its command matchers remain callable during that teardown, so the view reads a memo that keeps
+    // the last row. It stays keyed by id so an ordinary metadata refresh does not remount every pane.
+    expect(app).toContain('activeTask() ?? previous ?? null')
+    expect(app).toContain('<Show keyed when={activeTaskId()}>')
+    expect(app).toContain('task={taskForView()!}')
+    expect(app).not.toContain('task={activeTask()!}')
   })
 })

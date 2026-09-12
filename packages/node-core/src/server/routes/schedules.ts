@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { cadenceSchema, type ScheduleTargetOption, type ScheduleTargetsResponse } from '@acorn/protocol/schedules.ts'
-import { nodeActions, riskOf } from '../nodeActions/registry'
+import { nodeActions, riskOf } from '../nodeActions'
 import { viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
