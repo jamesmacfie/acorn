@@ -31,7 +31,9 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
+| [session_name.md](./session_name.md) | Generated managed-session titles after the first accepted prompt, with user rename precedence and semantic lifecycle events. | Proposal, 2026-09-12. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
+| [web_search_run.md](./web_search_run.md) | Provider-neutral web searches, page actions, and result details in managed-run transcripts, verified against Codex and Claude Code. | Proposal, 2026-09-12. Not started. |
 
 ## How these relate
 
