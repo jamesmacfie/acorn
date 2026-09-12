@@ -75,6 +75,7 @@
       "agents.managedRoute",
       "agents.runtime",
       "agents.sessionExecute",
+      "agents.sessions",
       "agents.usageRoute",
       "changes.localGit",
       "core.scheduler",

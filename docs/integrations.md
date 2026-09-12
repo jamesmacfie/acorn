@@ -193,6 +193,14 @@ unbudgeted proxy to whatever the caller asked for. Each connection provider regi
 matching model adapter, and the model registry refuses an adapter naming a connection provider that
 has not registered yet, or one that has not declared `textGeneration`.
 
+`CoreServices.models.generateText` also accepts an internal `harness:<profileId>` backend for
+contained one-shot work such as managed-session naming. This is not a synthesized connection and does
+not spend the first available API credential. It resolves the registered profile's `aiArgv`, disables
+tools through that profile, runs the CLI with its own authenticated account in an empty temporary
+directory, and carries no Acorn API URL or token into the child. Profiles without `aiArgv`, including
+Aider, are unavailable for this path. Harness calls share the provider request scheduler and the same
+input and timeout bounds as connection-backed calls.
+
 ## Provider boundaries
 
 Provider credentials are read through named plugin accessors and CoreServices. The owning provider

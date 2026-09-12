@@ -1,10 +1,14 @@
-import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
-import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
+import {
+  availableModelConnections,
+  HARNESS_BACKEND_PREFIX,
+  type AvailableModelConnection,
+} from '@acorn/protocol/modelProviders.ts'
 import type { SecretService } from '../security/secrets'
 import type { AppDatabase } from '../../../server/db'
 import { connectionSummary, listConnections } from '../../../server/integrations/connections'
 import { connectionProviderRegistry } from '../../../server/integrations/connectionRegistry'
 import { generateTextForConnection, type GenerateTextForConnectionArgs } from '../../../server/modelProviders/runtime'
+import { generateTextForHarness } from '../../../server/modelProviders/harnessRuntime'
 import type { GenerateTextResult } from '../../../server/modelProviders/types'
 
 // Everything except the two bindings core supplies for itself.
@@ -26,7 +30,13 @@ export type ModelService = {
 
 export function createModelService(db: AppDatabase, secrets: SecretService): ModelService {
   return {
-    generateText: (request) => generateTextForConnection({ ...request, db, secrets }),
+    generateText: (request) => request.connectionId.startsWith(HARNESS_BACKEND_PREFIX)
+      ? generateTextForHarness({
+          profileId: request.connectionId.slice(HARNESS_BACKEND_PREFIX.length),
+          input: request.input,
+          ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+        })
+      : generateTextForConnection({ ...request, db, secrets }),
     available: async (userId) => {
       const rows = await listConnections(db, userId)
       // The projection `/v2/core/integrations` serves, called rather than restated so a plugin's

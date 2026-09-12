@@ -50,7 +50,9 @@ event socket.
 
 The Agent pane and Agent Center manage structured Claude and Codex sessions: durable normalized event
 ledgers, queued turns, permission/question requests, attachments, artifacts, usage, search, archive,
-fork, compact, import, and terminal handoff. Aider is available through its terminal profile.
+fork, compact, import, terminal handoff, and short generated titles after the first accepted prompt.
+Aider is available through its terminal profile and keeps the deterministic prompt fallback because
+its profile has no contained one-shot mode.
 
 ## Integrations and model providers
 

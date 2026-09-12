@@ -19,8 +19,11 @@ import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
 import { AgentWebhookService, webhookEventKind } from './webhookService'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentLifecycleFrame } from '../contract/lifecycle'
 
-type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
+type PublishedFrame = AgentWsFrame
+  | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
+  | AgentLifecycleFrame
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
 import { defaultAgentConcurrency } from '../shared/concurrency'
@@ -125,7 +128,7 @@ export class ManagedAgentEngine {
     this.terminalHandoffRunning = options.terminalHandoffRunning
     this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
-    this.store = new AgentStore(options.db, options.core)
+    this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
     // The redaction list grows as sessions start, rather than being computed once, because each session

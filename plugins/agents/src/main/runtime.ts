@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { HARNESS_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
+import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import type {
   AgentConfigOption,
   AgentDeleteResult,
@@ -28,6 +30,20 @@ import {
   type AgentRuntimeOptions,
   type WaitCondition,
 } from './runtimeEngine'
+import {
+  buildSessionTitlePrompt,
+  generationText,
+  isSessionTitlePromptEligible,
+  normalizeGeneratedSessionTitle,
+  SESSION_TITLE_SYSTEM_PROMPT,
+} from './sessionTitle'
+
+const SESSION_TITLE_TIMEOUT_MS = 5_000
+
+type SessionTitleOperation = {
+  controller: AbortController
+  promise: Promise<void>
+}
 
 /**
  * Product-facing managed-agent commands. Provider process supervision, ordered event durability,
@@ -56,6 +72,7 @@ const withPromptText = (parts: EnqueueAgentTurnInput['input'], text: string): En
 
 export class ManagedAgentRuntime extends ManagedAgentEngine {
   private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
+  private readonly sessionTitleOperations = new Map<string, SessionTitleOperation>()
 
   async createSession(
     input: CreateAgentSessionInput,
@@ -145,6 +162,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   override async stop(): Promise<void> {
+    for (const operation of this.sessionTitleOperations.values()) {
+      operation.controller.abort(new Error('runtime_stop'))
+    }
+    await Promise.allSettled([...this.sessionTitleOperations.values()].map((operation) => operation.promise))
     await super.stop()
     // Provider start is now allowed to outlive its HTTP request, but never the plugin database it may
     // still update. super.stop() stops/awaits each live start; this joins the policy continuation too.
@@ -233,7 +254,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       message: 'Imported transcript. History is read-only until its provider session reference is explicitly verified.',
     })
     for (const imported of parsed.turns) {
-      const turn = await this.store.enqueueTurn(session.id, {
+      const { turn } = await this.store.enqueueTurn(session.id, {
         input: [{ type: 'text', text: imported.user }],
         source: 'import',
         effectivePolicy: { imported: true },
@@ -327,7 +348,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
             value: typeof option.currentValue === 'string' ? option.currentValue : null,
           }]
         : [])
-    const turn = await this.store.enqueueTurn(sessionId, {
+    const outcome = await this.store.enqueueTurn(sessionId, {
       ...enqueued,
       effectivePolicy: {
         ...enqueued.effectivePolicy,
@@ -336,6 +357,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         capturedAt: Date.now(),
       },
     })
+    const { turn } = outcome
+    if (outcome.sessionAfterRename) {
+      this.emit({ channel: 'agent:session', session: outcome.sessionAfterRename })
+    }
     if (session.runtimeState === 'failed' || session.runtimeState === 'stopped') {
       await this.stopLive(session.id)
     }
@@ -346,7 +371,99 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     void this.ensureSession(session)
       .then(() => this.pump())
       .catch(() => undefined)
+    if (
+      outcome.inserted
+      && turn.ordinal === 0
+      && turn.source === 'interactive'
+      && outcome.firstTurnFallback
+    ) {
+      this.startSessionTitleGeneration(session, enqueued.input, outcome.firstTurnFallback)
+    }
     return turn
+  }
+
+  private startSessionTitleGeneration(
+    session: AgentSession,
+    parts: EnqueueAgentTurnInput['input'],
+    fallback: string,
+  ): void {
+    if (this.sessionTitleOperations.has(session.id)) return
+    const text = generationText(parts)
+    const userId = this.currentUserId()
+    const profile = agentProfileRegistry.get(session.profileId)
+    if (!isSessionTitlePromptEligible(text) || !userId || !profile?.aiArgv) {
+      if (profile) this.logSessionTitle(session.profileId, profile.aiArgv ? 'skipped' : 'unavailable', 0, text.length)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(new Error('session_title_timeout')), SESSION_TITLE_TIMEOUT_MS)
+    const promise = this.generateSessionTitle(session, userId, text, fallback, controller)
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(timeout)
+        this.sessionTitleOperations.delete(session.id)
+      })
+    this.sessionTitleOperations.set(session.id, { controller, promise })
+  }
+
+  private async generateSessionTitle(
+    session: AgentSession,
+    userId: string,
+    text: string,
+    fallback: string,
+    controller: AbortController,
+  ): Promise<void> {
+    const startedAt = Date.now()
+    let outcome: 'generated' | 'timeout' | 'unavailable' | 'invalid' | 'superseded' | 'aborted' = 'unavailable'
+    try {
+      const generated = await this.core.models.generateText({
+        userId,
+        connectionId: `${HARNESS_BACKEND_PREFIX}${session.profileId}`,
+        input: {
+          system: SESSION_TITLE_SYSTEM_PROMPT,
+          prompt: buildSessionTitlePrompt(text),
+          maxOutputTokens: 64,
+          signal: controller.signal,
+        },
+        timeoutMs: SESSION_TITLE_TIMEOUT_MS,
+      })
+      if (controller.signal.aborted) {
+        outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
+        return
+      }
+      const title = normalizeGeneratedSessionTitle(generated.text, fallback)
+      if (!title) {
+        outcome = 'invalid'
+        return
+      }
+      const renamed = await this.store.renameSession(session.id, {
+        title,
+        expectedTitle: fallback,
+        source: 'generated',
+      })
+      if (!renamed.changed) {
+        outcome = 'superseded'
+        return
+      }
+      this.emit({ channel: 'agent:session', session: renamed.session })
+      outcome = 'generated'
+    } catch {
+      if (controller.signal.aborted) {
+        outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
+      }
+    } finally {
+      this.logSessionTitle(session.profileId, outcome, Date.now() - startedAt, text.length)
+    }
+  }
+
+  private logSessionTitle(
+    profileId: string,
+    outcome: 'generated' | 'skipped' | 'timeout' | 'unavailable' | 'invalid' | 'superseded' | 'aborted',
+    durationMs: number,
+    promptChars: number,
+  ): void {
+    console.info('[agents.session-title.generate]', { profileId, outcome, durationMs, promptChars })
   }
 
   // For a change outside a turn that widens what the dispatcher may start, the concurrency ceilings
@@ -562,6 +679,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         detail = error instanceof Error ? error.message : 'Provider-side deletion failed.'
       }
     }
+    const titleOperation = this.sessionTitleOperations.get(sessionId)
+    titleOperation?.controller.abort(new Error('session_deleted'))
+    if (titleOperation) await titleOperation.promise
     await this.stopLive(sessionId)
     const removed = await this.store.deleteSession(sessionId)
     await Promise.all([

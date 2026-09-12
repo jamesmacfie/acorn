@@ -172,6 +172,7 @@ client: wsOnWorkflowStepEvent
 client: wsSend
 client: wsWrite
 node: AGENTS_HARNESS_REGISTRY
+node: AGENT_TOOL_PASSTHROUGH
 node: AgentProfileContribution
 node: AgentToolContribution
 node: AppEnv
@@ -253,6 +254,7 @@ node: buildSessionEnv
 node: capabilityId
 node: childEnv
 node: chunkRowsByColumnBudget
+node: codexJsonAdapter
 node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability

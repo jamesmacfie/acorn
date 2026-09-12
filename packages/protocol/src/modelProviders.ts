@@ -1,6 +1,8 @@
 import type { Integration, IntegrationsResponse } from './api'
 import type { PublicIntegrationProvider } from './integrations'
 
+export const HARNESS_BACKEND_PREFIX = 'harness:'
+
 export type AvailableModelConnection = {
   provider: PublicIntegrationProvider
   connection: Integration

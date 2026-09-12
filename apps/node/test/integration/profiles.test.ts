@@ -16,7 +16,9 @@ describe('agent profile registry', () => {
 
     const codex = agentProfileRegistry.require('codex')
     expect(codex.resumeArgv?.('codex', 's2')).toEqual({ file: 'codex', args: ['resume', 's2'] })
-    expect(codex.aiArgv).toBeUndefined()
+    expect(codex.aiArgv?.('codex', { prompt: 'choose' }).args).toEqual([
+      'exec', '--json', '--ephemeral', '-s', 'read-only', '--skip-git-repo-check', 'choose',
+    ])
   })
 
   it('adds a profile through one registration and every dynamic consumer sees it', () => {

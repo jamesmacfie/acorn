@@ -20,6 +20,25 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+A new session starts as `New agent session`. Its first accepted turn immediately replaces that with a
+deterministic label from the first non-empty text part, or the first attachment filename, so naming
+never blocks the turn. For a first interactive text prompt of at least five words, the runtime then
+asks the same session profile for a shorter title in the background. That one-shot run has tools
+disabled, executes in an empty temporary directory, receives only the effective text left by the
+`before-send` hook, and is bounded to five seconds. Workflow, automation, import, attachment-only,
+short, repeated, and later turns do not generate a title.
+
+The generated write compares against the exact fallback before replacing it. A user rename therefore
+wins whether it lands before or during generation, and a restart cannot regenerate a title from an
+already inserted turn. A generation failure leaves the fallback and adds nothing to the transcript.
+
+Session roster changes are announced on `plugin:agents:sessions-changed`. The frame carries task and
+session ids, current presence and archive state, a stable `changes` array (`created`, `renamed`,
+`archived`, `restored`, or `deleted`), and `renameSource` for a rename. It never carries either title;
+a node-side consumer rebuilds through the task-scoped `agents.sessions` capability. Generated and
+user-authored renames use the same store mutation and each successful change also publishes the full
+`agent:session` frame clients already use for their cache.
+
 ## Harnesses
 
 A harness is one agent acorn can manage. A driver adapts its protocol into the common session and
@@ -387,6 +406,10 @@ ready. A startup failure therefore settles that visible row as `failed` and reco
 event ledger; it is not reported as a late failure of a create request whose resource already exists.
 The runtime tracks the detached initialization through shutdown so it cannot outlive the plugin
 database.
+
+Automatic title calls are owned the same way: one in-flight operation per session, with an abort
+controller held by the runtime. Session deletion aborts and joins its call before deleting the row,
+and shutdown aborts and joins every naming call before the plugin database closes.
 
 A session reference the agent has forgotten is recoverable, not fatal. Agents keep their own session
 stores and prune them, and Claude Code keys its store by working directory, so a checkout that moved

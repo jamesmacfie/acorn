@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type {
@@ -14,6 +14,9 @@ import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protoco
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
 import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
+import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../contract/lifecycle'
+import { AgentLifecycle } from './lifecycle'
+import { normalizeStoredSessionTitle } from './sessionTitle'
 
 const now = (): number => Date.now()
 
@@ -47,10 +50,15 @@ type SessionSearchFilter = {
  * through core before filtering this plugin's own tables.
  */
 export class AgentSessionRepository {
+  protected readonly lifecycle: AgentLifecycle
+
   constructor(
     protected readonly db: PluginDatabase,
     protected readonly core: CoreServices,
-  ) {}
+    publishLifecycle?: AgentLifecyclePublisher,
+  ) {
+    this.lifecycle = new AgentLifecycle(db, publishLifecycle)
+  }
 
   // `null` means no workspace filter. An empty array means the workspace has no tasks, so the query
   // narrows to nothing rather than falling through to unfiltered.
@@ -266,13 +274,44 @@ export class AgentSessionRepository {
   async patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    renameSource: SessionRenameSource = 'user',
   ): Promise<AgentSession> {
+    const result = await this.mutateSession(sessionId, patch, { renameSource })
+    return result.session
+  }
+
+  async renameSession(
+    sessionId: string,
+    input: { title: string; expectedTitle?: string; source: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
+    return this.mutateSession(sessionId, { title: input.title }, {
+      expectedTitle: input.expectedTitle,
+      renameSource: input.source,
+    })
+  }
+
+  private async mutateSession(
+    sessionId: string,
+    patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options: { expectedTitle?: string; renameSource: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
+    const before = await this.requireSession(sessionId)
+    if (options.expectedTitle !== undefined && before.title !== options.expectedTitle) {
+      return { session: before, changed: false }
+    }
+    const title = patch.title !== undefined ? normalizeStoredSessionTitle(patch.title) : undefined
+    const renamed = title !== undefined && title !== before.title
+    const archiveChanged = patch.archived !== undefined
+      && patch.archived !== (before.archivedAt != null)
+    const hasOtherWrite = patch.lastReadSeq !== undefined || patch.config !== undefined
+    if (!renamed && !archiveChanged && !hasOtherWrite) return { session: before, changed: false }
+
     const timestamp = now()
-    await this.db
+    const write = await this.db
       .update(schema.agentSessions)
       .set({
         updatedAt: timestamp,
-        ...(patch.title ? { title: patch.title } : {}),
+        ...(renamed ? { title } : {}),
         ...(patch.archived != null
           ? {
               archivedAt: patch.archived ? timestamp : null,
@@ -287,8 +326,27 @@ export class AgentSessionRepository {
           : {}),
         ...(patch.config ? { configJson: JSON.stringify(patch.config) } : {}),
       })
-      .where(eq(schema.agentSessions.id, sessionId))
-    return this.requireSession(sessionId)
+      .where(and(
+        eq(schema.agentSessions.id, sessionId),
+        options.expectedTitle !== undefined
+          ? and(
+              eq(schema.agentSessions.title, options.expectedTitle),
+              title !== undefined ? ne(schema.agentSessions.title, title) : undefined,
+            )
+          : undefined,
+      ))
+      .run()
+    if (Number(write.changes ?? 0) === 0) {
+      return { session: await this.requireSession(sessionId), changed: false }
+    }
+
+    const session = await this.requireSession(sessionId)
+    const changes: AgentSessionChange[] = [
+      ...(renamed ? ['renamed' as const] : []),
+      ...(archiveChanged ? [patch.archived ? 'archived' as const : 'restored' as const] : []),
+    ]
+    this.lifecycle.announceSession(session, changes, options.renameSource)
+    return { session, changed: renamed || archiveChanged || hasOtherWrite }
   }
 
   async setController(sessionId: string, controller: AgentSession['controller']): Promise<AgentSession> {
@@ -314,6 +372,8 @@ export class AgentSessionRepository {
     attachmentIds: string[]
     artifactObjects: RemovedArtifactObject[]
   }> {
+    const session = await this.getSession(sessionId)
+    if (!session) return { attachmentIds: [], artifactObjects: [] }
     const turns = await this.db.select({ id: schema.agentTurns.id }).from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
     const turnIds = turns.map((turn) => turn.id)
     const [attachmentRows, artifactRows] = await Promise.all([
@@ -336,6 +396,7 @@ export class AgentSessionRepository {
       tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
     })
+    this.lifecycle.announceSession(session, ['deleted'])
     return {
       attachmentIds: attachmentRows.map((row) => row.attachmentId),
       artifactObjects: artifactRows,
@@ -450,5 +511,9 @@ export class AgentSessionRepository {
       .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.status, 'pending')))
       .orderBy(asc(schema.agentRequests.createdAt))
     return rows.map(mapAgentRequest)
+  }
+
+  lifecycleSessions(taskId: string) {
+    return this.lifecycle.sessions(taskId)
   }
 }

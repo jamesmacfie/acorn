@@ -44,6 +44,8 @@ export const claudeCodeProfile: AgentProfileContribution = {
       'dontAsk',
       '--tools',
       '',
+      '--strict-mcp-config',
+      ...(opts.system ? ['--system-prompt', opts.system] : []),
       ...(opts.model ? ['--model', opts.model] : []),
       ...(opts.schema ? ['--json-schema', JSON.stringify(opts.schema)] : []),
       opts.prompt,
@@ -51,4 +53,3 @@ export const claudeCodeProfile: AgentProfileContribution = {
   }),
   streamJson: lineDelimitedJsonAdapter,
 }
-

@@ -39,4 +39,14 @@ describe('the codex profile', () => {
     // `resume <ref>` where claude uses `--resume <ref>`. plugins/agents' terminal handoff spawns this verbatim.
     expect(codexProfile.resumeArgv!('codex', 'sess-1')).toEqual({ file: 'codex', args: ['resume', 'sess-1'] })
   })
+
+  it('contains a one-shot decision in a read-only empty directory', () => {
+    expect(codexProfile.aiArgv!('codex', { prompt: 'decide', system: 'title rules' })).toEqual({
+      file: 'codex',
+      args: [
+        'exec', '--json', '--ephemeral', '-s', 'read-only', '--skip-git-repo-check',
+        'title rules\n\ndecide',
+      ],
+    })
+  })
 })
