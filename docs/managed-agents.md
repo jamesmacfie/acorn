@@ -96,7 +96,13 @@ loaded plugin can reach.
 
 **Tier 2 is a native driver, first-party only, for what ACP cannot say.** Codex is the reason it
 exists. Its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
-`thread/delete`, and per-turn model, effort, and permission settings, and ACP expresses none of them.
+`thread/delete`, and Codex-specific per-turn model, effort, permission, and collaboration-mode
+settings. Those app-server operations have no ACP equivalent for a Codex session. The native driver
+discovers Default and Plan through
+`collaborationMode/list`, expands the selected preset for `turn/start`, and follows
+`thread/settings/updated` so a preset's effective model and effort stay synchronized with the generic
+configuration shown by acorn. App-servers that do not expose the experimental list endpoint continue
+without a Mode picker.
 A native driver is written when a vendor protocol carries product value the generic driver cannot,
 and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
 the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.

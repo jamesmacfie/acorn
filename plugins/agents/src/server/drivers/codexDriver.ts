@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type {
+  AgentConfigOption,
   AgentInputPart,
   AgentProviderDescriptor,
 } from '@acorn/protocol/managedAgents.ts'
@@ -15,10 +16,15 @@ import { probeCodexAuthentication } from './authProbe'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
 import { providerStderrNotice } from './diagnostics'
 import {
+  codexCollaborationModeForTurn,
+  codexCollaborationModes,
   codexModelOptions,
+  codexOptionsWithThreadSettings,
   codexPermissionOptions,
   codexReasoningOptions,
   codexSkillsFromResponse,
+  codexThreadSettings,
+  type CodexThreadSettings,
 } from './codexConfiguration'
 
 // The node's log, tagged as the provider's side of this plugin (docs/plugin-authoring.md §
@@ -29,6 +35,30 @@ const execFileAsync = promisify(execFile)
 const DRIVER_VERSION = 'codex-app-server-v2'
 
 const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
+
+const sessionConfigValue = (options: AgentDriverStartOptions, id: string): string | null => {
+  const configOptions = Array.isArray(options.session.config.configOptions)
+    ? options.session.config.configOptions
+    : []
+  const option = configOptions.find((value) => asObject(value)?.id === id)
+  return stringValue(asObject(option)?.currentValue)
+}
+
+const changedConfigLabels = (
+  before: readonly AgentConfigOption[],
+  after: readonly AgentConfigOption[],
+): string[] => after.flatMap((option) => {
+  const previous = before.find((candidate) => candidate.id === option.id)
+  if (!previous || previous.currentValue === option.currentValue || option.currentValue == null) return []
+  const value = option.values.find((candidate) => candidate.value === option.currentValue)
+  return [`${option.label} changed to ${value?.label ?? option.currentValue}`]
+})
+
+const configValuesChanged = (
+  before: readonly AgentConfigOption[],
+  after: readonly AgentConfigOption[],
+): boolean => after.some((option) =>
+  before.find((candidate) => candidate.id === option.id)?.currentValue !== option.currentValue)
 
 async function executableVersion(executable: string): Promise<string | undefined> {
   try {
@@ -107,6 +137,7 @@ export class CodexAgentDriver implements AgentDriver {
         'elicitations',
         'models',
         'reasoning_levels',
+        'modes',
         'permission_policies',
         'skills',
         'usage',
@@ -135,8 +166,16 @@ export class CodexAgentDriver implements AgentDriver {
     })
 
     let threadId = options.session.providerSessionRef
+    const resuming = threadId != null
     let currentTurnId: string | null = null
     let ready = false
+    let currentModel: string | null = null
+    let currentEffort: string | null = null
+    let reportedMode: 'default' | 'plan' | null = null
+    let latestThreadSettings: CodexThreadSettings | null = null
+    let collaborationModes = codexCollaborationModes(null, null)
+    let configOptions: AgentConfigOption[] = []
+    let metadataReady = false
     const pendingRequests = new Map<string, JsonRpcServerRequest>()
     const childRouter = new CodexChildRouter()
     let rpc!: JsonRpcProcess
@@ -169,6 +208,28 @@ export class CodexAgentDriver implements AgentDriver {
         if (routed.to === 'subagent') {
           for (const event of routed.events) void options.onEvent(event)
           return
+        }
+        if (notification.method === 'thread/settings/updated') {
+          const settings = codexThreadSettings(notification.params.threadSettings)
+          if (settings) {
+            latestThreadSettings = settings
+            reportedMode = settings.mode
+            currentModel = settings.model
+            currentEffort = settings.reasoningEffort
+            if (metadataReady) {
+              const previous = configOptions
+              configOptions = codexOptionsWithThreadSettings(configOptions, settings)
+              const diagnostics = changedConfigLabels(previous, configOptions)
+              if (configValuesChanged(previous, configOptions)) {
+                void (async () => {
+                  await options.onEvent({ type: 'session_metadata', configOptions })
+                  for (const message of diagnostics) {
+                    await options.onEvent({ type: 'diagnostic', level: 'info', message })
+                  }
+                })()
+              }
+            }
+          }
         }
         for (const event of normalizeCodexNotification(notification)) {
           if (event.type === 'session_state') ready = event.state === 'ready'
@@ -236,18 +297,29 @@ export class CodexAgentDriver implements AgentDriver {
     // child until it is set. Whatever arrived during the handshake was the parent's by definition.
     childRouter.setRootThread(threadId)
 
-    const [models, permissionProfiles, skills] = await Promise.all([
+    const [models, permissionProfiles, skills, modeResponse] = await Promise.all([
       rpc.request('model/list', { limit: 100, includeHidden: false }).catch(() => null),
       rpc.request('permissionProfile/list', { cwd: options.cwd, limit: 100 }).catch(() => null),
       rpc.request('skills/list', { cwds: [options.cwd], forceReload: false }).catch(() => null),
+      // App-servers without this experimental endpoint reject the request. A missing response means
+      // no advertised option, leaving the rest of session startup unchanged.
+      rpc.request('collaborationMode/list', {}).catch(() => null),
     ])
     const activePermission = asObject(sessionResponse.activePermissionProfile)
-    const configOptions = [
-      ...codexModelOptions(models, stringValue(sessionResponse.model)),
+    currentModel = currentModel ?? stringValue(sessionResponse.model)
+    currentEffort = currentEffort ?? stringValue(sessionResponse.reasoningEffort)
+    const storedMode = sessionConfigValue(options, 'mode')
+    collaborationModes = codexCollaborationModes(
+      modeResponse,
+      reportedMode ?? storedMode ?? (resuming ? null : 'default'),
+    )
+    configOptions = [
+      ...(collaborationModes.option ? [collaborationModes.option] : []),
+      ...codexModelOptions(models, currentModel),
       ...codexReasoningOptions(
         models,
-        stringValue(sessionResponse.model),
-        stringValue(sessionResponse.reasoningEffort),
+        currentModel,
+        currentEffort,
       ),
       ...codexPermissionOptions(permissionProfiles, stringValue(activePermission?.id)),
     ]
@@ -257,6 +329,18 @@ export class CodexAgentDriver implements AgentDriver {
       configOptions,
       skills: codexSkillsFromResponse(skills),
     })
+    metadataReady = true
+    if (latestThreadSettings) {
+      const synchronized = codexOptionsWithThreadSettings(configOptions, latestThreadSettings)
+      if (configValuesChanged(configOptions, synchronized)) {
+        const diagnostics = changedConfigLabels(configOptions, synchronized)
+        configOptions = synchronized
+        await options.onEvent({ type: 'session_metadata', configOptions })
+        for (const message of diagnostics) {
+          await options.onEvent({ type: 'diagnostic', level: 'info', message })
+        }
+      }
+    }
     ready = true
     await options.onEvent({ type: 'session_state', state: 'ready' })
 
@@ -271,14 +355,25 @@ export class CodexAgentDriver implements AgentDriver {
         if (!threadId) throw new Error('Codex thread is not initialized.')
         if (!ready || currentTurnId) throw new Error('Codex session is not ready for another turn.')
         ready = false
+        const policy = turnOptions.turn.effectivePolicy
+        const collaborationMode = codexCollaborationModeForTurn(
+          collaborationModes,
+          policy.mode,
+          policy.model ?? currentModel,
+          policy.effort ?? currentEffort,
+        )
         const result = await rpc.request<Record<string, unknown>>('turn/start', {
           threadId,
           clientUserMessageId: turnOptions.turn.id,
           input: codexInput(turnOptions.input, options.cwd, turnOptions.attachments),
           cwd: options.cwd,
-          ...(turnOptions.turn.effectivePolicy.model ? { model: turnOptions.turn.effectivePolicy.model } : {}),
-          ...(turnOptions.turn.effectivePolicy.effort ? { effort: turnOptions.turn.effectivePolicy.effort } : {}),
-          ...(turnOptions.turn.effectivePolicy.permissions ? { permissions: turnOptions.turn.effectivePolicy.permissions } : {}),
+          ...(collaborationMode
+            ? { collaborationMode }
+            : {
+                ...(policy.model ? { model: policy.model } : {}),
+                ...(policy.effort ? { effort: policy.effort } : {}),
+              }),
+          ...(policy.permissions ? { permissions: policy.permissions } : {}),
         })
         const turn = asObject(result.turn)
         currentTurnId = stringValue(turn?.id)
@@ -295,10 +390,10 @@ export class CodexAgentDriver implements AgentDriver {
         rpc.respond(request.id, codexServerRequestResponse(request, resolution))
       },
       async setConfig(optionId, value) {
-        if (optionId === 'model') {
-          return configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)
-        }
-        return configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)
+        configOptions = configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)
+        if (optionId === 'model') currentModel = value
+        if (optionId === 'reasoning') currentEffort = value
+        return configOptions
       },
       async compact() {
         if (!threadId) return
