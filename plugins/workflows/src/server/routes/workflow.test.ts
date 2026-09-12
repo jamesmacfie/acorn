@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { ProviderOperationError } from '@acorn/plugin-api/node'
@@ -50,6 +50,18 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
 
 describe('workflow routes', () => {
   afterEach(() => setWorkflowBridge(null))
+
+  it('scopes the authoring catalog to a project and keeps it behind the device gate', async () => {
+    const projects: Array<string | undefined> = []
+    setWorkflowBridge(fake({ catalog: async (projectId) => {
+      projects.push(projectId)
+      return { kinds: [], policies: [], profiles: [], workflows: [] }
+    } }))
+
+    expect((await authed().fetch(req('/api/catalog?projectId=project-one'), {} as Env)).status).toBe(200)
+    expect((await asTask1().fetch(req('/api/catalog?projectId=project-one'), {} as Env)).status).toBe(403)
+    expect(projects).toEqual(['project-one'])
+  })
 
   it('starts a run with a valid def and returns the runId', async () => {
     let seen: unknown = null
@@ -139,6 +151,26 @@ describe('workflow routes', () => {
     expect(started).toEqual(['repo:ship', 'user:ship'])
   })
 
+  it('keeps database child definitions behind the device gate', async () => {
+    const allowed: boolean[] = []
+    setWorkflowBridge(fake({ startById: async (_taskId, _defId, _inputs, allowDatabaseDefinitions) => {
+      allowed.push(allowDatabaseDefinitions)
+      return { runId: 'run1' }
+    } }))
+    const parent = {
+      name: 'Parent',
+      steps: [{
+        name: 'child',
+        kind: 'workflow',
+        childWorkflow: { ref: { source: 'database', id: 'owner-draft' } },
+      }],
+    }
+    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { def: parent }), {} as Env)).status).toBe(403)
+    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
+    expect(allowed).toEqual([false, true])
+  })
+
   it('hands a task-confined caller the file layers alone', async () => {
     const asked: boolean[] = []
     setWorkflowBridge(fake({ defs: async (_id, includeRows) => (asked.push(includeRows), { workflows: [], errors: [] }) }))
@@ -189,6 +221,14 @@ describe('a task-scoped credential is confined to its own runs', () => {
     const res = await asTask1().fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 's' }), {} as Env)
     expect(res.status).toBe(403)
     expect(calls).toEqual([])
+  })
+
+  it('cannot read the node-wide run source directly', async () => {
+    const allRuns = vi.fn(async () => ({ runs: [{ id: 'run2', taskId: 'task2' }] }))
+    setWorkflowBridge(fake({ allRuns }))
+
+    expect((await asTask1().fetch(req('/api/runs'), {} as Env)).status).toBe(403)
+    expect(allRuns).not.toHaveBeenCalled()
   })
 
   it('still answers 503 rather than 404 when the runner is not wired', async () => {

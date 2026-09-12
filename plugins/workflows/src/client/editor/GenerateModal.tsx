@@ -59,7 +59,7 @@ export default function GenerateModal(props: {
   mode: WorkflowGenerateRequest['mode']
   /** The workspace supplies examples, `defId` excludes this row from them, and `draft` is either
    *  reduced to overwrite hints or supplied as the edit source. */
-  context: { workspaceId: string; defId?: string; draft: WorkflowDef }
+  context: { workspaceId: string; projectId: string; defId?: string; draft: WorkflowDef }
   onDismiss: () => void
   onGenerated: (result: WorkflowGenerateResult) => void
 }) {
@@ -105,6 +105,7 @@ export default function GenerateModal(props: {
         ...(modelId() ? { modelId: modelId() } : {}),
         description: description().trim(),
         workspaceId: props.context.workspaceId,
+        projectId: props.context.projectId,
         ...(props.context.defId ? { defId: props.context.defId } : {}),
       }
       const request: WorkflowGenerateRequest = props.mode === 'edit'

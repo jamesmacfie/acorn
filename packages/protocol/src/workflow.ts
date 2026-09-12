@@ -136,7 +136,7 @@ export type WorkflowStepRow = {
   mode: string
   profileId: string | null
   model: string | null
-  status: 'pending' | 'running' | 'waiting-gate' | 'done' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
+  status: 'pending' | 'running' | 'waiting-gate' | 'waiting-children' | 'done' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null

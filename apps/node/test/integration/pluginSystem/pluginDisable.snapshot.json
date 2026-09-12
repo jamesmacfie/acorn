@@ -86,6 +86,7 @@
       "agents.requests",
       "agents.reviewInput.v1",
       "agents.runtime",
+      "agents.sessionControl",
       "agents.sessionExecute",
       "agents.sessions",
       "agents.turns",

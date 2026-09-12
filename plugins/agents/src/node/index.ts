@@ -2,7 +2,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
-import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
+import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
 import { claudeHarness } from '../server/drivers/claudeHarness'
 import { CodexAgentDriver } from '../server/drivers/codexDriver'
 import { agentDriverRegistry } from '../server/drivers/registry'
@@ -14,6 +14,7 @@ import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS, type AgentTurnChangedEvent } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
+import { createSessionControl } from '../server/sessions/sessionControl'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
@@ -251,6 +252,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // time and falls back to its own headless runner, so a node without this plugin still runs
       // non-managed workflow steps.
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
+      ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
       ctx.capabilities.provide(AGENTS_RUNTIME, {

@@ -19,6 +19,7 @@ import {
   GENERATE_MAX_SYSTEM_CHARS,
   renderStepKinds,
   renderVocabulary,
+  renderWorkflowTargets,
   selectExamples,
   type WorkflowExample,
 } from './generateWorkflow'
@@ -247,6 +248,31 @@ describe('policies and profiles come from the catalog too', () => {
   })
 })
 
+describe('saved child workflows in the prompt', () => {
+  const target = {
+    ref: { source: 'database' as const, id: 'review-row' },
+    name: 'Review a ticket',
+    inputs: [{ name: 'ticket', description: 'Ticket number', required: true }],
+    outputs: [{ step: 'summary', schema: { type: 'object', properties: { result: { type: 'string' } } } }],
+  }
+
+  it('lists only catalog references and shows both dispatch shapes with structured data', () => {
+    const text = renderWorkflowTargets(catalog({ workflows: [target] }))
+    expect(text).toContain('"kind": "workflow"')
+    expect(text).toContain('"kind": "workflow-map"')
+    expect(text).toContain('"id": "review-row"')
+    expect(text).toContain('`ticket`, required. Ticket number')
+    expect(text).toContain('"items": {')
+    expect(text).toContain('"type": "array"')
+    expect(text).toContain('`summary`: {"type":"object"')
+  })
+
+  it('forbids dispatch when the scoped catalog is empty', () => {
+    expect(renderWorkflowTargets(catalog({ workflows: [] })))
+      .toContain('Do not write a `workflow` or `workflow-map` step.')
+  })
+})
+
 describe('the built-in worked examples', () => {
   it('ships two, and both pass the checker they teach', () => {
     expect(BUILTIN_EXAMPLES).toHaveLength(2)
@@ -318,6 +344,21 @@ describe('the workspace examples', () => {
     expect(omit).toEqual([])
   })
 
+  it('leaves parent workflows out because their protected target is not model-visible', () => {
+    const parent: WorkflowDef = {
+      name: 'parent',
+      steps: [
+        {
+          name: 'dispatch',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'review-row' } },
+        },
+        { name: 'finish', prompt: 'Summarize.' },
+      ],
+    }
+    expect(select([example('parent', parent)]).include).toEqual([])
+  })
+
   it('takes at most four, and names what did not fit', () => {
     const many = Array.from({ length: 7 }, (_, index) => example(`e-${index}`, chain(`chain ${index}`)))
     const { include, omit } = select(many)
@@ -355,8 +396,8 @@ describe('the workspace examples', () => {
 
   it('leaves every fixed section and both built-in examples standing when nothing fits', () => {
     const text = buildGenerateSystemPrompt({ catalog: catalog(), examples: [example('a', fanIn('a'))], validation: validation(), exampleBudget: 0 })
-    expect(text).not.toContain('## 8.')
-    for (const heading of ['## 2.', '## 3.', '## 4.', '## 5.', '## 6.', '## 7.']) expect(text).toContain(heading)
+    expect(text).not.toContain('## 9.')
+    for (const heading of ['## 2.', '## 3.', '## 4.', '## 5.', '## 6.', '## 7.', '## 8.']) expect(text).toContain(heading)
     for (const builtin of BUILTIN_EXAMPLES) expect(text).toContain(JSON.stringify(builtin.def, null, 2))
   })
 })

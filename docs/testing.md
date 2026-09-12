@@ -645,6 +645,29 @@ acceptance pass.
     Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
     workflow-owned session and confirm `agent_spawn` is absent.
 
+The next five items are the workflow-task release checks. They were not run in this worktree because
+the app requires the main checkout's environment and port. The workflow, integration, and host tests
+cover the corresponding state and rendering contracts.
+
+65. Run a workflow whose child stops at a human gate. Confirm the parent is gated, the child card says
+    approval is required, and opening it lands on the child gate. Approve it, then use the child
+    run's parent and root links to return to the original run.
+66. Map three structured items so one child succeeds, one fails, and one waits for approval. Confirm
+    the progress and failure counts update, every task and run link opens the right child, and the
+    parent waits for all three before failing. Check each bounded result and compare the root's tree
+    usage with each child's own usage.
+67. Cancel a running mapped workflow and confirm the dialog says it cancels the run tree. Check that
+    admitted child runs and managed sessions settle before the parent does, while the child tasks
+    remain available. Retry a failed map and confirm it reuses those tasks and runs instead of
+    creating replacements.
+68. Disconnect the active Node while viewing a parent and child, let both advance, then reconnect.
+    Confirm the run list, selected steps, child progress, gates, failures, and usage reconcile without
+    relying on the missed frames.
+69. On two Nodes, create fixtures with the same task and run IDs and different titles. Switch between
+    the Nodes and confirm navigation and history stay with the active Node. Then run one legacy
+    `fan-out` definition and one static inline workflow reference to confirm both still behave as
+    documented.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
@@ -656,8 +679,8 @@ The dashboards backlog keeps its own once-only verification pass in
 [docs/future/dashboards/README.md](./future/dashboards/README.md) § 0, because its items gate that
 folder's remaining work rather than a release.
 
-A worktree cannot run the app (no `.env`, and 4317 is the live instance), so run the whole checklist
-from the main checkout.
+A worktree cannot run the app without the main checkout's `.env`. An existing development instance
+also owns the desktop renderer's fixed port, 4319. Run the whole checklist from the main checkout.
 
 ## Composition-root tests
 

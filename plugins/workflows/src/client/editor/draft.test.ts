@@ -90,6 +90,35 @@ describe('renaming a node', () => {
     expect(step(renameNode(start, 'one', 'first'), 'two')?.with?.command).toBe('echo ${steps.first.output}')
   })
 
+  it('rewrites structured binding and map-source references', () => {
+    const start = newDraft({
+      name: 'w',
+      steps: [
+        { name: 'tickets', after: [], schema: { type: 'object' } },
+        {
+          name: 'review',
+          kind: 'workflow-map',
+          after: ['tickets'],
+          items: { step: 'tickets', pointer: '/items' },
+          itemKey: '/id',
+          childWorkflow: {
+            ref: { source: 'database', id: 'child' },
+            inputs: { ticket: { from: 'step', step: 'tickets', pointer: '/ticket' } },
+          },
+          title: {
+            template: 'Review ${ticket}',
+            bindings: { ticket: { from: 'step', step: 'tickets', pointer: '/ticket' } },
+          },
+        },
+      ],
+    })
+    const renamed = renameNode(start, 'tickets', 'selected-tickets')
+    const review = step(renamed, 'review')
+    expect(review?.items?.step).toBe('selected-tickets')
+    expect(review?.childWorkflow?.inputs?.ticket).toMatchObject({ step: 'selected-tickets' })
+    expect(review?.title?.bindings?.ticket).toMatchObject({ step: 'selected-tickets' })
+  })
+
   it('carries the selection with the node', () => {
     const renamed = renameNode(draft({ kind: 'node', name: 'history' }), 'history', 'why')
     expect(renamed.selection).toEqual({ kind: 'node', name: 'why' })

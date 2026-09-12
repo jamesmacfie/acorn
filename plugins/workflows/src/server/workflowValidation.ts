@@ -6,9 +6,16 @@ import type {
   StepValidationContext,
   WorkflowBudget,
   WorkflowDef,
+  WorkflowCatalogTarget,
   WorkflowStepDef,
 } from '../shared/workflowContracts'
+import {
+  RUNTIME_WORKFLOW_KINDS,
+  workflowDispatchProblems,
+} from './workflowDispatchValidation'
 import { intersectToolCeilings, narrowsToolCeiling } from './workflowTools'
+
+export { parseWorkflowJsonPointer } from './workflowDispatchValidation'
 
 const TEMPLATE_RE = /\$\{steps\.([^}]+)\.output\}/g
 const STEP_TEMPLATE_TOKEN_RE = /\$\{steps\.[^}]*\}/g
@@ -81,6 +88,8 @@ export type WorkflowValidationCatalog = {
   // A kind's description, for the host-applied field checks below. Absent for a kind that has none.
   describeStepKind?: (kind: string) => StepKindDescription | undefined
   validateStepKind?: (kind: string, step: WorkflowStepDef, context: StepValidationContext) => string[]
+  /** Present only when validation runs in an editor or generation request with a project scope. */
+  workflowTargets?: readonly WorkflowCatalogTarget[]
 }
 
 export class WorkflowValidationError extends Error {
@@ -195,6 +204,9 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!INPUT_NAME_RE.test(name)) errors.push(`input ${index + 1} has an invalid name '${name}'`)
     else if (declaredInputs.has(name)) errors.push(`input '${name}' is declared more than once`)
     else declaredInputs.add(name)
+    if (input.description != null && typeof input.description !== 'string') errors.push(`input '${name}' description must be a string`)
+    if (input.required != null && typeof input.required !== 'boolean') errors.push(`input '${name}' required must be true or false`)
+    if (input.default != null && typeof input.default !== 'string') errors.push(`input '${name}' default must be a string`)
   }
 
   // The graph. `after` is checked before the cycle walk, because a dangling name would send the walk
@@ -213,11 +225,17 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
   )
   const after = (name: string): readonly string[] => edges.get(name) ?? []
   const precedes = (candidate: string, step: string): boolean => predecessors.get(step)?.has(candidate) ?? false
+  const structured = (name: string): boolean => {
+    const source = stepAt(name)
+    if (!source) return false
+    if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
+    return !!catalog.describeStepKind?.(source.kind ?? 'agent')?.output?.schema
+  }
 
   for (const [index, step] of def.steps.entries()) {
     const kind = step.kind ?? 'agent'
     const label = `step '${step.name || index + 1}'`
-    if (!catalog.stepKinds.has(kind)) errors.push(`${label} has unknown kind '${kind}'`)
+    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(`${label} has unknown kind '${kind}'`)
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     if (!narrowsToolCeiling(intersectToolCeilings(def.tools, step.tools), step.childStep?.tools)) {
       errors.push(`${label} child tool ceiling widens its parent ceiling`)
@@ -255,6 +273,15 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!fieldErrors.length) {
       errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }) ?? []))
     }
+    errors.push(...workflowDispatchProblems({
+      label,
+      step,
+      targets: catalog.workflowTargets,
+      declaredInputs,
+      indexes,
+      precedes,
+      structured,
+    }))
     if (!(catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       for (const field of ['isolation', 'inputs', 'configOptions'] as const) {
         if (step[field] != null) errors.push(`${label} is a '${kind}' step, which cannot take ${field}`)

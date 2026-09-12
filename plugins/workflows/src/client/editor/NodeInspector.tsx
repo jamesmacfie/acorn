@@ -29,6 +29,7 @@ import BranchesField from './BranchesField'
 import FieldControl from './FieldControl'
 import JoinField from './JoinField'
 import PromptField from './PromptField'
+import WorkflowDispatchForm from './WorkflowDispatchForm'
 import {
   canConnect,
   effectiveAfter,
@@ -477,7 +478,7 @@ export default function NodeInspector(props: {
               {(described) => (
                 <For each={described().fields}>
                   {(field) => (
-                    <Show when={field.id !== 'joins'}>
+                    <Show when={field.id !== 'joins' && !field.type.startsWith('workflow-') && field.type !== 'child-workflow'}>
                       <Show
                         when={field.type === 'prompt'}
                         fallback={(
@@ -518,6 +519,16 @@ export default function NodeInspector(props: {
                   )}
                 </For>
               )}
+            </Show>
+
+            <Show when={kindOf(current()) === 'workflow' || kindOf(current()) === 'workflow-map'}>
+              <WorkflowDispatchForm
+                def={def()}
+                step={current()}
+                catalog={props.catalog}
+                disabled={props.readOnly}
+                onChange={(patch) => props.actions.setStep(current().name, patch)}
+              />
             </Show>
 
             <Show when={kindOf(current()) === 'decide'}>

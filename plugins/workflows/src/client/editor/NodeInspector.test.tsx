@@ -21,6 +21,11 @@ const catalog = (kinds: WorkflowCatalog['kinds']): WorkflowCatalog => ({
   kinds,
   policies: [{ id: 'no-secrets', pluginId: null }],
   profiles: [{ id: 'claude-code', label: 'Claude Code', managed: true, structured: true }],
+  workflows: [{
+    ref: { source: 'database', id: 'review-row' },
+    name: 'Review ticket',
+    inputs: [{ name: 'ticket', description: 'Ticket number', required: true }],
+  }],
 })
 
 const providers: AgentProviderDescriptor[] = [{
@@ -161,5 +166,69 @@ describe('a kind that runs an agent', () => {
     const gate: WorkflowCatalog['kinds'][number] = { id: 'gate-human', pluginId: null, describe: { label: 'Wait for a person', fields: [] } }
     mount({ name: 'w', steps: [{ name: 'review', kind: 'gate-human', after: [] }] }, [gate], 'review')
     expect(labels('button.ui-select')).not.toContain('Harness')
+  })
+})
+
+describe('runtime workflow fields', () => {
+  const kinds: WorkflowCatalog['kinds'] = [
+    { id: 'workflow', pluginId: null, describe: { label: 'Run a workflow', fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
+    { id: 'workflow-map', pluginId: null, describe: { label: 'Map to workflows', fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
+  ]
+
+  it('offers the scoped child target and its declared required input', () => {
+    mount({
+      name: 'w',
+      inputs: [{ name: 'ticket' }],
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        after: [],
+        childWorkflow: { ref: { source: 'database', id: 'review-row' } },
+      }],
+    }, kinds, 'review')
+    expect(labels('button.ui-select')).toContain('Child workflow')
+    expect(host.textContent).toContain('Review ticket')
+    expect(host.textContent).toContain('Choose where this required input comes from.')
+    expect(host.textContent).toContain('Ticket number')
+  })
+
+  it('keeps an unavailable target visible and names the invalid draft', () => {
+    mount({
+      name: 'w',
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        after: [],
+        childWorkflow: { ref: { source: 'database', id: 'removed-row' } },
+      }],
+    }, kinds, 'review')
+    expect(host.textContent).toContain('not available')
+    expect(host.textContent).toContain('This workflow is not available to the selected project.')
+  })
+
+  it('offers only structured predecessors as map sources and shows pointer validation', async () => {
+    mount({
+      name: 'w',
+      steps: [
+        { name: 'plain', after: [], prompt: 'Write prose.' },
+        { name: 'tickets', after: [], prompt: 'Select tickets.', schema: { type: 'object' } },
+        {
+          name: 'review',
+          kind: 'workflow-map',
+          after: ['plain', 'tickets'],
+          items: { step: 'tickets', pointer: 'tickets' },
+          itemKey: '__proto__',
+          childWorkflow: { ref: { source: 'database', id: 'review-row' } },
+          title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'item', pointer: '/number' } } },
+        },
+      ],
+    }, kinds, 'review')
+    host.querySelector<HTMLButtonElement>('button[aria-label="Source step"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle()
+    const options = [...document.body.querySelectorAll('[role="option"]')].map((option) => option.textContent)
+    expect(options).toContain('tickets')
+    expect(options).not.toContain('plain')
+    expect(host.textContent).toContain('Start a JSON Pointer with /')
   })
 })

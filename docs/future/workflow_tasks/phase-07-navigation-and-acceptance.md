@@ -1,31 +1,38 @@
-# Expose child runs and complete the handoff
+# Phase 7: Navigation and acceptance
 
-Date: 2026-09-12. Status: implementation proposal, not started.
-Baseline: `8cb7ce45`. Paths describe the surveyed code, not a promise that it has stayed unchanged.
+Date: 2026-09-13. Status: shipped.
 
-Depends on: Phase 6. Scope: Workflow run UI, task links, regression tests, and owning documentation.
+The workflow-task programme is complete. See the owning documentation for the current contracts:
 
-Read [background](./background.md), [execution contract](./reference.md), and [scope](./refused.md) before implementing. This phase is not independently releasable before the programme's final gate.
+- [Workflows](../../workflows.md) describes child runs, map progress, gates, failures, usage,
+  cancellation, retries, events, and navigation.
+- [Workspaces and tasks](../../workspaces-and-tasks.md) describes child task ownership, worktrees,
+  and retention.
+- [Security model](../../security.md) describes trust, confinement, and inherited authority.
+- [API reference](../../api-reference.md) and [data layer](../../data-layer.md) describe the internal
+  idempotent start capability, projections, and durable records.
+- [Testing](../../testing.md) owns the manual release checklist.
 
-## Implementation
+Runtime child-workflow dispatch remains enabled because every automated release gate passed. The
+scheduled-workflows programme can use `workflows.runner` with a reserved task ID, intended run ID,
+caller key, payload fingerprint, and trigger. Retrying the same invocation returns the existing run.
 
-1. Extend `plugins/workflows/src/client/runs/` and `workflowsClient.ts` to show parent/root links, child task/run links, map progress, gate attention, failures, and aggregate usage. Use explicit lineage, not inferred task titles.
-2. Keep run history and task navigation Node-scoped. Invalidate the relevant parent and child queries on run events and reconcile on reconnect. Do not depend on receiving every event.
-3. Make retry and cancellation copy explain their tree-wide effects. Preserve child tasks after completion and show their final status without auto-archiving worktrees.
-4. Add end-to-end Node integration fixtures for the ticket example, using a structured fixture producer. Prove generated and hand-authored definitions execute identically.
-5. Update `docs/workflows.md`, `docs/workspaces-and-tasks.md`, `docs/security.md`, and the owning API/data/event docs for implemented contracts. Record remaining limitations, including cross-run business deduplication.
-6. Verify the scheduled-workflows programme can consume the internal idempotent start contract. Mark this programme complete only after the gates below pass.
+## Acceptance evidence
 
-## Tests and acceptance
+- The structured ticket fixture ran a generated workflow and a hand-authored TOML workflow through
+  the same resolver, dispatcher, and runner. Both produced the same child prompts and inputs. A
+  restart during the human gate preserved the intended task and run IDs and created no duplicate
+  child work.
+- The workflow plugin suite passed 345 tests in 34 files.
+- `pnpm lint` passed in all 33 linted packages.
+- `pnpm db:check` applied every migration in all 11 chains, including all five workflow migrations.
+- The architecture suite passed 63 tests in four files.
+- `pnpm test` passed all 34 package tasks. The TUI suite included 584 passing tests and two documented
+  skips; the desktop suite included 101 client tests and 31 Rust tests.
+- `git diff --check` passed.
 
-Run the complete regression suite. Manually inspect a gated child, mixed-result map, cancel/retry, offline reconnect, and identical resource IDs on different Nodes. Verify legacy fan-out and static inline composition still behave as before.
-
-Add colocated `.test.ts` or `.test.tsx` tests beside the changed module, following its neighboring tests. Run `pnpm --filter @acorn/plugin-workflows test` and `pnpm lint`; both must exit zero. For core changes also run `pnpm --filter @acorn/node-core test`. For migrations run `pnpm db:check`. Phase 7 additionally requires `pnpm test` and `pnpm --filter @acorn/arch-tests test`.
-
-## Stop conditions
-
-Do not expose scheduling early through an unguarded button. Hand off the internal contract and evidence to scheduled_workflows only after runtime, AI authoring, and UI acceptance pass.
-
-## Verify before building
-
-Compare the scoped implementation with `git diff 8cb7ce45..HEAD -- plugins/workflows packages/node-core`. Re-read changed contracts and tests; amend this phase if assumptions have drifted. Keep core/plugin imports, task authentication, and unrelated work untouched. Record test evidence and update the [phase status](./README.md) on completion.
+The five realistic UI checks in [Testing](../../testing.md) were not run from this worktree. The app
+needs the main checkout's environment, and its development port was already owned by the live
+instance. Component, host-parity, event, reconnect, integration, and terminal-rendering tests cover
+the corresponding automated contracts. Run checklist items 65–69 from the main checkout before the
+next release.

@@ -81,6 +81,8 @@ export function Fold(props: {
   meta?: JSX.Element
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  /** Inset a section that belongs to the content above it. */
+  nested?: boolean
   persistKey?: string
   defaultOpen?: boolean
   open?: boolean
@@ -98,7 +100,7 @@ export function Fold(props: {
   // header then contents: `↓` from an open fold's header enters its first child.
   const control = stop({ onPress: toggle })
   return (
-    <box flexDirection="column" flexShrink={0}>
+    <box flexDirection="column" flexShrink={0} paddingLeft={props.nested ? 2 : 0}>
       <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
         <Line {...litControl({ focused: control.focused() })}>{open() ? '▾' : '▸'}</Line>
         <Line {...litControl({ focused: control.focused(), strong: true })}>{props.label}</Line>

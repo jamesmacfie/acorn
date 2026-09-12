@@ -1,4 +1,5 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
+import type { WorkflowChildRunSummary } from '../shared/api'
 
 export type WorkflowRunStatus = 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled'
 export type WorkflowGateStatus = 'waiting-gate' | 'done' | 'failed' | 'cancelled'
@@ -14,6 +15,11 @@ export type WorkflowGateChangedEvent = {
   runId: string
   stepId: string
   status: WorkflowGateStatus
+}
+
+export type WorkflowChildChangedEvent = WorkflowChildRunSummary & {
+  /** Parent task whose run surface should refresh. */
+  ownerTaskId: string
 }
 
 export type WorkflowGateRecord = WorkflowGateChangedEvent & { name: string }
