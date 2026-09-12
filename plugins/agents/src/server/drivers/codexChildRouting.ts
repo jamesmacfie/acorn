@@ -61,6 +61,7 @@ const CHILD_DROPPED_METHODS = new Set([
   'thread/unarchived',
   'thread/compacted',
   'thread/name/updated',
+  'thread/settings/updated',
   'turn/plan/updated',
   'turn/diff/updated',
   'item/plan/delta',
