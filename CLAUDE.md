@@ -18,3 +18,14 @@ bound, and without that bound the tests that spawn processes or mint certificate
 load while passing in isolation. For the desktop shell alone, use
 `pnpm --filter @acorn/desktop test`, which stages the bundle inputs and then runs the boot test and
 the Rust suite.
+
+When a change affects the desktop UI, test it in the real Tauri window on a graphical host. Run
+`pnpm dev:agent -- --session <name>`; it uses isolated data and ports and adds the current checkout as
+a local project, so neither the onboarding wizard nor GitHub login blocks the test. In another
+terminal, run `pnpm dev:agent:ui -- --session <name> snapshot`, then use `click`, `fill`, and
+`screenshot` with the returned element references. Run `snapshot` again after each UI transition and
+finish with `pnpm dev:agent:ui -- --session <name> stop`. Use `--onboarding` when the wizard is the
+subject and `pnpm dev:agent:smoke` to verify the automation path itself. This driver covers the main
+renderer, not native menus and dialogs or host-owned child webviews; use native computer-use control
+or the release checklist for those surfaces. See [docs/local-development.md](./docs/local-development.md)
+for the full workflow.

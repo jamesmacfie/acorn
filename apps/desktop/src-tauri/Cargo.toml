@@ -17,6 +17,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # debug build for free; a release build has to ask, and a shipped release deliberately does not
 # (src/webviews.rs).
 devtools = ["tauri/devtools"]
+# The local agent launcher is the only caller. Keeping the WebDriver server behind an explicit
+# feature means a normal debug build cannot expose an automation port by accident.
+agent-automation = ["dep:tauri-plugin-wdio-webdriver"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -28,6 +31,7 @@ tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

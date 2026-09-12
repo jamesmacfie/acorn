@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm run stage && ACORN_DEV_SERVER=http://localhost:4319 tauri dev --config src-tauri/tauri.dev.json",
+    "dev:agent": "node scripts/agent/session.mjs",
+    "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
+    "dev:agent:ui": "node scripts/agent/ui.mjs",
     "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax",
     "dist": "pnpm run build && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
     "stage": "pnpm run build:service && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
