@@ -101,6 +101,11 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 ## Documentation ownership
 
+The workflow automation implementation plans are indexed in
+[workflow tasks](./future/workflow_tasks/README.md) and
+[scheduled workflows](./future/scheduled_workflows/README.md), in that implementation order.
+Each programme indexes its background, contract reference, refusals, and phase documents.
+
 Keep one owning page for each contract. Link to it from other pages instead of copying its details.
 Group long references by topic in a subfolder. Keep the original landing page when source comments
 or external links depend on its path, and update relative links when moving a section.
