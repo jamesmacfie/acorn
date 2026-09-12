@@ -637,7 +637,8 @@ export type TaskPullRelation = AttachTaskPullInput & {
 
 export type CoreTaskService = {
   load(taskId: string): Promise<TaskRef | undefined>
-  /** The task's worktree root, creating it lazily. `null` when no checkout is mapped. */
+  /** The task's worktree root, creating it lazily. `null` when no checkout is mapped, the task is
+   *  archiving, or it is not active. */
   root(taskId: string): Promise<string | null>
   resolveCwd(
     task: TaskRef | undefined,

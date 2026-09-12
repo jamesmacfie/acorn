@@ -51,7 +51,7 @@ export type TaskService = {
   // what acorn promises about it).
   load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree
-  // lazily if needed. null when no checkout is mapped.
+  // lazily if needed. null when no checkout is mapped, the task is archiving, or it is not active.
   root(taskId: string): Promise<string | null>
   // The cwd a task's commands run in, creating the worktree on first use
   // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id, because

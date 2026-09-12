@@ -1,7 +1,7 @@
 import { For, createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, prefsOptions,
+  agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
   sendReferenceToAgent, taskBridge, taskStatus, type Task,
 } from '@acorn/plugin-api/client'
@@ -47,13 +47,17 @@ export function createChangesModel(task: Task) {
   // whether a merge or rebase is mid-flight (docs/diff-rendering.md § Data flow). The list draws the
   // changes, the branch bar draws the rest.
   const [status, { refetch }] = createResource(
-    () => task.id,
+    // Archive keeps the pane mounted so it can report teardown failures. Stop asking for Git state
+    // during that interval: the node is removing this worktree, and a status read has no stable tree
+    // to describe. Returning to active after a refusal changes this source back and refetches.
+    () => isArchiving(task.id) ? undefined : task.id,
     async (id) => await localGitApi.status(id),
     { initialValue: emptyLocalStatus() },
   )
   // The rail's dirty poll is the refresh signal: when the worktree's change count moves, this
   // re-lists.
   createEffect(() => {
+    if (isArchiving(task.id)) return
     const st = taskStatus(task.id)
     void st?.dirtyCount
     void st?.dirty
