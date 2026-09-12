@@ -119,6 +119,21 @@ describe('the delegated session sidebar', () => {
       .toContain('Delegated by Claude terminal (claude-code) · depth 1 · shared')
   })
 
+  it('leads a resting session with a queued prompt on its queue, and a busy one on its motion', () => {
+    // The whole point of moving the queue into the leading slot: a session held behind the concurrency
+    // limit rests at `ready`, and the resting mark alone would draw it as simply done.
+    const waiting = session('waiting-on-limit', { title: 'Holding a prompt', queuedTurns: 2 })
+    const busy = session('busy', { title: 'Running one', runtimeState: 'working', queuedTurns: 1 })
+    mount([waiting, busy], {})
+
+    const leadOf = (title: string) => rowNamed(title).querySelector('.ui-row-leading .ui-icon')
+    expect(leadOf('Holding a prompt')?.querySelector('title')?.textContent).toBe('2 queued follow-ups')
+    // Motion wins while something is in flight, so the busy row keeps its turning mark and says nothing
+    // about the one prompt behind it.
+    expect(leadOf('Running one')?.getAttribute('data-spin')).toBe('')
+    expect(leadOf('Running one')?.querySelector('title')).toBeNull()
+  })
+
   it('keeps key-based managed and provider-subagent selection behavior', () => {
     const root = session('root', { title: 'Parent', subagents: [nativeSubagent] })
     const child = session('managed-child', { kind: 'delegated', title: 'Managed child', parentSessionId: root.id })
