@@ -235,10 +235,11 @@ addressed, sent a turn, forked, or handed to a terminal, so making it a session 
 every table that reads one. It is a projection instead: each session's row carries a `subagents`
 roster, folded from that session's own `subagent` events by `recordEvent`, in the same transaction as
 the event insert. The runtime already broadcasts a session row after every event it records, and agent
-frames are pushed to every client rather than subscribed to per id, so the task sidebar's indented
-sub-rows appear and settle live for every session in the task, not only the open one, and nothing extra
-is fetched. The roster keeps every in-flight entry plus the last 20 settled ones; the full history stays
-in the event ledger, which is what the transcript reads.
+frames are pushed to every client rather than subscribed to per id, so the task sidebar's sub-rows
+appear and settle live for every session in the task, not only the open one, and nothing extra is
+fetched. Each sub-row is inset behind a one-pixel left rule, aligned with its parent's text, to show
+which parent owns it. The roster keeps every in-flight entry plus the last 20 settled ones; the full
+history stays in the event ledger, which is what the transcript reads.
 
 A session row also carries `queuedTurns`, the count of follow-ups waiting to dispatch. It is a column
 on the session row, kept current by the store whenever a turn enters or leaves the queue, folded there
@@ -321,8 +322,9 @@ interrupted child turn.
 A managed child records `parentSessionId` and the parent's active `parentTurnId`. A terminal-owned
 child uses only the spawn ledger for authority and exposes a bounded terminal label and profile for
 display. The session list projects that lineage beside its session page. The Agent pane nests managed
-children below an available managed parent, labels terminal-owned children without inventing a
-parent row, shows depth and isolation, and links a selected child back to its managed parent.
+children below an available managed parent and marks that ownership with the same inset left rule as
+provider-native subagents, labels terminal-owned children without inventing a parent row, shows depth
+and isolation, and links a selected child back to its managed parent.
 Provider-native subagent rows keep their original place under the provider session.
 
 Only a direct owner can address a child. A child may create one more level, but a third level is

@@ -285,7 +285,8 @@ business on `:root`: `diff.css`'s `--diff-gutter-w`, `--diff-marker-w`, `--diff-
 `--diff-chrome-w` let a row canvas's minimum width add up the same gutter and marker widths the
 columns themselves use, so the two cannot drift apart and clip the last character off a long line;
 `primitives.css`'s `--row-field-w` is the track width `.ui-row`'s `meta` column reserves, shared by
-the row and its own grid and meaningless to anything else.
+the row and its own grid and meaningless to anything else; `--row-owner-inset` places a nested row's
+one-pixel ownership rule on its parent's text column and keeps the row width inside the pane.
 
 ### Border roles
 
