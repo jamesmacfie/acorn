@@ -44,7 +44,7 @@ maintain forever. This vocabulary is a fixed struct with a most-restrictive merg
 
 ## Trust the row
 
-The repo-config trust gate (`packages/node-core/src/main/repoConfigTrust.ts`) hashes `.acorn/*` files
+The repo-config trust gate (`packages/node-core/src/server/repoConfigTrust.ts`) hashes `.acorn/*` files
 on the premise that the checkout is untrusted and the database is trusted. [api-gates.md](./api-gates.md)
 § Gate 2 closes the write path that broke that premise. As the belt behind that gate, extend
 `readRepoConfigSnapshot` to include the project row's executable fields (`setupScript`, `devScript`,
@@ -59,7 +59,7 @@ the database file — and a developer controls the database file. For a buyer, t
 the machine. Two pieces:
 
 1. **OTLP export** of the existing append-only `audit` table
-   (`packages/node-core/src/server/routes/audit.ts`, retention and route already exist) to the managed
+   (`packages/node-core/src/server/routes/security/audit.ts`, retention and route already exist) to the managed
    telemetry sink.
 2. **The tool-dispatch trail.** `docs/agent-tools.md` § Rich results already names the registry
    dispatch seam as where a tool-usage audit belongs. Emit it there, keyed by task, and export it the
@@ -67,19 +67,17 @@ the machine. Two pieces:
 
 Retention, the read route, and the dispatch seam all exist. This is mostly plumbing, not new design.
 
-## The plugin containment rung comes due
+## The plugin containment rung
 
-This is the question a security review actually asks, and rung 1 does not answer it. Rung 1
-(`docs/security.md` § Rung 1) means an honest plugin cannot overreach by accident — a real property,
-but not the one an auditor asks about. They will ask what stops a loaded plugin's node half from
-reading `core.sqlite`. The answer is rung 2 (`docs/security.md` § Rung 2): each loaded plugin's node
-half runs as a child process holding a plugin-scoped internal token whose scope is its manifest, with
-enforcement moved to the auth middleware where it is strong. It is already designed; it has not been
-built.
+This is the question a security review actually asks: what stops a loaded plugin's node half from
+reading `core.sqlite`? Rung 2 (`docs/security.md` § Rung 2) now answers it. Each node half runs in
+its own permission-scoped worker, reaches the host through an owner-bound, manifest-shaped RPC
+context, and receives only exact filesystem grants. Loader acceptance tests prove that direct
+`node:sqlite` access cannot open core or peer databases.
 
-Under a managed policy, force it: loaded plugins run out of process or they do not load. Treat rung 2
-as a launch requirement for the enterprise offering, not a follow-up, because it is the question the
-review asks first.
+A managed policy therefore has no weaker in-process mode to disable: if the isolated realm cannot
+start, the plugin does not load. Rung 3 remains the separate question of OS-adversarial confinement,
+crash isolation, and per-plugin resource controls.
 
 ## What acorn does not build
 

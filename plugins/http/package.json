@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-http",
   "version": "0.1.0",
+  "description": "An HTTP client pane: request drafts scoped to a task, saved back to the repo when they are worth keeping.",
   "private": true,
   "type": "module",
   "exports": {

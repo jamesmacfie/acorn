@@ -136,7 +136,7 @@ ctx.collections.register({
 
 `pluginId` and the registry id are bound by the host from the registering plugin, so a collection
 cannot be filed under a stranger's name. Both feeders land in one registry
-(`client-core/src/registries/collections.ts`) and nothing downstream can tell them apart. That is the
+(`client-core/src/host/registries/sources/collections.ts`) and nothing downstream can tell them apart. That is the
 point: a third-party plugin's panels ship no client bundle, trigger no trust prompt, and are
 pixel-identical to a first-party one's under every appearance pack.
 
@@ -271,7 +271,7 @@ as every action any plugin ships does.
 
 `openUrl` is not automatically a trip to the browser. Before opening one, the dispatcher asks the
 content-link registry whether the URL names something acorn has its own surface for (`openInAppUrl`
-in `registries/contentLinks.ts`). The URL stays the row's identity and the plugin still declares the
+in `registries/panes/contentLinks.ts`). The URL stays the row's identity and the plugin still declares the
 same verb. Only the destination is resolved late, by whoever owns the pattern.
 
 There are three destinations and a provider gets whichever it declared, in this order:
@@ -303,7 +303,7 @@ unavailable. No task means no pane, no installed plugin means no panel, and no n
 declared `path` means no route, so a surface never has to know which of the three a provider shipped.
 
 Taking a route also selects the rail source that owns it (`sourceIdForPath` in
-`registries/sources.ts`). The shell draws from the rail selection rather than from the location:
+`registries/sources/sources.ts`). The shell draws from the rail selection rather than from the location:
 every contributed route mounts as a `noop` and the surface comes off the rail, so navigating from a
 dashboard to another source's route without that step moves the address bar and leaves the dashboard
 on screen. A path no source claims leaves the rail alone, and core's own routes are not rail sources.
@@ -607,7 +607,7 @@ can be wrong live where they can be. The same rule puts every scale, tick, and r
 Everything pure in that list moved to `packages/dashboards-core`, because the node's measure sampler
 has to compute a panel's number with the same functions the renderer draws it with (see
 [schedules](./schedules.md)) and a client package cannot enter the node's graph.
-`client-core/src/dashboards/*.ts` are one-line re-exports, so every path named in this document still
+`client-core/src/features/dashboards/*.ts` are one-line re-exports, so every path named in this document still
 resolves and every component here still says `./model`. Only `editor.ts`, `data.ts`, `draft.ts`,
 `persist.ts`, and the components stayed, because they read registries, signals, or the query client,
 which is the line the new package draws.
@@ -617,7 +617,7 @@ which is the line the new package draws.
 Panel definitions and placements are one JSON blob in the owning node's per-user prefs, as the
 `core.dashboards` persisted-state slice, versioned from day one. They are not device state. A panel
 describes that node's resources, so it follows the resource (see
-[scope rules in the state doc](./state.md)) and every client paired with that node renders the board
+[scope rules in the state doc](./state-ownership.md)) and every client paired with that node renders the board
 its owner built. The device's query cache stays the offline read fallback, as for every other
 node-backed read.
 
@@ -934,6 +934,6 @@ refused each have a deliverable spec in [the dashboards backlog](./future/dashbo
   this sits next to without reversing: descriptors in [the plugins doc](./plugins.md).
 - Why descriptors exist and why the verb set stays closed: [extensibility](./extensibility.md).
 - The mirrors a collection route projects over: [data layer](./data-layer.md).
-- Why panel definitions follow the node rather than the device: [state](./state.md).
+- Why panel definitions follow the node rather than the device: [state](./state-ownership.md).
 - The backlog, one deliverable per file, plus the refusals:
   [dashboards backlog](./future/dashboards/README.md).

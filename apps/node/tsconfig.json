@@ -1,7 +1,7 @@
 {
-  // The Electron-free service composition root. No DOM: nothing here may reach for `window` or
-  // `document`, and narrowing lib/types makes that a compile error rather than a runtime surprise
-  // inside a utility process.
+  // The service composition root. No DOM: nothing here may reach for `window` or `document`, and
+  // narrowing lib/types makes that a compile error rather than a runtime surprise inside a
+  // supervised child process.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext"],

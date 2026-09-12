@@ -1,5 +1,5 @@
 // Docker surface routes (docs/plugins.md): the local daemon browsed/actioned over loopback HTTP
-// behind the DockerBridge (main/dockerBridge.ts). Refs reach argv in the main process, so every
+// behind the DockerBridge (../dockerBridge.ts). Refs reach argv on the node, so every
 // ref is shape-validated here first (leading-dash guard). Answers 503 when the bridge isn't wired.
 import { Hono } from 'hono'
 import { z } from 'zod'

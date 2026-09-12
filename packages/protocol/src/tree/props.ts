@@ -6,7 +6,7 @@
 // is a function, a `class`, a `style`, or a role prop carrying a raw colour. Those are what this
 // refuses.
 //
-// ponytail: one shared schema for all 62 nodes rather than 62 hand-written ones. The per-node
+// ponytail: one shared schema for every node rather than one hand-written per node. The per-node
 // allowlist would be defence in depth, not the load-bearing check, and it rots on every kit change.
 // Upgrade path if a node ever does spread its leftovers: give `KIT_NODE_SCHEMAS` real per-node
 // entries — every caller already goes through it.

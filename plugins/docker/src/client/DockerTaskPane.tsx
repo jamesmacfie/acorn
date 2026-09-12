@@ -10,7 +10,7 @@ import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
 import { wsOnDockerChanged } from './wsChannel'
-import { containerTone, dockerSelection, rememberDockerSelection } from './dockerViewState'
+import { containerTone, dockerSelection, rememberDockerSelection } from './dockerViewStore'
 import ContainerDetail from './ContainerDetail'
 import { Chip, ChipRow, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
 

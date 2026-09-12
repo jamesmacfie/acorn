@@ -88,7 +88,7 @@ export function eventChord(event: KeyboardEventShape): string | null {
 }
 
 // Structural rather than instanceof-based: this runs in the shell, a sandboxed frame, and Node
-// tests. It intentionally recognizes the same EditContext surface Monaco uses as the old client-only
+// tests. It intentionally recognizes the same EditContext surface a code editor uses as the old client-only
 // predicate did.
 export function isTypingTarget(target: unknown): boolean {
   if (!target || typeof target !== 'object') return false

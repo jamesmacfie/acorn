@@ -23,7 +23,7 @@ beforeEach(() => _resetPluginRequests())
 describe('the tool cannot install', () => {
   it('imports nothing that could install, download or write to disk', () => {
     // Structural, not behavioural: the request/decision split is only a defence for as long as this
-    // module has no installer in reach. A future import of pluginInstaller here would give a
+    // module has no installer in reach. A future import of server/plugins/installer.ts here would give a
     // prompt-injected agent a code path to arbitrary code execution, and no test written against the
     // handler's output would notice.
     const source = readFileSync(new URL('./pluginRequests.ts', import.meta.url), 'utf8')

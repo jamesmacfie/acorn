@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-preview",
   "version": "0.1.0",
+  "description": "A live preview of what a task is building, plus the page rules the shell enforces around it.",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,13 +14,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "solid-js": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

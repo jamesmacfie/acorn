@@ -1,0 +1,346 @@
+import { mkdirSync, readFileSync, renameSync } from 'node:fs'
+import { join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
+import { z } from 'zod'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
+import { cadenceSchema } from '@acorn/protocol/schedules.ts'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+
+const log = createLogger('plugins')
+
+// This device's decisions about which plugin bundles it will run. See docs/plugins.md and
+// docs/security.md, "Third-party plugin bundles", for the key, the storage, and what "gained" means
+// in the update diff.
+//
+// Not encrypted, unlike the device tokens next door. A decision record is not a secret, and
+// safeStorage would mean a machine with no keychain forgets every decision the owner made and
+// re-prompts for all of them. Otherwise the file discipline matches fleet.json: 0700 dir, 0600 file,
+// chmod after write.
+
+const TRUST_FILE = 'plugin-trust.json'
+
+const webviewGrantSchema = z.strictObject({
+  surface: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  hosts: z.array(z.string().min(1).max(253)).min(1).max(32),
+}) as z.ZodType<PluginWebviewGrant>
+
+const keyClaimGrantSchema = z.strictObject({
+  surface: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  chords: z.array(z.string().min(1).max(64)).min(1).max(32),
+}) as z.ZodType<PluginKeyClaimGrant>
+
+const navigationDestinationGrantSchema = z.strictObject({
+  surface: z.string().min(1).max(64),
+  label: z.string().min(1).max(120),
+  destination: z.string().min(1).max(64),
+  targetKind: z.string().min(1).max(64),
+  noticeKind: z.string().min(1).max(64).optional(),
+}) as z.ZodType<PluginNavigationDestinationGrant>
+
+const extensionGrantSchema = z.strictObject({
+  kind: z.enum(['hosts', 'extends', 'replaces']),
+  // A `<pluginId>:<pointId>` reference or a designated core slot id, both bounded by the manifest.
+  target: z.string().min(1).max(130),
+  label: z.string().min(1).max(80),
+}) as z.ZodType<PluginExtensionGrant>
+
+// The cadence is the whole grant beside the name, so it is parsed rather than kept as an opaque
+// blob. A snapshot that cannot be compared is one the update prompt cannot diff.
+const scheduleGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  cadence: cadenceSchema,
+}) as z.ZodType<PluginScheduleGrant>
+
+// `cleansUp` is the whole grant beside the id, and the diff turns on it. A package that used to only
+// warn on archive and now offers to change something has grown its reach.
+const taskCheckGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  cleansUp: z.boolean(),
+}) as z.ZodType<PluginTaskCheckGrant>
+
+// The whole spawn is the grant, so all of it is parsed. "This package now runs a different binary"
+// is the diff that matters most, and it needs a field-by-field comparison.
+const harnessGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  kind: z.enum(['command', 'entry']),
+  run: z.string().min(1).max(512),
+  env: z.array(z.string().min(1).max(64)).max(32),
+}) as z.ZodType<PluginHarnessGrant>
+
+const agentToolGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  description: z.string().min(1).max(500),
+  risk: z.enum(['read', 'write', 'execute']),
+  requiresSession: z.boolean(),
+  maxOutputBytes: z.number().int().positive(),
+}) as z.ZodType<PluginAgentToolGrant>
+
+const contextSectionGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  defaultIncluded: z.boolean(),
+  maxBytes: z.number().int().positive(),
+  maxTokens: z.number().int().positive(),
+}) as z.ZodType<PluginContextSectionGrant>
+
+const ackSchema = z.strictObject({
+  pluginId: z.string().min(1),
+  hash: z.string().regex(/^[0-9a-f]{64}$/),
+  // The node that served these bytes, so the prompt can name it and a later audit can answer "where
+  // did this come from". Not part of the key, because the same bundle from a second node is the same
+  // code.
+  nodeId: z.string().min(1),
+  version: z.string().min(1),
+  // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
+  // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
+  permissions: pluginPermissionsSchema,
+  // Default keeps version-1 trust files written before webviews readable. An old acknowledgement
+  // says the accepted bundle had no recorded webview grant.
+  webviews: z.array(webviewGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before frame key claims readable.
+  keyClaims: z.array(keyClaimGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before cooperative destinations readable.
+  navigationDestinations: z.array(navigationDestinationGrantSchema).max(64).default([]),
+  // Default keeps acknowledgements written before the cooperative cross-plugin seam readable. An old
+  // acknowledgement says the accepted bundle reached into nothing outside itself, which was true.
+  extensions: z.array(extensionGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before schedules existed readable. An old acknowledgement
+  // says the accepted bundle ran nothing on its own, which was true.
+  schedules: z.array(scheduleGrantSchema).max(4).default([]),
+  // Default keeps acknowledgements written before archive checks existed readable. An old
+  // acknowledgement says the accepted bundle had nothing to say on archive.
+  taskChecks: z.array(taskCheckGrantSchema).max(4).default([]),
+  // Default keeps acknowledgements written before harnesses existed readable. An old acknowledgement
+  // says the accepted bundle asked acorn to run nothing, which was true.
+  harnesses: z.array(harnessGrantSchema).max(4).default([]),
+  agentTools: z.array(agentToolGrantSchema).max(16).default([]),
+  contextSections: z.array(contextSectionGrantSchema).max(8).default([]),
+  decision: z.enum(['accepted', 'rejected']),
+  decidedAt: z.number().int(),
+  // Set when the disclosure behind the decision could not be fully parsed, because a node ran a newer
+  // manifest schema than this shell. The decision is exact and the snapshot is not, so this row must
+  // never become the baseline of a "what changed" diff. Optional, because a file written before this
+  // field existed does not carry it and its absence means complete.
+  partial: z.literal(true).optional(),
+  // The dev grant below wrote this row when a bundle arrived for a plugin the owner put into
+  // development mode. No human answered a prompt.
+  //
+  // Marked so revocation can find it. Ending dev mode has to drop these acknowledgements as well as
+  // the grant, or every auto-trusted hash stays accepted and the control is a lie. It is also why a
+  // dev row is always `partial`: nobody read a disclosure, so it must never become the baseline of a
+  // later "what changed" diff.
+  dev: z.literal(true).optional(),
+})
+export type PluginAck = z.infer<typeof ackSchema>
+
+// The dev trust grant. See docs/security.md, "The dev grant", and docs/plugins.md, "Development
+// mode".
+const devGrantSchema = z.strictObject({
+  pluginId: z.string().min(1),
+  nodeId: z.string().min(1),
+  // Where the agent iterates, when the install was a local-path one. Display only, because it is the
+  // node's filesystem and nothing here resolves it.
+  path: z.string().min(1).max(1024).optional(),
+  grantedAt: z.number().int(),
+})
+export type PluginDevGrant = z.infer<typeof devGrantSchema>
+
+// Read loosely. The rows are validated one at a time below, so a single unreadable acknowledgement
+// cannot condemn the ones beside it. `devGrants` defaults, so a file written before dev mode existed
+// reads as "nothing is in development".
+const fileSchema = z.strictObject({ version: z.literal(1), acks: z.array(z.unknown()), devGrants: z.array(z.unknown()).default([]) })
+
+export class PluginTrustStore {
+  #acks: PluginAck[] | null = null
+  #grants: PluginDevGrant[] | null = null
+
+  constructor(private readonly userDataDir: string) {}
+
+  list(): PluginAck[] {
+    if (!this.#acks) this.read()
+    return [...this.#acks!]
+  }
+
+  listDevGrants(): PluginDevGrant[] {
+    if (!this.#grants) this.read()
+    return [...this.#grants!]
+  }
+
+  devGrantFor(pluginId: string, nodeId: string): PluginDevGrant | undefined {
+    return this.listDevGrants().find((grant) => grant.pluginId === pluginId && grant.nodeId === nodeId)
+  }
+
+  /** Put a plugin into development mode on this device. Upsert, so re-approving does not stack rows. */
+  grantDev(grant: PluginDevGrant): void {
+    const parsed = devGrantSchema.parse(grant)
+    this.write(
+      this.list(),
+      [...this.listDevGrants().filter((existing) => !(existing.pluginId === parsed.pluginId && existing.nodeId === parsed.nodeId)), parsed],
+    )
+  }
+
+  /** End development mode. See docs/security.md, "The dev grant". */
+  revokeDev(pluginId: string, nodeId: string): void {
+    this.write(
+      this.list().filter((ack) => !(ack.dev && ack.pluginId === pluginId && ack.nodeId === nodeId)),
+      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && grant.nodeId === nodeId)),
+    )
+  }
+
+  // Undefined means "never seen these bytes", which is the prompt condition. A rejection is a real
+  // answer and is remembered, so a plugin the owner turned away does not ask again every boot.
+  decisionFor(pluginId: string, hash: string): PluginAck | undefined {
+    return this.list().find((ack) => ack.pluginId === pluginId && ack.hash === hash)
+  }
+
+  // The most recent bundle of this plugin the owner accepted, when it is not the one being asked
+  // about. It turns a bare "do you trust this?" into "this plugin has been updated, and here is what
+  // its permissions gained".
+  //
+  // A `partial` row is not a candidate. Its snapshot is known incomplete, so a diff against it would
+  // report grants as newly requested that the owner had already seen.
+  previousFor(pluginId: string, hash: string): PluginAck | undefined {
+    return this.list()
+      .filter((ack) => ack.pluginId === pluginId && ack.hash !== hash && ack.decision === 'accepted' && !ack.partial)
+      .sort((a, b) => b.decidedAt - a.decidedAt)[0]
+  }
+
+  // Upsert on (pluginId, hash). Re-deciding the same bundle replaces the row rather than appending,
+  // so the file cannot grow a history of one plugin being toggled.
+  record(ack: PluginAck): void {
+    const parsed = ackSchema.parse(ack)
+    const stored = this.decisionFor(parsed.pluginId, parsed.hash)
+    // Re-deciding the same bundle the same way writes nothing. Every launch re-records the five
+    // bundled plugins (bundledPluginTrust.ts), and each write is an fsync of the whole file in front
+    // of the window. `decidedAt` is excluded because it moves on every call by definition, and the
+    // stored answer to "when did the owner decide this" is the first time, not the last.
+    if (stored && isDeepStrictEqual({ ...stored, decidedAt: 0 }, { ...parsed, decidedAt: 0 })) return
+    this.write([...this.list().filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)), parsed], this.listDevGrants())
+  }
+
+  /**
+   * Accepts a bundle because the plugin is in development mode on this device, not because anyone
+   * read a prompt. Returns false and stores nothing when there is no grant for (pluginId, nodeId),
+   * which keeps this from being a second, quieter way to trust a bundle.
+   *
+   * Always `partial`, because there is no disclosure behind it. See docs/security.md, "The dev
+   * grant".
+   */
+  recordDevAccept(input: { pluginId: string; hash: string; nodeId: string; version: string }): boolean {
+    if (!this.devGrantFor(input.pluginId, input.nodeId)) return false
+    this.record({
+      ...input,
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+      webviews: [],
+      keyClaims: [],
+      navigationDestinations: [],
+      extensions: [],
+      schedules: [],
+      taskChecks: [],
+      harnesses: [],
+      agentTools: [],
+      contextSections: [],
+      decision: 'accepted',
+      decidedAt: Date.now(),
+      partial: true,
+      dev: true,
+    })
+    return true
+  }
+
+  // Forgetting a node does not drop its acknowledgements. The decision was about bytes, those bytes
+  // are still in the cache, and another node may still offer them, so re-pairing must not re-prompt
+  // for code the owner already approved. The cache sweep drops the last accepted row for a plugin no
+  // node offers any more, on its own clock.
+  forgetPlugin(pluginId: string): void {
+    this.write(
+      this.list().filter((ack) => ack.pluginId !== pluginId),
+      this.listDevGrants().filter((grant) => grant.pluginId !== pluginId),
+    )
+  }
+
+  // One row at a time, and that granularity is the point. Parsing the file as a unit meant one
+  // acknowledgement this shell could not read failed all of them, and the damage did not stop at
+  // re-prompting: the empty list became the cache and the next record() or forgetPlugin() wrote it
+  // back. One unreadable row erased every decision on the device, including the rejections that keep
+  // unwanted plugins quiet.
+  //
+  // Still fails closed per row. A row this code cannot read is one it asks about again, because
+  // guessing could mean running code on the strength of a half-parsed record.
+  private read(): void {
+    this.#acks = []
+    this.#grants = []
+    let text: string
+    try {
+      text = readFileSync(join(this.userDataDir, TRUST_FILE), 'utf8')
+    } catch {
+      // No file, so nothing has ever been trusted on this device. The one case with nothing to
+      // preserve, which is why it is separate from the unreadable-bytes case below.
+      return
+    }
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      raw = null
+    }
+    const file = fileSchema.safeParse(raw)
+    if (!file.success) {
+      // An unrecognised shape says nothing about what it held. Moved aside rather than left for the
+      // next write to overwrite. This is the only copy of every decision the owner has made, and "we
+      // could not read it" must not become "it is gone".
+      log.warn('plugin-trust.json is unreadable; every plugin will ask again')
+      this.quarantine()
+      return
+    }
+    const acks: PluginAck[] = []
+    let dropped = 0
+    for (const entry of file.data.acks) {
+      const parsed = ackSchema.safeParse(entry)
+      if (parsed.success) acks.push(parsed.data)
+      else dropped++
+    }
+    if (dropped) {
+      log.warn(`${dropped} plugin trust record(s) could not be read; those bundles will ask again`, { dropped })
+    }
+    // Same per-row stance, same direction of failure. A grant this code cannot read does not exist,
+    // so the plugin it covered goes back to prompting per hash.
+    const grants: PluginDevGrant[] = []
+    for (const entry of file.data.devGrants) {
+      const parsed = devGrantSchema.safeParse(entry)
+      if (parsed.success) grants.push(parsed.data)
+    }
+    this.#acks = acks
+    this.#grants = grants
+  }
+
+  private quarantine(): void {
+    const path = join(this.userDataDir, TRUST_FILE)
+    try {
+      renameSync(path, `${path}.corrupt`)
+      log.warn(`the previous file was kept as ${TRUST_FILE}.corrupt`)
+    } catch (error) {
+      // Best effort. A read-only or vanished directory is not a reason to fail the boot.
+      log.warn(`could not set the unreadable trust file aside: ${describeError(error).message}`)
+    }
+  }
+
+  private write(acks: PluginAck[], devGrants: PluginDevGrant[]): void {
+    this.#acks = acks
+    this.#grants = devGrants
+    const path = join(this.userDataDir, TRUST_FILE)
+    mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
+    const file = { version: 1, acks, devGrants } satisfies { version: 1; acks: PluginAck[]; devGrants: PluginDevGrant[] }
+    // The shared open-write-fsync-close-rename, not a plain write: a torn trust file is a security
+    // record the user set once, and the recovery from a half-written one is quarantine plus a prompt
+    // for every plugin. The blob cache next door deliberately keeps the looser variant; see
+    // pluginCache.ts § writeBundle.
+    writePrivateAtomic(path, `${JSON.stringify(file, null, 2)}\n`)
+  }
+}

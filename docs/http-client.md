@@ -6,7 +6,7 @@ Node-owned and encrypted where their values are sensitive.
 It is a loaded plugin (`docs/plugins.md` § Two tiers), in neither compiled composition list. Its node
 half serves `/v2/p/http` through the portable fetch carrier. Its client half is one sandboxed frame
 bundle drawing three surfaces, and its rail entry is a manifest descriptor the host renders. What
-moved, and what that cost, is in `docs/third-party/README.md` § "http has moved".
+moved, and what that cost, is in `docs/loaded-plugin-migration.md` § "http has moved".
 
 ## Data model
 
@@ -66,10 +66,23 @@ Every route in this router requires a `device` principal, send included, so inte
 callers cannot use the HTTP pane as a general outbound or secret-reading oracle. Provider
 integrations use their own allowlisted clients.
 
+## The workflow step
+
+`http:request` is this plugin's contribution to `workflows:step-kind`
+([workflows.md](./workflows.md) § Contributed step kinds). It sends through the same `send` path the
+pane uses, so the post-interpolation scheme check, the 5 MB response cap, the project's variable
+layers, and the command deadline all apply unchanged.
+
+Its `describe` names the five fields the handler reads: `method`, `url`, `headers`, `bodyMode`, and
+`body`. `headers` takes either a `[steps.with.headers]` table or one `Name: value` per line, which is
+what the drawn textarea produces. `auth` is not a field. It is an object with a different shape per
+mode, and a field that needs a component is not a field, so a step that authenticates writes `auth`
+in the definition's JSON or puts the header in `headers`.
+
 ## Other outbound consumers in the Node
 
 There is one more, and it is deliberately not built on anything shared: the plugin installer
-(`packages/node-core/src/main/pluginInstaller.ts`) fetches release metadata and a package archive when
+(`packages/node-core/src/server/plugins/installer.ts`) fetches release metadata and a package archive when
 an owner installs a plugin. It keeps its `fetch` usage inside its own module, with its own scheme guard
 (https everywhere, http only on loopback, re-checked after redirects), a 32 MiB archive cap, and a
 60-second timeout. Same posture as the send path above, and for the same reason: a general client
@@ -95,6 +108,36 @@ The rail source lists the project's saved requests and nothing more. The host dr
 `/v2/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the panel
 beside it, so the descriptor vocabulary does not have to grow into a UI framework.
 
+### From the command palette
+
+Three rows under an **API** group (`docs/command-palette-and-shortcuts.md`), all declared in the
+manifest and all served by this plugin's own node half.
+
+| Row | Kind | What it does |
+| --- | --- | --- |
+| Find a saved request | search, project-scoped | `/v2/p/http/palette/requests` answers the routed project's saved rows; picking one navigates to `http-project`, the same address the rail row has |
+| New request | action | Delivers `new-request` to the `http` pane, where the panel starts a blank draft — the same thing the "+ Request" button does |
+| Import a curl command | input, task-scoped | `/v2/p/http/palette/import-curl` parses the pasted command, saves it encrypted against the task, and opens the pane on it |
+
+Two properties are the point of the pair, and both are structural rather than a filter applied
+afterwards.
+
+**The search cannot return a secret, because it never reads one.** The URL, the headers, the body, the
+auth block and the variables are the five columns the node encrypts. The palette's query selects `id`,
+`name`, `folder` and `method` and nothing else, so no ciphertext is opened anywhere on the path and a
+row has no field a credential could occupy — not even the URL, which the rail beside it also leaves
+out, since `?token=…` typed literally is an ordinary way to have saved a request. Rows are filtered by
+owner *and* project in SQL, so another login's requests and another project's are never selected.
+Contrast the agent-context capture, which does open the ciphertext and therefore carries a redaction
+pass and an allowlist.
+
+**The import never sends and never shells out.** `fromCurl` reads flags out of a token list produced by
+`tokenizeShell`, which is a quote-and-escape reader and not a shell: no `child_process`, no `fetch`. A
+`$(…)` or a backtick in a pasted command is stored as the literal text it is. The parsed request goes
+through the same body schema and the same encryption a save from the pane does, and the route answers
+only once the row is stored. Sending stays a separate act the reader takes in the panel with the
+request in front of them.
+
 All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
 components (`docs/plugins.md` § The tree contract). Three consequences are visible in the UI, and all
 three are the same consequence — the plugin has no document of its own.
@@ -115,5 +158,5 @@ literal query value do not. A `{{VAR}}` reference in a URL is kept, because a re
 its resolved value never exists at capture time.
 
 Legacy `http-draft:*` keys from releases that persisted unsaved drafts in `localStorage` are swept by
-the shell at renderer activation (`client-core/persistence/legacyStorage.ts`), not by the plugin. A
+the shell at renderer activation (`client-core/infra/persistence/legacyStorage.ts`), not by the plugin. A
 frame's storage area is its own and could never have reached them.

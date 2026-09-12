@@ -5,7 +5,7 @@ import { CONTEXT_SECTION_POINT } from './sectionPoint'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
-import { selectionFor, setSectionSelection } from './selectionState'
+import { selectionFor, setSectionSelection } from './selectionStore'
 import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary, type TraySelection } from './model'
 import { bumpContextRevision } from './contextRevision'
 

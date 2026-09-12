@@ -1,6 +1,6 @@
 // Shared types for the find-in-files feature (docs/panes.md): the Search pane POSTs to the
-// searchRoute (server/routes/search.ts), whose SearchBridge (main/search.ts) runs ripgrep against
-// the task's worktree. Types live here so main + renderer stay in lockstep, like shared/terminal.ts.
+// searchRoute (server/routes/search.ts), whose SearchBridge (server/search.ts) runs ripgrep against
+// the task's worktree. Types live here so node + client stay in lockstep, like shared/terminal.ts.
 
 export type SearchOpts = {
   caseSensitive?: boolean
@@ -9,7 +9,7 @@ export type SearchOpts = {
 }
 
 // One match within a file. `col`/`endCol` are 1-based UTF-16 columns, matching JavaScript string
-// indices and Monaco positions. The main-process parser converts ripgrep's UTF-8 byte offsets.
+// indices and editor positions. The node's parser converts ripgrep's UTF-8 byte offsets.
 export type SearchHit = {
   line: number
   col: number

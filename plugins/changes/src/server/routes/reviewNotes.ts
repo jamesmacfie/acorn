@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { ReviewNote } from '../../shared/api'
 import { type AppEnv, type CoreServices, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { reviewNotes as reviewNotesTable } from '../../node/schema'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 // CRUD over this plugin's review_notes table, mounted under /v2/p/changes/tasks. The send loop:
 // create as unsent, deliver via sendToAgent, POST /sent stamps sentAt, and an edit clears it again,
@@ -14,6 +15,20 @@ import { reviewNotes as reviewNotesTable } from '../../node/schema'
 // docs/data-layer.md § Plugin databases.
 
 type Row = typeof reviewNotesTable.$inferSelect
+type Emit = (frame: { channel: string } & Record<string, unknown>) => void
+
+const announceNotes = async (db: PluginDatabase, taskId: string, emit?: Emit): Promise<void> => {
+  if (!emit) return
+  const [all] = await db.select({ value: count() }).from(reviewNotesTable).where(eq(reviewNotesTable.taskId, taskId))
+  const [unsent] = await db.select({ value: count() }).from(reviewNotesTable)
+    .where(and(eq(reviewNotesTable.taskId, taskId), isNull(reviewNotesTable.sentAt)))
+  emit({
+    channel: pluginChannel('changes', 'review-notes-changed'),
+    taskId,
+    total: all?.value ?? 0,
+    unsent: unsent?.value ?? 0,
+  })
+}
 
 // A note anchors to a range in a diff, so `endLine >= startLine` is part of the shape rather than a
 // follow-up check: a note that ends before it starts is not a note. `endLine` defaults to `startLine`
@@ -46,7 +61,7 @@ const rowToNote = (r: Row): ReviewNote => ({
   createdAt: r.createdAt,
 })
 
-export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) =>
+export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emit?: Emit) =>
   new Hono<AppEnv>()
     .get('/:id/review-notes', async (c) => {
       const rows = await db.select().from(reviewNotesTable).where(eq(reviewNotesTable.taskId, c.req.param('id'))).orderBy(reviewNotesTable.createdAt)
@@ -71,22 +86,33 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
         createdAt: Date.now(),
       }
       await db.insert(reviewNotesTable).values(row)
+      await announceNotes(db, taskId, emit)
       return c.json(rowToNote(row))
     })
     // Edit clears sentAt, so an edited note counts as unsent again (orca's pattern).
     .patch('/:id/review-notes/:noteId', async (c) => {
       const parsed = editBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
-      await db
-        .update(reviewNotesTable)
-        .set({ body: parsed.data.body.trim(), sentAt: null })
-        .where(and(eq(reviewNotesTable.id, c.req.param('noteId')), eq(reviewNotesTable.taskId, c.req.param('id'))))
+      const taskId = c.req.param('id')
+      const noteId = c.req.param('noteId')
+      const [before] = await db.select({ body: reviewNotesTable.body, sentAt: reviewNotesTable.sentAt })
+        .from(reviewNotesTable)
+        .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
+      const body = parsed.data.body.trim()
+      if (before && (before.body !== body || before.sentAt !== null)) {
+        await db.update(reviewNotesTable).set({ body, sentAt: null })
+          .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
+        await announceNotes(db, taskId, emit)
+      }
       return c.json({ ok: true })
     })
     .delete('/:id/review-notes/:noteId', async (c) => {
-      await db
+      const taskId = c.req.param('id')
+      const deleted = await db
         .delete(reviewNotesTable)
-        .where(and(eq(reviewNotesTable.id, c.req.param('noteId')), eq(reviewNotesTable.taskId, c.req.param('id'))))
+        .where(and(eq(reviewNotesTable.id, c.req.param('noteId')), eq(reviewNotesTable.taskId, taskId)))
+        .returning({ id: reviewNotesTable.id })
+      if (deleted.length) await announceNotes(db, taskId, emit)
       return c.json({ ok: true })
     })
     // Stamp sentAt on confirmed delivery (the send loop's final step).
@@ -94,9 +120,12 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       const parsed = sentBody.safeParse(await c.req.json().catch(() => null))
       const ids = parsed.success ? parsed.data.ids : []
       if (!ids.length) return respondError(c, 400, 'bad_request')
-      await db
+      const taskId = c.req.param('id')
+      const changed = await db
         .update(reviewNotesTable)
         .set({ sentAt: Date.now() })
-        .where(and(eq(reviewNotesTable.taskId, c.req.param('id')), inArray(reviewNotesTable.id, ids)))
+        .where(and(eq(reviewNotesTable.taskId, taskId), inArray(reviewNotesTable.id, ids), isNull(reviewNotesTable.sentAt)))
+        .returning({ id: reviewNotesTable.id })
+      if (changed.length) await announceNotes(db, taskId, emit)
       return c.json({ ok: true })
     })

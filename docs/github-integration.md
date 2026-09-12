@@ -6,7 +6,7 @@ integration credential and its repositories/PRs are a disposable local mirror.
 ## Connecting
 
 Settings → Integrations and the first-run wizard both run the OAuth device authorization flow through
-the same `createDeviceFlow` helper in `packages/client-core/src/integrations/deviceFlow.ts`, so the
+the same `createDeviceFlow` helper in `packages/client-core/src/features/integrations/deviceFlow.ts`, so the
 polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
 1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
@@ -34,6 +34,11 @@ commits, review threads, labels, requested reviewers, checks, freshness, viewed 
 repositories. Provider reads are serve-then-revalidate and may use ETags. List refreshes replace
 collections so inaccessible repositories/PRs disappear from the local projection.
 
+`plugin:github:repos-changed` announces a completed full repository-list replacement or a repository
+inserted by a live lookup after a mirror miss. A `304 Not Modified` response updates only freshness
+and does not send the event. Node-side plugins can use the user-scoped `github.mirror` capability to
+list the same repository inventory without calling GitHub.
+
 Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A blob miss fetches
 from GitHub and stores the result by SHA. The cache is per Node and can hold private repository data.
 
@@ -44,12 +49,31 @@ mentions, labels, reviewers, comments, review threads, and create-PR. Mutations 
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
 value.
 
+PR detail keeps the mirror's serve-then-revalidate behavior, including provider-rendered `bodyHTML`.
+That HTML can contain GitHub `private-user-images` URLs signed for only a few minutes, so a stale read
+may briefly carry an expired URL. `plugin:github:pr-synced` means that the local pull request mirror
+was committed or invalidated, so consumers re-read the identified pull request. The plugin sends it
+after a background refresh and after a successful PR mutation updates or invalidates mirror state.
+A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
+other clients and plugins in sync with the initiating client.
+
+Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
+repository's open-pull list. The interactive route and `github_pull_create` agent tool share this
+write path.
+
 The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
 route. It infers the head from the task branch, uses the requested base, and atomically attaches the
 created PR through `CoreServices.tasks.attachPull`: the first attachment claims
 `tasks.pull_number`, while later attachments become durable related rows with the managed session id.
 Shelling out to `gh pr create` still has only branch-adoption semantics and does not gain agent
 attribution.
+
+Two read-tier tools sit beside it. `pr_review_comments` returns the submitted reviews, the inline
+threads and the conversation comments for the task's PR, and `pr_checks` returns every mirrored check
+with the failing ones named. Both read this plugin's mirror, so neither spends the credential or
+touches the network, and both distinguish an unmirrored PR from an empty one. Before they existed, an
+agent asked to address review feedback had to shell out to `gh` against data acorn already had
+([agent tools](./agent-tools.md) § GitHub).
 
 The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
 live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only
@@ -99,18 +123,31 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 
 A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
-The PR pane keeps that scalar PR as its primary and adds read-only chips to the strip from three
+The PR pane keeps that scalar PR as its primary and adds read-only tabs to the strip from three
 sources: durable
 `task_pulls` relations, the connected base/head graph of the mirrored open-PR list, and PR links in
-the primary description, comments, reviews, and threads. Stack and mention evidence is derived on
-read, so retargeting a stack or editing out a link removes it without a cleanup migration. A linked
-task destination wins over agent, mention, and stack destinations; an agent destination opens the
-recorded managed session through the existing notice-target seam.
+the primary description, comments, reviews, and threads. A pull body is GitHub's rendered HTML, and
+only the `/pull/` form of a link is taken, so a `Fixes #42` that GitHub wrote as an issue link stays
+out of the strip. Stack and mention evidence is derived on read, so retargeting a stack or editing
+out a link removes it without a cleanup migration. A linked task destination wins over agent,
+mention, and stack destinations; an agent destination opens the recorded managed session through the
+existing notice-target seam.
 
-Selecting a related PR with no task offers `+ Task` in the strip. Promotion reuses the
+The strip is the kit's `Tabs`, and every tab is labelled `#1234`, so each one carries the mark of the
+destination it has: a list for a linked task, a bot for the agent that opened it, a link for a
+mention, a branch for a stack neighbour. Selection follows focus in a tablist, so a tab only ever
+changes which pull the pane reads. Taking the destination is a control beside the strip, acting on
+the selected tab, which is what keeps a reader arrowing along the strip from being carried off to
+another task.
+
+The strip is drawn on the desktop only. A terminal has a few lines of chrome above the pane and the
+strip wants a whole row of them, so there it collapses to the primary PR; the related ones stay
+reachable from the pull list.
+
+Selecting a related PR with no task offers `+ Task` beside the strip. Promotion reuses the
 repository-list workflow: the new task takes the matching core project, the PR head branch and pull
-number, and any unambiguous Linear references from the PR body. If exactly one other active task
-already owns that PR, the chip opens it instead; several owners keep the explicit task chooser.
+number, and any unambiguous Linear references from the PR body. If active tasks already own that PR,
+the offer is replaced by a control that opens the one owner, or by a chooser over several.
 
 Within a task PR body, another GitHub PR link is a `plugin:select` intent for the existing PR pane,
 not a route change or reference-panel overlay. Which pull is selected changes what the navigator and
@@ -155,5 +192,83 @@ contributors are added beside them ([plugins.md](./plugins.md) § Cooperative ex
 
 Keyboard navigation comes from the tree rather than from this plugin: the pull list, the file list,
 the check list and the pull strip are kit collections, so the arrows, `j` and `k`, Home, End and
-type-ahead all work without a binding of github's own. What is left in `Shortcuts.tsx` is the file
-finder, `[` and `]` cycling, and "create pull request" — commands that are not a list.
+type-ahead all work without a binding of github's own. What is left in `Shortcuts.tsx` is the keyboard
+for what is not a list: the file finder, `[` and `]` cycling, and "create pull request". All three are
+commands now, and the section below says which of them the palette carries as well.
+
+## From the command palette
+
+Shipped 2026-09-03. Seven commands: six built as a function of what the router says
+(`plugins/github/src/client/commands.ts`) and one registered at boot beside the rail source
+(`plugins/github/src/client/index.ts`). How the palette itself works is
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md); what belongs here is this
+plugin's share of it.
+
+| Command | Kind | Chord | In the palette |
+| --- | --- | --- | --- |
+| Go to GitHub in the left rail (`source.github.open`) | action | `⌘0` | Yes |
+| Open keyboard shortcuts (`help.shortcuts.open`) | action | `?` | No — the reference is a Settings page, and the palette already has a row that opens Settings |
+| Find file in this pull request (`github.files.find`) | `search` | `/` | Yes |
+| Next changed file (`github.files.next`) | action | `]` | No |
+| Previous changed file (`github.files.previous`) | action | `[` | No |
+| Find pull request (`github.pull.find`) | `search`, project-scoped | none | Yes |
+| Create pull request (`github.pull.create`) | action | `c` | Yes |
+
+`plugins/github/src/client/commands.test.ts` pins the six the component builds, in that order, and the
+three of them that carry `palette`. Cycling is not one of the three: `[` and `]` step through a list
+that is already on screen, and opening a palette to move one file forward costs more than the move.
+Five of the six are gated on the route — the three file commands need a pull request open, and finding
+or creating one needs the routed project to have a GitHub repository. `when` on the command and
+`active` on the binding read the same accessors, so a palette row disappears for the same reason its
+key stops doing anything.
+
+They are registered per mount from `plugins/github/src/client/Shortcuts.tsx` rather than through
+`ctx.commands`, because every one of the six needs the router: which project is routed, which pull
+request is open, and where to navigate. A plugin's `init` runs at boot with no router in scope. The
+decisions are still built in `commands.ts` out of eight accessors the component passes in, for the
+reason `plugins/github/src/client/pullList/model.ts` exists — a decision worth testing should not need
+a DOM to reach. The rail-source command needs no router and is registered the ordinary way.
+
+**The changed-file finder was an overlay until 2026-09-03** — a second command-palette-shaped dialog
+with its own query, cursor, key handling and list. It is a `search` command on the shared session now.
+What moved is who owns the dialog; nothing a reader touches moved with it.
+
+- **`/` keeps its typing exemption and its route gate.** The binding is `typing-exempt`, so the bare
+  key fires wherever the reader is in the pull request but not from inside a filter box or a comment
+  composer, where a slash is a slash. It exists only while a pull request is open.
+- **The order is the one order.** `plugins/github/src/client/changedFiles.ts` owns a pull request's
+  changed-file order and its `?file=` target, and three places write that parameter — this finder, `[`
+  and `]` cycling, and the file list in the navigator — so all three read the same file-summaries
+  query. An empty query is that order; a ranked query keeps it as the tie-break. Ranking is over the
+  whole path rather than over the filename and the directory a row draws separately, so `client/App`
+  still matches `src/client/App.tsx`.
+- **Picking a file writes `?file=`, and that is what makes the pick outlive the palette closing.** The
+  URL is the selection and the diff reads it as its scroll anchor, so nothing has to be handed back
+  out of a dialog that is already gone. A file the pull request no longer changes is refused rather
+  than selected.
+
+**The `overlay` slot component draws nothing, and is not dead code.** `Shortcuts.tsx` returns `null`.
+It is kept because a registration that needs the router has to be mounted inside one, and a slot is how
+this plugin gets a component mounted in the shell at all. It stays a `.tsx` sibling rather than a line
+in `index.ts` (`plugins/github/src/client/slotContribution.tsx`) because this is the one slot whose
+component needs a prop wired from the slot context — `onOpenShortcuts`, which the contribution fills
+from `props.context.openSettings('shortcuts')` — and a JSX wrapper is how a slot adapts a component to
+the host's props contract.
+
+The cost of mounting that way is named in `docs/tui.md` § What a plugin loses here: the terminal host
+does not fill the `overlay` slot, so both of these searches are desktop-only. The editor's `⌘P` is not,
+because it is registered in its plugin's `init` ([editor.md](./editor.md) § From the command palette).
+
+**Finding a pull request stays project-scoped and capped.** `scope: 'project'`, because the list is the
+routed repository's open pull requests and there is no fleet or workspace query behind it to widen it
+to. One read serves a whole palette session, so typing after the frame opens costs nothing, and
+matching reuses the browse list's own `filterPulls`, so the palette finds a pull request by the same
+words the filter box does: its number, its title and its author. `MAX_PULL_ROWS` is 50 — the same
+number the session caps any search at, said here so the provider keeps its own promise rather than
+leaning on the host to keep it. Picking a row selects the GitHub rail source and then navigates, in
+that order, because the shell draws from the selected source rather than from the location.
+
+What is deliberately not a command: merging, converting a draft, submitting a review, commenting,
+changing labels or reviewers, and rerunning checks. Every one of them needs the pull request in front
+of you — which pull, which file, which thread, and what state it is in — so every one of them stays in
+the surface that shows it. A palette row would have to rebuild that context or act without it.

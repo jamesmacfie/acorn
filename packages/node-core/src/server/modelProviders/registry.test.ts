@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ConnectionProviderRegistry } from '../integrations/connectionRegistry'
-import { publicConnectionProvider } from '../integrations/providers/shared'
+import { publicConnectionProvider } from '../integrations/providerShared'
 import { ModelProviderRegistry } from './registry'
 
 const connectionProvider = (textGeneration: boolean) =>

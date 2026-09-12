@@ -19,6 +19,10 @@ export default defineConfig({
     // scripts/check-renderer-budget.mjs parses.
     { name: 'acorn:absolute-base', config: () => ({ base: '/' }) },
   ],
+  // Which host the kit draws to (client-core kit/tokens/support.ts). Stated rather than left to the
+  // default, so the two host packages read the same way and a bundle that lands on the wrong one is a
+  // grep away.
+  define: { __ACORN_HOST__: '"dom"' },
   // Why format and entryFileNames matter for the highlighter worker's Content-Security-Policy:
   // docs/shell.md § The syntax-highlighter worker's separate policy. The `worker-` prefix is what
   // the CSP's filename match keys on.

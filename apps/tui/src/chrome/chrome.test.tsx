@@ -1,0 +1,614 @@
+/** @jsxImportSource @acorn/tui/jsx */
+import { describe, expect, it } from 'vitest'
+import { toast } from '@acorn/client-core/features/notifications/toast.ts'
+import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
+import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
+import { tasksKey, type Task } from '@acorn/protocol/api.ts'
+import { createMemo, createRoot, createSignal } from 'solid-js'
+import type { Renderable } from '../tree/compat'
+import type { KeyEvent } from '../keyEvent'
+import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { keyedRows } from '../kit/showing'
+import { recordedRequests } from '../fixture'
+import { renderFixture } from '../harness'
+import { activeHints } from './bindings'
+
+// The chrome, drawn against the fixture node: rail, topbar, pane strip, footer, palette, overlays.
+//
+// Whole-screen assertions rather than cell-level ones, for the reason the smoke test gives: what a
+// reader would look for on the screen. The one thing asserted cell by cell is where the caret is,
+// because on this host the caret is not decoration — it is where the keys are, and a screen with no
+// caret is a screen nobody can drive (docs/testing.md § Test layers).
+
+const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
+
+/** The hint line, which is the last drawn row of the screen. A notification takes the row above it. */
+const footer = (frame: string): string => frame.split('\n').slice(-2)[0] ?? ''
+
+/**
+ * One group with a child of every kind, registered by the test that needs it.
+ *
+ * The shipped catalogue has groups and searches of its own, but they are about a fleet, a workspace
+ * roster and a theme list — data this fixture node does not have and this suite has no business
+ * asserting on. What is being drawn here is the rectangle: a field, a list, a marker and a status
+ * line, one per frame kind.
+ */
+const registerFixtureCommands = () => {
+  let volume = 'quiet'
+  return registerCommands([
+    { id: 'fixture.group', kind: 'group', title: 'Fixture group', category: 'navigation', palette: true, order: 900 },
+    {
+      id: 'fixture.stay', parentId: 'fixture.group', title: 'Stay open and say so', category: 'action',
+      palette: true, order: 100, run: () => ({ effect: 'stay', status: 'Still here.' }),
+    },
+    {
+      id: 'fixture.close', parentId: 'fixture.group', title: 'Close the palette', category: 'action',
+      palette: true, order: 200, run: () => {},
+    },
+    {
+      id: 'fixture.search', parentId: 'fixture.group', kind: 'search', title: 'Search a list',
+      category: 'navigation', palette: true, order: 300, placeholder: 'Type to narrow the colours…',
+      minQueryLength: 0, debounceMs: 0,
+      query: async (text) => ['amber', 'cyan', 'magenta', 'teal']
+        .filter((colour) => colour.includes(text.trim()))
+        .map((colour) => ({ id: colour, title: colour })),
+      select: (item) => ({ effect: 'stay', status: `You picked ${item.title}.` }),
+    },
+    {
+      id: 'fixture.input', parentId: 'fixture.group', kind: 'input', title: 'Say something back',
+      category: 'navigation', palette: true, order: 400, placeholder: 'Type a line and press Enter…',
+      submit: (text) => ({ effect: 'stay', status: `You said ${text}.` }),
+    },
+    {
+      id: 'fixture.setting', parentId: 'fixture.group', kind: 'setting', title: 'Volume',
+      category: 'navigation', palette: true, order: 500,
+      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      read: async () => volume,
+      write: async (value) => (volume = value),
+    },
+  ])
+}
+
+describe('the shell', () => {
+  it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
+    const screen = await renderFixture({ pane: 'notes' })
+    const frame = await screen.until('Scratchpad')
+    screen.done()
+
+    const lines = frame.split('\n')
+    // The topbar: the workspace, how many tasks are in it, and the branch of the one that is open.
+    expect(lines[0]).toContain('acorn')
+    expect(lines[0]).toContain('1 task')
+    expect(lines[0]).toContain('fix-login')
+    // The pane strip, with the pane it is showing marked.
+    expect(frame).toContain('[Notes]')
+    // The pane itself, which is the notes pane and knows nothing about any of this.
+    expect(frame).toContain('Scratchpad')
+    // The footer, drawn from the keymap's active layers.
+    expect(lines[lines.length - 2]).toContain('j/k move')
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(80)
+  }, 30_000)
+
+  it('holds together at 120 by 40, where the rail keeps its names', async () => {
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
+    const frame = await screen.frame()
+    screen.done()
+
+    // Wide enough for the rail to be a rail rather than a strip of marks.
+    expect(frame).toContain('fix-login')
+    expect(frame).toContain('[Notes]')
+    for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
+  }, 30_000)
+
+  it('opens on the first Menu source, with the keys on that row', async () => {
+    const screen = await renderFixture({ width: 120, height: 40 })
+    const frame = await screen.until('Reviews')
+    screen.done()
+
+    // There is no click to put the keys anywhere. Startup waits for provider/workspace gates, picks
+    // the first source the Menu actually draws, and lands the caret on the same row.
+    const row = frame.split('\n')[caretRow(frame)] ?? ''
+    expect(row).toContain('GitHub')
+    expect(frame).toContain('Reviews')
+  }, 30_000)
+
+  it('cycles rail, pane strip and pane on tab, and wraps', async () => {
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
+    const rail = await screen.frame()
+    const strip = await screen.press('TAB').then(() => screen.frame())
+    const pane = await screen.press('TAB').then(() => screen.frame())
+    screen.done()
+
+    expect(rail.split('\n')[caretRow(rail)]).toContain('fix-login')
+    expect(strip.split('\n')[caretRow(strip)]).toContain('[Notes]')
+    expect(pane.split('\n')[caretRow(pane)]).toContain('Scratchpad')
+  }, 30_000)
+
+  it('hides the left column on the chord and brings it back', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    expect(await screen.frame()).toContain('Browse')
+
+    // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
+    // it below 100 cells went with the icons, because the strip only said anything when every row had
+    // a glyph and most of those glyphs drew nothing (../kit/glyphs.ts).
+    await screen.press('b', { ctrl: true })
+    const hidden = await screen.frame()
+    expect(hidden).not.toContain('Browse')
+    expect(hidden).not.toContain('Tasks')
+
+    await screen.press('b', { ctrl: true })
+    const back = await screen.frame()
+    screen.done()
+    expect(back).toContain('Browse')
+  }, 30_000)
+
+  it('names the workspace and the project in the topbar, and p picks a project', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    // `Workspace > Project`. The project is not visible anywhere else on this host — the desktop
+    // carries it in the address bar — so a reader with an empty browse list can tell a missing
+    // integration from the wrong project (./Topbar.tsx).
+    expect((await screen.frame()).split('\n')[0]).toContain('>')
+
+    await screen.press('p')
+    const open = await screen.frame()
+    screen.done()
+    expect(open).toContain('Project')
+  }, 30_000)
+
+  it('opens the palette on the chord, filters, and gives the keys back on escape', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const before = caretRow(await screen.frame())
+
+    await screen.press('k', { ctrl: true })
+    const open = await screen.frame()
+    expect(open).toContain('Commands')
+    expect(open).toContain('tasks, workspaces, projects and nodes')
+
+    // The field owns the typing, and the list narrows to what matches.
+    await screen.press('q')
+    const filtered = await screen.frame()
+    expect(filtered).toContain('Quit')
+    expect(filtered).not.toContain('tasks, workspaces, projects and nodes')
+
+    await screen.press('ESCAPE')
+    const closed = await screen.frame()
+    screen.done()
+
+    expect(closed).not.toContain('tasks, workspaces, projects and nodes')
+    expect(closed).toContain('Reviews')
+    // Back where they were, which is what the DOM palette's `prevFocus` does with an element.
+    expect(caretRow(closed)).toBe(before)
+  }, 30_000)
+
+  it('walks into a command group on return and back out of it on escape', async () => {
+    const commands = registerFixtureCommands()
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'fixture') await screen.press(letter)
+    expect(await screen.frame()).toContain('Fixture group')
+
+    // A root search deliberately flattens descendants ahead of their parent group. Move past the
+    // five matching children to enter the group itself.
+    for (let row = 0; row < 5; row += 1) await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    const inside = await screen.frame()
+    expect(inside).toContain('Stay open and say so')
+    expect(inside).toContain('Close the palette')
+
+    // Escape pops to exactly where it was — the query that was typed is still there — and only the
+    // second one closes, which is the same sequence the desktop runs
+    // (client-core/host/palette/paletteView.test.tsx).
+    await screen.press('ESCAPE')
+    const back = await screen.frame()
+    expect(back).toContain('Fixture group')
+    expect(back).toContain('│ fixture')
+
+    await screen.press('ESCAPE')
+    const closed = await screen.frame()
+    expect(closed).not.toContain('Fixture group')
+    expect(closed).toContain('Reviews')
+
+    // A typed root reaches a descendant by its breadcrumb, so nesting hides nothing
+    // (client-core/host/registries/commands/graph.ts).
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'stay') await screen.press(letter)
+    const found = await screen.frame()
+    screen.done()
+    commands.dispose()
+    expect(found).toContain('Stay open and say so')
+  }, 30_000)
+
+  it('draws a search, an input and a setting in the same rectangle as the list', async () => {
+    // The interactive kinds, over the same session the desktop's palette runs on; the transitions
+    // themselves are client-core/host/registries/commands/session.test.tsx. What is asked here is only
+    // what a terminal can answer: the frame's own placeholder is in the field, the rows are the
+    // provider's, the current value is marked, and Enter reaches the outcome.
+    const commands = registerFixtureCommands()
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'fixture') await screen.press(letter)
+    for (let row = 0; row < 5; row += 1) await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+
+    // The group's five children, in the order they declared: stay, close, search, input, setting.
+    await screen.press('ARROW_DOWN')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    const searching = await screen.until('amber')
+    expect(searching).toContain('narrow the colours')
+    expect(searching).toContain('magenta')
+
+    for (const letter of 'mag') await screen.press(letter)
+    const narrowed = await screen.frame()
+    expect(narrowed).toContain('magenta')
+    expect(narrowed).not.toContain('amber')
+
+    await screen.press('RETURN')
+    expect(await screen.until('You picked magenta')).toContain('You picked magenta')
+
+    // Escape pops back to the group with the cursor where it was, and the input is the row below.
+    await screen.press('ESCAPE')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    expect(await screen.until('Press Enter to submit')).toContain('Type a line')
+
+    for (const letter of 'hello') await screen.press(letter)
+    await screen.press('RETURN')
+    expect(await screen.until('You said')).toContain('hello')
+
+    // And a setting: both choices drawn, the one that is set marked, and picking the other one keeps
+    // the frame open with the marker moved.
+    await screen.press('ESCAPE')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    const choices = await screen.until('Loud')
+    expect(choices).toContain('Quiet')
+    expect(choices).toContain('current')
+
+    await screen.press('RETURN')
+    const chosen = await screen.until('Set to Loud')
+    screen.done()
+    commands.dispose()
+    expect(chosen).toContain('Quiet')
+  }, 30_000)
+
+  it('draws the cheat sheet on ? with the keys that are live', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('?')
+    const frame = await screen.frame()
+    screen.done()
+
+    expect(frame).toContain('Keys')
+    expect(frame).toContain('j/k')
+    expect(frame).toContain('ctrl+k')
+    // Read from the active layers, not from a written list: `tab` is this host's own key for a shared
+    // intent and it is here because the region layer bound it (../keys/install.ts).
+    expect(frame).toContain('tab')
+  }, 30_000)
+
+  it('draws every cheat sheet row from what the engine reports at the depth the sheet opened from', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.until('Invalidate', 45)
+    // What the keyboard offers on the screen behind the sheet. Asked before the press, because the
+    // sheet is a `Modal` and pushes a scope the moment it draws: inside it the region layers have
+    // nothing to reach and the engine rightly stops reporting them. The sheet answers the question a
+    // reader asked, which is "what can I do here", so it snapshots on open (./CheatSheet.tsx).
+    const offered = activeHints().map((hint) => hint.keys)
+    await screen.press('?')
+    const frame = await screen.frame()
+    screen.done()
+
+    // The rows, as drawn: the key column of every line inside the dialog's frame. `Kbd` pads the key
+    // to the widest one and the row has a gap of two, so two spaces end the column.
+    const drawn = frame.split('\n')
+      .filter((line) => line.startsWith('│ '))
+      .map((line) => line.slice(2).split(/\s{2,}/)[0] ?? '')
+
+    // Both directions, which is the whole point of one source. Neither list may hold a key the other
+    // does not: a row the engine never reported is the sheet lying about a key that does nothing, and
+    // a hint with no row is the footer offering something the sheet cannot explain. Adding a binding
+    // adds a row here and removing one removes it, with nothing to keep in step by hand
+    // (./bindings.ts, docs/tui.md § The footer).
+    expect(drawn).toEqual(offered)
+  }, 30_000)
+
+  it('goes to the ends of a list on G and g, beside End and Home', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.until('Invalidate', 45)
+    const on = async (): Promise<string> => {
+      const frame = await screen.frame()
+      return (frame.split('\n')[caretRow(frame)] ?? '').trim()
+    }
+    // vim's first and last, and they are `first` and `last` in the shared intent table rather than a
+    // mode of this host's own — so the desktop's lists answer them too, and there is one table
+    // (client-core/kit/keys/keymap.ts § intentKeys, docs/tui.md § The five key groups).
+    expect(await on()).toContain('GitHub')
+    await screen.press('g', { shift: true })
+    expect(await on()).toContain('Memory')
+    await screen.press('g')
+    expect(await on()).toContain('GitHub')
+    // The same two intents the page group reaches with the keys a reader without vim in their hands
+    // would try.
+    await screen.press('END')
+    expect(await on()).toContain('Memory')
+    await screen.press('HOME')
+    expect(await on()).toContain('GitHub')
+    screen.done()
+  }, 30_000)
+
+  it('draws a notification above the footer, and never takes the keys for it', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const opening = await screen.frame()
+    const before = opening.split('\n')[caretRow(opening)]
+    toast('Saved.')
+    const frame = await screen.frame()
+
+    const lines = frame.split('\n')
+    const at = lines.findIndex((line) => line.includes('Saved.'))
+    expect(at).toBeGreaterThan(0)
+    // Above the footer, which is the last drawn line.
+    expect(lines[at + 1]).toContain('j/k move')
+    // The keys are where they were. Compared by what the caret is on rather than its row number, so
+    // a notification taking one line tests focus rather than panel arithmetic.
+    expect(lines[caretRow(frame)]).toBe(before)
+
+    await screen.press('ESCAPE')
+    const cleared = await screen.frame()
+    screen.done()
+    expect(cleared).not.toContain('Saved.')
+  }, 30_000)
+
+  // The count and what is behind it (docs/tui.md § What is drawn bespoke). The number is the desktop
+  // bell's, written here through the platform seam's `setBadge`, and `n` opens the same two sections
+  // the bell's popover holds.
+  it('counts what is waiting in the topbar, and opens the inbox on n', async () => {
+    _resetNotices()
+    pushNotice({ taskId: 'task-1', kind: 'agent-needs-input', title: 'claude needs you', at: Date.now() })
+    pushNotice({ taskId: 'task-1', kind: 'agent-completed', title: 'claude finished', at: Date.now() })
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const counted = await screen.until('\u25d4 2')
+    expect(counted.split('\n')[0]).toContain('\u25d4 2')
+
+    await screen.press('n')
+    const inbox = await screen.until('claude needs you')
+    screen.done()
+    _resetNotices()
+
+    expect(inbox).toContain('Notifications')
+    expect(inbox).toContain('claude finished')
+  }, 30_000)
+
+  it('draws no count when nothing is waiting', async () => {
+    _resetNotices()
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const frame = await screen.frame()
+    screen.done()
+    expect(frame.split('\n')[0]).not.toContain('\u25d4')
+  }, 30_000)
+
+  // Drawing in front of the node (docs/tui.md § Attach or start,
+  // docs/performance.md § Every host draws first). `acorn` creates its renderer before
+  // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
+  // persisted cache with nothing on the wire.
+  it('draws the whole shell from the persisted cache while the node it started is booting', async () => {
+    const cached: Task[] = [{
+      id: 'task-cached', title: 'from-last-time', projectId: 'project-1', branch: 'from-last-time',
+      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
+      github: null, worktreePath: null, pullNumber: null,
+    }]
+    const screen = await renderFixture({
+      width: 100,
+      height: 28,
+      starting: true,
+      // Seeded into the same per-node client the shell renders under, which is the whole of this
+      // phase: `App` used to mint one of its own, so a restored snapshot was invisible to it and every
+      // start was cold (client-core/infra/node/fleet.ts § clientFor).
+      cache: (client) => client.setQueryData(tasksKey, cached),
+    })
+    const frame = await screen.frame()
+    screen.done()
+
+    const lines = frame.split('\n')
+    // The rail's task, drawn from the cache. Not the fixture's `fix-login`: nothing asked the node
+    // for tasks at all, because a seeded query with a fresh timestamp is inside `clientFor`'s
+    // thirty-second staleTime.
+    expect(frame).toContain('from-last-time')
+    expect(frame).not.toContain('fix-login')
+    expect(recordedRequests().some((request) => request.path === '/v2/core/tasks')).toBe(false)
+    // …and the chrome around it is whole: topbar, rail, pane strip and the keys on the footer.
+    expect(lines[0]).toContain('acorn')
+    expect(lines[lines.length - 2]).toContain('j/k move')
+    // The one thing that says the node is not there yet, and it is not drawn as a fault: a node
+    // this run spawned reads as `offline` to the broker, which would otherwise say "unreachable —
+    // retrying" about a node that is booting fine (./nodeState.ts).
+    expect(frame).toContain('starting the node')
+    expect(frame).not.toContain('unreachable')
+  }, 30_000)
+
+  it('drops the starting sentence once the handshake lands, and fills the rail from the node', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const frame = await screen.until('fix-login')
+    screen.done()
+
+    expect(frame).not.toContain('starting the node')
+    expect(frame).toContain('fix-login')
+  }, 30_000)
+
+  it('asks before quitting a node it started, and does not when it only attached', async () => {
+    const attached = await renderFixture({ width: 100, height: 28 })
+    await attached.press('q')
+    const straight = await attached.frame()
+    expect(straight).not.toContain('Quit and stop the node')
+    expect(attached.quits()).toBe(1)
+    attached.done()
+
+    const started = await renderFixture({ width: 100, height: 28, supervised: true })
+    await started.press('q')
+    const asked = await started.frame()
+    expect(asked).toContain('Quit and stop the node')
+    expect(started.quits()).toBe(0)
+
+    // Enter on the first row quits. The overlay is still drawn afterwards and that is right: the real
+    // `onQuit` takes the terminal back and ends the process, so there is no frame after it to close
+    // anything in. A list inside a `Modal` answering Enter at all is what the swallow layer used to
+    // break, and a scope cannot: it names no keys (../keys/trap.ts).
+    await started.press('RETURN')
+    started.done()
+    expect(started.quits()).toBe(1)
+  }, 30_000)
+})
+
+// ── What the footer costs ─────────────────────────────────────────────────────────────────────
+//
+// The footer is drawn on every frame the shell draws, and its list comes from a walk of every active
+// keymap layer. Asking per render was the cost; asking per change is the fix, and "per change" has to
+// mean the four things that actually move the answer
+// (./bindings.ts § When the answer moves).
+
+describe('the footer asks the keymap once per change', () => {
+  it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    try {
+      await screen.until('Reviews')
+      const engine = keymap<Renderable, KeyEvent>()!
+      let asks = 0
+      const real = engine.getActiveKeys
+      engine.getActiveKeys = ((options?: Parameters<typeof real>[0]) => {
+        asks += 1
+        return real.call(engine, options)
+      }) as typeof real
+      try {
+        // Frames that have nothing to do with the keyboard. A toast draws a line above the footer and
+        // a resize redraws the whole screen, and neither adds or removes a key.
+        toast('Saved.')
+        await screen.frame()
+        await screen.frame()
+        screen.resize(110, 30)
+        await screen.frame()
+        const idle = asks
+        expect(idle, 'the footer re-collected on a frame that moved no keys').toBeLessThanOrEqual(1)
+
+        // And a key that moves the keys is a change, so the answer is asked for again. A handful
+        // rather than one, because Tab into another region mounts the controls in it and each of them
+        // registering a layer is a real change to what the footer can offer — but a handful bounded
+        // by the move rather than one per frame for the rest of the run, which is what it was.
+        await screen.press('TAB')
+        await screen.frame()
+        expect(asks - idle).toBeGreaterThan(0)
+        // The bound tracks the number of controls in the region tabbed into, so it moves when the
+        // rail gains a row. Memory (70) took it from eight to nine.
+        expect(asks - idle).toBeLessThanOrEqual(9)
+      } finally {
+        engine.getActiveKeys = real
+      }
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+})
+
+// ── Rows a change does not rebuild ────────────────────────────────────────────────────────────
+//
+// `<For>` keys by object identity, so a rail that maps its tasks into fresh wrappers on every change
+// destroys and rebuilds every row renderable — including the rows that did not change
+// (../kit/showing.tsx § keyedRows).
+
+describe('the rail keeps the rows a change did not touch', () => {
+  it('hands the same wrapper back for an unchanged task, and the same array when nothing moved', () => {
+    createRoot((dispose) => {
+      type RailTask = { id: string; title: string; parentId: string | null }
+      const alpha: RailTask = { id: 'a', title: 'Alpha', parentId: null }
+      const bravo: RailTask = { id: 'b', title: 'Bravo', parentId: null }
+      const charlie: RailTask = { id: 'c', title: 'Charlie', parentId: null }
+      const [tasks, setTasks] = createSignal([alpha, bravo, charlie])
+      const hierarchy = createMemo(() => taskHierarchy(tasks()))
+      const depthByTask = createMemo(() => new Map(hierarchy().map((entry) => [entry.task.id, entry.depth])))
+      const orderedTasks = createMemo(() => hierarchy().map((entry) => entry.task))
+      const rows = keyedRows(orderedTasks, (task) => ({
+        key: task.id,
+        task,
+        get depth() { return depthByTask().get(task.id) ?? 0 },
+      }))
+
+      const first = rows()
+      expect(first.map((row) => row.key)).toEqual(['a', 'b', 'c'])
+      // Read again with nothing moved: the same array, so `<For>` has nothing to diff.
+      expect(rows()).toBe(first)
+
+      // A reorder, which is what a `tasks:changed` that moved a task up the list is. Every row is the
+      // object it was, so every row renderable survives.
+      setTasks([charlie, alpha, bravo])
+      const reordered = rows()
+      expect(reordered.map((row) => row.key)).toEqual(['c', 'a', 'b'])
+      expect(reordered[0]).toBe(first[2])
+      expect(reordered[1]).toBe(first[0])
+      expect(reordered[2]).toBe(first[1])
+
+      // And a task whose data changed is a new wrapper, because the row has to redraw. The rows
+      // beside it are untouched, which is the half that matters.
+      const renamedAlpha: RailTask = { id: 'a', title: 'Alpha renamed', parentId: null }
+      setTasks([charlie, renamedAlpha, bravo])
+      const changed = rows()
+      expect(changed[0]).toBe(first[2])
+      expect(changed[1]).not.toBe(first[0])
+      expect(changed[2]).toBe(first[1])
+
+      // A parent's presence changes hierarchy without changing the child row. The retained wrapper
+      // survives, while its reactive depth follows the updated projection.
+      const delta: RailTask = { id: 'd', title: 'Delta', parentId: 'a' }
+      setTasks([delta, charlie, renamedAlpha, bravo])
+      const nested = rows()
+      const deltaRow = nested.find((row) => row.key === 'd')!
+      expect(deltaRow.depth).toBe(1)
+      setTasks([delta, charlie, bravo])
+      expect(rows().find((row) => row.key === 'd')).toBe(deltaRow)
+      expect(deltaRow.depth).toBe(0)
+      dispose()
+    })
+  })
+})
+
+// ── The way out, at every depth ───────────────────────────────────────────────────────────────
+//
+// Last in the file, and that is not taste. The measurement above is of one screen's collects after
+// one Tab, and it counts nine rather than eight when a `pr` fixture ran before it: opening that pane
+// leaves something registered that the next screen's Tab pays for once. Worth finding and not worth
+// finding here, so this case sits after the count rather than in front of it.
+
+describe('the footer says how to get out', () => {
+  it('says how to get out at every depth, behind a menu and behind a modal', async () => {
+    const screen = await renderFixture({ width: 100, height: 28, pane: 'pr' })
+    await screen.until('#42', 45)
+    // The scopes are a stack and Escape pops it, and the footer's `esc` is the only thing on this host
+    // that draws the depth at all. It has to survive the cut: the footer ellipsises rather than
+    // wrapping, and this row used to sit last in reading order, so the line ran out before it every
+    // time (./bindings.ts § specs).
+    expect(footer(await screen.frame())).toContain('esc back')
+
+    // Two deep, inside a `MenuList`'s scope. Nothing behind the menu is in scope, so most of what the
+    // footer was saying goes with it — which is the moment a reader most needs the one key that gets
+    // them out.
+    expect(await screen.reach('squash', 40)).toBe(true)
+    await screen.press('RETURN')
+    await screen.until('rebase')
+    expect(footer(await screen.frame())).toContain('esc back')
+
+    // And two deep inside a `Modal`, which is the other kind of scope and lands the keys as well as
+    // containing them (../keys/regions.ts § pushScope).
+    await screen.press('ESCAPE')
+    await screen.press('?')
+    await screen.until('Keys')
+    expect(footer(await screen.frame())).toContain('esc back')
+    // Climbed back out before the screen goes. The overlay stack is module state that outlives one
+    // fixture, and a case that leaves a dialog open leaves the next one measuring a screen it did not
+    // build (§ what the footer costs).
+    await screen.press('ESCAPE')
+    screen.done()
+
+    // Three deep is not asserted because a reader cannot get there. Every dialog the shell opens is
+    // opened by a bare key, and the command layer drops its bare keys above the screen's own depth,
+    // so `?` over an open menu does nothing. A third scope needs a pane that draws a `Menu` inside
+    // its own `Modal`, and no pane in the roster does (../keys/commandLayer.ts, ../keys/tiers.ts).
+  }, 30_000)
+})

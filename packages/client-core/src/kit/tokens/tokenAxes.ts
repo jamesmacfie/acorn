@@ -1,0 +1,117 @@
+// The appearance token contract, as data. See docs/ui-design.md § Token axes for the two axes and
+// why they are disjoint.
+//
+// This module is the single declaration of which token belongs to which axis. `tokenAxes.test.ts`
+// reads the stylesheets and asserts they agree, so the contract fails the suite rather than
+// degrading silently.
+import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
+
+/** Theme self-description: the only theme tokens that are not colours. See docs/ui-design.md
+ * § Token axes for what each one replaced and why a plugin theme cannot set them. */
+export const SELF_DESCRIPTION_TOKENS = ['--is-dark', '--color-scheme'] as const
+
+/** Declared once on `:root` as `var()` references into the palette. See docs/ui-design.md
+ * § Token axes for why a theme block must never restate one. */
+export const DERIVED_THEME_TOKENS = [
+  '--danger', '--danger-fg', '--success', '--success-fg',
+  '--surface-sunken', '--accent-fg',
+  '--state-ok', '--state-warn', '--state-bad',
+  '--find-hit-bg', '--find-current-bg', '--scrim-color',
+  '--brand-legible',
+] as const
+
+/** Series identity, for a chart mark asking "which one" rather than "how is this doing." See
+ * docs/ui-design.md § Token axes for why this is neither a palette primitive nor derived, and
+ * docs/dashboards.md § Views are derived, not chosen from a menu for how a chart uses it.
+ *
+ * Three, hard cap. Series four onwards folds into `other`. */
+export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
+
+/** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. See docs/ui-design.md
+ * § Plugin themes for why the palette half also lives in `@acorn/protocol/themeTokens.ts`. */
+export const THEME_TOKENS = [
+  ...THEME_PALETTE_TOKENS,
+  ...SELF_DESCRIPTION_TOKENS,
+  ...DERIVED_THEME_TOKENS,
+  ...SERIES_TOKENS,
+] as const
+
+/** Shape, typography, space, density, chrome, motion. Defaults in `styles/tokens-style.css`. */
+export const STYLE_TOKENS = [
+  // shape
+  '--radius-0', '--radius-xs', '--radius-sm', '--radius-md', '--radius-lg', '--radius-xl',
+  '--radius-pill', '--radius-circle',
+  '--radius-control', '--radius-surface', '--radius-popover', '--radius-chip',
+  '--radius-pill-fixed', '--radius-marker', '--radius',
+  '--bw-0', '--bw', '--bw-strong', '--bw-marker',
+  '--divider-w', '--chrome-divider-w', '--pane-divider-w', '--pane-bw',
+  '--control-bw', '--surface-bw', '--marker-w', '--stripe-w', '--tab-active-w',
+  '--divider', '--chrome-divider', '--control-border', '--surface-border',
+  // space
+  '--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
+  '--space-6', '--space-7', '--space-8', '--space-9', '--space-10', '--space-11',
+  '--pane-pad', '--pane-pad-y', '--pane-measure',
+  '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
+  '--pad-control', '--pad-control-lg', '--pad-chip', '--pad-cell', '--pad-surface', '--pad-body',
+  // density
+  '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm', '--control-h-xs',
+  '--topbar-h', '--pane-head-h', '--tab-h', '--tabrail-w', '--task-footer-h',
+  '--listdetail-w', '--listdetail-w-narrow', '--listdetail-w-wide',
+  '--icon-size', '--icon-box', '--avatar-sm', '--avatar-md', '--diff-line-h', '--term-fs',
+  // typography
+  '--font-mono', '--font-ui', '--font-glyph', '--font-display',
+  '--fs-2xs', '--fs-xs', '--fs-sm', '--fs', '--fs-md', '--fs-lg', '--fs-xl',
+  '--lh', '--lh-tight', '--lh-diff',
+  '--fw-normal', '--fw-medium', '--fw-semibold', '--fw-bold',
+  '--label-transform', '--label-tracking', '--label-weight', '--label-size',
+  '--heading-transform', '--heading-tracking', '--heading-weight',
+  // elevation
+  '--shadow-0', '--shadow-1', '--shadow-2', '--shadow-3', '--shadow-4', '--shadow-5',
+  '--shadow-drawer-l', '--shadow-drawer-l-sm',
+  '--elev-popover', '--elev-menu', '--elev-modal', '--elev-drawer', '--elev-panel',
+  '--elev-card', '--elev-pane', '--elev-row-hover',
+  '--ring', '--focus-ring-w', '--focus-ring-offset', '--focus-ring-style',
+  '--scrim-alpha', '--scrim', '--scrim-filter',
+  '--card-bg', '--pane-bg', '--popover-bg', '--input-bg', '--chip-bg',
+  '--shell-pad', '--pane-gap', '--pane-radius',
+  // motion
+  '--dur-instant', '--dur-short', '--dur-med', '--dur-long',
+  '--ease-out', '--ease-in-out', '--ease-spring', '--ease-interactive',
+  '--transition-color', '--hover-lift', '--press-scale',
+] as const
+
+/** Owned by neither axis. Declared in `styles/tokens-invariant.css`. */
+export const INVARIANT_TOKENS = [
+  '--z-base', '--z-sticky', '--z-resizer', '--z-float', '--z-rail', '--z-panel',
+  '--z-popover', '--z-drawer', '--z-drawer-menu', '--z-overlay', '--z-modal',
+  '--z-picker', '--z-toast', '--z-tooltip',
+  '--brand-fg',
+  '--tabular',
+] as const
+
+// Tokens read from JavaScript via getComputedStyle, because canvas surfaces cannot use CSS. See
+// docs/ui-design.md § Token axes for the full list and why renaming one breaks the terminal or
+// editor silently. Add to this list when a bridge starts reading a new token.
+export const BRIDGE_TOKENS = [
+  '--bg', '--bg-subtle', '--bg-hover', '--bg-selected',
+  '--text', '--text-muted', '--text-faint',
+  '--font-mono', '--is-dark', '--term-fs',
+] as const
+
+/** Complete CSS-variable projection for isolated plugin documents. A frame renders the shared CSS
+ * itself, so it needs every token from both axes plus the invariant stacking and brand values. */
+export const FRAME_TOKENS = [
+  ...THEME_TOKENS,
+  ...STYLE_TOKENS,
+  ...INVARIANT_TOKENS,
+] as const
+
+/** Ordering constraints that are behavioural, not cosmetic, asserted by the test. See
+ * docs/ui-design.md § Token axes for why each pair is ordered this way. */
+export const Z_ORDER_INVARIANTS: readonly (readonly [above: string, below: string])[] = [
+  ['--z-picker', '--z-modal'],
+  ['--z-modal', '--z-overlay'],
+  ['--z-drawer-menu', '--z-drawer'],
+  ['--z-toast', '--z-modal'],
+  ['--z-tooltip', '--z-toast'],
+]

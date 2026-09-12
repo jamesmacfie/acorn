@@ -2,9 +2,8 @@
 
 Design notes from the third-party-plugins session (2026-08-08). Nothing here is scheduled; this
 records the analysis so a future project starts from conclusions instead of re-deriving them.
-The terminal client is the third non-desktop surface and has its own programme in
-[terminal/](./terminal/README.md); it shares this file's reasoning about auth and custody and none of
-its browser constraints.
+The terminal client is the other non-desktop surface, and it shipped: [tui.md](../tui.md) owns it.
+It shares this file's reasoning about auth and custody and none of its browser constraints.
 The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
 the plugin docs (`docs/plugins.md`, `docs/security.md`).
 
@@ -71,8 +70,9 @@ a browser.
 Fan-out itself is just N fetch targets + N WebSockets; a browser does that fine. The per-node
 query caches are already node-scoped, built for N from day one. Two architectures:
 
-- **Browser-side fan-out** (recommended): the client platform adapter grows a `WebBroker` —
-  endpoint records + tokens in IndexedDB, one WS per node, same node-scoped caches. Truest to
+- **Browser-side fan-out** (recommended): the client platform adapter grows a `WebBroker` — the web
+  host's composition of `@acorn/custody`, which is a package rather than the desktop's, with endpoint
+  records + tokens in IndexedDB, one WS per node, and the same node-scoped caches. Truest to
   the existing model: nodes stay independent peers, zero new server-side machinery. Costs: the
   token-custody downgrade above, per-node TLS/CORS setup, N sockets on a phone (fine for the
   foreground-brief mobile subset).
@@ -137,7 +137,7 @@ All three are reflected in the shipped system. Item 1 was **not** true when this
 it — a 2026-08-15 survey found the seam existed as a TypeScript type and nothing else — and it landed
 that day (`git history: docs/future/node-first/platform-seam.md`). Everything else here waits.
 
-1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/platform/`.)
+1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/infra/platform/`.)
    Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,
    trust prompts) is behind capability-grouped interfaces with the desktop bridge as their only
    implementation, and `boundaries.test.ts` fails any file outside the seam that reads the global.
@@ -146,7 +146,7 @@ that day (`git history: docs/future/node-first/platform-seam.md`). Everything el
    buffers whole responses (streaming cannot cross IPC), so a web transport is free to return a
    streaming response — the type is per-implementation and does not impose the desktop's limit.
 2. **`formFactor` on frame surfaces** in the plugin manifest, default `["desktop"]`. One field,
-   added while the schema is young. Descriptors need nothing. (Shipped — `pluginContract.ts`.)
+   added while the schema is young. Descriptors need nothing. (Shipped — `plugin/contract.ts`.)
 3. **Keep the sandbox bridge scheme-agnostic.** The MessageChannel bridge and SDK must not
    hardcode `app-plugin://` — on web the same isolation is a sandboxed iframe with an opaque
    origin and CSP headers. (Held today — `frames/sdk.ts` names no origin.)

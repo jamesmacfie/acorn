@@ -23,9 +23,10 @@ lazily when a task first needs filesystem/process access.
 - `agents` — managed Claude/Codex sessions, requests, context, artifacts, and lifecycle.
 - `pr` — linked pull-request review.
 - `changes` — uncommitted diff, staging, commit/push, and review notes.
+- `findings` — quiet observations plus explicit, consolidated memory-review bundles with retained provenance and history.
 - `notes` — task, workspace, and global Markdown notes.
 - `context` — choose, preview, size, and send task context.
-- `editor` / `search` — worktree files, Monaco editing, and ripgrep search.
+- `editor` / `search` — worktree files, code editing, and ripgrep search.
 - `preview` — hardened browser preview. Agents get their own browser instead, from the `browser`
   plugin, which has no pane.
 - `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.
@@ -50,7 +51,10 @@ event socket.
 
 The Agent pane and Agent Center manage structured Claude and Codex sessions: durable normalized event
 ledgers, queued turns, permission/question requests, attachments, artifacts, usage, search, archive,
-fork, compact, import, and terminal handoff. Aider is available through its terminal profile.
+fork, compact, import, terminal handoff, agent-driven delegated sessions, and short generated titles
+after the first accepted prompt. Delegation can share the parent task or create a selectable child
+task with a lazy worktree. Aider is available through its terminal profile and keeps the deterministic
+prompt fallback because its profile has no contained one-shot mode.
 
 ## Integrations and model providers
 
@@ -58,6 +62,12 @@ GitHub uses device-flow OAuth. Linear connections, and Rollbar connections when 
 installed, are managed from Settings and expose
 provider sources and task links. OpenAI and Anthropic are model-provider connections used by features
 such as SQL generation; prompts and responses are not persisted by the model-provider plugin.
+Settings also lists what this owner can generate with, keys and installed agent CLIs together, and
+holds the one "Generate with" default every Generate control in the app opens on
+([state-ownership.md](./state-ownership.md) § Scope rules). The first-run wizard shows the same list
+on a **Generate with AI** step and offers a key form per provider. It never blocks: an agent CLI
+already on the machine needs no setup at all, and someone who wants neither a CLI nor a key moves on
+and finds this in Settings later.
 
 ## Notes, memory, and context
 
@@ -65,6 +75,10 @@ Notes are Markdown at task, workspace, and global scope. Memory is durable revie
 index, search, proposals, and agent tools. Agents propose memory changes; accepting a proposal is a
 human-gated action. The context feature assembles provider, task, notes, and memory sections within
 byte/token budgets and can sync an immutable snapshot to an agent session.
+
+Findings retains evidence discovered during a task without notifying the owner or creating a review
+obligation. Managed agents, paired devices, and registered plugin producers can record bounded,
+structured observations. The task pane shows their full history.
 
 ## Workflows
 
@@ -84,7 +98,9 @@ and variable data encrypted at rest; sending is restricted to an interactive dev
 
 ## Settings and fleet
 
-Settings includes workspaces, appearance, integrations, MCP, agent tools, pricing, workflows,
-terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. Nodes and plugins are
+Settings includes workspaces, appearance, notifications, integrations, MCP, agent tools, pricing, workflows,
+terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. The Notifications page
+switches sound, system notifications, the app-icon count, and each of the three things an agent can
+do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). Nodes and plugins are
 managed per Node. With more than one Node, the shell adds Fleet home, Node labels, aggregate Agent
 Center/attention/search, Node-aware palette rows, and partial/offline states.

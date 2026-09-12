@@ -5,13 +5,13 @@ import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { SecretUnavailableError, type SecretService } from '../../main/core/secrets'
+import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import type { RouteFailure, RouteResult } from '../sync/engine'
 import { providerRequestScheduler } from './budgetRuntime'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { getConnection } from './connections'
 import { ProviderOperationError, type ProviderProject } from './types'
-import { broadcastConnectionChanged } from '../../main/notify'
+import { broadcastConnectionChanged } from '../notify'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
   ok: false,

@@ -4,7 +4,7 @@ import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import DatabasePanel from './DatabasePanel'
 
 // One bundle, one manifest surface: the lower region of the `database` pane's `document-over-frame`
-// layout (docs/third-party/monaco.md § Composed panes: decided). The props the host mounted this slot
+// layout (docs/editor.md § Composed panes: decided). The props the host mounted this slot
 // with decide what it renders.
 //
 // Everything this pane does is task-scoped. The connection is resolved from the task's worktree, from

@@ -74,15 +74,15 @@ the tree.
 
 - `packages/protocol/src/extensionPoints.ts`: the slot.
 - `packages/protocol/src/paneSwitcher.ts` (new): `PaneSwitcherProps`.
-- `packages/client-core/src/registries/exclusiveSlots.ts`: `resolveExclusiveSlot` always returns a
+- `packages/client-core/src/host/registries/extensionPoints/exclusiveSlots.ts`: `resolveExclusiveSlot` always returns a
   provider; the `core` provider is registered like any other; props typing per slot.
-- `packages/client-core/src/plugins/ExclusiveSlotHost.tsx`: no `core` prop; the failure counter.
-- `packages/client-core/src/tasks/PaneSwitcher.tsx` (new) and `TaskPaneHost.tsx`.
-- `packages/client-core/src/tabs/TabRail.tsx`: `rail.taskList` moves to the same shape.
-- `packages/client-core/src/plugins/frames/register.ts`: props forwarding for `coreSlot`.
-- `packages/client-core/src/keys/install.ts`: the pane chords call the slot verb.
-- `packages/client-core/src/settings/PluginsSettings.tsx`: the label and the failure reason.
-- `packages/plugin-api/src/client/index.ts`: `PaneSwitcherProps` re-exported; the surface snapshot
+- `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx`: no `core` prop; the failure counter.
+- `packages/client-core/src/features/tasks/PaneSwitcher.tsx` (new) and `TaskPaneHost.tsx`.
+- `packages/client-core/src/features/tabs/TabRail.tsx`: `rail.taskList` moves to the same shape.
+- `packages/client-core/src/host/frames/register.ts`: props forwarding for `coreSlot`.
+- `packages/client-core/src/host/keys/install.ts`: the pane chords call the slot verb.
+- `packages/client-core/src/features/settings/PluginsSettings.tsx`: the label and the failure reason.
+- `packages/plugin-api/src/client.ts`: `PaneSwitcherProps` re-exported; the surface snapshot
   gains the name.
 - `plugins/*/acorn-plugin.config.mjs`: none. The test plugin lives in the fixture.
 
@@ -131,11 +131,11 @@ And against the layout programme's list: no key event reaches the provider (inte
 - Layout phase 4 has shipped: `Slot` arbitration with `replace` mode, the generalised Settings
   picker, and `extensionPermissionLines` taking per-slot sentences. If not, stop.
 - Layout phase 3 has shipped: `TreeHost`, the worker, `mountTree`.
-- `packages/client-core/src/tasks/TaskPaneHost.tsx` builds the switcher from `switcherPanes()` and
+- `packages/client-core/src/features/tasks/TaskPaneHost.tsx` builds the switcher from `switcherPanes()` and
   dispatches `LayoutAction`s (`show`, `add`, `close`, `pin`, `maximize`, `equalize`) through
   `dispatchLayout`.
-- `packages/client-core/src/plugins/ExclusiveSlotHost.tsx` takes a `core` render prop.
-- `packages/client-core/src/keys/install.ts` owns the `meta+1`–`meta+9` bindings for the tabs layout
+- `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx` takes a `core` render prop.
+- `packages/client-core/src/host/keys/install.ts` owns the `meta+1`–`meta+9` bindings for the tabs layout
   and the pane row.
-- `packages/protocol/src/pluginContract.ts` has `coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS)`.
+- `packages/protocol/src/plugin/contract.ts` has `coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS)`.
 - Phase 0 of this folder has shipped and its fixture plugin exists.

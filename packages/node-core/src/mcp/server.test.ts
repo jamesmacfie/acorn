@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer, type Server } from 'node:https'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ensureCert } from '../main/tls'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { ensureCert } from '../server/transport/tls'
 
 // Integration test over real stdio JSON-RPC (docs/mcp.md, docs/agent-tools.md § Projections). This
 // test stubs the loopback surface the server proxies to and asserts the projection: list mirrors the
@@ -14,15 +15,19 @@ import { ensureCert } from '../main/tls'
 // is covered at the registry/route layer.
 //
 // The stub is HTTPS with a real acorn certificate, and the child gets ACORN_DATA_DIR and
-// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/service/runtime.ts): resolve
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/runtime.ts): resolve
 // the port from node.json, trust the node's certificate as a CA, and validate fully.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+// The executable entry lives with the app that builds it (docs/mcp.md); this package keeps the
+// library half. cwd stays node-core's root so `--import tsx` and the certificate helper resolve here.
+const MCP_ENTRY = resolve(appRoot, '../../apps/node/src/entries/mcp.ts')
 
-// A tiny fixture manifest, two tools, one with args, projected as JSON schema by the registry.
+// A tiny fixture manifest projected as JSON schema by the registry.
 const MANIFEST = {
   tools: [
     { name: 'task_current', description: 'the task', risk: 'read', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    { name: 'retry_tool', description: 'retry once', risk: 'execute', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     {
       name: 'notes_append',
       description: 'append a note',
@@ -46,7 +51,7 @@ class McpClient {
     const ambient = Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !key.startsWith('ACORN_') && key !== 'NODE_EXTRA_CA_CERTS'),
     )
-    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/mcp/main.ts'], { cwd: appRoot, env: { ...ambient, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
+    this.child = spawn(process.execPath, ['--import', 'tsx', MCP_ENTRY], { cwd: appRoot, env: { ...ambient, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stdout!.on('data', (chunk: Buffer) => {
       this.buffer += chunk.toString()
       let i: number
@@ -98,14 +103,24 @@ const toolText = (res: { result?: unknown }): unknown => JSON.parse((res.result 
 
 describe('acorn MCP server projects the agent-tool registry over stdio (docs/agent-tools.md)', () => {
   let stub: Server
+  let retryStub: Server
   let port: number
+  let retryPort: number
   // Stands in for a node's data root: the certificate the stub serves, and the node.json the child reads
   // the port out of.
   let dataDir: string
   let caPath: string
   // A certificate the stub does not serve: the case where some other node is on that port.
   let strangerCaPath: string
-  const posts: { url: string; body: unknown; internal: string; session: string; ceiling: string }[] = []
+  const posts: {
+    url: string
+    body: unknown
+    internal: string
+    session: string
+    ceiling: string
+    callId: string
+    server: 'primary' | 'retry'
+  }[] = []
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-mcp-root-'))
@@ -115,7 +130,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     strangerCaPath = join(stranger, 'tls', 'cert.pem')
     ensureCert(stranger)
 
-    stub = createServer({ key: cert.keyPem, cert: cert.certPem, minVersion: 'TLSv1.3' }, (req, res) => {
+    const handler = (server: 'primary' | 'retry') => (req: IncomingMessage, res: ServerResponse) => {
       const json = (v: unknown) => {
         res.setHeader('content-type', 'application/json')
         res.end(JSON.stringify(v))
@@ -131,7 +146,16 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
             internal: String(req.headers['x-acorn-internal'] ?? ''),
             session: String(req.headers['x-acorn-session-id'] ?? ''),
             ceiling: String(req.headers['x-acorn-tool-ceiling'] ?? ''),
+            callId: String(req.headers['x-acorn-tool-call-id'] ?? ''),
+            server,
           })
+          // Simulate the old node disappearing after it received the request. apiCall re-reads
+          // node.json and sends the same logical MCP call to the replacement node.
+          if (server === 'primary' && url.endsWith('/tools/retry_tool')) {
+            writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port: retryPort }))
+            req.socket.destroy()
+            return
+          }
           if (url.endsWith('/tools/task_current')) return json({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813, links: [{ provider: 'linear' }] })
           json({ ok: true })
         })
@@ -140,16 +164,26 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       if (url.startsWith('/v2/core/tasks/t1/tools')) return json(MANIFEST)
       res.statusCode = 404
       res.end('{}')
-    })
+    }
+    stub = createServer({ key: cert.keyPem, cert: cert.certPem, minVersion: 'TLSv1.3' }, handler('primary'))
+    retryStub = createServer({ key: cert.keyPem, cert: cert.certPem, minVersion: 'TLSv1.3' }, handler('retry'))
     await new Promise<void>((r) => stub.listen(0, '127.0.0.1', r))
+    await new Promise<void>((r) => retryStub.listen(0, '127.0.0.1', r))
     port = (stub.address() as { port: number }).port
+    retryPort = (retryStub.address() as { port: number }).port
     // What openDataRoot writes, and the only current thing a reattached child can read: the URL it was
     // spawned with is from a previous boot, the port in here is from this one.
     writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
   })
 
+  beforeEach(() => {
+    posts.length = 0
+    writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
+  })
+
   afterAll(() => {
     stub.close()
+    retryStub.close()
     rmSync(dataDir, { recursive: true, force: true })
     rmSync(dirname(dirname(strangerCaPath)), { recursive: true, force: true })
   })
@@ -171,7 +205,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
 
       const list = await client.send('tools/list')
       const tools = (list.result as { tools: { name: string; inputSchema: unknown }[] }).tools
-      expect(tools.map((t) => t.name).sort()).toEqual(['notes_append', 'task_current'])
+      expect(tools.map((t) => t.name).sort()).toEqual(['notes_append', 'retry_tool', 'task_current'])
       // The registry's JSON schema rides through unchanged.
       expect(tools.find((t) => t.name === 'notes_append')?.inputSchema).toMatchObject({ properties: { slug: { type: 'string' } } })
 
@@ -185,6 +219,29 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(post?.internal).toBe('internal-token')
       expect(post?.session).toBe('sess-42')
       expect(post?.ceiling).toBe('encoded-scope')
+      expect(post?.callId).toMatch(/^[0-9a-f-]{36}$/)
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  it('keeps one call id across the loopback retry', async () => {
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'internal-token',
+      ACORN_SESSION_ID: 'sess-42',
+    })
+    try {
+      await client.init()
+      await client.send('tools/list') // cache the primary node endpoint
+      expect(toolText(await client.send('tools/call', { name: 'retry_tool', arguments: {} }))).toEqual({ ok: true })
+
+      const attempts = posts.filter((post) => post.url.endsWith('/tools/retry_tool'))
+      expect(attempts.map((attempt) => attempt.server)).toEqual(['primary', 'retry'])
+      expect(attempts[0]?.callId).toMatch(/^[0-9a-f-]{36}$/)
+      expect(attempts[1]?.callId).toBe(attempts[0]?.callId)
     } finally {
       client.kill()
     }

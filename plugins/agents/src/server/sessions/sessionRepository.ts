@@ -1,0 +1,594 @@
+import { randomUUID } from 'node:crypto'
+import { and, asc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm'
+import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
+import * as schema from '../../node/schema'
+import type {
+  AgentEventRecord,
+  AgentNormalizedEvent,
+  AgentRequest,
+  AgentSession,
+  AgentSubagent,
+  AgentTurn,
+} from '@acorn/protocol/managedAgents.ts'
+import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protocol/managedAgents.ts'
+import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
+import type { RemovedArtifactObject } from './artifactStore'
+import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
+import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
+import { AgentLifecycle } from './lifecycle'
+import { normalizeStoredSessionTitle } from './sessionTitle'
+
+const now = (): number => Date.now()
+
+// Tolerant on purpose: a roster that cannot be decoded starts over rather than failing the event
+// insert. Losing the roster costs a sidebar row; failing the insert loses the transcript.
+const parseSubagents = (value: string | null): AgentSubagent[] => {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed) ? parsed as AgentSubagent[] : []
+  } catch {
+    return []
+  }
+}
+
+type SessionSearchFilter = {
+  taskId?: string
+  workspaceId?: string
+  limit?: number
+}
+
+/**
+ * Session projection, request-resolution, deletion, and search repository.
+ *
+ * The append-only event transaction lives here because it is the authority that advances the
+ * session sequence and all query projections atomically. Turn queue operations remain in
+ * AgentStore; both slices share one inherited database handle.
+ *
+ * See docs/managed-agents.md § Session model for how a workspace-scoped read resolves task ids
+ * through core before filtering this plugin's own tables.
+ */
+export class AgentSessionRepository {
+  protected readonly lifecycle: AgentLifecycle
+
+  constructor(
+    protected readonly db: PluginDatabase,
+    protected readonly core: CoreServices,
+    publishLifecycle?: AgentLifecyclePublisher,
+  ) {
+    this.lifecycle = new AgentLifecycle(db, publishLifecycle)
+  }
+
+  // `null` means no workspace filter. An empty array means the workspace has no tasks, so the query
+  // narrows to nothing rather than falling through to unfiltered.
+  protected async workspaceTaskIds(workspaceId: string | undefined): Promise<string[] | null> {
+    if (!workspaceId) return null
+    return this.core.tasks.idsForWorkspace(workspaceId)
+  }
+
+  async getSession(id: string): Promise<AgentSession | null> {
+    const [row] = await this.db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, id)).limit(1)
+    return row ? mapAgentSession(row) : null
+  }
+
+  async requireSession(id: string): Promise<AgentSession> {
+    const session = await this.getSession(id)
+    if (!session) throw new Error(`Managed agent session not found: ${id}`)
+    return session
+  }
+
+  async recordEvent(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
+    const timestamp = now()
+    const projection = projectAgentEvent(event, turnId)
+    const eventId = randomUUID()
+    const committed = this.db.transaction((tx) => {
+      const current = tx
+        .select({
+          lastEventSeq: schema.agentSessions.lastEventSeq,
+          configJson: schema.agentSessions.configJson,
+          subagentsJson: schema.agentSessions.subagentsJson,
+        })
+        .from(schema.agentSessions)
+        .where(eq(schema.agentSessions.id, sessionId))
+        .get()
+      if (!current) throw new Error(`Managed agent session not found: ${sessionId}`)
+      const seq = current.lastEventSeq + 1
+      const configJson = event.type === 'session_metadata'
+        ? JSON.stringify({
+            ...JSON.parse(current.configJson) as Record<string, unknown>,
+            ...(event.configOptions ? { configOptions: event.configOptions } : {}),
+            ...(event.commands ? { commands: event.commands } : {}),
+            ...(event.skills ? { skills: event.skills } : {}),
+          })
+        : projection.configJson
+      // The subagent roster projected onto the row in the same transaction as the event insert, so a
+      // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
+      // row rather than in a table of its own because runtimeEngine.record() already broadcasts the
+      // row after every event, which is what makes the sidebar's sub-rows live for a session nobody
+      // has opened (docs/managed-agents.md § Subagents).
+      const subagentsJson = event.type === 'subagent'
+        ? JSON.stringify(foldSubagentRoster(
+            parseSubagents(current.subagentsJson),
+            event.subagent,
+            turnId,
+            timestamp,
+          ))
+        : undefined
+      tx.update(schema.agentSessions)
+        .set({
+          lastEventSeq: seq,
+          updatedAt: timestamp,
+          ...(projection.runtimeState ? { runtimeState: projection.runtimeState } : {}),
+          ...(projection.attention ? { attention: projection.attention } : {}),
+          ...(projection.providerSessionRef ? { providerSessionRef: projection.providerSessionRef } : {}),
+          ...(configJson ? { configJson } : {}),
+          ...(subagentsJson ? { subagentsJson } : {}),
+        })
+        .where(eq(schema.agentSessions.id, sessionId))
+        .run()
+
+      const values: typeof schema.agentEvents.$inferInsert = {
+        id: eventId,
+        sessionId,
+        turnId,
+        seq,
+        schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
+        eventJson: JSON.stringify(event),
+        searchText: agentEventSearchText(event),
+        createdAt: timestamp,
+      }
+      tx.insert(schema.agentEvents).values(values).run()
+      const changed = this.applyEventProjection(tx, sessionId, turnId, event, timestamp)
+      return {
+        row: { ...values, turnId: values.turnId ?? null, searchText: values.searchText ?? null },
+        ...changed,
+      }
+    })
+    if (committed.turnChanged && turnId) await this.lifecycle.announceTurn(turnId)
+    if (committed.requestChanged && (event.type === 'request' || event.type === 'request_resolved')) {
+      await this.lifecycle.announceRequest(sessionId, event.requestId)
+    }
+    return mapAgentEvent(committed.row)
+  }
+
+  private applyEventProjection(
+    tx: Parameters<Parameters<PluginDatabase['transaction']>[0]>[0],
+    sessionId: string,
+    turnId: string | null,
+    event: AgentNormalizedEvent,
+    timestamp: number,
+  ): { turnChanged: boolean; requestChanged: boolean } {
+    if (event.type === 'request') {
+      const result = tx.insert(schema.agentRequests)
+        .values({
+          id: randomUUID(),
+          sessionId,
+          turnId,
+          providerRequestId: event.requestId,
+          kind: event.kind,
+          status: 'pending',
+          title: event.title,
+          detail: event.detail ?? null,
+          payloadJson: JSON.stringify({ options: event.options ?? [], questions: event.questions ?? [] }),
+          createdAt: timestamp,
+        })
+        .onConflictDoNothing()
+        .run()
+      return { turnChanged: false, requestChanged: result.changes > 0 }
+    } else if (event.type === 'request_resolved') {
+      const current = tx
+        .select({ status: schema.agentRequests.status })
+        .from(schema.agentRequests)
+        .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.providerRequestId, event.requestId)))
+        .get()
+      tx.update(schema.agentRequests)
+        .set({ status: 'resolved', resolutionJson: JSON.stringify(event.resolution), resolvedAt: timestamp })
+        .where(and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, event.requestId),
+          inArray(schema.agentRequests.status, ['pending', 'resolving']),
+        ))
+        .run()
+      return {
+        turnChanged: false,
+        requestChanged: current?.status === 'pending' || current?.status === 'resolving',
+      }
+    } else if (event.type === 'turn_completed' && turnId) {
+      const current = tx
+        .select({ status: schema.agentTurns.status })
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId))
+        .get()
+      tx.update(schema.agentTurns)
+        .set({ status: 'completed', stopReason: event.stopReason ?? null, completedAt: timestamp })
+        .where(and(
+          eq(schema.agentTurns.id, turnId),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ))
+        .run()
+      return {
+        turnChanged: current?.status === 'dispatching' || current?.status === 'active',
+        requestChanged: false,
+      }
+    } else if (event.type === 'usage' && turnId) {
+      tx.update(schema.agentTurns)
+        .set({ usageJson: JSON.stringify(event.usage) })
+        .where(eq(schema.agentTurns.id, turnId))
+        .run()
+    } else if (event.type === 'error' && turnId) {
+      const current = tx
+        .select({ status: schema.agentTurns.status })
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId))
+        .get()
+      tx.update(schema.agentTurns)
+        .set({
+          status: event.retryable ? 'interrupted' : 'failed',
+          errorJson: JSON.stringify({ code: event.code, message: event.message }),
+          completedAt: timestamp,
+        })
+        .where(and(
+          eq(schema.agentTurns.id, turnId),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ))
+        .run()
+      return {
+        turnChanged: current?.status === 'dispatching' || current?.status === 'active',
+        requestChanged: false,
+      }
+    }
+    return { turnChanged: false, requestChanged: false }
+  }
+
+  async claimRequestResolution(
+    sessionId: string,
+    providerRequestId: string,
+    resolution: unknown,
+    idempotencyKey: string,
+  ): Promise<{ request: AgentRequest; claimed: boolean }> {
+    const result = this.db.transaction((tx) => {
+      const request = tx
+        .select()
+        .from(schema.agentRequests)
+        .where(and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, providerRequestId),
+        ))
+        .get()
+      if (!request) throw new Error('Agent request not found.')
+      if (request.status === 'resolved' || request.status === 'expired') {
+        return { request: mapAgentRequest(request), claimed: false }
+      }
+      if (request.status === 'resolving') {
+        if (request.resolutionIdempotencyKey !== idempotencyKey) {
+          throw new Error('Agent request resolution is already in progress.')
+        }
+        return { request: mapAgentRequest(request), claimed: false }
+      }
+      tx.update(schema.agentRequests)
+        .set({
+          status: 'resolving',
+          resolutionJson: JSON.stringify(resolution),
+          resolutionIdempotencyKey: idempotencyKey,
+        })
+        .where(and(eq(schema.agentRequests.id, request.id), eq(schema.agentRequests.status, 'pending')))
+        .run()
+      const claimed = tx
+        .select()
+        .from(schema.agentRequests)
+        .where(eq(schema.agentRequests.id, request.id))
+        .get()
+      if (!claimed) throw new Error('Claimed agent request disappeared.')
+      return { request: mapAgentRequest(claimed), claimed: true }
+    })
+    if (result.claimed) await this.lifecycle.announceRequest(sessionId, providerRequestId)
+    return result
+  }
+
+  async request(sessionId: string, providerRequestId: string): Promise<AgentRequest | null> {
+    const [request] = await this.db
+      .select()
+      .from(schema.agentRequests)
+      .where(and(
+        eq(schema.agentRequests.sessionId, sessionId),
+        eq(schema.agentRequests.providerRequestId, providerRequestId),
+      ))
+      .limit(1)
+    return request ? mapAgentRequest(request) : null
+  }
+
+  async expireClaimedRequest(sessionId: string, providerRequestId: string): Promise<void> {
+    const before = await this.request(sessionId, providerRequestId)
+    if (before?.status !== 'resolving') return
+    await this.db
+      .update(schema.agentRequests)
+      .set({ status: 'expired', resolvedAt: now() })
+      .where(and(
+        eq(schema.agentRequests.sessionId, sessionId),
+        eq(schema.agentRequests.providerRequestId, providerRequestId),
+        eq(schema.agentRequests.status, 'resolving'),
+      ))
+    await this.lifecycle.announceRequest(sessionId, providerRequestId)
+  }
+
+  async expirePendingRequests(sessionId: string): Promise<void> {
+    const requests = await this.db
+      .select({ providerRequestId: schema.agentRequests.providerRequestId })
+      .from(schema.agentRequests)
+      .where(and(
+        eq(schema.agentRequests.sessionId, sessionId),
+        inArray(schema.agentRequests.status, ['pending', 'resolving']),
+      ))
+    if (!requests.length) return
+    await this.db
+      .update(schema.agentRequests)
+      .set({ status: 'expired', resolvedAt: now() })
+      .where(and(
+        eq(schema.agentRequests.sessionId, sessionId),
+        inArray(schema.agentRequests.status, ['pending', 'resolving']),
+      ))
+    for (const request of requests) await this.lifecycle.announceRequest(sessionId, request.providerRequestId)
+  }
+
+  async patchSession(
+    sessionId: string,
+    patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    renameSource: SessionRenameSource = 'user',
+  ): Promise<AgentSession> {
+    const result = await this.mutateSession(sessionId, patch, { renameSource })
+    return result.session
+  }
+
+  async renameSession(
+    sessionId: string,
+    input: { title: string; expectedTitle?: string; source: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
+    return this.mutateSession(sessionId, { title: input.title }, {
+      expectedTitle: input.expectedTitle,
+      renameSource: input.source,
+    })
+  }
+
+  private async mutateSession(
+    sessionId: string,
+    patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options: { expectedTitle?: string; renameSource: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
+    const before = await this.requireSession(sessionId)
+    if (options.expectedTitle !== undefined && before.title !== options.expectedTitle) {
+      return { session: before, changed: false }
+    }
+    const title = patch.title !== undefined ? normalizeStoredSessionTitle(patch.title) : undefined
+    const renamed = title !== undefined && title !== before.title
+    const archiveChanged = patch.archived !== undefined
+      && patch.archived !== (before.archivedAt != null)
+    const hasOtherWrite = patch.lastReadSeq !== undefined || patch.config !== undefined
+    if (!renamed && !archiveChanged && !hasOtherWrite) return { session: before, changed: false }
+
+    const timestamp = now()
+    const write = await this.db
+      .update(schema.agentSessions)
+      .set({
+        updatedAt: timestamp,
+        ...(renamed ? { title } : {}),
+        ...(patch.archived != null
+          ? {
+              archivedAt: patch.archived ? timestamp : null,
+              runtimeState: patch.archived ? 'archived' : 'stopped',
+            }
+          : {}),
+        ...(patch.lastReadSeq != null
+          ? {
+              lastReadSeq: patch.lastReadSeq,
+              attention: 'none',
+            }
+          : {}),
+        ...(patch.config ? { configJson: JSON.stringify(patch.config) } : {}),
+      })
+      .where(and(
+        eq(schema.agentSessions.id, sessionId),
+        options.expectedTitle !== undefined
+          ? and(
+              eq(schema.agentSessions.title, options.expectedTitle),
+              title !== undefined ? ne(schema.agentSessions.title, title) : undefined,
+            )
+          : undefined,
+      ))
+      .run()
+    if (Number(write.changes ?? 0) === 0) {
+      return { session: await this.requireSession(sessionId), changed: false }
+    }
+
+    const session = await this.requireSession(sessionId)
+    const changes: AgentSessionChange[] = [
+      ...(renamed ? ['renamed' as const] : []),
+      ...(archiveChanged ? [patch.archived ? 'archived' as const : 'restored' as const] : []),
+    ]
+    this.lifecycle.announceSession(session, changes, options.renameSource)
+    return { session, changed: renamed || archiveChanged || hasOtherWrite }
+  }
+
+  async setController(sessionId: string, controller: AgentSession['controller']): Promise<AgentSession> {
+    await this.db
+      .update(schema.agentSessions)
+      .set({ controller, updatedAt: now() })
+      .where(eq(schema.agentSessions.id, sessionId))
+    return this.requireSession(sessionId)
+  }
+
+  async setProviderSessionReference(
+    sessionId: string,
+    providerSessionRef: string | null,
+  ): Promise<AgentSession> {
+    await this.db
+      .update(schema.agentSessions)
+      .set({ providerSessionRef, updatedAt: now() })
+      .where(eq(schema.agentSessions.id, sessionId))
+    return this.requireSession(sessionId)
+  }
+
+  async deleteSession(sessionId: string): Promise<{
+    attachmentIds: string[]
+    artifactObjects: RemovedArtifactObject[]
+  }> {
+    const session = await this.getSession(sessionId)
+    if (!session) return { attachmentIds: [], artifactObjects: [] }
+    const turns = await this.db.select({ id: schema.agentTurns.id }).from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
+    const turnIds = turns.map((turn) => turn.id)
+    const [attachmentRows, artifactRows] = await Promise.all([
+      turnIds.length
+        ? this.db
+            .selectDistinct({ attachmentId: schema.agentAttachmentRefs.attachmentId })
+            .from(schema.agentAttachmentRefs)
+            .where(inArray(schema.agentAttachmentRefs.turnId, turnIds))
+        : Promise.resolve([]),
+      this.db
+        .select({ id: schema.agentArtifacts.id, storageKey: schema.agentArtifacts.storageKey })
+        .from(schema.agentArtifacts)
+        .where(eq(schema.agentArtifacts.sessionId, sessionId)),
+    ])
+    this.db.transaction((tx) => {
+      if (turnIds.length) tx.delete(schema.agentAttachmentRefs).where(inArray(schema.agentAttachmentRefs.turnId, turnIds)).run()
+      tx.delete(schema.agentArtifacts).where(eq(schema.agentArtifacts.sessionId, sessionId)).run()
+      tx.delete(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId)).run()
+      tx.delete(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).run()
+      tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
+      tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
+    })
+    this.lifecycle.announceSession(session, ['deleted'])
+    return {
+      attachmentIds: attachmentRows.map((row) => row.attachmentId),
+      artifactObjects: artifactRows,
+    }
+  }
+
+  async searchSessions(query: string, filter: SessionSearchFilter = {}): Promise<AgentSession[]> {
+    const bounded = Math.min(Math.max(filter.limit ?? 50, 1), 100)
+    const terms = query
+      .split(/\s+/)
+      .map((term) => term.replace(/"/g, ''))
+      .filter(Boolean)
+      .map((term) => `"${term}"`)
+      .join(' ')
+    if (!terms) return []
+    const escapedLike = `%${query.replace(/[%_]/g, '\\$&')}%`
+    const taskIds = await this.workspaceTaskIds(filter.workspaceId)
+    if (taskIds?.length === 0) return []
+    // A reusable `task_id IN (…)` chunk for the one query that has to be raw SQL: FTS5 MATCH has no
+    // Drizzle expression, so `agent_events_fts` is only reachable through sql``. Values are still bound
+    // parameters, never interpolated text.
+    const taskIdFilter = taskIds
+      ? sql` AND agent_sessions.task_id IN (${sql.join(taskIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql``
+    const [eventMatches, artifactMatches] = await Promise.all([
+      taskIds
+        ? // The join to `agent_sessions` stays: it is this plugin's own table, and it is what carries
+          // the task id the filter needs. What left is the pair of core tables behind it.
+          this.db.all<{ sessionId: string; rank: number }>(sql`
+            SELECT agent_events_fts.session_id AS sessionId, min(agent_events_fts.rank) AS rank
+            FROM agent_events_fts
+            INNER JOIN agent_sessions ON agent_sessions.id = agent_events_fts.session_id
+            WHERE agent_events_fts MATCH ${terms}${taskIdFilter}
+            GROUP BY agent_events_fts.session_id
+            ORDER BY rank
+            LIMIT 200
+          `)
+        : this.db.all<{ sessionId: string; rank: number }>(sql`
+            SELECT session_id AS sessionId, min(rank) AS rank
+            FROM agent_events_fts
+            WHERE agent_events_fts MATCH ${terms}
+            GROUP BY session_id
+            ORDER BY rank
+            LIMIT 200
+          `),
+      taskIds
+        ? this.db
+            .selectDistinct({ sessionId: schema.agentArtifacts.sessionId })
+            .from(schema.agentArtifacts)
+            .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, schema.agentArtifacts.sessionId))
+            .where(and(
+              inArray(schema.agentSessions.taskId, taskIds),
+              or(
+                like(schema.agentArtifacts.title, escapedLike),
+                like(schema.agentArtifacts.metadataJson, escapedLike),
+              ),
+            ))
+            .limit(200)
+        : this.db
+            .selectDistinct({ sessionId: schema.agentArtifacts.sessionId })
+            .from(schema.agentArtifacts)
+            .where(or(
+              like(schema.agentArtifacts.title, escapedLike),
+              like(schema.agentArtifacts.metadataJson, escapedLike),
+            ))
+            .limit(200),
+    ])
+    const rankBySession = new Map(eventMatches.map((match) => [match.sessionId, match.rank]))
+    const matchedIds = [...new Set([
+      ...eventMatches.map((match) => match.sessionId),
+      ...artifactMatches.map((match) => match.sessionId),
+    ])]
+    const textMatch = matchedIds.length
+      ? or(like(schema.agentSessions.title, escapedLike), inArray(schema.agentSessions.id, matchedIds))
+      : like(schema.agentSessions.title, escapedLike)
+    // One query now, not two. The workspace-scoped branch existed only to reach core workspace membership
+    // through `tasks`; with the ids in hand the filter is an ordinary predicate on this plugin's own
+    // column, so the join, the `{ session: … }` projection and the `.map` that unwrapped it all go.
+    const rows = await this.db
+      .select()
+      .from(schema.agentSessions)
+      .where(and(
+        isNull(schema.agentSessions.archivedAt),
+        filter.taskId ? eq(schema.agentSessions.taskId, filter.taskId) : undefined,
+        taskIds ? inArray(schema.agentSessions.taskId, taskIds) : undefined,
+        textMatch,
+      ))
+      .limit(200)
+    return rows
+      .sort((a, b) => {
+        const aRank = rankBySession.get(a.id) ?? Number.POSITIVE_INFINITY
+        const bRank = rankBySession.get(b.id) ?? Number.POSITIVE_INFINITY
+        return aRank - bRank || b.updatedAt - a.updatedAt
+      })
+      .slice(0, bounded)
+      .map(mapAgentSession)
+  }
+
+  async activeTurn(sessionId: string): Promise<AgentTurn | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['dispatching', 'active'])))
+      .limit(1)
+    return row ? mapAgentTurn(row) : null
+  }
+
+  async pendingRequests(sessionId: string): Promise<AgentRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentRequests)
+      .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.status, 'pending')))
+      .orderBy(asc(schema.agentRequests.createdAt))
+    return rows.map(mapAgentRequest)
+  }
+
+  lifecycleTurns(filter: { taskId: string; sessionId?: string }) {
+    return this.lifecycle.turns(filter)
+  }
+
+  lifecycleRequests(filter: { taskId: string; sessionId?: string }) {
+    return this.lifecycle.requests(filter)
+  }
+
+  lifecycleSessions(taskId: string) {
+    return this.lifecycle.sessions(taskId)
+  }
+
+  lifecycleCompletedReviewInputs(taskId: string) {
+    return this.lifecycle.completedReviewInputs(taskId)
+  }
+
+  lifecycleReviewInput(input: { taskId: string; sessionId: string; turnId: string }) {
+    return this.lifecycle.reviewInput(input)
+  }
+}

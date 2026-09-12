@@ -33,11 +33,18 @@ describe('Rollbar descriptor rows', () => {
     expect(rollbarRailItem(ITEM)).toEqual({
       id: 'rollbar%3Aproduction:142%2F7',
       title: 'Checkout failed',
-      fields: ['#142/7', 'error', 'production', 'Production'],
-      badge: '12 occurrences',
+      fields: ['#142/7'],
+      fieldsFirst: true,
+      icon: 'circle-x',
+      severity: 'danger',
+      badge: '12',
       task: {
         origin: 'rollbar',
         title: 'Checkout failed',
+        // What a workflow started from this row is told (docs/workflows.md § Starting a run). Facts
+        // the row already has, and no payload: an occurrence body would be a second call and would
+        // walk straight past the privacy allowlist.
+        body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',
         link: {
           connectionId: 'rollbar:production',
           identifier: '142/7',
@@ -49,5 +56,13 @@ describe('Rollbar descriptor rows', () => {
         },
       },
     })
+  })
+
+  it.each([
+    ['critical', 'circle-x', 'danger'],
+    ['warning', 'triangle-alert', 'warn'],
+    ['info', 'info', 'info'],
+  ] as const)('maps %s to a semantic severity icon', (level, icon, severity) => {
+    expect(rollbarRailItem({ ...ITEM, level })).toMatchObject({ icon, severity })
   })
 })

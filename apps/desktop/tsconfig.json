@@ -1,5 +1,5 @@
 {
-  // Both halves in one program: `src/app/client` is the renderer (DOM) and `src/shell` is the Tauri
+  // Both halves in one program: `src/client` is the renderer (DOM) and `src/shell` is the Tauri
   // shell's TypeScript — the injected bridge and the desktop helper process (node).
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {

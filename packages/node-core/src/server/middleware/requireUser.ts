@@ -24,7 +24,7 @@ export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
 })
 
 // The rule on its own, for the one caller that has a principal but no request: a scheduled plugin run
-// has neither (server/plugin/scheduleRun.ts) and must answer this question the same way a route does.
+// has neither (server/pluginHost/scheduleRun.ts) and must answer this question the same way a route does.
 export const principalMayUseProviderCredential = (principal: Principal | null | undefined): boolean =>
   !!principal && (principal.kind === 'device' || principal.scope === 'service')
 

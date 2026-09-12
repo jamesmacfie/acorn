@@ -1,6 +1,6 @@
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from '@acorn/plugin-api/ui/diff'
-import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '../../contract/api'
+import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '../../shared/api'
 
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false

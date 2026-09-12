@@ -38,6 +38,28 @@ export default {
       // its focus group and padding from (docs/panes.md § Layout model).
       layout: 'single',
       regions: { body: { kind: 'remote', entry: 'pane' } },
+    }, {
+      // The same tree, drawn beside the rail list at `/p/:projectId` with no task anywhere. Without it
+      // a rail row had nowhere to land: `openPane` needs a task, so clicking an item from the sidebar
+      // outside a task drew nothing at all. Linear's `linear-issue` is the same pair for the same
+      // reason. Keep both — a project-scoped task pane would break the keybinding and the command.
+      target: 'pane',
+      id: 'rollbar-item',
+      label: 'Rollbar item',
+      glyph: 'brand:rollbar',
+      scope: 'project',
+      layout: 'single',
+      regions: { body: { kind: 'remote', entry: 'pane' } },
+    }],
+    // The `/p/:projectId/x/rollbar/` prefix is the host's, minted from the plugin id. `:item` carries
+    // the whole rail row id (`<connection>:<identifier>`), encoded on the way in and decoded on the way
+    // out, because a Rollbar item is only unique within its connection.
+    routes: [{
+      id: 'rollbar.item-route',
+      path: '/p/:projectId/x/rollbar/items/:item',
+      surface: 'rollbar-item',
+      item: 'item',
+      order: 60,
     }],
     sources: [{
       id: 'rollbar-items',
@@ -49,7 +71,9 @@ export default {
       // The rail route reads `?project=` (src/server/routes/rollbar.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
-      onSelect: { verb: 'openPane', pane: 'rollbar' },
+      // `navigate`, not `openPane`: the detail belongs to the project, so a row click changes the URL
+      // and the surface beside the list follows. It is also what mounts `rollbar-item` at all.
+      onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
     commands: [{
       id: 'open',
@@ -57,6 +81,28 @@ export default {
       category: 'pane',
       palette: false,
       action: { verb: 'openPane', pane: 'rollbar' },
+    }, {
+      // The routed project's active Rollbar items, searched from the palette
+      // (docs/integrations.md § From the command palette).
+      //
+      // `scope: 'project'` is what makes this safe and what makes it useful: the host sends the
+      // project the palette session captured and nothing else, the route resolves only the
+      // connections that project's workspace maps, and the command is not offered at all where there
+      // is no routed project. A manifest cannot widen that — it names the scope, never the value.
+      //
+      // `navigate` rather than `openPane`, matching the source above: an item's detail belongs to the
+      // project, so picking a row changes the URL and `rollbar-item` draws beside the list. Promoting
+      // one into a task is deliberately not what picking it means.
+      id: 'find-item',
+      title: 'Rollbar: find an item',
+      hint: 'active items in the projects this repository follows',
+      keywords: ['error', 'exception', 'issue', 'rollbar'],
+      category: 'navigation',
+      kind: 'search',
+      scope: 'project',
+      route: '/v2/p/rollbar/palette/issues',
+      placeholder: 'Find a Rollbar item…',
+      onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
   },

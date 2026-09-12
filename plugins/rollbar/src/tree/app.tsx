@@ -168,8 +168,15 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   )
 }
 
+// A `Show`, not a bare ternary. A component body runs once, so a ternary there stays on whichever
+// branch the first state picked: the pane mounts loading, the fetch fails, and the error had nowhere
+// to draw. What was left was the EmptyState with its text removed, which reads as a blank pane.
 function PageStatus(props: { state: PageState }) {
-  return props.state.kind === 'error'
-    ? <Alert variant="banner" title={props.state.title}>{props.state.detail}</Alert>
-    : <EmptyState busy={props.state.kind === 'loading'}>{props.state.message}</EmptyState>
+  const failure = () => (props.state.kind === 'error' ? props.state : undefined)
+  const message = () => (props.state.kind === 'error' ? '' : props.state.message)
+  return (
+    <Show when={failure()} fallback={<EmptyState busy={props.state.kind === 'loading'}>{message()}</EmptyState>}>
+      {(error) => <Alert variant="banner" title={error().title}>{error().detail}</Alert>}
+    </Show>
+  )
 }

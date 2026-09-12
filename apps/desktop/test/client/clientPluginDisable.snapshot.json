@@ -8,12 +8,42 @@
       "editor",
       "pr",
       "notes",
-      "preview"
+      "preview",
+      "workflows"
+    ],
+    "commands": [
+      "task.terminal.new-claude",
+      "task.terminal.new-codex",
+      "agents.sessions.new",
+      "source.agents.open",
+      "agents.sessions.find",
+      "changes.open",
+      "context.open",
+      "source.docker.open",
+      "docker.find",
+      "editor.files.open",
+      "editor.search.open",
+      "source.github.open",
+      "memory.learnings.review",
+      "memory.search",
+      "memory.proposals.open",
+      "notes.find",
+      "notes.create",
+      "preview.open",
+      "terminal.run",
+      "terminal.run.targets",
+      "terminal.run.layouts",
+      "terminal.run.sessions",
+      "workflows.run",
+      "workflows.runs.find",
+      "workflows.new"
     ],
     "sources": [
       "agents",
       "docker",
-      "github"
+      "github",
+      "memory",
+      "workflows"
     ],
     "settingsPages": [
       "agent-concurrency",
@@ -24,17 +54,19 @@
       "workflows"
     ],
     "slots": [
+      "overlay/agents.commands",
       "task.footer/docker-footer-badge",
-      "overlay/palette.files",
-      "overlay/palette.pull-files",
+      "overlay/github.shortcuts",
       "overlay/onboarding.first-run",
-      "drawer/terminal.drawer"
+      "drawer/terminal.drawer",
+      "overlay/workflows.start-from-item"
     ],
     "extensionPoints": [
       "agents:tool-card",
       "agents:attachment",
       "agents:composer-actions",
       "changes:diff-line",
+      "changes:push-actions",
       "context:section",
       "docker:stats-beside",
       "docker:container",
@@ -43,14 +75,11 @@
     ],
     "extensions": [
       "changes.tool-card",
+      "github.push-actions",
       "memory.section"
     ],
     "refPanels": [
       "github-pull"
-    ],
-    "paletteRows": [
-      "terminal.run",
-      "workflows.defs"
     ],
     "agentContexts": [
       "acorn-task-context",
@@ -58,7 +87,8 @@
       "acorn-terminals"
     ],
     "schedules": [
-      "docker.task-containers"
+      "docker.task-containers",
+      "workflows.task-runs"
     ],
     "railMarkers": [
       "agents",
@@ -66,6 +96,7 @@
     ],
     "persistedStateSlices": [
       "agents.tool-fold",
+      "changes.view",
       "context.section-selection",
       "docker.prefs",
       "editor.open-files",
@@ -76,7 +107,8 @@
     ],
     "attentionSources": [
       "agents.sessions",
-      "memory.proposals"
+      "memory.proposals",
+      "workflows.gates"
     ],
     "collections": [
       "agents:sessions",
@@ -101,16 +133,26 @@
       "panes": [
         "changes"
       ],
+      "commands": [
+        "changes.open"
+      ],
       "extensionPoints": [
-        "changes:diff-line"
+        "changes:diff-line",
+        "changes:push-actions"
       ],
       "extensions": [
         "changes.tool-card"
+      ],
+      "persistedStateSlices": [
+        "changes.view"
       ]
     },
     "context": {
       "panes": [
         "context"
+      ],
+      "commands": [
+        "context.open"
       ],
       "extensionPoints": [
         "context:section"
@@ -125,6 +167,10 @@
     "docker": {
       "panes": [
         "docker"
+      ],
+      "commands": [
+        "source.docker.open",
+        "docker.find"
       ],
       "sources": [
         "docker"
@@ -159,8 +205,9 @@
       "panes": [
         "editor"
       ],
-      "slots": [
-        "overlay/palette.files"
+      "commands": [
+        "editor.files.open",
+        "editor.search.open"
       ],
       "persistedStateSlices": [
         "editor.open-files"
@@ -170,15 +217,21 @@
       "panes": [
         "pr"
       ],
+      "commands": [
+        "source.github.open"
+      ],
       "sources": [
         "github"
       ],
       "slots": [
-        "overlay/palette.pull-files"
+        "overlay/github.shortcuts"
       ],
       "extensionPoints": [
         "github:diff-line",
         "github:summary-badges"
+      ],
+      "extensions": [
+        "github.push-actions"
       ],
       "refPanels": [
         "github-pull"
@@ -205,14 +258,34 @@
     "preview": {
       "panes": [
         "preview"
+      ],
+      "commands": [
+        "preview.open"
       ]
     },
     "workflows": {
+      "panes": [
+        "workflows"
+      ],
+      "commands": [
+        "workflows.run",
+        "workflows.runs.find",
+        "workflows.new"
+      ],
+      "sources": [
+        "workflows"
+      ],
       "settingsPages": [
         "workflows"
       ],
-      "paletteRows": [
-        "workflows.defs"
+      "slots": [
+        "overlay/workflows.start-from-item"
+      ],
+      "schedules": [
+        "workflows.task-runs"
+      ],
+      "attentionSources": [
+        "workflows.gates"
       ]
     }
   }

@@ -2,13 +2,13 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, RUN_TARGETS, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../../shared/send'
 
 export type { SendSubmit }
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
-  // Answers from the same session map that main/wsHub.ts reads through StreamHandlers.streamTaskId,
+  // Answers from the same session map that server/transport/wsHub.ts reads through StreamHandlers.streamTaskId,
   // not re-derived from list(), so the HTTP and WS halves cannot disagree about who owns a session
   // (docs/security.md § Transport and auth). Null means no such session.
   taskIdFor(sessionId: string): string | null
@@ -70,6 +70,18 @@ export const terminal = new Hono<AppEnv>()
     }),
   )
   .get('/profiles', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.profiles()))
+  // The run targets a task declares, as `{ options }`, for the `terminal:run-target` workflow step's
+  // picker (../workflowSteps.ts). The same targets are on core's `/v2/core/tasks/:id/run`; a field's
+  // `optionsRoute` has to sit in the contributing plugin's own namespace, and answer options rather
+  // than run-target rows.
+  .get('/tasks/:taskId/run-targets', (c) =>
+    viaBridge(c, RUN_TARGETS, async (b) => {
+      // RunBridge answers `unknown` by design — it carries a plugin's shape across the host — so the
+      // projection names the two fields it reads rather than trusting the whole row.
+      const result = await b.targets(c.req.param('taskId')) as { targets?: { id: string; command?: string }[] }
+      return { options: (result.targets ?? []).map((target) => ({ value: target.id, label: target.id, ...(target.command ? { description: target.command } : {}) })) }
+    }),
+  )
   .post('/sessions', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')

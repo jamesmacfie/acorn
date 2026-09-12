@@ -40,6 +40,17 @@
     "test": {
       "dependsOn": ["topo"]
     },
+    // The same hazard, one package over. client-core's `lint` runs the icon census first
+    // (scripts/icon-census.mjs), which scans every app and plugin for literal Lucide names. Plugins
+    // are not client-core's dependencies — the cycle is deliberately broken — so `topo` gives it none
+    // of their hashes, and a new icon spelled in plugins/ would land on a cache hit with the check
+    // never run. Hash what the census reads.
+    "@acorn/client-core#lint": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../{apps,packages,plugins}/*/src/**"
+      ]
+    },
     // The boundary test reads every package off disk rather than importing them, so it has no
     // dependency edges for `topo` to hash — once cached, nothing in the repo could invalidate it
     // and it silently reported a stale pass. Hash the manifests and sources it actually inspects.

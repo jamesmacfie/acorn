@@ -38,7 +38,7 @@ surfaces.
   the part of its design acorn refuses, and the argument is in [refused.md](./refused.md). A
   keybinding names a command id. A pick names a provider id.
 - A node pref. Task layouts, open files, filters, and dashboards belong to the node the resource is
-  on (`docs/state.md`), and a device file that held them would make the device the owner of state it
+  on (`docs/state-ownership.md`), and a device file that held them would make the device the owner of state it
   does not own.
 - A token, a certificate, a fingerprint, or a node endpoint. `fleet.json` and the keychain own those
   and they are not configuration.
@@ -58,5 +58,5 @@ on an older one.
 
 Until there is a terminal host, every user of this file has Settings open in front of them, and the
 file is a second way to do something the UI already does well. Building it earlier would mean
-maintaining two surfaces for one audience. When the `acorn` command from `docs/future/terminal/phase-3-process-and-auth.md` exists, its
+maintaining two surfaces for one audience. Now that the `acorn` command exists (`docs/tui.md`), its
 first user will want this on day one, and that is the day to build it.

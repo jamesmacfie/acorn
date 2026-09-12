@@ -190,7 +190,7 @@ writeFileSync(
       // the storage engine, and it lands in the middle of the pairing banner. Scoped to this one
       // warning class rather than --no-warnings, so a real deprecation still gets through.
       scripts: { start: 'node --disable-warning=ExperimentalWarning dist/standalone.js' },
-      // The real floor is the node:sqlite surface main/sqlite.ts touches: enableForeignKeyConstraints
+      // The real floor is the node:sqlite surface server/storage/sqlite.ts touches: enableForeignKeyConstraints
       // landed in 22.18/24.4, backup() and setReturnArrays earlier. npm only warns on a mismatch, but
       // a warning that names the requirement beats "unknown option" from deep inside boot.
       engines: { node: RUNTIME_PIN.engines },
@@ -224,7 +224,7 @@ writeFileSync(
   ].join('\n'),
 )
 
-// `tar` rather than a packing library, for the same reason main/backup.ts uses it: the platform has one,
+// `tar` rather than a packing library, for the same reason server/storage/backup.ts uses it: the platform has one,
 // it is what the operator will unpack with, and a dependency for a single `-czf` is not worth it.
 const archive = join(OUT, `acorn-node-${desktop.version}.tar.gz`)
 execFileSync('tar', ['-czf', archive, '-C', OUT, 'acorn-node'], { stdio: 'inherit' })

@@ -1,12 +1,12 @@
 {
   "name": "@acorn/plugin-terminal",
   "version": "0.1.0",
+  "description": "The PTY stream and the run targets around it. The most privileged plugin in the tree.",
   "private": true,
   "type": "module",
   "exports": {
     "./node/index.ts": "./src/node/index.ts",
     "./client/index.ts": "./src/client/index.ts",
-    "./main/index.ts": "./src/main/index.ts",
     "./contract/*": "./src/contract/*",
     "./testkit": "./src/testkit/index.ts",
     "./testkit/client": "./src/testkit/client.ts"
@@ -16,8 +16,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/protocol": "workspace:*",
@@ -35,6 +33,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",

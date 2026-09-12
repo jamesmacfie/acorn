@@ -20,7 +20,7 @@ whether or not anyone is".
 
 The scheduler lives in `packages/node-core/src/server/schedules/`, not in shell code, so both Node
 hosts get the same one by construction. Each composition root
-(`apps/node/src/service/runtime.ts`, `apps/node/src/server/standalone.ts`) builds it, provides it as
+(`apps/node/src/composition/runtime.ts`, `apps/node/src/entries/standalone.ts`) builds it, provides it as
 the `SCHEDULER` capability before the listener binds, starts it after, and stops it in the `schedules`
 step of the ordered drain. That step sits after the listener and before plugins and SQLite, because a
 run holds a database handle.
@@ -117,6 +117,11 @@ of their own, not an edited plugin one.
 None of that is schedule-specific policy. It is the engine's retain-the-state-row rule and the host's
 registration lifecycle, restated for this kind.
 
+Findings automatic preparation is not a declared schedule. Terminal exit, top-level workflow
+completion, and task archive call bounded lifecycle adapters. Findings persists the checkpoint, then
+starts preparation only when the owner enabled it. Disabling findings removes those adapters through
+capability lookup and leaves no timer that can continue model work.
+
 #### Trust
 
 A schedule joins the **Declared** group of the trust dialog and of the agent-install review screen,
@@ -145,7 +150,7 @@ The calendar forms use node-local time, because the node is the owner's machine 
 their 03:30. Daylight saving does what local time does and nobody pretends otherwise.
 
 **The renderer has its own `ctx.schedules`, and it is not this one.** A client schedule takes a raw
-`intervalMs` with no floor and no budget (`client-core/src/registries/schedules.ts`), because below the
+`intervalMs` with no floor and no budget (`client-core/src/host/registries/shell/schedules.ts`), because below the
 300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
 word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
 2026-08-27, which made one idea look like two.
@@ -198,7 +203,7 @@ fire and a clicked one are indistinguishable to the handler. The schedule owns o
 What can be scheduled comes from a node-side registry with **one** feeder: manifest commands whose verb
 is `runNodeAction`, synthesised by the host. There is no new descriptor kind, so the plugin wire
 contract did not grow, and there is no `ctx` member either — the registration reaches the registry
-through a host-only seam (`HostPluginContext` in `server/plugin/types.ts`). It was on the authoring
+through a host-only seam (`HostPluginContext` in `server/pluginHost/types.ts`). It was on the authoring
 context until 2026-08-27, where it read as something a plugin writes and no plugin ever did.
 
 An action that declares no tier is treated as `execute`, the strongest. That is a deliberate repair
@@ -267,7 +272,7 @@ taken once, at creation, because 3am cannot answer a confirmation strip.
 the tier the host just showed; letting it post a tier would make the confirmation something a client
 could quietly widen, which is the one property the arming rule exists to prevent.
 
-Plugin frames cannot reach any of these (`client-core/plugins/frames/scopes.ts`): reading the list
+Plugin frames cannot reach any of these (`client-core/host/frames/scopes.ts`): reading the list
 enumerates what the machine does unwatched, and creating one is a way to make code run later.
 
 ## Settings
@@ -306,7 +311,7 @@ retention.
 
 ## Not built yet
 
-- **Unattended backup.** `main/backup.ts` is route-triggered only, and a `core:backup` schedule is one
+- **Unattended backup.** `server/storage/backup.ts` is route-triggered only, and a `core:backup` schedule is one
   registration away — but it needs a retention policy nobody has asked for yet, and a weekly archive of
   every database written forever to one directory is unbounded disk growth. The open question is *how
   many backups should a node keep*; see git history (`git log --follow -- docs/future/cron`) for the

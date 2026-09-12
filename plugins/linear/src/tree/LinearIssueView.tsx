@@ -1,6 +1,6 @@
 import { createSignal, For, Show, type JSX } from 'solid-js'
 import {
-  Badge, Button, Card, Chip, ChipRow, Composer, EmptyState, Facts, Heading, Inline, Markdown,
+  Badge, Button, Card, Chip, ChipRow, Composer, CopyButton, EmptyState, Facts, Heading, Inline, Markdown,
   Meter, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
@@ -16,7 +16,7 @@ import { formatDate, relativeTime } from './model'
 // the shell's appearance packs.
 //
 // Two things live outside this file. The panel chrome belongs to whoever opened the panel
-// (client-core/plugins/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
+// (client-core/host/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
 // tickets sits in app.tsx beside the task read.
 
 // Glyph per activity kind (Linear-style compact feed).
@@ -80,7 +80,11 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   const comment = (entry: LinearComment, isReply: boolean) => (
     <Card pad="sm" stripe={isReply ? 'accent' : undefined}>
       <Stack gap="row">
-        <Toolbar variant="bar" size="sm">
+        {/* An `Inline`, not a `Toolbar`: a bar inside a card is inset by the card's padding and then
+            pads itself again, so the author's name sat further in than their own words and the strip
+            stood taller than the line it holds. Github's inline threads put this meta line flush with
+            the comment body, and so does this one now. */}
+        <Inline>
           <Text emphasis="strong">{entry.author ?? 'Unknown'}</Text>
           <Show when={relativeTime(entry.createdAt)}>{(age) => <Text tone="muted">{age()}</Text>}</Show>
           <ToolbarSpacer />
@@ -93,7 +97,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
               Reply
             </Button>
           </Show>
-        </Toolbar>
+        </Inline>
         {/* The host renders and sanitises the markdown. What used to be an `innerHTML` write inside the
             frame is now a node with a `text` prop, which is the only way a stranger's markup can reach
             the shell's DOM at all. */}
@@ -161,11 +165,17 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       <TabPanel idPrefix="linear" id="overview" active={props.activeTab}>
         <Stack gap="section">
           <Facts items={facts()} />
+          {/* `CopyButton` rather than a `Button` reading "Copy": the branch name is the whole point of
+              the bar, and a word beside it competes with it for the eye. `always`, because the kit
+              takes no class and this tree has no way to give the bar the `.copyable` the button's
+              hover reveal keys off. No `onCopy` either — the host draws this button in the shell's
+              own DOM, so it reaches the real clipboard, and `onCopy` is not one of the eleven event
+              names a handler may cross the wire under. */}
           <Show when={issue().branchName}>
             {(branch) => (
               <Toolbar variant="bar" size="sm">
                 <Text emphasis="mono">{branch()}</Text>
-                <Button size="sm" variant="bare" onPress={() => props.onCopy(branch())}>Copy</Button>
+                <CopyButton text={branch()} always title="Copy the branch name" />
               </Toolbar>
             )}
           </Show>

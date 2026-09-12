@@ -1,7 +1,8 @@
 // The test seam for this package (docs/architecture-overview.md § Package boundaries).
 //
 //   apps/node/test/integration/coreTools.test.ts     notesAgentTools, NotesStore
-//   apps/node/test/integration/taskContext.test.ts   NotesStore
+//   apps/node/test/integration/taskContext.test.ts   NotesStore, notesSection
 //   apps/node/test/integration/workflowRunner.test.ts   NotesStore
-export { notesAgentTools } from '../main/agentTools'
-export { NotesStore } from '../main/notes'
+export { notesAgentTools } from '../server/agentTools'
+export { NotesStore } from '../server/notes'
+export { notesSection, type ContextNotesSource } from '../server/contextSection'

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { contentLinkRegistry, openInAppUrl, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+import { contentLinkRegistry, openInAppUrl, parseInAppTarget } from '@acorn/client-core/host/registries/panes/contentLinks.ts'
 import { type Project, setProjectsLookup } from '@acorn/plugin-api/testkit/client'
-import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
+import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/host/registries/panes/refPanels.ts'
 import { githubContentLinkContributions, makeContentLinkHandler } from './contentLinks'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
 

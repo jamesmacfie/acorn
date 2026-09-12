@@ -4,10 +4,10 @@ import type { SearchResult } from '../../shared/search'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 // Find-in-files: project-wide text search over the task's worktree through ripgrep. The taskId in the
-// path is the capability: the renderer never hands over a worktree path, and the bridge re-derives it
+// path is the capability: the client never hands over a worktree path, and the bridge re-derives it
 // from the DB and runs rg with cwd:root. Pure Node, so it works in dev:node.
 
-// The main-process backing (main/search.ts): resolve the task worktree and run ripgrep.
+// The node backing (../search.ts): resolve the task worktree and run ripgrep.
 export type SearchBridge = {
   findInFiles(taskId: string, query: string, opts: SearchOpts): Promise<SearchResult>
 }

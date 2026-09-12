@@ -50,11 +50,40 @@ content because it is not shared storage.
 Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
 cache.
 
+Opening the cache sweeps the directory once, and the sweep is a permission migration: `put` writes
+mode 0600, so a file with any other mode was written by an older build under a permissive umask. The
+mode comes off the `lstat` the sweep already does, and only a file that is actually wrong is
+chmodded. That matters because the sweep is synchronous and sits in front of the node's listener:
+2,975 blobs and an unconditional `chmod` each cost 102 ms of every boot and fixed nothing
+(`packages/node-core/src/server/bindings.ts`, docs/performance.md § 2026-09-03 —
+phase 3).
+
 ## Renderer query cache
 
-The renderer uses TanStack Query with one `QueryClient` and one IndexedDB persister per Node. The
-persister key is scoped to the Node, not merely prefixed into every feature key. This makes the cache
-partition structural: identical task or repository IDs on separate Nodes cannot collide.
+The renderer uses TanStack Query with one `QueryClient` and one persister per Node. The persister key
+is scoped to the Node, not merely prefixed into every feature key. This makes the cache partition
+structural: identical task or repository IDs on separate Nodes cannot collide.
+
+Which partition the shell mounts on comes from the last-known active Node id, read synchronously on
+the renderer's first tick. It has to: the window opens before anything has asked the helper which
+Nodes there are ([frontend.md](./frontend.md) § Painting before the node), and a partition picked a
+tick late would mount the shell on the `origin` cache and then remount it on the real one, throwing
+away the first paint. So the device remembers the id
+(`packages/client-core/src/infra/node/activeNode.ts`), the fleet answer corrects it, and a Node that
+has gone reaches the `node-replaced` reload. A launch with nothing remembered has no cache to draw
+either, and renders the onboarding path instead.
+
+Where a partition is written is the host's, through `setCacheStorage`. IndexedDB is the default,
+because the hosts that had one were browsers; the terminal client has none and installs a directory
+of files instead, one per partition key, before the first cache is built. That host drives the
+persister itself — `persistQueryClient` from `@tanstack/query-persist-client-core`, with the same
+`maxAge` and dehydration predicate the desktop's provider passes — and awaits the restore before it
+renders, which is its `isRestoring`.
+
+One client per node is a contract, not a convention. The terminal client was the host that broke it:
+it minted a second `QueryClient` for its shell beside the per-node one, so the shell read a cache
+nothing persisted and nothing invalidated. Nothing on any host may add another
+([tui.md](./tui.md) § Booting client-core under Node).
 
 The persisted cache is disposable and has a bounded lifetime. It provides fast last-known reads,
 not mutation confirmation. When a Node is reconnecting or offline, cached responses remain visible

@@ -1,26 +1,32 @@
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
-import { claudeHarness } from '../main/drivers/claudeHarness'
-import { CodexAgentDriver } from '../main/drivers/codexDriver'
-import { agentDriverRegistry } from '../main/drivers/registry'
-import { createHarnessRegistry } from '../main/harnessRegistry'
-import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../main/pricingStore'
-import { ManagedAgentRuntime } from '../main/runtime'
+import { claudeHarness } from '../server/drivers/claudeHarness'
+import { CodexAgentDriver } from '../server/drivers/codexDriver'
+import { agentDriverRegistry } from '../server/drivers/registry'
+import { createHarnessRegistry } from '../server/harnessRegistry'
+import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
+import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
-import { createSessionExecute } from '../main/sessionExecute'
-import { agentUsageCollectors } from '../main/usage/collectors'
-import { readAgentConcurrency, writeAgentConcurrency } from '../main/concurrencyStore'
-import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../main/sessionDefaultsStore'
-import { collectClaudeUsage } from '../main/usage/claudeUsage'
-import { collectCodexUsage } from '../main/usage/codexUsage'
-import { createAgentUsageService } from '../main/usage/service'
+import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
+import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS, type AgentTurnChangedEvent } from '../contract/lifecycle'
+import { createDraftAttachments } from '../server/sessions/draftAttachments'
+import { createSessionExecute } from '../server/sessions/sessionExecute'
+import { agentUsageCollectors } from '../server/usage/collectors'
+import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
+import { collectClaudeUsage } from '../server/usage/claudeUsage'
+import { collectCodexUsage } from '../server/usage/codexUsage'
+import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
-import { aiderProfile, claudeCodeProfile, codexProfile } from '../main/index'
+import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
+import { AgentDelegationStore } from '../server/delegation/store'
+import { AgentDelegationService } from '../server/delegation/service'
+import { delegationTools } from '../server/delegation/tools'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -45,7 +51,7 @@ function registerBuiltInDrivers(): void {
 
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
 // than inside the usage service, because a plugin-contributed harness feeds the same registry
-// (main/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
+// (../server/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -72,7 +78,10 @@ export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
   // See docs/security.md § Credential handling.
   internalEnv: InternalEnvFactory
-  memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
+  // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
+  // spawn cannot race the repair of the same creating ledger row.
+  reconciled: Promise<void>
+  onCompletedTurn?: (event: AgentTurnChangedEvent) => Promise<void>
 }
 
 // `dataDir` stays a parameter, unlike changes' and github's: the runtime writes attachments, artifacts
@@ -82,9 +91,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
+  let draftAttachmentsRoute: { dispose(): void } | null = null
+  let lifecycleCapabilities: Array<{ dispose(): void }> = []
   return {
     name: 'agents',
     required: true,
+    emits: [
+      { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
+      { verb: 'request-changed', description: 'An agent input request was created or changed state' },
+      { verb: 'sessions-changed', description: 'A managed agent session was created, renamed, archived, restored, or deleted' },
+      { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
+    ],
     // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
@@ -110,6 +127,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         dataDir,
         core,
         hooks: ctx.hooks,
+        telemetry: ctx.telemetry,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
         // Read per call, never captured. Creating a task's worktree consults that owner's per-repo
@@ -142,13 +160,37 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           return (await sessions.list()).some((terminal) =>
             terminal.agentSessionId === sessionId && terminal.status === 'running')
         },
-        onCompletedTurn: deps.memoryReviewTrigger,
+        onCompletedTurn: deps.onCompletedTurn,
       })
 
-      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
+      const delegation = new AgentDelegationService(
+        runtime,
+        new AgentDelegationStore(store),
+        async () => await ctx.capabilities.get(TERMINAL_SESSIONS)?.list() ?? [],
+        core.tasks,
+        deps.reconciled,
+      )
+      for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
+
+      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
+      lifecycleCapabilities = [
+        ctx.capabilities.provide(AGENTS_TURNS, {
+          list: (filter) => runtime!.store.lifecycleTurns(filter),
+        }),
+        ctx.capabilities.provide(AGENTS_REQUESTS, {
+          list: (filter) => runtime!.store.lifecycleRequests(filter),
+        }),
+        ctx.capabilities.provide(AGENTS_SESSIONS, {
+          list: (taskId) => runtime!.store.lifecycleSessions(taskId),
+        }),
+        ctx.capabilities.provide(AGENTS_REVIEW_INPUT, {
+          listCompleted: (taskId) => runtime!.store.lifecycleCompletedReviewInputs(taskId),
+          read: (input) => runtime!.store.lifecycleReviewInput(input),
+        }),
+      ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
-      // core's table (main/pricingStore.ts).
+      // core's table (../server/pricingStore.ts).
       const probeDir = join(dataDir, 'agent-usage-probe')
       registerBuiltInUsageCollectors(probeDir)
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
@@ -211,7 +253,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
-      ctx.capabilities.provide(AGENTS_RUNTIME, { reconcile: () => runtime!.reconcile() })
+      ctx.capabilities.provide(AGENTS_RUNTIME, {
+        reconcile: async () => {
+          await runtime!.reconcile()
+          await delegation.reconcile()
+        },
+      })
+      // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
+      // attachment reaches this plugin through, since a sandbox cannot call another plugin's routes.
+      // Read and write only, and only for a draft: the composer still owns which attachment is in the
+      // turn, because the node cannot transact with an array in the client.
+      draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
     },
     // Releases what init acquired, in the order docs/managed-agents.md § Operations and failure
     // describes.
@@ -219,8 +271,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       await runtime?.stop()
       runtime = null
       managedRoute?.dispose()
+      draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
       harnessRoute?.dispose()
+      for (const capability of lifecycleCapabilities) capability.dispose()
+      lifecycleCapabilities = []
       for (const dispose of builtInProfileDisposables ?? []) dispose()
       builtInProfileDisposables = null
       for (const dispose of builtInDriverDisposables ?? []) dispose()

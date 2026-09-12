@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { ProjectRef } from '@acorn/node-core/main/projects.ts'
-import type { TaskRef } from '@acorn/node-core/main/taskWorktree.ts'
-import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/server/plugin/types.ts'
+import type { CoreServices } from '@acorn/node-core/server/core/index.ts'
+import type { ProjectRef } from '@acorn/node-core/server/projects.ts'
+import type { TaskRef } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
+import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/server/pluginHost/types.ts'
 import type { StoredConnection } from '@acorn/node-core/server/integrations/connections.ts'
 import type { ExternalItemStore } from '@acorn/node-core/server/integrations/itemStore.ts'
-import type { CapabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import type { CapabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 import type * as Published from './public.ts'
 
 // The drift lock for the hand-written published declarations, copying the pattern
@@ -32,10 +33,13 @@ type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]
 // Adding a name to a list below is the deliberate act. It means "acorn no longer promises the shape of
 // this one member", and it should be argued for in review like any other narrowing.
 const HOLES = {
-  context: ['storage', 'tools', 'providers', 'collections', 'contextSections', 'taskChecks'],
+  context: ['storage', 'providers', 'collections', 'taskChecks'],
   tasks: ['runConfig'],
   projects: ['config', 'setup'],
   proc: ['ProcessError'],
+  // One member of the batch, because a record's shape lives in `@acorn/protocol/telemetry.ts` and
+  // a loaded plugin cannot import protocol. The two `ctx` members beside it are compared in full.
+  telemetry: ['records'],
 } as const
 
 // Two shapes the published types leave as type parameters rather than describing: a stored connection
@@ -52,16 +56,14 @@ type Hole<C, K extends keyof C | string> = Omit<C, K>
  *  and both sides are widened here before they are compared. */
 type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 
-// The loaded tier's projection of the real context: no `routes.register`, no `events.channel`, no
-// `events.streams`. The host withholds all three whatever a manifest says (docs/extensibility.md §
-// Two tiers, permanently), and the published type describes the tier a stranger can write.
-type LoadedContext = Omit<NodePluginContext, 'routes' | 'events' | 'core'> & {
-  routes: Omit<NodePluginContext['routes'], 'register'>
-  events: Omit<NodePluginContext['events'], 'channel' | 'streams'>
-  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git'>>
+// The host's `NodePluginContext` IS the loaded tier's shape now — the compiled-only members live on
+// `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
+// one exception, and not a tier one: its big facets are compared one at a time below.
+type LoadedContext = Omit<NodePluginContext, 'core'> & {
+  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
 }
 type PublishedContext = Omit<Published.NodePluginContext<Real[0], Real[1]>, 'core'> & {
-  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git'>>
+  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
 }
 
 const _context: Mutual<Hole<LoadedContext, (typeof HOLES.context)[number]>, Hole<PublishedContext, (typeof HOLES.context)[number]>> = [true, true]
@@ -77,31 +79,64 @@ const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[
 const _tasks: Mutual<Hole<CoreServices['tasks'], (typeof HOLES.tasks)[number]>, Hole<Published.CoreServices['tasks'], (typeof HOLES.tasks)[number]>> = [true, true]
 const _projects: Mutual<Hole<CoreServices['projects'], (typeof HOLES.projects)[number]>, Hole<Published.CoreServices['projects'], (typeof HOLES.projects)[number]>> = [true, true]
 const _request: Mutual<PluginRequestContext, Published.PluginRequestContext<Real[0], Real[1]>> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request]
+// The sink contract, compared apart from the batch's `records`, whose element type is protocol's
+// and therefore opaque on the published side.
+type BatchOf<T> = T extends { onBatch(sink: (batch: infer B) => void): unknown } ? B : never
+const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'>, Hole<BatchOf<Published.CoreTelemetryService>, 'records'>> = [true, true]
+// One capability whose shape is written out here rather than left opaque, because a plugin outside this
+// repository is the whole reason it exists (`agents.draftAttachments`). The row it hands back is
+// protocol's `AgentAttachment`, so this is what stops the published copy drifting from the real one.
+const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
+void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
+
+// Public authoring fixture: these are manifest values an out-of-tree package can type without a
+// runtime import or a Zod dependency.
+const _loadedTool = {
+  id: 'lookup',
+  description: 'Read one task-local record.',
+  inputSchema: {
+    type: 'object',
+    properties: { id: { type: 'string', minLength: 1, maxLength: 100 } },
+    required: ['id'],
+    additionalProperties: false,
+  },
+  risk: 'read',
+  handler: '/v2/p/example/tools/lookup',
+  timeoutMs: 5_000,
+  maxOutputBytes: 65_536,
+} satisfies Published.PluginAgentToolDescriptor
+const _loadedContext = {
+  id: 'references', label: 'References', order: 60,
+  read: '/v2/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
+} satisfies Published.PluginContextSectionDescriptor
+void [_loadedTool, _loadedContext]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
-  expect(HOLES.context).toHaveLength(6)
-  expect(Object.values(HOLES).flat()).toHaveLength(10)
-  // Nine of the context's fifteen members are compared in full, `core` facet by facet above, and
+  expect(HOLES.context).toHaveLength(4)
+  expect(Object.values(HOLES).flat()).toHaveLength(9)
+  // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
-    'name', 'routes', 'tools', 'schedules', 'collections', 'taskChecks',
-    'contextSections', 'runs', 'audit', 'extensionPoints', 'providers', 'capabilities', 'storage', 'core', 'events',
+    'name', 'routes', 'schedules', 'collections', 'taskChecks',
+    'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
+    'telemetry', 'log',
   ]
-  expect(published.length - HOLES.context.length).toBe(9)
+  expect(published.length - HOLES.context.length).toBe(12)
 })
 
 it('names every capability the first-party plugins publish', () => {
-  // The discovery half of the capability work: eleven of these ids are declared in
+  // The discovery half of the capability work: these ids are declared in
   // `plugins/*/src/contract/` modules a loaded plugin cannot import.
   const ids: Array<keyof Published.CapabilityCatalogue> = [
-    'agents.sessionExecute', 'agents.runtime', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
+    'agents.sessionExecute', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
+    'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
     'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
-    'memory.knowledge', 'github.mirror', 'preview.rules', 'workflows.runner', 'workflows.notices',
+    'memory.knowledge', 'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
+    'workflows.runner', 'workflows.gates', 'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(14)
+  expect(new Set(ids).size).toBe(22)
 })
 
 it('declares no runtime, which is what makes it publishable as a .d.ts', () => {

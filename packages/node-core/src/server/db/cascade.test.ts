@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { cascadeDeletePluginData } from './cascade'
 import { schema } from './index'

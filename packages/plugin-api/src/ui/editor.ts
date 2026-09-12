@@ -1,11 +1,19 @@
-// The Monaco surface, owned once by the host: the theme both compiled panes were carrying a copy
-// of, and the canonical-language-id to Monaco map that replaces their two divergent extension
-// tables. See docs/third-party/monaco.md § Sequence step 1 for why it is its own entrypoint and why
-// it is compiled-panes-only (folding it onto ./ui/host would drag 30 MB of editor into docker's
-// boot graph).
+// The editor surface, owned once by the host: the theme both compiled panes were carrying a copy
+// of, and the canonical-language-id to CodeMirror map that replaces their two divergent extension
+// tables. See docs/editor.md § Sequence step 1 for why it is its own entrypoint and why it is
+// compiled-panes-only.
 //
-// `applyMonacoTheme` and `monacoLanguageFor` stay off this surface (docs/plugins.md § The plugin
-// API). `watchMonacoTheme` already applies the theme on subscribe, and a pane holds a path, so it
-// wants `monacoLanguageForPath`.
-export { MONACO_THEME, watchMonacoTheme } from '@acorn/client-core/editor/theme.ts'
-export { monacoLanguageForPath } from '@acorn/client-core/editor/language.ts'
+// It stays a separate entrypoint after the move off Monaco for the same reason it became one: an
+// editor is a few hundred kilobytes of grammars that no other pane's boot graph should carry. What
+// changed is that it is no longer *unloadable* under node — CodeMirror touches no browser global at
+// module scope — which is why it is not on the browser-realm list in entrypoints.test.ts any more.
+//
+// `languageFor` stays off this surface (docs/plugins.md § The plugin API): a pane holds a path, so
+// it wants `languageForPath`.
+export { editorTheme, refreshEditorTheme, watchEditorTheme } from '@acorn/client-core/features/editor/theme.ts'
+export { languageForPath, shouldHighlightDocument } from '@acorn/client-core/features/editor/language.ts'
+export { applyViewState, captureViewState, type EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
+// A code box that is not a document: the library and the theme, and the caller keeps the text
+// (client-core features/editor/embed.ts). Workflows' JSON tab is the case.
+export { mountEmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
+export type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'

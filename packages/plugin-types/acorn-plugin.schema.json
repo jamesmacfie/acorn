@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 7)",
+  "title": "acorn plugin manifest (plugin API major 12)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -202,6 +202,42 @@
               "items": {
                 "type": "string",
                 "minLength": 1
+              }
+            },
+            "env": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Z_][A-Z0-9_]*$"
+              }
+            },
+            "files": {
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "env": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Z_][A-Z0-9_]*$"
+                  },
+                  "access": {
+                    "default": "read",
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "read-write"
+                    ]
+                  }
+                },
+                "required": [
+                  "env"
+                ]
               }
             }
           }
@@ -448,6 +484,42 @@
                   "minLength": 1,
                   "maxLength": 64
                 }
+              },
+              "destinations": {
+                "default": [],
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "targetKind": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "noticeKind": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "targetKind"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -497,6 +569,11 @@
               },
               "projectScoped": {
                 "type": "boolean"
+              },
+              "defaultPane": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "onSelect": {
                 "oneOf": [
@@ -1127,144 +1204,774 @@
           "maxItems": 32,
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "title": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 120
-              },
-              "category": {
-                "default": "action",
-                "type": "string",
-                "enum": [
-                  "action",
-                  "navigation",
-                  "pane",
-                  "task",
-                  "terminal",
-                  "workspace"
-                ]
-              },
-              "palette": {
-                "default": true,
-                "type": "boolean"
-              },
-              "action": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openPane"
-                      },
-                      "pane": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "pane"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
                     ]
                   },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openTask"
-                      }
-                    },
-                    "required": [
-                      "verb"
-                    ]
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
                   },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "runNodeAction"
-                      },
-                      "path": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "path"
-                    ]
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
                   },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openUrl"
-                      },
-                      "url": {
-                        "type": "string",
-                        "format": "uri"
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "url"
-                    ]
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
                   },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openOverlay"
-                      },
-                      "overlay": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "overlay"
-                    ]
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
                   },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "surfaceAction"
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "default": "action",
+                    "type": "string",
+                    "const": "action"
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openPane"
+                          },
+                          "pane": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "pane"
+                        ]
                       },
-                      "surface": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openTask"
+                          }
+                        },
+                        "required": [
+                          "verb"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "runNodeAction"
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "path"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openUrl"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "url"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openOverlay"
+                          },
+                          "overlay": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "overlay"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "surfaceAction"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
                       }
-                    },
-                    "required": [
-                      "verb",
-                      "surface"
                     ]
                   }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "action"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
+                    ]
+                  },
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "group"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
+                    ]
+                  },
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "search"
+                  },
+                  "scope": {
+                    "default": "node",
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "task",
+                      "project",
+                      "workspace",
+                      "node"
+                    ]
+                  },
+                  "route": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "placeholder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "minQueryLength": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 20
+                  },
+                  "debounceMs": {
+                    "type": "integer",
+                    "minimum": 150,
+                    "maximum": 1000
+                  },
+                  "onSelect": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openPane"
+                          },
+                          "pane": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "pane"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openTask"
+                          }
+                        },
+                        "required": [
+                          "verb"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "runNodeAction"
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "path"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openUrl"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "url"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openOverlay"
+                          },
+                          "overlay": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "overlay"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "surfaceAction"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "navigate"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "kind",
+                  "route",
+                  "onSelect"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
+                    ]
+                  },
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "input"
+                  },
+                  "scope": {
+                    "default": "node",
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "task",
+                      "project",
+                      "workspace",
+                      "node"
+                    ]
+                  },
+                  "route": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "placeholder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "onSuccess": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openPane"
+                          },
+                          "pane": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "pane"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openTask"
+                          }
+                        },
+                        "required": [
+                          "verb"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "runNodeAction"
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "path"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openUrl"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "url"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openOverlay"
+                          },
+                          "overlay": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "overlay"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "surfaceAction"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "kind",
+                  "route",
+                  "onSuccess"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "category": {
+                    "default": "action",
+                    "type": "string",
+                    "enum": [
+                      "action",
+                      "navigation",
+                      "pane",
+                      "task",
+                      "terminal",
+                      "workspace"
+                    ]
+                  },
+                  "palette": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "keywords": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "setting"
+                  },
+                  "scope": {
+                    "default": "node",
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "task",
+                      "project",
+                      "workspace",
+                      "node"
+                    ]
+                  },
+                  "readRoute": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "writeRoute": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "options": {
+                    "minItems": 2,
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "keywords": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          }
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "label"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "kind",
+                  "readRoute",
+                  "writeRoute",
+                  "options"
                 ]
               }
-            },
-            "required": [
-              "id",
-              "title",
-              "action"
             ]
           }
         },
@@ -1725,7 +2432,8 @@
               "location": {
                 "type": "string",
                 "enum": [
-                  "task.row"
+                  "task.row",
+                  "item.row"
                 ]
               },
               "label": {
@@ -2007,6 +2715,16 @@
                   "maxLength": 128
                 }
               },
+              "actions": {
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[a-z][a-zA-Z0-9]*$"
+                }
+              },
               "payload": {
                 "type": "object",
                 "propertyNames": {
@@ -2130,6 +2848,11 @@
                   "minLength": 1,
                   "maxLength": 128
                 }
+              },
+              "overlay": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "mode": {
                 "type": "string",
@@ -2719,6 +3442,36 @@
                       "minLength": 1,
                       "maxLength": 4096
                     }
+                  },
+                  "oneShot": {
+                    "type": "object",
+                    "properties": {
+                      "args": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "modelFlag": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "output": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "json-lines"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "args",
+                      "output"
+                    ]
                   }
                 },
                 "required": [
@@ -2730,6 +3483,135 @@
               "id",
               "label",
               "spawn"
+            ]
+          }
+        },
+        "agentTools": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "inputSchema": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write",
+                  "execute"
+                ]
+              },
+              "scope": {
+                "default": "task",
+                "type": "string",
+                "const": "task"
+              },
+              "handler": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "requiresSession": {
+                "default": false,
+                "type": "boolean"
+              },
+              "timeoutMs": {
+                "default": 10000,
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 30000
+              },
+              "maxOutputBytes": {
+                "default": 65536,
+                "type": "integer",
+                "minimum": 1024,
+                "maximum": 262144
+              }
+            },
+            "required": [
+              "id",
+              "description",
+              "inputSchema",
+              "risk",
+              "handler"
+            ]
+          }
+        },
+        "contextSections": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "scope": {
+                "default": "task",
+                "type": "string",
+                "const": "task"
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "read": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "defaultIncluded": {
+                "default": false,
+                "type": "boolean"
+              },
+              "timeoutMs": {
+                "default": 5000,
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 15000
+              },
+              "maxBytes": {
+                "type": "integer",
+                "minimum": 1024,
+                "maximum": 65536
+              },
+              "maxTokens": {
+                "type": "integer",
+                "minimum": 256,
+                "maximum": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "order",
+              "read",
+              "maxBytes",
+              "maxTokens"
             ]
           }
         }

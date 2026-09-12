@@ -1,0 +1,47 @@
+/* Command palette (docs/command-palette-and-shortcuts.md): flat, square, 1px borders per docs/ui-design.md. */
+.overlay.palette { width: min(560px, 90vw); padding: 0; }
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.palette-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-6);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.palette-row.selected { background: var(--bg-selected); }
+.palette-row.palette-error { color: var(--del-marker); cursor: default; }
+.palette-label { flex: none; }
+/* A search result's own marker: a count, a state, a severity. Beside the label, because it is about
+   the row rather than about where the row came from. */
+.palette-badge { flex: none; font-family: var(--font-ui); }
+/* Where a root-search hit lives, when the hit is not at the top level. Between the label and the
+   hint, because it belongs to the label. */
+.palette-crumb { flex: none; font-family: var(--font-ui); }
+.palette-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-ui);
+}
+.palette-empty { padding: var(--space-5) var(--space-6); font-size: var(--fs-sm); }
+/* Where in the command tree this frame is. Above the field, because it is the thing the query is
+   being typed inside of. */
+.palette-crumbs {
+  padding: var(--space-3) var(--space-6) 0;
+  font-size: var(--fs-sm);
+}

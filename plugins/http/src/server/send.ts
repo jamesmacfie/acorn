@@ -1,5 +1,4 @@
-// The API panel's request executor. Runs in the Hono server, which is a plain Node process (under
-// Electron via apps/desktop's main/bootstrap.ts, otherwise via apps/node's server/standalone.ts), so
+// The API panel's request executor. Runs in the Hono server, a plain Node process (apps/node), so
 // this needs no bridge. A bridge exists to hold a stateful Node handle (a pg.Pool, a PTY); fetch is
 // stateless.
 import { execFile } from 'node:child_process'
@@ -31,7 +30,7 @@ export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secret
 
 const exec = promisify(execFile)
 
-// Caps. The response cap protects the renderer (the body is base64'd into JSON); the command cap
+// Caps. The response cap protects the client (the body is base64'd into JSON); the command cap
 // bounds a variable script that decides to print a file.
 const MAX_BODY_BYTES = 5 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
@@ -165,7 +164,7 @@ async function resolveVarsWithSensitivity(
   for (const [name, value] of Object.entries(input.vars)) vars[name] = value
   return {
     values: vars,
-    // Secret variables and command outputs never originated in renderer state. Track their
+    // Secret variables and command outputs never originated in client state. Track their
     // plaintext only for response redaction; value-kind and per-request overrides are already
     // visible in the editable draft.
     sensitiveValues: enabled.filter((row) => row.kind !== 'value').map((row) => vars[row.name]).filter(Boolean),
@@ -294,7 +293,7 @@ export async function send(
     url: redactResolved(res.url || target.toString(), resolved.sensitiveValues),
     redirected: res.redirected,
     headers: [...res.headers.entries()],
-    // Base64 so a binary response survives the JSON hop intact; the renderer decodes it and picks a
+    // Base64 so a binary response survives the JSON hop intact; the client decodes it and picks a
     // view from the content-type.
     bodyBase64: Buffer.from(bytes).toString('base64'),
     size: bytes.byteLength,

@@ -1,5 +1,5 @@
 // GitHub's TanStack Query definitions. They live with the plugin that owns the routes and the keys
-// (../contract/api.ts) rather than in client-core, so the shell no longer carries a feature's read
+// (../shared/api.ts) rather than in client-core, so the shell no longer carries a feature's read
 // layer.
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
@@ -51,7 +51,7 @@ import {
   type Repo,
   type RunJobs,
   type TaskPullRelationsResponse,
-} from '../contract/api'
+} from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }

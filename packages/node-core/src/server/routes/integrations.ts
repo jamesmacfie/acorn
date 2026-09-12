@@ -21,7 +21,8 @@ import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { projectInWorkspace } from './workspaces'
+import { projectInWorkspace } from './projects/workspaces'
+import { broadcastWorkspaceProjectsChanged } from '../notify'
 
 // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
 const setDisabledBody = z.object({ disabled: z.boolean() })
@@ -130,7 +131,8 @@ export const integrations = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
     const db = getDb(c.env)
     const id = c.req.param('id')
-    if (!(await getConnection(db, ownerId(c), id))) return respondError(c, 403, 'provider_not_connected')
+    const connection = await getConnection(db, ownerId(c), id)
+    if (!connection) return respondError(c, 403, 'provider_not_connected')
     const mappings = parsed.data.mappings ?? []
     // A project has to sit in the workspace it is being scoped under, or the link would match nothing
     // for the rest of its life.
@@ -139,6 +141,10 @@ export const integrations = new Hono<AppEnv>()
         return respondError(c, 400, 'provider_bad_config')
       }
     }
+    const previous = await db
+      .select()
+      .from(schema.workspaceExternalProjects)
+      .where(eq(schema.workspaceExternalProjects.integrationId, id))
     const now = Date.now()
     await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.integrationId, id))
     if (mappings.length) {
@@ -152,6 +158,19 @@ export const integrations = new Hono<AppEnv>()
           createdAt: now,
         })))
         .onConflictDoNothing()
+    }
+    const current = await db
+      .select()
+      .from(schema.workspaceExternalProjects)
+      .where(eq(schema.workspaceExternalProjects.integrationId, id))
+    const key = (mapping: typeof current[number]) => `${mapping.workspaceId}\0${mapping.externalId}\0${mapping.projectId}`
+    const previousKeys = new Set(previous.map(key))
+    const changed = previousKeys.size !== current.length || current.some((mapping) => !previousKeys.has(key(mapping)))
+    if (changed) {
+      broadcastWorkspaceProjectsChanged({
+        providerId: connection.provider,
+        workspaceIds: [...new Set([...previous, ...current].map((mapping) => mapping.workspaceId))].sort(),
+      })
     }
     return c.json({ ok: true })
   })

@@ -1,12 +1,12 @@
 import { lazy } from 'solid-js'
 import type { SourceContribution } from '@acorn/plugin-api/client'
 
-const AgentCenter = lazy(() => import('./AgentCenter'))
+const AgentCenter = lazy(() => import('./center/AgentCenter'))
 
 export const agentCenterSourceContribution: SourceContribution<never> = {
   id: 'agents',
   // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
-  // apps/desktop/src/app/client/plugins.ts.
+  // apps/desktop/src/client/plugins.ts.
   order: 60,
   glyph: 'bot',
   label: 'Agents',

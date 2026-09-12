@@ -1,6 +1,6 @@
 import { scanContentRefs, type Task } from '@acorn/plugin-api/client'
-import type { Pull, PullDetail, TaskPullRelation } from '../../contract/api'
-import { formatPullRef, parsePullRef, type PullRef } from '../../contract/pullRef'
+import type { Pull, PullDetail, TaskPullRelation } from '../../shared/api'
+import { formatPullRef, parsePullRef, type PullRef } from '../../shared/pullRef'
 
 export type RelatedPullEvidence =
   | { kind: 'stack'; anchorPullNumber: number; direction: 'parent' | 'child' }

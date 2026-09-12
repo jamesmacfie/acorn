@@ -7,7 +7,7 @@
 // This removes the remembered sequence, not the restart. Trust dialogs are skipped in a development
 // build (main/helper/bundledPluginTrust.ts), and the rebuild is this. The node restart is the one real
 // step, because a loaded plugin's routes, tables and jobs wire at init
-// (node-core/server/routes/plugins.ts), and under `pnpm dev:node` even that is automatic, because
+// (node-core/server/routes/plugins/plugins.ts), and under `pnpm dev:node` even that is automatic, because
 // node's own `--watch` sees the rewritten bundle.
 //
 // A supervisor around the existing builder rather than a flag inside it: a fresh process per rebuild

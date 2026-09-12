@@ -9,7 +9,8 @@ string owned by the contribution; core does not maintain a closed union of featu
 | --- | ---: | --- |
 | `pr` | 10 | linked GitHub pull request |
 | `agents` | 15 | managed Agent pane |
-| `changes` | 20 | worktree diff and review notes |
+| `changes` | 20 | worktree diff, staging, commit, and remote actions |
+| `workflows` | 25 | workflow runs on this task, their nodes, and what the selected node is doing, which for an agent node is its whole conversation |
 | `notes` | 30 | task/workspace/global notes |
 | `context` | 40 | context selection and sync |
 | `editor` | 50 | worktree editor, with find-in-files as a sidebar panel |
@@ -18,7 +19,12 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `http` | 76 | loaded HTTP tree; API request client for this task |
 | `preview` | 80 | browser preview |
 | `linear` | 90 | loaded Linear tree; linked issue, selected descriptor row, or content-link target |
-| `rollbar` | 100 | loaded Rollbar tree; linked item or selected descriptor row |
+| `rollbar` | 100 | loaded Rollbar tree; linked item |
+
+`workflows` is `list-detail` and gated by `when`: a task that has never run a workflow does not get
+the button, because most tasks never will ([workflows.md](./workflows.md) § The run pane). It declares
+the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
+narrow column is unusable.
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
@@ -38,10 +44,11 @@ both halves of that pane are now host-drawn components; the region keeps the nam
 is the point: the reader has one rectangle, and the row knows nothing about the split inside it
 (`docs/plugins.md` § Document surfaces).
 
-Two of those plugins also declare a project-scoped pane, which is not in this table because it is not
-part of a task's layout. `http-project` and `linear-issue` are drawn beside their plugin's rail list
-at `/p/:projectId`, addressed by a manifest route under `/p/:projectId/x/<plugin-id>/`. They exist
-because a rail row click often has no task, and `openPane` needs one.
+Three of those plugins also declare a project-scoped pane, which is not in this table because it is
+not part of a task's layout. `http-project`, `linear-issue` and `rollbar-item` are drawn beside their
+plugin's rail list at `/p/:projectId`, addressed by a manifest route under
+`/p/:projectId/x/<plugin-id>/`. They exist because a rail row click often has no task, and `openPane`
+needs one.
 
 ## Layout model
 
@@ -59,16 +66,21 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts) and the components are in
-`client-core/src/layouts`.
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts).
+
+**Which components draw them is the host package's,** the same way `KIT_COMPONENTS` is: the desktop's
+are in `client-core/src/host/layouts` and the terminal's are in `apps/tui/src/layouts`, and a host
+hands its table to `client-core/src/host/layouts/table.ts` before the first pane draws. The pane
+registry used to name the desktop's table directly, which meant a declared layout came back as a
+component only one host could mount.
 
 **Eight names, seven components**, and the mismatch is deliberate: `document-over-frame` and
 `frame-beside-document` are the same two regions with the axis flipped, so one component draws both.
 Position is in the name rather than in a prop precisely so that it is never a knob a plugin turns.
 Counts elsewhere in the docs are of the eight names.
 
-Each layout carries three renderings: the desktop one, which is built, plus a **narrow** projection
-for a mobile PWA and a **terminal** projection, both written down and neither built. Writing them is
+Each layout carries three renderings: the desktop one and the **terminal** one, both built, plus a
+**narrow** projection for a mobile PWA, written down and not built. Writing them is
 the layout's half of the kit's admission rule
 ([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)): a layout earns a name when two
 or more surfaces need it and cannot be expressed in the ones that exist, its regions are semantic
@@ -77,14 +89,20 @@ the answer; a new named layout is.
 
 | Layout | Regions | Desktop | Narrow | Terminal |
 | --- | --- | --- | --- | --- |
-| `single` | `body` | one region, the pane's padding and focus group | unchanged | unchanged |
-| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups |
-| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the same |
-| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line |
-| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | the document is a host text view, read-only in a first version; the frame region draws its tree |
+| `single` | `body` | one region, the pane's padding and focus group | unchanged | one frame, titled with the pane's name |
+| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
+| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the body is framed and titled with the pane's name; the two pinned strips are bare, because a frame round one line is three rows of chrome |
+| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line; the panel is framed and titled with the open tab |
+| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, each framed; the document is a host text view, read-only for now |
 | `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop | side by side | as `document-over-frame` | the same |
-| `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop |
-| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | unchanged |
+| `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop, each region framed |
+| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | the step is framed and titled with the pane's name |
+
+**Every terminal region draws a frame, and no rule between two of them.** A frame carries the region's
+name in its top border and lights while the keys are inside it, which is what a landmark's label and
+`:focus-within` do on the desktop. Two frames meeting already draw a line, so the rules that used to
+separate regions are gone. Frames go one level deep only: the region is framed, the pane around it is
+not ([docs/tui.md](./tui.md) § The screen).
 
 Every region is a focus group: one chord moves between them, focus inside one is roving, and each
 remembers the node it was last on
@@ -97,16 +115,62 @@ is the region name — `pane.inline-below` is a `header-body-footer` footer, `pa
 `list-detail` detail ([docs/plugins.md § Cooperative extension points](./plugins.md)).
 
 **Nothing in a layout reads the window width.** Breakpoints are style tokens so a mobile shell can set
-them, and a drag clamps against the layout's own element (`shell.css` § Layouts).
+them, and a drag clamps against the layout's own element (`shell.css` § Layouts). The terminal keeps
+the same rule against the terminal's own size: a layout asks its own box how wide it turned out, and
+`SIGWINCH` is the renderer's alone.
+
+**Every handle is a key in a terminal**, because there is no grip to drag: the primary modifier with
+Shift and an arrow moves a split, and the position is kept in the same host-owned session signal the
+desktop's drag writes to. That is why `SplitHandle` and `SplitCell` are `absent` in the support
+matrix — the handle is not a node there.
+
+One projection changed on contact, in terminal phase 2. `document-over-frame` and
+`frame-beside-document` were written as "the frame region is a rectangle and is absent, so the
+document half fills the pane". That was drawn before it was clear what a `frame` region holds: a
+loaded plugin's *tree*, which draws in cells like any other. What cannot cross is an iframe's pixels,
+and a frame region is not one. Both halves are drawn.
 
 **The host owns a region's inset.** A region's contents are a plugin's tree, and the kit takes no
 `class`, so a chip row or a composer sitting flush against the pane's border is the one thing a plugin
 cannot fix from inside. Every region that holds content takes the pane's inline padding: the scrolling
-bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`, and
-`list-detail`'s detail column. Three kinds of child take it back, because they are edge-to-edge by
-nature: a `Toolbar` or a `Tabs` strip, which carry that padding themselves and have a background that
-has to reach the pane's edge; a `ListDetail`, whose divider is its columns' shared edge and whose
-columns pad themselves; and a diff, which is a canvas.
+bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`,
+`list-detail`'s detail column, and a `ListDetail`'s own detail column when it says `scroll`.
+
+Two kinds of child drop the region's padding altogether, because the whole region is theirs: a
+`ListDetail`, whose divider is its columns' shared edge and whose columns pad themselves, and a diff,
+which is a canvas.
+
+Everything else that is edge-to-edge by nature pulls the same padding back out with a negative margin,
+at whatever depth it sits: a `Toolbar`, a `Tabs` strip, a pane-level `SectionHeader` and a `Row`. Each
+carries the pane's padding itself and each has a background — a bar's tint and rule, a row's selection
+and its accent marker — that has to reach the pane's edge. Depth matters because a plugin's tree is one
+`Stack` at its root and its bars hang off that, so a direct-child rule reached almost none of them.
+
+Two things stop the pull-back. A `Card` owns its own inset, so a bar or a row inside one belongs to the
+card's edge rather than the pane's; and an `actions` `Toolbar` is a footer with no background and no
+padding of its own, so it has nothing to take back.
+
+A scroller in between hands the padding on rather than clipping it. `overflow` clips at the padding
+box, so a bar pulled a pane-pad left of a `TabPanel`'s content box lands outside it, with nothing to
+scroll to, because a browser will not scroll to negative inline-start. That cut the first character
+off Linear's branch name. So `TabPanel`, `Rows`, `Timeline` and the grid scroller each take the
+region's padding over, out by a pane-pad and in by a pane-pad, which leaves a bar inside one sitting
+exactly on the clip edge. It nests: a `Rows` scroller inside a `TabPanel` does the same against the
+panel.
+
+`list-detail`'s detail column also takes a small pad below its last child and a gap between its
+children, because the child at the bottom of it is a composer or a row of actions: without them the
+agents composer sat on the pane's bottom border with the transcript touching it from above. The
+Workflows pane inherits that the moment an agent node draws a composer of its own, which is the same
+region rule reaching a second pane rather than a second arrangement. A `ListDetail` or a diff drops
+both along with the inline padding.
+
+**The reading column stops at `--pane-measure`** and sits in the middle of whatever the pane has
+left. A pane is as wide as the display someone gave it, and at 3700px an agent transcript ran to
+about 480 characters a line. Two children are exempt. Chrome is, because a bar's background has to
+reach the pane's edge whatever the measure is, so a `Toolbar` and a `Tabs` strip stay full-bleed.
+So is a scroller: the cap goes on the list inside it rather than on the scroller itself, because a
+narrowed scroller leaves a dead gutter on each side that the wheel does nothing over.
 
 The host keeps the per-pane state a layout needs, under the pane ID: which tab a `tabs` pane is
 showing, where a `list-detail` or `stack-split` handle sits. It is session-only, because it is a
@@ -124,9 +188,16 @@ one. Regions of the same pane are mounted independently, which means anything tw
 outlive either. Collapsing a library must not take the note being edited with it, and switching from
 Overview to Files must not lose the pull request the reader had chosen.
 
+The changes pane is the sharpest case, because there the region really does go away. Its commit
+message is typed in the `list-footer`, and below 80 columns `list-detail` shows one side at a time, so
+a reader who types half a message and goes to look at the diff unmounts the field they were typing in.
+The draft lives on the pane's model, above every region
+(`plugins/changes/src/client/commitState.ts`), which is also why the two commit chords are registered
+there: a shortcut that comes and goes with a column is not a shortcut.
+
 The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
 builds it once per task inside its own reactive root, hands it to every region, and disposes it when
-the task is evicted (`client-core/src/registries/paneModels.ts`):
+the task is evicted (`client-core/src/host/registries/panes/paneModels.ts`):
 
 ```ts
 ctx.panes.register({
@@ -146,6 +217,20 @@ The seam exists because four compiled panes had each hand-rolled the same per-ta
 the admission rule's own test. A pane whose regions share nothing omits `model` and its regions are
 handed `undefined`.
 
+**The model is also what makes a pane cheap to close and open again.** A pane drawing itself with one
+`component` rather than a layout can reach for the same holder directly — `paneModel(paneId, taskId,
+build)` on `@acorn/plugin-api/client` — and the editor does, for its per-file documents: the text, the
+undo history and the cursor of every open file survive the pane being toggled off and on, because they
+belong to the task rather than to the mount (`docs/editor.md` § One round trip to text). Across tasks
+the query cache is the keep-alive instead, warmed by `prefetch` below.
+
+There is deliberately no `keepAlive` field. The contract used to carry one — `'dom' | 'none'`, set by
+exactly one pane and read by nothing — which promised the host would keep a pane's elements alive
+across a task switch and delivered nothing. A hidden element tree per task is the memory shape this
+codebase already declined for the agent transcript (`docs/managed-agents.md`), and the two mechanisms
+above cover what the field was reaching for, so it was deleted rather than implemented. A test in
+`registries/panes/panes.test.tsx` fails compilation if it comes back.
+
 The PR pane still keeps two maps of its own. One is keyed by the pull request, because a task can be
 about several; the other is keyed by the task but holds a live subscription that must outlive the
 pane's own mounts. Neither is a copy of this seam waiting to be deleted; if a third appears with a
@@ -154,9 +239,22 @@ task-shaped key and nothing to subscribe to, it belongs here.
 **A split inside a region is the plugin's.** A pane's regions are its *outer* arrangement; a `ListDetail`
 drawn inside one region is a different object with a different owner, which is why `ListDetail` and
 `DocumentTabs` are kit nodes as well as layout names. The PR pane is a `single` layout whose one region
-is a kit `ListDetail` — the navigator beside the diff, the same pair the GitHub browse surface draws —
-and that is correct rather than a pane that should have named `list-detail`. The two columns are one
-surface over one model, not two regions the host mounts apart.
+is a kit `Sections` — the pull request's own parts beside its diff, the same node the GitHub browse
+surface draws — and that is correct rather than a pane that should have named `list-detail` or `tabs`.
+The parts are one surface over one model, not regions the host mounts apart.
+
+`Sections` is where that distinction pays. A pane layout is arranged by the host and its regions are
+named by the pane contribution, so a surface that wants a different arrangement per host but the same
+regions everywhere has to be a layout — except a browse source's detail region is not a pane and cannot
+name one. So the shape is a kit node instead, and both call sites reach it: the desktop draws a header
+over a column of folds beside the main region, and the terminal draws a strip of tabs over one panel
+([ui-design.md § The closed kit](./ui-design.md)).
+
+The node takes its two columns two ways, and both matter. A caller with an element to spare passes the
+left one as `list`; a caller that cannot — a remote tree, whose props are JSON on a message port —
+passes a `ListColumn` and a `DetailColumn` as children and sets `split`. Below 80 columns the first form
+draws the detail alone, and the second stacks its two children, because the node has no keys of its own
+to switch with and two columns of 38 cells is a column nobody can read.
 
 A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
 `overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its
@@ -181,7 +279,7 @@ otherwise. A loaded plugin may also declare a _project-scoped_ pane (`"scope": "
 manifest). That is a different thing wearing the same rectangle. It is drawn beside its own rail
 Source's list at `/p/:projectId`, it has no task, and it never enters a task layout, so none of the
 layout model, `?pane=` and `?item=` addressing, or `paneRegistry` above applies to it. It lives in
-its own registry (`client-core/registries/projectSurfaces.ts`) so those consumers do not have to
+its own registry (`client-core/host/registries/panes/projectSurfaces.ts`) so those consumers do not have to
 branch on a scope they cannot act on.
 
 It has no layout state to keep a selection in, so its selection lives in the URL: one route per
@@ -196,7 +294,7 @@ A _reference panel_ is the other thing a plugin's item can open into, and it is 
 the above: no layout entry, no `PaneId`, no `?pane=` address, nothing persisted. It is one item shown
 over whatever the reader was already looking at, and it is dismissed rather than closed. A plugin
 contributes one keyed by the provider whose items it renders and may only name its own provider
-(`client-core/registries/refPanels.ts`). The shell holds which ref is open and draws it in one place,
+(`client-core/host/registries/panes/refPanels.ts`). The shell holds which ref is open and draws it in one place,
 so any surface that renders content can call `openRefPanel({ providerId, displayId })` and get any
 installed provider's panel. One at a time: opening a second replaces the first. When the named
 provider has no registered contribution, `openRefPanel` returns `false` instead of opening. A claim
@@ -206,7 +304,7 @@ refusal is not a dead end, because the caller's next fallback, such as the real 
 there.
 
 Any reference panel can offer a "find or create a task for this" action through one shared,
-host-drawn component (`client-core/registries/RefPanelTaskLink.tsx`), instead of each panel drawing
+host-drawn component (`client-core/host/components/RefPanelTaskLink.tsx`), instead of each panel drawing
 its own. Creating a task is a core write that makes a worktree on disk and needs `core.tasks:write`;
 a plugin drawing this button itself would have to hold that permission for everything it ever does,
 to earn one click. The host draws the button and does the write instead, and the same component works
@@ -218,7 +316,7 @@ questions. The pane is "show me this provider's items for this task": richer, an
 the rectangle they were using. The panel is "let me glance at this one thing": it needs no task, so
 it also works in classic browse and beside a rail list, and it keeps the reader's place. Which one a
 click gets is the clicking surface's preference, with the other as fallback. For more information,
-see `docs/plugins.md` § "Loaded plugins: the client half".
+see `docs/plugins.md` § "The client half of a loaded plugin".
 
 ## Contributions
 
@@ -278,8 +376,20 @@ A layout naming a region it does not have, or missing one it requires, throws at
 than at render. The manifest parser refuses the same thing on the node, and the client repeats the
 check over the roster row, because a manifest reaches a device as bytes a node sent.
 
-Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
+Shared diff rendering, the editor surface, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
+
+A pane may declare a `prefetch(task, queryClient)`, which the task rail calls when the pointer settles
+on a task row for 150 milliseconds — long enough that scrolling the rail fetches nothing. Every
+registered pane the task could show is asked, and a pane with nothing worth warming declares nothing.
+It is best-effort by construction: it returns nothing, and a failure only means the first paint is not
+instant.
+
+What belongs in one is the pane's *first* read, and only when that read is a row rather than work. The
+editor warms the task's checkout path, which is the one request its mount used to make before it could
+draw anything; the agent pane warms the task's session list, which its model asks for on open and the
+store then serves from a five-second window. The changes pane declares none on purpose: its first read
+spawns git, and phase 5 of the performance programme spent itself getting that spawn count down.
 
 A pane contribution has no `freshness` hook of its own. A pane's query status can only be read
 reactively, so a `freshness(task)` field returning a plain value would render a badge that never
@@ -290,16 +400,16 @@ live/refreshing/stale/offline/error vocabulary `docs/ui-design.md` § States des
 wants to say more about its own data draws it in its own header, where the query is already in scope.
 
 A pane button in the right rail can still carry status markers, and that is not the same seam. A
-marker comes from `registries/railMarkers.ts`, which asks a plugin about a target it names — a task, a
+marker comes from `features/tabs/railMarkers.ts`, which asks a plugin about a target it names — a task, a
 rail source, or a pane — and gets marker *data* back
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). The callback runs inside the
 rail's own render, so it costs no subscription the plugin does not already hold, and it is for state
 the plugin owns anyway rather than for the query status of the pane's own fetch.
 
 Find-in-files is backed by a ripgrep subprocess, not an editor feature, and that is not a stopgap.
-Monaco is an editor component with no filesystem or process access, so it provides find-within-a-file
-and nothing wider. Every editor that offers project-wide search, including the one Monaco was
-extracted from, implements it this way. There is no editor feature to replace the subprocess with.
+An editor component has no filesystem or process access, so it provides find-within-a-file and
+nothing wider. Every editor that offers project-wide search implements it this way. There is no
+editor feature to replace the subprocess with.
 
 The results are a panel in the editor pane's sidebar, beside the file tree. A result click opens a
 file in the editor, so a separate rail pane made one mental model ("find something in this project,

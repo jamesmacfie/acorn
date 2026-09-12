@@ -1,4 +1,5 @@
-import { capabilityId, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 export type AgentSessionExecuteRequest = {
@@ -12,6 +13,12 @@ export type AgentSessionExecuteRequest = {
   prompt: string
   schema?: object
   model?: string
+  // Provider option ids to the values this turn wants, as the provider advertises them (`model`,
+  // `reasoning`, and whatever else its descriptor lists). Applied to the session after the provider
+  // reports its option list and before the turn is enqueued, because that list is the only thing a
+  // value can be validated against. A value the provider does not offer is dropped with a diagnostic
+  // rather than failing the step.
+  configOptions?: Record<string, string>
   tools?: ToolCeiling
   timeoutMs?: number
   // Reuse an existing managed session rather than creating one. Validated by the provider against
@@ -29,3 +36,15 @@ export type AgentSessionExecuteRequest = {
 export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<HeadlessResult | null>
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')
+
+// Which agent profiles have a durable managed driver. Here rather than beside the implementation
+// because it is the other half of the sentence above: a caller reads it to know, before it calls,
+// whether this profile will resolve to a session or to `null`. The workflows catalog says `managed`
+// on a profile from this (docs/workflows.md § Contributed step kinds).
+const MANAGED_PROVIDERS: Readonly<Record<string, string>> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+}
+
+export const managedProviderForProfile = (profileId: string | undefined): string | null =>
+  MANAGED_PROVIDERS[profileId ?? ''] ?? null

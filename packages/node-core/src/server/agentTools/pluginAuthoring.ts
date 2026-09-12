@@ -2,18 +2,28 @@
 // vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
 // § plugin_authoring, docs/plugins.md § Teaching the agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import {
+  PLUGIN_CONTEXT_SECTION_MAX_BYTES,
+  PLUGIN_CONTEXT_SECTION_MAX_TOKENS,
+  PLUGIN_CONTEXT_TIMEOUT_MAX_MS,
+  PLUGIN_TOOL_OUTPUT_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_DEPTH,
+  PLUGIN_TOOL_TIMEOUT_MAX_MS,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
+import {
+  MAX_PLUGIN_BYTES,
   PLUGIN_BRIDGE_VERSION,
   type PluginBridgeApiRequest,
   type PluginBridgeDocumentRequest,
   type PluginBridgeRequest,
   type PluginBridgeUiRequest,
   type PluginBridgeWebviewRequest,
-} from '@acorn/protocol/pluginBridge.ts'
-import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
-import { NODE_CORE_FACETS } from '../../main/pluginPermissions.ts'
+} from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
+import { NODE_CORE_FACETS } from '../plugins/permissions.ts'
 import { registerContextSection, type ContextSectionContribution } from './contextSections.ts'
 import type { AgentToolContribution } from './registry.ts'
 
@@ -41,6 +51,17 @@ const manifestJsonSchema = (): JsonSchema =>
 const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | undefined =>
   path.reduce<JsonSchema | undefined>((node, key) => node?.properties?.[key], schema)
 
+/**
+ * One field off a descriptor's items, where the items may be a union of kinds.
+ *
+ * A command is five shapes now — action, group, search, input, setting — so `items.properties` is only there
+ * for the descriptors that are one shape. The first member carrying the field is the answer, because a
+ * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
+ */
+const field = (items: JsonSchema | undefined, name: string): JsonSchema | undefined =>
+  items?.properties?.[name]
+  ?? (items?.anyOf ?? items?.oneOf ?? []).map((member) => member.properties?.[name]).find(Boolean)
+
 // A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. zod emits
 // `oneOf` for a discriminated union under draft-7, and `anyOf` is the fallback if that changes. The
 // test asserts the result is non-empty, so a silent [] cannot ship.
@@ -50,10 +71,13 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // ── Derived from the bridge wire union ────────────────────────────────────────────────────────────
 //
 // `satisfies Record<Union, string>` is the guard: add a message kind to
-// `@acorn/protocol/pluginBridge.ts` and this file stops compiling until it is described here. A type
+// `@acorn/protocol/plugin/bridge.ts` and this file stops compiling until it is described here. A type
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
+  'api.bytes': `the same call for a route whose body is bytes: bridge.api.getBytes / postBytes, GET and POST only, `
+    + `capped at ${MAX_PLUGIN_BYTES} bytes each way. Same permission decision as \`api\`, made before the body is `
+    + `looked at. Reach for it instead of base64 whenever you are moving a file`,
   subscribe:
     'subscribe to a channel the manifest declared in `permissions.events`: one of the shell\'s own, or your own '
     + '`plugin:<id>:<verb>`, which your node half broadcasts on with `ctx.events.send`. That second one is how a frame '
@@ -64,6 +88,9 @@ const BRIDGE_KINDS = {
   document: 'the host editor of a document-over-frame pane (see documentOps); denied from every other surface',
   webview: 'controller verbs for a webview surface (see webviewOps); you cannot read the page or type into it',
   cancel: 'abandon an in-flight request by id',
+  telemetry: 'one telemetry record about your own frame: an event, a count, a gauge, a finished span, a log line '
+    + 'or an error, as `{ kind: "telemetry", record }`. No id and no reply, and the host stamps the owner from '
+    + 'the binding, so you never pass a plugin id. Counts against the same message budget as everything else',
   keydown: 'forward a chord this frame did not claim back to the shell',
   connected: 'the ack. Post it (or anything) or the host replaces the frame after 10s',
 } satisfies Record<PluginBridgeRequest['kind'], string>
@@ -72,9 +99,11 @@ const UI_OPS = {
   toast: 'title + optional detail',
   copy: 'write text to the clipboard — `navigator.clipboard` does not work in a frame',
   openPane: 'open a pane by id',
+  openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
-  'importer.close': 'importers and overlays: plain dismissal',
+  'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '
+    + 'JSON result under 64 KiB, which resolves that tree\'s openOverlay call',
 } satisfies Record<PluginBridgeUiRequest['op'], string>
 
 const DOCUMENT_OPS = { read: 1, write: 1, flush: 1 } satisfies Record<PluginBridgeDocumentRequest['op'], 1>
@@ -130,7 +159,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       contextMenuLocations: at(contributions, 'contextMenus')?.items?.properties?.location?.enum ?? [],
       extensionPointLocations: at(contributions, 'extensionPoints')?.items?.properties?.location?.enum ?? [],
       coreSlots: at(contributions, 'frames')?.items?.properties?.coreSlot?.enum ?? [],
-      commandCategories: at(contributions, 'commands')?.items?.properties?.category?.enum ?? [],
+      commandCategories: field(at(contributions, 'commands')?.items, 'category')?.enum ?? [],
       // A `themes` entry must carry exactly these token names, and a theme missing one is refused at
       // parse. Read off the strict object the schema builds from the palette
       // (@acorn/protocol/themeTokens.ts), so a new token reaches the agent with no edit here.
@@ -141,7 +170,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       // site with the full set in scope, and a command's `action` is the narrow one every context-free
       // surface takes.
       railOnSelect: verbs(at(contributions, 'sources')?.items?.properties?.onSelect),
-      commandsAndBadges: verbs(at(contributions, 'commands')?.items?.properties?.action),
+      commandsAndBadges: verbs(field(at(contributions, 'commands')?.items, 'action')),
     },
     permissions: {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
@@ -199,15 +228,21 @@ plugin API majors and must cover this node's: \`"4"\`, \`"3 || 4"\` or \`"2-4"\`
 Ids are permanent: the id is the route namespace, the renderer route prefix and the SQLite
 filename, so renaming a plugin is a new plugin plus a data migration plus a tombstone.
 
-A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary) and no
+A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary), no
+\`ctx.tools\`/\`ctx.contextSections\`, and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
 strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
-\`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.contextSections\`,
-\`ctx.runs\`, \`ctx.audit\`, \`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
+\`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.runs\`, \`ctx.audit\`,
+\`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
 \`ctx.events.send\`/\`status\`/\`on\` are there, shaped by the manifest. Those registries are owner-bound:
 the host stamps your plugin id on whatever you register, so you cannot file a schedule or a collection
 under another package's name. Declaring the same thing in the manifest goes through the same seam, so
 pick one — the manifest is what the owner reads at install.
+Declare loaded agent tools and task-context sections only in \`contributions.agentTools\` and
+\`contributions.contextSections\`. Each names a route in YOUR \`/v2/p/<id>/\` namespace; the host
+turns the descriptor into the same tool registry or context assembler used by compiled plugins, and
+removes it on update/unload. Tool input is bounded JSON Schema, not Zod in your bundle. Context returns
+bounded data and compact reference text, never a renderer or callback.
 Node actions and managed-agent harnesses have no \`ctx\` member at all: declare them in the manifest,
 which is the only way in (a command with the \`runNodeAction\` verb, and \`contributions.harnesses\`).
 
@@ -219,7 +254,11 @@ merges every plugin's into one list — register it if you own work that starts,
 not otherwise, never every call you make. \`ctx.extensionPoints\` is the node's many-to-many seam —
 \`open\` a point in your own namespace, \`contribute\` into anyone's — and the rule is a capability when
 there is one right answer, a point when there are many.
-There is no \`ctx.log\`; use \`console\`, prefixed with your plugin id.
+\`ctx.log\` and \`ctx.telemetry\` are on both tiers and need no permission: a log line, an event, a count,
+a gauge, a span, an error, each stamped with your plugin id by the host. Reading what everyone else
+collects is the other direction and is a token, \`permissions.node.core: ["telemetry"]\`, which gives you
+\`ctx.core.telemetry.onBatch\` and which the trust prompt draws high. A frame emits its own records over
+the bridge's \`telemetry\` verb instead, because a frame has no \`ctx\`.
 
 ## The loop — you cannot install anything, so ask
 
@@ -292,10 +331,35 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '',
     Object.entries(manifest.contributionCaps).map(([key, cap]) => `- \`${key}\` — max ${cap}`).join('\n'),
     '',
+    '**Loaded agent tools and context.** `agentTools` entries are task scoped and become',
+    '`<pluginId>_<localId>`. They carry `{ id, description, inputSchema, risk, handler, scope?,',
+    'requiresSession?, timeoutMs?, maxOutputBytes? }`; `handler` must be in YOUR namespace. The JSON',
+    `Schema is capped at ${PLUGIN_TOOL_SCHEMA_MAX_BYTES} bytes and ${PLUGIN_TOOL_SCHEMA_MAX_DEPTH} levels; only object/array/scalar types,`,
+    '`properties`, `required`, boolean `additionalProperties`, `items`, `enum`, and string/number/array',
+    `limits are accepted. Tool timeout is at most ${PLUGIN_TOOL_TIMEOUT_MAX_MS} ms and output at most ${PLUGIN_TOOL_OUTPUT_MAX_BYTES} bytes.`,
+    '`contextSections` entries carry `{ id, label, order, read, maxBytes, maxTokens, scope?,',
+    'defaultIncluded?, timeoutMs? }`; the read route is YOUR namespace and returns strict `{ items,',
+    'compact, unavailable? }` reference data. A section is capped at',
+    `${PLUGIN_CONTEXT_SECTION_MAX_BYTES} bytes, ${PLUGIN_CONTEXT_SECTION_MAX_TOKENS} tokens and ${PLUGIN_CONTEXT_TIMEOUT_MAX_MS} ms.`,
+    'The host supplies the verified task/session principal. Body IDs cannot widen it. It never retries a',
+    'plugin handler, and reload/unload removes every registration.',
+    '',
     `Frame targets: ${manifest.frameTargets.map((value) => `\`${value}\``).join(', ')}. `
       + `Host slots: ${manifest.slots.map((value) => `\`${value}\``).join(', ')}. `
       + `Context-menu locations: ${manifest.contextMenuLocations.map((value) => `\`${value}\``).join(', ')}. `
       + `Command categories: ${manifest.commandCategories.map((value) => `\`${value}\``).join(', ')}.`,
+    '',
+    '**Commands come in five kinds.** Omit `kind`, or say `action`, and your command is one verb the host',
+    'runs — which is what every command has always been. `group` holds children: a command may name a',
+    '`parentId` that is a group in your own manifest, and nothing else. `search` names a GET route in your',
+    'own namespace and one static `onSelect` verb; the host debounces the reader’s typing, sends `q` plus',
+    'the identifier your `scope` owns, and renders `{ items: [{ id, title, subtitle?, icon?, badge?, ref?,',
+    'taskId? }] }`. `input` names a POST route and one static `onSuccess` verb; the host sends',
+    '`{ input, taskId? }` on Enter and expects `{ ok: true, item?, message? }`. `setting` names a GET',
+    '`readRoute`, a PUT `writeRoute` and 2–32 `{ value, label }` choices; both routes answer `{ value }`,',
+    'and a value naming none of your choices is refused rather than shown. A result never chooses what',
+    'happens to it: everything but those fields is dropped, and the verb that runs is the one you declared',
+    'and a reader reviewed.',
     '',
     '**Descriptors for facts, trees for UI, rectangles for pixels.** Ask which of the three a surface is,',
     'in that order, and take the first that fits. A status chip, a badge, a menu row or a palette entry is',
@@ -337,7 +401,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     'Each value is a hex colour or a flat colour function (`#1e1e2e`, `rgba(0, 0, 0, 0.42)`,',
     '`oklch(0.7 0.15 250)`); named colours, `var()` and nested functions are refused. You write no CSS —',
     'the host generates the `:root[data-theme="plugin:<your-id>:<theme-id>"]` block itself, and writes',
-    '`--is-dark`, `--color-scheme` and `--syntax-fg` from `dark`, so never try to set those three.',
+    '`--is-dark` and `--color-scheme` from `dark`, so never try to set those two.',
     'The theme then appears in Settings → Appearance beside the built-in twelve.',
     '',
     '**Action verbs.** Descriptors do not run plugin code; they hand the host a verb from a closed set.',

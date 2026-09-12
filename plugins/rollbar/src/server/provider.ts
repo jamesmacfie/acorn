@@ -1,4 +1,4 @@
-import type { RollbarItemMetadata, RollbarItemSummary } from '../shared/api'
+import type { RollbarItemMetadata, RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrencesResponse } from '../shared/api'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   itemByCounterPath,
@@ -10,10 +10,14 @@ import {
   type RollbarApiItem,
   type RollbarProject,
 } from './'
-import { normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, parseJson, ProviderOperationError, type ProviderProjectSource, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
+import { composeItemDetail, normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, parseJson, ProviderOperationError, type ProviderItemDetail, type ProviderProjectSource, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
 import {
   createRollbarOccurrenceResources,
+  ROLLBAR_OCCURRENCES_RESOURCE,
+  ROLLBAR_OCCURRENCE_RESOURCE,
+  type RollbarOccurrenceInput,
+  type RollbarOccurrencesInput,
 } from './occurrenceResources'
 
 const ROLLBAR_PER_PAGE = 100
@@ -306,6 +310,25 @@ const occurrenceResources = createRollbarOccurrenceResources({
   failFor,
 })
 
+// What `issue_detail` returns for a Rollbar item: the metadata, plus the newest occurrence, which is
+// where the stack trace and the request context are. Three resource calls, the same three the item
+// route makes, because the trace does not live in the item row.
+//
+// The two occurrence reads stay soft. An item whose occurrences cannot be listed is still worth
+// handing over: an agent can act on the title, the level and the environment.
+const rollbarItemDetail: ProviderItemDetail = async (context, identifier) => {
+  const metadata = await context.resource<RollbarResourceInput, RollbarItemMetadata>(ROLLBAR_ITEMS_RESOURCE, { kind: 'detail', identifier })
+  if (!metadata.ok) {
+    if (metadata.failure.status === 404) return null
+    throw new Error(metadata.failure.error)
+  }
+  const occurrences = await context.resource<RollbarOccurrencesInput, RollbarOccurrencesResponse>(ROLLBAR_OCCURRENCES_RESOURCE, { identifier })
+  const latest = occurrences.ok ? occurrences.value.occurrences[0] : undefined
+  if (!latest) return composeItemDetail(metadata.value, null)
+  const occurrence = await context.resource<RollbarOccurrenceInput, RollbarOccurrenceDetail>(ROLLBAR_OCCURRENCE_RESOURCE, { identifier, occurrenceId: latest.id })
+  return composeItemDetail(metadata.value, occurrence.ok ? occurrence.value : null)
+}
+
 const CONFORMANCE_SUMMARY: RollbarItemSummary = {
   integrationId: 'rollbar-test', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999',
   url: 'https://rollbar.com/item/999/',
@@ -369,6 +392,7 @@ export const rollbarProvider = publicProvider({
   resources: [rollbarItemsResource, occurrenceResources.occurrences, occurrenceResources.occurrence],
   projects: rollbarProjectSource,
   codec: rollbarCodec,
+  detail: rollbarItemDetail,
   taskContext: {
     summarize(ref, item, state) {
       const data = (item as RollbarCached | null)?.summary

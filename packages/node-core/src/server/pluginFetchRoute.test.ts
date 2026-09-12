@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import type { Env } from '../main/bindings'
+import type { Env } from './bindings'
 import { createApp } from './index'
-import type { PluginRequestContext } from './plugin/types'
+import type { PluginRequestContext } from './pluginHost/types'
 import { registerRoute, removePluginRoutes } from './routeRegistry'
 
 // The fetch-shaped route seam a loaded plugin gets instead of a Hono router

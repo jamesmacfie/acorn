@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
+import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from '@acorn/client-core/kit/lib/displayMeta.ts'
 import { routeKey } from '@acorn/plugin-github/testkit/client'
 
 describe('fileStatusMeta', () => {

@@ -13,23 +13,37 @@ export function parseRollbarRailItemId(value: string): RollbarRailTarget | null 
   return parts && { integrationId: parts[0], identifier: parts[1] }
 }
 
+type RollbarSeverity = Pick<PluginRailItem, 'icon' | 'severity'>
+
+const rollbarSeverity = (level: string): RollbarSeverity => {
+  if (level === 'error' || level === 'critical') return { icon: 'circle-x', severity: 'danger' }
+  if (level === 'warning' || level === 'warn') return { icon: 'triangle-alert', severity: 'warn' }
+  return { icon: 'info', severity: 'info' }
+}
+
 export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
-  // Positional, and never filtered: see linear/shared/rail.ts. The host lays these out as columns,
-  // and an empty cell is what keeps the Nth fact under the Nth fact of every other row.
-  const facts = [
-    `#${item.identifier}`,
-    item.level,
-    item.environment,
-    item.integrationLabel,
-  ]
   return {
     id: rollbarRailItemId(item),
     title: item.title,
-    fields: facts,
-    badge: `${item.totalOccurrences} occurrence${item.totalOccurrences === 1 ? '' : 's'}`,
+    // One reserved track keeps short and long Rollbar ids aligned; the flexible title gets the rest.
+    fields: [`#${item.identifier}`],
+    fieldsFirst: true,
+    ...rollbarSeverity(item.level),
+    badge: String(item.totalOccurrences),
     task: {
       origin: 'rollbar',
       title: item.title.slice(0, 120),
+      // What a workflow started from this row is told about it (docs/workflows.md § Starting a run).
+      // Rollbar's list route carries no prose — an item's body is its stack trace, which is a second
+      // call per row — so this is the facts the row already has, which is what an investigating agent
+      // needs first anyway.
+      body: [
+        `Level: ${item.level}`,
+        `Environment: ${item.environment}`,
+        `Occurrences: ${item.totalOccurrences}`,
+        ...(item.framework ? [`Framework: ${item.framework}`] : []),
+        ...(item.url ? [item.url] : []),
+      ].join('\n'),
       link: {
         connectionId: item.integrationId,
         identifier: item.identifier,

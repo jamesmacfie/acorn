@@ -2,10 +2,10 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReviewNote } from '../../shared/api'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { reviewNotesRoutes } from './reviewNotes'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const jsonReq = (url: string, method: string, body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -18,16 +18,18 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
   let t: TestDb
   let plugin: TestPluginDb
   let app: Hono<AppEnv>
+  let frames: Array<{ channel: string } & Record<string, unknown>>
 
   beforeEach(async () => {
     t = makeTestDb()
     plugin = makeTestPluginDb('changes')
+    frames = []
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/tasks', reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }))
+    app.route('/api/tasks', reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }, (frame) => frames.push(frame)))
     const now = Date.now()
     await t.db.insert(schema.tasks).values({
       id: 'task1',
@@ -96,5 +98,25 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'left', startLine: 1, body: 'x' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 5, endLine: 3, body: 'x' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(jsonReq('/api/tasks/nope/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 1, endLine: 1, body: 'x' }), {} as Env)).status).toBe(404)
+  })
+
+  it('announces current counts only after real create, delivery, edit, and delete writes', async () => {
+    const note = await create()
+    expect(frames.at(-1)).toEqual({ channel: 'plugin:changes:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
+
+    await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [note.id] }), {} as Env)
+    expect(frames.at(-1)).toEqual({ channel: 'plugin:changes:review-notes-changed', taskId: 'task1', total: 1, unsent: 0 })
+    const afterSent = frames.length
+    await app.fetch(jsonReq('/api/tasks/task1/review-notes/sent', 'POST', { ids: [note.id] }), {} as Env)
+    expect(frames).toHaveLength(afterSent)
+
+    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
+    expect(frames.at(-1)).toEqual({ channel: 'plugin:changes:review-notes-changed', taskId: 'task1', total: 1, unsent: 1 })
+    const afterEdit = frames.length
+    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'PATCH', { body: 'Edited.' }), {} as Env)
+    expect(frames).toHaveLength(afterEdit)
+
+    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${note.id}`, 'DELETE'), {} as Env)
+    expect(frames.at(-1)).toEqual({ channel: 'plugin:changes:review-notes-changed', taskId: 'task1', total: 0, unsent: 0 })
   })
 })

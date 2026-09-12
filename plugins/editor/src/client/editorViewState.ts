@@ -1,14 +1,16 @@
-import type { editor } from 'monaco-editor'
 import { activeNodeId, onScopeEvicted } from '@acorn/plugin-api/client'
+import type { EditorViewState } from '@acorn/plugin-api/ui/editor'
 
-const viewStates = new Map<string, editor.ICodeEditorViewState>()
+// Where the reader was in each open file. Selection and scroll, as data this plugin owns, rather
+// than an editor library's opaque blob (docs/editor.md § View state).
+const viewStates = new Map<string, EditorViewState>()
 const viewKey = (taskId: string, path: string): string => `${activeNodeId() ?? ''}/${taskId}:${path}`
 
-export const rememberEditorViewState = (taskId: string, path: string, state: editor.ICodeEditorViewState): void => {
+export const rememberEditorViewState = (taskId: string, path: string, state: EditorViewState): void => {
   viewStates.set(viewKey(taskId, path), state)
 }
 
-export const editorViewState = (taskId: string, path: string): editor.ICodeEditorViewState | undefined =>
+export const editorViewState = (taskId: string, path: string): EditorViewState | undefined =>
   viewStates.get(viewKey(taskId, path))
 
 export function evictEditorViewStates(taskId: string): void {

@@ -3,7 +3,7 @@ import { z } from 'zod'
 // What a contributed harness's optional probe routes answer with (docs/plugin-authoring.md § Harnesses).
 //
 // Parsed, not cast: a plugin's own node half wrote these bytes, and the host hands them over as
-// `unknown` (node-core/server/plugin/harnesses.ts), so this is the boundary that checks them.
+// `unknown` (node-core/server/pluginHost/harnesses.ts), so this is the boundary that checks them.
 //
 // Both shapes are narrower than what the built-in probes produce, on purpose. `cost` needs the owner's
 // pricing table and `daily` comes out of one specific CLI's JSONL, so neither is a harness's to answer.

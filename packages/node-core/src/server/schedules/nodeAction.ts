@@ -1,6 +1,6 @@
 import { RISK_ORDER, type ToolRisk } from '@acorn/protocol/workflow.ts'
-import type { Env } from '../../main/bindings'
-import { nodeAction, riskOf, runNodeAction } from '../nodeActions/registry'
+import type { Env } from '../bindings'
+import { nodeAction, riskOf, runNodeAction } from '../nodeActions'
 import { ScheduleSkipped, type Scheduler } from './scheduler'
 
 // The `node-action` schedule target: what it may do (docs/schedules.md § `node-action`) and where

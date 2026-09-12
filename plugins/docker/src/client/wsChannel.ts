@@ -1,5 +1,5 @@
 // Docker's half of the WebSocket. Core owns the envelope and routes on the `docker` prefix
-// (@acorn/client-core/wsChannels.ts). The maps, the payload narrowing, and the reattach set below
+// (@acorn/client-core/infra/node/wsChannels.ts). The maps, the payload narrowing, and the reattach set below
 // belong to this plugin.
 import { registerWsChannel, wsConnect, wsSend } from '@acorn/plugin-api/client'
 import type { DockerServerFrame, DockerStatsSample } from '../shared/wsFrames'
