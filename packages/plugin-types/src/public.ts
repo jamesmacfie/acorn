@@ -35,6 +35,50 @@
  *  the reader and for the contract test; nothing reads it at runtime because there is no runtime. */
 export type HostOwned<T extends string> = { readonly __hostOwned?: T }
 
+// ── Manifest runtime contributions ───────────────────────────────────────────────────────────────
+
+/** The deliberately small JSON Schema language accepted by `contributions.agentTools`. Remote and
+ * recursive references, combinators and executable validators are not part of this contract. */
+export type PluginToolJsonSchema = {
+  type: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null'
+  description?: string
+  properties?: Record<string, PluginToolJsonSchema>
+  required?: string[]
+  additionalProperties?: boolean
+  items?: PluginToolJsonSchema
+  enum?: unknown[]
+  minLength?: number
+  maxLength?: number
+  minimum?: number
+  maximum?: number
+  minItems?: number
+  maxItems?: number
+}
+
+export type PluginAgentToolDescriptor = {
+  id: string
+  description: string
+  inputSchema: PluginToolJsonSchema
+  risk: 'read' | 'write' | 'execute'
+  scope?: 'task'
+  handler: string
+  requiresSession?: boolean
+  timeoutMs?: number
+  maxOutputBytes?: number
+}
+
+export type PluginContextSectionDescriptor = {
+  id: string
+  label: string
+  scope?: 'task'
+  order: number
+  read: string
+  defaultIncluded?: boolean
+  timeoutMs?: number
+  maxBytes: number
+  maxTokens: number
+}
+
 // ── The two entry points ──────────────────────────────────────────────────────────────────────────
 
 /** The default export of a loaded plugin's node entrypoint. `name` must equal the manifest's `id`. */
@@ -52,7 +96,8 @@ export type NodePlugin = {
  * This is the loaded tier's projection. A compiled plugin's context has six more members —
  * `routes.register`, `tools`, `contextSections`, `providers.model`, `events.channel` and
  * `events.streams` — each either a live object that cannot survive a message-passing boundary or a
- * contribution kind with no manifest carrier yet (docs/contribution-kinds.md).
+ * live object that cannot survive the message-passing boundary. Agent tools and context sections
+ * have manifest descriptor types above; they deliberately do not become live `ctx` registries.
  *
  * The host's own declaration of this type is
  * `packages/node-core/src/server/pluginHost/types.ts § NodePluginContext`, and a test holds the two

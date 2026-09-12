@@ -87,6 +87,26 @@ export type AgentSessionsCapability = {
   list(taskId: string): Promise<AgentSessionRosterEntry[]>
 }
 
+export type AgentReviewInputRef = Pick<AgentTurnChangedEvent, 'taskId' | 'sessionId' | 'turnId' | 'source' | 'attempt'> & {
+  purpose: 'ordinary' | 'workflow' | 'review'
+  completedSequence: number
+  completedAt: number
+}
+
+export type AgentReviewInput = AgentReviewInputRef & {
+  availability: 'available' | 'unavailable'
+  assistantSummary: string | null
+  userMessages: string[]
+  unavailableReason: string | null
+}
+
+/** Bounded, task-authorized completion input. Consumers never receive the agent event ledger. */
+export type AgentReviewInputCapability = {
+  listCompleted(taskId: string): Promise<AgentReviewInputRef[]>
+  read(input: { taskId: string; sessionId: string; turnId: string }): Promise<AgentReviewInput>
+}
+
 export const AGENTS_TURNS = capabilityId<AgentTurnsCapability>('agents.turns')
 export const AGENTS_REQUESTS = capabilityId<AgentRequestsCapability>('agents.requests')
 export const AGENTS_SESSIONS = capabilityId<AgentSessionsCapability>('agents.sessions')
+export const AGENTS_REVIEW_INPUT = capabilityId<AgentReviewInputCapability>('agents.reviewInput.v1')

@@ -41,7 +41,7 @@ your manifest at it and every contribution array is validated as you type:
   "id": "my-widget",
   "name": "My widget",
   "version": "0.1.0",
-  "apiVersion": "11"
+  "apiVersion": "12"
 }
 ```
 
@@ -69,13 +69,16 @@ Everything the host hands a loaded plugin: the context and its registries, `ctx.
 facets, `TaskRef` and `ProjectRef`, the request context a route handler receives, and a catalogue of
 every capability the first-party plugins publish.
 
-A few members carry a type this package deliberately does not describe — the host's drizzle handle
-behind `ctx.storage.open()`, a Zod schema on an agent-tool contribution. Adding either would mean
-adding a dependency to a package that promises none. Narrow them yourself if you need to; the rest
-of the surface is exact, and a test in the acorn repository fails if it drifts.
+A few context members carry a type this package deliberately does not describe — notably the host's
+drizzle handle behind `ctx.storage.open()`. The manifest-carried `PluginAgentToolDescriptor`,
+`PluginContextSectionDescriptor`, and bounded `PluginToolJsonSchema` are pure declarations and are
+exported here without adding a runtime dependency. The rest of the surface is exact, and a test in
+the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors: write `"11"`, or `"10 || 11"` once you have checked
-your plugin against both.
+`apiVersion` is a range over plugin API majors. The minimum/current major for agent-tool and context
+descriptors is `"12"`; write `"12"`, or `"11 || 12"` only after checking a plugin that does not use
+those keys against both. These descriptor keys are an additive API-11 change, so the major did not
+move: the compatibility promise permits additions and forbids removing an API-11 name.
 
 ## Related
 

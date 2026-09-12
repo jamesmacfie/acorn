@@ -5,6 +5,15 @@ import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import {
+  PLUGIN_CONTEXT_SECTION_MAX_BYTES,
+  PLUGIN_CONTEXT_SECTION_MAX_TOKENS,
+  PLUGIN_CONTEXT_TIMEOUT_MAX_MS,
+  PLUGIN_TOOL_OUTPUT_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_DEPTH,
+  PLUGIN_TOOL_TIMEOUT_MAX_MS,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
+import {
   MAX_PLUGIN_BYTES,
   PLUGIN_BRIDGE_VERSION,
   type PluginBridgeApiRequest,
@@ -90,6 +99,7 @@ const UI_OPS = {
   toast: 'title + optional detail',
   copy: 'write text to the clipboard — `navigator.clipboard` does not work in a frame',
   openPane: 'open a pane by id',
+  openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
   'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '
@@ -218,15 +228,21 @@ plugin API majors and must cover this node's: \`"4"\`, \`"3 || 4"\` or \`"2-4"\`
 Ids are permanent: the id is the route namespace, the renderer route prefix and the SQLite
 filename, so renaming a plugin is a new plugin plus a data migration plus a tombstone.
 
-A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary) and no
+A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary), no
+\`ctx.tools\`/\`ctx.contextSections\`, and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
 strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
-\`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.contextSections\`,
-\`ctx.runs\`, \`ctx.audit\`, \`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
+\`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.runs\`, \`ctx.audit\`,
+\`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
 \`ctx.events.send\`/\`status\`/\`on\` are there, shaped by the manifest. Those registries are owner-bound:
 the host stamps your plugin id on whatever you register, so you cannot file a schedule or a collection
 under another package's name. Declaring the same thing in the manifest goes through the same seam, so
 pick one — the manifest is what the owner reads at install.
+Declare loaded agent tools and task-context sections only in \`contributions.agentTools\` and
+\`contributions.contextSections\`. Each names a route in YOUR \`/v2/p/<id>/\` namespace; the host
+turns the descriptor into the same tool registry or context assembler used by compiled plugins, and
+removes it on update/unload. Tool input is bounded JSON Schema, not Zod in your bundle. Context returns
+bounded data and compact reference text, never a renderer or callback.
 Node actions and managed-agent harnesses have no \`ctx\` member at all: declare them in the manifest,
 which is the only way in (a command with the \`runNodeAction\` verb, and \`contributions.harnesses\`).
 
@@ -314,6 +330,19 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     "integration and starts being an app inside someone else's chrome.",
     '',
     Object.entries(manifest.contributionCaps).map(([key, cap]) => `- \`${key}\` — max ${cap}`).join('\n'),
+    '',
+    '**Loaded agent tools and context.** `agentTools` entries are task scoped and become',
+    '`<pluginId>_<localId>`. They carry `{ id, description, inputSchema, risk, handler, scope?,',
+    'requiresSession?, timeoutMs?, maxOutputBytes? }`; `handler` must be in YOUR namespace. The JSON',
+    `Schema is capped at ${PLUGIN_TOOL_SCHEMA_MAX_BYTES} bytes and ${PLUGIN_TOOL_SCHEMA_MAX_DEPTH} levels; only object/array/scalar types,`,
+    '`properties`, `required`, boolean `additionalProperties`, `items`, `enum`, and string/number/array',
+    `limits are accepted. Tool timeout is at most ${PLUGIN_TOOL_TIMEOUT_MAX_MS} ms and output at most ${PLUGIN_TOOL_OUTPUT_MAX_BYTES} bytes.`,
+    '`contextSections` entries carry `{ id, label, order, read, maxBytes, maxTokens, scope?,',
+    'defaultIncluded?, timeoutMs? }`; the read route is YOUR namespace and returns strict `{ items,',
+    'compact, unavailable? }` reference data. A section is capped at',
+    `${PLUGIN_CONTEXT_SECTION_MAX_BYTES} bytes, ${PLUGIN_CONTEXT_SECTION_MAX_TOKENS} tokens and ${PLUGIN_CONTEXT_TIMEOUT_MAX_MS} ms.`,
+    'The host supplies the verified task/session principal. Body IDs cannot widen it. It never retries a',
+    'plugin handler, and reload/unload removes every registration.',
     '',
     `Frame targets: ${manifest.frameTargets.map((value) => `\`${value}\``).join(', ')}. `
       + `Host slots: ${manifest.slots.map((value) => `\`${value}\``).join(', ')}. `

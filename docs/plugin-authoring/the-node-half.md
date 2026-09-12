@@ -49,6 +49,12 @@ would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.collections`,
 `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
 manifest.
 
+Agent tools and context sections are still available to a loaded package, but only as manifest
+descriptors: `contributions.agentTools` and `contributions.contextSections`. They do not become live
+registries in `ctx`. The host turns each descriptor into the same normalized registration compiled
+plugins use, binds every route to `/v2/p/<id>/`, and removes it with the package on reload or unload.
+See [Agent tools](../agent-tools.md#loaded-manifest-carriers) for the schema and response contracts.
+
 Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
 schedule, collection, task check, run source or audit verb cannot be filed under another package's
 name. Several are also manifest keys, and the host synthesises those declarations through this same
@@ -69,6 +75,61 @@ Three of them are newer than the rest and worth naming:
   the same shape asked a different question. Reach for a capability when there is one right answer and a
   point when there are many. See
   [plugins.md](../plugins.md) § Node-side extension points.
+
+`projects:read` exposes `ctx.core.projects.byWorkspace(workspaceId)` as well as the project and
+checkout readers. Use it when a plugin must validate that a task-scoped record names a project in the
+same workspace. It does not grant project writes or raw filesystem access.
+
+### Contributing findings from an installed plugin
+
+An external producer does not import Findings' runtime or receive its storage. It requires a
+compatible `findings` version in `requires.plugins`, declares local kinds, and connects a producer to
+the public extension point:
+
+```js
+let writer
+
+export default {
+  name: 'architecture-review',
+  init(ctx) {
+    ctx.extensionPoints.handle('findings:kind', {
+      id: 'architecture',
+      value: { version: 1, label: 'Architecture concern' },
+    })
+    ctx.extensionPoints.handle('findings:producer', {
+      id: 'review',
+      value: {
+        kinds: ['architecture'],
+        connect(next) {
+          writer = next
+          return () => { writer = undefined }
+        },
+      },
+    })
+    ctx.routes.fetch(async (request) => {
+      if (new URL(request.url).pathname !== '/record' || request.method !== 'POST' || !writer) {
+        return new Response('Not found', { status: 404 })
+      }
+      const { taskId } = await request.json()
+      const result = await writer.record({ kind: 'task', taskId }, {
+        sourceKey: `architecture:${taskId}`,
+        kind: 'architecture-review:architecture',
+        kindVersion: 1,
+        title: 'Review architecture boundary',
+        bodyMd: 'The adapter crosses an ownership boundary.',
+        claim: 'observed',
+        evidence: [],
+      })
+      return Response.json(result)
+    })
+  },
+}
+```
+
+The host qualifies `architecture` with the producer's plugin ID and binds the writer to that identity.
+It rejects undeclared kinds and revokes cached writers when either contribution unloads. The fixture at
+`apps/node/test/__fixtures__/findings-producer` is built and installed independently in the Findings
+integration test.
 
 **Node actions and harnesses have no `ctx` member at all.** The manifest is the only way in — a command
 whose verb is `runNodeAction`, and `contributions.harnesses` — and the host registers them for you
@@ -400,7 +461,7 @@ messages by hand:
 | `api.getBytes` / `api.postBytes` | The same call for a route whose body is bytes, on its own wire kind `api.bytes`. GET and POST, capped at 12 MiB each way, with an advisory `type` and `filename`. Reach for it instead of base64 whenever you are moving a file: the JSON verbs stringify everything, which costs a third more on the wire and a decode at each end. The path decision is identical, and another plugin's namespace is refused before the body is read. |
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
-| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
+| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openDestination` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openDestination` maps a surface-local manifest declaration to one host target kind; the plugin supplies only resource IDs of at most 300 characters. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |

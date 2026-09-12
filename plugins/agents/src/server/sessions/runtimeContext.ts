@@ -10,28 +10,6 @@ export const agentTurnInputText = (turn: AgentTurn): string =>
     return [`[Attachment: ${part.attachmentId}]`]
   }).join('\n\n')
 
-export async function buildCompletedTurnTranscript(store: AgentStore, sessionId: string, turnId: string): Promise<{ taskId: string; transcript: string }> {
-  const [snapshot, events] = await Promise.all([
-    store.snapshot(sessionId, 0, 1),
-    store.eventsForTurn(turnId),
-  ])
-  const turn = snapshot.turns.find((candidate) => candidate.id === turnId)
-  const lines = [
-    `Managed agent session: ${snapshot.session.id}`,
-    `Managed agent turn: ${turnId}`,
-    `Provider: ${snapshot.session.providerId}`,
-    '',
-    turn ? `User:\n${agentTurnInputText(turn)}` : '',
-    ...events.flatMap((record) => {
-      if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-      if (record.event.type === 'tool') return [`Tool: ${record.event.tool.title} (${record.event.tool.status ?? 'running'})`]
-      if (record.event.type === 'file_change') return [`File change: ${record.event.path ?? record.event.summary ?? 'unknown'}`]
-      return []
-    }),
-  ].filter(Boolean)
-  return { taskId: snapshot.session.taskId, transcript: lines.join('\n\n').slice(-20_000) }
-}
-
 export async function buildForkContext(store: AgentStore, source: AgentSession): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
   const snapshot = await store.exportSnapshot(source.id)
   const lines = snapshot.events.slice(-200).flatMap((record) => {

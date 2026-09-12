@@ -67,6 +67,7 @@ const request = (over: {
         permissions: permissions(),
         webviews: [],
         keyClaims: [],
+        navigationDestinations: [],
         extensions: [],
         ...over.previous,
       } as PluginAckRecord,
@@ -136,6 +137,27 @@ describe('trustTiers', () => {
     expect(enforced.map((line) => [line.key, line.added])).toEqual([['extension:extends:rows:linear:issues', true]])
   })
 
+  it('records and diffs loaded tool and context reach', () => {
+    const tool = {
+      id: 'record', description: 'Record a finding.', inputSchema: { type: 'object' as const },
+      risk: 'write' as const, scope: 'task' as const, handler: '/v2/p/board/tools/record',
+      requiresSession: true, timeoutMs: 5000, maxOutputBytes: 4096,
+    }
+    const section = {
+      id: 'findings', label: 'Findings', scope: 'task' as const, order: 40,
+      read: '/v2/p/board/context/findings', defaultIncluded: true, timeoutMs: 5000,
+      maxBytes: 8192, maxTokens: 1024,
+    }
+    const tiers = trustTiers(request({
+      contributions: { agentTools: [tool], contextSections: [section] },
+      previous: { agentTools: [], contextSections: [] },
+    }))
+    expect(keysIn(tiers, 'enforced')).toContain('agent-tool:record:write:true:4096')
+    expect(keysIn(tiers, 'declared')).toContain('context-section:findings:true:8192:1024')
+    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key))
+      .toEqual(expect.arrayContaining(['agent-tool:record:write:true:4096', 'context-section:findings:true:8192:1024']))
+  })
+
   it('keeps the enforced, declared and web claims in three separate lists', () => {
     // They may never be rendered as one: `Enforced` is checked by the UI bridge and Node worker,
     // `Declared` describes plugin-authored unattended behavior, and `Web pages` reaches the
@@ -189,6 +211,20 @@ describe('trustTiers', () => {
     expect(keysIn(tiers, 'enforced')).toEqual(['keys:board-pane:meta+shift+b'])
     expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key)).toEqual(['keys:board-pane:meta+shift+b'])
   })
+
+  it('treats a cooperative destination the previous version lacked as new', () => {
+    const contributions: Partial<PluginContributions> = {
+      frames: [{
+        target: 'pane', id: 'findings', label: 'Findings', glyph: 'puzzle', order: 500,
+        formFactor: ['desktop'], destinations: [{
+          id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
+        }],
+      }],
+    }
+    const tiers = trustTiers(request({ contributions, previous: { navigationDestinations: [] } }))
+    expect(keysIn(tiers, 'enforced')).toEqual(['destination:findings:memory-review:findings-candidate:memory-proposal'])
+    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added)).toHaveLength(1)
+  })
 })
 
 describe('recordTrustDecision', () => {
@@ -198,6 +234,7 @@ describe('recordTrustDecision', () => {
     await recordTrustDecision(current, 'accepted')
     expect(recordPluginTrust).toHaveBeenCalledWith(expect.objectContaining({
       pluginId: 'board', hash: HASH, nodeId: 'node-a', version: '2.0.0', decision: 'accepted',
+      navigationDestinations: [], agentTools: [], contextSections: [],
     }))
     // The projection catches up so a just-accepted plugin's surfaces do not wait for the next boot.
     expect(bundleAccepted('board', HASH)).toBe(true)

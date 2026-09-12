@@ -132,6 +132,7 @@ export const frameBindingFor = (pluginId: string, surface: PluginFrameSurface, r
   // The plugin's own task-scoped pane ids, which is the allowlist for the `openPane` verb.
   // Project-scoped surfaces are excluded because the verb opens into a task's layout.
   panes: (row.installed?.contributions.frames ?? []).filter(isTaskPane).map((entry) => entry.id),
+  destinations: (surface.destinations ?? []).map(({ id, targetKind }) => ({ id, targetKind })),
   // Roster rows are wire input. The node parsed these, but the device re-applies the closed claim
   // policy before handing the declaration to a frame.
   claimsKeys: (surface.claimsKeys ?? []).filter(isPluginKeyClaim),

@@ -7,14 +7,28 @@ import { runHook } from '../pluginHost/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
+import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
 type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; github: { owner: string; name: string } | null; workflowRunId?: string }
 type ContextDraft = {
   items: ContextItem[]
+  // A descriptor may carry already-formatted reference text. Compiled contributions normally leave
+  // this absent and use their pure `format` function below.
+  compact?: string
   // Kept separate from canonical `items` (docs/agent-tools.md § Context sections).
   compatibility?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
   absent?: ContextSectionResult['absent']
+  // A loaded section may have truncated at its own data source before the host sees its bounded list.
+  // Core adds this to anything omitted by the registry budget.
+  omitted?: number
+}
+
+export class ContextSectionAssemblyError extends Error {
+  constructor(readonly reason: 'unavailable' | 'timeout' | 'invalid-response', message: string) {
+    super(message)
+    this.name = 'ContextSectionAssemblyError'
+  }
 }
 
 export type ContextSectionContribution = {
@@ -25,6 +39,8 @@ export type ContextSectionContribution = {
   label: string
   defaultIncluded: boolean
   budget: ContextBudget
+  maxBytes?: number
+  maxTokens?: number
   assemble: (args: AssembleArgs) => Promise<ContextDraft>
   format: (items: ContextItem[], omitted: number, absent?: ContextSectionResult['absent']) => string
   jump?: (item: ContextItem) => ContextItem['jump']
@@ -173,7 +189,7 @@ class ContextSectionRegistry {
   // because Array.sort is stable; two sections claiming the same slot is a contribution the author
   // should fix, not something for this list to arbitrate.
   list(): readonly ContextSectionContribution[] {
-    return this.#registrations.map((r) => r.section).sort((a, b) => a.order - b.order)
+    return this.#registrations.map((r) => r.section).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
   }
 }
 
@@ -234,21 +250,45 @@ export async function assembleContext(
   const shaped = await runHook('core:before-snapshot', { taskId, sections: [...include].sort() })
   if (!shaped.ok) return null
   const included = new Set(shaped.payload.sections.filter((id) => include.has(id)))
+  let remainingBytes = MAX_AGENT_CONTEXT_BYTES
+  let remainingTokens = Math.ceil(MAX_AGENT_CONTEXT_BYTES / 4)
   for (const contribution of registry.list()) {
     if (!included.has(contribution.id)) continue
-    const draft = await contribution.assemble({ db, userLogin, task, repo, github, workflowRunId: opts.workflowRunId })
+    let draft: ContextDraft
+    try {
+      draft = await contribution.assemble({ db, userLogin, task, repo, github, workflowRunId: opts.workflowRunId })
+    } catch (error) {
+      draft = {
+        items: [],
+        absent: {
+          reason: error instanceof ContextSectionAssemblyError
+            ? error.reason
+            : error instanceof DOMException && error.name === 'TimeoutError' ? 'timeout' : 'unavailable',
+          detail: error instanceof Error ? error.message : 'This context section is unavailable.',
+        },
+      }
+    }
     const budgeted = applyBudget(draft.items, contribution.budget)
+    const omitted = budgeted.omitted + (draft.omitted ?? 0)
     const compatibility = budgetCompatibilityProjection(draft.compatibility, contribution.budget)
     if (compatibility) Object.assign(ctx, compatibility)
     const items = budgeted.items.map((item) => ({ ...item, jump: contribution.jump?.(item) }))
+    const rawCompact = draft.compact ?? contribution.format(items, omitted, draft.absent)
+    const sectionBytes = Math.min(contribution.maxBytes ?? remainingBytes, remainingBytes)
+    const sectionTokens = Math.min(contribution.maxTokens ?? remainingTokens, remainingTokens)
+    const compact = truncateBytes(rawCompact, Math.max(0, Math.min(sectionBytes, sectionTokens * 4)))
+    const compactBytes = Buffer.byteLength(compact, 'utf8')
+    const compactTokens = Math.ceil(compactBytes / 4)
+    remainingBytes = Math.max(0, remainingBytes - compactBytes)
+    remainingTokens = Math.max(0, remainingTokens - compactTokens)
     ctx.sections.push({
       id: contribution.id,
       label: contribution.label,
       defaultIncluded: contribution.defaultIncluded,
       budget: contribution.budget,
       items,
-      compact: contribution.format(items, budgeted.omitted, draft.absent),
-      omitted: budgeted.omitted,
+      compact,
+      omitted,
       absent: draft.absent,
     })
   }

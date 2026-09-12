@@ -1,10 +1,10 @@
 // `issue_detail`: one linked issue or error, in full, for an agent that has to act on it
 // (docs/agent-tools.md § issue_detail).
 //
-// Core owns this tool rather than the Linear and Rollbar plugins, because both ship loaded and
-// `ctx.tools` is compiled-only (docs/contribution-kinds.md). What each provider owns is the read
-// itself, through the `detail` member on its contribution. That split is why one tool covers every
-// connected issue tracker and error tracker, and why a third one needs no change here.
+// Core owns this stable cross-provider tool. What each provider owns is the read itself, through the
+// `detail` member on its contribution. That split is why one tool covers every connected issue tracker
+// and error tracker, and why a third one needs no change here. A loaded plugin may also declare its own
+// task-scoped tools, but doing so would create a provider-specific tool rather than this aggregation.
 //
 // Why it exists next to `linked_issues`: that tool answers "what is attached to this task" from the
 // cached summary, which is an identifier, a title, a URL and a state. An agent asked to implement a

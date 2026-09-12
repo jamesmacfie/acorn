@@ -2,8 +2,9 @@ import { useParams } from '@solidjs/router'
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Badge, Card, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Stack, Text } from '@acorn/plugin-api/ui'
 import { memoryApi, type MemoryProposalRow } from './memoryClient'
-import { highlightedProposal, clearHighlightedProposal } from './proposalTarget'
+import { highlightedFinding, highlightedProposal, clearHighlightedProposal } from './proposalTarget'
 import ProposalList from './ProposalList'
+import FindingsBundleReview from './FindingsBundleReview'
 
 // The routed project's proposals, plus the ones that name no project at all.
 //
@@ -37,6 +38,10 @@ export default function MemoryCenter() {
     { initialValue: [] },
   )
   const proposals = createMemo(() => proposalsForProject(allProposals(), params.projectId))
+  const [legacyMapping] = createResource(
+    highlightedProposal,
+    async (legacyId) => (await memoryApi().findingsMigrationReport()).mappings.find((entry) => entry.legacyId === legacyId) ?? null,
+  )
   const [memories, { refetch: refetchMemories }] = createResource(
     () => params.projectId ?? '',
     async (projectId) => {
@@ -65,10 +70,11 @@ export default function MemoryCenter() {
     <ListDetail>
       <DetailColumn scroll>
         <Stack gap="section">
+          <FindingsBundleReview focusCandidateId={highlightedFinding() ?? legacyMapping()?.candidateId ?? undefined} scope={params.projectId ? { kind: 'project', projectId: params.projectId } : { kind: 'private' }} onChanged={() => void refetchMemories()} />
           <Show when={proposals().length}>
             <Stack gap="row">
-              <Heading level={2} eyebrow="Waiting on you">Proposals</Heading>
-              <Text emphasis="muted">Auto-generated from agent sessions. Nothing is written until you accept it.</Text>
+              <Heading level={2}>Legacy proposals</Heading>
+              <Text emphasis="muted">Prepared by the earlier review path. Open each full preview before deciding.</Text>
               <ProposalList
                 proposals={proposals()}
                 highlightId={highlightedProposal()}

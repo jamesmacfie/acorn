@@ -159,6 +159,16 @@ export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpReg
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
 export { ToolError } from '@acorn/node-core/server/agentTools/registry.ts'
 export type { AgentToolContribution, ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
+export {
+  PLUGIN_CONTEXT_SECTION_MAX_BYTES,
+  PLUGIN_CONTEXT_SECTION_MAX_TOKENS,
+  PLUGIN_CONTEXT_TIMEOUT_MAX_MS,
+  PLUGIN_TOOL_OUTPUT_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_BYTES,
+  PLUGIN_TOOL_SCHEMA_MAX_DEPTH,
+  PLUGIN_TOOL_TIMEOUT_MAX_MS,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
+export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
 // that own their rows (docs/agent-tools.md § Context sections).
 export { formatOmitted, truncateBytes } from '@acorn/node-core/server/agentTools/contextSections.ts'

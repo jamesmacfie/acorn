@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 import type { MemoryRow } from './memoryClient'
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn() }))
-vi.mock('./memoryClient', () => ({ memoryApi: () => ({ search: mocks.search }) }))
+const mocks = vi.hoisted(() => ({ search: vi.fn(), prepare: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn() }))
+vi.mock('./memoryClient', () => ({ memoryApi: () => ({ search: mocks.search, prepare: mocks.prepare }) }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   openPane: mocks.openPane,
@@ -36,15 +36,18 @@ const find = (): SearchCommand => at('memory.search') as SearchCommand
 describe('the memory plugin catalogue', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('is a search and one open action, gated on the plugin, and only the search needs a task', () => {
-    expect(memoryCommands.map((command) => command.id)).toEqual(['memory.search', 'memory.proposals.open'])
+  it('includes explicit learning preparation, search, and the legacy proposal page', () => {
+    expect(memoryCommands.map((command) => command.id)).toEqual(['memory.learnings.review', 'memory.search', 'memory.proposals.open'])
     for (const command of memoryCommands) {
-      expect(command.requires, command.id).toEqual({ plugin: 'memory' })
       expect(command.palette, command.id).toBe(true)
     }
+    expect(at('memory.learnings.review').requires).toEqual({ plugin: 'findings' })
+    expect(at('memory.search').requires).toEqual({ plugin: 'memory' })
+    expect(at('memory.proposals.open').requires).toEqual({ plugin: 'memory' })
     // A search hit opens in a task's Context pane, so it needs one. A pending proposal is not
     // task-scoped and its page is a rail source, so it stays offered with no task in hand.
     expect(at('memory.search').scope).toBe('task')
+    expect(at('memory.learnings.review').scope).toBe('task')
     expect(at('memory.proposals.open').scope).toBeUndefined()
     // Remote, so the defaults apply: it waits for the typing to stop and for two characters.
     expect(find().debounceMs).toBeUndefined()

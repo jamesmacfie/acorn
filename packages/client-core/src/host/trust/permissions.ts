@@ -1,6 +1,6 @@
-import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { isExtensionPointKind, isHookMode, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
-import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
@@ -204,6 +204,35 @@ export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): P
       ]
     })
 
+export const agentToolGrants = (contributions: PluginContributions): PluginAgentToolGrant[] =>
+  pluginAgentToolGrants(contributions)
+
+export const agentToolPermissionLines = (grants: readonly PluginAgentToolGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) => line(
+      `agent-tool:${grant.id}:${grant.risk}:${grant.requiresSession}:${grant.maxOutputBytes}`,
+      {
+        text: `Offer a ${grant.risk} agent tool${grant.requiresSession ? ' only during an active agent session' : ''}: ${grant.description}`,
+        icon: 'puzzle',
+        high: grant.risk !== 'read',
+      },
+    ))
+
+export const contextSectionGrants = (contributions: PluginContributions): PluginContextSectionGrant[] =>
+  pluginContextSectionGrants(contributions)
+
+export const contextSectionPermissionLines = (grants: readonly PluginContextSectionGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) => line(
+      `context-section:${grant.id}:${grant.defaultIncluded}:${grant.maxBytes}:${grant.maxTokens}`,
+      {
+        text: `${grant.defaultIncluded ? 'Include' : 'Offer'} “${grant.label}” in task context, bounded to ${grant.maxBytes} bytes and ${grant.maxTokens} tokens`,
+        icon: 'notepad-text',
+      },
+    ))
+
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)
 
@@ -308,3 +337,19 @@ export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]):
         icon: 'keyboard',
       }),
     )
+
+export const navigationDestinationGrants = (
+  contributions: PluginContributions,
+): PluginNavigationDestinationGrant[] => pluginNavigationDestinationGrants(contributions)
+
+export const navigationDestinationPermissionLines = (
+  grants: readonly PluginNavigationDestinationGrant[],
+): PermissionLine[] => [...grants]
+  .sort((a, b) => a.surface.localeCompare(b.surface) || a.destination.localeCompare(b.destination))
+  .map((grant) => line(
+    `destination:${grant.surface}:${grant.destination}:${grant.targetKind}:${grant.noticeKind ?? ''}`,
+    {
+      text: `Open “${grant.label}” in another plugin`,
+      icon: 'puzzle',
+    },
+  ))

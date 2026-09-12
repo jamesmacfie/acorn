@@ -737,6 +737,16 @@ end-to-end suite pins that by spying at the broker: a denied path must produce n
 a discarded response. Both directions are capped at 12 MiB, and `type` and `filename` are advisory,
 because a sandbox saying what its bytes are decides nothing downstream.
 
+**Cooperative destinations are manifest allowlists.** A loaded frame cannot name another plugin's
+pane or route. A surface may declare up to eight local destination IDs, each mapped to one host target
+kind. `ui.openDestination` accepts only a declared ID and resource IDs of at most 300 characters. The
+host resolves the target through its notification navigation registry. The same declaration may name
+one notification kind; `ctx.events.notice` keeps a loaded plugin's target and kind only when both match
+that declaration. Every other loaded notice falls back to the plugin's own source and the non-toast
+`plugin` kind. Each destination appears as an enforced line in the trust prompt, and its surface,
+local ID, target kind, and optional notice kind form the update-diff key. Adding or retargeting one
+therefore requires a new decision.
+
 **Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
 reasonable:
 
@@ -932,6 +942,25 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   **disabled or ask-every-time until the owner enables them**, regardless of the plugin being
   trusted for everything else. Trusting a plugin's code and trusting an agent to call its tools
   autonomously are different decisions; keep them separate in the UI.
+- **Findings has no workflow-gate authority today.** Observations and memory candidates remain
+  advisory, and findings contributes no `workflows:policy`. A future opted-in policy must evaluate
+  only decision requests explicitly bound by the workflow definition, against the exact evidence
+  revision at execution time. Missing policy code, stale evidence, and incomplete obligations fail
+  closed. Clearing a required fix is a device-authenticated decision—addressed, explicit risk
+  waiver, or verified not applicable—and is never an agent tool. Acknowledgement, snooze,
+  withdrawal, dismissal, or a model-assigned severity grants no authority.
+- **A reviewer prompt is not a sandbox.** Before a provider can be advertised for a read-only
+  reviewer preset, conformance tests must prove both the Acorn tool ceiling and the provider-native
+  restriction on edits, shell commands, and other write paths. A provider that cannot enforce both
+  is unavailable for that preset. This is separate from CI or repository merge enforcement, which
+  would need its own versioned check receipt and integration.
+- **Loaded tool and context routes inherit task authority, never device authority.** Manifest
+  `agentTools[].handler` and `contextSections[].read` paths are confined to the declaring package at
+  parse time. Core invokes them with an internal principal whose user, task, session and signed tool
+  ceiling came from the authorized caller; IDs in the body cannot widen it. The task principal is
+  deliberately unable to enter device-only approval, memory-authority or cross-plugin routes. Tool
+  schemas, responses, deadlines and output sizes are bounded before data reaches MCP or prompt
+  assembly, and one failed context section is recorded as unavailable without failing its siblings.
 - **The `execute` tier denies by default.** A tier the owner has never expressed an opinion about
   falls back to `TOOL_TIER_DEFAULTS` (`@acorn/protocol/toolPermissions.ts`), where `execute` is
   `false`. The fallback used to be `true` for every tier, which meant shipping a new execute tool

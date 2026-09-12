@@ -1,4 +1,4 @@
-import type { PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../api'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../api'
 import {
   isCoreExclusiveSlot,
   isExtensionPointKind,
@@ -134,6 +134,28 @@ export const pluginHarnessGrants = (contributions: PluginContributions): PluginH
     })
     .sort((a, b) => a.id.localeCompare(b.id))
 
+export const pluginAgentToolGrants = (contributions: PluginContributions): PluginAgentToolGrant[] =>
+  (contributions.agentTools ?? [])
+    .map((tool) => ({
+      id: tool.id,
+      description: tool.description,
+      risk: tool.risk,
+      requiresSession: tool.requiresSession,
+      maxOutputBytes: tool.maxOutputBytes,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+export const pluginContextSectionGrants = (contributions: PluginContributions): PluginContextSectionGrant[] =>
+  (contributions.contextSections ?? [])
+    .map((section) => ({
+      id: section.id,
+      label: section.label,
+      defaultIncluded: section.defaultIncluded,
+      maxBytes: section.maxBytes,
+      maxTokens: section.maxTokens,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
 export const pluginKeyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   (contributions.frames ?? [])
     .flatMap((surface) => {
@@ -141,3 +163,19 @@ export const pluginKeyClaimGrants = (contributions: PluginContributions): Plugin
       return chords.length ? [{ surface: surface.id, label: surface.label, chords }] : []
     })
     .sort((a, b) => a.surface.localeCompare(b.surface))
+
+/** Cross-owner navigation that a plugin's remote tree may ask the host to perform. The manifest owns
+ * the human label and the exact notice target/kind pair; runtime messages can only choose one local
+ * destination id and supply bounded resource identifiers. */
+export const pluginNavigationDestinationGrants = (
+  contributions: PluginContributions,
+): PluginNavigationDestinationGrant[] =>
+  (contributions.frames ?? [])
+    .flatMap((surface) => (surface.destinations ?? []).map((destination) => ({
+      surface: surface.id,
+      label: destination.label,
+      destination: destination.id,
+      targetKind: destination.targetKind,
+      ...(destination.noticeKind ? { noticeKind: destination.noticeKind } : {}),
+    })))
+    .sort((a, b) => a.surface.localeCompare(b.surface) || a.destination.localeCompare(b.destination))

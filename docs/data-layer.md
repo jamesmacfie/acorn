@@ -86,6 +86,7 @@ These plugins own SQLite files and migrations:
 | `plugins/agents.sqlite` | managed sessions, turns, event ledger, delegation spawn ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
+| `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, notification receipts, and legacy import mappings |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |

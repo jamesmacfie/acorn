@@ -35,7 +35,7 @@ export type AgentToolContribution = {
 // A handler throws ToolError to classify a domain failure; anything else it throws is 'failed'.
 export class ToolError extends Error {
   constructor(
-    public readonly kind: 'not_found' | 'bad_request' | 'conflict' | 'needs-trust' | 'failed',
+    public readonly kind: 'not_found' | 'bad_request' | 'conflict' | 'needs-trust' | 'timeout' | 'failed',
     message: string,
   ) {
     super(message)

@@ -117,6 +117,11 @@ of their own, not an edited plugin one.
 None of that is schedule-specific policy. It is the engine's retain-the-state-row rule and the host's
 registration lifecycle, restated for this kind.
 
+Findings automatic preparation is not a declared schedule. Terminal exit, top-level workflow
+completion, and task archive call bounded lifecycle adapters. Findings persists the checkpoint, then
+starts preparation only when the owner enabled it. Disabling findings removes those adapters through
+capability lookup and leaves no timer that can continue model work.
+
 #### Trust
 
 A schedule joins the **Declared** group of the trust dialog and of the agent-install review screen,

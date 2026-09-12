@@ -7,6 +7,7 @@ export const memorySearchRoute = (query: string, projectId?: string, type?: stri
 export const memoryAddRoute = (taskId: string) => `/v2/p/memory/tasks/${taskId}/memory`
 export const memoryProposalsRoute = (taskId?: string) => `/v2/p/memory/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
 export const memoryResolveProposalRoute = (id: string) => `/v2/p/memory/memory/proposals/${encodeURIComponent(id)}/resolve`
+export const memoryApproveFindingRoute = (id: string) => `/v2/p/memory/memory/findings/${encodeURIComponent(id)}/approve`
 
 // The Memory page's rail source id, named by both halves: the client registers the source under it
 // (../client/proposalTarget.ts) and the node targets it from the proposal gate's bell row

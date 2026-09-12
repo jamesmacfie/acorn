@@ -1,4 +1,4 @@
-# plugin API major: 11
+# plugin API major: 12
 client: AttentionItem
 client: AttentionSourceContribution
 client: CHECK_TONE
@@ -267,8 +267,17 @@ node: NodePlugin
 node: NodeProviderContribution
 node: NodeSpec
 node: PLUGIN_API_MAJOR
+node: PLUGIN_CONTEXT_SECTION_MAX_BYTES
+node: PLUGIN_CONTEXT_SECTION_MAX_TOKENS
+node: PLUGIN_CONTEXT_TIMEOUT_MAX_MS
+node: PLUGIN_TOOL_OUTPUT_MAX_BYTES
+node: PLUGIN_TOOL_SCHEMA_MAX_BYTES
+node: PLUGIN_TOOL_SCHEMA_MAX_DEPTH
+node: PLUGIN_TOOL_TIMEOUT_MAX_MS
+node: PluginAgentToolDescriptor
 node: PluginBroadcast
 node: PluginContextSection
+node: PluginContextSectionDescriptor
 node: PluginDatabase
 node: PluginFetchHandler
 node: PluginHookHandler
@@ -392,6 +401,8 @@ testkit: makeTestPluginDb
 testkit: makeTestRequestContext
 testkit: schema
 testkit: seedProviderConnection
+testkit: testAgentToolDescriptor
+testkit: testContextSectionDescriptor
 testkit: testEnv
 testkit: testGate
 testkit: testSecretEnv

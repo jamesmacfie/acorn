@@ -239,6 +239,7 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
         announceMemories(projectId)
       }, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
+    memoryApproveFinding: async () => ({ ok: false, reason: 'Findings review is unavailable.' }),
     // --- notes ---
     //
     // Delegated to plugins/notes' `notes.store` capability, resolved per call. This is the

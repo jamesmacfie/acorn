@@ -193,6 +193,9 @@ export type ContextItem = {
   details?: string[]
   jump?: ContextPaneIntent
   origin?: { author: 'user' | 'agent' | 'workflow' } // notes section only, for provenance badges
+  // Reference data supplied by a section. Loaded contributors cannot supply a renderer or an action;
+  // consumers may show these as provenance labels.
+  sources?: { label: string; uri?: string }[]
 }
 export type ContextSectionResult = {
   id: string
@@ -202,7 +205,7 @@ export type ContextSectionResult = {
   items: ContextItem[]
   compact: string
   omitted: number
-  absent?: { reason: 'missing-cache'; detail: string }
+  absent?: { reason: 'missing-cache' | 'unavailable' | 'timeout' | 'invalid-response'; detail: string }
 }
 export type TaskContext = {
   task: { id: string; title: string; projectId: string; repo?: string; branch: string | null; worktreePath: string | null; pullNumber: number | null }
@@ -376,10 +379,20 @@ export type {
   PluginThemeDescriptor,
 } from './plugin/contract.ts'
 
-// The two grants the device derives from a manifest's frame surfaces and records against a trust
+// The frame grants the device derives from a manifest's surfaces and records against a trust
 // decision. Not manifest shapes: they're what the owner consented to, one row per surface.
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
+// A host-mediated jump from this package's UI into a target another client plugin owns. The target is
+// a notice kind, never a pane id or route; storing it makes a newly added cross-owner destination
+// visible in the update prompt.
+export type PluginNavigationDestinationGrant = {
+  surface: string
+  label: string
+  destination: string
+  targetKind: string
+  noticeKind?: string
+}
 
 // The third grant: what this package's manifest says about other packages and about core's own
 // surfaces (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three
@@ -434,6 +447,26 @@ export type PluginHarnessGrant = {
   // The second invocation, when the harness declares a one-shot text mode: the same command line the
   // Generate lists spend. Absent means the harness runs only as a session.
   oneShot?: string
+}
+
+// Loaded tool and context descriptors are executable/data-bearing surfaces in the same trust
+// snapshot as schedules and harnesses. Routes are intentionally absent: manifest validation binds
+// those to the declaring package, while these fields capture every way an update can widen what the
+// host will expose or return.
+export type PluginAgentToolGrant = {
+  id: string
+  description: string
+  risk: 'read' | 'write' | 'execute'
+  requiresSession: boolean
+  maxOutputBytes: number
+}
+
+export type PluginContextSectionGrant = {
+  id: string
+  label: string
+  defaultIncluded: boolean
+  maxBytes: number
+  maxTokens: number
 }
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,

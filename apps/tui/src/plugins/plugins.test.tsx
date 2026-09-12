@@ -83,10 +83,13 @@ test('a decision is recorded per (plugin, bundle), and only for bundles this dev
     permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
     webviews: [],
     keyClaims: [],
+    navigationDestinations: [],
     extensions: [],
     schedules: [],
     taskChecks: [],
     harnesses: [],
+    agentTools: [],
+    contextSections: [],
     decision: 'accepted' as const,
   }
   await custody.trustRecord(decision)

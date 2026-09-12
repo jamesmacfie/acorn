@@ -89,6 +89,28 @@ const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'
 const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
 void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
 
+// Public authoring fixture: these are manifest values an out-of-tree package can type without a
+// runtime import or a Zod dependency.
+const _loadedTool = {
+  id: 'lookup',
+  description: 'Read one task-local record.',
+  inputSchema: {
+    type: 'object',
+    properties: { id: { type: 'string', minLength: 1, maxLength: 100 } },
+    required: ['id'],
+    additionalProperties: false,
+  },
+  risk: 'read',
+  handler: '/v2/p/example/tools/lookup',
+  timeoutMs: 5_000,
+  maxOutputBytes: 65_536,
+} satisfies Published.PluginAgentToolDescriptor
+const _loadedContext = {
+  id: 'references', label: 'References', order: 60,
+  read: '/v2/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
+} satisfies Published.PluginContextSectionDescriptor
+void [_loadedTool, _loadedContext]
+
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.

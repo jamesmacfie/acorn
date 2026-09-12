@@ -22,7 +22,7 @@ must validate input again at execution time and use CoreServices for files, Git,
 and task lookup.
 
 Tool groups cover task and context inspection, the issue and error trackers, Git and changes, the
-pull request, notes, memory, terminal handoff, and browser operations. Nothing drives a workflow,
+pull request, notes, memory, findings, terminal handoff, and browser operations. Nothing drives a workflow,
 opens a database, or talks to Docker: [the MCP doc](./mcp.md) § Tool surface says why, and the
 registry is the authority on the list.
 
@@ -44,6 +44,23 @@ ci-loop step uses (`checkFailed` in `plugins/github/src/server/mirrorQueries.ts`
 Both distinguish an unmirrored pull request from an empty one, and say which in a `status` field. A
 task whose PR has never been mirrored is not a PR with no feedback, and it is not a green one.
 
+## Findings
+
+The findings plugin contributes two read tools and two write tools. All four derive the task from the
+tool context. The record and withdraw tools also require a signed managed-session claim.
+
+| Tool | Input | Result |
+| --- | --- | --- |
+| `findings_record` | Source key, kind and version, title, Markdown body, claim status, evidence, and optional correction ID | Observation ID, whether the call created it, and the scope revision |
+| `findings_list` | Optional cursor, limit, and `active` or `history` state | A bounded page, next cursor, and scope revision |
+| `findings_get` | Observation ID | The observation, provenance, evidence, correction link, and withdrawal history |
+| `findings_withdraw` | Observation ID and optional reason | Whether the call changed the record and the scope revision |
+
+An agent can record only for its signed task and session. It can withdraw only an observation from
+that session. Cross-task and foreign-session lookups return `not_found`. Repeating a source key with
+the same payload returns the original record; changing the payload returns `conflict`. These calls do
+not generate notices or attention items. For the data and limits, see [Findings](./findings.md).
+
 ## issue_detail
 
 `linked_issues` answers "what is attached to this task" from the cached summary: an identifier, a
@@ -56,10 +73,10 @@ fail.
 optional `refresh`, asks every connected workspace in turn, and returns the first that answers.
 Read-tier, so it is permitted by default.
 
-Core owns the tool and the provider owns the read. That split is not decoration: Linear and Rollbar
-both ship loaded, and `ctx.tools` is compiled-only
-([contribution kinds](./contribution-kinds.md)), so neither plugin can register a tool at all. What
-each declares instead is `detail` on its provider contribution, a function core calls once per
+Core owns the tool and the provider owns the read. That split remains intentional even though Linear
+and Rollbar can now declare loaded tools: one shared `issue_detail` name searches every connected
+provider, while a manifest tool belongs to one package and one owned route. What each provider
+declares is `detail` on its provider contribution, a function core calls once per
 connection with one method lent back to it:
 
 ```ts
@@ -82,6 +99,95 @@ it rather than the not-found, because a 401 from the workspace that owns the tic
 
 A provider that declares no `detail` offers summaries only. Naming it explicitly is a `bad_request`
 that says so, and when no provider declares one the tool's `when` withholds it entirely.
+
+## Loaded manifest carriers
+
+A loaded package does not receive the live `ctx.tools` or `ctx.contextSections` registries. It
+declares data in `acorn-plugin.json`, and the host adapts that data into the same registries used by
+compiled plugins:
+
+```json
+{
+  "contributions": {
+    "agentTools": [{
+      "id": "lookup",
+      "description": "Read the package's task-local record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "id": { "type": "string", "minLength": 1, "maxLength": 100 } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "risk": "read",
+      "scope": "task",
+      "handler": "/v2/p/example/tools/lookup",
+      "timeoutMs": 5000,
+      "maxOutputBytes": 65536
+    }],
+    "contextSections": [{
+      "id": "references",
+      "label": "Example references",
+      "scope": "task",
+      "order": 60,
+      "read": "/v2/p/example/context/references",
+      "defaultIncluded": false,
+      "timeoutMs": 5000,
+      "maxBytes": 32768,
+      "maxTokens": 4096
+    }]
+  }
+}
+```
+
+Tool IDs are lowercase snake case and become `<pluginId>_<id>` in the registry. The compatibility
+case where a context section's local ID equals its plugin ID keeps the established `<pluginId>`
+section ID; other sections become `<pluginId>:<id>`. Persisted tool and inclusion preference IDs must
+not be renamed casually.
+
+The accepted JSON Schema language is deliberately small: one object root, object/array/scalar types,
+`properties`, `required`, boolean `additionalProperties`, `items`, `enum`, string/number/array limits,
+and descriptions. `$ref`, remote or recursive schemas, combinators, executable validators, and every
+unknown keyword fail manifest validation. A schema is limited to 64 KiB, eight levels, 64 properties,
+and 64 enum values. The host compiles it once and validates arguments on every call.
+
+The handler receives `POST { arguments, origin: { taskId, sessionId?, callId? } }`. Those origin fields
+are informational: the route's `PluginRequestContext.principal` is built by the host from the verified
+task/session token and signed tool ceiling. The handler route is confined to the declaring plugin,
+and the internal task principal cannot use device-only routes. Owner preferences, session requirement,
+risk permission and signed ceiling all run before dispatch. Handler output must be JSON and fit the
+declared limit (1–256 KiB); timeouts are 100 ms–30 seconds and return the ordinary `timeout` tool error.
+
+A context read receives `POST { origin: { taskId }, scope: "task" }` under a host-built task
+principal and returns:
+
+```json
+{
+  "items": [{
+    "id": "record-1",
+    "kind": "reference",
+    "label": "Record one",
+    "body": "Bounded reference text",
+    "details": ["optional detail"],
+    "sources": [{ "label": "origin", "uri": "urn:example:record-1" }]
+  }],
+  "compact": "## Example references\n- Record one",
+  "omitted": 0,
+  "unavailable": { "detail": "optional non-fatal status" }
+}
+```
+
+The response is a strict, bounded data shape, never a renderer or formatter function. The assembler
+applies the descriptor's byte/token ceilings and the 512 KiB global budget in deterministic
+`order`, then ID order. A timeout, HTTP failure, oversized response or invalid response marks that
+section unavailable (with `timeout`, `unavailable`, or `invalid-response`) and does not discard its
+siblings. `defaultIncluded` supplies only the initial inclusion; an owner's explicit include list
+remains authoritative. Returned text is reference data, not host instructions.
+
+The descriptor adapter never retries a handler. The MCP loopback proxy may reconnect after a node
+restart, but it keeps one `x-acorn-tool-call-id` for the logical call. A mutating domain must use that
+ID (or its own domain key) for idempotency; a lost plugin reply is not permission to repeat a write.
+Reload first removes the old owner's registrations and replays the new descriptor set. Failed reload
+restores the prior set; successful update and unload cannot leave a stale tool or context section.
 
 ## Projections
 

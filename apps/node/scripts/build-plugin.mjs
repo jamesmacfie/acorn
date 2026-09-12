@@ -191,6 +191,7 @@ writeFileSync(
     ...(spec.icons ? { icons: spec.icons } : {}),
     version,
     apiVersion: apiMajor,
+    ...(spec.emits?.length ? { emits: spec.emits } : {}),
     node: './dist/node.js',
     ...(spec.client ? { client: './dist/client.js' } : {}),
     // Always './migrations' in the built package regardless of where the source chain lives, so the

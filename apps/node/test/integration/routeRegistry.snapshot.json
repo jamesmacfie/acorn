@@ -165,6 +165,8 @@
   "POST /v2/p/github/repos/:owner/:repo/pulls/:number/viewed",
   "POST /v2/p/github/repos/:owner/:repo/pulls/batch",
   "POST /v2/p/github/repos/refresh",
+  "POST /v2/p/memory/memory/findings/:id/approve",
+  "POST /v2/p/memory/memory/findings/:id/approve",
   "POST /v2/p/memory/memory/proposals/:id/resolve",
   "POST /v2/p/memory/memory/proposals/:id/resolve",
   "POST /v2/p/memory/tasks/:id/memory",

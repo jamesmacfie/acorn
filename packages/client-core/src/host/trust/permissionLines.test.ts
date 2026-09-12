@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import { agentToolGrants, agentToolPermissionLines, contextSectionGrants, contextSectionPermissionLines, extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
 import { EXTENSION_POINT_KINDS, HOOK_MODES } from '@acorn/protocol/extensionPoints.ts'
 
 // The update prompt diffs grant keys, not wording, so the key is what has to stay stable. This is a
@@ -295,7 +295,36 @@ describe('the harness grant', () => {
   })
 })
 
+describe('manifest runtime contribution grants', () => {
+  it('discloses tool risk/session/output and context inclusion/budgets', () => {
+    const contributions = {
+      agentTools: [{ id: 'record', description: 'Record a finding.', risk: 'write', requiresSession: true, maxOutputBytes: 4096 }],
+      contextSections: [{ id: 'findings', label: 'Findings', defaultIncluded: true, maxBytes: 8192, maxTokens: 1024 }],
+    } as never
+    const tools = agentToolPermissionLines(agentToolGrants(contributions))
+    const sections = contextSectionPermissionLines(contextSectionGrants(contributions))
+    expect(texts(tools)).toEqual(['Offer a write agent tool only during an active agent session: Record a finding.'])
+    expect(tools[0]?.high).toBe(true)
+    expect(texts(sections)).toEqual(['Include “Findings” in task context, bounded to 8192 bytes and 1024 tokens'])
+    expect(tools[0]?.key).toContain(':write:true:4096')
+    expect(sections[0]?.key).toContain(':true:8192:1024')
+  })
+})
+
 describe('the cross-plugin grants', () => {
+  it('discloses a cooperative destination and keys updates by its exact target', () => {
+    const contributions = {
+      frames: [{
+        target: 'pane', id: 'findings', label: 'Findings', destinations: [{
+          id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
+        }],
+      }],
+    } as never
+    const lines = navigationDestinationPermissionLines(navigationDestinationGrants(contributions))
+    expect(texts(lines)).toEqual(['Open “Review in Memory” in another plugin'])
+    expect(lines[0]?.key).toBe('destination:findings:memory-review:findings-candidate:memory-proposal')
+  })
+
   // Every kind, both directions. A kind added to the protocol with no sentence here is a hole a person
   // would consent through, which is why this is a loop over the vocabulary rather than a list of cases.
   it('has a host-owned sentence for every kind, in both directions', () => {

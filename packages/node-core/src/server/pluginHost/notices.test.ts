@@ -87,6 +87,49 @@ describe('a loaded plugin', () => {
     }
   })
 
+  it('keeps a target only when the manifest declared its kind and notice class', () => {
+    broadcasts.length = 0
+    const ctx = makeTestNodeContext({
+      plugin,
+      permissions: {},
+      destinations: [{ id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' }],
+    })
+    try {
+      ctx.events.notice({
+        taskId: 't1',
+        title: 'Review one finding',
+        kind: 'memory-proposal',
+        target: { kind: 'findings-candidate', resourceId: 'candidate-1' },
+      })
+      expect(sent()[0]).toMatchObject({
+        kind: 'memory-proposal',
+        target: { kind: 'findings-candidate', resourceId: 'candidate-1' },
+      })
+    } finally {
+      ctx.cleanup()
+    }
+  })
+
+  it('strips a target whose notice class was not declared', () => {
+    broadcasts.length = 0
+    const ctx = makeTestNodeContext({
+      plugin,
+      permissions: {},
+      destinations: [{ id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' }],
+    })
+    try {
+      ctx.events.notice({
+        taskId: 't1',
+        title: 'Spoofed failure',
+        kind: 'agent-error',
+        target: { kind: 'findings-candidate', resourceId: 'candidate-1' },
+      })
+      expect(sent()[0]).toEqual({ pluginId: 'testkit-probe', taskId: 't1', title: 'Spoofed failure', detail: undefined, kind: 'plugin' })
+    } finally {
+      ctx.cleanup()
+    }
+  })
+
   it('keeps the title and detail it wrote', () => {
     broadcasts.length = 0
     const ctx = makeTestNodeContext({ plugin, permissions: {} })

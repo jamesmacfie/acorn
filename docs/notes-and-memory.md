@@ -119,6 +119,39 @@ Memory stays a first-party plugin. The loaded tier contributes a declarative sou
 page; and memory is the human gate on knowledge an agent proposes writing into your repository, which
 is the wrong thing to move behind the sandbox.
 
+Findings-backed suggestions appear above legacy proposals. The Memory page and task Context section
+render the same bundle projection: three stable summaries followed by **Show all**, with an exact
+full-body preview before approval. Updates show their accepted base as a unified before/after diff.
+Editing covers the name for additions and the type, description, body, and project/private reach for
+all candidates, then creates a new revision before **Approve changes** is available. Update names are
+stable file identities and are not renamed in place. Dismiss, post-action optional reason hints, undo, a selected snooze date,
+source evidence, and history remain attached to the candidate.
+Omitted outcomes retain their preparation reason and can be restored to the open change. A source
+inside an incorrectly grouped change can be separated into its own candidate before editing.
+
+Approval stays under `/v2/p/memory/memory/findings/:candidateId/approve` and requires a paired device.
+The request names the exact candidate revision, payload hash, and idempotency key. Memory persists a
+prepared receipt in its own database before the atomic Markdown write. The receipt binds the payload,
+scope, target identity, full accepted-memory version hash, and device identity without storing a
+token. One receipt can own a candidate revision. A retry reconciles an already-written file and
+finishes findings linkage without writing twice. A stale
+revision or changed update base becomes a conflict and never overwrites the current memory.
+
+Legacy JSON proposals remain authoritative while findings is disabled or its import report contains
+an unreadable, malformed, or changed source. Their card requires **View change** and shows and edits
+the full body, metadata, and scope before approval.
+
+When every source hash has a one-to-one mapping, findings becomes the proposal authority. Memory
+hides mapped legacy rows from the page and its per-proposal attention source, so one suggestion does
+not appear twice. Compatibility requests through a legacy ID can approve or reject only the exact
+candidate revision imported from that file. After the Findings operation succeeds, memory atomically
+mirrors the verdict into the retained proposal JSON. If that status link is interrupted, replay uses
+the durable promotion receipt or idempotent dismissal and repairs the JSON without writing the memory
+file again. This keeps the fallback queue resolved if findings is later disabled.
+An edited or grouped successor returns a review-required result and opens the Memory
+page through the retained ID mapping. Legacy files remain in `memory-proposals/` for the compatibility
+period.
+
 ## Context integration
 
 Notes and memory each register a context section. Core assembles sections with GitHub, task, Linear,
@@ -166,13 +199,15 @@ the Node owns the kind and the slug, so a note started from the palette gets the
 same `name-2` collision rule the pane's own button gets. Both rows are task-scoped, because opening a
 note is a pane intent addressed at a task even when the note is a global one.
 
-Memory contributes a search and one open action (`plugins/memory/src/client/commands.ts`). **Search
+Memory contributes a search and two actions (`plugins/memory/src/client/commands.ts`). **Search
 memory** goes through the existing full-text path, so the ordering is that index's own rank and the
 device does not re-rank it, and a row reveals by the memory's name rather than its id, because the
 name is what the context section keys its rows by. It is task-scoped even though the query is about
 the project: the query carries the captured project, but the surface a hit opens in belongs to a task,
 and a row that cannot be opened is not worth offering. **Review memory proposals** goes to the Memory
 page instead, and so is offered with no task in hand.
+**Review learnings** is task-scoped and explicitly prepares findings from that task, then opens the
+Memory page. It neither enables automatic preparation nor selects a model backend.
 
 What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note
 list, where the scope and the current value are both on screen. Accepting or rejecting a proposal
@@ -181,9 +216,13 @@ name, a type, a scope, and a body, which is four fields rather than one line.
 
 ## Lifecycle hooks
 
-Managed-agent completion can trigger memory review. The hook creates proposals or review attention;
-it does not bypass the human acceptance gate. Review runs on the first installed agent profile with a
-headless mode, tried in a fixed order (Claude Code, then Codex) rather than one hardcoded CLI, so a
-Codex-only install still gets auto-generation. Notes and memory capabilities resolve through the Node
-capability registry, so disabling one plugin yields an explicit unavailable section rather than a
-cross-plugin import.
+When findings is active and its migration report permits cutover, managed-agent completion updates
+findings checkpoints instead of running the legacy per-turn generator. Ordinary turns do not create
+review cards or notices. Terminal exit, top-level workflow completion, and task archive can prepare a
+bundle when the owner enables that setting. Workflow handoff notes remain notes and are read only as
+bounded input for the workflow boundary.
+
+If findings is disabled or cutover is unsafe, the legacy hook remains available. It runs on the first
+installed agent profile with a headless mode, in a fixed order of Claude Code then Codex. It still
+creates proposals but cannot bypass the human acceptance gate. Re-enabling findings imports those
+files and resumes their mappings.

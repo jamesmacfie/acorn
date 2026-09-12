@@ -4,11 +4,20 @@ import * as schema from '../../node/schema'
 import type { AgentRequest, AgentSession, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import type {
   AgentLifecyclePublisher,
+  AgentReviewInput,
+  AgentReviewInputRef,
   AgentRequestState,
   AgentSessionRosterEntry,
   AgentTurnState,
 } from '../../contract/lifecycle'
 import { mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
+
+const eventType = (json: string): string | null => {
+  try {
+    const parsed = JSON.parse(json) as { type?: unknown }
+    return typeof parsed.type === 'string' ? parsed.type : null
+  } catch { return null }
+}
 
 /**
  * The one post-commit projection from managed-agent rows to the public lifecycle catalogue.
@@ -109,6 +118,81 @@ export class AgentLifecycle {
         updatedAt: session.updatedAt,
       }
     })
+  }
+
+  async completedReviewInputs(taskId: string): Promise<AgentReviewInputRef[]> {
+    const rows = await this.db
+      .select({ turn: schema.agentTurns, session: schema.agentSessions })
+      .from(schema.agentTurns)
+      .innerJoin(schema.agentSessions, eq(schema.agentTurns.sessionId, schema.agentSessions.id))
+      .where(and(eq(schema.agentSessions.taskId, taskId), eq(schema.agentTurns.status, 'completed')))
+      .orderBy(asc(schema.agentTurns.completedAt))
+    const refs: AgentReviewInputRef[] = []
+    for (const { turn, session } of rows) {
+      const events = await this.db.select({ seq: schema.agentEvents.seq, eventJson: schema.agentEvents.eventJson })
+        .from(schema.agentEvents)
+        .where(and(eq(schema.agentEvents.turnId, turn.id), eq(schema.agentEvents.sessionId, session.id)))
+        .orderBy(asc(schema.agentEvents.seq))
+      const completedSequence = events.findLast((event) => eventType(event.eventJson) === 'turn_completed')?.seq
+      if (turn.completedAt == null || completedSequence == null) continue
+      refs.push({
+        taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: turn.source as AgentReviewInputRef['source'],
+        attempt: turn.attempt,
+        purpose: session.kind === 'workflow' || turn.source === 'workflow' ? 'workflow' : 'ordinary',
+        completedSequence,
+        completedAt: turn.completedAt,
+      })
+    }
+    return refs
+  }
+
+  async reviewInput(input: { taskId: string; sessionId: string; turnId: string }): Promise<AgentReviewInput> {
+    const [row] = await this.db
+      .select({ turn: schema.agentTurns, session: schema.agentSessions })
+      .from(schema.agentTurns)
+      .innerJoin(schema.agentSessions, eq(schema.agentTurns.sessionId, schema.agentSessions.id))
+      .where(and(
+        eq(schema.agentSessions.taskId, input.taskId),
+        eq(schema.agentSessions.id, input.sessionId),
+        eq(schema.agentTurns.id, input.turnId),
+      ))
+      .limit(1)
+    if (!row || row.turn.status !== 'completed' || row.turn.completedAt == null) {
+      return {
+        ...input, source: 'interactive', attempt: 0, purpose: 'ordinary', completedSequence: 0,
+        completedAt: 0, availability: 'unavailable', assistantSummary: null, userMessages: [],
+        unavailableReason: 'The completed managed turn is unavailable for this task.',
+      }
+    }
+    const events = await this.db.select().from(schema.agentEvents)
+      .where(and(eq(schema.agentEvents.sessionId, input.sessionId), eq(schema.agentEvents.turnId, input.turnId)))
+      .orderBy(asc(schema.agentEvents.seq))
+    const completedSequence = events.findLast((event) => eventType(event.eventJson) === 'turn_completed')?.seq ?? 0
+    const parsed = events.filter((event) => event.seq <= completedSequence).flatMap((event) => {
+      try { return [JSON.parse(event.eventJson) as { type?: string; text?: string }] } catch { return [] }
+    })
+    const assistantSummary = parsed.filter((event) => event.type === 'assistant_message' && typeof event.text === 'string')
+      .map((event) => event.text!.trim()).filter(Boolean).join('\n\n').slice(-12_000) || null
+    const userMessages = parsed.filter((event) => event.type === 'user_message' && typeof event.text === 'string')
+      .map((event) => event.text!.trim()).filter(Boolean).slice(-4).map((text) => text.slice(-2_000))
+    const available = !!assistantSummary || userMessages.length > 0
+    return {
+      taskId: input.taskId,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      source: row.turn.source as AgentReviewInput['source'],
+      attempt: row.turn.attempt,
+      purpose: row.session.kind === 'workflow' || row.turn.source === 'workflow' ? 'workflow' : 'ordinary',
+      completedSequence,
+      completedAt: row.turn.completedAt,
+      availability: available ? 'available' : 'unavailable',
+      assistantSummary,
+      userMessages,
+      unavailableReason: available ? null : 'The turn completed without bounded reviewable text.',
+    }
   }
 
   private async turnRow(turnId: string): Promise<{ turn: AgentTurn; taskId: string } | null> {

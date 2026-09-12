@@ -46,6 +46,7 @@ export type FrameBinding = {
   // The pane ids this plugin contributed. `openPane` may name one of these and nothing else. A plugin
   // cannot use the bridge to drive the rest of the shell's layout.
   panes: readonly string[]
+  destinations?: readonly { id: string; targetKind: string }[]
   // Populated only for a webview binding, from the manifest row the host read.
   hosts?: readonly string[]
   // Host-validated declaration for this exact surface.
@@ -86,6 +87,7 @@ export type FrameServices = {
   toast(title: string, detail?: string): void
   copy(text: string): void
   openPane(paneId: string): void
+  openTarget?(target: { kind: string; resourceId: string; subresourceId?: string }): void
   // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
   // otherwise. Returns nothing on purpose; see the `openUrl` case below for why the frame is told neither
   // the outcome nor when it happened.
@@ -421,6 +423,20 @@ export function createFrameBridge(input: {
           return void post(denied(id, 'openPane may only name a pane this plugin contributed'))
         }
         services.openPane(paneId)
+        return void post({ id, ok: true, status: 200, body: null })
+      }
+      case 'openDestination': {
+        const destinationId = data.destinationId
+        const resourceId = data.resourceId
+        const subresourceId = data.subresourceId
+        const destination = typeof destinationId === 'string'
+          ? binding.destinations?.find((entry) => entry.id === destinationId)
+          : undefined
+        if (!destination || typeof resourceId !== 'string' || !resourceId || resourceId.length > 300
+          || (subresourceId !== undefined && (typeof subresourceId !== 'string' || subresourceId.length > 300))) {
+          return void post(denied(id, 'openDestination must name a declared destination and bounded resource'))
+        }
+        services.openTarget?.({ kind: destination.targetKind, resourceId, ...(subresourceId === undefined ? {} : { subresourceId }) })
         return void post({ id, ok: true, status: 200, body: null })
       }
       case 'openUrl': {

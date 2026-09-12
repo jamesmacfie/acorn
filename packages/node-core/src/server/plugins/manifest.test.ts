@@ -77,6 +77,62 @@ describe('brand marks', () => {
   })
 })
 
+describe('runtime contribution descriptors', () => {
+  const inputSchema = {
+    type: 'object',
+    properties: { message: { type: 'string', minLength: 1, maxLength: 40 } },
+    required: ['message'],
+    additionalProperties: false,
+  }
+
+  it('accepts bounded tool and context carriers and applies their defaults', () => {
+    const result = nodeManifest({
+      agentTools: [{
+        id: 'echo', description: 'Echo one message.', inputSchema, risk: 'read',
+        handler: '/v2/p/board/tools/echo',
+      }],
+      contextSections: [{
+        id: 'references', label: 'References', order: 25, read: '/v2/p/board/context',
+        maxBytes: 4096, maxTokens: 1024,
+      }],
+    })
+    expect(result.success && result.data.contributions.agentTools[0]).toMatchObject({
+      scope: 'task', timeoutMs: 10_000, maxOutputBytes: 64 * 1024, requiresSession: false,
+    })
+    expect(result.success && result.data.contributions.contextSections[0]).toMatchObject({
+      scope: 'task', timeoutMs: 5_000, defaultIncluded: false,
+    })
+  })
+
+  it('rejects unsupported schemas, excessive nesting, and unowned/device routes at install', () => {
+    const tool = (schema: unknown, handler = '/v2/p/board/tool') => nodeManifest({
+      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema: schema, risk: 'read', handler }],
+    })
+    expect(messages(tool({ ...inputSchema, $ref: 'https://example.test/schema.json' }))).toContain("unsupported JSON Schema keyword '$ref'")
+    expect(messages(tool({ type: 'object', properties: { value: { oneOf: [{ type: 'string' }] } } }))).toContain("unsupported JSON Schema keyword 'oneOf'")
+    expect(messages(tool({ type: 'object', properties: { value: { type: 'string', maxLength: '40' } } }))).toContain('must be a non-negative integer')
+    expect(messages(tool({ type: 'object', properties: { value: { type: 'string' } }, required: ['missing'] }))).toContain("names unknown property 'missing'")
+    let nested: Record<string, unknown> = { type: 'string' }
+    for (let i = 0; i < 10; i++) nested = { type: 'array', items: nested }
+    expect(messages(tool({ type: 'object', properties: { nested } })).some((message) => message.includes('maximum nesting depth'))).toBe(true)
+    expect(messages(tool(inputSchema, '/v2/p/memory/approve'))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(tool(inputSchema, '/v2/core/devices'))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(nodeManifest({
+      contextSections: [{ id: 'r', label: 'R', order: 1, read: '/v2/p/other/context', maxBytes: 1024, maxTokens: 256 }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+  })
+
+  it('requires a node half and rejects duplicate local ids across carriers', () => {
+    expect(messages(manifest({
+      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema, risk: 'read', handler: '/v2/p/board/tool' }],
+    }))).toContain('an agent tool calls a node route; declare `node` in the manifest')
+    expect(messages(nodeManifest({
+      agentTools: [{ id: 'same', description: 'Probe.', inputSchema, risk: 'read', handler: '/v2/p/board/tool' }],
+      contextSections: [{ id: 'same', label: 'R', order: 1, read: '/v2/p/board/context', maxBytes: 1024, maxTokens: 256 }],
+    }))).toContain("duplicate contribution id 'same'")
+  })
+})
+
 describe('permission identifier shape', () => {
   it('bounds scope and event strings before they can reach the trust layout', () => {
     expect(permissionManifest({ api: ['x'.repeat(65)] }).success).toBe(false)
@@ -207,6 +263,29 @@ describe('webview surfaces', () => {
     const declared = { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }
     expect(messages(manifest({ frames: [declared] }))).toContain('a webview surface needs a client bundle; declare `client` in the manifest')
     expect(webviewManifest({ frames: [declared] }).success).toBe(true)
+  })
+})
+
+describe('cooperative navigation destinations', () => {
+  const pane = (destinations: unknown[]) => ({ ...PANE, destinations })
+
+  it('accepts a bounded target mapping and applies an empty default', () => {
+    const declared = manifest({ frames: [pane([{
+      id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
+    }])] })
+    expect(declared.success && declared.data.contributions.frames[0]?.destinations).toEqual([{
+      id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal',
+    }])
+    const empty = manifest({ frames: [PANE] })
+    expect(empty.success && empty.data.contributions.frames[0]?.destinations).toEqual([])
+  })
+
+  it('rejects duplicate ids and more than eight destinations', () => {
+    const destination = (id: string) => ({ id, label: id, targetKind: 'findings-candidate' })
+    expect(messages(manifest({ frames: [pane([destination('review'), destination('review')])] })))
+      .toContain("duplicate destination id 'review'")
+    expect(manifest({ frames: [pane(Array.from({ length: 9 }, (_, index) => destination(`d-${index}`)))] }).success)
+      .toBe(false)
   })
 })
 

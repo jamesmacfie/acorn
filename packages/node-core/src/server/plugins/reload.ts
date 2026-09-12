@@ -58,6 +58,9 @@ export function createPluginReloader(options: {
           taskChecks: entry.manifest.contributions.taskChecks,
           auditActions: entry.manifest.contributions.auditActions,
           harnesses: entry.manifest.contributions.harnesses,
+          agentTools: entry.manifest.contributions.agentTools,
+          contextSections: entry.manifest.contributions.contextSections,
+          destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
           dir: entry.dir,
         },
       })

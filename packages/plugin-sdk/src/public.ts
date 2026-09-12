@@ -86,6 +86,8 @@ export type AcornBridge = {
     copy(text: string): Promise<void>
     /** Open another of this plugin's own panes. */
     openPane(paneId: string): Promise<void>
+    /** Open a cooperative destination explicitly declared by this surface. */
+    openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
     /** Hand an `https` URL to the host. Anything else is refused, and resolving says only that the host
      * accepted it: where it lands is the host's business, because the frame does not know which surface
      * it is. */

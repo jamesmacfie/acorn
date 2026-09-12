@@ -109,6 +109,19 @@ describe('archiveTask teardown ordering', () => {
     expect(row.worktreePath).toBeNull()
   })
 
+  it('captures review input before teardown or worktree removal', async () => {
+    const order: string[] = []
+    await setTeardown('true')
+    const res = await archiveTask(t.db, 'task1', {}, {
+      ...deps(),
+      captureReviewInput: async () => { order.push(`capture:${existsSync(worktree)}`) },
+      runTeardown: async (script, cwd, env) => { order.push(`teardown:${existsSync(worktree)}`); return runTeardownProcess(script, cwd, env) },
+      dropTaskSessions: async () => { order.push(`drop:${existsSync(worktree)}`) },
+    })
+    expect(res).toEqual({ ok: true })
+    expect(order).toEqual(['capture:true', 'teardown:true', 'drop:false'])
+  })
+
   it('non-zero teardown pauses the archive and removes nothing', async () => {
     await setTeardown('echo boom >&2; exit 3')
     const res = await archiveTask(t.db, 'task1', {}, deps())

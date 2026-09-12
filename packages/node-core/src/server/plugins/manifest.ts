@@ -51,6 +51,8 @@ export type {
   PluginExtensionPointDescriptor,
   PluginFrameSurface,
   PluginHarnessDescriptor,
+  PluginAgentToolDescriptor,
+  PluginContextSectionDescriptor,
   PluginKeybindingDescriptor,
   PluginPaneRegion,
   PluginRefResolverDescriptor,
@@ -79,7 +81,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     }
     required.add(dependency.id)
   }
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks, harnesses } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -131,6 +133,19 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   }
 
   const route = (path: string, at: (string | number)[]): void => confine(path, own, at)
+
+  agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
+  contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
+  if (!manifest.node) {
+    agentTools.forEach((_entry, i) => ctx.addIssue({
+      code: 'custom', path: ['contributions', 'agentTools', i],
+      message: 'an agent tool calls a node route; declare `node` in the manifest',
+    }))
+    contextSections.forEach((_entry, i) => ctx.addIssue({
+      code: 'custom', path: ['contributions', 'contextSections', i],
+      message: 'a context section calls a node route; declare `node` in the manifest',
+    }))
+  }
 
   // Filled by `action` below, and read after every descriptor pass has run: an overlay has no click site
   // of its own, so a declared one that nothing opens is the same "parses and can never appear" failure
@@ -659,7 +674,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks, ...harnesses]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

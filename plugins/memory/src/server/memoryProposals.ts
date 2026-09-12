@@ -94,6 +94,18 @@ export class MemoryProposalStore {
     return out.sort((a, b) => b.createdAt - a.createdAt)
   }
 
+  /** Migration bytes for the findings owner. Paths stay private to memory; malformed and unreadable
+   * files remain visible as null/raw sources so findings can retain an explicit failure row. */
+  async legacySources(): Promise<{ filename: string; source: string | null }[]> {
+    const entries = (await readdir(this.root).catch(() => [] as string[]))
+      .filter((name) => name.endsWith('.json'))
+      .sort()
+    return Promise.all(entries.map(async (filename) => ({
+      filename,
+      source: await readFile(join(this.root, filename), 'utf8').catch(() => null),
+    })))
+  }
+
   async get(id: string): Promise<MemoryProposal | null> {
     try {
       const parsed = memoryProposalSchema.safeParse(JSON.parse(await readFile(this.fileFor(id), 'utf8')))

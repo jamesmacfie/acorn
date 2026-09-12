@@ -138,6 +138,7 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'toast'; title: string; detail?: string }
   | { id: number; kind: 'ui'; op: 'copy'; text: string }
   | { id: number; kind: 'ui'; op: 'openPane'; paneId: string }
+  | { id: number; kind: 'ui'; op: 'openDestination'; destinationId: string; resourceId: string; subresourceId?: string }
   // Hand an `https` URL to the host, which runs the same content-link ladder every shell surface
   // runs: in-app when a recogniser claims it, the owner's browser otherwise. The frame passes a URL
   // and learns nothing back, because the host is the side that knows which surface this port belongs

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import type { PluginFrameSurface } from '@acorn/protocol/plugin/contract.ts'
 import type { Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
 import { createCoreServices, SecretService, type CoreServices } from '../server/core'
@@ -37,6 +38,8 @@ export type TestNodeContextOptions = {
   // Omit for the built-in tier, the full context exactly as the host builds it. `ctx.storage` is
   // present in both tiers.
   permissions?: Partial<NodePermissions>
+  /** Manifest-declared cooperative destinations for loaded-tier notice tests. */
+  destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // Where ctx.storage.open() migrates from. Defaults to this checkout's `plugins/<id>/migrations`, which
   // suits every workspace plugin's suite. Pass it for a chain that lives somewhere else.
   migrations?: string
@@ -120,7 +123,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     onUndo: (undo) => void undos.push(undo),
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
     // the binding carries the loader's raw one (server/pluginHost/context.ts).
-    ...(permissions ? { loaded: { permissions, storage } } : {}),
+    ...(permissions ? { loaded: { permissions, storage, ...(options.destinations ? { destinations: options.destinations } : {}) } } : {}),
     storage,
   })
 

@@ -25,7 +25,7 @@ const as = (principal: unknown) => {
   })
   return app.route('/api', knowledge)
 }
-const authed = () => as({ kind: 'device', userId: 'james' })
+const authed = () => as({ kind: 'device', userId: 'james', deviceId: 'device-1' })
 // A child an agent spawned inside task1: an agent session's own ACORN_API_TOKEN.
 const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
 // The node calling its own HTTP surface over loopback.
@@ -109,6 +109,17 @@ describe('memory proposals are device-gated and task-confined', () => {
     // The control: a human at a keyboard still resolves, so the gate is not simply off.
     expect((await authed().fetch(req('/api/memory/proposals/p-task1/resolve', 'POST', body), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['resolve:p-task1:true'])
+  })
+
+  it('keeps exact-revision findings approval behind the device gate', async () => {
+    const calls: string[] = []
+    setKnowledgeBridge(fake({ memoryApproveFinding: async (id, input) => (calls.push(`${id}:${input.revision}:${input.payloadHash}:${input.deviceId}`), { ok: true }) }))
+    const body = { revision: 3, payloadHash: 'sha256', idempotencyKey: 'approve-1' }
+    expect((await asTask1().fetch(req('/api/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(403)
+    expect((await asService().fetch(req('/api/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(403)
+    expect(calls).toEqual([])
+    expect((await authed().fetch(req('/api/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(200)
+    expect(calls).toEqual(['candidate-1:3:sha256:device-1'])
   })
 
   // The `/workspaces/:wsId/notes*` routes are workspace-scoped, but they still need owner-only access:

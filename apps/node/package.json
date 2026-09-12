@@ -23,6 +23,7 @@
     "@acorn/plugin-changes": "workspace:*",
     "@acorn/plugin-docker": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-findings": "workspace:*",
     "@acorn/plugin-github": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",

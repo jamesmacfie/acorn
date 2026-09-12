@@ -38,6 +38,7 @@
     "./plugin/contract.ts": "./src/plugin/contract.ts",
     "./plugin/grants.ts": "./src/plugin/grants.ts",
     "./plugin/ids.ts": "./src/plugin/ids.ts",
+    "./plugin/runtimeContributions.ts": "./src/plugin/runtimeContributions.ts",
     "./plugin/state.ts": "./src/plugin/state.ts",
     "./projectColor.ts": "./src/projectColor.ts",
     "./refResolvers.ts": "./src/refResolvers.ts",

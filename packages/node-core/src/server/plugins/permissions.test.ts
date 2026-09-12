@@ -22,7 +22,7 @@ const CORE = {
   identity: marker('identity'),
   telemetry: marker('telemetry'),
   projects: {
-    byId: marker('byId'), byGithub: marker('byGithub'), checkouts: marker('checkouts'), externalProjects,
+    byId: marker('byId'), byGithub: marker('byGithub'), byWorkspace: marker('byWorkspace'), checkouts: marker('checkouts'), externalProjects,
     config: marker('config'), assertConfigTrusted: marker('assertConfigTrusted'), setup: marker('setup'),
     create: marker('create'), update: marker('update'),
   },
@@ -72,7 +72,7 @@ describe('scopeCore', () => {
 
   it('keeps project config and its executable scripts out of the read grant', () => {
     const read = scoped({ core: ['projects:read'] }).projects
-    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'externalProjects'])
+    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'byWorkspace', 'checkouts', 'externalProjects'])
     // The disclosure the trust prompt has to name: "read projects" includes every mapped project path
     // on the machine.
     expect(read.checkouts).toBe(CORE.projects.checkouts)
@@ -107,13 +107,13 @@ describe('scopeCore', () => {
   it('makes the config grant imply identity reads and include the whole config surface', () => {
     const config = scoped({ core: ['projects:config'] }).projects
     expect(Object.keys(config).sort()).toEqual(
-      ['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'externalProjects', 'setup'],
+      ['assertConfigTrusted', 'byGithub', 'byId', 'byWorkspace', 'checkouts', 'config', 'externalProjects', 'setup'],
     )
   })
 
   it('lets write imply read without silently implying config access', () => {
     const write = scoped({ core: ['projects:write'] }).projects
-    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'create', 'externalProjects', 'update'])
+    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'byWorkspace', 'checkouts', 'create', 'externalProjects', 'update'])
     expect((write as { config?: unknown }).config).toBeUndefined()
   })
 

@@ -115,6 +115,8 @@ export const sessionControl = {
 
 let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
+let reviewBoundary: ((input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>) | null = null
+let archiveReviewBoundary: ((input: { taskId: string; transcriptTail: string | null }) => Promise<void>) | null = null
 let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
@@ -304,7 +306,11 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     worktreeSettled(s)
     for (const listener of runSessionExitListeners) listener(s.meta.id, exitCode)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
-    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.tail(10_000))
+    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') {
+      const transcriptTail = s.ring.tail(16_000)
+      if (reviewBoundary) void reviewBoundary({ taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, transcriptTail }).catch(() => undefined)
+      else void memoryReviewTrigger?.(s.meta.taskId, transcriptTail)
+    }
     statusBroadcast()
   })
   return s
@@ -543,6 +549,8 @@ export type TerminalChannelDeps = {
   internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
   memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
+  reviewBoundary?: (input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>
+  archiveReviewBoundary?: (input: { taskId: string; transcriptTail: string | null }) => Promise<void>
   seedTaskNotes: (task: TaskRef) => Promise<void>
   // Resolves when the composition root's post-window reconcile pass is done, including on failure.
   // Mutating surfaces that read the sessions map await it.
@@ -583,6 +591,8 @@ export function disposeTerminal(): void {
   internalEnv = () => ({})
   launchInjector = null
   memoryReviewTrigger = null
+  reviewBoundary = null
+  archiveReviewBoundary = null
   seedNotes = null
   bootReconciled = Promise.resolve()
   statusBroadcast = () => {}
@@ -603,6 +613,8 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   internalEnv = deps.internalEnv
   launchInjector = deps.launchInjector
   memoryReviewTrigger = deps.memoryReviewTrigger
+  reviewBoundary = deps.reviewBoundary ?? null
+  archiveReviewBoundary = deps.archiveReviewBoundary ?? null
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
   statusBroadcast = deps.status ?? (() => {})
@@ -675,6 +687,15 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   const taskSessions: TaskSessionsBridge = {
     // The reconcile gate the route awaits before the running-session guard.
     ready: () => bootReconciled,
+    captureArchiveReviewInput: async (taskId) => {
+      const output = [...sessions.values()]
+        .filter((session) => session.meta.taskId === taskId && session.meta.title !== 'Teardown')
+        .map((session) => session.ring.tail(4_000))
+        .filter(Boolean)
+        .join('\n\n')
+        .slice(-16_000)
+      await archiveReviewBoundary?.({ taskId, transcriptTail: output || null })
+    },
     runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
     killRunning: (taskId) => {
       for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
