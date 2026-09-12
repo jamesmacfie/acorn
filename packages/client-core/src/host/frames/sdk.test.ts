@@ -336,6 +336,8 @@ describe('state and ui', () => {
     expect(sent.at(-1)).toMatchObject({ op: 'copy', text: 'abc' })
     await acorn.ui.openPane('board')
     expect(sent.at(-1)).toMatchObject({ op: 'openPane', paneId: 'board' })
+    await acorn.ui.openDestination('memory-review', 'candidate-1', 'revision-2')
+    expect(sent.at(-1)).toMatchObject({ op: 'openDestination', destinationId: 'memory-review', resourceId: 'candidate-1', subresourceId: 'revision-2' })
     await acorn.ui.openUrl('https://github.com/runn/acorn/pull/1')
     expect(sent.at(-1)).toMatchObject({ op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
     await acorn.ui.done()

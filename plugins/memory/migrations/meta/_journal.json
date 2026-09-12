@@ -8,6 +8,20 @@
       "when": 1786177106405,
       "tag": "0000_clumsy_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789164889529,
+      "tag": "0001_easy_junta",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789166429119,
+      "tag": "0002_chief_inhumans",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
 import ProposalList from './ProposalList'
 import { Alert, Button, Card, Field, Inline, Input, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
+import FindingsBundleReview from './FindingsBundleReview'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
@@ -60,6 +61,9 @@ export default function MemorySection(props: {
 
   return (
     <Stack gap="row">
+      <Show when={props.task.projectId}>
+        {(projectId) => <FindingsBundleReview compact scope={{ kind: 'project', projectId: projectId() }} onChanged={props.onChanged} />}
+      </Show>
       <Show when={(proposals() ?? []).length}>
         <Stack gap="row">
           <Text emphasis="muted">Memory proposals for this task. Every pending proposal is on the Memory page.</Text>

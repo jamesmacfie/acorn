@@ -35,3 +35,4 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit/manifest.ts'
+export { testAgentToolDescriptor, testContextSectionDescriptor } from '@acorn/node-core/testkit/runtimeContributions.ts'

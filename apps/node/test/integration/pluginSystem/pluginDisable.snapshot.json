@@ -84,6 +84,7 @@
       "agents.harnessRegistry",
       "agents.managedRoute",
       "agents.requests",
+      "agents.reviewInput.v1",
       "agents.runtime",
       "agents.sessionExecute",
       "agents.sessions",

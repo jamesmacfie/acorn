@@ -328,3 +328,27 @@ to (`docs/plugins.md` § The dev loop).
   `⌘⇧F` from outside the pane opening it with the box focused, the query surviving a flip to Files and
   back, a double-clicked hit revealing in Monaco, and "Reveal active file in editor tree" flipping the
   sidebar back. The route and its two ripgrep gotchas are covered by the unchanged tests.
+
+## Findings has moved
+
+Findings runs from the app-bundled installed package. It keeps the `findings` ID, the
+`plugins/findings.sqlite` filename, and the original migration chain. Its four task tools and bounded
+context section come from manifest descriptors. Its device API uses one portable fetch handler, and
+its pane and settings page use remote trees on desktop and terminal hosts.
+
+This move added one client contract: a frame surface can declare cooperative destinations. The broker
+maps a local destination ID to a host-owned target kind, which lets Findings open Memory's candidate
+review without calling a Memory route. The same declaration gates the target and notice kind that a
+loaded node notification can retain. Destinations appear in the trust prompt and a changed target is
+treated as a new grant. Plugin API major 12 marks that contract.
+
+Memory remains compiled because it owns trusted approval and writes knowledge files. It contributes
+review validation, completion callbacks, and legacy proposal contents through public Findings
+extension points. Findings has no Memory capability, route grant, process execution, network access,
+secret access, or raw legacy-directory access.
+
+`apps/node/test/integration/plugins/findings.test.ts` starts from a populated database written through
+the compiled path. It then loads the built package and checks observation IDs, candidate revisions,
+dismissal actions, migration mappings, tools, context, and an independently installed producer. The
+same test covers package updates, disable and re-enable, uninstall and reinstall without purge, and a
+failed migration that leaves the data readable after the package is repaired.

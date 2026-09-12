@@ -9,7 +9,7 @@ import type {
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
-import type { AgentLifecycleFrame } from '../../contract/lifecycle'
+import type { AgentLifecycleFrame, AgentTurnChangedEvent } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
 import { readAgentConcurrency } from '../concurrencyStore'
@@ -24,7 +24,7 @@ import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventB
 import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
-import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
+import { agentTurnInputText, buildForkContext } from './runtimeContext'
 
 type PublishedFrame = AgentWsFrame
   | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
@@ -33,7 +33,6 @@ type PublishedFrame = AgentWsFrame
 // Three tags, one owner: the engine's own lines, the memory hand-off, and the webhook queue. The
 // tag is what the reader greps for and the owner is what a sink files it under.
 const log = createLogger('agents', 'agents')
-const memoryLog = createLogger('agents:memory', 'agents')
 const webhookLog = createLogger('agents:webhook', 'agents')
 
 export { agentTurnInputText } from './runtimeContext'
@@ -68,7 +67,7 @@ export type AgentRuntimeOptions = {
   publish?(frame: PublishedFrame): void
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
-  onCompletedTurn?(taskId: string, transcriptTail: string): Promise<void>
+  onCompletedTurn?(event: AgentTurnChangedEvent): Promise<void>
   // The owner's half of this plugin's hooks (docs/plugins.md § Hooks). Optional so a test can build an
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
@@ -111,7 +110,7 @@ export class ManagedAgentEngine {
   protected readonly publish?: (frame: PublishedFrame) => void
   protected readonly startTerminalHandoff?: (session: AgentSession) => Promise<string>
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
-  protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
+  protected readonly onCompletedTurn?: (event: AgentTurnChangedEvent) => Promise<void>
   protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
   protected readonly telemetry?: PluginTelemetry
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
@@ -368,9 +367,16 @@ export class ManagedAgentEngine {
     await this.record(sessionId, turnId, event)
     if (settlesTurn) {
       if (event.type === 'turn_completed' && turnId && this.onCompletedTurn) {
-        void this.completedTurnTranscript(sessionId, turnId)
-          .then(({ taskId, transcript }) => this.onCompletedTurn!(taskId, transcript))
-          .catch((error: unknown) => memoryLog.warn(`completed-turn extraction failed: ${describeError(error).message}`))
+        const session = await this.store.requireSession(sessionId)
+        const turn = await this.store.turn(turnId)
+        if (turn) void this.onCompletedTurn({
+          taskId: session.taskId,
+          sessionId,
+          turnId,
+          source: turn.source,
+          status: turn.status,
+          attempt: turn.attempt,
+        }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
       }
       void this.pump()
     }
@@ -638,10 +644,6 @@ export class ManagedAgentEngine {
     const span = this.turnSpans.get(turnId)
     this.turnSpans.delete(turnId)
     span?.end(outcome === 'completed' ? 'ok' : 'error', { outcome })
-  }
-
-  protected completedTurnTranscript(sessionId: string, turnId: string): Promise<{ taskId: string; transcript: string }> {
-    return buildCompletedTurnTranscript(this.store, sessionId, turnId)
   }
 
   protected forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {

@@ -37,6 +37,7 @@ import { declareEmits } from './emits'
 import type { CompiledNodePluginContext, HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
 import { clearTelemetrySinks } from '../telemetry/collector'
+import { manifestAgentTool, manifestContextSection } from './runtimeContributions'
 
 const harnessLog = createLogger('harness')
 // One logger per plugin, minted where the name is known, so a line still reads `[plugin:<id>] …`.
@@ -365,6 +366,21 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // Runtime descriptors are adapters, not parallel implementations. They land through the same two
+  // context registries as compiled contributions, inheriting collision, projection and cleanup rules.
+  const registerManifestRuntimeContributions = (
+    ctx: HostPluginContext,
+    name: string,
+    binding?: LoadedPluginBinding,
+  ): void => {
+    const tools = binding?.agentTools ?? []
+    const sections = binding?.contextSections ?? []
+    if (tools.length === 0 && sections.length === 0) return
+    const env = requireEnv(name)
+    for (const descriptor of tools) ctx.tools.register(manifestAgentTool(env, name, descriptor))
+    for (const descriptor of sections) ctx.contextSections.register(manifestContextSection(env, name, descriptor))
+  }
+
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release
   // what it opened, and record why. Boot continues, which is the difference between "one installed
   // plugin is broken" and "this node does not start".
@@ -416,6 +432,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     registerManifestCollections(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
     registerManifestAuditActions(ctx, loaded)
+    registerManifestRuntimeContributions(ctx, plugin.name, loaded)
     running.push({ plugin, ctx, loaded })
   }
 
@@ -602,6 +619,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       registerManifestCollections(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
+      registerManifestRuntimeContributions(candidateCtx, name, next.binding)
       await next.plugin.init(candidateCtx)
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still serving,
@@ -760,5 +778,8 @@ async function disposeStarted(started: readonly NodePlugin[], closeStorage: (nam
       pluginLog(plugin.name).warn(`dispose failed: ${describeError(error).message}`)
     }
     closeStorage(plugin.name)
+    // A host can be stopped and started again in one process (tests do this, and supervised reload may
+    // eventually do the same). Teardown must revoke every live registry closure, not rely on process exit.
+    clearRegistrations(plugin.name)
   }
 }

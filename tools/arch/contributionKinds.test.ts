@@ -63,7 +63,9 @@ describe('the contribution-kind table is complete', () => {
     // A row whose tier is not "Both" has to say what happens to it. The check is on the row text, so a
     // new compiled-only kind cannot be added without answering the question.
     const rows = TABLE.split('\n').filter((line) => line.startsWith('| ') && /\| (Compiled|Loaded) \|/.test(line))
-    expect(rows.length).toBeGreaterThan(5)
+    // Five permanent/scheduled live-object seams remain after agent tools and context sections gained
+    // manifest carriers. Keep an anti-vacuity floor without making adding a safe twin fail the suite.
+    expect(rows.length).toBeGreaterThanOrEqual(5)
     expect(rows.filter((row) => !row.includes('**Direction:'))).toEqual([])
   })
 })

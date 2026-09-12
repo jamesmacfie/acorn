@@ -36,6 +36,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   toast: vi.fn(),
   copy: vi.fn(),
   openPane: vi.fn(),
+  openTarget: vi.fn(),
   openUrl: vi.fn(),
   frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),
@@ -265,6 +266,24 @@ describe('ui verbs', () => {
     await h.settled(2)
     expect(replyTo(h, 20)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.openPane).not.toHaveBeenCalled()
+  })
+
+  it('opens only a manifest-declared cooperative destination', async () => {
+    const h = withBridge({ destinations: [{ id: 'memory-review', targetKind: 'findings-candidate' }] })
+    h.send({ id: 201, kind: 'ui', op: 'openDestination', destinationId: 'memory-review', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+    await h.settled(2)
+    expect(replyTo(h, 201)).toMatchObject({ ok: true })
+    expect(h.svc.openTarget).toHaveBeenCalledWith({ kind: 'findings-candidate', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+  })
+
+  it('denies undeclared or unbounded cooperative destinations before navigation', async () => {
+    const h = withBridge({ destinations: [{ id: 'memory-review', targetKind: 'findings-candidate' }] })
+    h.send({ id: 202, kind: 'ui', op: 'openDestination', destinationId: 'memory-write', resourceId: 'candidate-1' })
+    h.send({ id: 203, kind: 'ui', op: 'openDestination', destinationId: 'memory-review', resourceId: 'x'.repeat(301) })
+    await h.settled(3)
+    expect(replyTo(h, 202)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(replyTo(h, 203)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openTarget).not.toHaveBeenCalled()
   })
 
   it('rejects the importer verbs from a pane surface', async () => {

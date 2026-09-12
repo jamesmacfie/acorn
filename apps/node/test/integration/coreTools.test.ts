@@ -64,8 +64,8 @@ describe('the full agent-tool manifest', () => {
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
-    // Core owns it because Linear and Rollbar ship loaded and `ctx.tools` is compiled-only; the read
-    // itself belongs to whichever provider answers (docs/agent-tools.md § issue_detail).
+    // Core owns the stable cross-provider tool; the provider-specific read belongs to whichever
+    // integration answers (docs/agent-tools.md § issue_detail).
     'issue_detail',
   ]
   // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.

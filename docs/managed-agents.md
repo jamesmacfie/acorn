@@ -54,6 +54,12 @@ effective policy, error, and transcript content; request resolution remains priv
 runtime. Core `agent-session:changed` remains the generic completion/attention compatibility event,
 and `agent:*` remains the owned transcript stream.
 
+`agents.reviewInput.v1` is the narrow exception for completion consumers that need content. A caller
+must name the owning task, session, and turn. The result contains the persisted `turn_completed`
+sequence, purpose, bounded assistant summary and user messages, and availability. It does not expose
+the event ledger, prompt policy, tool payloads, or errors. Findings uses the sequence as part of its
+durable checkpoint key and skips review-purpose work.
+
 ### What a session reports
 
 Starting a provider raises an `agent.session` span and dispatching a turn raises an `agent.turn`
@@ -174,6 +180,16 @@ cost, so its cost stays absent rather than being invented from a price table, an
 `--output-schema` it answers with the JSON as the message text, which the adapter parses only when it
 reads as an object or an array. A prose answer leaves the structured field empty, which is what a
 caller that asked for a shape should see.
+
+**There is no findings reviewer preset yet.** One-shot structured output proves that a profile can
+return a verdict-shaped value; it does not prove that the provider cannot edit files or invoke its
+own native tools while producing one. Findings-backed workflow decisions are deliberately deferred
+until a concrete gating workflow exists. Before a reusable reviewer preset can ship, the agents
+owner must define a small profile/policy carrier if the existing harness descriptor cannot express
+it, and provider conformance tests must prove both sides of the restriction: Acorn exposes only the
+declared read ceiling, and the provider's native invocation prevents file writes, shell execution,
+and ceiling escape. A prompt that asks the model to be read-only is not evidence. A provider without
+that conformance is shown as unavailable for the preset instead of being allowed by convention.
 
 **What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
 answers no to `fs`, `terminal`, and `mcpServers` at `initialize`. Each is worth adopting on its own

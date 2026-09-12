@@ -52,6 +52,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, managed delegation, approvals, artifacts, and usage. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
+| [findings.md](./findings.md) | Quiet task evidence, provenance, capture authority, history, and plugin collaboration contracts. |
 | [dashboards.md](./dashboards.md) | User-composed panels over typed record collections. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |

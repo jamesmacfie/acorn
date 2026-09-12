@@ -193,6 +193,15 @@ The tone stays with the severity either way. What a row is and how urgent it is 
 questions: a memory proposal is a nudge whether or not it is drawn with the memory mark, and a source
 that could dim its own warning by choosing a friendly glyph would make the section unreadable.
 
+Findings review bundles are passive by default. Publishing a bundle emits the plugin invalidation
+used by the Memory and Context surfaces. It does not create one notice per proposal. If the owner
+enables **Notify me when a prepared review bundle is ready**, findings emits one informational notice
+for that bundle and records its bundle ID before delivery so a retry does not emit another.
+
+After migration cutover, memory filters mapped legacy proposals from its per-proposal attention
+source. If findings is disabled or migration is unsafe, that source and the legacy aggregate notice
+remain available. The two producers therefore do not announce the same suggestion at once.
+
 ## Archiving a task takes its notices with it
 
 A notice is a pointer at a task. Archive the task and the row is still in the ring, still counting

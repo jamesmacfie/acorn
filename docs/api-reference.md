@@ -332,6 +332,34 @@ and `agent_cancel` only for a task-scoped internal principal with a signed sessi
 required execute permission. `POST /v2/core/tasks/:id/tools/:name` invokes them. A direct-child
 authorization failure is indistinguishable from an unknown session and returns 404.
 
+### Findings
+
+```text
+/v2/p/findings/tasks/:id/observations
+/v2/p/findings/tasks/:id/observations/:observationId
+/v2/p/findings/tasks/:id/observations/:observationId/withdraw
+/v2/p/findings/observations
+/v2/p/findings/observations/batch
+/v2/p/findings/tasks/:id/review/prepare
+/v2/p/findings/review/bundles
+/v2/p/findings/review/bundles/:id/cancel
+/v2/p/findings/review/bundles/:id/outcomes/:observationId/restore
+/v2/p/findings/review/candidates/:id
+/v2/p/findings/review/candidates/:id/edit
+/v2/p/findings/review/candidates/:id/decision
+/v2/p/findings/review/candidates/:id/history
+/v2/p/findings/review/candidates/:id/split
+```
+
+These routes are device-only and support task history, explicit device-authored capture, atomic
+capture batches, withdrawal, explicit preparation, and exact-revision review history. They stamp
+scope from the URL and origin from the authenticated device. Task-scoped internal callers use the `findings_*` agent tools instead. For request bodies,
+limits, retry semantics, and pagination, see [Findings](./findings.md).
+
+Final findings-backed memory approval is separately device-gated at
+`POST /v2/p/memory/memory/findings/:id/approve`; memory, not findings, owns its durable receipt and
+file effect.
+
 ### Terminal, workflows, and execution
 
 ```text
@@ -442,6 +470,17 @@ POST /v2/p/database/palette/generate     { input, taskId }
 GET  /v2/p/http/palette/requests         ?q&projectId
 POST /v2/p/http/palette/import-curl      { input, taskId }
 ```
+
+### Loaded agent tools and context sections
+
+`contributions.agentTools` and `contributions.contextSections` are manifest carriers, not new route
+families. Each names a route under the package's existing `/v2/p/<pluginId>/` namespace. The host
+calls those routes with a verified task-scoped internal principal, adapts the bounded response into
+the existing agent-tool registry or context assembler, and removes the registration on reload or
+unload. Agent tools still project through `GET /v2/core/tasks/:id/tools` and
+`POST /v2/core/tasks/:id/tools/:name`; context still projects through
+`GET /v2/core/tasks/:id/context`. See [Agent tools](./agent-tools.md#loaded-manifest-carriers) for the
+descriptor and response shapes.
 
 Each search re-checks the project or task owner on the node and answers at most 50 rows. The two
 POSTs require an interactive owner and commit their write before answering success, so the reader is

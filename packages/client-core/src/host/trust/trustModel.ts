@@ -1,11 +1,17 @@
 import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
 import {
+  agentToolGrants,
+  agentToolPermissionLines,
+  contextSectionGrants,
+  contextSectionPermissionLines,
   extensionGrants,
   extensionPermissionLines,
   harnessGrants,
   harnessPermissionLines,
   keyClaimGrants,
   keyClaimPermissionLines,
+  navigationDestinationGrants,
+  navigationDestinationPermissionLines,
   nodePermissionLines,
   type PermissionLine,
   scheduleGrants,
@@ -61,6 +67,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         ...uiPermissionLines(installed.permissions, request.row.name),
         ...nodePermissionLines(installed.permissions),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
+        ...navigationDestinationPermissionLines(navigationDestinationGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
         // plugin id the host read the manifest under, the same value every other namespace is minted
         // from, so a point's public name here is the one the rest of the app will address it by.
@@ -71,14 +78,17 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // command with the declared arguments and the plugin never gets a process of its own
         // (docs/managed-agents.md § Harnesses).
         ...harnessPermissionLines(harnessGrants(installed.contributions)),
+        ...agentToolPermissionLines(agentToolGrants(installed.contributions)),
       ],
       was: previous
         ? [
           ...uiPermissionLines(previous.permissions, request.row.name),
           ...nodePermissionLines(previous.permissions),
           ...keyClaimPermissionLines(previous.keyClaims ?? []),
+          ...navigationDestinationPermissionLines(previous.navigationDestinations ?? []),
           ...extensionPermissionLines(previous.extensions ?? []),
           ...harnessPermissionLines(previous.harnesses ?? []),
+          ...agentToolPermissionLines(previous.agentTools ?? []),
         ]
         : null,
     },
@@ -92,11 +102,13 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // Beside the schedules and for the same reason: the host holds the route confinement and the
         // deadline, but what runs on archive is the plugin's own node code.
         ...taskCheckPermissionLines(taskCheckGrants(installed.contributions)),
+        ...contextSectionPermissionLines(contextSectionGrants(installed.contributions)),
       ],
       was: previous
         ? [
           ...schedulePermissionLines(previous.schedules ?? []),
           ...taskCheckPermissionLines(previous.taskChecks ?? []),
+          ...contextSectionPermissionLines(previous.contextSections ?? []),
         ]
         : null,
     },
@@ -134,22 +146,25 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     permissions: installed.permissions,
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),
+    navigationDestinations: navigationDestinationGrants(installed.contributions),
     // Recorded as well as shown, for the reason the key claims are: the update prompt's "what is new"
     // mark is a set difference against what the owner last approved, and a grant that is not stored can
     // never read as newly requested. A plugin that starts reaching into a different package between
     // versions is exactly the change that must not slide past unremarked.
     extensions: extensionGrants(request.row.name, installed.contributions),
-    // Recorded for the same reason as the three above: an unrecorded grant can never read as newly
+    // Recorded for the same reason as the other contribution grants: an unrecorded grant can never read as newly
     // requested, and "this package now runs itself every five minutes" is exactly the change that must
     // not slide past the update prompt unremarked.
     schedules: scheduleGrants(installed.contributions),
-    // Recorded for the same reason as the four above. "This package now stops my containers when I
+    // Recorded for the same reason. "This package now stops my containers when I
     // archive" is exactly the change the update prompt has to be able to mark as new.
     taskChecks: taskCheckGrants(installed.contributions),
-    // Recorded for the same reason as the five above, and it is the sharpest case of it: "this package
+    // Recorded for the same reason, and it is the sharpest case of it: "this package
     // now asks acorn to run a different binary" is precisely the change that must not slide past the
     // update prompt unremarked, and an unrecorded grant can never read as newly requested.
     harnesses: harnessGrants(installed.contributions),
+    agentTools: agentToolGrants(installed.contributions),
+    contextSections: contextSectionGrants(installed.contributions),
     decision,
   })
   resolvePendingTrust(request.row.name, request.hash)

@@ -1,0 +1,10 @@
+{
+  "id": "architecture-review",
+  "name": "Architecture review producer",
+  "version": "1.0.0",
+  "apiVersion": "12",
+  "node": "./node.js",
+  "requires": { "plugins": [{ "id": "findings", "version": "0" }] },
+  "permissions": { "node": {} },
+  "contributions": {}
+}

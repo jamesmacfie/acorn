@@ -3,7 +3,7 @@
 //
 // Nothing here references another database. project_id is an opaque string resolved through
 // CoreServices.projects rather than joined, because a query never spans files.
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Memory index (docs/notes-and-memory.md § Memory; docs/data-layer.md § Ownership rules for
 // machine-scoped data). This table is the derived index, reconciled on change from every active
@@ -31,3 +31,12 @@ export const memories = sqliteTable('memories', {
   lastAccessedAt: integer('last_accessed_at'),
   accessCount: integer('access_count').notNull().default(0),
 })
+
+// Durable promotion receipts survive findings being disabled or removed. The approved payload is
+// frozen before the file write; retries reconcile the actual file hash and finish linkage once.
+export const memoryPromotionReceipts = sqliteTable('memory_promotion_receipts', {
+  operationId: text('operation_id').primaryKey(), candidateId: text('candidate_id').notNull(), candidateRevision: integer('candidate_revision').notNull(),
+  payloadHash: text('payload_hash').notNull(), payloadJson: text('payload_json').notNull(), scopeJson: text('scope_json').notNull(), targetPathIdentity: text('target_path_identity').notNull(),
+  expectedBaseHash: text('expected_base_hash'), deviceId: text('device_id').notNull(), state: text('state').notNull(), targetReference: text('target_reference'),
+  failureCode: text('failure_code'), createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(),
+}, (table) => [uniqueIndex('memory_promotion_receipts_candidate_revision_unique').on(table.candidateId, table.candidateRevision)])

@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
@@ -32,6 +32,14 @@ const keyClaimGrantSchema = z.strictObject({
   label: z.string().min(1).max(80),
   chords: z.array(z.string().min(1).max(64)).min(1).max(32),
 }) as z.ZodType<PluginKeyClaimGrant>
+
+const navigationDestinationGrantSchema = z.strictObject({
+  surface: z.string().min(1).max(64),
+  label: z.string().min(1).max(120),
+  destination: z.string().min(1).max(64),
+  targetKind: z.string().min(1).max(64),
+  noticeKind: z.string().min(1).max(64).optional(),
+}) as z.ZodType<PluginNavigationDestinationGrant>
 
 const extensionGrantSchema = z.strictObject({
   kind: z.enum(['hosts', 'extends', 'replaces']),
@@ -65,6 +73,22 @@ const harnessGrantSchema = z.strictObject({
   env: z.array(z.string().min(1).max(64)).max(32),
 }) as z.ZodType<PluginHarnessGrant>
 
+const agentToolGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  description: z.string().min(1).max(500),
+  risk: z.enum(['read', 'write', 'execute']),
+  requiresSession: z.boolean(),
+  maxOutputBytes: z.number().int().positive(),
+}) as z.ZodType<PluginAgentToolGrant>
+
+const contextSectionGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  defaultIncluded: z.boolean(),
+  maxBytes: z.number().int().positive(),
+  maxTokens: z.number().int().positive(),
+}) as z.ZodType<PluginContextSectionGrant>
+
 const ackSchema = z.strictObject({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -81,6 +105,8 @@ const ackSchema = z.strictObject({
   webviews: z.array(webviewGrantSchema).max(32).default([]),
   // Default keeps acknowledgements written before frame key claims readable.
   keyClaims: z.array(keyClaimGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before cooperative destinations readable.
+  navigationDestinations: z.array(navigationDestinationGrantSchema).max(64).default([]),
   // Default keeps acknowledgements written before the cooperative cross-plugin seam readable. An old
   // acknowledgement says the accepted bundle reached into nothing outside itself, which was true.
   extensions: z.array(extensionGrantSchema).max(32).default([]),
@@ -93,6 +119,8 @@ const ackSchema = z.strictObject({
   // Default keeps acknowledgements written before harnesses existed readable. An old acknowledgement
   // says the accepted bundle asked acorn to run nothing, which was true.
   harnesses: z.array(harnessGrantSchema).max(4).default([]),
+  agentTools: z.array(agentToolGrantSchema).max(16).default([]),
+  contextSections: z.array(contextSectionGrantSchema).max(8).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure behind the decision could not be fully parsed, because a node ran a newer
@@ -211,10 +239,13 @@ export class PluginTrustStore {
       permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
       webviews: [],
       keyClaims: [],
+      navigationDestinations: [],
       extensions: [],
       schedules: [],
       taskChecks: [],
       harnesses: [],
+      agentTools: [],
+      contextSections: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,

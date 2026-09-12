@@ -26,6 +26,11 @@ vi.mock('../registries/commands/clientEvents', async (importOriginal) => ({
   openPane: (...args: unknown[]) => openPane(...args),
 }))
 
+const openTarget = vi.fn()
+vi.mock('../../features/notifications/notifications', () => ({
+  openTarget: (...args: unknown[]) => openTarget(...args),
+}))
+
 const toast = vi.fn()
 vi.mock('../../features/notifications/toast', () => ({ toast: (...args: unknown[]) => toast(...args) }))
 
@@ -70,6 +75,7 @@ const windowOpen = vi.fn()
 beforeEach(() => {
   sendRaw.mockClear()
   openPane.mockClear()
+  openTarget.mockClear()
   toast.mockClear()
   saveJsonPref.mockClear()
   openInAppUrl.mockReset()
@@ -270,5 +276,17 @@ describe('toast', () => {
     build().toast('Copied', 'to the clipboard')
     build().toast('Copied')
     expect(toast.mock.calls).toEqual([['Copied — to the clipboard'], ['Copied']])
+  })
+})
+
+describe('cooperative destinations', () => {
+  it('pins target navigation to the frame task', () => {
+    build({ binding: binding({ taskId: 'task-7' }) }).openTarget?.({ kind: 'findings-candidate', resourceId: 'candidate-1' })
+    expect(openTarget).toHaveBeenCalledWith('task-7', { kind: 'findings-candidate', resourceId: 'candidate-1' })
+  })
+
+  it('does nothing when the surface has no task', () => {
+    build({ binding: binding({ taskId: undefined }) }).openTarget?.({ kind: 'findings-candidate', resourceId: 'candidate-1' })
+    expect(openTarget).not.toHaveBeenCalled()
   })
 })

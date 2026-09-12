@@ -30,6 +30,7 @@ export type WorkflowsPluginDeps = {
   // plugins/memory's auto-generation trigger, as a thunk. Optional, so a node with memory disabled
   // still runs workflows and the run produces no memory proposals.
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
+  reviewBoundary?: (input: { taskId: string; runId: string; status: string; transcriptTail: string | null }) => Promise<void>
   // '' when every check passed, a rendered list when some failed, null when there is nothing to check
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
   // treats null as a hard failure and '' as done.
@@ -204,12 +205,16 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         gateChanged: (taskId, runId, stepId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
-          if (!deps.memoryReviewTrigger) return
           const handoff = await ctx.capabilities
             .require(NOTES_STORE)
             .read({ scope: 'task', taskId }, `workflow-handoffs-${runId}`)
             .catch(() => null)
-          await deps.memoryReviewTrigger(taskId, handoff?.body ?? `Workflow ${runId} reached a terminal state.`)
+          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
+          if (deps.reviewBoundary) {
+            await deps.reviewBoundary({ taskId, runId, status: run?.status ?? 'unknown', transcriptTail: handoff?.body ?? null }).catch(() => undefined)
+          } else if (deps.memoryReviewTrigger) {
+            await deps.memoryReviewTrigger(taskId, handoff?.body ?? `Workflow ${runId} reached a terminal state.`)
+          }
         },
         startRunTarget: async (taskId, targetId) => {
           // terminal.runTargets, resolved at call time. A node with terminal disabled cannot start a

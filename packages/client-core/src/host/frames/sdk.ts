@@ -109,6 +109,8 @@ export type AcornBridge = {
     copy(text: string): Promise<void>
     /** Open another of this plugin's own panes. */
     openPane(paneId: string): Promise<void>
+    /** Open a manifest-declared cooperative destination owned by another plugin. */
+    openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
     /**
     /**
      * Hand an `https` URL to the host. It resolves in-app when something recognises it, such as another
@@ -453,6 +455,10 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         toast: async (title, detail) => void (await request({ kind: 'ui', op: 'toast', title, ...(detail === undefined ? {} : { detail }) })),
         copy: async (text) => void (await request({ kind: 'ui', op: 'copy', text })),
         openPane: async (paneId) => void (await request({ kind: 'ui', op: 'openPane', paneId })),
+        openDestination: async (destinationId, resourceId, subresourceId) => void (await request({
+          kind: 'ui', op: 'openDestination', destinationId, resourceId,
+          ...(subresourceId === undefined ? {} : { subresourceId }),
+        })),
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
         close: async (result) => void (await request({ kind: 'ui', op: 'importer.close', ...(result === undefined ? {} : { result }) })),

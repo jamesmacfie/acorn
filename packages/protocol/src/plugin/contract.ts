@@ -5,6 +5,7 @@
 // node-core/server/plugins/manifest.ts adds the cross-field rules and the reader. The wire projections at
 // the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
+import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from '../collections.ts'
 import {
   commandSettingOptionSchema,
@@ -149,6 +150,17 @@ const paneRegionSource = z.union([
   z.object({ kind: z.literal('document') }).extend(documentRegion.shape),
 ])
 
+// Cooperative navigation into a surface another plugin owns. The destination is a notice-target
+// kind, not a route: the owning client plugin decides how to present the resource, and the caller
+// gains no API access to it. `noticeKind` is also explicit because a loaded node otherwise emits the
+// quiet generic plugin kind.
+const navigationDestination = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(120),
+  targetKind: z.string().min(1).max(64),
+  noticeKind: z.string().min(1).max(64).optional(),
+}).strict()
+
 const frameSurface = z.object({
   // Which registry this lands in. The shell renders them all the same way; the surrounding chrome it
   // supplies is what differs.
@@ -203,7 +215,17 @@ const frameSurface = z.object({
       ctx.addIssue({ code: 'custom', message: 'claimed keys must be canonical chords with meta, ctrl, or alt' })
     }
   })).max(32).default([]),
+  // The only cross-owner UI effect a loaded tree may request. Each id maps to one target kind the
+  // manifest disclosed; the runtime supplies only the bounded resource id.
+  destinations: z.array(navigationDestination).max(8).default([]),
 }).superRefine((surface, ctx) => {
+  const destinationIds = new Set<string>()
+  for (const [index, destination] of surface.destinations.entries()) {
+    if (destinationIds.has(destination.id)) {
+      ctx.addIssue({ code: 'custom', path: ['destinations', index, 'id'], message: `duplicate destination id '${destination.id}'` })
+    }
+    destinationIds.add(destination.id)
+  }
   // The one cross-field rule a surface can check on its own: a layout has the regions it has. The
   // client repeats it over a roster row, because a manifest reaches a device as bytes a node sent
   // (client-core/host/frames/layouts.ts).
@@ -976,6 +998,9 @@ const contributionsShape = z.looseObject({
   // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability. See
   // docs/managed-agents.md § Harnesses.
   harnesses: z.array(harnessDescriptor).max(4).default([]),
+  // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
+  agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
+  contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -1141,9 +1166,10 @@ export type PluginPaneRegion =
   | 'frame'
   | { kind: 'remote'; entry: string }
   | ({ kind: 'document' } & PluginDocumentRegion)
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout' | 'regions' | 'coreSlot'> & {
+export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot'> & {
   scope?: 'task' | 'project'
   claimsKeys?: string[]
+  destinations?: z.infer<typeof navigationDestination>[]
   // Wider than the parse on both: a roster row is bytes a node sent, and the client re-checks the
   // layout name, the region set and every route before it registers anything.
   layout?: string
@@ -1235,6 +1261,7 @@ export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
 export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
+export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
@@ -1261,4 +1288,6 @@ export type PluginContributions = {
   taskChecks?: PluginTaskCheckDescriptor[]
   auditActions?: PluginAuditActionDescriptor[]
   harnesses?: PluginHarnessDescriptor[]
+  agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
+  contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
 } & Record<string, unknown>

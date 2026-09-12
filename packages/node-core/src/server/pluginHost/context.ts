@@ -7,7 +7,7 @@
 // set of plugins and this is one plugin's surface.
 import type { CoreServices } from '../core'
 import type { Env } from '../bindings'
-import type { NodePermissions, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
+import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerCollectionRead } from '../collections/registry'
@@ -82,6 +82,9 @@ export type LoadedPluginBinding = {
   // And its managed agent harnesses, by the same route. The delivery seam also needs `dir` below, since
   // an adapter entry is a path inside the installed package.
   harnesses?: readonly PluginHarnessDescriptor[]
+  agentTools?: readonly PluginAgentToolDescriptor[]
+  contextSections?: readonly PluginContextSectionDescriptor[]
+  destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // The plugin's installed package directory, for resolving a manifest path the host hands on as an
   // absolute one. Host-side only: this is a path on the node's filesystem and must never reach a route
   // (server/plugins/loader.ts § InstalledPluginInfo).
@@ -398,7 +401,13 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // client stamps this plugin's own rail source. Nothing is invisible, so there is nothing for the
       // author to debug.
       notice: permissions
-        ? ({ taskId, title, detail }) => broadcastNotice(plugin, { taskId, title, detail, kind: 'plugin' })
+        ? ({ taskId, title, detail, kind, target }) => {
+          const declared = options.loaded?.destinations?.find((entry) =>
+            entry.targetKind === target?.kind && (entry.noticeKind === undefined || entry.noticeKind === kind))
+          broadcastNotice(plugin, declared
+            ? { taskId, title, detail, kind: declared.noticeKind ?? 'plugin', target }
+            : { taskId, title, detail, kind: 'plugin' })
+        }
         : (notice) => broadcastNotice(plugin, notice),
       // The receive side (docs/plugins.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and

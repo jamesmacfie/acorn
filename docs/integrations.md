@@ -74,8 +74,10 @@ provider knows how many the answer takes. Linear reads the issue and Rollbar rea
 occurrence list and the newest occurrence. Declaring nothing means this provider offers summaries
 only, which is the honest state for a provider whose items have no body.
 
-Why the tool lives in core and the read lives here: Linear and Rollbar ship loaded, and `ctx.tools` is
-compiled-only. For the full contract, see [agent tools](./agent-tools.md) § issue_detail.
+Why the tool lives in core and the read lives here: `issue_detail` is the stable aggregation across
+every connected issue and error provider. A loaded plugin can declare its own task-scoped tool, but
+that would be provider-specific rather than automatically covering other providers. For the full
+contract, see [agent tools](./agent-tools.md) § issue_detail.
 
 ## Project sources
 

@@ -11,7 +11,7 @@ import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../se
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
+import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS, type AgentTurnChangedEvent } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { agentUsageCollectors } from '../server/usage/collectors'
@@ -81,7 +81,7 @@ export type AgentsPluginDeps = {
   // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
   // spawn cannot race the repair of the same creating ledger row.
   reconciled: Promise<void>
-  memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
+  onCompletedTurn?: (event: AgentTurnChangedEvent) => Promise<void>
 }
 
 // `dataDir` stays a parameter, unlike changes' and github's: the runtime writes attachments, artifacts
@@ -160,7 +160,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           return (await sessions.list()).some((terminal) =>
             terminal.agentSessionId === sessionId && terminal.status === 'running')
         },
-        onCompletedTurn: deps.memoryReviewTrigger,
+        onCompletedTurn: deps.onCompletedTurn,
       })
 
       const delegation = new AgentDelegationService(
@@ -182,6 +182,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         }),
         ctx.capabilities.provide(AGENTS_SESSIONS, {
           list: (taskId) => runtime!.store.lifecycleSessions(taskId),
+        }),
+        ctx.capabilities.provide(AGENTS_REVIEW_INPUT, {
+          listCompleted: (taskId) => runtime!.store.lifecycleCompletedReviewInputs(taskId),
+          read: (input) => runtime!.store.lifecycleReviewInput(input),
         }),
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits

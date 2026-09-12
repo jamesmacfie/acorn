@@ -13,8 +13,13 @@ export { MEMORY_SOURCE_ID }
 // a later visit to the page opens with nothing picked.
 const [highlightedProposal, setHighlightedProposal] = createSignal<string | undefined>()
 export { highlightedProposal }
+const [highlightedFinding, setHighlightedFinding] = createSignal<string | undefined>()
+export { highlightedFinding }
 
-export const clearHighlightedProposal = (): void => setHighlightedProposal(undefined)
+export const clearHighlightedProposal = (): void => {
+  setHighlightedProposal(undefined)
+  setHighlightedFinding(undefined)
+}
 
 export function activateMemoryNoticeTargets(): void {
   // The per-proposal row from the attention inbox, which names one proposal. The node's proposal-gate
@@ -22,6 +27,13 @@ export function activateMemoryNoticeTargets(): void {
   // instead and never reaches this handler (../node/index.ts).
   registerNoticeTargetHandler('memory-proposal', (_taskId, target) => {
     setHighlightedProposal(target.resourceId || undefined)
+    setSelectedSource(MEMORY_SOURCE_ID)
+  })
+  registerNoticeTargetHandler('findings-bundle', () => {
+    setSelectedSource(MEMORY_SOURCE_ID)
+  })
+  registerNoticeTargetHandler('findings-candidate', (_taskId, target) => {
+    setHighlightedFinding(target.resourceId || undefined)
     setSelectedSource(MEMORY_SOURCE_ID)
   })
 }

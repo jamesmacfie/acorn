@@ -19,11 +19,12 @@ import { runHook } from '../../pluginHost/hooks'
 import { startSpan } from '../../telemetry/collector'
 import { isToolWithinCeiling } from '@acorn/protocol/workflow.ts'
 
-const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = {
+const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500 | 504> = {
   not_found: 404,
   bad_request: 400,
   conflict: 409,
   'needs-trust': 409,
+  timeout: 504,
   failed: 500,
 }
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>

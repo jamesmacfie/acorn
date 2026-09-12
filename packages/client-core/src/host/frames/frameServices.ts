@@ -4,6 +4,7 @@ import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { sendRaw, sendRawBytes } from '../../infra/node/apiClient'
 import { toast } from '../../features/notifications/toast'
 import { clientEvents, openPane } from '../registries/commands/clientEvents'
+import { openTarget } from '../../features/notifications/notifications'
 import { executeCommand } from '../registries/commands/commands'
 import { openInAppUrl } from '../registries/panes/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/commands/keybindings'
@@ -159,6 +160,10 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // A pane is opened in a task's layout, so a frame with no task has nothing to open into.
       const taskId = props.binding.taskId
       if (taskId) openPane(taskId, paneId)
+    },
+    openTarget: (target) => {
+      const taskId = props.binding.taskId
+      if (taskId) openTarget(taskId, target)
     },
     // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
     // the same content-link ladder and rung-preference rule every shell surface follows

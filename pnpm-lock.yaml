@@ -257,6 +257,9 @@ importers:
       '@acorn/plugin-editor':
         specifier: workspace:*
         version: link:../../plugins/editor
+      '@acorn/plugin-findings':
+        specifier: workspace:*
+        version: link:../../plugins/findings
       '@acorn/plugin-github':
         specifier: workspace:*
         version: link:../../plugins/github
@@ -1129,6 +1132,52 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
 
+  plugins/findings:
+    dependencies:
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@acorn/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+
   plugins/github:
     dependencies:
       '@acorn/plugin-api':
@@ -1275,6 +1324,9 @@ importers:
       '@acorn/plugin-context':
         specifier: workspace:*
         version: link:../context
+      '@acorn/plugin-findings':
+        specifier: workspace:*
+        version: link:../findings
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../notes

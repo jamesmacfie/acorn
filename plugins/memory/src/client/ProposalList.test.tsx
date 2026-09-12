@@ -43,6 +43,7 @@ const button = (label: string): HTMLButtonElement => {
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 0))
+const openPreview = () => button('View change').click()
 
 beforeEach(() => {
   resolveProposal.mockReset()
@@ -57,7 +58,8 @@ afterEach(() => {
 describe('resolving a proposal', () => {
   it('accepts with no edit, and tells the owner so it can refetch', async () => {
     mount()
-    button('Accept').click()
+    openPreview()
+    button('Approve').click()
     await settle()
     // No `edited`: the description was not touched, and sending it back unchanged would make every
     // accept look like an edit in the store.
@@ -67,10 +69,11 @@ describe('resolving a proposal', () => {
 
   it('sends the edited description when the owner changed it', async () => {
     mount()
-    const input = host.querySelector('input') as HTMLInputElement
+    openPreview()
+    const input = host.querySelectorAll('input')[1] as HTMLInputElement
     input.value = 'strip it before you commit'
     input.dispatchEvent(new Event('input', { bubbles: true }))
-    button('Accept').click()
+    button('Approve').click()
     await settle()
     expect(resolveProposal).toHaveBeenCalledWith('p1', true, {
       name: 'no-ponytail-comments', type: 'convention', description: 'strip it before you commit',
@@ -80,7 +83,8 @@ describe('resolving a proposal', () => {
 
   it('rejects without carrying the edit, since nothing is written', async () => {
     mount()
-    button('Reject').click()
+    openPreview()
+    button('Dismiss').click()
     await settle()
     expect(resolveProposal).toHaveBeenCalledWith('p1', false, undefined)
     expect(onResolved).toHaveBeenCalled()
@@ -92,7 +96,8 @@ describe('resolving a proposal', () => {
   it('shows the node’s reason when it refuses', async () => {
     resolveProposal.mockResolvedValue({ ok: false, reason: 'The task worktree is gone.' })
     mount()
-    button('Accept').click()
+    openPreview()
+    button('Approve').click()
     await settle()
     expect(host.textContent).toContain('The task worktree is gone.')
   })
@@ -100,11 +105,12 @@ describe('resolving a proposal', () => {
   it('shows a thrown request rather than swallowing it', async () => {
     resolveProposal.mockRejectedValue(new Error('bridge-unavailable'))
     mount()
-    button('Accept').click()
+    openPreview()
+    button('Approve').click()
     await settle()
     expect(host.textContent).toContain('bridge-unavailable')
     // The owner can try again: a failed accept must not leave the row wedged.
-    expect(button('Accept').disabled).toBe(false)
+    expect(button('Approve').disabled).toBe(false)
     // And it did not report success, which would have refetched the row away.
     expect(onResolved).not.toHaveBeenCalled()
   })
@@ -112,7 +118,8 @@ describe('resolving a proposal', () => {
   it('says which proposal failed, not just that one did', async () => {
     resolveProposal.mockResolvedValue({ ok: false, reason: 'The task worktree is gone.' })
     mount([proposal(), proposal({ id: 'p2', name: 'prefer-node-sqlite' })])
-    button('Accept').click() // the first card's
+    openPreview()
+    button('Approve').click() // the first card's
     await settle()
     const cards = [...host.querySelectorAll('.ui-card')]
     expect(cards[0].textContent).toContain('The task worktree is gone.')

@@ -17,7 +17,7 @@ import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { setPluginDevGrant } from '../plugins/host'
-import { nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
+import { navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
 import './plugin-trust.css'
 
 // The owner's side of an agent's install request (docs/plugins.md § Approval-mediated install and
@@ -68,6 +68,7 @@ export default function PluginApprovalDialog() {
       // nobody here, so it belongs on the one disclosure a node-only package ever gets.
       ...schedulePermissionLines(scheduleGrants(installed.contributions)),
       ...uiPermissionLines(installed.permissions, row.name),
+      ...navigationDestinationPermissionLines(navigationDestinationGrants(installed.contributions)),
       ...webviewPermissionLines(webviewGrants(installed.contributions)),
     ]
   }

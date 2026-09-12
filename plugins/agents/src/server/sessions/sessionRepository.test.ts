@@ -100,4 +100,26 @@ describe('subagent roster on the session row', () => {
     expect(snapshot.events.map((event) => event.id)).toContain(record.id)
     expect(snapshot.session.subagents.map((entry) => entry.id)).toEqual(['a'])
   })
+
+  it('projects only bounded completed-turn review input under the owning task', async () => {
+    const created = await session()
+    const turn = await store.enqueueTurn(created.id, {
+      source: 'interactive', input: [{ type: 'text', text: 'Original prompt' }],
+      effectivePolicy: {}, idempotencyKey: 'review-input-1',
+    })
+    await store.startTurn(turn.id)
+    await store.recordEvent(created.id, turn.id, { type: 'assistant_message', text: 'Reusable outcome.' })
+    await store.recordEvent(created.id, turn.id, { type: 'turn_completed', stopReason: 'end_turn' })
+    await store.recordEvent(created.id, turn.id, { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } })
+
+    const refs = await store.lifecycleCompletedReviewInputs(created.taskId)
+    expect(refs).toHaveLength(1)
+    expect(refs[0]!.completedSequence).toBe(2)
+    await expect(store.lifecycleReviewInput({ taskId: created.taskId, sessionId: created.id, turnId: turn.id })).resolves.toMatchObject({
+      assistantSummary: 'Reusable outcome.', completedSequence: 2, availability: 'available', purpose: 'ordinary',
+    })
+    await expect(store.lifecycleReviewInput({ taskId: 'another-task', sessionId: created.id, turnId: turn.id })).resolves.toMatchObject({
+      availability: 'unavailable', assistantSummary: null,
+    })
+  })
 })

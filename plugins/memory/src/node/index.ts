@@ -8,6 +8,13 @@ import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
 import { MEMORY_LIBRARY, type MemoryLibraryEntry, type MemoryType } from '../contract/library'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
+import { FINDINGS_LEGACY_SOURCE, FINDINGS_REVIEW_TARGET } from '@acorn/plugin-findings/contract/extensions.ts'
+import { FINDINGS_LIFECYCLE } from '@acorn/plugin-findings/contract/lifecycle.ts'
+import { FINDINGS_REVIEW } from '@acorn/plugin-findings/contract/review.ts'
+import { createMemoryFindingsTarget } from '../server/findingsReview'
+import { homedir } from 'node:os'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
+import { resolveMappedLegacyProposal } from '../server/legacyFindingsCompatibility'
 
 // No deps: both of this plugin's former app-supplied thunks resolve through the plugin context now,
 // sendToAgent and notes through capabilities and the owner identity through ctx.core.identity.
@@ -68,6 +75,40 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
         target: { kind: 'source', resourceId: MEMORY_SOURCE_ID },
       })
       const runtime = registerKnowledgeChannel(db, dataDir, ctx.core, { sendToAgent, notes, notice, emit: ctx.events.send })
+      const findingsTarget = createMemoryFindingsTarget({
+        db, memory: runtime, capabilities: ctx.capabilities, homeDir: homedir(),
+        announce: (projectId) => ctx.events.send({ channel: pluginChannel('memory', 'memories-changed'), ...(projectId ? { scope: 'project', projectId } : { scope: 'private', projectId: null }) }),
+      })
+      // The host qualifies contribution IDs with this plugin owner, producing `memory:change`.
+      ctx.extensionPoints.handle(FINDINGS_REVIEW_TARGET, { id: 'change', value: findingsTarget.contribution })
+      ctx.extensionPoints.handle(FINDINGS_LEGACY_SOURCE, {
+        id: 'memory-proposals',
+        value: { version: 1, list: () => runtime.proposals.legacySources() },
+      })
+      runtime.route.memoryApproveFinding = (id, input) => findingsTarget.approve({ candidateId: id, ...input })
+      const legacyProposals = runtime.route.memoryProposals
+      const legacyResolve = runtime.route.memoryResolveProposal
+      runtime.route.memoryProposals = async (taskId) => {
+        const rows = await legacyProposals(taskId) as Array<{ id: string }>
+        const lifecycle = ctx.capabilities.get(FINDINGS_LIFECYCLE)
+        if (!lifecycle || !(await lifecycle.migrationReport()).cutoverReady) return rows
+        const mappings = await Promise.all(rows.map((row) => lifecycle.legacyMapping(row.id)))
+        return rows.filter((_row, index) => !mappings[index]?.oneToOne)
+      }
+      runtime.route.memoryResolveProposal = async (id, approved, edited, deviceId) => {
+        const lifecycle = ctx.capabilities.get(FINDINGS_LIFECYCLE)
+        const review = ctx.capabilities.get(FINDINGS_REVIEW)
+        if (!lifecycle || !review) return legacyResolve(id, approved, edited, deviceId)
+        const resolved = await resolveMappedLegacyProposal({ id, approved, edited, deviceId }, {
+          migrationReport: () => lifecycle.migrationReport(),
+          mapping: (legacyId) => lifecycle.legacyMapping(legacyId),
+          dismiss: (legacyId, actorId) => lifecycle.dismissLegacy(legacyId, actorId),
+          candidate: (candidateId) => review.candidate(candidateId),
+          approve: (input) => findingsTarget.approve(input),
+          proposals: runtime.proposals,
+        })
+        return resolved ?? legacyResolve(id, approved, edited, deviceId)
+      }
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()

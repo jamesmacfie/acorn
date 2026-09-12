@@ -77,6 +77,17 @@ The proving pair is workflows and http: workflows opens `workflows:step-kind`, `
 `workflows:trigger`, and the http plugin contributes the `http:request` step, with neither package
 importing the other's implementation ([workflows.md](../workflows.md) § Contributed step kinds).
 
+Findings opens two more points. `findings:kind` collects versioned kind descriptors and optional
+validators. `findings:producer` connects a contributor to a host-bound writer. The writer stamps the
+contributor's identity and accepts only kinds that contributor declared. Resolve both point rosters
+per call so disabling either plugin revokes cached writers. For more information, see
+[Findings](../findings.md#plugin-collaboration).
+
+`findings:review-target` is the review-side point. A target validates its own versioned payload and
+receives a revocable completion callback tied to that registration. The callback may report
+applying, applied, or conflict after the target's own authorized operation; findings receives no
+target write function. Memory is the first handler, for `memory:change` version 1.
+
 
 ## Hooks
 

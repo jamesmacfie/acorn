@@ -31,6 +31,22 @@ const MEMORY_SECTION = 'memory'
 
 export const memoryCommands: readonly ContributedCommand[] = [
   {
+    id: 'memory.learnings.review',
+    title: 'Review learnings',
+    hint: 'prepare suggestions from this task’s findings',
+    keywords: ['memory', 'findings', 'prepare', 'learnings'],
+    category: 'action',
+    palette: true,
+    scope: 'task',
+    requires: { plugin: 'findings' },
+    run: async (context): Promise<CommandOutcome> => {
+      if (!context.taskId) return { effect: 'stay', status: 'Choose a task first.' }
+      await memoryApi().prepare(context.taskId, `manual:${context.taskId}:${Date.now()}`)
+      setSelectedSource(MEMORY_SOURCE_ID)
+      return COMMAND_CLOSED
+    },
+  },
+  {
     id: 'memory.search',
     kind: 'search',
     title: 'Search memory',

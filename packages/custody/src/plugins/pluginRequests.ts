@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
@@ -64,6 +64,13 @@ export const disclosureSchema = z.object({
     label: z.string().min(1).max(80),
     chords: z.array(z.string().min(1).max(64)).min(1).max(32),
   })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
+  navigationDestinations: z.array(z.strictObject({
+    surface: z.string().min(1).max(64),
+    label: z.string().min(1).max(120),
+    destination: z.string().min(1).max(64),
+    targetKind: z.string().min(1).max(64),
+    noticeKind: z.string().min(1).max(64).optional(),
+  })).max(64).default([]) as z.ZodType<PluginNavigationDestinationGrant[]>,
   // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
   // disclosure with no such field, and refusing it would put a decision beyond recording, which is
   // the re-queueing loop this schema was split up to escape.
@@ -91,6 +98,20 @@ export const disclosureSchema = z.object({
     run: z.string().min(1).max(512),
     env: z.array(z.string().min(1).max(64)).max(32),
   })).max(4).default([]) as z.ZodType<PluginHarnessGrant[]>,
+  agentTools: z.array(z.strictObject({
+    id: z.string().min(1).max(64),
+    description: z.string().min(1).max(500),
+    risk: z.enum(['read', 'write', 'execute']),
+    requiresSession: z.boolean(),
+    maxOutputBytes: z.number().int().positive(),
+  })).max(16).default([]) as z.ZodType<PluginAgentToolGrant[]>,
+  contextSections: z.array(z.strictObject({
+    id: z.string().min(1).max(64),
+    label: z.string().min(1).max(80),
+    defaultIncluded: z.boolean(),
+    maxBytes: z.number().int().positive(),
+    maxTokens: z.number().int().positive(),
+  })).max(8).default([]) as z.ZodType<PluginContextSectionGrant[]>,
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -98,10 +119,13 @@ export const NO_DISCLOSURE = {
   permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
   webviews: [],
   keyClaims: [],
+  navigationDestinations: [],
   extensions: [],
   schedules: [],
   taskChecks: [],
   harnesses: [],
+  agentTools: [],
+  contextSections: [],
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {

@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { memoryApi, type MemoryProposalRow } from './memoryClient'
-import { Alert, Badge, Button, Card, Inline, Input, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, Card, Field, Heading, Inline, Input, Markdown, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 
 // The human gate over auto-generated memory (docs/notes-and-memory.md § Memory). Accept, with an
 // optional edit to the description, writes the file and indexes it; reject leaves no trace.
@@ -18,7 +18,8 @@ export default function ProposalList(props: {
   // A proposal to select and scroll to, set when the reader arrived from its notification row.
   highlightId?: string
 }) {
-  const [edits, setEdits] = createSignal<Record<string, string>>({})
+  const [edits, setEdits] = createSignal<Record<string, Pick<MemoryProposalRow, 'name' | 'type' | 'description' | 'body'>>>({})
+  const [open, setOpen] = createSignal<string | null>(props.highlightId ?? null)
   const [errors, setErrors] = createSignal<Record<string, string>>({})
   const [busy, setBusy] = createSignal<string | null>(null)
 
@@ -30,12 +31,12 @@ export default function ProposalList(props: {
     setErrors((prev) => ({ ...prev, [id]: '' }))
     try {
       const proposal = props.proposals.find((candidate) => candidate.id === id)
-      const description = edits()[id]
+      const edited = edits()[id]
       const res = await memoryApi().resolveProposal(
         id,
         approved,
-        approved && proposal && description && description !== proposal.description
-          ? { name: proposal.name, type: proposal.type, description, body: proposal.body }
+        approved && proposal && edited && JSON.stringify(edited) !== JSON.stringify({ name: proposal.name, type: proposal.type, description: proposal.description, body: proposal.body })
+          ? edited
           : undefined,
       )
       // A refusal answers 200 with `ok: false`, so it is a value rather than a throw and needs saying
@@ -65,11 +66,7 @@ export default function ProposalList(props: {
                 <Text emphasis="muted">{proposal.type}</Text>
                 <Text emphasis="strong">{proposal.name}</Text>
               </Inline>
-              <Input
-                label={`Description for ${proposal.name}`}
-                value={edits()[proposal.id] ?? proposal.description}
-                onInput={(value) => setEdits((prev) => ({ ...prev, [proposal.id]: value }))}
-              />
+              <Text>{proposal.description}</Text>
               {/* Verification flags (structural `flags`, docs/notes-and-memory.md): warning badges
                   beside the proposal, never folded into the description text. */}
               <Show when={proposal.flags.length}>
@@ -77,11 +74,19 @@ export default function ProposalList(props: {
                   <For each={proposal.flags}>{(flag) => <Badge tone="warn" shape="pill">⚠ {flag}</Badge>}</For>
                 </Inline>
               </Show>
-              <Show when={errors()[proposal.id]}>{(message) => <Alert>{message()}</Alert>}</Show>
-              <Toolbar variant="actions" size="sm">
-                <Button size="sm" busy={busy() === proposal.id} disabled={!!busy()} onPress={() => void resolve(proposal.id, true)}>Accept</Button>
-                <Button size="sm" disabled={!!busy()} onPress={() => void resolve(proposal.id, false)}>Reject</Button>
-              </Toolbar>
+              <Show when={open() === proposal.id} fallback={<Button size="sm" onPress={() => setOpen(proposal.id)}>View change</Button>}>
+                <Stack gap="row">
+                  <Heading level={3}>Full proposed memory</Heading>
+                  <Field label="Name"><Input value={edits()[proposal.id]?.name ?? proposal.name} onInput={(name) => setEdits((prev) => ({ ...prev, [proposal.id]: { name, type: prev[proposal.id]?.type ?? proposal.type, description: prev[proposal.id]?.description ?? proposal.description, body: prev[proposal.id]?.body ?? proposal.body } }))} /></Field>
+                  <Field label="Type"><Select value={edits()[proposal.id]?.type ?? proposal.type} options={['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user'].map((type) => ({ value: type, label: type }))} onChange={(type) => setEdits((prev) => ({ ...prev, [proposal.id]: { name: prev[proposal.id]?.name ?? proposal.name, type: type as MemoryProposalRow['type'], description: prev[proposal.id]?.description ?? proposal.description, body: prev[proposal.id]?.body ?? proposal.body } }))} /></Field>
+                  <Field label="Description"><Input value={edits()[proposal.id]?.description ?? proposal.description} onInput={(description) => setEdits((prev) => ({ ...prev, [proposal.id]: { name: prev[proposal.id]?.name ?? proposal.name, type: prev[proposal.id]?.type ?? proposal.type, description, body: prev[proposal.id]?.body ?? proposal.body } }))} /></Field>
+                  <Field label="Body"><Textarea mono rows={8} value={edits()[proposal.id]?.body ?? proposal.body} onInput={(body) => setEdits((prev) => ({ ...prev, [proposal.id]: { name: prev[proposal.id]?.name ?? proposal.name, type: prev[proposal.id]?.type ?? proposal.type, description: prev[proposal.id]?.description ?? proposal.description, body } }))} /></Field>
+                  <Text tone="muted">{proposal.projectId ? 'Applies to this project' : 'Applies across projects'}</Text>
+                  <Markdown text={edits()[proposal.id]?.body ?? proposal.body} images="placeholder" copy />
+                  <Show when={errors()[proposal.id]}>{(message) => <Alert>{message()}</Alert>}</Show>
+                  <Toolbar variant="actions" size="sm"><Button size="sm" busy={busy() === proposal.id} disabled={!!busy()} onPress={() => void resolve(proposal.id, true)}>Approve</Button><Button size="sm" disabled={!!busy()} onPress={() => void resolve(proposal.id, false)}>Dismiss</Button></Toolbar>
+                </Stack>
+              </Show>
             </Stack>
           </Card>
         )}

@@ -12,7 +12,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'11'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"11"` unless you have checked your plugin against another major too, in which case `"10 || 11"` or `"9-11"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'12'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"12"` unless you have checked your plugin against another major too, in which case `"11 || 12"` or `"10-12"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -77,7 +77,7 @@ is the widest one that owns tables; `plugins/model-providers/` is the narrowest 
 ### Contributions
 
 `contributions` is a loose object — a manifest written for a newer acorn contributes less on an older
-one rather than failing to parse — with twenty-one named keys, each capped. The caps are not arbitrary:
+one rather than failing to parse — with twenty-three named keys, each capped. The caps are not arbitrary:
 each one is the point past which a contribution stops being an integration and starts being an app
 inside someone else's chrome.
 
@@ -91,7 +91,7 @@ host cannot draw.
 
 | Key | Cap | What it declares |
 | --- | --- | --- |
-| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. Also where a pane declares its `claimsKeys`, and where a `coreSlot` surface names which core surface it offers to replace. |
+| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. This is also where a pane declares `claimsKeys` and up to eight cooperative `destinations`, and where a `coreSlot` surface names the core surface that it offers to replace. |
 | `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels` records why each refused slot is refused. |
 | `palette` | 32 | The pre-`commands` spelling, still parsed as an alias for a command with `palette: true` and rewritten into one before anything else sees it. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for, and it has only the `action` shape. |
@@ -112,6 +112,8 @@ host cannot draw.
 | `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a GET on your own namespace, for rows and annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](the-manifest.md#harnesses). |
+| `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v2/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
+| `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
 plugin can be. `tokens` must carry **exactly** the palette token names and nothing else: a missing one,
@@ -215,7 +217,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "11",
+  "apiVersion": "12",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [

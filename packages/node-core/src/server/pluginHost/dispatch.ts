@@ -53,6 +53,7 @@ export async function dispatchPluginRoute(
   path: string,
   init: PluginDispatchInit,
   signal: AbortSignal,
+  originPrincipal?: Principal,
 ): Promise<Response> {
   const url = confinePluginPath(pluginId, path)
   const match = resolvePluginFetch(pluginId, url.pathname)
@@ -60,7 +61,10 @@ export async function dispatchPluginRoute(
 
   const userId = env.ACTIVE_IDENTITY.get()
   if (!userId) throw new Error('this node has no bound identity, so an unattended run has nobody to run as')
-  const principal: Principal = { kind: 'internal', userId, scope: 'service' }
+  // Scheduled work defaults to service authority. Tool/context adapters pass a host-built task
+  // principal instead; the plugin route must never infer that authority from its JSON body.
+  const principal: Principal = originPrincipal ?? { kind: 'internal', userId, scope: 'service' }
+  if (principal.userId !== userId) throw new Error('plugin dispatch principal does not match the active node identity')
 
   // Mount-relative, exactly as servePluginFetch hands it to an HTTP-served handler. The query string
   // rides along untouched, which is what makes a declared collection param reach the plugin as the

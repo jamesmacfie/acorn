@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { readPluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
 import type { PluginCache } from './pluginCache'
@@ -64,10 +64,13 @@ export function trustBundledClientPlugins(
         permissions: manifest.permissions,
         webviews: pluginWebviewGrants(manifest.contributions),
         keyClaims: pluginKeyClaimGrants(manifest.contributions),
+        navigationDestinations: pluginNavigationDestinationGrants(manifest.contributions),
         extensions: pluginExtensionGrants(id, manifest.contributions),
         schedules: pluginScheduleGrants(manifest.contributions),
         taskChecks: pluginTaskCheckGrants(manifest.contributions),
         harnesses: pluginHarnessGrants(manifest.contributions),
+        agentTools: pluginAgentToolGrants(manifest.contributions),
+        contextSections: pluginContextSectionGrants(manifest.contributions),
         decision: 'accepted',
         decidedAt: Date.now(),
       })

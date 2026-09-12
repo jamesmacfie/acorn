@@ -8,7 +8,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
@@ -160,7 +160,8 @@ export type PluginTrustDecision = {
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
   keyClaims: PluginKeyClaimGrant[]
-  // Each of the five below is required here and defaulted in the store's schema, so an acknowledgement
+  navigationDestinations: PluginNavigationDestinationGrant[]
+  // Each contribution snapshot below is required here and defaulted in the store's schema, so an acknowledgement
   // written before the field existed reads back as the empty list, which is what was true of it.
 
   // What this manifest says about surfaces that are not its own, in both directions
@@ -172,6 +173,9 @@ export type PluginTrustDecision = {
   taskChecks: PluginTaskCheckGrant[]
   // What this package asks acorn to run as a managed agent (docs/managed-agents.md § Harnesses).
   harnesses: PluginHarnessGrant[]
+  // Task-scoped tools and bounded context carried by the installed manifest.
+  agentTools: PluginAgentToolGrant[]
+  contextSections: PluginContextSectionGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & {

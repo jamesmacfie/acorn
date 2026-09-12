@@ -23,6 +23,7 @@ lazily when a task first needs filesystem/process access.
 - `agents` — managed Claude/Codex sessions, requests, context, artifacts, and lifecycle.
 - `pr` — linked pull-request review.
 - `changes` — uncommitted diff, staging, commit/push, and review notes.
+- `findings` — quiet observations plus explicit, consolidated memory-review bundles with retained provenance and history.
 - `notes` — task, workspace, and global Markdown notes.
 - `context` — choose, preview, size, and send task context.
 - `editor` / `search` — worktree files, code editing, and ripgrep search.
@@ -73,6 +74,10 @@ Notes are Markdown at task, workspace, and global scope. Memory is durable revie
 index, search, proposals, and agent tools. Agents propose memory changes; accepting a proposal is a
 human-gated action. The context feature assembles provider, task, notes, and memory sections within
 byte/token budgets and can sync an immutable snapshot to an agent session.
+
+Findings retains evidence discovered during a task without notifying the owner or creating a review
+obligation. Managed agents, paired devices, and registered plugin producers can record bounded,
+structured observations. The task pane shows their full history.
 
 ## Workflows
 

@@ -56,6 +56,9 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 
 Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `providers.model`,
 `events.channel`, or `events.streams`. Those members belong to the compiled context.
+Loaded packages declare task-scoped tools and bounded context through `contributions.agentTools` and
+`contributions.contextSections` instead. The host adapts those descriptors into the same registries;
+they are not a second MCP server or context assembler.
 
 Core returns projections such as `TaskRef`, not database rows. A manifest grants each core facet
 explicitly. The host sends that owner-bound projection over RPC to a permission-scoped worker; direct
@@ -122,7 +125,7 @@ verb in `emits` and the consumer grants the full channel. Missing producers emit
 
 First-party lifecycle broadcasts cover workflow runs and human gates, managed-agent turns,
 requests and session rosters, GitHub repositories and pull-request mirrors, browser-capture
-collections, local review-note counts, memory-library scopes, and resolved preview homes. The
+collections, local review-note counts, findings scope revisions, memory-library scopes, and resolved preview homes. The
 provider's `contract/` directory holds the matching read capability whenever a listener needs more
 than the event's safe state payload. Exact payloads and deliberate omissions are in
 [Forward compatibility](./plugins/forward-compatibility.md#shipped-first-party-lifecycle-events).
@@ -145,10 +148,20 @@ Share identifiers and types through public contracts. Do not import a provider's
 read its database, or use core internals to bypass a missing API. For working fragments, see
 [Events and capabilities](./plugin-authoring/events-and-capabilities.md).
 
+Findings is the loaded example with separate read and write collaboration contracts. Consumers
+read task history through `findings.records.v1`. Producers contribute to `findings:producer` and
+receive a host-bound writer that limits them to their declared `findings:kind` entries. For the full
+contract, see [Findings](./findings.md).
+Review consumers use read-only `findings.review.v1`. A destination contributes validation and an
+owner-bound completion callback through `findings:review-target`; memory uses that callback only
+after its own device route and durable promotion receipt have completed the target write.
+
 ## Notifications
 
-Use `ctx.events.notice` for a notification from a node plugin. The host binds a loaded plugin's
-notification destination to that plugin and drops its supplied `target` and `kind` fields.
+Use `ctx.events.notice` for a notification from a node plugin. By default, the host binds a loaded
+plugin's notification destination to that plugin and drops its supplied `target` and `kind` fields.
+A frame may declare a cooperative destination with a target kind and optional notice kind. The host
+keeps a matching target and strips every undeclared pair.
 Use attention contributions for persistent conditions that the user needs to resolve.
 For delivery and acknowledgment behavior, see [Notifications](./notifications.md).
 
