@@ -51,6 +51,8 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   'circle-check': '✓',
   'circle-alert': '!',
   'circle-dashed': '◌',
+  'circle-question-mark': '?',
+  'shield-question-mark': '⚿',
   'square-check': '☑',
   'triangle-alert': '⚠',
   info: 'i',
@@ -101,4 +103,6 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   'git-compare': '⇄',
   'git-pull-request': '⇡',
   'git-commit-horizontal': '●',
+  workflow: '⑂',
+  'clipboard-pen': '✎',
 }
