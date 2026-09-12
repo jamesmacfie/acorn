@@ -111,7 +111,8 @@ describe('the delegated session sidebar', () => {
 
     expect(rowNamed('Nested child').dataset.depth).toBe('1')
     expect(rowNamed('Nested child').textContent).toContain('waiting')
-    expect(rowNamed('Nested child').textContent).toContain('permission')
+    // The attention mark is an icon now, so what a reader gets is its title rather than a pill's words.
+    expect(rowNamed('Nested child').querySelector('svg > title')?.textContent).toBe('Wants permission')
     expect(rowNamed('Nested child').textContent).toContain('depth 1 · shared')
     expect(rowNamed('Terminal child').dataset.depth).toBeUndefined()
     expect(rowNamed('Terminal child').textContent)

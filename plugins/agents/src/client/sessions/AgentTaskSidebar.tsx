@@ -2,13 +2,14 @@ import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import {
-  Badge, EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
+  EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
 import { sessionModelLabel } from '../settings/agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
+import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { delegationSummary } from './sessionRoster'
@@ -112,7 +113,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                   variant="stacked"
                   density="compact"
                   leading={<RuntimeStateIcon state="waiting" />}
-                  trailing={<Badge tone="warn" size="xs">{entry()?.request.kind.replace('_', ' ')}</Badge>}
+                  trailing={
+                    <Show when={entry()?.request.kind}>
+                      {(kind) => <Icon {...attentionMark(kind())} />}
+                    </Show>
+                  }
                   onPress={() => {
                     const found = entry()
                     if (found) openManagedSession(props.task.id, found.session.id, found.request.providerRequestId)
@@ -167,9 +172,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           trailing={
                             <>
                               <Show when={!['none', 'unread'].includes(current().attention)}>
-                                <Badge tone={current().attention === 'error' ? 'danger' : 'warn'} size="xs">
-                                  {current().attention.replace('_', ' ')}
-                                </Badge>
+                                <Icon {...attentionMark(current().attention)} />
                               </Show>
                               <RowActions ariaLabel="Session actions">
                                 {(menu) => (

@@ -86,3 +86,31 @@ export const usageTone = (health: string): Tone => {
   if (health === 'critical') return 'danger'
   return 'muted'
 }
+
+/** What a session is waiting on, as a mark rather than a word. The sidebar used to print the reason
+ *  in a pill, which put a second block of text on a row that already carries a title, a provider, a
+ *  model and a state, and the pill was the widest thing on it.
+ *
+ *  One table for two vocabularies: an attention reason and a request kind are the same words apart
+ *  from `elicitation`, which only ever arrives as a request. `unread` and `none` are absent because
+ *  neither draws a mark. */
+const ATTENTION_MARK: Record<string, { name: string; title: string }> = {
+  permission: { name: 'shield-question-mark', title: 'Wants permission' },
+  question: { name: 'circle-question-mark', title: 'Asked a question' },
+  elicitation: { name: 'clipboard-pen', title: 'Wants details filled in' },
+  workflow_gate: { name: 'workflow', title: 'At a workflow gate' },
+  completed: { name: 'circle-check', title: 'Finished a turn' },
+  error: { name: 'triangle-alert', title: 'Failed' },
+}
+
+/** Icon props, so a caller spreads this rather than restating the three names. The title is not
+ *  decoration: an icon without one has no accessible name, and the pill it replaces could be read
+ *  aloud.
+ *
+ *  Only the reasons that block the owner warn. `completed` is a nudge, the same split the inbox and
+ *  the sessions panel make. */
+export const attentionMark = (reason: string): { name: string; title: string; tone: Tone } => ({
+  name: ATTENTION_MARK[reason]?.name ?? 'circle-alert',
+  title: ATTENTION_MARK[reason]?.title ?? reason.replace('_', ' '),
+  tone: reason === 'error' ? 'danger' : reason === 'completed' ? 'ok' : 'warn',
+})
