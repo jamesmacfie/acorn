@@ -177,6 +177,24 @@ describe('Claude subagent attribution, unit cases', () => {
     expect(events[0]).toMatchObject({ type: 'tool', tool: { subagentId: undefined } })
   })
 
+  // Hand-written against the adapter's source rather than the capture, which is the one shape a
+  // capture cannot hold: the fixture's subagents both finished inside the 30-second ping interval.
+  // This is what @agentclientprotocol/claude-agent-acp 0.54.1 sends for a `tool_progress` message,
+  // transcribed from its `case "tool_progress"` in dist/acp-agent.js. The id is the CLI's own,
+  // `${toolUseID}-heartbeat-${n}` from the 30-second interval in the 2.1.269 binary.
+  const heartbeat = (toolName: string): AgentNormalizedEvent[] => normalizeAcpUpdate({
+    sessionUpdate: 'tool_call_update',
+    toolCallId: 'agent-1-heartbeat-0',
+    status: 'in_progress',
+    _meta: { claudeCode: { toolName, toolResponse: { elapsedTimeSeconds: 30 } } },
+  } as SessionUpdate, 'Claude Code')
+
+  it('drops a progress heartbeat instead of inventing a call for it', () => {
+    // `Agent` is the one that hurt: every ping minted a subagent row that never settled.
+    expect(heartbeat('Agent')).toEqual([])
+    expect(heartbeat('Bash')).toEqual([])
+  })
+
   it('reads a failed subagent out of the summary rather than the status', () => {
     const [event] = normalizeAcpUpdate({
       sessionUpdate: 'tool_call_update',
