@@ -28,6 +28,7 @@ import {
   type AgentRuntimeOptions,
   type WaitCondition,
 } from './runtimeEngine'
+import { mergeSessionConfigChange } from './sessionConfigMerge'
 
 /**
  * Product-facing managed-agent commands. Provider process supervision, ordered event durability,
@@ -566,6 +567,12 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         // automation did, so it is the only place that has to notice one to carry it forward.
         if (options.remember !== false) await this.rememberSessionDefaults(before.providerId, changed)
       }
+      const latest = await this.store.requireSession(sessionId)
+      persistedPatch = {
+        ...persistedPatch,
+        config: mergeSessionConfigChange(before.config, persistedPatch.config!, latest.config),
+      }
+      assertBoundedJson('Agent session configuration', persistedPatch.config, MAX_AGENT_CONFIG_BYTES)
     }
     if (patch.archived != null) {
       const live = await this.ensureSession(before).catch(() => null)
