@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MentionTextarea, { type MentionSource } from './MentionTextarea'
 
 // The field the agents composer is written against: three sigils, three lists, and a coloured copy of
@@ -112,5 +112,24 @@ describe('MentionTextarea', () => {
     const token = host.querySelector('.ui-mentionfield-token')
     expect(token?.getAttribute('data-tone')).toBe('warn')
     expect(host.querySelector('.ui-mentionfield')?.hasAttribute('data-mirrored')).toBe(true)
+  })
+
+  it('keeps the field focused after a file paste redraws its caller', async () => {
+    const elsewhere = document.createElement('button')
+    host.append(elsewhere)
+    const onFiles = vi.fn(() => elsewhere.focus())
+    mount({ onFiles })
+    field().focus()
+    const image = new File(['image'], 'pasted.png', { type: 'image/png' })
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [image] } })
+
+    field().dispatchEvent(paste)
+    expect(paste.defaultPrevented).toBe(true)
+    expect(onFiles).toHaveBeenCalledWith([image])
+    expect(document.activeElement).toBe(elsewhere)
+
+    await Promise.resolve()
+    expect(document.activeElement).toBe(field())
   })
 })
