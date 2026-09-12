@@ -5,6 +5,14 @@ import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSe
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../shared/schemas'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'
+import { DEFAULT_SESSION_TITLE, deterministicSessionTitle } from './sessionTitle'
+
+export type EnqueueTurnOutcome = {
+  turn: AgentTurn
+  inserted: boolean
+  firstTurnFallback: string | null
+  sessionAfterRename: AgentSession | null
+}
 
 type SessionListFilter = {
   taskId?: string
@@ -36,14 +44,16 @@ export class AgentStore extends AgentSessionRepository {
       runtimeState: provider.driverKind === 'terminal' ? 'stopped' : 'creating',
       attention: 'none',
       statusAuthority: provider.statusAuthority,
-      title: input.title ?? 'New agent session',
+      title: input.title ?? DEFAULT_SESSION_TITLE,
       configJson: JSON.stringify(input.config),
       parentSessionId: input.parentSessionId ?? null,
       parentTurnId: input.parentTurnId ?? null,
       createdAt: timestamp,
       updatedAt: timestamp,
     })
-    return this.requireSession(id)
+    const session = await this.requireSession(id)
+    this.lifecycle.announceSession(session, ['created'])
+    return session
   }
 
   async operationResult<T>(idempotencyKey: string, command: string): Promise<T | null> {
@@ -176,13 +186,20 @@ export class AgentStore extends AgentSessionRepository {
     return { events: page, nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
   }
 
-  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn> {
+  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<EnqueueTurnOutcome> {
     const [existing] = await this.db
       .select()
       .from(schema.agentTurns)
       .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, input.idempotencyKey)))
       .limit(1)
-    if (existing) return mapAgentTurn(existing)
+    if (existing) {
+      return {
+        turn: mapAgentTurn(existing),
+        inserted: false,
+        firstTurnFallback: null,
+        sessionAfterRename: null,
+      }
+    }
 
     const attachmentParts = input.input.flatMap((part, position) =>
       part.type === 'attachment' || part.type === 'image'
@@ -237,23 +254,34 @@ export class AgentStore extends AgentSessionRepository {
         position: attachmentParts.find((part) => part.id === attachmentId)?.position ?? 0,
       })))
     }
+    let firstTurnFallback: string | null = null
+    let sessionAfterRename: AgentSession | null = null
     if (Number(maxRow?.ordinal ?? -1) < 0) {
-      const firstText = input.input.find((part) => part.type === 'text')?.text.trim()
-      const deterministicTitle = firstText || attachmentRows[0]?.filename
-      if (deterministicTitle) {
-        const title = deterministicTitle.replace(/\s+/g, ' ').slice(0, 96)
-        await this.db
-          .update(schema.agentSessions)
-          .set({ title, updatedAt: timestamp })
-          .where(and(
-            eq(schema.agentSessions.id, sessionId),
-            eq(schema.agentSessions.title, 'New agent session'),
-          ))
+      const firstAttachmentId = attachmentParts.toSorted((left, right) => left.position - right.position)[0]?.id
+      const title = deterministicSessionTitle(
+        input.input,
+        attachmentRows.find((attachment) => attachment.id === firstAttachmentId)?.filename,
+      )
+      if (title) {
+        const renamed = await this.renameSession(sessionId, {
+          title,
+          expectedTitle: DEFAULT_SESSION_TITLE,
+          source: 'generated',
+        })
+        if (renamed.changed) {
+          firstTurnFallback = renamed.session.title
+          sessionAfterRename = renamed.session
+        }
       }
     }
     const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, id)).limit(1)
     if (!row) throw new Error('Queued turn was not persisted.')
-    return mapAgentTurn(row)
+    return {
+      turn: mapAgentTurn(row),
+      inserted: true,
+      firstTurnFallback,
+      sessionAfterRename,
+    }
   }
 
   async nextQueuedTurn(sessionId: string): Promise<AgentTurn | null> {

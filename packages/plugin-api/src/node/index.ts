@@ -94,7 +94,8 @@ export { RUN_TARGETS } from '@acorn/node-core/server/routes/harness.ts'
 
 // ── Agents: profiles, headless runs, MCP registration ─────────────────────────────────────────
 export { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
-export { lineDelimitedJsonAdapter } from '@acorn/node-core/main/agentProfiles/streamJson.ts'
+export { AGENT_TOOL_PASSTHROUGH } from '@acorn/node-core/main/agentProfiles/toolEnv.ts'
+export { codexJsonAdapter, lineDelimitedJsonAdapter } from '@acorn/node-core/main/agentProfiles/streamJson.ts'
 export type { AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/types.ts'
 export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/main/headless.ts'
 export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/main/headless.ts'

@@ -46,3 +46,59 @@ export function parseStreamJson(stdout: string): HeadlessCapture {
 }
 
 export const lineDelimitedJsonAdapter: StreamJsonAdapter = { parse: parseStreamJson, parseLine: parseStreamLine }
+
+const codexItem = (event: StreamEvent): Record<string, unknown> | null =>
+  event.item && typeof event.item === 'object' ? event.item as Record<string, unknown> : null
+
+const codexNumber = (usage: Record<string, unknown>, key: string): number | undefined =>
+  typeof usage[key] === 'number' ? usage[key] as number : undefined
+
+const codexStructured = (text: string | null): unknown | null => {
+  if (!text) return null
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
+  for (const candidate of [fenced?.[1]?.trim(), text.trim()]) {
+    if (!candidate) continue
+    try {
+      const parsed = JSON.parse(candidate) as unknown
+      if (parsed && typeof parsed === 'object') return parsed
+    } catch {
+      // Prose is a valid text result, but not a structured result.
+    }
+  }
+  return null
+}
+
+/** Read the event shape emitted by `codex exec --json`. */
+export function parseCodexStreamJson(stdout: string): HeadlessCapture {
+  const events = stdout.split('\n').map(parseStreamLine).filter((event): event is StreamEvent => event != null)
+  let result: string | null = null
+  for (let index = events.length - 1; index >= 0 && result == null; index--) {
+    if (events[index]?.type !== 'item.completed') continue
+    const item = codexItem(events[index]!)
+    if (item?.type === 'agent_message' && typeof item.text === 'string') result = item.text
+  }
+  const threadId = events.find((event) => event.type === 'thread.started')?.thread_id
+  const turn = [...events].reverse().find((event) => event.type === 'turn.completed')
+  const usage = turn?.usage && typeof turn.usage === 'object' ? turn.usage as Record<string, unknown> : null
+  const inputTokens = usage ? codexNumber(usage, 'input_tokens') : undefined
+  const outputTokens = usage ? codexNumber(usage, 'output_tokens') : undefined
+  const cachedInputTokens = usage ? codexNumber(usage, 'cached_input_tokens') : undefined
+  return {
+    result,
+    structuredOutput: codexStructured(result),
+    sessionId: typeof threadId === 'string' ? threadId : null,
+    costUsd: null,
+    ...(inputTokens !== undefined || outputTokens !== undefined || cachedInputTokens !== undefined
+      ? {
+          usage: {
+            ...(inputTokens !== undefined ? { inputTokens } : {}),
+            ...(outputTokens !== undefined ? { outputTokens } : {}),
+            ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+          },
+        }
+      : {}),
+    events,
+  }
+}
+
+export const codexJsonAdapter: StreamJsonAdapter = { parse: parseCodexStreamJson, parseLine: parseStreamLine }

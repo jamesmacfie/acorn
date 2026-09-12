@@ -59,6 +59,12 @@ describe('the claude-code profile', () => {
     // edit. Pinned as a whole array, since `args[indexOf('--tools') + 1] === ''` would still pass with
     // a second non-empty `--tools` or an inserted `--add-dir` appended later.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
-    expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', 'decide'])
+    expect(args).toEqual([
+      '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk',
+      '--tools', '', '--strict-mcp-config', 'decide',
+    ])
+    const withSystem = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide', system: 'title rules' })
+    expect(withSystem.args).toContain('--system-prompt')
+    expect(withSystem.args).toContain('title rules')
   })
 })

@@ -4,6 +4,7 @@ export type HeadlessArgv = { file: string; args: string[] }
 
 export type HeadlessOpts = {
   prompt: string
+  system?: string
   model?: string
   schema?: object
   resumeSessionId?: string

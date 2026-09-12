@@ -16,7 +16,7 @@ import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
 import { broadcastConnectionChanged } from '../../main/notify'
 
-const DEFAULT_TIMEOUT_MS = 60_000
+export const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_SYSTEM_CHARS = 100_000
 const MAX_PROMPT_CHARS = 1_000_000
 const MAX_OUTPUT_TOKENS = 128_000
@@ -46,7 +46,7 @@ const badConfig = (): never => {
   throw new ProviderOperationError('provider_bad_config', 400)
 }
 
-const validateInput = (input: GenerateTextInput, timeoutMs: number): void => {
+export const validateInput = (input: GenerateTextInput, timeoutMs: number): void => {
   if (!input.system.trim() || input.system.length > MAX_SYSTEM_CHARS) badConfig()
   if (!input.prompt.trim() || input.prompt.length > MAX_PROMPT_CHARS) badConfig()
   if (!Number.isInteger(input.maxOutputTokens) || input.maxOutputTokens < 1 || input.maxOutputTokens > MAX_OUTPUT_TOKENS) {

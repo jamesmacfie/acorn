@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, type CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -291,6 +292,7 @@ describe('managed agent runtime conformance', () => {
   let core: CoreServices
   let dataDir: string
   let runtime: ManagedAgentRuntime | null
+  let disposeProfile: (() => void) | null
 
   beforeEach(async () => {
     testDb = makeTestDb()
@@ -298,14 +300,28 @@ describe('managed agent runtime conformance', () => {
     core = createCoreServices({ secrets: SECRETS, db: testDb.db, activeIdentity: memoryIdentityStore() })
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-runtime-'))
     runtime = null
+    disposeProfile = null
   })
 
   afterEach(async () => {
     await runtime?.stop()
+    disposeProfile?.()
     pluginDb.cleanup()
     testDb.cleanup()
     await rm(dataDir, { recursive: true, force: true })
   })
+
+  const registerTitleProfile = (id: string) => {
+    disposeProfile = agentProfileRegistry.register({
+      id,
+      label: 'Title test',
+      kind: 'agent',
+      command: '/bin/true',
+      backendPreference: 'node-pty',
+      transport: 'pty',
+      aiArgv: (command, options) => ({ file: command, args: [options.prompt] }),
+    })
+  }
 
   it('acknowledges an interactive session once durable while its provider keeps connecting', async () => {
     const seed = await seedTask(testDb, dataDir)
@@ -577,6 +593,157 @@ describe('managed agent runtime conformance', () => {
     expect(await runtime.store.hasProviderExecutionHistory(session.id)).toBe(true)
   })
 
+  it('generates a first-turn title in the background and preserves a concurrent user rename', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const profileId = 'title-generation-race'
+    registerTitleProfile(profileId)
+    let resolveGeneration!: (value: Awaited<ReturnType<CoreServices['models']['generateText']>>) => void
+    const generation = new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
+      resolveGeneration = resolve
+    })
+    const generateText = vi.fn(() => generation)
+    core.models.generateText = generateText
+    const published: Array<{ channel: string; [key: string]: unknown }> = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry: new AgentDriverRegistry(),
+      publish: (frame) => published.push(frame),
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: profileId,
+      profileId,
+      kind: 'interactive',
+      config: {},
+    }, descriptor(profileId))
+    const key = randomUUID()
+
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Please implement generated session naming now' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: key,
+    })
+    expect(turn.ordinal).toBe(0)
+    expect((await runtime.store.requireSession(session.id)).title).toBe('Please implement generated session naming now')
+    expect(generateText).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'owner',
+      connectionId: `harness:${profileId}`,
+      timeoutMs: 5_000,
+      input: expect.objectContaining({
+        maxOutputTokens: 64,
+        prompt: 'First user request:\nPlease implement generated session naming now',
+      }),
+    }))
+    expect(published.some((frame) => frame.channel === 'agent:session'
+      && (frame.session as { title?: string }).title === 'Please implement generated session naming now')).toBe(true)
+
+    await runtime.patchSession(session.id, { title: 'My chosen title' })
+    resolveGeneration({
+      text: 'Generated title should lose',
+      providerId: profileId,
+      connectionId: `harness:${profileId}`,
+      modelId: 'default',
+    })
+    await vi.waitFor(async () => {
+      expect((await runtime!.store.requireSession(session.id)).title).toBe('My chosen title')
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Please implement generated session naming now' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: key,
+    })
+    expect(generateText).toHaveBeenCalledTimes(1)
+  })
+
+  it('publishes a generated title after the fallback', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const profileId = 'title-generation-success'
+    registerTitleProfile(profileId)
+    core.models.generateText = vi.fn(async () => ({
+      text: 'Generated session naming',
+      providerId: profileId,
+      connectionId: `harness:${profileId}`,
+      modelId: 'default',
+    }))
+    const titles: string[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry: new AgentDriverRegistry(),
+      publish: (frame) => {
+        if (frame.channel === 'agent:session') titles.push(frame.session.title)
+      },
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: profileId,
+      profileId,
+      kind: 'interactive',
+      config: {},
+    }, descriptor(profileId))
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Please implement generated session naming now' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    await vi.waitFor(async () => {
+      expect((await runtime!.store.requireSession(session.id)).title).toBe('Generated session naming')
+    })
+    expect(titles).toEqual(expect.arrayContaining([
+      'Please implement generated session naming now',
+      'Generated session naming',
+    ]))
+  })
+
+  it('aborts owned title work during shutdown', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const profileId = 'title-generation-shutdown'
+    registerTitleProfile(profileId)
+    const generateText = vi.fn(({ input }: Parameters<CoreServices['models']['generateText']>[0]) =>
+      new Promise<never>((_resolve, reject) => {
+        input.signal?.addEventListener('abort', () => reject(input.signal?.reason), { once: true })
+      }))
+    core.models.generateText = generateText
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry: new AgentDriverRegistry(),
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: profileId,
+      profileId,
+      kind: 'interactive',
+      config: {},
+    }, descriptor(profileId))
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Keep the fallback when runtime stops' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    expect(generateText).toHaveBeenCalledTimes(1)
+    await runtime.stop()
+    expect((await runtime.store.requireSession(session.id)).title).toBe('Keep the fallback when runtime stops')
+    runtime = null
+  })
+
   it('edits, reorders, and removes durable queued turns', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
@@ -595,13 +762,13 @@ describe('managed agent runtime conformance', () => {
       kind: 'interactive',
       config: {},
     }, descriptor('fake'))
-    const first = await runtime.store.enqueueTurn(session.id, {
+    const { turn: first } = await runtime.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'First prompt.' }],
       source: 'interactive',
       effectivePolicy: {},
       idempotencyKey: randomUUID(),
     })
-    const second = await runtime.store.enqueueTurn(session.id, {
+    const { turn: second } = await runtime.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Second prompt.' }],
       source: 'interactive',
       effectivePolicy: {},

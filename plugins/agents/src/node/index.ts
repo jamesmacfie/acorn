@@ -10,6 +10,7 @@ import { createHarnessRegistry } from '../main/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../main/pricingStore'
 import { ManagedAgentRuntime } from '../main/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
+import { AGENTS_SESSIONS } from '../contract/lifecycle'
 import { createSessionExecute } from '../main/sessionExecute'
 import { agentUsageCollectors } from '../main/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../main/concurrencyStore'
@@ -82,9 +83,14 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
+  let lifecycleRoute: { dispose(): void } | null = null
   return {
     name: 'agents',
     required: true,
+    emits: [
+      { verb: 'sessions-changed', description: 'A managed agent session entered or changed its task roster' },
+      { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
+    ],
     // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
@@ -146,6 +152,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
+      lifecycleRoute = ctx.capabilities.provide(AGENTS_SESSIONS, {
+        list: (taskId) => runtime!.store.lifecycleSessions(taskId),
+      })
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
       // core's table (main/pricingStore.ts).
@@ -221,6 +230,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       managedRoute?.dispose()
       usageRoute?.dispose()
       harnessRoute?.dispose()
+      lifecycleRoute?.dispose()
+      lifecycleRoute = null
       for (const dispose of builtInProfileDisposables ?? []) dispose()
       builtInProfileDisposables = null
       for (const dispose of builtInDriverDisposables ?? []) dispose()

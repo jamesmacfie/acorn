@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type AgentProfileContribution, lineDelimitedJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
+import { type AgentProfileContribution, codexJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
 
 function materializeSchema(schema: object): string {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-schema-'))
@@ -29,6 +29,21 @@ export const codexProfile: AgentProfileContribution = {
     ],
   }),
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['resume', sessionRef] }),
-  streamJson: lineDelimitedJsonAdapter,
+  // A contained one-shot run has no writable repository and no projected tools. Codex has no
+  // system-prompt flag, so this profile joins the two prompt roles explicitly.
+  aiArgv: (command, opts) => ({
+    file: command,
+    args: [
+      'exec',
+      '--json',
+      '--ephemeral',
+      '-s',
+      'read-only',
+      '--skip-git-repo-check',
+      ...(opts.model ? ['-m', opts.model] : []),
+      ...(opts.schema ? ['--output-schema', materializeSchema(opts.schema)] : []),
+      opts.system ? `${opts.system}\n\n${opts.prompt}` : opts.prompt,
+    ],
+  }),
+  streamJson: codexJsonAdapter,
 }
-
