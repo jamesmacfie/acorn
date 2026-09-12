@@ -129,7 +129,7 @@ const AGENT_SESSIONS = [{
   config: {},
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [],
+  subagents: [], queuedTurns: 0,
   lastEventSeq: 2,
   lastReadSeq: 2,
   archivedAt: null,

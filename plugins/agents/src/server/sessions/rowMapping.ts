@@ -38,6 +38,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   parentSessionId: row.parentSessionId,
   parentTurnId: row.parentTurnId,
   subagents: parseJson<AgentSubagent[]>(row.subagentsJson, []),
+  queuedTurns: row.queuedTurns,
   lastEventSeq: row.lastEventSeq,
   lastReadSeq: row.lastReadSeq,
   archivedAt: row.archivedAt,

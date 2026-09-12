@@ -382,6 +382,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         capturedAt: Date.now(),
       },
     })
+    // Carry the fresh queued count to every client now. A busy session re-broadcasts its row on the
+    // next event anyway, but a session held idle behind the concurrency limit produces no event, so its
+    // waiting-prompt mark would not appear until something unrelated woke it.
+    this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
     if (session.runtimeState === 'failed' || session.runtimeState === 'stopped') {
       await this.stopLive(session.id)
     }

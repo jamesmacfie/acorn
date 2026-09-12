@@ -779,6 +779,50 @@ describe('managed agent runtime conformance', () => {
     expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })
 
+  it('counts queued turns onto list rows', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    }, descriptor('fake'))
+
+    const empty = await runtime.store.listSessions({ taskId: seed.taskId })
+    expect(empty.sessions[0]?.queuedTurns).toBe(0)
+
+    const first = await runtime.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'first follow-up' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: 'queued-one',
+    })
+    await runtime.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'second follow-up' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: 'queued-two',
+    })
+
+    const listed = await runtime.store.listSessions({ taskId: seed.taskId })
+    expect(listed.sessions[0]?.queuedTurns).toBe(2)
+
+    // A turn leaving the queue drops the count, so the mark clears.
+    await runtime.store.cancelTurn(first.id)
+    const afterCancel = await runtime.store.listSessions({ taskId: seed.taskId })
+    expect(afterCancel.sessions[0]?.queuedTurns).toBe(1)
+  })
+
   it('scopes session lists and full-text search to one workspace', async () => {
     const firstSeed = await seedTask(testDb, dataDir, 'workspace-one')
     const secondSeed = await seedTask(testDb, dataDir, 'workspace-two')

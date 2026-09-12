@@ -238,8 +238,17 @@ sub-rows appear and settle live for every session in the task, not only the open
 is fetched. The roster keeps every in-flight entry plus the last 20 settled ones; the full history stays
 in the event ledger, which is what the transcript reads.
 
+A session row also carries `queuedTurns`, the count of follow-ups waiting to dispatch. It is a column
+on the session row, kept current by the store whenever a turn enters or leaves the queue, folded there
+for the same reason as the subagent roster: the row is broadcast after every event, so a value on the
+row reaches every client live, and a count computed only when the list is fetched would be overwritten
+by the next broadcast. A queued turn leaves `runtimeState` at `ready` or `working`, so without this
+count the task sidebar has no way to mark a session whose only sign of a waiting prompt is the prompt
+itself. Enqueuing a follow-up on a session held idle behind the concurrency limit broadcasts the row on
+its own, because no event would otherwise wake it.
+
 A subagent's own progress never touches its session's runtime state. Turn boundaries own that, and a
-child that settles after its parent's turn completed — which Codex allows — would otherwise drag the
+child that settles after its parent's turn completed, which Codex allows, would otherwise drag the
 session back out of ready.
 
 The two harnesses report a subagent very differently, and the roster shows what each actually sent
