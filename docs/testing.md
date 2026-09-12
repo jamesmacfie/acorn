@@ -125,6 +125,12 @@ before the bundler pass, so a broken boot path fails in seconds rather than minu
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
 
+`pnpm dev:agent:smoke` covers the first real-window step on a graphical development host. It starts
+an isolated automation build with a fresh data root, reads the onboarding screen through the embedded
+WebDriver server, clicks into the project step, takes a screenshot, and shuts the session down. For
+feature work, `pnpm dev:agent` leaves the same kind of window running so an agent can inspect and
+operate the main renderer; [local-development.md](./local-development.md) documents the commands.
+
 ## The browser smoke test
 
 `plugins/browser/src/server/driver.smoke.test.ts` runs an agent's loop against a real Chrome — load a
@@ -136,8 +142,9 @@ tools reported why.
 
 ## The smoke checklist
 
-Deliberately manual — it replaced the Playwright specs, whose harness left the repo with the Electron
-shell. Run it per release. Its first pass is still owed, on a machine that never had the Electron
+Run this checklist per release. The automation-only development launcher covers main-renderer flows,
+but it deliberately does not replace checks of the packaged app, native chrome, host-owned child
+webviews, or real external CLIs. Its first pass is still owed, on a machine that never had the Electron
 build, and nothing ships to a person until it passes (docs/shell.md § Signing gates and the updater).
 
 1. Install and launch; the window appears and the local node reaches online.

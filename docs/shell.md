@@ -52,7 +52,8 @@ key if neither file supplies it, resolved before the listener starts accepting c
 `tauri_plugin_single_instance` makes a second launch focus the running window instead of starting a
 second process. The data root's own exclusive lock (`node-core/main/dataRoot.ts`) is the real mutual
 exclusion; the single-instance lock only keeps a second launch from getting as far as contending for
-it.
+it. The automation-only debug build omits this convenience layer because each of its windows has a
+distinct data root; the Node lock still protects each root.
 
 Quitting negotiates with the renderer first. Quit is a custom menu item rather than
 `PredefinedMenuItem::quit`, because the predefined one routes through `[NSApp terminate:]` and skips
@@ -408,9 +409,12 @@ navigation, including the ones page script drives, and the module marks the trav
 so they move the cursor instead of truncating the future. That is what lets the pane offer back and
 forward honestly rather than always-enabled.
 
-No webview is attached to a debugger. Agent browser automation is `plugins/browser`, which runs
-Playwright against a browser of the node's own, so an agent on a headless node has one too. The
-preview pane is the person's surface and nothing steers it but them.
+Normal development and packaged webviews expose no automation server. The explicit
+`agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
+so a local development agent can inspect and operate the renderer. The feature is absent from normal
+builds, and its launcher uses an isolated data root and dynamic ports. It does not drive the host-owned
+preview or loaded-plugin child webviews. Separately, agent browser automation is `plugins/browser`,
+which runs Playwright against a browser of the node's own, so an agent on a headless node has one too.
 
 For a task whose dev server is served by another node process,
 `@acorn/desktop-helper/main/previewTunnel.ts` opens an authenticated loopback listener that forwards

@@ -42,6 +42,45 @@ stages them with the pinned Node runtime and the migration chains, then runs `ta
 Vite renderer on port 4319. `pnpm dev:node` runs the standalone Node and prints one JSON handshake
 line containing endpoint, fingerprint, certificate, Node ID, and device token.
 
+### Agent-driven desktop development
+
+An agent on a graphical development host can launch and drive a real Acorn window without using the
+normal development profile or signing in to GitHub:
+
+```sh
+pnpm dev:agent -- --session my-change
+```
+
+The launcher builds an automation-only debug binary, chooses unused loopback ports for Vite and the
+embedded WebDriver server, and keeps the Node data, logs, screenshots, and session manifest under
+`.acorn/agent-dev/my-change/`. It does not share the normal development data root or participate in
+the production shell's single-instance lock, so it can run beside another Acorn checkout. By default
+it adds the current checkout as a local project before launch. Pass `--project /absolute/path` to add
+a different folder, or `--onboarding` to start with an empty profile and exercise the first-run flow.
+Git and GitHub remain optional in either case.
+
+Once the launcher prints `ready`, use its small command-line driver from another terminal:
+
+```sh
+pnpm dev:agent:ui -- --session my-change snapshot
+pnpm dev:agent:ui -- --session my-change click e2
+pnpm dev:agent:ui -- --session my-change fill e4 "new value"
+pnpm dev:agent:ui -- --session my-change screenshot after-change.png
+pnpm dev:agent:ui -- --session my-change stop
+```
+
+Run `snapshot` before an element action and again after the UI changes; its element references belong
+to that snapshot. Omit `--session` when exactly one agent session is running. Session names identify
+persistent data directories, so a stopped name is not reused accidentally; pass `--reuse` to keep and
+reopen its data. For a disposable end-to-end check of the launcher and first-run UI, run
+`pnpm dev:agent:smoke`.
+
+The driver controls the main Acorn renderer through the Tauri webview. It can inspect rendered text,
+click and fill elements, and capture the window. Native menus and dialogs, terminal keyboard fidelity,
+and host-owned child webviews still require native computer-use control or the release smoke checklist.
+The WebDriver dependency and server exist only behind the `agent-automation` Cargo feature used by
+this launcher; normal development and packaged builds do not expose it.
+
 Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those. It rebuilds the plugin's
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
 target to build into and why the node restarts.

@@ -6,6 +6,11 @@ mod menu;
 mod plugin_scheme;
 mod webviews;
 
+#[cfg(all(feature = "agent-automation", not(debug_assertions)))]
+compile_error!(
+    "agent-automation is a local debug feature and cannot be included in a release build"
+);
+
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -60,15 +65,26 @@ pub fn run() {
     // starts it. See src/app_scheme.rs, `plugin_worker_hash`.
     let worker_frames = frames.clone();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(not(feature = "agent-automation"))]
+    {
         // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
         // launch focus the running window instead of failing on that lock.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.webview_windows().values().next() {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
-        }))
+        }));
+    }
+
+    #[cfg(feature = "agent-automation")]
+    {
+        builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    }
+
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .register_uri_scheme_protocol(APP_SCHEME, move |ctx, request| {
@@ -183,6 +199,10 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         (base.join("node"), base)
     } else {
         let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../node/.acorn");
+        let checkout = development_data_root(
+            checkout,
+            std::env::var_os("ACORN_DATA_DIR").map(PathBuf::from),
+        );
         (checkout.clone(), checkout.join("shell"))
     };
     for dir in [&data_dir, &user_data_dir] {
@@ -242,6 +262,12 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         quit_pending: AtomicBool::new(false),
     });
     Ok((helper, frames))
+}
+
+fn development_data_root(checkout: PathBuf, requested: Option<PathBuf>) -> PathBuf {
+    requested
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(checkout)
 }
 
 /// The Electron build's custody root and the key its device tokens are encrypted under, when both are
@@ -394,6 +420,20 @@ mod tests {
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
         assert_eq!(APP_ORIGIN, "app://acorn");
+    }
+
+    #[test]
+    fn a_development_data_root_can_be_isolated() {
+        let checkout = PathBuf::from("checkout/.acorn");
+        assert_eq!(development_data_root(checkout.clone(), None), checkout);
+        assert_eq!(
+            development_data_root(checkout.clone(), Some(PathBuf::new())),
+            checkout
+        );
+        assert_eq!(
+            development_data_root(checkout, Some(PathBuf::from("agent-data"))),
+            PathBuf::from("agent-data")
+        );
     }
 
     /// The one thing a JSON file can get wrong that nothing else would catch. Naming a window in a
