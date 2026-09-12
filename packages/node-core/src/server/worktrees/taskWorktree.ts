@@ -13,6 +13,7 @@ import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
 import { getProject, type ProjectRow } from '../projects'
 import { getProjectConfig } from '../projectConfig'
 import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
+import { isTaskArchiving } from './archiveGate'
 import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
@@ -107,7 +108,8 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
     .select({ id: schema.tasks.id, projectId: schema.tasks.projectId, worktreePath: schema.tasks.worktreePath })
     .from(schema.tasks)
     .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
-  const rows = only ? all.filter((row) => only(row.id)) : all
+  const visible = all.filter((row) => !isTaskArchiving(row.id))
+  const rows = only ? visible.filter((row) => only(row.id)) : visible
 
   // `git status` is async but still CPU/disk work. An unbounded Promise.all made every task start a
   // process at once, producing a periodic resource spike that grew with the task roster.
@@ -191,11 +193,19 @@ function assertOnBranch(path: string, branch: string): void {
 }
 
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
+
+// Archive claims the task first, then awaits any creator that passed the gate before the claim. A
+// creator checks the gate again after its initial database reads, so none can enter after this wait.
+export async function waitForTaskWorktreeCreation(taskId: string): Promise<void> {
+  await inflightCreates.get(taskId)?.catch(() => undefined)
+}
+
 export async function resolveTaskCwd(
   db: AppDatabase,
   t: TaskRef | undefined,
   _baseCheckout: string | undefined,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
+  if (t && isTaskArchiving(t.id)) throw new BridgeError(409, 'task-archiving', 'Task archive is in progress.')
   const project = t ? await projectForTask(db, t) : null
   const projectRoot = project?.path && isDir(project.path) ? project.path : undefined
   // The project row is authoritative. `baseCheckout` remains in the seam for callers compiled against
@@ -203,6 +213,9 @@ export async function resolveTaskCwd(
   // path into an arbitrary folder.
   const checkout = projectRoot
   if (!t || !checkout) return { cwd: homedir(), isWorktree: false, created: false }
+  // projectForTask awaited above. Recheck so an archive that claimed the task during that read wins
+  // before this call can reuse or create a worktree.
+  if (isTaskArchiving(t.id)) throw new BridgeError(409, 'task-archiving', 'Task archive is in progress.')
   // Branchless tasks never use a persisted worktree: they run in the project root.
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
@@ -259,7 +272,9 @@ export async function resolveTaskCwd(
 // the task id, not a renderer-supplied absolute path, is the capability.
 export async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)
-  if (!t) return null
+  // Archived tasks retain their rows for history. They must not recreate the worktree that archive
+  // removed, and an active row claimed by archive must stop serving filesystem reads immediately.
+  if (!t || t.status !== 'active' || isTaskArchiving(taskId)) return null
   const project = await projectForTask(db, t)
   const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
   if (!baseCheckout) return null

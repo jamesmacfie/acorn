@@ -165,6 +165,7 @@ export {
 export { isPaneId } from '@acorn/client-core/features/tasks/taskLayout.ts'
 export type { TaskLayout } from '@acorn/client-core/features/tasks/taskLayout.ts'
 export { createTask } from '@acorn/client-core/features/tasks/taskMutations.ts'
+export { isArchiving } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
 export {
   activeTerminal,
   addSession,

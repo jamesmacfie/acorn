@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { archiveTask, runTeardownProcess, type ArchiveDeps } from './archive'
+import { computeTaskStatuses, taskRoot } from '../worktrees/taskWorktree'
 
 // Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
 // parallel run. Matches the other git-backed suites (plugins/changes/main/localGitService.test.ts).
@@ -122,6 +123,24 @@ describe('archiveTask teardown ordering', () => {
     expect(order).toEqual(['capture:true', 'teardown:true', 'drop:false'])
   })
 
+  it('does not serve or recreate the worktree while archive owns the task', async () => {
+    let rootDuringDrop: string | undefined | null
+    const res = await archiveTask(t.db, 'task1', {}, {
+      ...deps(),
+      dropTaskSessions: async () => {
+        rootDuringDrop = await taskRoot(t.db, 'task1')
+        await expect(computeTaskStatuses(t.db)).resolves.toEqual([])
+      },
+    })
+
+    expect(res).toEqual({ ok: true })
+    expect(rootDuringDrop).toBeNull()
+    expect(existsSync(worktree)).toBe(false)
+    // The retained historical row must not make a later pane or plugin call recreate the directory.
+    await expect(taskRoot(t.db, 'task1')).resolves.toBeNull()
+    expect(existsSync(worktree)).toBe(false)
+  })
+
   it('non-zero teardown pauses the archive and removes nothing', async () => {
     await setTeardown('echo boom >&2; exit 3')
     const res = await archiveTask(t.db, 'task1', {}, deps())
@@ -133,6 +152,8 @@ describe('archiveTask teardown ordering', () => {
     expect(existsSync(worktree)).toBe(true)
     const [row] = await t.db.select().from(schema.tasks)
     expect(row.status).toBe('active')
+    // A refusal releases the transient gate so the active task remains usable and retryable.
+    await expect(taskRoot(t.db, 'task1')).resolves.toBe(worktree)
   })
 
   it('skipTeardown archives past a failing script', async () => {

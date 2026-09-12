@@ -120,6 +120,7 @@ client: handlePluginContentLinkClick
 client: hasHostCapability
 client: integrationsOptions
 client: isAppDark
+client: isArchiving
 client: isDarkColor
 client: isPaneId
 client: isTerminalMax

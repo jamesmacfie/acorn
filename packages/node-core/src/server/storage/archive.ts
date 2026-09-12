@@ -11,9 +11,10 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
 import { getProjectConfig } from '../projectConfig'
-import { projectForTask } from '../worktrees/taskWorktree'
+import { projectForTask, waitForTaskWorktreeCreation } from '../worktrees/taskWorktree'
 import { buildSessionEnv } from '../taskEnv'
 import { removeWorktree } from '../worktrees/worktrees'
+import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
 
 const exec = promisify(execFile)
@@ -63,6 +64,18 @@ async function teardownScriptFor(db: AppDatabase, projectId: string): Promise<st
 }
 
 export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts, deps: ArchiveDeps): Promise<ArchiveResult> {
+  if (!beginTaskArchive(id)) return { ok: false, reason: 'Task archive is already in progress.' }
+  try {
+    // A root request that began before the claim may still be creating the worktree. Let it finish,
+    // then load the authoritative path that archive must remove. Later root requests stop at the gate.
+    await waitForTaskWorktreeCreation(id)
+    return await archiveClaimedTask(db, id, opts, deps)
+  } finally {
+    finishTaskArchive(id)
+  }
+}
+
+async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts, deps: ArchiveDeps): Promise<ArchiveResult> {
   // Defaults match the menu archive: remove the worktree, refuse a dirty or running task.
   const deleteWorktree = opts.deleteWorktree ?? true
   const force = opts.force ?? false

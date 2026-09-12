@@ -165,6 +165,11 @@ failures instead of pretending removal succeeded. Its order is guard, repo teard
 sessions, plugin cleanups, remove worktree, mark archived. The two teardown steps sit before removal
 so anything that needs the worktree still has it.
 
+Archive claims the task's worktree lifecycle before teardown starts. New root reads return no path
+while that claim is held, and archive waits for a worktree creation that was already in flight before
+it reads the path to remove. An archived task also returns no root. This keeps a pane refresh from
+reading a half-removed tree or recreating the directory between removal and the final status write.
+
 Before any of that, the confirmation dialog asks every plugin what it has to say about this task,
 such as running containers, uncommitted files, or live sessions, and offers whatever cleanup each one
 declared. That is a plugin contribution called a task check, and it is the only way anything reaches
@@ -178,6 +183,10 @@ highest-priority marker and it takes the slot under the task's glyph
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). It no longer blanks the row's
 other markers the way it used to: anything it outranks keeps its place in the hover tooltip, because a
 marker that loses its corner should lose the pixels, never the state.
+
+The same flag pauses the Changes pane's Git reads while the archive runs. The pane remains mounted so
+it can show a teardown failure, but it keeps its last stable status instead of observing worktree
+removal as a list of deleted files. A failed archive clears the flag and triggers a fresh read.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
