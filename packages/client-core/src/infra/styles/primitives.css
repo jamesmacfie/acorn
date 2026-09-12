@@ -1301,6 +1301,11 @@ a.ui-row:hover { background: var(--bg-hover); }
   white-space: normal;
   overflow: visible;
 }
+/* `align-items: flex-start` sizes each line to its own text, which for a long title is wider than the
+   body. The body does not clip it, so the title painted straight across whatever the row put in
+   `trailing`: a 420px agent session row drew its title 520px wide and ran it under the state mark.
+   The cap is what lets `.ui-text`'s own ellipsis fire. */
+.ui-row[data-variant='stacked'] .ui-row-body > * { max-width: 100%; }
 
 /* ── The kit's grouping and showing nodes ───────────────────────────────────────────────────
    The ten nodes added when the kit closed (docs/ui-design.md § The closed kit). Each one replaces
