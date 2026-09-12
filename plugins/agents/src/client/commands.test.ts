@@ -30,7 +30,7 @@ const session = (over: Partial<AgentSession> = {}): AgentSession => ({
   kind: 'interactive', driverKind: 'acp', driverVersion: '1', providerSessionRef: null,
   controller: 'acorn', runtimeState: 'ready', attention: 'none', statusAuthority: 'protocol',
   title: 'Fix the rail', model: 'opus', config: {}, parentSessionId: null, parentTurnId: null,
-  subagents: [], lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 0, updatedAt: 0,
+  subagents: [], queuedTurns: 0, lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 0, updatedAt: 0,
   ...over,
 })
 

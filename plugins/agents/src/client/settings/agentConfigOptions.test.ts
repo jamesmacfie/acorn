@@ -50,7 +50,7 @@ const session = (config: Record<string, unknown>, model: string | null = null): 
   config,
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [],
+  subagents: [], queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,

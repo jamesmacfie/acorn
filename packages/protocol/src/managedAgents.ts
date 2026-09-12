@@ -267,6 +267,11 @@ export type AgentSession = {
   /** Projected from the session's own `subagent` events by the repository, so every surface that reads
    *  a session row sees the live roster without loading its transcript. */
   subagents: AgentSubagent[]
+  /** How many follow-up turns are queued and waiting to dispatch. Counted onto the list read model so a
+   *  row can mark a waiting prompt without loading the transcript; a queued turn leaves `runtimeState`
+   *  at `ready` or `working`, so it has no other sign on the row. Snapshot reads leave it 0, since the
+   *  open pane derives its queue from the turns it already holds. */
+  queuedTurns: number
   lastEventSeq: number
   lastReadSeq: number
   archivedAt: number | null

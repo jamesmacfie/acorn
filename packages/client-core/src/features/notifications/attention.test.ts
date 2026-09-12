@@ -67,7 +67,7 @@ const session = (over: Partial<AgentSession>): AgentSession => ({
   id: 's1', taskId: 't1', providerId: 'claude', profileId: 'p', kind: 'interactive',
   driverKind: 'd', driverVersion: '1', providerSessionRef: null, controller: 'acorn',
   runtimeState: 'working', attention: 'none', statusAuthority: 'protocol', title: 'claude',
-  model: null, config: {}, parentSessionId: null, parentTurnId: null, subagents: [],
+  model: null, config: {}, parentSessionId: null, parentTurnId: null, subagents: [], queuedTurns: 0,
   lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 0, updatedAt: 0, ...over,
 })
 

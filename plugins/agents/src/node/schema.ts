@@ -34,6 +34,11 @@ export const agentSessions = sqliteTable(
     // already broadcast to every client after every event, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),
+    // How many turns are queued and waiting to dispatch. On the row for the same reason as the subagent
+    // roster: the row is broadcast after every event, so the task sidebar can mark a session whose only
+    // sign of a waiting prompt is this count. Kept current by server/sessions/store.ts on every turn that
+    // enters or leaves the queue.
+    queuedTurns: integer('queued_turns').notNull().default(0),
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
     archivedAt: integer('archived_at'),

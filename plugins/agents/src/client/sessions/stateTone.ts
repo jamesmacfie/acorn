@@ -114,3 +114,12 @@ export const attentionMark = (reason: string): { name: string; title: string; to
   title: ATTENTION_MARK[reason]?.title ?? reason.replace('_', ' '),
   tone: reason === 'error' ? 'danger' : reason === 'completed' ? 'ok' : 'warn',
 })
+
+/** A follow-up waiting to be sent, as a mark on the list row. A queued turn leaves the runtime state at
+ *  `ready` or `working`, so the leading state icon can't show it: accent rather than muted, because the
+ *  point is that this wait is otherwise invisible. */
+export const queuedMark = (count: number): { name: string; title: string; tone: Tone } => ({
+  name: 'list-plus',
+  title: count === 1 ? '1 queued follow-up' : `${count} queued follow-ups`,
+  tone: 'accent',
+})

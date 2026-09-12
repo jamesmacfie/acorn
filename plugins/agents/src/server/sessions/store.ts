@@ -205,6 +205,20 @@ export class AgentStore extends AgentSessionRepository {
     return { events: page, nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
   }
 
+  /** Recompute a session's queued-turn count and store it on the row. Called after every change that
+   *  can move a turn into or out of the queue. A recount rather than a running tally, because a count
+   *  that drifts is a mark that lies, and the query is one indexed row count. */
+  private async recountQueuedTurns(sessionId: string): Promise<void> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.agentTurns)
+      .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.status, 'queued')))
+    await this.db
+      .update(schema.agentSessions)
+      .set({ queuedTurns: Number(row?.count ?? 0) })
+      .where(eq(schema.agentSessions.id, sessionId))
+  }
+
   async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn> {
     const [existing] = await this.db
       .select()
@@ -281,6 +295,7 @@ export class AgentStore extends AgentSessionRepository {
           ))
       }
     }
+    await this.recountQueuedTurns(sessionId)
     const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, id)).limit(1)
     if (!row) throw new Error('Queued turn was not persisted.')
     const turn = mapAgentTurn(row)
@@ -417,6 +432,7 @@ export class AgentStore extends AgentSessionRepository {
         errorJson: null,
       })
       .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'queued')))
+    await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'dispatching') await this.lifecycle.announceTurn(turnId)
   }
@@ -441,6 +457,7 @@ export class AgentStore extends AgentSessionRepository {
         eq(schema.agentTurns.id, turnId),
         eq(schema.agentTurns.status, before.status),
       ))
+    if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'active') await this.lifecycle.announceTurn(turnId)
   }
@@ -458,6 +475,7 @@ export class AgentStore extends AgentSessionRepository {
         errorJson: JSON.stringify({ code: 'safe_transient_retry', message }),
       })
       .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'active')))
+    await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'queued') await this.lifecycle.announceTurn(turnId)
   }
@@ -476,6 +494,7 @@ export class AgentStore extends AgentSessionRepository {
       .update(schema.agentTurns)
       .set({ status: 'cancelled', completedAt: now() })
       .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['queued', 'dispatching', 'active'])))
+    if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'cancelled') await this.lifecycle.announceTurn(turnId)
   }
