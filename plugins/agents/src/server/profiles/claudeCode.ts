@@ -81,6 +81,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
   models: [
     { id: 'sonnet', label: 'Sonnet' },
     { id: 'opus', label: 'Opus' },
+    { id: 'fable', label: 'Fable' },
     { id: 'haiku', label: 'Haiku' },
   ],
   defaultModelId: 'sonnet',
