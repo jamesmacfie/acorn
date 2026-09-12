@@ -1,6 +1,7 @@
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowRunProjection } from '../../shared/api'
 
 // The pane's model under jsdom rather than in bare Node, because everything asserted here is
 // reactive: a frame moves a signal and a memo has to see it. The node-environment project resolves
@@ -8,7 +9,7 @@ import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.t
 
 const runsCalls = vi.fn()
 const stepsCalls = vi.fn()
-let runRows: WorkflowRunRow[] = []
+let runRows: WorkflowRunProjection[] = []
 let stepRows: WorkflowStepRow[] = []
 
 vi.mock('../workflowsClient', () => ({
@@ -33,7 +34,9 @@ type StepEvent = (frame: { runId: string; stepId: string; event: unknown }) => v
 
 let onStepChanged: StepChanged | undefined
 let onStepEvent: StepEvent | undefined
-let onRunChanged: (() => void) | undefined
+let onRunChanged: ((payload: unknown) => void) | undefined
+let onChildChanged: ((payload: unknown) => void) | undefined
+let onReconnect: (() => void) | undefined
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -45,18 +48,28 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
     onStepEvent = cb
     return () => { onStepEvent = undefined }
   },
-  onPluginFrame: (_plugin: string, _channel: string, cb: () => void) => {
-    onRunChanged = cb
-    return () => { onRunChanged = undefined }
+  onPluginFrame: (_plugin: string, channel: string, cb: (payload: unknown) => void) => {
+    if (channel.endsWith(':run-changed')) onRunChanged = cb
+    if (channel.endsWith(':child-changed')) onChildChanged = cb
+    return () => {
+      if (onRunChanged === cb) onRunChanged = undefined
+      if (onChildChanged === cb) onChildChanged = undefined
+    }
+  },
+  wsOnReconnect: (cb: () => void) => {
+    onReconnect = cb
+    return () => { if (onReconnect === cb) onReconnect = undefined }
   },
 }))
 
 const { openPane } = await import('@acorn/plugin-api/client')
 const { createRunPaneModel } = await import('./runPaneModel')
 
-const run = (over: Partial<WorkflowRunRow>): WorkflowRunRow => ({
+const run = (over: Partial<WorkflowRunProjection>): WorkflowRunProjection => ({
   id: 'run-1', taskId: 'task-1', name: 'Investigate an issue', status: 'running', posture: 'gated',
   error: null, createdAt: 200, updatedAt: 200,
+  rootRunId: 'run-1', parentRunId: null, parentStepId: null, rootTaskId: 'task-1',
+  rootRunName: 'Investigate an issue', parentTaskId: null, parentRunName: null, depth: 0, usage: null,
   defJson: JSON.stringify({ name: 'Investigate an issue', steps: [{ name: 'reproduce', after: [] }, { name: 'synthesise', after: ['reproduce'] }] }),
   ...over,
 })
@@ -121,10 +134,23 @@ describe('the run pane model', () => {
     const model = await mount()
     const before = stepsCalls.mock.calls.length
     stepRows = [step({ status: 'done' }), step({ id: 'st2', idx: 1, name: 'synthesise', status: 'running' })]
-    onRunChanged?.()
+    onRunChanged?.({ taskId: 'task-1', runId: 'run-1' })
     await settle()
     expect(stepsCalls.mock.calls.length).toBeGreaterThan(before)
     expect(model.steps().find((row) => row.id === 'st2')?.status).toBe('running')
+  })
+
+  it('re-reads parent child summaries on a child change and after reconnect', async () => {
+    await mount()
+    const before = stepsCalls.mock.calls.length
+    onChildChanged?.({ ownerTaskId: 'task-1', taskId: 'child-task', parentRunId: 'run-1', runId: 'child-run' })
+    await settle()
+    expect(stepsCalls.mock.calls.length).toBeGreaterThan(before)
+
+    const afterChild = stepsCalls.mock.calls.length
+    onReconnect?.()
+    await settle()
+    expect(stepsCalls.mock.calls.length).toBeGreaterThan(afterChild)
   })
 
   it('keeps only the last few kilobytes of a command tail', async () => {

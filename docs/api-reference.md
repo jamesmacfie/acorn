@@ -386,6 +386,20 @@ failed node back to pending. Retry answers 403 to a task-confined caller, becaus
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
 foreign or unknown run as a 404.
 
+`GET /v2/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections. Each projection
+has explicit root and parent run IDs, the corresponding task IDs and names, depth, and usage. A root
+reports aggregate tree usage; a child reports only its own turns.
+`GET /v2/p/workflows/workflows/runs/:runId/steps` adds a `children` list to each dispatch step. Every child
+summary carries its task and run IDs, item key, dispatch and run status, bounded result or error, and
+usage. These are durable reads, not event payload reconstruction.
+
+Node-owned callers use the `workflows.runner` capability instead of HTTP. Its start request supplies
+a task ID, optional inputs, a stable caller key and payload fingerprint, a reserved run ID, and a
+trigger. It can supply an inline definition or a saved definition ID. The workflows plugin resolves
+saved references in the task's scope, freezes the complete graph, and verifies a replay against the
+same invocation identity. This is the internal handoff used by scheduled workflows; it does not add
+a scheduling route or button.
+
 `GET /v2/p/workflows/catalog` answers every step kind this node can run, with the form each one
 draws, plus the policies and the agent profiles
 ([workflows.md](./workflows.md) § Contributed step kinds). It takes an optional `projectId` and
@@ -516,8 +530,14 @@ both ends. Core owns twelve, and every other prefix belongs to the plugin that r
 
 `term:` is transport on both ends and `workflow:` carries the notification bell's notices, per-step
 stream events, and `workflow:step-changed`, which names one step whose status moved so a run surface
-can redraw that node without re-reading the run. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
-them, described under [Backpressure](./terminal.md#backpressure). The other eleven are the Node saying
+can redraw that node without re-reading the run. Plugin-owned workflow invalidations use
+`plugin:workflows:run-changed`, `plugin:workflows:gate-changed`, and
+`plugin:workflows:child-changed`. The child frame uses `ownerTaskId` to route the invalidation to the
+parent surface. Its summary keeps the distinct parent and child task and run IDs, status, result, and
+usage projection. Clients still re-read after the frame and after reconnecting.
+
+`ws:shed` is the hub saying it dropped frames because a socket was too far behind to take them,
+described under [Backpressure](./terminal.md#backpressure). The other eleven are the Node saying
 that something it owns has moved, and each is one frame:
 
 - `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in

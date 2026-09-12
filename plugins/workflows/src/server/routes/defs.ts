@@ -64,6 +64,7 @@ const generateCommon = {
   modelId: z.string().min(1).optional(),
   description: z.string().min(1).max(GENERATE_MAX_DESCRIPTION_CHARS),
   workspaceId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
   defId: z.string().min(1).optional(),
 }
 const generateBody = z.discriminatedUnion('mode', [

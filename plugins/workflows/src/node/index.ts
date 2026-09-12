@@ -1,25 +1,29 @@
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
-import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, describeError, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
-import { desc, eq, inArray, sum } from 'drizzle-orm'
+import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { eq } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
 import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
+import { WorkflowDispatcher } from '../server/workflowDispatch'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/workflowTools'
-import { validateWorkflow, WorkflowValidationError } from '../server/workflowValidation'
+import { validateWorkflow } from '../server/workflowValidation'
+import { workflowRunsForTask } from '../server/workflowRunReadModel'
+import { workflowTaskResolutionScope } from '../server/workflowResolution'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
-import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../shared/runStatus'
 import { workflowRuns, workflowSteps } from './schema'
+import { workflowRunList, workflowStepProjections } from '../server/workflowRunProjection'
+import { WorkflowStartService } from '../server/workflowStartService'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
@@ -65,6 +69,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     emits: [
       { verb: 'run-changed', description: 'A workflow run changed durable status' },
       { verb: 'gate-changed', description: 'A workflow approval gate started or settled' },
+      { verb: 'child-changed', description: 'A dispatched child workflow changed durable state' },
     ],
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
     // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
@@ -92,6 +97,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         payload: { taskId: 'string', runId: 'string', stepId: 'string', step: 'string', kind: 'string' },
         allows: ['observe', 'veto'],
       })
+      let dispatcher: WorkflowDispatcher
       const runner = new WorkflowRunner(store, {
         hooks: ctx.hooks,
         telemetry: ctx.telemetry,
@@ -228,34 +234,34 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         // Materialises a child task (docs/workflows.md covers fan-out, branch dedup, and lazy worktree
         // creation). Core owns `tasks`, so the insert is core's.
-        createChildTask: (parentTaskId, seed) => core.tasks.createChild(parentTaskId, seed),
+        createChildTask: (parentTaskId, seed, intendedTaskId) => core.tasks.createChild(parentTaskId, seed, intendedTaskId),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
+        cancelAgentSession: async (taskId, sessionId) => {
+          await ctx.capabilities.get(AGENTS_SESSION_CONTROL)?.cancel(taskId, sessionId)
+        },
+        dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
+        dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
+        childChanged: (event) => ctx.events.send({ channel: pluginChannel('workflows', 'child-changed'), ...event }),
+        // Runtime dispatch is available only after the complete workflow-task acceptance gate.
+        runtimeWorkflowDispatchEnabled: true,
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
       }, ctx.extensionPoints)
+      dispatcher = new WorkflowDispatcher(store, runner, core.tasks, {
+        authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+      })
       // Kept so dispose can abort in-flight steps before the database closes.
       live = runner
 
-      // A task's project and the checkout its workflow files load from. `null` once the task is gone.
-      const taskScope = async (taskId: string) => {
-        const task = await core.tasks.load(taskId)
-        if (!task) return null
-        const project = await core.projects.byId(task.projectId)
-        const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
-        return { task, project, repoDir }
-      }
-
-      const startDef = async (taskId: string, def: WorkflowDef, inputs?: Record<string, string>) => {
-        await deps.reconciled // don't start a run the restart sweep would immediately re-queue
-        try {
-          return { runId: await runner.start(taskId, def, { inputs }) }
-        } catch (error) {
-          if (isRepoConfigTrustError(error)) {
-            ctx.events.repoConfigTrustNotice(taskId)
-            return { error: 'needs-trust' }
-          }
-          return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }
-        }
-      }
+      // Scope construction lives beside definition resolution, so routes, child dispatch, and the
+      // later scheduler adapter cannot disagree about which workspace, project, or checkout applies.
+      const taskScope = (taskId: string) => workflowTaskResolutionScope(core, taskId, homedir())
+      const starts = new WorkflowStartService(store, runner, {
+        reconciled: deps.reconciled,
+        taskScope,
+        project: (projectId) => core.projects.byId(projectId),
+        authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+        onTrustRequired: (taskId) => ctx.events.repoConfigTrustNotice(taskId),
+      }, homedir())
 
       // `plugin:workflows:defs-changed` (docs/plugins.md § Hearing another plugin): the rail list and
       // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
@@ -282,68 +288,17 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const }))],
           }
         },
-        catalog: async () => runner.catalog(),
-        start: (taskId, def, inputs) => startDef(taskId, def as WorkflowDef, inputs),
-        startById: async (taskId, defId, inputs) => {
-          const scope = await taskScope(taskId)
-          if (!scope) return { error: 'That task no longer exists.' }
-          const file = /^(repo|user):(.+)$/.exec(defId)
-          if (file) {
-            const loaded = loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
-            const found = loaded.workflows.find((workflow) => workflow.id === file[2] && workflow.source === file[1])
-            if (!found) return { error: `'${file[2]}' is not a workflow this task can run.` }
-            // `found.source` is what makes runner.start assert the repo trust snapshot for a committed
-            // file. Resolving here rather than trusting a definition in the request body is the point.
-            return startDef(taskId, found, inputs)
-          }
-          const row = await getDef(store, defId)
-          if (!row || !scope.project || row.workspaceId !== scope.project.workspaceId || (row.projectId && row.projectId !== scope.project.id)) {
-            return { error: 'That workflow is not one this task can run.' }
-          }
-          // No trust check: a row was typed by the owner behind the device gate and has no committed
-          // bytes to hash (docs/security.md § Process, path, and configuration controls).
-          return startDef(taskId, row.def, inputs)
-        },
-        runs: async (taskId) => {
-          const rows = await store.select().from(workflowRuns).where(eq(workflowRuns.taskId, taskId))
-          return rows.sort((a, b) => b.createdAt - a.createdAt)
-        },
+        catalog: (projectId) => starts.catalogForProject(projectId),
+        start: (taskId, def, inputs, allowDatabaseDefinitions) =>
+          starts.startDefinition(taskId, def as WorkflowDef, inputs, undefined, allowDatabaseDefinitions),
+        startById: (taskId, defId, inputs, allowDatabaseDefinitions) =>
+          starts.startById(taskId, defId, inputs, allowDatabaseDefinitions),
+        runs: (taskId) => workflowRunsForTask(store, taskId),
         // This plugin's contribution to the merged run list (@acorn/protocol/runs.ts). A projection,
         // not the rows: the merged list is display-shaped and deliberately narrow, and a caller that
         // wants a run's steps comes back to this plugin addressing it by id.
-        allRuns: async () => {
-          const rows = await store.select().from(workflowRuns).orderBy(desc(workflowRuns.createdAt)).limit(RUN_LIST_LIMIT)
-          // One grouped read rather than a join per row: cost lives on the steps and the merged list
-          // shows it per run, which is the only reason this plugin has to add anything up here.
-          const costRows = rows.length
-            ? await store
-              .select({ runId: workflowSteps.runId, costUsd: sum(workflowSteps.costUsd) })
-              .from(workflowSteps)
-              .where(inArray(workflowSteps.runId, rows.map((row) => row.id)))
-              .groupBy(workflowSteps.runId)
-            : []
-          const costs = new Map(costRows.map((row) => [row.runId, Number(row.costUsd ?? 0)]))
-          return {
-            runs: rows.map((row) => ({
-              id: row.id,
-              title: row.name,
-              status: toRunStatus(row.status),
-              startedAt: row.createdAt,
-              endedAt: TERMINAL_WORKFLOW_STATUSES.has(row.status) ? row.updatedAt : null,
-              taskId: row.taskId,
-              costUsd: costs.get(row.id) ?? null,
-              ...(row.error ? { detail: row.error.slice(0, 200) } : {}),
-            })),
-          }
-        },
-        steps: async (runId) =>
-          (await runner.steps(runId)).map((step) => {
-            if (!step.sessionId || !step.profileId || /[^A-Za-z0-9_-]/.test(step.sessionId)) return step
-            const profile = getProfile(step.profileId)
-            if (profile.id !== step.profileId) return { ...step, resumeCommand: null }
-            const resume = profile.resumeArgv?.(resolveCommand(profile), step.sessionId)
-            return { ...step, resumeCommand: resume ? [resume.file, ...resume.args].join(' ') : null }
-          }),
+        allRuns: () => workflowRunList(store),
+        steps: (runId) => workflowStepProjections(runner, runId),
         gate: async (runId, stepId, approved) => {
           await deps.reconciled // an approval resumes a step the restart sweep could otherwise clobber
           await runner.resolveGate(runId, stepId, approved)
@@ -415,24 +370,35 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           defsChanged(row.workspaceId)
           return { ok: true }
         },
-        // `projectId` is accepted and unused, as the catalog route's is. What a step may name inside a
-        // project — a run target, a saved query — is checked when the step runs, because the node
-        // validating a definition may not have the repository at all.
-        validate: async (def) => ({ problems: validateWorkflow(def as WorkflowDef, runner.validationCatalog()) }),
+        validate: async (def, projectId) => {
+          const catalog = await starts.catalogForProject(projectId)
+          return {
+            problems: validateWorkflow(def as WorkflowDef, {
+              ...runner.validationCatalog(),
+              workflowTargets: catalog.workflows,
+            }),
+          }
+        },
         // Wiring only; the two calls and the repair pass are in ../server/generateWorkflowRequest.ts.
         // The runner's validation catalog rather than the pure one built from the kinds alone: it
         // carries each contributed kind's own `validate`, without which a workspace definition with a
         // broken step passes the example filter and teaches the model the mistake.
-        generate: async ({ userId, ...request }) =>
-          generateWorkflowRequest({
+        generate: async ({ userId, ...request }) => {
+          const project = request.projectId ? await core.projects.byId(request.projectId) : null
+          if (request.projectId && (!project || project.workspaceId !== request.workspaceId)) {
+            return { error: 'The selected project is not in this workspace.' }
+          }
+          const catalog = await starts.generationCatalog(request.projectId, request.defId)
+          return generateWorkflowRequest({
             request,
-            catalog: runner.catalog(),
-            validation: runner.validationCatalog(),
+            catalog,
+            validation: { ...runner.validationCatalog(), workflowTargets: catalog.workflows },
             // Rows, which carry the whole definition. The merged list summarises, and a summary is
             // not a worked example.
             examples: (await listDefs(store, request.workspaceId)).map((row) => ({ id: row.id, def: row.def })),
             generateText: (args) => core.models.generateText({ userId, ...args }),
-          }),
+          })
+        },
         modelBackends: (userId) => core.models.available(userId),
         saveToRepo: async (id, { taskId, keepRow }) => {
           const row = await getDef(store, id)
@@ -467,7 +433,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
       // (server/workflowRunner.ts explains the ordering).
-      ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
+      ctx.capabilities.provide(WORKFLOWS_RUNNER, {
+        reconcile: async () => {
+          const recovered = await dispatcher.reconcile()
+          for (const error of recovered.errors) ctx.log.warn(`workflow dispatch recovery failed: ${error}`)
+          await runner.reconcile()
+        },
+        start: (request) => starts.startInternal(request),
+      })
       ctx.capabilities.provide(WORKFLOW_GATES, {
         list: async (taskId) => {
           const runs = await store.select().from(workflowRuns).where(eq(workflowRuns.taskId, taskId))

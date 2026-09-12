@@ -13,8 +13,10 @@ import {
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
+import type { WorkflowStepProjection } from '../../shared/api'
 import { formatCost, formatDuration, kindLabel, kindRunsAgent, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
+import { ChildRuns, RunLineage } from './RunRelationships'
 
 // The run pane's `detail` region: what one node is doing, and the controls that are legal for the
 // state it is in (docs/workflows.md § Routes and UI).
@@ -96,6 +98,14 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   const openTerminal = (sessionId: string): void => {
     setTerminalOpen(props.task.id, true)
     requestTerminalFocus(props.task.id, sessionId)
+  }
+
+  const openTaskTarget = (taskId: string, runId?: string): void => {
+    const task = (tasks.data ?? []).find((candidate) => candidate.id === taskId)
+    if (!task) return
+    navigate(runId
+      ? `${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(runId)}`
+      : pathForTask(task))
   }
 
   const resumeInTerminal = async (name: string, profileId: string | null, command: string): Promise<void> => {
@@ -244,8 +254,10 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 {meta(current)}
               </Toolbar>
 
+              <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
               {alerts(current)}
               {childTaskLine()}
+              <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
 
               <Switch>
                 <Match when={shape() === 'gate'}>
@@ -307,6 +319,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
             {controls(current)}
           </Toolbar>
 
+          <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
           {alerts(current)}
 
           {/* Folded, because the transcript below says most of it in more detail. What is worth
@@ -315,6 +328,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           <Fold label="Step details">
             <Stack gap="row">
               {childTaskLine()}
+              <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
               <Facts
                 grouping="rows"
                 size="sm"

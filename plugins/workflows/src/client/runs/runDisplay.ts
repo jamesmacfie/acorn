@@ -4,6 +4,7 @@
 // Each map is one line, because the icon census reads a line for a literal only when that line
 // mentions an icon (client-core scripts/icon-census.mjs).
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowUsageSummary } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted'
@@ -41,3 +42,14 @@ export const runCost = (steps: readonly WorkflowStepRow[]): number =>
   steps.reduce((total, step) => total + (step.costUsd ?? 0), 0)
 
 export const formatCost = (usd: number): string => (usd > 0 ? `$${usd.toFixed(2)}` : '')
+
+/** A compact provider-usage line for the run footer and child cards. */
+export const formatUsage = (usage: WorkflowUsageSummary | null | undefined): string => {
+  if (!usage) return ''
+  return [
+    formatCost(usage.costUsd),
+    `${usage.turns.toLocaleString()} ${usage.turns === 1 ? 'turn' : 'turns'}`,
+    `${usage.inputTokens.toLocaleString()} input`,
+    `${usage.outputTokens.toLocaleString()} output`,
+  ].filter(Boolean).join(' · ')
+}

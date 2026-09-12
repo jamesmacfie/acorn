@@ -26,7 +26,7 @@
 // so it returns the parse error for the route to answer 422 with.
 import type { WorkflowGenerateNote, WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
 import type { WorkflowCatalog, WorkflowDef } from '../shared/workflowContracts'
-import { definitionForPrompt, restoreProtectedDefinition } from './editWorkflow'
+import { definitionForPrompt, restoreProtectedDefinition, restoreProtectedWorkflowTargets } from './editWorkflow'
 import {
   buildGenerateSystemPrompt,
   buildGenerateUserPrompt,
@@ -70,7 +70,8 @@ function readAnswer(
 ): Answer | { error: string } {
   const parsed = parseGeneratedWorkflow(text)
   if ('error' in parsed) return parsed
-  const grounded = groundWorkflow(parsed.def, catalog)
+  const candidate = currentDef ? restoreProtectedWorkflowTargets(currentDef, parsed.def) : parsed.def
+  const grounded = groundWorkflow(candidate, catalog)
   const def = currentDef ? restoreProtectedDefinition(currentDef, grounded.def) : grounded.def
   return {
     def,

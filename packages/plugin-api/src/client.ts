@@ -33,7 +33,7 @@ export { openTarget } from '@acorn/client-core/features/notifications/notificati
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
+export { wsAttach, wsConnect, wsOnNotice, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
 // A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.

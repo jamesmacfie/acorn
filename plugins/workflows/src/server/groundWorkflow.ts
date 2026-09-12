@@ -26,8 +26,15 @@
 // class this file exists for.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../shared/api'
 import { STEP_NAME_RE, uniqueStepName } from '../shared/stepNames'
-import type { WorkflowCatalog, WorkflowDef, WorkflowInput, WorkflowStepDef } from '../shared/workflowContracts'
+import type {
+  WorkflowCatalog,
+  WorkflowDef,
+  WorkflowInput,
+  WorkflowStepDef,
+  WorkflowValueBinding,
+} from '../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generateWorkflow'
+import { groundWorkflowDispatch } from './groundWorkflowDispatch'
 import { workflowEdges } from './workflowValidation'
 
 export type GroundedWorkflow = { def: WorkflowDef; notes: WorkflowGenerateNote[] }
@@ -42,7 +49,8 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
 const DEF_KEYS = ['name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'steps']
 const STEP_KEYS = [
   'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
-  'schema', 'policy', 'maxIterations', 'requiresRun', 'childStep', 'joins', 'branches', 'with', 'tools', 'budget',
+  'schema', 'policy', 'maxIterations', 'requiresRun', 'childStep', 'childWorkflow', 'items', 'itemKey',
+  'title', 'joins', 'branches', 'with', 'tools', 'budget',
 ]
 const CHILD_STEP_KEYS = ['name', 'profileId', 'model', 'prompt', 'schema', 'tools', 'budget']
 const INPUT_KEYS = ['name', 'description', 'required', 'default']
@@ -213,6 +221,11 @@ function pruneCeiling<T extends object>(tools: T | undefined, report: (key: stri
  *  rename does the same (../client/editor/draft.ts); this one adds no `after` key of its own. */
 function renameStep(def: WorkflowDef, from: string, to: string): WorkflowDef {
   const rewrite = (value: string): string => value.split(`\${steps.${from}.output}`).join(`\${steps.${to}.output}`)
+  const bindings = (table: Record<string, WorkflowValueBinding> | undefined) =>
+    table && Object.fromEntries(Object.entries(table).map(([name, binding]) => [
+      name,
+      binding.from === 'step' && binding.step === from ? { ...binding, step: to } : binding,
+    ]))
   const steps = def.steps.map((step) => {
     const next: WorkflowStepDef = { ...step }
     if (next.name === from) next.name = to
@@ -228,6 +241,9 @@ function renameStep(def: WorkflowDef, from: string, to: string): WorkflowDef {
     if (isRecord(next.with)) {
       next.with = Object.fromEntries(Object.entries(next.with).map(([key, value]) => [key, typeof value === 'string' ? rewrite(value) : value]))
     }
+    if (next.childWorkflow?.inputs) next.childWorkflow = { ...next.childWorkflow, inputs: bindings(next.childWorkflow.inputs) }
+    if (next.items?.step === from) next.items = { ...next.items, step: to }
+    if (next.title?.bindings) next.title = { ...next.title, bindings: bindings(next.title.bindings) }
     return next
   })
   return { ...def, steps }
@@ -495,5 +511,6 @@ export function groundWorkflow(def: WorkflowDef, catalog: WorkflowCatalog): Grou
   const steps = next.steps.map((step) => groundStep(step, catalog, kinds, notes))
   if (steps.some((step, index) => step !== next.steps[index])) next = { ...next, steps }
   next = groundReferences(next, notes)
+  next = groundWorkflowDispatch(next, catalog, notes)
   return { def: next, notes }
 }

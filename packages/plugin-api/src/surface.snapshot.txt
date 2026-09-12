@@ -218,6 +218,7 @@ client: writeLocal
 client: wsAttach
 client: wsConnect
 client: wsOnNotice
+client: wsOnReconnect
 client: wsOnStatus
 client: wsOnWorkflowStepChanged
 client: wsOnWorkflowStepEvent

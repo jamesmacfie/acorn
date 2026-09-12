@@ -131,6 +131,57 @@ kind = "gate-human"
     expect(parsed.inputs).toHaveLength(2)
   })
 
+  it('round trips single and mapped runtime workflow references without changing static composition', () => {
+    const { parsed, written, again } = roundTrip(`
+name = "dispatch"
+[[inputs]]
+name = "ticket"
+
+[[steps]]
+name = "select"
+after = []
+
+[[steps]]
+name = "one"
+kind = "workflow"
+[steps.child_workflow.ref]
+source = "database"
+id = "review-row"
+[steps.child_workflow.inputs.ticket]
+from = "input"
+name = "ticket"
+
+[[steps]]
+name = "many"
+kind = "workflow-map"
+after = ["select"]
+item_key = "/id"
+[steps.items]
+step = "select"
+pointer = "/tickets"
+[steps.child_workflow.ref]
+source = "repo"
+path = ".acorn/workflows/review.toml"
+[steps.child_workflow.inputs.ticket]
+from = "item"
+pointer = "/number"
+[steps.title]
+template = "Review \${ticket}"
+[steps.title.bindings.ticket]
+from = "item"
+pointer = "/number"
+`)
+    expect(again).toEqual(parsed)
+    expect(written).toContain('[steps.child_workflow.ref]')
+    expect(written).not.toContain('\nworkflow = "review-row"')
+
+    const staticErrors: { source: string; message: string }[] = []
+    const staticStep = parseWorkflowToml('[[steps]]\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
+    expect(staticErrors).toEqual([])
+    expect(staticStep?.steps[0]).toMatchObject({ workflowRef: 'review-block' })
+    expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
+  })
+
   it('writes a multi-line prompt as a literal block, so `${…}` survives unescaped', () => {
     const { written, parsed, again } = roundTrip(`
 name = "templated"

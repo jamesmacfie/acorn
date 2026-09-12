@@ -123,6 +123,22 @@ provisioning state, and an owner-scoped idempotency key. It does not mirror chil
 worktree spawn crosses the Agents and core databases through stable IDs and replayable operations;
 there is no cross-file transaction.
 
+`workflow_runs` stores explicit root run, parent run, parent step, and depth fields. It also keeps the
+resolved definition graph, effective authority, absolute deadline, and optional invocation identity
+used for recovery. These are execution records, not response fields: task run reads project them into
+parent and root task links without exposing the frozen internal authority.
+
+`workflow_dispatches` is the replay ledger for child workflow tasks. A unique caller key and payload
+fingerprint reserve stable task and run IDs before either cross-database effect. The row progresses
+through `reserved`, `task-created`, `run-started`, `cancelling`, and `terminal`; reconciliation reads
+that state and repeats only the missing transition. Core task IDs are plain cross-database IDs, so
+there is no foreign key or transaction spanning the workflow and core databases.
+
+`workflow_turn_admissions` records each provider turn before dispatch and settles it once with cost
+and token usage. Rows are keyed to the root, run, and step. Root run projections sum the whole tree;
+child projections sum only that child. A reserved row still consumes the allowance after a crash,
+because the provider may have accepted work before the terminal usage event was lost.
+
 ## Database plugin: the Postgres pane
 
 The database plugin's pane connects to a Postgres database per task, for browsing and editing the
@@ -237,7 +253,8 @@ declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); 
 with no client attached, parses the answer, stamps who answered, and merges
 (`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v2/core/runs` is the merged
 read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
-other exists.
+other exists. A task-confined caller uses this merged route and receives only its task's rows. The
+workflow source route is a node-internal aggregation seam and rejects a direct task-confined read.
 
 What the shape costs, stated plainly: the row is display-shaped — id, title, one of five statuses,
 started, ended, task, cost, one line of detail — and an owner with a richer vocabulary maps into it
