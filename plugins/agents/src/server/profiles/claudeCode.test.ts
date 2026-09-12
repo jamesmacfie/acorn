@@ -80,7 +80,7 @@ describe('the claude-code profile', () => {
 
   it('offers the CLI aliases as its model catalog, so a picker has something to draw', () => {
     // Aliases rather than dated ids: the CLI resolves `sonnet` to whatever it ships with.
-    expect(claudeCodeProfile.models?.map((model) => model.id)).toEqual(['sonnet', 'opus', 'haiku'])
+    expect(claudeCodeProfile.models?.map((model) => model.id)).toEqual(['sonnet', 'opus', 'fable', 'haiku'])
     expect(claudeCodeProfile.defaultModelId).toBe('sonnet')
     expect(claudeCodeProfile.glyph).toBe('brand:agents/claude')
   })
