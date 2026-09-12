@@ -26,11 +26,16 @@ export type AgentRequestChangedEvent = {
   status: AgentRequestStatus
 }
 
+export type SessionRenameSource = 'generated' | 'user'
+export type AgentSessionChange = 'created' | 'renamed' | 'archived' | 'restored' | 'deleted'
+
 export type AgentSessionsChangedEvent = {
   taskId: string
   sessionId: string
   present: boolean
   archived: boolean
+  changes: AgentSessionChange[]
+  renameSource?: SessionRenameSource
 }
 
 export type AgentLifecycleFrame =
@@ -59,7 +64,7 @@ export type AgentRequestState = AgentRequestChangedEvent & {
   resolvedAt: number | null
 }
 
-export type AgentSessionRosterEntry = AgentSessionsChangedEvent & {
+export type AgentSessionRosterEntry = Omit<AgentSessionsChangedEvent, 'changes' | 'renameSource'> & {
   providerId: string
   profileId: string
   kind: AgentSessionKind

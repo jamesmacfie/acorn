@@ -52,6 +52,7 @@ export const codexProfile: AgentProfileContribution = {
     args: [
       'exec',
       '--json',
+      '--ephemeral',
       '-s',
       'read-only',
       '--skip-git-repo-check',
@@ -67,4 +68,3 @@ export const codexProfile: AgentProfileContribution = {
   // configured default runs unless a caller names something, and then `-m` carries it.
   glyph: 'brand:agents/codex',
 }
-

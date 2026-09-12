@@ -47,14 +47,14 @@ describe('the codex profile', () => {
     // headless case has it: a sandbox opt-out slipped into the middle would otherwise pass.
     const { file, args } = codexProfile.aiArgv!('codex', { prompt: 'decide' })
     expect(file).toBe('codex')
-    expect(args).toEqual(['exec', '--json', '-s', 'read-only', '--skip-git-repo-check', 'decide'])
+    expect(args).toEqual(['exec', '--json', '--ephemeral', '-s', 'read-only', '--skip-git-repo-check', 'decide'])
   })
 
   it('prepends the system half to the prompt with a blank line, because codex exec has no flag for it', () => {
     const { args } = codexProfile.aiArgv!('codex', { prompt: 'What colour is the sky?', system: 'Answer with a single word only.' })
     // One argument, not two: a `--system-prompt` that does not exist would be read as the prompt.
     expect(args.at(-1)).toBe('Answer with a single word only.\n\nWhat colour is the sky?')
-    expect(args).toHaveLength(6)
+    expect(args).toHaveLength(7)
   })
 
   it('passes -m only when a caller names a model, because codex owns its own default', () => {

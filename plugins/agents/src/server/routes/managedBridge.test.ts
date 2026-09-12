@@ -49,7 +49,7 @@ describe('the snapshot a client reads', () => {
       kind: 'interactive',
       config: {},
     }, PROVIDER)
-    const turn = await store.enqueueTurn(session.id, {
+    const { turn } = await store.enqueueTurn(session.id, {
       source: 'interactive',
       input: [{ type: 'text', text: 'go' }],
       effectivePolicy: {},
