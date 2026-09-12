@@ -7,7 +7,9 @@ import type {
   AgentReviewInput,
   AgentReviewInputRef,
   AgentRequestState,
+  AgentSessionChange,
   AgentSessionRosterEntry,
+  SessionRenameSource,
   AgentTurnState,
 } from '../../contract/lifecycle'
 import { mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
@@ -30,13 +32,20 @@ export class AgentLifecycle {
     private readonly publish?: AgentLifecyclePublisher,
   ) {}
 
-  announceSession(session: AgentSession, present = true): void {
+  announceSession(
+    session: AgentSession,
+    changes: AgentSessionChange[],
+    renameSource?: SessionRenameSource,
+  ): void {
+    if (!changes.length) return
     this.publish?.({
       channel: 'plugin:agents:sessions-changed',
       taskId: session.taskId,
       sessionId: session.id,
-      present,
+      present: !changes.includes('deleted'),
       archived: session.archivedAt != null,
+      changes,
+      ...(changes.includes('renamed') && renameSource ? { renameSource } : {}),
     })
   }
 

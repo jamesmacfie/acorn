@@ -19,7 +19,9 @@ describe('agent profile registry', () => {
     // Codex has a one-shot mode of its own since 2026-09-09, where this used to assert it had none.
     // `-s read-only` stands in for claude's empty `--tools`, and `--skip-git-repo-check` is what lets
     // it start in the empty directory a one-shot generate runs in.
-    expect(codex.aiArgv?.('codex', { prompt: 'choose' }).args).toEqual(['exec', '--json', '-s', 'read-only', '--skip-git-repo-check', 'choose'])
+    expect(codex.aiArgv?.('codex', { prompt: 'choose' }).args).toEqual([
+      'exec', '--json', '--ephemeral', '-s', 'read-only', '--skip-git-repo-check', 'choose',
+    ])
   })
 
   it('adds a profile through one registration and every dynamic consumer sees it', () => {

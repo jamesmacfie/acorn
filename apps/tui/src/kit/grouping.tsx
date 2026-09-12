@@ -5,7 +5,7 @@ import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { isCompact } from '../appearance'
+import { isCompact, slotColor } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { GLYPHS } from './glyphs'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
@@ -81,6 +81,8 @@ export function Fold(props: {
   meta?: JSX.Element
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  /** Inset the fold behind a left rule, matching the DOM host's ownership cue. */
+  nested?: boolean
   persistKey?: string
   defaultOpen?: boolean
   open?: boolean
@@ -98,7 +100,14 @@ export function Fold(props: {
   // header then contents: `↓` from an open fold's header enters its first child.
   const control = stop({ onPress: toggle })
   return (
-    <box flexDirection="column" flexShrink={0}>
+    <box
+      flexDirection="column"
+      flexShrink={0}
+      border={props.nested ? ['left'] : []}
+      borderStyle="single"
+      borderColor={props.nested ? slotColor('default') : undefined}
+      paddingLeft={props.nested ? 1 : 0}
+    >
       <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
         <Line {...litControl({ focused: control.focused() })}>{open() ? '▾' : '▸'}</Line>
         <Line {...litControl({ focused: control.focused(), strong: true })}>{props.label}</Line>

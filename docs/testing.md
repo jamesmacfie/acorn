@@ -300,6 +300,12 @@ build, and nothing ships to a person until it passes (docs/shell.md § Signing g
    command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
    a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
    registry, and only a real CLI can prove the transcript.
+
+For managed-session naming, run one detailed first prompt with both Claude Code and Codex. Confirm the
+prompt fallback appears immediately and is replaced by a short title without interrupting the turn.
+Repeat while renaming the session before the generated result arrives, and confirm the user title
+wins. Signed-out CLIs and Aider must retain the fallback without adding a transcript warning.
+
 10. Build the reference node provider into the running node's data root
     (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
     node into that file, and from Settings → Nodes adopt it, run a task on it, then create and destroy

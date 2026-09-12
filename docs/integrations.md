@@ -394,6 +394,11 @@ What a generate deliberately is not is `agents.sessionExecute`. That path needs 
 durable session row, and appends to the transcript ledger per call. A commit message is not a
 session, and forty "Workflow: commit message" rows in Agent Center is the wrong record.
 
+Managed-session naming is the internal consumer that deliberately has no route or model picker. It
+spends `harness:<session.profileId>` only after that profile's first accepted interactive prompt, so
+it never falls through to a stored API credential or a different CLI. A profile without `aiArgv`,
+including Aider, is unavailable for this path and keeps the deterministic prompt fallback.
+
 **One core read route, and it is not the generate endpoint this section refuses.**
 `GET /v2/core/models/backends` is device-only and answers `backends` in list order plus `missing`,
 which is every profile with a one-shot mode whose command is not on this machine. The refusal above

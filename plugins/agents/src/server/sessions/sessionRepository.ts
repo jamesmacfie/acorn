@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
@@ -14,8 +14,9 @@ import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protoco
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
 import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
-import type { AgentLifecyclePublisher } from '../../contract/lifecycle'
+import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
 import { AgentLifecycle } from './lifecycle'
+import { normalizeStoredSessionTitle } from './sessionTitle'
 
 const now = (): number => Date.now()
 
@@ -332,14 +333,44 @@ export class AgentSessionRepository {
   async patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    renameSource: SessionRenameSource = 'user',
   ): Promise<AgentSession> {
+    const result = await this.mutateSession(sessionId, patch, { renameSource })
+    return result.session
+  }
+
+  async renameSession(
+    sessionId: string,
+    input: { title: string; expectedTitle?: string; source: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
+    return this.mutateSession(sessionId, { title: input.title }, {
+      expectedTitle: input.expectedTitle,
+      renameSource: input.source,
+    })
+  }
+
+  private async mutateSession(
+    sessionId: string,
+    patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options: { expectedTitle?: string; renameSource: SessionRenameSource },
+  ): Promise<{ session: AgentSession; changed: boolean }> {
     const before = await this.requireSession(sessionId)
+    if (options.expectedTitle !== undefined && before.title !== options.expectedTitle) {
+      return { session: before, changed: false }
+    }
+    const title = patch.title !== undefined ? normalizeStoredSessionTitle(patch.title) : undefined
+    const renamed = title !== undefined && title !== before.title
+    const archiveChanged = patch.archived !== undefined
+      && patch.archived !== (before.archivedAt != null)
+    const hasOtherWrite = patch.lastReadSeq !== undefined || patch.config !== undefined
+    if (!renamed && !archiveChanged && !hasOtherWrite) return { session: before, changed: false }
+
     const timestamp = now()
-    await this.db
+    const write = await this.db
       .update(schema.agentSessions)
       .set({
         updatedAt: timestamp,
-        ...(patch.title ? { title: patch.title } : {}),
+        ...(renamed ? { title } : {}),
         ...(patch.archived != null
           ? {
               archivedAt: patch.archived ? timestamp : null,
@@ -354,12 +385,27 @@ export class AgentSessionRepository {
           : {}),
         ...(patch.config ? { configJson: JSON.stringify(patch.config) } : {}),
       })
-      .where(eq(schema.agentSessions.id, sessionId))
+      .where(and(
+        eq(schema.agentSessions.id, sessionId),
+        options.expectedTitle !== undefined
+          ? and(
+              eq(schema.agentSessions.title, options.expectedTitle),
+              title !== undefined ? ne(schema.agentSessions.title, title) : undefined,
+            )
+          : undefined,
+      ))
+      .run()
+    if (Number(write.changes ?? 0) === 0) {
+      return { session: await this.requireSession(sessionId), changed: false }
+    }
+
     const session = await this.requireSession(sessionId)
-    const rosterChanged = (patch.title != null && session.title !== before.title)
-      || (patch.archived != null && (session.archivedAt != null) !== (before.archivedAt != null))
-    if (rosterChanged) this.lifecycle.announceSession(session)
-    return session
+    const changes: AgentSessionChange[] = [
+      ...(renamed ? ['renamed' as const] : []),
+      ...(archiveChanged ? [patch.archived ? 'archived' as const : 'restored' as const] : []),
+    ]
+    this.lifecycle.announceSession(session, changes, options.renameSource)
+    return { session, changed: renamed || archiveChanged || hasOtherWrite }
   }
 
   async setController(sessionId: string, controller: AgentSession['controller']): Promise<AgentSession> {
@@ -409,7 +455,7 @@ export class AgentSessionRepository {
       tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
     })
-    this.lifecycle.announceSession(session, false)
+    this.lifecycle.announceSession(session, ['deleted'])
     return {
       attachmentIds: attachmentRows.map((row) => row.attachmentId),
       artifactObjects: artifactRows,

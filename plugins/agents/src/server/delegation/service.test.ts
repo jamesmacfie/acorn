@@ -79,7 +79,8 @@ describe('agent delegation service', () => {
       store: sessions,
       providers: async () => [PROVIDER],
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) => sessions.createSession(input, PROVIDER)),
-      enqueueTurn: vi.fn((sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) => sessions.enqueueTurn(sessionId, input)),
+      enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
+        (await sessions.enqueueTurn(sessionId, input)).turn),
       applyRequestedConfig: vi.fn(async () => undefined),
       wait: vi.fn((sessionId: string, afterSeq: number) => sessions.snapshot(sessionId, afterSeq)),
       cancelTurn: vi.fn(async (sessionId: string, turnId?: string) => {
@@ -145,7 +146,7 @@ describe('agent delegation service', () => {
 
   it('creates one durable child and turn for a replayed managed caller call', async () => {
     const parent = await managedCaller()
-    const parentTurn = await sessions.enqueueTurn(parent.id, {
+    const { turn: parentTurn } = await sessions.enqueueTurn(parent.id, {
       input: [{ type: 'text', text: 'delegate' }],
       source: 'interactive',
       effectivePolicy: {},
@@ -301,7 +302,7 @@ describe('agent delegation service', () => {
       kind: 'delegated',
       config: { delegationSpawnId: turnWritten.id },
     }, PROVIDER)
-    const recoveredTurn = await sessions.enqueueTurn(turnSession.id, {
+    const { turn: recoveredTurn } = await sessions.enqueueTurn(turnSession.id, {
       input: [{ type: 'text', text: 'Inspect the branch.' }],
       source: 'delegation',
       effectivePolicy: { delegationSpawnId: turnWritten.id },
@@ -535,7 +536,7 @@ describe('agent delegation service', () => {
   it('does not reveal a missing or foreign named turn through cancellation', async () => {
     const { parent, child } = await spawnChild()
     const other = await managedCaller(parent.taskId)
-    const foreignTurn = await sessions.enqueueTurn(other.id, {
+    const { turn: foreignTurn } = await sessions.enqueueTurn(other.id, {
       input: [{ type: 'text', text: 'Foreign.' }],
       source: 'interactive',
       effectivePolicy: {},

@@ -101,10 +101,106 @@ describe('managed-agent lifecycle events and read models', () => {
     config: {},
   }, provider)
 
+  it('announces creation, generated fallback, and idempotent insertion state without content', async () => {
+    const session = await createSession()
+    expect(frames).toEqual([expect.objectContaining({
+      channel: 'plugin:agents:sessions-changed',
+      sessionId: session.id,
+      changes: ['created'],
+      present: true,
+      archived: false,
+    })])
+
+    const key = randomUUID()
+    const first = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: '  Implement\n generated   session names  ' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: key,
+    })
+    expect(first).toMatchObject({ inserted: true, firstTurnFallback: 'Implement generated session names' })
+    expect(first.sessionAfterRename?.title).toBe('Implement generated session names')
+    const sessionFrames = frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')
+    expect(sessionFrames.at(-1)).toEqual({
+      channel: 'plugin:agents:sessions-changed',
+      taskId: session.taskId,
+      sessionId: session.id,
+      present: true,
+      archived: false,
+      changes: ['renamed'],
+      renameSource: 'generated',
+    })
+    expect(sessionFrames.at(-1)).not.toHaveProperty('title')
+
+    const replay = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'ignored replay' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: key,
+    })
+    expect(replay).toMatchObject({ inserted: false, firstTurnFallback: null, sessionAfterRename: null })
+    expect(frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')).toHaveLength(2)
+  })
+
+  it('uses compare-and-set and emits one stable event for combined user changes', async () => {
+    const session = await createSession()
+    frames = []
+    const equal = await store.renameSession(session.id, {
+      title: session.title,
+      source: 'user',
+    })
+    expect(equal).toEqual({ session, changed: false })
+    expect(frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')).toEqual([])
+
+    const unchanged = await store.renameSession(session.id, {
+      title: 'Generated result',
+      expectedTitle: 'a different fallback',
+      source: 'generated',
+    })
+    expect(unchanged.changed).toBe(false)
+    expect(unchanged.session.updatedAt).toBe(session.updatedAt)
+    expect(frames).toEqual([])
+
+    const changed = await store.patchSession(session.id, { title: '  Owner title  ', archived: true })
+    expect(changed.title).toBe('Owner title')
+    expect(changed.archivedAt).not.toBeNull()
+    expect(frames).toEqual([{
+      channel: 'plugin:agents:sessions-changed',
+      taskId: session.taskId,
+      sessionId: session.id,
+      present: true,
+      archived: true,
+      changes: ['renamed', 'archived'],
+      renameSource: 'user',
+    }])
+    expect((await store.lifecycleSessions(session.taskId))[0]?.title).toBe('Owner title')
+  })
+
+  it('does not replace a title authored before the first turn', async () => {
+    const session = await store.createSession({
+      taskId,
+      providerId: provider.id,
+      profileId: provider.profileId,
+      kind: 'interactive',
+      config: {},
+      title: 'Owner title',
+    }, provider)
+    frames = []
+    const outcome = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Please implement generated session naming now' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    expect(outcome).toMatchObject({ inserted: true, firstTurnFallback: null, sessionAfterRename: null })
+    expect((await store.requireSession(session.id)).title).toBe('Owner title')
+    expect(frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')).toEqual([])
+  })
+
   it('announces every real turn transition with the current attempt and suppresses replays', async () => {
     const session = await createSession()
     frames = []
-    const turn = await store.enqueueTurn(session.id, {
+    const { turn } = await store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Do the work.' }],
       source: 'delegation',
       effectivePolicy: {},
@@ -228,11 +324,11 @@ describe('managed-agent lifecycle events and read models', () => {
     await store.deleteSession(session.id)
 
     expect(frames.filter((frame) => frame.channel === 'plugin:agents:sessions-changed')).toEqual([
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: true },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false },
-      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: false, archived: false },
+      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['created'] },
+      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['renamed'], renameSource: 'user' },
+      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: true, changes: ['archived'] },
+      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: true, archived: false, changes: ['restored'] },
+      { channel: 'plugin:agents:sessions-changed', taskId, sessionId: session.id, present: false, archived: false, changes: ['deleted'] },
     ])
     expect(await store.lifecycleSessions(taskId)).toEqual([])
   })

@@ -99,7 +99,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     emits: [
       { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
       { verb: 'request-changed', description: 'An agent input request was created or changed state' },
-      { verb: 'sessions-changed', description: 'A managed agent session entered or changed its task roster' },
+      { verb: 'sessions-changed', description: 'A managed agent session was created, renamed, archived, restored, or deleted' },
       { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
     ],
     // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.

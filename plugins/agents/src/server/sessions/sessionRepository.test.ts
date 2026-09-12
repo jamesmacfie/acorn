@@ -103,7 +103,7 @@ describe('subagent roster on the session row', () => {
 
   it('projects only bounded completed-turn review input under the owning task', async () => {
     const created = await session()
-    const turn = await store.enqueueTurn(created.id, {
+    const { turn } = await store.enqueueTurn(created.id, {
       source: 'interactive', input: [{ type: 'text', text: 'Original prompt' }],
       effectivePolicy: {}, idempotencyKey: 'review-input-1',
     })

@@ -35,6 +35,18 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+A new session starts as `New agent session`. Its first accepted turn immediately replaces that with a
+deterministic label from the first non-empty text part, or the first attachment filename, so naming
+never blocks the turn. For a first interactive text prompt of at least five words, the runtime then
+asks the same session profile for a shorter title in the background. That one-shot run has tools
+disabled, executes in an empty temporary directory, receives only the effective text left by the
+`before-send` hook, and is bounded to five seconds. Workflow, delegation, automation, import,
+attachment-only, short, repeated, and later turns do not generate a title.
+
+The generated write compares against the exact fallback before replacing it. A user rename therefore
+wins whether it lands before or during generation, and a restart cannot regenerate a title from an
+already inserted turn. A generation failure leaves the fallback and adds nothing to the transcript.
+
 ### Cross-plugin lifecycle
 
 Three plugin events reduce the durable model without copying its private content:
@@ -44,8 +56,9 @@ Three plugin events reduce the durable model without copying its private content
 - `plugin:agents:request-changed` carries task, session, provider request id, kind, and status after
   creation, resolution claim, provider acknowledgement, expiry, cancellation cleanup, or restart
   repair.
-- `plugin:agents:sessions-changed` carries task, session, presence, and archive state after create,
-  title change, archive, restore, or deletion. Titles never enter the event payload.
+- `plugin:agents:sessions-changed` carries task and session ids, current presence and archive state,
+  and a stable `changes` array (`created`, `renamed`, `archived`, `restored`, or `deleted`). A rename
+  also carries `renameSource` (`generated` or `user`). Titles never enter the event payload.
 
 The store and repository own these post-commit announcements, rather than each route and runtime
 path sending independently. Node-side consumers rebuild current state through the task-scoped
@@ -53,6 +66,10 @@ path sending independently. Node-side consumers rebuild current state through th
 effective policy, error, and transcript content; request resolution remains private to the agent
 runtime. Core `agent-session:changed` remains the generic completion/attention compatibility event,
 and `agent:*` remains the owned transcript stream.
+
+The immediate fallback, generated title, and user-authored rename all use the repository's one title
+mutation. Each successful change also publishes the full `agent:session` frame clients already use to
+update their cache.
 
 `agents.reviewInput.v1` is the narrow exception for completion consumers that need content. A caller
 must name the owning task, session, and turn. The result contains the persisted `turn_completed`
@@ -791,6 +808,10 @@ ready. A startup failure therefore settles that visible row as `failed` and reco
 event ledger; it is not reported as a late failure of a create request whose resource already exists.
 The runtime tracks the detached initialization through shutdown so it cannot outlive the plugin
 database.
+
+Automatic title calls have the same custody: the runtime owns one in-flight operation per session.
+Session deletion aborts and joins that operation before deleting the row, and shutdown aborts and
+joins every naming call before the plugin database closes.
 
 A session reference the agent has forgotten is recoverable, not fatal. Agents keep their own session
 stores and prune them, and Claude Code keys its store by working directory, so a checkout that moved
