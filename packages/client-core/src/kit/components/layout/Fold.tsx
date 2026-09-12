@@ -39,6 +39,9 @@ export function Fold(props: {
    *  must not open the fold. */
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  /** Draw the whole section inset behind a left rule, so it reads as owned by what sits above it.
+   *  A subagent's card under its parent's stream is the case that wanted this. */
+  nested?: boolean
   persistKey?: string
   /** Where the fold starts, when nothing has been stored under `persistKey`. */
   defaultOpen?: boolean
@@ -57,6 +60,7 @@ export function Fold(props: {
   return (
     <details
       class="ui-fold"
+      data-nested={props.nested ? '' : undefined}
       open={open()}
       onToggle={(event) => {
         const next = event.currentTarget.open
