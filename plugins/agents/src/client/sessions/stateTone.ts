@@ -30,7 +30,10 @@ const RUNTIME_ICON: Record<string, string> = {
   creating: 'clock',
   connecting: 'clock',
   replaying: 'clock',
-  ready: 'circle',
+  // `ready` is where a session rests once its turn is over, so the resting mark says finished rather
+  // than drawing the blank circle a never-run session would deserve. Muted, not green, for the reason
+  // above: most rows in a busy task are finished.
+  ready: 'circle-check',
   working: 'loader-circle',
   waiting: 'circle-alert',
   cancelling: 'loader-circle',
@@ -57,8 +60,9 @@ export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
 
 /** The shape beside that colour, the pair RUNTIME_ICON makes for a session. A subagent that is running
  *  gets the same turning loader as a session that is working, because a reader scanning the sidebar is
- *  asking one question of both kinds of row: is this thing moving? An idle subagent borrows `ready`'s
- *  circle for the same reason: it is resting, not finished. */
+ *  asking one question of both kinds of row: is this thing moving? An idle subagent keeps a plain
+ *  circle where a resting session takes a check: a Codex child rests resumable, so it is waiting to be
+ *  picked up rather than done with. */
 const SUBAGENT_ICON: Record<AgentSubagentStatus, string> = {
   pending: 'clock',
   running: 'loader-circle',
