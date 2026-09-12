@@ -206,12 +206,14 @@ agent that should have asked guessed instead, for as long as the capability was 
 declares `form` alone. A url-mode elicitation would hand a person a link to open, which is a different
 surface and a different consent question, so it stays undeclared and never arrives.
 
-One schema property becomes one question (`server/drivers/acpNormalizer.ts`), and nothing in that
-mapping knows a vendor's field names, so any ACP agent's form maps the same way. Claude pairs every
-choice with a free-text box, which lands as its own question titled "Other". An answer travels back as
-the option's own value behind the label a person picked, because the card answers with labels and
-Codex numbers its options positionally. A question is answered in the same card, by the same route,
-and against the same durable row as a permission (§ Client surfaces).
+One schema property becomes one question (`server/drivers/formElicitation.ts`), and nothing in that
+mapping knows a vendor's field names, so property-bearing ACP and Codex app-server forms map the same
+way. Claude pairs every choice with a free-text box, which lands as its own question titled "Other".
+For Codex, a form with no properties is consent rather than an empty question: the card offers Allow
+and Decline, and sends the chosen MCP action back to the provider. An answer travels back as the
+option's own value behind the label a person picked, because the card answers with labels and Codex
+numbers its own question options positionally. A question is answered in the same card, by the same
+route, and against the same durable row as a permission (§ Client surfaces).
 
 **A question the agent stopped waiting for is released with its turn.** No cancellation signal reaches
 an elicitation handler, so a turn can end with a question still parked: the ACP request would never be

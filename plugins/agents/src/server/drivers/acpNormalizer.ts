@@ -11,11 +11,11 @@ import type {
   AgentConfigOption,
   AgentNormalizedEvent,
   AgentPermissionOption,
-  AgentQuestion,
   AgentSubagentUpdate,
   AgentToolCall,
   AgentUsage,
 } from '@acorn/protocol/managedAgents.ts'
+import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 
 const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
   kind === 'allow_once' || kind === 'allow_always' || kind === 'reject_once' || kind === 'reject_always'
@@ -40,108 +40,24 @@ export function normalizeAcpPermission(
   }
 }
 
-// A form elicitation is the other way an ACP agent blocks on a person: not "may I", but "which one".
-// Claude Code's AskUserQuestion arrives here, and so does an MCP server that asks a question of its
-// own; both are off unless the client says it can draw a form (./acpDriver.ts, `clientCapabilities`).
-//
-// One schema property becomes one question, and nothing here knows a vendor's field names. The Claude
-// adapter pairs every choice with a free-text box beside it, which lands as its own question titled
-// "Other", the same shape any other agent's form would produce.
-type FormProperty = {
-  type?: string
-  title?: string | null
-  description?: string | null
-  enum?: string[] | null
-  oneOf?: EnumOption[] | null
-  items?: { enum?: string[] | null; anyOf?: EnumOption[] | null } | null
-}
-type EnumOption = { const: string; title?: string | null; description?: string | null }
-
-const formProperties = (request: CreateElicitationRequest): Array<[string, FormProperty]> => {
-  // The request is a union whose open member swallows the schema into `unknown`, so it is read back
-  // through the narrow shape this file uses rather than through the SDK's own.
-  const schema = ('requestedSchema' in request ? request.requestedSchema : undefined) as
-    { properties?: Record<string, unknown> } | undefined
-  return Object.entries(schema?.properties ?? {}).map(([key, value]) => [key, value as FormProperty])
-}
-
-// The choices a property offers, or nothing when it is a free-text field. `id` is what goes back to the
-// agent and `label` is what a person reads, which differ whenever the agent titles its options.
-const formOptions = (property: FormProperty): AgentQuestion['options'] => {
-  const titled = property.type === 'array' ? property.items?.anyOf : property.oneOf
-  if (titled?.length) {
-    return titled.map((option) => ({
-      id: option.const,
-      label: option.title || option.const,
-      ...(option.description ? { description: option.description } : {}),
-    }))
-  }
-  const bare = property.type === 'array' ? property.items?.enum : property.enum
-  if (bare?.length) return bare.map((value) => ({ id: value, label: value }))
-  if (property.type === 'boolean') return [{ id: 'true', label: 'Yes' }, { id: 'false', label: 'No' }]
-  return undefined
-}
-
 export function normalizeAcpElicitation(
   requestId: string,
   request: CreateElicitationRequest,
 ): AgentNormalizedEvent {
-  return {
-    type: 'request',
-    requestId,
-    // 'question' rather than 'elicitation', because that word is on the card in front of a person.
-    kind: 'question',
-    title: request.message,
-    questions: formProperties(request).map(([key, property]) => {
-      const options = formOptions(property)
-      const title = property.title ?? undefined
-      const description = property.description ?? undefined
-      return {
-        id: key,
-        // Both only when the property carries both. A form with one question puts that question in
-        // `message` and leaves the field with a bare header, so using the header twice reads twice.
-        ...(title && description ? { header: title } : {}),
-        prompt: description ?? title ?? request.message,
-        ...(options ? { options } : {}),
-        ...(property.type === 'array' ? { multiple: true } : {}),
-      }
-    }),
-    // A form marks nothing required, so leaving is always allowed. Skip tells the agent nobody
-    // answered and lets the turn carry on; only a cancelled turn aborts the call behind it.
-    options: [{ id: 'decline', label: 'Skip', kind: 'reject_once' }],
-  }
+  return normalizeFormElicitation(requestId, {
+    message: request.message,
+    requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
+  })
 }
-
-// What a person picked, on its way back to the agent. The card answers with labels, so each one is
-// matched to the option that offered it and the option's own value is what travels.
-const formValue = (property: FormProperty, label: string): string =>
-  formOptions(property)?.find((option) => option.label === label)?.id ?? label
 
 export function acpElicitationResponse(
   request: CreateElicitationRequest,
   resolution: unknown,
 ): CreateElicitationResponse {
-  const row = (typeof resolution === 'object' && resolution != null ? resolution : {}) as Record<string, unknown>
-  // The Skip button, and a request drained by a cancelled turn.
-  if (typeof row.optionId === 'string') return row.optionId === 'cancel' ? { action: 'cancel' } : { action: 'decline' }
-  const answers = (typeof row.answers === 'object' && row.answers != null ? row.answers : {}) as Record<string, unknown>
-  const content: Record<string, string | number | boolean | string[]> = {}
-  for (const [key, property] of formProperties(request)) {
-    const answer = answers[key]
-    const picked = (Array.isArray(answer) ? answer.map(String) : [String(answer ?? '')])
-      .filter((value) => value !== '')
-      .map((label) => formValue(property, label))
-    if (!picked.length) continue
-    if (property.type === 'array') content[key] = picked
-    else if (property.type === 'boolean') content[key] = picked[0] === 'true'
-    else if (property.type === 'number' || property.type === 'integer') {
-      const value = Number(picked[0])
-      if (!Number.isNaN(value)) content[key] = value
-    } else content[key] = picked[0]
-  }
-  // An unanswered property is simply absent, including one the schema marked `required`.
-  // Claude's adapter marks none, and an agent that does gets the same "skipped" it gets from decline.
-  return { action: 'accept', content }
+  return formElicitationResponse({
+    message: request.message,
+    requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
+  }, resolution)
 }
 
 const configCategory = (category: string | null | undefined): AgentConfigOption['category'] => {

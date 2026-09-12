@@ -6,6 +6,7 @@ import type {
   AgentToolCall,
 } from '@acorn/protocol/managedAgents.ts'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
+import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 
 type JsonObject = Record<string, unknown>
 
@@ -287,13 +288,10 @@ export function normalizeCodexServerRequest(request: JsonRpcServerRequest): Agen
       return { type: 'request', requestId, kind: 'question', title: 'Codex has a question', questions }
     }
     case 'mcpServer/elicitation/request':
-      return {
-        type: 'request',
-        requestId,
-        kind: 'elicitation',
-        title: stringValue(request.params.message) ?? 'Input requested',
-        detail: request.params.requestedSchema == null ? undefined : JSON.stringify(request.params.requestedSchema),
-      }
+      return normalizeFormElicitation(requestId, {
+        message: stringValue(request.params.message) ?? 'Input requested',
+        requestedSchema: request.params.requestedSchema,
+      })
     default:
       return null
   }
@@ -324,7 +322,10 @@ export function codexServerRequestResponse(request: JsonRpcServerRequest, resolu
       }
     }
     case 'mcpServer/elicitation/request':
-      return row ?? { action: 'cancel' }
+      return formElicitationResponse({
+        message: stringValue(request.params.message) ?? 'Input requested',
+        requestedSchema: request.params.requestedSchema,
+      }, resolution)
     default:
       return row ?? {}
   }
