@@ -81,18 +81,6 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
   return t
 }
 
-// Per-project preferred base ref for a new branch (docs/workspaces-and-tasks.md § Worktrees and
-// setup): the prefs key `base_ref:<projectId>`.
-export const baseRefPref = async (db: AppDatabase, userId: string | null, projectId: string): Promise<string | null> => {
-  if (!userId) return null
-  const [row] = await db
-    .select()
-    .from(schema.prefs)
-    .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, `base_ref:${projectId}`)))
-    .limit(1)
-  return row?.value ?? null
-}
-
 // Startup context injection toggle: opt-out, so an absent preference means on. The key mirrors
 // PrefKeys.startupContextInjection; core and client can't be imported from main, so it is a
 // literal string here.
@@ -203,8 +191,7 @@ const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boole
 export async function resolveTaskCwd(
   db: AppDatabase,
   t: TaskRef | undefined,
-  baseCheckout: string | undefined,
-  userId: string | null = null,
+  _baseCheckout: string | undefined,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   const project = t ? await projectForTask(db, t) : null
   const projectRoot = project?.path && isDir(project.path) ? project.path : undefined
@@ -235,7 +222,6 @@ export async function resolveTaskCwd(
       repo,
       branch,
       t.pullNumber,
-      project ? await baseRefPref(db, userId, project.id) : null,
     )
     // Falling back to the project root here put the task in the main checkout, on whatever branch
     // the user last left it, silently, and typically alongside whatever other task lives there.
@@ -268,7 +254,7 @@ export async function resolveTaskCwd(
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
 // like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
 // the task id, not a renderer-supplied absolute path, is the capability.
-export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null): Promise<string | null> {
+export async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const project = await projectForTask(db, t)
@@ -278,7 +264,7 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
   // worktree becomes null here rather than an exception through every editor/changes/db read. The
   // loud path is the one that spawns a session in it.
   try {
-    const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId)
+    const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
     return resolve(cwd)
   } catch (e) {
     console.warn('[worktrees] no usable worktree for task', taskId, '-', e instanceof Error ? e.message : e)
@@ -345,7 +331,7 @@ export async function taskRunConfig(
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
   let cwd: string
   try {
-    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout, null))
+    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout))
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No usable worktree for this task.' }
   }

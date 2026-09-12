@@ -52,20 +52,12 @@ export type TaskService = {
   load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree
   // lazily if needed. null when no checkout is mapped.
-  //
-  // `userId` matters: creating a worktree reads the per-project base-ref preference, which is
-  // user-owned, and a missing identity falls back to git's origin/main rather than picking another
-  // login's preference. A caller holding an authorizing identity must pass it.
-  root(taskId: string, userId?: string | null): Promise<string | null>
+  root(taskId: string): Promise<string | null>
   // The cwd a task's commands run in, creating the worktree on first use
   // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id, because
   // the one caller already loaded it and re-reading would be a second query across a database
   // boundary.
-  //
-  // `userId` carries the same weight it does on `root`. The workflow runner passes the node's active
-  // owner identity. Terminal's spawn path runs for whoever is at the keyboard, omits it, and gets
-  // git's fallback.
-  resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined, userId?: string | null): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
+  resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   // Run targets and cwd for a task: project settings merged with the project's committed
   // `.acorn/config.toml`. plugins/terminal's RuntimeService is the only consumer, and it can read
   // neither source itself, since one is a core table and the other needs the lazy worktree.
@@ -154,8 +146,8 @@ export function createTaskService(db: AppDatabase): TaskService {
       const row = await loadTask(db, taskId)
       return row && toTaskRef(row)
     },
-    root: (taskId, userId = null) => taskRoot(db, taskId, userId),
-    resolveCwd: (task, baseCheckout, userId = null) => resolveTaskCwd(db, task, baseCheckout, userId),
+    root: (taskId) => taskRoot(db, taskId),
+    resolveCwd: (task, baseCheckout) => resolveTaskCwd(db, task, baseCheckout),
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),

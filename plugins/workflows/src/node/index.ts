@@ -115,9 +115,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           if (managed) return managed
           // The headless fallback: a profile with no managed driver, or a node with agents disabled.
           const task = await core.tasks.load(taskId)
-          // The identity is passed through because creating the worktree consults the owner's per-repo
-          // base_ref preference; dropping it would silently fall back to git's origin/main.
-          const { cwd } = task ? await core.tasks.resolveCwd(task, undefined, core.identity.active()) : { cwd: homedir() }
+          const { cwd } = task ? await core.tasks.resolveCwd(task, undefined) : { cwd: homedir() }
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
           const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
           const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)

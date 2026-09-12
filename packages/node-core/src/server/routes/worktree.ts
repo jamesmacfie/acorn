@@ -58,7 +58,7 @@ async function capturePreviewUrl(
 ): Promise<{ ok: boolean; url?: string; reason?: string }> {
   const script = rawScript?.trim()
   if (!script) return { ok: false, reason: 'no script configured' }
-  const cwd = await taskRoot(db, taskId, null)
+  const cwd = await taskRoot(db, taskId)
   if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
   const task = await loadTask(db, taskId)
   const project = task ? await projectForTask(db, task) : null
@@ -85,7 +85,7 @@ async function capturePreviewUrl(
 // MCP config inspector (docs/mcp.md): read only the known candidate files and mask secrets here, so
 // raw values never cross to the renderer. Read-only, since acorn never launches these servers.
 async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> {
-  const root = taskId ? await taskRoot(db, taskId, null) : null
+  const root = taskId ? await taskRoot(db, taskId) : null
   const out: { file: string; servers: McpServerSummary[] }[] = []
   for (const candidate of MCP_CANDIDATES) {
     const base = candidate.root === 'home' ? homedir() : root
@@ -157,7 +157,7 @@ export const worktree = new Hono<AppEnv>()
     if (!isDir(project.path)) return c.json({ ok: true })
     // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
     // is only to get the setup script in early. The surface that actually needs the cwd will say so.
-    await resolveTaskCwd(db, task, project.path, null).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
+    await resolveTaskCwd(db, task, project.path).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
     broadcastStatus() // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })
@@ -176,7 +176,7 @@ export const worktree = new Hono<AppEnv>()
   })
   .get('/tasks/:id/mcp', async (c) => c.json(await inspectTaskMcp(getDb(c.env), c.req.param('id'))))
   .post('/tasks/:id/mcp/starter', async (c) => {
-    const root = await taskRoot(getDb(c.env), c.req.param('id'), null)
+    const root = await taskRoot(getDb(c.env), c.req.param('id'))
     if (!root) return c.json({ ok: false, reason: 'No worktree yet — open a terminal first.' })
     const file = resolve(root, '.mcp.json')
     if (existsSync(file)) return c.json({ ok: false, reason: '.mcp.json already exists.' })

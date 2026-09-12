@@ -100,7 +100,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (input.profileId !== provider.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await this.core.tasks.root(input.taskId, this.currentUserId()))) {
+    if (!(await this.core.tasks.root(input.taskId))) {
       throw new Error('The task has no mapped checkout.')
     }
     const session = await this.store.createSession(input, provider)
@@ -210,7 +210,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (provider.profileId !== input.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await this.core.tasks.root(input.taskId, this.currentUserId()))) {
+    if (!(await this.core.tasks.root(input.taskId))) {
       throw new Error('The task has no mapped checkout.')
     }
     const parsed = parseAgentTranscript(input.content)
@@ -291,7 +291,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.requireSession(sessionId)
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
     if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
-    const cwd = await this.core.tasks.root(session.taskId, this.currentUserId())
+    const cwd = await this.core.tasks.root(session.taskId)
     if (!cwd) throw new Error('The task has no mapped checkout.')
     await validateAgentInputFiles(cwd, input.input)
     assertBoundedJson('Effective agent policy', input.effectivePolicy, MAX_AGENT_POLICY_BYTES)
@@ -388,7 +388,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   ): Promise<AgentTurn> {
     if (patch.input) {
       const session = await this.store.requireSession(sessionId)
-      const cwd = await this.core.tasks.root(session.taskId, this.currentUserId())
+      const cwd = await this.core.tasks.root(session.taskId)
       if (!cwd) throw new Error('The task has no mapped checkout.')
       await validateAgentInputFiles(cwd, patch.input)
     }
