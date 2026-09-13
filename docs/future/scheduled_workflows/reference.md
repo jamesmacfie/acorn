@@ -1,5 +1,9 @@
 # Scheduling contract
 
+> Superseded on 2026-09-13 by [workflow v2](../workflow_v2/README.md).
+> Do not implement this historical plan. Its original text is retained for background; the new
+> [scheduling contract](../workflow_v2/scheduling.md) and implementation slices are authoritative.
+
 Date: 2026-09-12. Status: implementation proposal, not started.
 Baseline: `8cb7ce45`. Paths describe the surveyed code, not a promise that it has stayed unchanged.
 

@@ -17,11 +17,12 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
 | [workflow_tasks/](./workflow_tasks/README.md) | The shipped child-task workflow programme and links to its owning documentation. | Shipped, 2026-09-13. |
-| [scheduled_workflows/](./scheduled_workflows/README.md) | User-approved schedules with supplied inputs and a fresh task per occurrence. Five phases after workflow tasks. | Proposal, 2026-09-12. Not started. |
+| [workflow_v2/](./workflow_v2/README.md) | Shared plugin data, typed workflows, simple authoring, dashboards, AI discovery, and scheduling. Twenty implementation slices with contracts and UX flows. | Accepted design, 2026-09-13. Implementation not started. |
+| [scheduled_workflows/](./scheduled_workflows/README.md) | Historical scheduling proposal retained for background. Follow workflow v2 instead. | Superseded, 2026-09-13. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
-| [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
+| [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 
 ## The single files

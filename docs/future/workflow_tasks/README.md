@@ -16,5 +16,5 @@ Current behavior is documented in:
 - [Testing](../../testing.md) for the manual acceptance checklist.
 
 [Phase 7](./phase-07-navigation-and-acceptance.md) records the final automated and manual gates.
-[Scheduled workflows](../scheduled_workflows/README.md) can build on the internal idempotent start
-capability.
+[Workflow v2](../workflow_v2/README.md) builds on the internal idempotent start capability and owns
+the next scheduling and child-workflow implementation plan.
