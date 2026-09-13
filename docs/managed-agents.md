@@ -44,8 +44,11 @@ disabled, executes in an empty temporary directory, receives only the effective 
 attachment-only, short, repeated, and later turns do not generate a title.
 
 The generated write compares against the exact fallback before replacing it. A user rename therefore
-wins whether it lands before or during generation, and a restart cannot regenerate a title from an
-already inserted turn. A generation failure leaves the fallback and adds nothing to the transcript.
+wins whether it lands before or during generation, and a restart cannot automatically regenerate a
+title from an already inserted turn. **Regenerate title** is the explicit exception: it reads only the
+first durable text prompt, asks the same profile again, and compares against the title that was current
+when the request started. A rename made while regeneration runs still wins. A generation failure leaves
+the current title and adds nothing to the transcript.
 
 ### Cross-plugin lifecycle
 
@@ -679,7 +682,7 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 | New Codex terminal | action, needs an open task | The same for the `codex` profile |
 | Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
 | How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
-| Agent session | group, task-scoped | Fork, retry, compact, continue in terminal, rename, the two exports and archive — the open session's ••• menu, while the pane is on screen |
+| Agent session | group, task-scoped | Fork, retry, compact, continue in terminal, regenerate title, rename, the two exports and archive — the open session's ••• menu, while the pane is on screen |
 
 **New agent session is a picker, not an action, and it needs an open task.** A session is created
 against a task worktree, so there is nothing to start one in when no task is open and the palette
@@ -818,9 +821,9 @@ event ledger; it is not reported as a late failure of a create request whose res
 The runtime tracks the detached initialization through shutdown so it cannot outlive the plugin
 database.
 
-Automatic title calls have the same custody: the runtime owns one in-flight operation per session.
-Session deletion aborts and joins that operation before deleting the row, and shutdown aborts and
-joins every naming call before the plugin database closes.
+Automatic and explicitly regenerated title calls have the same custody: the runtime owns one in-flight
+operation per session. Session deletion aborts and joins that operation before deleting the row, and
+shutdown aborts and joins every naming call before the plugin database closes.
 
 A session reference the agent has forgotten is recoverable, not fatal. Agents keep their own session
 stores and prune them, and Claude Code keys its store by working directory, so a checkout that moved

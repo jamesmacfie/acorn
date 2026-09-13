@@ -453,24 +453,60 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       return
     }
 
+    void this.runSessionTitleGeneration(session, userId, text, fallback, fallback).catch(() => undefined)
+  }
+
+  /** Generate again from the first durable text prompt. This is an explicit one-shot command, so it
+   *  may replace any current title, but compare-and-set still lets a rename made while it runs win. */
+  async regenerateTitle(sessionId: string): Promise<AgentSession> {
+    const inFlight = this.sessionTitleOperations.get(sessionId)
+    if (inFlight) await inFlight.promise
+
+    const session = await this.store.requireSession(sessionId)
+    const firstTurn = await this.store.firstTurn(sessionId)
+    const text = generationText(firstTurn?.input ?? [])
+    if (!text) throw new Error('Send a text prompt before regenerating the session title.')
+
+    const userId = this.currentUserId()
+    const profile = agentProfileRegistry.get(session.profileId)
+    if (!userId || !profile?.aiArgv) {
+      this.logSessionTitle(session.profileId, 'unavailable', 0, text.length)
+      throw new Error('Title generation is unavailable for this session provider.')
+    }
+    return this.runSessionTitleGeneration(session, userId, text, session.title)
+  }
+
+  private runSessionTitleGeneration(
+    session: AgentSession,
+    userId: string,
+    text: string,
+    expectedTitle: string,
+    excludedTitle?: string,
+  ): Promise<AgentSession> {
+    if (this.sessionTitleOperations.has(session.id)) {
+      throw new Error('Session title generation is already in progress.')
+    }
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(new Error('session_title_timeout')), SESSION_TITLE_TIMEOUT_MS)
-    const promise = this.generateSessionTitle(session, userId, text, fallback, controller)
-      .catch(() => undefined)
+    const work = this.generateSessionTitle(session, userId, text, expectedTitle, excludedTitle, controller)
+    const promise = work
+      .then(() => undefined, () => undefined)
       .finally(() => {
         clearTimeout(timeout)
         this.sessionTitleOperations.delete(session.id)
       })
     this.sessionTitleOperations.set(session.id, { controller, promise })
+    return work
   }
 
   private async generateSessionTitle(
     session: AgentSession,
     userId: string,
     text: string,
-    fallback: string,
+    expectedTitle: string,
+    excludedTitle: string | undefined,
     controller: AbortController,
-  ): Promise<void> {
+  ): Promise<AgentSession> {
     const startedAt = Date.now()
     let outcome: 'generated' | 'timeout' | 'unavailable' | 'invalid' | 'superseded' | 'aborted' = 'unavailable'
     try {
@@ -487,28 +523,30 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       })
       if (controller.signal.aborted) {
         outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
-        return
+        throw controller.signal.reason
       }
-      const title = normalizeGeneratedSessionTitle(generated.text, fallback)
+      const title = normalizeGeneratedSessionTitle(generated.text, excludedTitle)
       if (!title) {
         outcome = 'invalid'
-        return
+        throw new Error('The provider did not return a usable session title.')
       }
       const renamed = await this.store.renameSession(session.id, {
         title,
-        expectedTitle: fallback,
+        expectedTitle,
         source: 'generated',
       })
       if (!renamed.changed) {
         outcome = 'superseded'
-        return
+        return renamed.session
       }
       this.emit({ channel: 'agent:session', session: renamed.session })
       outcome = 'generated'
-    } catch {
+      return renamed.session
+    } catch (error) {
       if (controller.signal.aborted) {
         outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
       }
+      throw error
     } finally {
       this.logSessionTitle(session.profileId, outcome, Date.now() - startedAt, text.length)
     }

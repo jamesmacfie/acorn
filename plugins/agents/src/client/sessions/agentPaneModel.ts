@@ -197,6 +197,14 @@ export function createAgentPaneModel(task: Task) {
     })
   }
 
+  async function regenerateTitle() {
+    const session = selected()
+    if (!session) return
+    await action(async () => {
+      managedAgentStore.upsertSession(await managedAgentApi.regenerateTitle(session.id))
+    }, false)
+  }
+
   async function exportHistory(format: 'json' | 'markdown') {
     const session = selected()
     if (!session) return
@@ -257,6 +265,7 @@ export function createAgentPaneModel(task: Task) {
   const sessionActions = createMemo<SessionAction[]>(() => {
     const session = selected()
     if (!session) return []
+    const hasTextPrompt = snapshot()?.turns[0]?.input.some((part) => part.type === 'text' && !!part.text.trim()) ?? false
     return [
       { id: 'fork', label: 'Fork session', run: () => void fork() },
       ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
@@ -295,6 +304,13 @@ export function createAgentPaneModel(task: Task) {
             run: () => void verifyImportedResume(),
           }]
         : []),
+      {
+        id: 'regenerate-title',
+        label: 'Regenerate title',
+        description: hasTextPrompt ? undefined : 'Send a text prompt before regenerating the title.',
+        disabled: !hasTextPrompt,
+        run: () => void regenerateTitle(),
+      },
       { id: 'rename', label: 'Rename session', run: () => sessionAction(session, 'rename') },
       { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
       { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },

@@ -333,6 +333,18 @@ export class AgentStore extends AgentSessionRepository {
     return row ? mapAgentTurn(row) : null
   }
 
+  /** The durable prompt a manual title regeneration describes. This stays a narrow read: title
+   *  regeneration does not need the session's event ledger, requests, or later turns. */
+  async firstTurn(sessionId: string): Promise<AgentTurn | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(eq(schema.agentTurns.sessionId, sessionId))
+      .orderBy(asc(schema.agentTurns.ordinal))
+      .limit(1)
+    return row ? mapAgentTurn(row) : null
+  }
+
   async nextQueuedTurn(sessionId: string): Promise<AgentTurn | null> {
     const [row] = await this.db
       .select()
