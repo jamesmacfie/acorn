@@ -1,4 +1,4 @@
-import { createSignal, For, mergeProps, Show, type Component } from 'solid-js'
+import { createEffect, createSignal, For, mergeProps, on, Show, type Component } from 'solid-js'
 import { agentToolTone } from '@acorn/plugin-api/client'
 import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
@@ -44,6 +44,7 @@ const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
 // onto nothing. Providers report plenty of calls with neither output nor a path, so those render flat.
 const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
+  const fold = useAgentToolFold()
   // Seeded from the reader's setting, then the reader's own. A reactive `open` would shut a card the
   // moment its call finished, which is when somebody is most likely to be reading it, and the card
   // only holds this state for as long as it stays mounted — see the note on Show's children in
@@ -53,6 +54,10 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // started call as `running`, the ACP path reports it as `pending` and never as `running` at all, so
   // one provider's cards opened themselves and the other's never did.
   const [open, setOpen] = createSignal(props.defaultOpen)
+  // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
+  // the seed above already decided how this card opens, and a new card arriving after a collapse
+  // starts collapsed anyway.
+  createEffect(on(() => fold.collapseSignal?.(), () => setOpen(false), { defer: true }))
   return (
     <Fold
       label={props.tool.title || 'Tool'}

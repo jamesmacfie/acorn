@@ -4,9 +4,9 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
-import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
 import { sessionModelSummary } from '../settings/agentConfigOptions'
-import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar, type TimelineControls } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
@@ -25,12 +25,20 @@ export default function AgentTranscript(props: {
   /** Which surface is drawing this, for the scroll place below. Two panes can be open on one session
    *  and a reader can be following live in one while reading history in the other. */
   viewKeyPrefix?: string
+  /** Keep only the reader's and the agent's messages, dropping tool calls, reasoning and notes. Driven
+   *  by the "show chats only" toggle above the composer. */
+  chatsOnly?: boolean
+  /** Bumped by "collapse all" above the composer; every tool card watches it and shuts. */
+  collapseSignal?: () => number
+  /** Handed the transcript's scroll jumps once the scroller exists, for the top/bottom buttons that
+   *  live outside this element above the composer. */
+  onControls?: (api: TimelineControls) => void
   onExitSubagent: () => void
   onRequestResolved: () => void
 }) {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
-  const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient)
+  const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient, props.collapseSignal)
   const conversation = createMemo(() => {
     agentTelemetry.observe('agents.transcript.events', props.snapshot.events.length)
     return agentTelemetry.measure('agents.transcript.project', () => buildConversationItems(props.snapshot.events))
@@ -58,10 +66,11 @@ export default function AgentTranscript(props: {
   // Falls back to the session's own stream when the card is not there: selecting a subagent under
   // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
   const items = createMemo(() => {
-    const items = agentTelemetry.measure('agents.transcript.visible', () =>
+    const visible = agentTelemetry.measure('agents.transcript.visible', () =>
       visibleConversationItems(focused()?.children ?? conversation(), (requestId) => requestsById().get(requestId)))
-    agentTelemetry.observe('agents.transcript.items', items.length)
-    return items
+    const shown = props.chatsOnly ? visible.filter(isChatItem) : visible
+    agentTelemetry.observe('agents.transcript.items', shown.length)
+    return shown
   })
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
@@ -133,7 +142,7 @@ export default function AgentTranscript(props: {
           </EmptyState>
         }
       >
-        <Timeline follow viewKey={viewId()} ariaLabel="Agent transcript">
+        <Timeline follow viewKey={viewId()} ariaLabel="Agent transcript" controls={props.onControls}>
           {/*
             `Index`, not `For`: buildConversationItems rebuilds every item object on every snapshot, and
             `For` keys by reference, so it would recreate the whole list on each streamed event and take

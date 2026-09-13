@@ -17,6 +17,7 @@ import {
 import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport, type Viewport } from './scrolling'
+import type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -190,9 +191,22 @@ export function Card(props: {
  *
  *  `props.follow` is read once rather than through a `Show`, because it is a constant at every call
  *  site and a reactive read would rebuild every turn the moment it flipped. */
-export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?: string; children: JSX.Element }) {
+export function Timeline(props: {
+  ariaLabel?: string
+  follow?: boolean
+  viewKey?: string
+  controls?: (api: TimelineControls) => void
+  children: JSX.Element
+}) {
   if (!props.follow) return <box flexDirection="column" flexGrow={1}>{props.children}</box>
   let view: Viewport | undefined
+  // The same jumps the DOM hands out, against this host's viewport. `scrollTo`, not `stickToBottom`,
+  // for the bottom: the reader asked to go there, so it is not the conditional re-stick a turn arriving
+  // does.
+  props.controls?.({
+    toTop: () => view?.scrollTo(0),
+    toBottom: () => { if (view) view.scrollTo(Math.max(0, view.scrollHeight - view.viewport.height)) },
+  })
   return (
     <ScrollViewport onBox={(box) => { view = box }}>
       {/* An inner box sized by the turns. The viewport's content box is free-sized, so this one's

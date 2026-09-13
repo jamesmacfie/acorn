@@ -47,6 +47,14 @@
   line-height: 1;
 }
 .ui-btn[data-variant='bare']:hover:not(:disabled) { color: var(--text); background: transparent; }
+/* An icon-only bare button still needs a square to sit in. `bare` drops min-height for its text form,
+   where the text supplies the height; a glyph does not, so without this its hover and pressed
+   backgrounds paint as a strip the height of the glyph — the squished selection a toggle showed. The
+   width is already the control's (above); this gives back the matching height so the chip is square. */
+.ui-btn[data-variant='bare'][data-icon-only] { min-height: var(--control-h); }
+.ui-btn[data-variant='bare'][data-icon-only][data-size='sm'] { min-height: var(--control-h-sm); }
+.ui-btn[data-variant='bare'][data-icon-only][data-size='xs'] { min-height: var(--control-h-xs); }
+.ui-btn[data-variant='bare'][data-icon-only]:hover:not(:disabled) { background: var(--bg-hover); }
 
 .ui-btn[data-tone='accent'] { color: var(--accent); }
 .ui-btn[data-tone='danger'] { color: var(--danger); }

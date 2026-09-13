@@ -66,6 +66,11 @@ export const visibleConversationItems = (
 ): AgentConversationItem[] =>
   items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
 
+/** A card that is somebody talking — the reader or the agent — as opposed to a tool call, reasoning,
+ *  or a note. What the "show chats only" toggle above the composer keeps. */
+export const isChatItem = (item: AgentConversationItem): boolean =>
+  item.event.type === 'user_message' || item.event.type === 'assistant_message'
+
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
   items: AgentConversationItem[],
