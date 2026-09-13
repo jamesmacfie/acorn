@@ -34,6 +34,17 @@ const rememberPlace = (key: string, top: number): void => {
   if (places.size > PLACES) places.delete(places.keys().next().value as string)
 }
 
+/** The two jumps a caller can drive from outside — a "go to top"/"go to bottom" pair above the
+ *  composer, say. Handed out through `controls` because the scroll is the timeline's own, so the
+ *  jumps have to move its `following` flag as well as its scrollTop or a stream would pull the view
+ *  straight back down. Only meaningful on a followed timeline. */
+export type TimelineControls = {
+  /** Jump to the oldest turn and stop following, so new turns no longer pull the view down. */
+  toTop: () => void
+  /** Jump to the newest turn and follow it again. */
+  toBottom: () => void
+}
+
 export function Timeline(props: {
   ariaLabel?: string
   /**
@@ -47,6 +58,9 @@ export function Timeline(props: {
   /** Which list this is, for the place the reader was left at. A timeline that swaps its contents —
    *  one session's stream for another's — is a different list and wants a different key. */
   viewKey?: string
+  /** Handed the scroll jumps once the scroller exists, for a control that lives outside this element.
+   *  Only called on a followed timeline; a plain run of cards has no scroll of its own to drive. */
+  controls?: (api: TimelineControls) => void
   children: JSX.Element
 }) {
   const collection = createDomCollection({ selector: '.ui-timeline-turn > .ui-card[data-interactive]' })
@@ -102,6 +116,23 @@ export function Timeline(props: {
   const noteInput = () => {
     userDriven = true
   }
+  // Driven from outside, so they set `following` by hand rather than inferring it from position: a jump
+  // to the top must survive the next streamed event, which the follow logic would otherwise read as the
+  // list growing under a reader who is still at the bottom.
+  const toTop = () => {
+    if (!scroller) return
+    target = null
+    following = false
+    scroller.scrollTop = 0
+    applied = scroller.scrollTop
+    rememberPlace(viewKey(), scroller.scrollTop)
+  }
+  const toBottom = () => {
+    target = null
+    following = true
+    pin()
+  }
+  props.controls?.({ toTop, toBottom })
   // The list grows for two reasons and the response differs: while restoring we chase the saved
   // offset, otherwise we sit on the bottom. The scroller is observed too, because something appearing
   // above it shortens the viewport without touching the list.

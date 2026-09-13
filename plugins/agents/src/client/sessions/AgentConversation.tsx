@@ -1,6 +1,6 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, EmptyState, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Icon, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
@@ -30,6 +30,12 @@ export default function AgentConversation(props: AgentConversationProps & {
   autoFocus?: boolean
 }) {
   const [error, setError] = createSignal('')
+  // The transcript view controls, sitting above the composer because that is where the reader's hands
+  // are. They reach into the transcript, which is a sibling: the scroll jumps come back up from the kit
+  // Timeline through `onControls`, the filter and collapse-all push back down as a signal and a counter.
+  const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
+  const [chatsOnly, setChatsOnly] = createSignal(false)
+  const [collapseTick, setCollapseTick] = createSignal(0)
   // A memo, not an inline getter. `on()` re-runs its callback on every notification without comparing
   // the input, and `loadSnapshot` ends in `upsertSession`, which replaces the row a caller may have
   // derived this id from. That was an infinite reload loop in the pane model this came out of.
@@ -102,6 +108,9 @@ export default function AgentConversation(props: AgentConversationProps & {
               focusRequestId={focusedManagedRequest(sessionId())}
               focusSubagentId={selectedManagedSubagent(sessionId())}
               viewKeyPrefix={props.viewKeyPrefix}
+              chatsOnly={chatsOnly()}
+              collapseSignal={collapseTick}
+              onControls={setScrollControls}
               onExitSubagent={() => clearManagedSubagent(sessionId())}
               onRequestResolved={reload}
             />
@@ -131,6 +140,53 @@ export default function AgentConversation(props: AgentConversationProps & {
               submitDisabled={agentSessionIsStarting(current())}
               autoFocus={props.autoFocus}
               previousAutomaticContext={previousAutomaticContext()}
+              // The transcript view controls, on the composer's own top row so they line up with the
+              // model and effort selects. They act on the sibling transcript; the composer only hosts them.
+              viewControls={(
+                <>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Scroll to the top of the transcript"
+                    tip="Go to top"
+                    onPress={() => scrollControls()?.toTop()}
+                  >
+                    <Icon name="arrow-up-to-line" />
+                  </Button>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Scroll to the bottom of the transcript"
+                    tip="Go to bottom"
+                    onPress={() => scrollControls()?.toBottom()}
+                  >
+                    <Icon name="arrow-down-to-line" />
+                  </Button>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Show only agent and user messages"
+                    tip="Chats only"
+                    pressed={chatsOnly()}
+                    onPress={() => setChatsOnly((on) => !on)}
+                  >
+                    <Icon name="messages-square" />
+                  </Button>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    iconOnly
+                    label="Collapse every tool card"
+                    tip="Collapse all"
+                    onPress={() => setCollapseTick((tick) => tick + 1)}
+                  >
+                    <Icon name="fold-vertical" />
+                  </Button>
+                </>
+              )}
               onSessionUpdated={managedAgentStore.upsertSession}
               onSent={reload}
             />

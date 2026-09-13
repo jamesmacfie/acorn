@@ -39,6 +39,7 @@ export type { ItemProps } from '../keys/collection'
 export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 export type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
+export type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
 export type {
   MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'

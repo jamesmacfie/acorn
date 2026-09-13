@@ -77,6 +77,9 @@ export type AgentToolFoldSetting = {
   startsOpen: () => boolean
   /** Report a reader's toggle. Stores it only under `sticky`. */
   onToggle: (open: boolean) => void
+  /** A counter the reader bumps with "collapse all" above the composer. A card watches it and shuts
+   *  when it changes. Absent for a card drawn outside a transcript, which has nothing to collapse. */
+  collapseSignal?: () => number
 }
 
 /**
@@ -92,12 +95,14 @@ export type AgentToolFoldSetting = {
 export const createAgentToolFoldSetting = (
   prefs: () => Record<string, string> | undefined,
   queryClient: QueryClient,
+  collapseSignal?: () => number,
 ): AgentToolFoldSetting => ({
   startsOpen: () => foldStartsOpen(readAgentToolFoldPrefs(prefs())),
   onToggle: (open) => {
     const next = foldPrefsAfterToggle(readAgentToolFoldPrefs(prefs()), open)
     if (next) void saveAgentToolFoldPrefs(queryClient, next)
   },
+  collapseSignal,
 })
 
 // Collapsed, and remembering nothing, for a card drawn outside a transcript.
