@@ -40,7 +40,7 @@ deterministic label from the first non-empty text part, or the first attachment 
 never blocks the turn. For a first interactive text prompt of at least five words, the runtime then
 asks the same session profile for a shorter title in the background. That one-shot run has tools
 disabled, executes in an empty temporary directory, receives only the effective text left by the
-`before-send` hook, and is bounded to five seconds. Workflow, delegation, automation, import,
+`before-send` hook, and is bounded to 30 seconds. Workflow, delegation, automation, import,
 attachment-only, short, repeated, and later turns do not generate a title.
 
 The generated write compares against the exact fallback before replacing it. A user rename therefore

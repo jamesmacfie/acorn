@@ -321,7 +321,7 @@ Normalize the result defensively:
 7. Remove trailing sentence punctuation.
 8. Reject an empty result, `New agent session`, or a value equal to the fallback.
 
-Set `maxOutputTokens` to 64 and the request timeout to 5 seconds. One retry is acceptable only for a
+Set `maxOutputTokens` to 64 and the request timeout to 30 seconds. One retry is acceptable only for a
 transient provider failure and must remain inside an overall bounded operation. Do not retry invalid
 content. The fallback is already a valid answer.
 
@@ -565,7 +565,7 @@ Use an injected or mocked `core.models.generateText` and controlled promises to 
 - The real provider pump starts while title generation remains pending.
 - The backend id is `harness:<session.profileId>`.
 - The request has the title system prompt, bounded effective user text, 64 output tokens, and a
-  5-second timeout.
+  30-second timeout.
 - Workflow, delegation, automation, import, attachment-only, short, and second turns do not call the
   model.
 - An idempotent replay of the first turn does not call the model twice.

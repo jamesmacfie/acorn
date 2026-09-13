@@ -726,7 +726,7 @@ describe('managed agent runtime conformance', () => {
     expect(generateText).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'owner',
       backendId: `harness:${profileId}`,
-      timeoutMs: 5_000,
+      timeoutMs: 30_000,
       input: expect.objectContaining({
         maxOutputTokens: 64,
         prompt: 'First user request:\nPlease implement generated session naming now',
@@ -797,6 +797,52 @@ describe('managed agent runtime conformance', () => {
       'Please implement generated session naming now',
       'Generated session naming',
     ]))
+  })
+
+  it('allows a slow one-shot CLI to finish without delaying the accepted turn', async () => {
+    vi.useFakeTimers()
+    try {
+      const seed = await seedTask(testDb, dataDir)
+      const profileId = 'title-generation-slow-success'
+      registerTitleProfile(profileId)
+      core.models.generateText = vi.fn(() => new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
+        setTimeout(() => resolve({
+          text: 'Generated after CLI startup',
+          providerId: profileId,
+          backendId: `harness:${profileId}`,
+          modelId: 'default',
+        }), 10_000)
+      }))
+      runtime = new ManagedAgentRuntime({
+        db: pluginDb.db,
+        dataDir,
+        core,
+        internalEnv: () => ({}),
+        secrets: SECRETS,
+        currentUserId: () => 'owner',
+        registry: new AgentDriverRegistry(),
+      })
+      const session = await runtime.store.createSession({
+        taskId: seed.taskId,
+        providerId: profileId,
+        profileId,
+        kind: 'interactive',
+        config: {},
+      }, descriptor(profileId))
+
+      await runtime.enqueueTurn(session.id, {
+        input: [{ type: 'text', text: 'Allow enough time for title generation' }],
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
+      })
+      expect((await runtime.store.requireSession(session.id)).title).toBe('Allow enough time for title generation')
+
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect((await runtime.store.requireSession(session.id)).title).toBe('Generated after CLI startup')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('aborts owned title work during shutdown', async () => {
