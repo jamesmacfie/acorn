@@ -37,6 +37,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [session_name.md](./session_name.md) | Generated managed-session titles after the first accepted prompt, with user rename precedence and semantic lifecycle events. | Proposal, 2026-09-12. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [web_search_run.md](./web_search_run.md) | Provider-neutral web searches, page actions, and result details in managed-run transcripts, verified against Codex and Claude Code. | Proposal, 2026-09-12. Not started. |
+| [data-capability.md](./data-capability.md) | A host-owned `ctx.core.data` facet so a sandboxed plugin can query a database the host connects to, with the database plugin as first consumer. | Proposal, 2026-09-14. Not started. |
 
 ## How these relate
 
