@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import type {
   AgentNormalizedEvent,
   AgentPermissionOption,
@@ -5,6 +6,7 @@ import type {
   AgentQuestion,
   AgentToolCall,
 } from '@acorn/protocol/managedAgents.ts'
+import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 
@@ -15,6 +17,46 @@ export const asObject = (value: unknown): JsonObject | null =>
 
 export const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
 export const numberValue = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null
+
+const decodedBase64 = (value: string): Uint8Array | null => {
+  const encoded = value.trim().replace(/^data:[^;,]+;base64,/i, '').replace(/\s/g, '')
+  if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return null
+  const bytes = Buffer.from(encoded, 'base64')
+  if (bytes.toString('base64').replace(/=+$/, '') !== encoded.replace(/=+$/, '')) return null
+  return bytes
+}
+
+const generatedImageFormat = (bytes: Uint8Array): { mediaType: string; extension: string } => {
+  const startsWith = (...signature: number[]) => signature.every((byte, index) => bytes[index] === byte)
+  if (startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) {
+    return { mediaType: 'image/png', extension: 'png' }
+  }
+  if (startsWith(0xff, 0xd8, 0xff)) return { mediaType: 'image/jpeg', extension: 'jpg' }
+  if (startsWith(0x47, 0x49, 0x46, 0x38)) return { mediaType: 'image/gif', extension: 'gif' }
+  if (
+    startsWith(0x52, 0x49, 0x46, 0x46)
+    && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) return { mediaType: 'image/webp', extension: 'webp' }
+  return { mediaType: 'application/octet-stream', extension: 'bin' }
+}
+
+/** The provider-specific half of the generated-artifact seam. The returned bytes are transient. */
+export function codexGeneratedArtifact(notification: JsonRpcNotification): AgentDriverGeneratedArtifact | null {
+  if (notification.method !== 'item/completed') return null
+  const item = asObject(notification.params.item)
+  if (stringValue(item?.type) !== 'imageGeneration') return null
+  const result = stringValue(item?.result)
+  const bytes = result ? decodedBase64(result) : null
+  if (!bytes) return null
+  const format = generatedImageFormat(bytes)
+  return {
+    type: 'generated_artifact',
+    kind: 'file',
+    title: `Generated image.${format.extension}`,
+    mediaType: format.mediaType,
+    bytes,
+  }
+}
 
 function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | null {
   const type = stringValue(item.type)

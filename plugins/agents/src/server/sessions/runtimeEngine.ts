@@ -8,6 +8,7 @@ import type {
   AgentSessionSnapshot,
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
+import type { AgentDriverEvent } from '../drivers/types'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame, AgentTurnChangedEvent } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
@@ -341,7 +342,7 @@ export class ManagedAgentEngine {
     }
   }
 
-  protected async onProviderEvent(sessionId: string, event: AgentNormalizedEvent): Promise<void> {
+  protected async onProviderEvent(sessionId: string, event: AgentDriverEvent): Promise<void> {
     if (
       event.type === 'session_state'
       && event.state === 'ready'

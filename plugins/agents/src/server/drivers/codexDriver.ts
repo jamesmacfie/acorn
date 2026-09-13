@@ -9,7 +9,13 @@ import type {
 } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { CodexChildRouter } from './codexChildRouting'
-import { asObject, codexServerRequestResponse, normalizeCodexNotification, normalizeCodexServerRequest } from './codexNormalizer'
+import {
+  asObject,
+  codexGeneratedArtifact,
+  codexServerRequestResponse,
+  normalizeCodexNotification,
+  normalizeCodexServerRequest,
+} from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { probeCodexAuthentication } from './authProbe'
@@ -149,6 +155,7 @@ export class CodexAgentDriver implements AgentDriver {
         'file_changes',
         'subagents',
         'attachments',
+        'generated_artifacts',
       ],
       configOptions: [],
       commands: [],
@@ -236,6 +243,8 @@ export class CodexAgentDriver implements AgentDriver {
           if (event.type === 'turn_completed' || event.type === 'error') currentTurnId = null
           void options.onEvent(event)
         }
+        const generatedArtifact = codexGeneratedArtifact(notification)
+        if (generatedArtifact) void options.onEvent(generatedArtifact)
       },
       onRequest: onServerRequest,
       // The node's log rather than the transcript: a byte count the reader cannot act on is not part of

@@ -107,7 +107,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       env: {},
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        events.push(event)
+        if (event.type !== 'generated_artifact') events.push(event)
       },
       onClosed: () => {},
     })
@@ -203,7 +203,7 @@ describe('a question the agent stopped waiting for is released with the turn', (
       cwd: process.cwd(),
       env: {},
       noProviderExecutionHistory: false,
-      onEvent: (event) => { events.push(event) },
+      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event) },
       onClosed: () => {},
     })
 

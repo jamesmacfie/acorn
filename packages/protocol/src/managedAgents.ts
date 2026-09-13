@@ -73,6 +73,7 @@ export type AgentCapability =
   | 'file_changes'
   | 'subagents'
   | 'attachments'
+  | 'generated_artifacts'
 
 export type AgentConfigOption = {
   id: string
