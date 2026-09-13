@@ -1,8 +1,17 @@
 import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentDriverEvent } from '../drivers/types'
 import type { AgentArtifactStore } from './artifactStore'
 import { boundProviderEvent } from './boundProviderEvent'
 
 const MAX_INLINE_TOOL_BYTES = 64 * 1024
+const MAX_GENERATED_ARTIFACT_BYTES = 16 * 1024 * 1024
+
+const boundedMediaType = (value: string): string => {
+  const mediaType = value.trim().slice(0, 200)
+  return /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(mediaType)
+    ? mediaType
+    : 'application/octet-stream'
+}
 
 /**
  * Bounds provider-owned display data and promotes oversized output into Acorn artifacts before an
@@ -24,8 +33,35 @@ export class ProviderEventMaterializer {
   async map(
     sessionId: string,
     turnId: string | null,
-    providerEvent: AgentNormalizedEvent,
+    providerEvent: AgentDriverEvent,
   ): Promise<AgentNormalizedEvent[]> {
+    if (providerEvent.type === 'generated_artifact') {
+      if (providerEvent.bytes.byteLength === 0 || providerEvent.bytes.byteLength > MAX_GENERATED_ARTIFACT_BYTES) {
+        return [{
+          type: 'diagnostic',
+          level: 'warning',
+          message: providerEvent.bytes.byteLength === 0
+            ? 'The provider returned an empty generated artifact.'
+            : 'The provider returned a generated artifact larger than 16 MiB.',
+        }]
+      }
+      const artifact = await this.artifacts.putBytes({
+        sessionId,
+        turnId,
+        kind: providerEvent.kind,
+        title: providerEvent.title.slice(0, 500),
+        bytes: providerEvent.bytes,
+        mediaType: boundedMediaType(providerEvent.mediaType),
+      })
+      return [{
+        type: 'artifact',
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        title: artifact.title,
+        mediaType: artifact.mediaType ?? undefined,
+        byteSize: artifact.byteSize ?? undefined,
+      }]
+    }
     const event = boundProviderEvent(providerEvent, this.secretValues)
     if (event.type === 'tool') {
       const key = `${sessionId}:${turnId ?? 'session'}:${event.tool.id}`

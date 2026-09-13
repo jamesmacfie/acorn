@@ -142,4 +142,33 @@ describe('Codex app-server normalization', () => {
       ],
     }])
   })
+
+  it('extracts completed generated images as transient provider artifacts', async () => {
+    const result = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+    const notification = {
+      method: 'item/completed',
+      params: {
+        item: {
+          type: 'imageGeneration',
+          id: 'image-1',
+          status: 'completed',
+          result,
+        },
+      },
+    }
+
+    const { codexGeneratedArtifact } = await import('./codexNormalizer')
+    const artifact = codexGeneratedArtifact(notification)
+    expect(artifact).toMatchObject({
+      type: 'generated_artifact',
+      kind: 'file',
+      title: 'Generated image.png',
+      mediaType: 'image/png',
+    })
+    expect(Array.from(artifact?.bytes ?? [])).toEqual(Array.from(Buffer.from(result, 'base64')))
+    expect(normalizeCodexNotification(notification)).toEqual([{
+      type: 'tool',
+      tool: { id: 'image-1', title: 'Generated image', kind: 'image', status: 'completed' },
+    }])
+  })
 })

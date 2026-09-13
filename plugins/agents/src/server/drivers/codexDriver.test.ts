@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentDriverEvent } from './types'
 
 const wire = vi.hoisted(() => ({
   requests: [] as Array<{ method: string; params: Record<string, unknown> }>,
@@ -145,6 +146,7 @@ const turn = (mode: string): AgentTurn => ({
 
 async function start(mode: string | null = null, resumed = false) {
   const events: AgentNormalizedEvent[] = []
+  const driverEvents: AgentDriverEvent[] = []
   const { CodexAgentDriver } = await import('./codexDriver')
   const handle = await new CodexAgentDriver().start({
     session: session(mode, resumed),
@@ -152,11 +154,12 @@ async function start(mode: string | null = null, resumed = false) {
     env: {},
     noProviderExecutionHistory: false,
     onEvent: (event) => {
-      events.push(event)
+      driverEvents.push(event)
+      if (event.type !== 'generated_artifact') events.push(event)
     },
     onClosed: () => {},
   })
-  return { events, handle }
+  return { driverEvents, events, handle }
 }
 
 describe('Codex collaboration modes', () => {
@@ -175,7 +178,36 @@ describe('Codex collaboration modes', () => {
 
   it('advertises the modes provider capability', async () => {
     const { CodexAgentDriver } = await import('./codexDriver')
-    expect((await new CodexAgentDriver().probe()).capabilities).toContain('modes')
+    expect((await new CodexAgentDriver().probe()).capabilities).toEqual(expect.arrayContaining([
+      'modes',
+      'generated_artifacts',
+    ]))
+  })
+
+  it('emits image generation output through the generated-artifact seam', async () => {
+    const { driverEvents } = await start()
+    wire.onNotification?.({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        item: {
+          type: 'imageGeneration',
+          id: 'image-1',
+          status: 'completed',
+          result: 'iVBORw0KGgo=',
+        },
+      },
+    })
+    await Promise.resolve()
+
+    expect(driverEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'generated_artifact',
+        kind: 'file',
+        title: 'Generated image.png',
+        mediaType: 'image/png',
+      }),
+    ]))
   })
 
   it('advertises modes and sends each selected preset with complete settings', async () => {

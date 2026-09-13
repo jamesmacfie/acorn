@@ -40,7 +40,23 @@ export class AgentArtifactStore {
     mediaType?: string
     metadata?: Record<string, unknown>
   }): Promise<AgentArtifact> {
-    const bytes = Buffer.from(input.text, 'utf8')
+    return this.putBytes({
+      ...input,
+      bytes: Buffer.from(input.text, 'utf8'),
+      mediaType: input.mediaType ?? 'text/plain; charset=utf-8',
+    })
+  }
+
+  async putBytes(input: {
+    sessionId: string
+    turnId: string | null
+    kind: AgentArtifactKind
+    title: string
+    bytes: Uint8Array
+    mediaType: string
+    metadata?: Record<string, unknown>
+  }): Promise<AgentArtifact> {
+    const bytes = Buffer.from(input.bytes)
     const hash = createHash('sha256').update(bytes).digest('hex')
     const storageKey = `${hash.slice(0, 2)}/${hash}`
     const directory = join(this.root, hash.slice(0, 2))
@@ -68,7 +84,7 @@ export class AgentArtifactStore {
       turnId: input.turnId,
       kind: input.kind,
       title: input.title.slice(0, 500),
-      mediaType: input.mediaType ?? 'text/plain; charset=utf-8',
+      mediaType: input.mediaType,
       storageKey,
       byteSize: bytes.byteLength,
       metadataJson: JSON.stringify({ ...input.metadata, sha256: hash }),

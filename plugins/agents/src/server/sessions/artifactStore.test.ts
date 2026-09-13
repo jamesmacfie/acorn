@@ -45,6 +45,26 @@ describe('managed-agent artifact store', () => {
     expect(new TextDecoder().decode(content?.bytes)).toBe(text)
   })
 
+  it('stores generated binary output with its media type intact', async () => {
+    const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47])
+    const artifact = await store.putBytes({
+      sessionId: 'session',
+      turnId: 'turn',
+      kind: 'file',
+      title: 'Generated image.png',
+      bytes,
+      mediaType: 'image/png',
+    })
+
+    expect(artifact).toMatchObject({
+      kind: 'file',
+      title: 'Generated image.png',
+      mediaType: 'image/png',
+      byteSize: bytes.byteLength,
+    })
+    expect(Array.from((await store.read(artifact.id))?.bytes ?? [])).toEqual(Array.from(bytes))
+  })
+
   it('deduplicates object bytes and only removes the file after the final metadata row is deleted', async () => {
     const first = await store.putText({
       sessionId: 'one',

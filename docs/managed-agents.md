@@ -124,6 +124,13 @@ A native driver is written when a vendor protocol carries product value the gene
 and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
 the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
 
+Generated files cross a separate, provider-neutral driver seam. A driver emits transient bytes with
+a title, media type, and artifact kind; the runtime bounds them, takes custody in the content-addressed
+artifact store, and writes only the resulting artifact reference to the normalized event ledger.
+Provider paths and base64 payloads therefore never become durable transcript events. Codex opts into
+this seam with the `generated_artifacts` capability and maps completed `imageGeneration` items to it.
+Another native provider can emit the same driver event without adding a provider-specific client path.
+
 Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
 
 **plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
@@ -735,7 +742,9 @@ choices to pick from.
 Context is assembled by the Node from registered task sections and sent as an immutable snapshot.
 Attachments are validated, task-scoped, stored through the shared blob cache, and referenced by
 session records. Artifacts are authenticated no-store downloads; provider paths and worktree paths
-are revalidated against the owning task.
+are revalidated against the owning task. Raster image artifacts are fetched as authenticated bytes
+and drawn inline in the transcript with their download action. Other artifact media types keep the
+download row.
 
 ### Draft attachments, and replacing one
 

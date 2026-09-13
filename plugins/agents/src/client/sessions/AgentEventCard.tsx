@@ -2,9 +2,7 @@ import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, requestTerminalFocus, saveFile, setTerminalOpen } from '@acorn/plugin-api/client'
-import { managedAgentApi } from './managedClient'
-import { downloadName } from './downloadName'
+import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert, Button, Card, CodeBlock, Fold, Heading, Icon, Inline, Menu, Row, Stack, Text,
@@ -16,6 +14,7 @@ import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
+import AgentArtifactCard from './AgentArtifactCard'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -31,18 +30,10 @@ const usageLine = (usage: AgentUsage): string => [
   usage.cost ? `${usage.cost.amount.toFixed(4)} ${usage.cost.currency}` : '',
 ].filter(Boolean).join(' · ')
 
-const artifactSize = (byteSize?: number): string =>
-  byteSize == null ? '' : `${Math.max(1, Math.round(byteSize / 1024)).toLocaleString()} KiB · `
-
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
   in_progress: { icon: 'circle-dot', tone: 'accent', label: 'In progress' },
   completed: { icon: 'circle-check', tone: 'ok', label: 'Completed' },
-}
-
-async function downloadArtifact(artifactId: string, title: string): Promise<void> {
-  const { bytes, type, filename } = await managedAgentApi.artifactContent(artifactId)
-  await saveFile({ bytes, mimeType: type, suggestedName: filename ?? (downloadName(title, 180) || 'artifact') })
 }
 
 // The reader's way out of the transcript. Three formats because the answer lands in three kinds of
@@ -287,15 +278,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'artifact'}>
         {(_shown) => {
           const artifact = () => event() as Extract<ReturnType<typeof event>, { type: 'artifact' }>
-          return (
-            <Row
-              leading={<Icon name="paperclip" />}
-              meta={<Text emphasis="muted">{artifactSize(artifact().byteSize)}Download →</Text>}
-              onPress={() => void downloadArtifact(artifact().artifactId, artifact().title)}
-            >
-              {artifact().title}
-            </Row>
-          )
+          return <AgentArtifactCard artifact={artifact()} />
         }}
       </Show>
       {/*

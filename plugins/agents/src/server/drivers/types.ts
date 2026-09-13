@@ -1,4 +1,5 @@
 import type {
+  AgentArtifactKind,
   AgentConfigOption,
   AgentInputPart,
   AgentNormalizedEvent,
@@ -7,12 +8,27 @@ import type {
   AgentTurn,
 } from '@acorn/protocol/managedAgents.ts'
 
+/**
+ * Binary output from a provider before Acorn takes custody of it. This type never crosses the wire
+ * or reaches the event ledger: ProviderEventMaterializer stores the bytes and replaces it with the
+ * ordinary artifact event every client already understands.
+ */
+export type AgentDriverGeneratedArtifact = {
+  type: 'generated_artifact'
+  kind: AgentArtifactKind
+  title: string
+  mediaType: string
+  bytes: Uint8Array
+}
+
+export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact
+
 export type AgentDriverStartOptions = {
   session: AgentSession
   cwd: string
   env: Record<string, string>
   noProviderExecutionHistory: boolean
-  onEvent(event: AgentNormalizedEvent): void | Promise<void>
+  onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>
 }
 
