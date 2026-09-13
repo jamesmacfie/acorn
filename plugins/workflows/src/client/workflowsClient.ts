@@ -12,7 +12,7 @@ import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import type { WorkflowGenerateRequest, WorkflowGenerateResult } from '../shared/api'
+import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowRunProjection, WorkflowStepProjection } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 
 /** How long the generate route may take.
@@ -71,8 +71,8 @@ type At = { nodeId?: string; signal?: AbortSignal }
 
 export const workflowApi = {
   defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
-  runs: (taskId: string) => readJson<WorkflowRunRow[]>(workflowRunsRoute(taskId)),
-  steps: (runId: string, at: At = {}) => readJson<WorkflowStepRow[]>(workflowStepsRoute(runId), at),
+  runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
+  steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
   gate: (runId: string, stepId: string, approved: boolean) => post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved }),
   cancel: (runId: string) => writeJson<{ ok: boolean }>(workflowCancelRoute(runId), { method: 'POST' }),
   kill: (runId: string, stepId: string) => post<{ ok: boolean }>(workflowKillRoute(runId), { stepId }),

@@ -6,7 +6,49 @@
 // Zod bound are the same number, and a number written twice is a number that drifts. The routes
 // themselves stay in ../client/workflowsClient.ts with the rest of this plugin's namespace.
 
+import type { WorkflowRunRow as WireWorkflowRunRow, WorkflowStepRow as WireWorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import type { WorkflowDef, WorkflowInput } from './workflowContracts'
+
+export type WorkflowUsageSummary = {
+  costUsd: number
+  inputTokens: number
+  outputTokens: number
+  turns: number
+}
+
+/** One admitted child workflow, projected from the dispatch ledger and child run row. */
+export type WorkflowChildRunSummary = {
+  parentTaskId: string
+  parentRunId: string
+  parentStepId: string
+  itemKey: string | null
+  taskId: string
+  runId: string
+  name: string | null
+  dispatchState: 'reserved' | 'task-created' | 'run-started' | 'cancelling' | 'terminal'
+  runStatus: 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled' | null
+  resultSummary: string | null
+  error: string | null
+  usage: WorkflowUsageSummary | null
+  updatedAt: number
+}
+
+export type WorkflowRunProjection = WireWorkflowRunRow & {
+  rootRunId: string | null
+  parentRunId: string | null
+  parentStepId: string | null
+  rootTaskId: string
+  rootRunName: string
+  parentTaskId: string | null
+  parentRunName: string | null
+  depth: number
+  /** Root runs report the complete tree. Child runs report only their own admitted turns. */
+  usage: WorkflowUsageSummary | null
+}
+
+export type WorkflowStepProjection = WireWorkflowStepRow & {
+  children: WorkflowChildRunSummary[]
+}
 
 /** How much description or edit instruction the modal takes and the route accepts.
  *
@@ -26,6 +68,7 @@ type WorkflowGenerateRequestBase = {
   modelId?: string
   description: string
   workspaceId: string
+  projectId?: string
   defId?: string
 }
 
@@ -63,6 +106,8 @@ export type WorkflowGenerateNoteCode =
   | 'malformed-reference'
   | 'declared-input'
   | 'dropped-schema'
+  | 'unknown-workflow'
+  | 'unsupported-binding'
 
 export type WorkflowGenerateNote = { code: WorkflowGenerateNoteCode; message: string; step?: string }
 

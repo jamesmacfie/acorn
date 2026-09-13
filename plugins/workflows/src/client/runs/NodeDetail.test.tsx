@@ -36,6 +36,7 @@ const gate = vi.fn()
 
 const modelFor = (row: WorkflowStepRow): RunPaneModel => ({
   selectedStep: () => row,
+  selectedRun: () => undefined,
   busy: () => false,
   error: () => '',
   setError: () => undefined,

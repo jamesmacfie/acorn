@@ -7,10 +7,11 @@
 import { createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
 import {
   clientEvents, consumePaneIntent, onPluginFrame, type PaneIntent, type Task,
-  wsOnWorkflowStepChanged, wsOnWorkflowStepEvent,
+  wsOnReconnect, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent,
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowRunRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
 import { graphOrder } from '../editor/draft'
@@ -28,7 +29,7 @@ export type RunNode = {
   name: string
   depth: number
   parents: readonly string[]
-  step: WorkflowStepRow | undefined
+  step: WorkflowStepProjection | undefined
 }
 
 export type RunPaneModel = ReturnType<typeof createRunPaneModel>
@@ -55,7 +56,7 @@ export function createRunPaneModel(task: Task) {
   const [tails, setTails] = createSignal<Record<string, string>>({})
   const [now, setNow] = createSignal(Date.now())
 
-  const [runs, { refetch: refetchRuns }] = createResource(() => workflowApi.runs(task.id), { initialValue: [] })
+  const [runs, { refetch: refetchRuns }] = createResource<WorkflowRunProjection[]>(() => workflowApi.runs(task.id), { initialValue: [] })
   const [steps, { refetch: refetchSteps, mutate: mutateSteps }] = createResource(
     () => selectedRunId(),
     (runId) => workflowApi.steps(runId),
@@ -129,7 +130,7 @@ export function createRunPaneModel(task: Task) {
   onCleanup(wsOnWorkflowStepChanged(({ runId, stepId, status }) => {
     if (runId !== selectedRunId()) return
     mutateSteps((current) => current.map((step) =>
-      step.id === stepId ? { ...step, status: status as WorkflowStepRow['status'], updatedAt: Date.now() } : step))
+      step.id === stepId ? { ...step, status: status as WorkflowStepProjection['status'], updatedAt: Date.now() } : step))
   }))
 
   onCleanup(wsOnWorkflowStepEvent(({ runId, stepId, event }) => {
@@ -143,10 +144,23 @@ export function createRunPaneModel(task: Task) {
     })
   }))
 
-  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => {
+  const refresh = (): void => {
     void refetchRuns()
     void refetchSteps()
+  }
+
+  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
+    const changed = payload as Partial<{ taskId: string; runId: string }>
+    if (changed.taskId !== task.id && changed.runId !== selectedRunId()) return
+    refresh()
   }))
+  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), (payload) => {
+    const changed = payload as Partial<WorkflowChildRunSummary & { ownerTaskId: string }>
+    if (changed.ownerTaskId !== task.id && changed.ownerTaskId !== selectedRun()?.parentTaskId) return
+    refresh()
+  }))
+  // Events announce edges, not history. Re-read both resources after a reconnect or a shed frame.
+  onCleanup(wsOnReconnect(refresh))
 
   // ── Somebody else pointed at a run ────────────────────────────────────────────────────────────
   //
@@ -206,10 +220,7 @@ export function createRunPaneModel(task: Task) {
       const tail = tails()[stepId]
       return tail ? tail.split('\n') : []
     },
-    refresh: () => {
-      void refetchRuns()
-      void refetchSteps()
-    },
+    refresh,
     gate: (approved: boolean) => {
       const run = selectedRunId()
       const step = selectedStepId()

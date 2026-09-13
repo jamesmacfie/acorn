@@ -53,7 +53,7 @@ in the node's own graph.
 ### Startup: data directory, environment, and the singleton lock
 
 The writable app-data root, holding the SQLite databases, blobs, worktrees, and notes, is
-`apps/node/.acorn` in a dev checkout, so a checkout's data stays with the checkout. A packaged build
+`<checkout>/apps/node/.acorn` in a development checkout, so a checkout's data stays with the checkout. A packaged build
 uses the OS application-data path. The shell's own custody root is a separate directory: `fleet.json`
 and the encrypted device tokens belong to this application, not to the node. Packaged, that is the
 application-data directory itself with the node's root beneath it; in a checkout it is

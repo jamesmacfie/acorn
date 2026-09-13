@@ -9,7 +9,7 @@
 // list loses its pane. That is the same window the rail and the merged run list show, and a longer
 // one would mean a count query per task.
 import { createSignal } from 'solid-js'
-import { onPluginFrame, type ClientScheduleContribution } from '@acorn/plugin-api/client'
+import { onPluginFrame, wsOnReconnect, type ClientScheduleContribution } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { workflowApi } from '../workflowsClient'
 
@@ -34,5 +34,14 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
     // two minutes would rebuild the strip for nothing.
     setRunCounts((current) => (same(current, next) ? current : next))
   },
-  subscribe: (refresh) => onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), refresh),
+  subscribe: (refresh) => {
+    const offRun = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), refresh)
+    const offChild = onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), refresh)
+    const offReconnect = wsOnReconnect(refresh)
+    return () => {
+      offReconnect()
+      offChild()
+      offRun()
+    }
+  },
 }

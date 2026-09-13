@@ -267,6 +267,13 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
   by `resolveInRoot`, and the next start from that file asks for the acknowledgement
   ([workflows.md](./workflows.md) § Database definitions).
+- A child workflow is resolved in its parent task's workspace and project before any child task is
+  created. Repository definitions re-enter the configuration trust check; database definitions stay
+  device-owned. The child receives its own task-confined token, never the parent's token. Its tool
+  ceiling, turn and token limits, cost limit, and deadline can only narrow the root's approved
+  authority. The resolved graph and effective limits are persisted so restart recovery cannot gain
+  authority from an edited definition. Cancellation closes admission before it stops descendants,
+  which prevents a late child creation from escaping the tree-wide cancel.
 - Docker matching configuration is declarative; Docker and run-target execution remains subject to
   the appropriate trust gate.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to

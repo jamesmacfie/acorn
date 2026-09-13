@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import type { WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 
 // Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,
 // resolve a human gate. Commands use HTTP while notices and live events use the shared WebSocket.
@@ -18,17 +19,16 @@ export type WorkflowBridge = {
   // only — this workspace's `workflow_defs` rows. A row is owner-typed configuration that skips the
   // repo trust snapshot, so an agent inside the task neither sees one nor starts one.
   defs(taskId: string, includeRows: boolean): Promise<unknown>
-  // Every step kind, policy and profile this node can run, with the form each kind draws
-  // (../../shared/workflowContracts.ts § WorkflowCatalog). Node-wide: nothing about a kind depends
-  // on the project, and `projectId` on the route is for the editor phase that reads it.
-  catalog(): Promise<unknown>
-  start(taskId: string, def: unknown, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
+  // Every step kind, policy and profile this node can run, plus saved workflow references scoped to
+  // the selected project. Definition metadata is owner-visible executable configuration.
+  catalog(projectId?: string): Promise<unknown>
+  start(taskId: string, def: unknown, inputs: Record<string, string> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
   // Start a definition the node resolves itself: `repo:<fileId>` or `user:<fileId>` for a file this
   // task's project loads, anything else for a `workflow_defs` row. Resolving here rather than taking
   // the definition in the body is what lets the repo trust snapshot be checked for real.
-  startById(taskId: string, defId: string, inputs?: Record<string, string>): Promise<{ runId?: string; error?: string }>
-  runs(taskId: string): Promise<unknown[]>
-  steps(runId: string): Promise<unknown[]>
+  startById(taskId: string, defId: string, inputs: Record<string, string> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
+  runs(taskId: string): Promise<WorkflowRunProjection[]>
+  steps(runId: string): Promise<WorkflowStepProjection[]>
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
@@ -63,6 +63,18 @@ const startBody = z
 // A `defId` that names a file rather than a row. A row is owner-typed configuration that skips the
 // repo trust snapshot, so a task-confined caller may start a file and not a row.
 const FILE_DEF_ID = /^(repo|user):/
+const referencesDatabaseChild = (def: unknown): boolean => {
+  if (!def || typeof def !== 'object') return false
+  const steps = (def as { steps?: unknown }).steps
+  if (!Array.isArray(steps)) return false
+  return steps.some((step) => {
+    if (!step || typeof step !== 'object') return false
+    const child = (step as { childWorkflow?: unknown }).childWorkflow
+    if (!child || typeof child !== 'object') return false
+    const ref = (child as { ref?: unknown }).ref
+    return !!ref && typeof ref === 'object' && (ref as { source?: unknown }).source === 'database'
+  })
+}
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
 const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
@@ -84,9 +96,9 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
   .use('/workflows/runs/:runId/*', ownsRun)
-  // The editor's and the palette's list of what a step may be. `projectId` is accepted and unused:
-  // the catalog is node-wide, and the editor sends it so a later per-project answer needs no new route.
-  .get('/catalog', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.catalog()))
+  // The editor's list of what a step may be, including project-scoped saved workflow references.
+  // Device-only because database definitions are owner-authored executable configuration.
+  .get('/catalog', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.catalog(c.req.query('projectId'))))
   .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'), !isTaskConfined(c))))
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
@@ -94,9 +106,12 @@ export const workflow = new Hono<AppEnv>()
     const { def, defId, inputs } = parsed.data
     if (defId) {
       if (isTaskConfined(c) && !FILE_DEF_ID.test(defId)) return respondError(c, 403, 'forbidden')
-      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs))
+      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, !isTaskConfined(c)))
     }
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), def, inputs))
+    // A database definition is owner-authored configuration without a repository trust snapshot.
+    // The same device-only rule applies when an inline parent refers to one as a child.
+    if (isTaskConfined(c) && referencesDatabaseChild(def)) return respondError(c, 403, 'forbidden')
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), def, inputs, !isTaskConfined(c)))
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
@@ -126,8 +141,10 @@ export const workflow = new Hono<AppEnv>()
     isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.runForSession(c.req.param('sessionId'))))
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Read by the node with no
   // client and no request in sight, through the plugin dispatcher, so it takes no params and answers
-  // node-wide; `/v2/core/runs` applies the caller's confinement over the merged answer.
-  .get('/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()))
+  // node-wide. A task-confined caller uses `/v2/core/runs`, which filters the merged answer.
+  .get('/runs', (c) => isTaskConfined(c)
+    ? respondError(c, 403, 'forbidden')
+    : viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()))
 // No trigger-poll route. The sweep is a node schedule now (../../node/index.ts), and "check now" is
 // the scheduler's own run-now on the settings page, which every schedule already has. A second,
 // workflow-only door to the same sweep would need its own confinement rule for no extra reach.

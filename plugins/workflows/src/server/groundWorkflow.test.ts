@@ -210,6 +210,104 @@ describe('identifiers the catalog can refute', () => {
   })
 })
 
+describe('child workflow grounding', () => {
+  const target = {
+    ref: { source: 'database' as const, id: 'review-workflow' },
+    name: 'Review ticket',
+    inputs: [{ name: 'ticket', required: true }],
+  }
+  const withTarget: WorkflowCatalog = {
+    ...catalog,
+    kinds: [
+      ...catalog.kinds,
+      { id: 'workflow', pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS.workflow },
+      { id: 'workflow-map', pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] },
+    ],
+    workflows: [target],
+  }
+  const grounded = (steps: unknown[], inputs?: WorkflowDef['inputs']) =>
+    groundWorkflow({ name: 'Parent', inputs, steps } as WorkflowDef, withTarget)
+
+  it('drops a target that the scoped catalog does not offer', () => {
+    const result = grounded([{ name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'invented' } } }])
+    expect(result.def.steps[0]?.childWorkflow).toBeUndefined()
+    expect(codes(result)).toContain('unknown-workflow')
+  })
+
+  it('drops every generated target when the scoped catalog is empty', () => {
+    const result = groundWorkflow({
+      name: 'Parent',
+      steps: [{
+        name: 'child',
+        kind: 'workflow',
+        childWorkflow: { ref: target.ref },
+      }],
+    }, { ...withTarget, workflows: [] })
+    expect(result.def.steps[0]?.childWorkflow).toBeUndefined()
+    expect(codes(result)).toContain('unknown-workflow')
+  })
+
+  it('drops undeclared and unsupported bindings but keeps a valid parent input binding', () => {
+    const result = grounded([{
+      name: 'child',
+      kind: 'workflow',
+      childWorkflow: {
+        ref: target.ref,
+        inputs: {
+          ticket: { from: 'input', name: 'ticket' },
+          extra: { from: 'literal', value: 'x' },
+          item: { from: 'item', pointer: '/number' },
+        },
+      },
+    }], [{ name: 'ticket', required: true }])
+    expect(result.def.steps[0]?.childWorkflow?.inputs).toEqual({ ticket: { from: 'input', name: 'ticket' } })
+    expect(codes(result).filter((code) => code === 'unsupported-binding')).toHaveLength(2)
+  })
+
+  it('drops map sources and step bindings that do not name a structured predecessor', () => {
+    const result = grounded([
+      { name: 'plain', after: [], prompt: 'Answer in prose.' },
+      {
+        name: 'children',
+        kind: 'workflow-map',
+        after: ['plain'],
+        items: { step: 'plain', pointer: '/tickets' },
+        itemKey: '/id',
+        childWorkflow: { ref: target.ref, inputs: { ticket: { from: 'step', step: 'plain', pointer: '/ticket' } } },
+        title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'step', step: 'plain', pointer: '/ticket' } } },
+      },
+    ])
+    expect(result.def.steps[1]?.items).toBeUndefined()
+    expect(result.def.steps[1]?.childWorkflow?.inputs).toBeUndefined()
+    expect(result.def.steps[1]?.title?.bindings).toBeUndefined()
+  })
+
+  it('rewrites map and binding references when grounding renames a step', () => {
+    const result = grounded([
+      {
+        name: 'Select tickets',
+        after: [],
+        schema: { type: 'object', properties: { tickets: { type: 'array' } } },
+        prompt: 'Select tickets.',
+      },
+      {
+        name: 'children',
+        kind: 'workflow-map',
+        after: ['Select tickets'],
+        items: { step: 'Select tickets', pointer: '/tickets' },
+        itemKey: '/id',
+        childWorkflow: { ref: target.ref, inputs: { ticket: { from: 'step', step: 'Select tickets', pointer: '/number' } } },
+        title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'step', step: 'Select tickets', pointer: '/number' } } },
+      },
+    ])
+    const child = result.def.steps[1]!
+    expect(child.after).toEqual(['select-tickets'])
+    expect(child.items?.step).toBe('select-tickets')
+    expect(child.childWorkflow?.inputs?.ticket).toMatchObject({ step: 'select-tickets' })
+    expect(child.title?.bindings?.ticket).toMatchObject({ step: 'select-tickets' })
+  })
+})
+
 describe('keys outside the vocabulary', () => {
   it('drops a key that is not part of a workflow, a step, a child step or an input', () => {
     const result = ground(workflow(

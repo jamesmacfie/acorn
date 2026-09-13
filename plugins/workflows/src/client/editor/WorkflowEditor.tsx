@@ -303,6 +303,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           backends={backends() ?? []}
           context={{
             workspaceId: workspaceId(),
+            projectId: props.projectId,
             // Only a row can be an example of itself: the worked examples the node picks are rows.
             ...(store.ref()?.source === 'database' ? { defId: store.ref()?.id } : {}),
             draft: draft().def,

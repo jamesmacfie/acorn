@@ -5,7 +5,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
-import { formatCost, kindLabel, runCost, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatCost, formatUsage, kindLabel, runCost, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 // The run pane's list column: this task's runs, then the selected run's nodes in the same reading
@@ -21,6 +21,7 @@ import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 type NodeView = 'rows' | 'graph'
 const NODE_VIEW_KEY = 'plugin:workflows:runs:nodeView'
+const CHILD_TERMINAL = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
 
 /** The list header: how many runs this task has. */
 export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
@@ -129,6 +130,13 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                           <Badge size="xs">{`⇐ ${node().parents.length}`}</Badge>
                         </Show>
                         <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
+                        <Show when={node().step?.children.length}>
+                          {(count) => (
+                            <Text emphasis="muted">
+                              {`${node().step!.children.filter((child) => child.runStatus && CHILD_TERMINAL.has(child.runStatus)).length}/${count()} children`}
+                            </Text>
+                          )}
+                        </Show>
                         <Text emphasis="muted">{stepElapsed(node().step, model.now())}</Text>
                       </>
                     )}
@@ -149,7 +157,8 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
 /** Under the list: what the run has cost, and the one control that acts on the whole run. */
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
-  const cost = createMemo(() => formatCost(runCost(model.steps())))
+  const usage = createMemo(() => formatUsage(model.selectedRun()?.usage))
+  const legacyCost = createMemo(() => formatCost(runCost(model.steps())))
   return (
     <Show when={model.selectedRun()}>
       {(run) => (
@@ -163,16 +172,20 @@ export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
               <ConfirmButton
                 size="sm"
                 tone="danger"
-                confirmLabel="Cancel it?"
+                confirmLabel="Cancel this run and its child runs?"
                 disabled={model.busy()}
                 onConfirm={() => void model.cancel()}
               >
-                Cancel run
+                Cancel run tree
               </ConfirmButton>
             </Show>
           )}
         >
-          {[run().status, cost()].filter(Boolean).join(' · ')}
+          {[
+            run().status,
+            run().depth === 0 && run().usage ? 'Tree usage' : run().usage ? 'Run usage' : '',
+            usage() || legacyCost(),
+          ].filter(Boolean).join(' · ')}
         </SectionHeader>
       )}
     </Show>

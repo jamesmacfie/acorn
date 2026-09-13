@@ -173,6 +173,17 @@ function rewriteReferences(value: unknown, from: string, to: string, depth = 0):
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, rewriteReferences(entry, from, to, depth + 1)]))
 }
 
+const rewriteBindingStep = <T extends { from: string; step?: string }>(binding: T, from: string, to: string): T =>
+  binding.from === 'step' && binding.step === from ? { ...binding, step: to } : binding
+
+const rewriteBindings = <T extends { from: string; step?: string }>(
+  bindings: Record<string, T> | undefined,
+  from: string,
+  to: string,
+): Record<string, T> | undefined => bindings && Object.fromEntries(
+  Object.entries(bindings).map(([name, binding]) => [name, rewriteBindingStep(binding, from, to)]),
+)
+
 /** Why this rename cannot happen, or nothing. */
 export function renameProblem(def: WorkflowDef, from: string, to: string): string | undefined {
   if (to === from) return undefined
@@ -194,6 +205,11 @@ export function renameNode(draft: WorkflowDraft, from: string, to: string): Work
     if (next.with) next.with = rewriteReferences(next.with, from, to) as Record<string, unknown>
     if (next.joins === from) next.joins = to
     if (next.childStep?.prompt) next.childStep = { ...next.childStep, prompt: rewriteReferences(next.childStep.prompt, from, to) as string }
+    if (next.childWorkflow?.inputs) {
+      next.childWorkflow = { ...next.childWorkflow, inputs: rewriteBindings(next.childWorkflow.inputs, from, to) }
+    }
+    if (next.items?.step === from) next.items = { ...next.items, step: to }
+    if (next.title?.bindings) next.title = { ...next.title, bindings: rewriteBindings(next.title.bindings, from, to) }
     if (next.branches) {
       next.branches = Object.fromEntries(Object.entries(next.branches).map(([verdict, target]) => [verdict, target === from ? to : target]))
     }
@@ -237,7 +253,7 @@ export function setField(draft: WorkflowDraft, name: string, kind: string, field
   const empty = value === '' || value === undefined || value === null
   if (fieldHome(kind, fieldId) === 'with') {
     return patchStep(draft, name, (step) => {
-      const table = { ...(step.with ?? {}) }
+      const table = { ...step.with }
       if (empty) delete table[fieldId]
       else table[fieldId] = value
       const next: WorkflowStepDef = { ...step, with: table }
@@ -253,7 +269,7 @@ export function setField(draft: WorkflowDraft, name: string, kind: string, field
       return next
     }
     const [head, tail] = path
-    const nested = { ...((step as unknown as Record<string, Record<string, unknown>>)[head] ?? {}) }
+    const nested = { ...(step as unknown as Record<string, Record<string, unknown>>)[head] }
     if (empty) delete nested[tail]
     else nested[tail] = value
     const next = { ...step, [head]: nested } as WorkflowStepDef

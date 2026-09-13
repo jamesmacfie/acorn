@@ -1,4 +1,4 @@
-// How the seven built-in kinds describe themselves, and where each of their fields lands
+// How the nine built-in kinds describe themselves, and where each of their fields lands
 // (docs/workflows.md § Contributed step kinds).
 //
 // Here rather than beside the handlers in ../server/workflowBuiltins.ts for two reasons. The editor
@@ -83,6 +83,56 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     icon: 'merge',
     fields: [{ id: 'joins', label: 'Fan-out step', type: 'select', required: true, hint: 'A fan-out step this one waits on.' }],
     output: { description: 'One row per child: its name, its status, and its structured result.' },
+  },
+  workflow: {
+    label: 'Run a workflow',
+    description: 'Start one saved workflow in a child task and wait for its result.',
+    icon: 'workflow',
+    fields: [{
+      id: 'childWorkflow',
+      label: 'Child workflow',
+      type: 'child-workflow',
+      required: true,
+      hint: 'Pick a workflow available to this project, then bind its declared inputs.',
+    }],
+    output: { description: 'The child task, run status, and bounded result summary.' },
+  },
+  'workflow-map': {
+    label: 'Map to workflows',
+    description: 'Start one saved workflow in a child task for each selected item.',
+    icon: 'git-fork',
+    fields: [
+      {
+        id: 'items',
+        label: 'Items',
+        type: 'workflow-map-source',
+        required: true,
+        hint: 'Select an array from a structured predecessor result.',
+      },
+      {
+        id: 'itemKey',
+        label: 'Item key pointer',
+        type: 'workflow-json-pointer',
+        required: true,
+        placeholder: '/id',
+        hint: 'A safe JSON Pointer to a nonempty string that identifies each item.',
+      },
+      {
+        id: 'childWorkflow',
+        label: 'Child workflow',
+        type: 'child-workflow',
+        required: true,
+        hint: 'Pick a workflow available to this project, then bind its declared inputs.',
+      },
+      {
+        id: 'title',
+        label: 'Child task title',
+        type: 'workflow-title',
+        required: true,
+        hint: 'Write a title template and bind each placeholder to a string value.',
+      },
+    ],
+    output: { description: 'One result per source item, in source order, with its task, run, status, and summary.' },
   },
 }
 

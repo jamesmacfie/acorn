@@ -21,8 +21,11 @@ import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type { WorkflowGenerateNote } from '../shared/api'
 import { GENERATE_MAX_DESCRIPTION_CHARS } from '../shared/api'
 import type { StepField, StepFieldOption, WorkflowCatalog, WorkflowDef, WorkflowInput } from '../shared/workflowContracts'
-import { definitionForPrompt } from './editWorkflow'
+import { definitionForPrompt, type PromptWorkflowDef } from './editWorkflow'
+import { renderWorkflowTargets } from './workflowTargetPrompt'
 import { validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './workflowValidation'
+
+export { renderWorkflowTargets } from './workflowTargetPrompt'
 
 /** How much the model may write back. A definition with six well-written prompts is a big document,
  *  and an answer cut off mid-string is not JSON, so this is generous rather than tight. */
@@ -311,6 +314,10 @@ const fieldType = (field: StepField, detail: KindDetail): string => {
   if (field.type === 'number' && (field.min != null || field.max != null)) {
     return `number from ${field.min ?? 'any'} to ${field.max ?? 'any'}`
   }
+  if (field.type === 'child-workflow') return 'child workflow object'
+  if (field.type === 'workflow-map-source') return 'structured map source object'
+  if (field.type === 'workflow-json-pointer') return 'JSON Pointer string'
+  if (field.type === 'workflow-title') return 'bound title object'
   return field.type
 }
 
@@ -556,10 +563,12 @@ export function renderVocabulary(catalog: WorkflowCatalog, budget = GENERATE_MAX
   return full.length <= budget ? full : vocabularyAt(catalog, true)
 }
 
-// --- 6. the checker, and the mistake this feature exists to avoid ---
+// --- 6. saved workflows this project can dispatch ---
+
+// --- 7. the checker, and the mistake this feature exists to avoid ---
 
 const SECTION_RULES = [
-  '## 6. Rules and mistakes',
+  '## 7. Rules and mistakes',
   '',
   '### What the checker refuses',
   '',
@@ -577,6 +586,9 @@ const SECTION_RULES = [
   '- A `join` step whose `joins` does not name a fan-out behind it.',
   '- A required field of a kind left empty.',
   '- `isolation` or `inputs` on a kind that does not run an agent.',
+  '- A child workflow reference that section 6 does not list.',
+  '- A child input binding the target does not declare, or a required child input with no binding.',
+  '- A map source or step binding that does not name a structured predecessor.',
   '',
   '### Mistakes to avoid',
   '',
@@ -626,7 +638,7 @@ const SECTION_RULES = [
   '}',
 ].join('\n')
 
-// --- 7. two worked examples that always ship ---
+// --- 8. two worked examples that always ship ---
 //
 // Data rather than text, so a test can put them through `validateWorkflow` and a built-in example
 // can never teach something the checker refuses. The first is the motivating case: parallel work,
@@ -742,16 +754,17 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
 ]
 
 const SECTION_EXAMPLES = [
-  '## 7. Worked examples',
+  '## 8. Worked examples',
   '',
   ...BUILTIN_EXAMPLES.flatMap(({ def, note }) => [JSON.stringify(def, null, 2), '', note, '']),
 ].join('\n').trimEnd()
 
-// --- 8. worked examples from this workspace ---
+// --- 9. worked examples from this workspace ---
 
 /** A definition somebody here wrote, with the id it is addressed by so the one being edited can be
  *  kept out of its own examples. */
 export type WorkflowExample = { id: string; def: WorkflowDef }
+type PromptWorkflowExample = { id: string; def: PromptWorkflowDef }
 
 /** How much one definition teaches, highest first.
  *
@@ -772,24 +785,28 @@ function teachingScore(def: WorkflowDef): number {
  *  value rather than smallest first, and it drops a whole example rather than truncating one: half a
  *  JSON definition is invalid syntax, and a broken worked example teaches worse than no example.
  *
- *  Three definitions never make it in: the one being edited, anything under two steps, and anything
- *  that does not itself pass the checker. A workspace's broken workflow is exactly the wrong thing
- *  to learn house style from. */
+ *  Four definitions never make it in: the one being edited, anything under two steps, anything that
+ *  does not pass the checker, and a parent workflow. `definitionForPrompt` removes protected child
+ *  targets, so rendering a parent afterward would teach an incomplete dispatch shape. Section 6
+ *  provides complete catalog-backed dispatch examples instead. */
 export function selectExamples(args: {
   examples: readonly WorkflowExample[]
   validation: WorkflowValidationCatalog
   excludeId?: string
   budget?: number
-}): { include: WorkflowExample[]; omit: WorkflowExample[] } {
+}): { include: PromptWorkflowExample[]; omit: WorkflowExample[] } {
   const budget = args.budget ?? GENERATE_MAX_EXAMPLE_CHARS
   const candidates = args.examples
     .filter((example) => example.id !== args.excludeId && (example.def.steps?.length ?? 0) >= 2)
+    .filter((example) => !example.def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map'))
     .filter((example) => !validateWorkflow(example.def, args.validation).length)
-    .map((example) => ({ id: example.id, def: definitionForPrompt(example.def) }))
-    .map((example) => ({ example, text: JSON.stringify(example.def, null, 2), score: teachingScore(example.def) }))
+    .map((original) => {
+      const example = { id: original.id, def: definitionForPrompt(original.def) }
+      return { original, example, text: JSON.stringify(example.def, null, 2), score: teachingScore(original.def) }
+    })
     .sort((a, b) => b.score - a.score || a.text.length - b.text.length || a.example.id.localeCompare(b.example.id))
 
-  const include: WorkflowExample[] = []
+  const include: PromptWorkflowExample[] = []
   const omit: WorkflowExample[] = []
   let spent = 0
   for (const candidate of candidates) {
@@ -799,16 +816,16 @@ export function selectExamples(args: {
     if (fits) {
       include.push(candidate.example)
       spent += candidate.text.length
-    } else omit.push(candidate.example)
+    } else omit.push(candidate.original)
   }
   return { include, omit }
 }
 
 /** The workspace's own definitions, or nothing at all. The only section that can disappear. */
-function renderWorkspaceExamples(selected: { include: readonly WorkflowExample[]; omit: readonly WorkflowExample[] }): string {
+function renderWorkspaceExamples(selected: { include: readonly PromptWorkflowExample[]; omit: readonly WorkflowExample[] }): string {
   if (!selected.include.length) return ''
   const lines = [
-    '## 8. Worked examples from this workspace',
+    '## 9. Worked examples from this workspace',
     '',
     'Definitions somebody here wrote and this node runs. Follow how they name steps and how much they',
     'say in a prompt. They are house style, not templates: write what the description asks for.',
@@ -837,6 +854,7 @@ export function catalogValidation(catalog: WorkflowCatalog): WorkflowValidationC
     structuredProfiles: new Set(catalog.profiles.filter((profile) => profile.structured).map((profile) => profile.id)),
     agentStepKinds: new Set(catalog.kinds.filter((kind) => kind.describe?.runsAgent).map((kind) => kind.id)),
     describeStepKind: (kind) => described.get(kind) ?? undefined,
+    workflowTargets: catalog.workflows,
   }
 }
 
@@ -863,6 +881,7 @@ export function buildGenerateSystemPrompt(args: {
     renderStepKinds(args.catalog),
     SECTION_CONTRACTS,
     renderVocabulary(args.catalog),
+    renderWorkflowTargets(args.catalog),
     SECTION_RULES,
     SECTION_EXAMPLES,
     renderWorkspaceExamples(selected),
@@ -924,7 +943,7 @@ export function buildGenerateUserPrompt(args:
  *  the fix, and paraphrasing it loses the fix. */
 export function buildRepairUserPrompt(args: {
   userPrompt: string
-  def: WorkflowDef
+  def: WorkflowDef | PromptWorkflowDef
   notes: readonly WorkflowGenerateNote[]
   problems: readonly string[]
 }): string {

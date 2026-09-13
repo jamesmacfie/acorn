@@ -37,6 +37,13 @@ export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promi
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')
 
+/** Task-checked cancellation for a managed session owned by another plugin's operation. */
+export type AgentSessionControl = {
+  cancel(taskId: string, sessionId: string): Promise<void>
+}
+
+export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.sessionControl')
+
 // Which agent profiles have a durable managed driver. Here rather than beside the implementation
 // because it is the other half of the sentence above: a caller reads it to know, before it calls,
 // whether this profile will resolve to a session or to `null`. The workflows catalog says `managed`

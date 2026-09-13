@@ -99,6 +99,7 @@
   "GET /v2/p/terminal/sessions",
   "GET /v2/p/terminal/tasks/:taskId/run-targets",
   "GET /v2/p/workflows/catalog",
+  "GET /v2/p/workflows/catalog",
   "GET /v2/p/workflows/defs",
   "GET /v2/p/workflows/defs/:id",
   "GET /v2/p/workflows/defs/model-connections",

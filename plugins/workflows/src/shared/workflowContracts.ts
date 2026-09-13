@@ -36,6 +36,32 @@ export type WorkflowInput = {
   default?: string
 }
 
+export type WorkflowDefinitionRef =
+  | { source: 'database'; id: string }
+  | { source: 'repo'; path: string }
+  | { source: 'user'; id: string }
+
+export type WorkflowValueBinding =
+  | { from: 'literal'; value: string }
+  | { from: 'input'; name: string }
+  | { from: 'step'; step: string; pointer: string }
+  | { from: 'item'; pointer: string }
+
+export type WorkflowBoundTemplate = {
+  template: string
+  bindings?: Record<string, WorkflowValueBinding>
+}
+
+export type ChildWorkflowConfig = {
+  ref: WorkflowDefinitionRef
+  inputs?: Record<string, WorkflowValueBinding>
+}
+
+export type WorkflowMapSource = {
+  step: string
+  pointer: string
+}
+
 export type WorkflowStepDef = {
   name: string
   kind?: string
@@ -60,6 +86,14 @@ export type WorkflowStepDef = {
   maxIterations?: number
   requiresRun?: string
   childStep?: WorkflowChildStepDef
+  // Runtime child workflows use a separate key from static `workflow` file composition. Resolution
+  // freezes the referenced definition before any child task exists.
+  childWorkflow?: ChildWorkflowConfig
+  // `workflow-map` reads an array from one predecessor's structured result. The item key is a JSON
+  // Pointer within each item, and the title template can read only its declared bindings.
+  items?: WorkflowMapSource
+  itemKey?: string
+  title?: WorkflowBoundTemplate
   joins?: string
   branches?: Record<string, string>
   // A contributed kind's own configuration, straight off the workflow file's `[steps.with]` table
@@ -83,6 +117,29 @@ export type WorkflowDef = {
 
 export type WorkflowRunRow = typeof schema.workflowRuns.$inferSelect
 export type WorkflowStepRow = typeof schema.workflowSteps.$inferSelect
+
+export type WorkflowDefinitionProvenance =
+  | { source: 'inline' }
+  | { source: 'database'; id: string; revision: number }
+  | { source: 'repo'; path: string }
+  | { source: 'user'; id: string }
+
+export type ResolvedWorkflowNode = {
+  path: string[]
+  depth: number
+  definition: WorkflowDef
+  provenance: WorkflowDefinitionProvenance
+  defaultInputs: Record<string, string>
+  fingerprint: string
+}
+
+/** The executable definition graph frozen before a root run starts. */
+export type ResolvedWorkflowGraph = {
+  root: WorkflowDef
+  nodes: ResolvedWorkflowNode[]
+  fingerprint: string
+  requiresRepoTrust: boolean
+}
 
 export type WorkflowStepEvent = {
   at: number
@@ -124,6 +181,7 @@ export type StepHandlerOutcome =
   | ({ status: 'failed'; error: string } & StepHandlerData)
   | ({ status: 'safety-rail'; error: string } & StepHandlerData)
   | { status: 'waiting-gate' }
+  | { status: 'waiting-children' }
   | { status: 'cancelled'; error?: string }
 
 export type StepHandler = (ctx: StepHandlerContext) => Promise<StepHandlerOutcome>
@@ -142,7 +200,17 @@ export type StepValidator = (step: WorkflowStepDef, context: StepValidationConte
 
 // What a kind's form looks like, as data (docs/workflows.md § Contributed step kinds). The host draws
 // it, so a kind can be edited in the UI on either host without the plugin shipping a component.
-export type StepFieldType = 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'prompt'
+export type StepFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'prompt'
+  | 'child-workflow'
+  | 'workflow-map-source'
+  | 'workflow-json-pointer'
+  | 'workflow-title'
 
 export type StepFieldOption = { value: string; label: string; description?: string }
 
@@ -191,6 +259,16 @@ export type WorkflowCatalog = {
   kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
   policies: { id: string; pluginId: string | null }[]
   profiles: { id: string; label: string; managed: boolean; structured: boolean }[]
+  /** Saved workflows that the selected project can resolve. This metadata contains no definition
+   *  body, input default, credential, or runtime value. */
+  workflows?: WorkflowCatalogTarget[]
+}
+
+export type WorkflowCatalogTarget = {
+  ref: WorkflowDefinitionRef
+  name: string
+  inputs: Array<Omit<WorkflowInput, 'default'> & { hasDefault?: boolean }>
+  outputs?: { step: string; schema: object }[]
 }
 export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
 
