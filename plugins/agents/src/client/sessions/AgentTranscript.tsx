@@ -5,7 +5,7 @@ import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
-import { sessionModelLabel } from '../settings/agentConfigOptions'
+import { sessionModelSummary } from '../settings/agentConfigOptions'
 import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
@@ -64,7 +64,7 @@ export default function AgentTranscript(props: {
     return items
   })
   const sessionId = createMemo(() => props.snapshot.session.id)
-  const sessionModel = createMemo(() => sessionModelLabel(props.snapshot.session))
+  const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
   // different lists, so one key would restore the wrong offset every time the reader stepped in or out.
   // Two surfaces on the same stream are two lists in that same sense, so the prefix is part of the key.

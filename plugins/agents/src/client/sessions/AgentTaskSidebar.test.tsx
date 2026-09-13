@@ -137,6 +137,32 @@ describe('the delegated session sidebar', () => {
     expect(leadOf('Running one')?.querySelector('title')).toBeNull()
   })
 
+  it('shows Codex reasoning effort beside its model', () => {
+    mount([session('configured', {
+      title: 'Configured Codex',
+      config: {
+        configOptions: [
+          {
+            id: 'model',
+            label: 'Model',
+            category: 'model',
+            currentValue: 'gpt-5.6-sol',
+            values: [{ value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' }],
+          },
+          {
+            id: 'reasoning',
+            label: 'Effort',
+            category: 'reasoning',
+            currentValue: 'high',
+            values: [{ value: 'high', label: 'High' }],
+          },
+        ],
+      },
+    })], {})
+
+    expect(rowNamed('Configured Codex').textContent).toContain('codex · GPT-5.6 Sol · High · ready')
+  })
+
   it('keeps key-based managed and provider-subagent selection behavior', () => {
     const root = session('root', { title: 'Parent', subagents: [nativeSubagent] })
     const child = session('managed-child', { kind: 'delegated', title: 'Managed child', parentSessionId: root.id })
