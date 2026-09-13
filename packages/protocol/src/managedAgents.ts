@@ -198,6 +198,11 @@ export type AgentSubagent = {
   role?: string
   model?: string
   providerAgentRef?: string
+  /** Detached from the parent's turn: the spawning call returned the moment the child launched, so the
+   *  child runs on while the parent's turn is over. Claude Code's `run_in_background` Agent call. It
+   *  changes how completion is read, because that spawning call's own `completed` is a launch receipt,
+   *  not the child's finish. See docs/managed-agents.md, section Subagents. */
+  background?: boolean
   usage?: AgentUsage
   toolUseCount?: number
   durationMs?: number

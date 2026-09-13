@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
 import { acpElicitationResponse, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
+import { foldSubagentRoster } from '../sessions/stateMachine'
 import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
 import { buildConversationItems } from '../../client/sessions/conversationItems'
@@ -137,6 +138,72 @@ describe('Claude subagent attribution, against the captured wire', () => {
       event.type === 'assistant_message')
     expect(prose.length).toBeGreaterThan(0)
     expect(prose.every((event) => event.subagentId === undefined)).toBe(true)
+  })
+})
+
+describe('a backgrounded subagent, as the wire reports it', () => {
+  // The wire of a `run_in_background: true` Agent call, captured on Claude Code 2.1.241: the spawn
+  // carries the flag, then a summary lands at launch with status `async_launched`, then the spawning
+  // call's own status goes `completed` while the child is only getting started.
+  const agentId = 'toolu_bg'
+  const meta = (extra: Record<string, unknown>) => ({ _meta: { claudeCode: extra } })
+
+  const launchInput = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId, title: 'Recon the sessions folder',
+    rawInput: { subagent_type: 'general-purpose', run_in_background: true },
+    ...meta({ toolName: 'Agent' }),
+  } as unknown as SessionUpdate
+  const launchSummary = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId,
+    ...meta({ toolResponse: { agentId: 'a97', agentType: 'general-purpose', status: 'async_launched' } }),
+  } as unknown as SessionUpdate
+  const spawnCompleted = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId, status: 'completed', ...meta({ toolName: 'Agent' }),
+  } as unknown as SessionUpdate
+
+  const rosterFrom = (updates: SessionUpdate[]) => {
+    let roster: import('@acorn/protocol/managedAgents.ts').AgentSubagent[] = []
+    for (const update of updates) {
+      for (const event of normalizeAcpUpdate(update, 'Claude Code')) {
+        if (event.type === 'subagent') roster = foldSubagentRoster(roster, event.subagent, 'turn-1', 1)
+      }
+    }
+    return roster
+  }
+
+  it('reads the launch receipt as running, not done', () => {
+    const roster = rosterFrom([launchInput, launchSummary])
+    expect(roster).toHaveLength(1)
+    expect(roster[0]).toMatchObject({ status: 'running', background: true })
+  })
+
+  it('does not let the spawning call’s own completion settle a background child', () => {
+    const roster = rosterFrom([launchInput, launchSummary, spawnCompleted])
+    expect(roster[0]?.status).toBe('running')
+    expect(roster[0]?.background).toBe(true)
+  })
+
+  it('still settles when a real completion summary arrives', () => {
+    const done = {
+      sessionUpdate: 'tool_call_update', toolCallId: agentId,
+      ...meta({ toolResponse: { agentId: 'a97', status: 'completed', totalDurationMs: 51000, totalToolUseCount: 22 } }),
+    } as unknown as SessionUpdate
+    const roster = rosterFrom([launchInput, launchSummary, spawnCompleted, done])
+    expect(roster[0]).toMatchObject({ status: 'completed', durationMs: 51000, toolUseCount: 22 })
+  })
+
+  it('leaves a foreground subagent settling on its own completion, as before', () => {
+    // Same shape without the background flag: the spawning call’s completion is the child’s finish.
+    const fgSpawn = {
+      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', title: 'Read one file',
+      rawInput: { subagent_type: 'general-purpose', run_in_background: false }, ...meta({ toolName: 'Agent' }),
+    } as unknown as SessionUpdate
+    const fgDone = {
+      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', status: 'completed', ...meta({ toolName: 'Agent' }),
+    } as unknown as SessionUpdate
+    const roster = rosterFrom([fgSpawn, fgDone])
+    expect(roster[0]).toMatchObject({ status: 'completed' })
+    expect(roster[0]?.background).toBeUndefined()
   })
 })
 

@@ -300,7 +300,7 @@ rather than a fixed set of columns with gaps in it.
 | Live file changes | yes, the diff on the tool call | yes, the child's own patch updates |
 | Live usage | no | the child's own `thread/tokenUsage/updated` |
 | At completion | `_meta.claudeCode.toolResponse`: agent id, type, model, tokens, tool uses, duration | nothing extra |
-| Terminal state | completed | idle, and still resumable |
+| Terminal state | completed, unless backgrounded (see below) | idle, and still resumable |
 
 Reading Claude's `_meta.claudeCode` namespace in the shared ACP normalizer is deliberate rather than a
 harness quirk: another harness's namespace is simply absent, so the branch costs nothing, and a quirk
@@ -313,6 +313,18 @@ and the adapter forwards the ping as a `tool_call_update` under an id it made up
 normalizer recognises it. Reading a ping as a call mints a new card every 30 seconds, and when the tool
 is `Agent` it mints a subagent row keyed on an id that never appears again, so the completion lands on
 the real call and the row sits at "Working" for good.
+
+A backgrounded Claude subagent needs a second exception, for the same reason the heartbeat does: the
+spawning `Agent` call does not mean what it looks like. When the CLI runs a child with
+`run_in_background: true`, the call returns the instant the child launches, so its `toolResponse`
+arrives at the start with `status: "async_launched"` and the call's own status then goes `completed`,
+all while the child is only getting started. Its inner tool calls stream on for as long as it runs.
+Reading that first summary as a finish, or the spawning call's `completed` as the child's, marks the
+row done before it has done anything. So `async_launched` folds to `running` and sets the roster
+entry's `background` flag, and a background entry is settled only by a real completion summary, the one
+update that carries the harness handle. A terminal status with no agent id on it is the launch receipt
+and leaves the row running. The parent session still reads as ready meanwhile, by the rule above: a
+backgrounded child is precisely a child that outlives its parent's turn.
 
 Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
 `turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's
