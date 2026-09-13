@@ -132,10 +132,16 @@ describe('the session actions in the palette', () => {
   it('is one group over one row per action, gated on the plugin and on an open task', () => {
     const pane = mountCommands([
       item({ id: 'fork', label: 'Fork session' }),
+      item({ id: 'regenerate-title', label: 'Regenerate title' }),
       item({ id: 'archive', label: 'Archive session…' }),
     ])
     expect(pane.registered().map((command) => command.id))
-      .toEqual(['agents.session', 'agents.session.fork', 'agents.session.archive'])
+      .toEqual([
+        'agents.session',
+        'agents.session.fork',
+        'agents.session.regenerate-title',
+        'agents.session.archive',
+      ])
     expect(pane.registered()[0])
       .toMatchObject({ kind: 'group', palette: true, scope: 'task', requires: { plugin: 'agents' } })
     expect(pane.at('agents.session.fork'))

@@ -52,7 +52,7 @@ export const normalizeStoredSessionTitle = (value: string): string => {
   return title
 }
 
-export const normalizeGeneratedSessionTitle = (value: string, fallback: string): string | null => {
+export const normalizeGeneratedSessionTitle = (value: string, excludedTitle?: string): string | null => {
   const lines = value
     .trim()
     .split(/\r?\n/)
@@ -80,6 +80,6 @@ export const normalizeGeneratedSessionTitle = (value: string, fallback: string):
     title = boundary > 0 ? candidate.slice(0, boundary) : candidate
   }
   title = title.replace(/[.!?,;:]+$/u, '').trim()
-  if (!title || title === DEFAULT_SESSION_TITLE || title === fallback) return null
+  if (!title || title === DEFAULT_SESSION_TITLE || title === excludedTitle) return null
   return title
 }

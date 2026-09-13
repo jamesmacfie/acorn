@@ -39,7 +39,7 @@ const METHODS = [
   'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
-  'patchSession', 'fork', 'compact', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
+  'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search',
 ] as const
 
@@ -67,6 +67,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
       expect((await app.fetch(req(`/api/sessions/${sessionId}/cancel`, 'POST', {}), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/fork`, 'POST', {}), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/compact`, 'POST'), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/regenerate-title`, 'POST'), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/handoff-terminal`, 'POST'), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/turns`, 'POST', { input: [{ type: 'text', text: 'x' }] }), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}`, 'PATCH', { title: 'stolen' }), {} as Env)).status).toBe(404)
@@ -78,6 +79,14 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     const seen: string[] = []
     setManagedAgentsBridge(fake({ snapshot: async (id) => (seen.push(id), { session: null } as never) }))
     expect((await asTask1().fetch(req('/api/sessions/s1'), {} as Env)).status).toBe(200)
+    expect(seen).toEqual(['s1'])
+  })
+
+  it('regenerates the title only through the owning session', async () => {
+    const seen: string[] = []
+    setManagedAgentsBridge(fake({ regenerateTitle: async (id) => (seen.push(id), { id } as never) }))
+    const response = await asTask1().fetch(req('/api/sessions/s1/regenerate-title', 'POST'), {} as Env)
+    expect(response.status).toBe(200)
     expect(seen).toEqual(['s1'])
   })
 

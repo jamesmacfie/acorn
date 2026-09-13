@@ -122,6 +122,7 @@ export function managedAgentsBridge(
     patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),
     fork: (sessionId, title) => guarded(() => runtime.fork(sessionId, title)),
     compact: (sessionId) => guarded(() => runtime.compact(sessionId)),
+    regenerateTitle: (sessionId) => guarded(() => runtime.regenerateTitle(sessionId)),
     deleteSession: (sessionId) => guarded(() => runtime.deleteSession(sessionId)),
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),

@@ -799,6 +799,70 @@ describe('managed agent runtime conformance', () => {
     ]))
   })
 
+  it('regenerates from the first durable prompt without overwriting a concurrent user rename', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const profileId = 'title-regeneration'
+    registerTitleProfile(profileId)
+    let resolveFirst!: (value: Awaited<ReturnType<CoreServices['models']['generateText']>>) => void
+    const firstGeneration = new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
+      resolveFirst = resolve
+    })
+    core.models.generateText = vi.fn()
+      .mockImplementationOnce(() => firstGeneration)
+      .mockResolvedValueOnce({
+        text: 'Regenerated session title',
+        providerId: profileId,
+        backendId: `harness:${profileId}`,
+        modelId: 'default',
+      })
+    const titles: string[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry: new AgentDriverRegistry(),
+      publish: (frame) => {
+        if (frame.channel === 'agent:session') titles.push(frame.session.title)
+      },
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: profileId,
+      profileId,
+      kind: 'interactive',
+      config: {},
+    }, descriptor(profileId))
+    await runtime.store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Build a durable manual title regeneration command' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+
+    const superseded = runtime.regenerateTitle(session.id)
+    await vi.waitFor(() => expect(core.models.generateText).toHaveBeenCalledTimes(1))
+    await runtime.patchSession(session.id, { title: 'My title wins' })
+    resolveFirst({
+      text: 'Discard this generated title',
+      providerId: profileId,
+      backendId: `harness:${profileId}`,
+      modelId: 'default',
+    })
+    expect((await superseded).title).toBe('My title wins')
+
+    const regenerated = await runtime.regenerateTitle(session.id)
+    expect(regenerated.title).toBe('Regenerated session title')
+    expect(core.models.generateText).toHaveBeenLastCalledWith(expect.objectContaining({
+      input: expect.objectContaining({
+        prompt: 'First user request:\nBuild a durable manual title regeneration command',
+      }),
+    }))
+    expect(titles).toContain('Regenerated session title')
+  })
+
   it('allows a slow one-shot CLI to finish without delaying the accepted turn', async () => {
     vi.useFakeTimers()
     try {

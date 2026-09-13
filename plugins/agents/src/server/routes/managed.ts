@@ -71,6 +71,7 @@ export type ManagedAgentsBridge = {
   patchSession(sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
   compact(sessionId: string): Promise<void>
+  regenerateTitle(sessionId: string): Promise<AgentSession>
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
   resumeManaged(sessionId: string): Promise<AgentSession>
@@ -321,6 +322,8 @@ export const managedAgents = new Hono<AppEnv>()
       await bridge.compact(c.req.param('sessionId'))
       return { ok: true }
     }))
+  .post('/sessions/:sessionId/regenerate-title', (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/handoff-terminal', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.handoffToTerminal(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/resume-managed', (c) =>

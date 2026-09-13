@@ -256,9 +256,11 @@ operations.
 The same conditional operation handles two generated calls that somehow overlap. The first result
 may replace the fallback. Later results find a different title and do nothing.
 
-No persistent title-provenance column is required for this one-time behavior. The exact expected
-title is enough to protect user changes. Add persistent provenance only if a later design introduces
-manual regeneration, clearing back to automatic mode, or repeated topic-shift naming.
+No persistent title-provenance column is required for one-shot behavior. Automatic generation compares
+against its prompt fallback; an explicit manual regeneration compares against the title that was
+current when the request started. Both protect a user rename made while generation is running. Add
+persistent provenance only if a later design introduces an automatic naming mode or repeated
+topic-shift naming.
 
 ### Keep background work under runtime custody
 
@@ -618,8 +620,9 @@ Run these checks with Claude Code and Codex profiles:
 - Do not place old or new titles in lifecycle event payloads. Consumers can use the task-scoped
   session capability.
 - Do not write title-generation details into the managed transcript.
-- Do not add repeated or topic-shift regeneration. It requires persistent title provenance, a user
-  control to return to automatic naming, context selection, and throttling.
+- Do not add automatic repeated or topic-shift regeneration. It requires persistent title provenance,
+  a user control to return to automatic naming, context selection, and throttling. An explicit one-shot
+  regeneration from the first durable prompt does not create that automatic state.
 - Do not add image understanding. `GenerateTextInput` is text-only, and an attachment filename is an
   adequate fallback for this version.
 - Do not add a database column for title provenance until behavior needs to survive beyond the

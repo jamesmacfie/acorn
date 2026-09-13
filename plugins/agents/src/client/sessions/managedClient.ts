@@ -117,6 +117,8 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/fork'), 'POST', title ? { title } : {}),
   compact: (sessionId: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
+  regenerateTitle: (sessionId: string) =>
+    jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
   handoff: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/handoff-terminal'), 'POST'),
   resumeManaged: (sessionId: string) =>

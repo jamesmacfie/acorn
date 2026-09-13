@@ -62,5 +62,6 @@ describe('managed session title rules', () => {
     expect(normalizeGeneratedSessionTitle('', 'fallback')).toBeNull()
     expect(normalizeGeneratedSessionTitle('New agent session', 'fallback')).toBeNull()
     expect(normalizeGeneratedSessionTitle('fallback', 'fallback')).toBeNull()
+    expect(normalizeGeneratedSessionTitle('Existing generated title')).toBe('Existing generated title')
   })
 })
