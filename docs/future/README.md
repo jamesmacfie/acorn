@@ -35,6 +35,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [session_name.md](./session_name.md) | Generated managed-session titles after the first accepted prompt, with user rename precedence and semantic lifecycle events. | Proposal, 2026-09-12. Not started. |
+| [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [web_search_run.md](./web_search_run.md) | Provider-neutral web searches, page actions, and result details in managed-run transcripts, verified against Codex and Claude Code. | Proposal, 2026-09-12. Not started. |
 | [data-capability.md](./data-capability.md) | A host-owned `ctx.core.data` facet so a sandboxed plugin can query a database the host connects to, with the database plugin as first consumer. | Proposal, 2026-09-14. Not started. |
