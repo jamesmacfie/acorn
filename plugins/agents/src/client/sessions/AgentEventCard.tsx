@@ -143,7 +143,7 @@ export default function AgentEventCard(props: {
             // else in the stream is a tool call or a note rather than somebody talking.
             <Card pad="sm" stripe="ok">
               <Stack gap="row">
-                <Inline>
+                <Inline spread>
                   <Text emphasis="eyebrow">Agent</Text>
                   <CopyOutputMenu text={() => message().text} event={message} />
                 </Inline>

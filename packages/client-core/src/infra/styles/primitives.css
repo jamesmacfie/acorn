@@ -1370,6 +1370,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-stack[data-grow] { flex: 1; min-height: 0; }
 .ui-inline { display: flex; align-items: center; min-width: 0; gap: var(--kit-gap); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }
+/* Push the last child to the far edge: a label on the left, its one action on the right. */
+.ui-inline[data-spread] { justify-content: space-between; }
 
 /* Text: the role pair, as attributes rather than as six classes. `neutral` is the default colour and
    so has no rule: a tone that restates the inherited value is a rule that has to be kept in step
