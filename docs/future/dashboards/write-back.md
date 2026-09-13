@@ -1,5 +1,8 @@
 # Board-drag write-back
 
+> Scope update, 2026-09-13: write-back remains outside [workflow v2](../workflow_v2/README.md).
+> Recheck the new source and record contracts before implementing this separate proposal.
+
 **Unbuilt and gated** — the precondition is on record in `refused.md`: revisit when read-only boards
 have real usage, so the mutation contract is designed against observed boards rather than imagined
 ones. This file exists so that pickup does not start from zero.

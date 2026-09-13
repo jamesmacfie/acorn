@@ -101,10 +101,10 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 ## Documentation ownership
 
-The workflow automation implementation plans are indexed in
-[workflow tasks](./future/workflow_tasks/README.md) and
-[scheduled workflows](./future/scheduled_workflows/README.md), in that implementation order.
-Each programme indexes its background, contract reference, refusals, and phase documents.
+The [workflow v2 programme](./future/workflow_v2/README.md) owns the next workflow, shared data,
+dashboard-authoring, and scheduling implementation plan. It builds on the shipped
+[workflow tasks](./future/workflow_tasks/README.md) and supersedes the separate
+[scheduled workflows proposal](./future/scheduled_workflows/README.md).
 
 Keep one owning page for each contract. Link to it from other pages instead of copying its details.
 Group long references by topic in a subfolder. Keep the original landing page when source comments
@@ -114,6 +114,42 @@ Describe implemented behavior in reference pages. Put proposed application chang
 [Future work](./future/README.md), and label dated measurements as historical evidence.
 Update this index when adding a page. `tools/arch/docPaths.test.ts` checks file paths and relative
 links; review the implementation to verify API signatures and behavior.
+
+## Workflow v2 implementation programme
+
+Accepted design, implementation not started, 2026-09-13. These are proposed contracts, not shipped APIs.
+
+- [Programme and implementation order](./future/workflow_v2/README.md)
+- [Context and decisions](./future/workflow_v2/context.md)
+- [Data contract](./future/workflow_v2/data-contract.md)
+- [Workflow contract](./future/workflow_v2/workflow-contract.md)
+- [Publication and repository editing](./future/workflow_v2/publication.md)
+- [Scheduling and processing history](./future/workflow_v2/scheduling.md)
+- [Authoring UX](./future/workflow_v2/ux-authoring.md)
+- [Running and scheduling UX](./future/workflow_v2/ux-running.md)
+- [AI authoring](./future/workflow_v2/ai-authoring.md)
+- [Verification and transition](./future/workflow_v2/verification.md)
+- [Refused alternatives](./future/workflow_v2/refused.md)
+- [Phase 01: Typed values and structural schemas](./future/workflow_v2/phase-01-typed-values.md)
+- [Phase 02: Source runtime and loaded-plugin parity](./future/workflow_v2/phase-02-source-runtime.md)
+- [Phase 03: GitHub pull-request source](./future/workflow_v2/phase-03-github-source.md)
+- [Phase 04: Linear and Rollbar source adapters](./future/workflow_v2/phase-04-linear-rollbar-sources.md)
+- [Phase 05: Workspace query drafts and published revisions](./future/workflow_v2/phase-05-query-library.md)
+- [Phase 06: Typed workflow inputs, outputs, and stable steps](./future/workflow_v2/phase-06-workflow-values.md)
+- [Phase 07: Query, details, and condition steps](./future/workflow_v2/phase-07-conditions-and-data-steps.md)
+- [Phase 08: One dispatcher for nested child workflows](./future/workflow_v2/phase-08-child-dispatch.md)
+- [Phase 09: Durable selections and repeat decisions](./future/workflow_v2/phase-09-processing-history.md)
+- [Phase 10: Workflow draft recovery and dependency publication](./future/workflow_v2/phase-10-workflow-publication.md)
+- [Phase 11: Visual repository editing and portable export](./future/workflow_v2/phase-11-repository-authoring.md)
+- [Phase 12: Shared source/query editor and field picker](./future/workflow_v2/phase-12-shared-data-editor.md)
+- [Phase 13: Outline-led workflow authoring](./future/workflow_v2/phase-13-workflow-editor.md)
+- [Phase 14: Dashboard publication and persistent preview editor](./future/workflow_v2/phase-14-dashboard-editor.md)
+- [Phase 15: Contextual AI discovery and proposal review](./future/workflow_v2/phase-15-ai-authoring.md)
+- [Phase 16: Approved occurrences and incremental checks](./future/workflow_v2/phase-16-schedule-runtime.md)
+- [Phase 17: Scheduling, activation, and change review](./future/workflow_v2/phase-17-schedule-editor.md)
+- [Phase 18: Record-first history and collapsed task navigation](./future/workflow_v2/phase-18-run-history.md)
+- [Phase 19: Complete migration and remove superseded paths](./future/workflow_v2/phase-19-transition.md)
+- [Phase 20: Release acceptance and documentation handoff](./future/workflow_v2/phase-20-acceptance.md)
 
 ## Plugin reference topics
 
