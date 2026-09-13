@@ -599,7 +599,7 @@ export default function AgentComposer(props: {
         sources={sources()}
         segments={segments}
         onInput={setDraft}
-        onFiles={(dropped) => void addFiles(dropped)}
+        onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
         onKeyDown={(event) => {

@@ -61,8 +61,9 @@ export type MentionTextareaProps = {
   onSubmit?: () => void
   /** Escape, when the list is closed. Absent leaves Escape to whatever is outside the field. */
   onCancel?: () => void
-  /** Files pasted or dropped onto the field. */
-  onFiles?: (files: File[]) => void
+  /** Files pasted or dropped onto the field. Return the work so a paste can restore focus after an
+   *  asynchronous upload redraws its caller. */
+  onFiles?: (files: File[]) => void | Promise<void>
   onKeyDown?: (event: KeyboardEvent) => void
   /** Drawn inside the field's box, before the text: the agents composer's expand toggle. */
   overlay?: JSX.Element
@@ -200,11 +201,19 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           const pasted = [...(event.clipboardData?.files ?? [])]
           if (!pasted.length || !props.onFiles) return
           event.preventDefault()
-          props.onFiles(pasted)
-          // A paste belongs to this field. Adding the attachment can synchronously redraw the
-          // surrounding composer, so restore the caret after those updates have settled instead of
-          // making the reader click back into the draft before they can keep typing.
-          queueMicrotask(() => field?.focus())
+          const pastedField = field
+          const adding = props.onFiles(pasted)
+          // A paste belongs to this field. Starting the upload can redraw synchronously, and finishing
+          // it can move the surrounding composer after an await. Cover both boundaries. The late pass
+          // only takes focus back from the document body, so it does not pull the reader away from a
+          // control they deliberately focused while the upload was running.
+          queueMicrotask(() => pastedField?.focus())
+          if (adding) {
+            const restore = () => {
+              if (pastedField?.isConnected && document.activeElement === document.body) pastedField.focus()
+            }
+            void adding.then(restore, restore)
+          }
         }}
         onDragOver={(event) => {
           if (props.onFiles && event.dataTransfer?.types.includes('Files')) event.preventDefault()
