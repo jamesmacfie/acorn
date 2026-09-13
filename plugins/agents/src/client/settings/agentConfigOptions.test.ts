@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { sameAgentConfigOptions, sessionModelLabel } from './agentConfigOptions'
+import { sameAgentConfigOptions, sessionModelLabel, sessionModelSummary } from './agentConfigOptions'
 
 const options = (): AgentConfigOption[] => [{
   id: 'model',
@@ -72,5 +72,24 @@ describe('the model a session is running', () => {
   it('falls back to the column when no provider option is on the session yet', () => {
     expect(sessionModelLabel(session({}, 'gpt-5.6-terra'))).toBe('gpt-5.6-terra')
     expect(sessionModelLabel(session({ configOptions: [] }))).toBeUndefined()
+  })
+
+  it('puts a separately advertised reasoning effort beside the model in session summaries', () => {
+    expect(sessionModelSummary(session({
+      configOptions: [
+        ...options(),
+        {
+          id: 'reasoning',
+          label: 'Effort',
+          category: 'reasoning',
+          currentValue: 'high',
+          values: [{ value: 'high', label: 'High' }],
+        },
+      ],
+    }))).toBe('GPT-5.6 Sol · High')
+  })
+
+  it('keeps the model-only summary when the provider reports no effort', () => {
+    expect(sessionModelSummary(session({ configOptions: options() }))).toBe('GPT-5.6 Sol')
   })
 })

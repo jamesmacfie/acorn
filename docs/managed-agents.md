@@ -428,6 +428,11 @@ it fails for any reason a selection can break, not only for the one it was writt
   module map keyed by session (`plugins/agents/src/client/composer/composerState.ts`) rather than in
   the component. What stays per mount is view state: how tall the box is, which picker is open, and
   which surface's scroll place the transcript restores.
+- A roster row puts the provider's live reasoning effort beside its live model name. Codex reports
+  those as separate configuration options, and both can change while the session is open, so the
+  display reads `configOptions` rather than the legacy model column. Provider-native subagents inherit
+  the same combined summary when the provider has not named a different child model. Dashboard data
+  keeps model as its own typed field; the combined value is presentation text, not a stored contract.
 - Starting an interactive session acknowledges the durable row before waiting for the provider CLI.
   The pane selects that row immediately, draws a **Connecting…** state above the composer, and keeps
   the draft editable while Send and provider configuration remain disabled. `ready` is published only
