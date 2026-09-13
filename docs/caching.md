@@ -90,6 +90,12 @@ not mutation confirmation. When a Node is reconnecting or offline, cached respon
 with freshness badges. A WebSocket reconnect or sequence gap marks affected data stale and triggers
 normal refetching; there is no history cursor or offline mutation queue.
 
+The Workflows pane follows the same rule even though its selected run and steps are Solid resources
+rather than persisted query rows. Run and child-change frames re-read the relevant task, and socket
+reconnect re-reads both the task's run list and the selected run's steps. The pane model is created
+inside the active Node shell, and the task-run index subscribes through that same Node connection.
+Identical task or run IDs on two Nodes therefore cannot invalidate or navigate into each other.
+
 The persisted cache has no version buster. An entry written before a response type gained a required
 field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
 required field. Nothing else invalidates an old entry.

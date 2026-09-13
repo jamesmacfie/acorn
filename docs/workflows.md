@@ -157,6 +157,37 @@ surfaces as an error row instead of being skipped silently. A sub-workflow's ste
 its id, and so are the `after` and `joins` names inside it, so an expanded block keeps its own shape
 inside the outer graph.
 
+### Child workflow tasks
+
+`workflow` starts one saved workflow in a child task. `workflow-map` reads an array from a structured
+predecessor and starts one child task for each item. Before a root run starts, the Node resolves every
+database, repository, and user reference in the task's project scope. It validates the supplied or
+defaulted child inputs, applies repository trust, and freezes the resolved graph with the run. An edit
+to a referenced definition therefore affects a later root run, not one already in progress.
+
+Each dispatch is recorded before it creates a task or starts a run. The record holds a stable caller
+key and payload fingerprint, reserved task and run IDs, explicit root and parent lineage, and its
+progress from reservation to terminal state. A retry or restart resumes that record. Repeating the
+same request returns the same task and run; reusing its key with different content fails. The initial
+release permits one child-workflow level and at most 12 descendant tasks per root run.
+
+A child-workflow step waits without taking an agent execution slot. A mapped step keeps source order,
+uses the configured JSON Pointer as the stable item key, and records each child's task ID, run ID,
+status, bounded result, failure, and provider usage. An empty array succeeds. When results are mixed,
+the parent waits for every admitted child and then fails with the failed-child count. A child gate
+puts the parent in `gated`; approval still happens in the child run.
+
+Cancellation stops new admissions, cancels descendant runs and managed sessions, and settles the
+root only after admitted children settle. A failure in another branch applies the same cleanup
+before the root becomes failed. Child tasks stay active, and their worktrees remain as ordinary task
+history. Retrying a dispatch step reuses the saved child roster and does not create replacement
+tasks. Tool ceilings, provider-turn limits, cost, token limits, and the absolute deadline are
+intersected down the tree. Usage is admitted once against the root and remains charged across
+retries.
+
+This replay protection is limited to one root run. Starting a fresh root can process the same
+business item again; cross-run business deduplication is deliberately not part of workflow dispatch.
+
 ## Database definitions
 
 A definition does not have to be a file. `workflow_defs`, in this plugin's own SQLite file, holds one
@@ -221,7 +252,7 @@ the rail is showing, and opens it. The same verb is a palette command, `workflow
 
 Picking a definition goes to `/p/:projectId/x/workflows/:id`, where `:id` is `db:<rowId>` for a row,
 `repo:<fileId>` for a committed file, or `user:<fileId>` for one under `~/.acorn/workflows`. The
-The editor is drawn by the rail source's detail region, so the terminal client puts the definition
+editor is drawn by the rail source's detail region, so the terminal client puts the definition
 list in its Browse panel and the editor in the main one, and the editor's own node list and inspector
 are a `list-detail` pair inside that. Every control is a kit node, so none of this is plugin code
 either host had to be given.
@@ -245,6 +276,89 @@ select per option that harness advertises through `GET /v2/p/agents/providers`, 
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
 never restates the model list.
 
+### Child workflow authoring
+
+Add **Run a workflow** to start one saved workflow, or **Map to workflows** to start one copy for
+each item in a structured result. The child workflow picker lists database, repository, and user
+definitions that the selected project can resolve. The catalog includes each target's declared
+inputs and terminal output schemas. It omits definition bodies, input defaults, credentials, and
+values from a run.
+
+The inspector draws one binding for each declared child input. A binding can use fixed text, a
+declared parent input, or a JSON Pointer into a structured predecessor. A mapped step can also use a
+JSON Pointer into the item. Required child inputs without a saved default must have a binding.
+
+This definition runs one saved child and passes through the parent's `ticket` input:
+
+```json
+{
+  "name": "Review one ticket",
+  "inputs": [{ "name": "ticket", "required": true }],
+  "steps": [{
+    "name": "review",
+    "kind": "workflow",
+    "childWorkflow": {
+      "ref": { "source": "database", "id": "WORKFLOW_ID" },
+      "inputs": { "ticket": { "from": "input", "name": "ticket" } }
+    }
+  }]
+}
+```
+
+A mapped step names a structured predecessor, the pointer to its array, a stable item key, and a
+title for each child task:
+
+```json
+{
+  "name": "Review selected tickets",
+  "steps": [
+    {
+      "name": "select",
+      "after": [],
+      "prompt": "Select the tickets to review.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "number": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "review",
+      "kind": "workflow-map",
+      "after": ["select"],
+      "items": { "step": "select", "pointer": "/tickets" },
+      "itemKey": "/id",
+      "childWorkflow": {
+        "ref": { "source": "repo", "path": ".acorn/workflows/review-ticket.toml" },
+        "inputs": { "ticket": { "from": "item", "pointer": "/number" } }
+      },
+      "title": {
+        "template": "Review ${ticket}",
+        "bindings": { "ticket": { "from": "item", "pointer": "/number" } }
+      }
+    }
+  ]
+}
+```
+
+The editor preserves unavailable targets, unsupported bindings, and malformed pointers in the
+draft, then reports each problem beside the field and in validation. Saving the draft does not make
+it runnable. The start path validates and resolves every child before it creates a task.
+
+Renaming a step rewrites map sources and structured step bindings along with graph edges and prompt
+references. The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
+child workflow contract.
+
 ### Generating and editing with AI
 
 **Generate** on the editor toolbar is a menu once there is a saved workflow or an unsaved draft with
@@ -259,11 +373,12 @@ asked to keep each where it still fits. Edit sends the graph itself and explicit
 preserve every step, prompt, edge, input, policy, budget, and setting the request does not need to
 change. The instruction box takes up to 8,000 characters, which is enough to paste an issue in.
 
-The edit projection does not send provider choices, execution targets, tool allowlists, triggers, or
-the `headers` and `auth` fields of contributed step configuration to the model. After the answer is
-grounded, those values are restored onto each surviving step with the same name and kind. Deleting,
-renaming, or changing the kind of a step deliberately breaks that identity and does not carry its
-protected configuration onto the replacement.
+The edit projection removes provider choices, configured execution targets, tool allowlists,
+triggers, and the `headers` and `auth` fields of contributed step configuration from each step. The
+scoped catalog separately lists the child targets that the model may use on a new step. After the
+answer is grounded, the server restores protected values onto each surviving step with the same name
+and kind. Deleting, renaming, or changing the kind of a step deliberately breaks that identity and
+does not carry its protected configuration onto the replacement.
 
 What the model is told about acorn is assembled at request time, not written down. The step kinds
 with the fields each one describes, the policies and the agent profiles all come out of the same
@@ -275,6 +390,18 @@ that one with a step waiting on two others comes first, because a fan-in is the 
 wrong on its own. The definition being edited is left out of its own examples, and so is any
 definition that does not itself pass the checker: a workspace's broken workflow is the wrong thing to
 learn house style from.
+
+Generation also receives the selected project's bounded child workflow catalog. It contains the
+same references, input signatures, and output schemas that the child workflow picker uses. Grounding
+removes a reference outside that catalog, an input binding the target does not declare, and a source
+that is not a structured predecessor. If the catalog is empty, the prompt forbids both child
+workflow kinds.
+
+For an AI edit, a configured child target is protected like a provider choice. The current definition
+sent in the user prompt omits that target, and the server restores it only to a step with the same
+name and kind. A renamed, deleted, or retyped step does not inherit the target. The model can propose
+a target only for a new step, and grounding keeps it only when the scoped catalog contains the exact
+reference.
 
 The reply is read back rather than trusted. Anything named in it that this node does not have is
 taken out before the draft is touched. An invented step kind becomes a plain agent step keeping its
@@ -397,8 +524,8 @@ as a problem rather than silently selecting another implementation.
 
 ## Contributed step kinds
 
-The seven built-in kinds — `agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`,
-`decide` — are not all there can be. Workflows opens three node extension points
+The nine built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`,
+`decide`, `workflow`, and `workflow-map`. Workflows opens three node extension points
 ([plugins.md](./plugins.md) § Node-side extension points) and any plugin may fill them:
 
 | Point | What it adds | Named in a file as |
@@ -455,7 +582,7 @@ kind's `validate`, and skips `validate` when any of those fail. So a validator c
 is right and check only the meaning. A field with an `optionsRoute` is not checked at load time,
 because the node reading the file may have no way to reach the project the route needs.
 
-The seven built-in kinds describe themselves through the same type, with the fields naming a step's
+The nine built-in kinds describe themselves through the same type, with the fields naming a step's
 own keys rather than keys in `with`
 (`plugins/workflows/src/shared/stepFields.ts`). The editor does not need to know which is which: it
 asks `fieldHome(kind, fieldId)`. A kind whose description says `runsAgent` may also take `isolation`,
@@ -568,6 +695,13 @@ terminal**, which resumes it: the agents sidebar used to be where that lived. A 
 task links to it. Every control is drawn only when its transition is legal and disabled while one is
 in flight, so a stale button is a race rather than a bug.
 
+A child-workflow node adds its map progress and one card per child. Each card links to the child task
+and run, and shows approval attention, failure detail, the bounded result, and that child's usage.
+Selecting a child run shows explicit parent and root links. Root-run footers report aggregate tree
+usage; child-run footers report only that run, so the same provider turn is not counted twice. The
+cancel confirmation says it cancels the run tree, and a retry explains that it reuses existing child
+tasks and runs.
+
 **The conversation is here.** An agent node draws the transcript, the queue and the composer that the
 Agent pane draws, because reading what a step is saying should not mean leaving the run. It is the
 same three components over the same session: plugins/agents publishes them as a client capability
@@ -598,19 +732,25 @@ stopped.
 
 ### What the pane listens to
 
-Three frames of its own, and each one costs what it should:
+Four frames of its own, and each one costs what it should:
 
 - `workflow:step-changed` moves one node's glyph and reads nothing.
 - `workflow:step:event` appends to the selected run's per-node tail, capped at 200 events and the
   last 4,000 characters of output.
 - `plugin:workflows:run-changed` re-reads the run and its steps, because a run beginning or ending
   changes rows this client never saw.
+- `plugin:workflows:child-changed` re-reads the parent and child summaries after a durable dispatch
+  transition.
 
-The last frame is the public run lifecycle, not merely a start/finish hint. It carries
+`plugin:workflows:run-changed` is the public run lifecycle, not merely a start/finish hint. It carries
 `{ taskId, runId, status }` after the run's full step roster is readable and after every real durable
 transition through `running`, `gated`, `cancelling`, `done`, `failed`, `safety-rail`, or `cancelled`.
 One `setRun` mutation funnel compares old and new state, so retries and terminal completion cannot
 drift into separate event semantics.
+
+Events remain invalidation hints. The run pane and its task-run index re-read after reconnect, so a
+missed child, run, or gate frame cannot leave durable state stale. These resources are mounted inside
+the active Node's client partition; identical task and run IDs on another Node do not share state.
 
 Human approvals have the narrower `plugin:workflows:gate-changed` frame. It names task, run, step,
 and the current `waiting-gate`, `done`, `failed`, or `cancelled` state only when entering or leaving
@@ -727,9 +867,9 @@ definition. Database rows have no trigger and no schedule; committed files keep 
 
 ## What workflows refuses
 
-Twenty-two decisions from the programme that built the editor, the row store, the run pane and the
-item menu, each with what would reopen it. They are here rather than in a design folder because every
-one of them is a thing workflows will keep being asked for.
+Thirty decisions from the programmes that built workflow authoring, execution, child dispatch, and
+navigation, each with what would reopen it. They are here rather than in a design folder because
+every one of them is a thing workflows will keep being asked for.
 
 **A separate `edges` list.** Refused. proliferate's wire shape is `nodes[]` beside
 `edges[{from, to}]`. `after` on each step keeps every committed TOML file meaning what it meant, puts
@@ -828,3 +968,30 @@ the frozen copy and keeps the original in the step's `inputs_json`.
 **A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
 addressed by task, and `packages/protocol/src/runs.ts` already says when a core runs table would be
 earned.
+
+**Replacing agent-only fan-out.** Refused. `fan-out` keeps its saved definition and result contract.
+Use `workflow-map` when each structured item needs a complete saved workflow in its own task.
+
+**A second child execution engine.** Refused. Child dispatch starts the ordinary workflow runner
+against a frozen resolved graph. A parallel engine would split recovery, gates, and safety rails.
+
+**A query language inside workflow-map.** Refused. The map consumes a structured predecessor through
+JSON Pointer. Provider queries and filtering belong to the step that produces that value.
+
+**Unbounded or remote workflow recursion.** Refused. Child workflows stay in the same project and
+Node, with one child-workflow level and 12 descendant tasks per root. More depth requires usage and
+operability evidence, not only a higher constant.
+
+**Detached child runs.** Refused. A dispatch step waits for every admitted child, carries child gates
+to the parent's attention state, and settles only after the children settle.
+
+**Authority from an AI-authored definition.** Refused. Generation can name only catalogued targets,
+and start still applies source trust and the root's approved limits. Saving a definition grants
+nothing.
+
+**Exactly-once business processing.** Refused. Invocation identity prevents duplicate task and run
+creation within one root. A fresh root may intentionally process the same ticket again; a business
+deduplication policy needs its own product contract.
+
+**Automatic child cleanup.** Refused. A child task and worktree are user work and remain after the
+workflow completes, fails, or is cancelled. The owner can archive them through the normal task flow.

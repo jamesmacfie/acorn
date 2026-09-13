@@ -12,9 +12,18 @@ import { validateWorkflow, type WorkflowValidationCatalog } from './workflowVali
 // is ./generateWorkflow.test.ts, and what comes out of one is ./groundWorkflow.test.ts.
 
 const catalog: WorkflowCatalog = {
-  kinds: BUILTIN_STEP_KINDS.map((id) => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
+  kinds: [
+    ...BUILTIN_STEP_KINDS.map((id) => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
+    { id: 'workflow', pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS.workflow },
+    { id: 'workflow-map', pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] },
+  ],
   policies: [{ id: 'checks-green', pluginId: null }],
   profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
+  workflows: [{
+    ref: { source: 'database', id: 'approved-target' },
+    name: 'Review ticket',
+    inputs: [{ name: 'ticket', required: true }],
+  }],
 }
 
 const validation: WorkflowValidationCatalog = {
@@ -110,6 +119,100 @@ describe('generateWorkflowRequest', () => {
       generateText,
     })
     expect(generateText.mock.calls[0]![0].input.modelId).toBeUndefined()
+  })
+
+  it('uses the same generation contract for a provider connection and an installed harness', async () => {
+    for (const backendId of ['connection:anthropic', 'harness:claude-code']) {
+      const generateText = answers(reply(clean))
+      await generateWorkflowRequest({
+        request: { mode: 'overwrite', backendId, description: 'Investigate.', workspaceId: 'w1' },
+        catalog,
+        validation,
+        generateText,
+      })
+      expect(generateText.mock.calls[0]?.[0].backendId).toBe(backendId)
+    }
+  })
+
+  it('repairs a missing required child input binding', async () => {
+    const missing: WorkflowDef = {
+      name: 'Dispatch',
+      inputs: [{ name: 'ticket', required: true }],
+      steps: [
+        { name: 'prepare', after: [], prompt: 'Prepare the review.' },
+        {
+          name: 'review',
+          kind: 'workflow',
+          after: ['prepare'],
+          childWorkflow: { ref: { source: 'database', id: 'approved-target' } },
+        },
+        { name: 'summarize', after: ['review'], prompt: 'Summarize the child result.' },
+      ],
+    }
+    const fixed: WorkflowDef = {
+      ...missing,
+      steps: missing.steps.map((step) => step.name === 'review'
+        ? {
+            ...step,
+            childWorkflow: {
+              ref: { source: 'database', id: 'approved-target' },
+              inputs: { ticket: { from: 'input', name: 'ticket' } },
+            },
+          }
+        : step),
+    }
+    const generateText = answers(reply(missing), reply(fixed))
+    const result = await run(generateText)
+    expect(promptOf(generateText, 1)).toContain("needs a binding for child input 'ticket'")
+    expect(result).toMatchObject({ repaired: true, problems: [] })
+    expect((result as { def: WorkflowDef }).def.steps.map((step) => [step.name, step.after])).toEqual([
+      ['prepare', []],
+      ['review', ['prepare']],
+      ['summarize', ['review']],
+    ])
+  })
+
+  it('keeps a configured child target through an AI edit and its repair pass', async () => {
+    const current: WorkflowDef = {
+      name: 'Dispatch',
+      inputs: [{ name: 'ticket', required: true }],
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: {
+          ref: { source: 'database', id: 'approved-target' },
+          inputs: { ticket: { from: 'input', name: 'ticket' } },
+        },
+      }],
+    }
+    const broken: WorkflowDef = {
+      name: 'Dispatch',
+      inputs: current.inputs,
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
+      }],
+    }
+    const repaired: WorkflowDef = {
+      ...broken,
+      steps: [{
+        ...broken.steps[0]!,
+        childWorkflow: {
+          ref: { source: 'database', id: 'another-invented-target' },
+          inputs: { ticket: { from: 'input', name: 'ticket' } },
+        },
+      }],
+    }
+    const result = await generateWorkflowRequest({
+      request: { mode: 'edit', backendId: 'c1', description: 'Keep the dispatch and fix its binding.', workspaceId: 'w1', currentDef: current },
+      catalog,
+      validation,
+      generateText: answers(reply(broken), reply(repaired)),
+    })
+    expect((result as { def: WorkflowDef }).def.steps[0]?.childWorkflow?.ref)
+      .toEqual({ source: 'database', id: 'approved-target' })
+    expect(result).toMatchObject({ repaired: true, problems: [] })
   })
 
   it('repairs once, on the same system prompt, carrying the description, the definition, the notes and every problem', async () => {

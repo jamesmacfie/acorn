@@ -7,7 +7,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 
 ## Environment
 
-Create `apps/desktop/.env` for local desktop development:
+Create `<checkout>/apps/desktop/.env` for local desktop development:
 
 ```dotenv
 GITHUB_CLIENT_ID=...
@@ -219,6 +219,6 @@ identify stale output by itself, so build order is `package.json`'s job.
 
 ## Data and credentials
 
-Never commit `apps/desktop/.env`, data roots, device tokens, integration credentials, TLS keys, or
+Never commit `<checkout>/apps/desktop/.env`, data roots, device tokens, integration credentials, TLS keys, or
 generated archives. Use a fresh `ACORN_DATA_DIR` for onboarding/import tests. The importer reads a
 copy and leaves the source database and sidecars unchanged.

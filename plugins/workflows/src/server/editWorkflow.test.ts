@@ -66,4 +66,59 @@ describe('protected configuration restoration', () => {
     const changedKind = restoreProtectedDefinition(current, { name: 'Deploy', steps: [{ name: 'send', prompt: 'Now use an agent.' }] })
     expect(changedKind.steps[0]?.with).toBeUndefined()
   })
+
+  it('keeps a configured child target only for the same-name, same-kind step', () => {
+    const configured: WorkflowDef = {
+      name: 'Dispatch',
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: {
+          ref: { source: 'database', id: 'approved-target' },
+          inputs: { ticket: { from: 'input', name: 'ticket' } },
+        },
+      }],
+    }
+    const visible = definitionForPrompt(configured)
+    expect(visible.steps[0]?.childWorkflow).not.toHaveProperty('ref')
+    expect(visible.steps[0]?.childWorkflow?.inputs).toEqual(configured.steps[0]?.childWorkflow?.inputs)
+
+    const attemptedChange = restoreProtectedDefinition(configured, {
+      name: 'Dispatch',
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
+      }],
+    })
+    expect(attemptedChange.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'approved-target' })
+
+    const renamed = restoreProtectedDefinition(configured, {
+      name: 'Dispatch',
+      steps: [{
+        name: 'different',
+        kind: 'workflow',
+        childWorkflow: { ref: { source: 'database', id: 'replacement' } },
+      }],
+    })
+    expect(renamed.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'replacement' })
+
+    const changedKind = restoreProtectedDefinition(configured, {
+      name: 'Dispatch',
+      steps: [{ name: 'review', prompt: 'Review in this task.' }],
+    })
+    expect(changedKind.steps[0]?.childWorkflow).toBeUndefined()
+
+    const duplicate = restoreProtectedDefinition(configured, {
+      name: 'Dispatch',
+      steps: [
+        { name: 'review', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'first' } } },
+        { name: 'review', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'second' } } },
+      ],
+    })
+    expect(duplicate.steps.map((step) => step.childWorkflow?.ref)).toEqual([
+      { source: 'database', id: 'first' },
+      { source: 'database', id: 'second' },
+    ])
+  })
 })

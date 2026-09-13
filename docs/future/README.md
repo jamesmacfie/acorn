@@ -16,7 +16,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
-| [workflow_tasks/](./workflow_tasks/README.md) | Child-task workflow runs, structured mapping, durable dispatch, shared limits, and AI authoring. Seven phases; implement before scheduled workflows. | Proposal, 2026-09-12. Not started. |
+| [workflow_tasks/](./workflow_tasks/README.md) | The shipped child-task workflow programme and links to its owning documentation. | Shipped, 2026-09-13. |
 | [scheduled_workflows/](./scheduled_workflows/README.md) | User-approved schedules with supplied inputs and a fresh task per occurrence. Five phases after workflow tasks. | Proposal, 2026-09-12. Not started. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |

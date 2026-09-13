@@ -8,7 +8,17 @@
 // the two definitions must match (./workflowToml.test.ts). Serialising is `smol-toml`'s job rather
 // than ours, apart from the one thing it will not do, below.
 import { stringify } from 'smol-toml'
-import type { ToolCeiling, WorkflowBudget, WorkflowChildStepDef, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
+import type {
+  ChildWorkflowConfig,
+  ToolCeiling,
+  WorkflowBoundTemplate,
+  WorkflowBudget,
+  WorkflowChildStepDef,
+  WorkflowDef,
+  WorkflowMapSource,
+  WorkflowStepDef,
+  WorkflowValueBinding,
+} from '../shared/workflowContracts'
 
 // A prompt is the reason this file is not a plain `stringify` call. smol-toml writes every string as
 // a basic one, so a five-line prompt lands as a single line with `\n` in it, and a file somebody is
@@ -63,6 +73,32 @@ const tomlChildStep = (child: WorkflowChildStepDef | undefined): Record<string, 
   return Object.keys(table).length ? table : undefined
 }
 
+const tomlBinding = (binding: WorkflowValueBinding): Record<string, unknown> => {
+  if (binding.from === 'literal') return { from: binding.from, value: binding.value }
+  if (binding.from === 'input') return { from: binding.from, name: binding.name }
+  if (binding.from === 'step') return { from: binding.from, step: binding.step, pointer: binding.pointer }
+  return { from: binding.from, pointer: binding.pointer }
+}
+
+const tomlBindings = (bindings: Record<string, WorkflowValueBinding> | undefined): Record<string, unknown> | undefined =>
+  bindings && Object.keys(bindings).length
+    ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, tomlBinding(binding)]))
+    : undefined
+
+const tomlChildWorkflow = (child: ChildWorkflowConfig | undefined): Record<string, unknown> | undefined => {
+  if (!child) return undefined
+  const ref = child.ref.source === 'repo'
+    ? { source: child.ref.source, path: child.ref.path }
+    : { source: child.ref.source, id: child.ref.id }
+  return drop({ ref, inputs: tomlBindings(child.inputs) })
+}
+
+const tomlMapSource = (source: WorkflowMapSource | undefined): Record<string, unknown> | undefined =>
+  source ? { step: source.step, pointer: source.pointer } : undefined
+
+const tomlTitle = (title: WorkflowBoundTemplate | undefined): Record<string, unknown> | undefined =>
+  title ? drop({ template: title.template, bindings: tomlBindings(title.bindings) }) : undefined
+
 const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
   drop({
     name: step.name,
@@ -81,6 +117,10 @@ const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
     joins: step.joins,
     branches: some(step.branches),
     child_step: tomlChildStep(step.childStep),
+    child_workflow: tomlChildWorkflow(step.childWorkflow),
+    items: tomlMapSource(step.items),
+    item_key: step.itemKey,
+    title: tomlTitle(step.title),
     with: step.with,
     tools: tomlTools(step.tools),
     budget: tomlBudget(step.budget),

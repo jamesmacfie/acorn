@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
-import { renderWith, resolveWorkflowInputs, validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './workflowValidation'
+import { parseWorkflowJsonPointer, renderWith, resolveWorkflowInputs, validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './workflowValidation'
 import type { WorkflowDef } from '../shared/workflowContracts'
 
 // The graph rules `after` brought with it (docs/workflows.md § Execution model). The parser is tested
@@ -107,6 +107,121 @@ describe('inputs', () => {
   it('substitutes into a with table, leaving anything that is not a string alone', () => {
     expect(renderWith({ command: 'echo ${inputs.issue}', timeoutMs: 5 }, [], { issue: 'hi' }))
       .toEqual({ command: 'echo hi', timeoutMs: 5 })
+  })
+})
+
+describe('runtime child workflow contracts', () => {
+  it('accepts a single child and a mapped child whose bindings use declared sources', () => {
+    const definition: WorkflowDef = {
+      name: 'parent',
+      inputs: [{ name: 'ticket' }],
+      steps: [
+        { name: 'select', after: [], schema: { type: 'object' } },
+        {
+          name: 'one',
+          kind: 'workflow',
+          after: ['select'],
+          childWorkflow: {
+            ref: { source: 'database', id: 'review' },
+            inputs: {
+              ticket: { from: 'input', name: 'ticket' },
+              result: { from: 'step', step: 'select', pointer: '/ticket' },
+            },
+          },
+        },
+        {
+          name: 'many',
+          kind: 'workflow-map',
+          after: ['select'],
+          childWorkflow: {
+            ref: { source: 'repo', path: '.acorn/workflows/review.toml' },
+            inputs: { ticket: { from: 'item', pointer: '/number' } },
+          },
+          items: { step: 'select', pointer: '/tickets' },
+          itemKey: '/id',
+          title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'item', pointer: '/number' } } },
+        },
+      ],
+    }
+    expect(check(definition)).toEqual([])
+    expect(JSON.parse(JSON.stringify(definition))).toEqual(definition)
+  })
+
+  it('locates unsafe paths, undeclared inputs, and non-predecessor mappings', () => {
+    const problems = check({
+      name: 'parent',
+      steps: [
+        { name: 'source', after: [] },
+        {
+          name: 'dispatch',
+          kind: 'workflow-map',
+          after: [],
+          childWorkflow: {
+            ref: { source: 'repo', path: '../review.toml' },
+            inputs: {
+              issue: { from: 'input', name: 'missing' },
+              data: { from: 'step', step: 'source', pointer: '/constructor/value' },
+            },
+          },
+          items: { step: 'source', pointer: '/tickets' },
+          itemKey: 'id',
+          title: { template: '${missing}' },
+        },
+      ],
+    })
+    expect(problems).toContain("step 'dispatch' child_workflow.ref.path must name a file under .acorn/workflows")
+    expect(problems).toContain("step 'dispatch' child_workflow.inputs.issue references undeclared input 'missing'")
+    expect(problems).toContain("step 'dispatch' child_workflow.inputs.data references 'source', which is not one of its predecessors")
+    expect(problems).toContain("step 'dispatch' child_workflow.inputs.data.pointer is not a safe JSON Pointer")
+    expect(problems).toContain("step 'dispatch' items references 'source', which is not one of its predecessors")
+    expect(problems).toContain("step 'dispatch' item_key is not a safe JSON Pointer")
+    expect(problems).toContain("step 'dispatch' title references undeclared binding 'missing'")
+  })
+
+  it('checks a child reference and its bindings against the scoped target catalog', () => {
+    const scopedCatalog: WorkflowValidationCatalog = {
+      ...catalog,
+      workflowTargets: [{
+        ref: { source: 'database', id: 'review' },
+        name: 'Review ticket',
+        inputs: [
+          { name: 'ticket', required: true },
+          { name: 'focus', required: true, hasDefault: true },
+        ],
+      }],
+    }
+    const validate = (def: WorkflowDef) => validateWorkflow(def, scopedCatalog)
+
+    expect(validate({
+      name: 'parent',
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: {
+          ref: { source: 'database', id: 'review' },
+          inputs: { extra: { from: 'literal', value: 'x' } },
+        },
+      }],
+    })).toEqual(expect.arrayContaining([
+      "step 'review' binds undeclared child input 'extra'",
+      "step 'review' needs a binding for child input 'ticket'",
+    ]))
+
+    expect(validate({
+      name: 'parent',
+      steps: [{
+        name: 'review',
+        kind: 'workflow',
+        childWorkflow: { ref: { source: 'database', id: 'invented' } },
+      }],
+    })).toContain("step 'review' child workflow is not available to this project")
+  })
+
+  it('parses pointers without evaluating or permitting prototype traversal', () => {
+    expect(parseWorkflowJsonPointer('/tickets/0/a~1b/~0value')).toEqual(['tickets', '0', 'a/b', '~value'])
+    expect(parseWorkflowJsonPointer('tickets')).toBeNull()
+    expect(parseWorkflowJsonPointer('/tickets/~2')).toBeNull()
+    expect(parseWorkflowJsonPointer('/__proto__/value')).toBeNull()
   })
 })
 

@@ -7,12 +7,16 @@ import { z } from 'zod'
 import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import type {
+  ChildWorkflowConfig,
   ToolCeiling,
   ToolRisk,
   WorkflowBudget,
   WorkflowDef,
   WorkflowInput,
   WorkflowStepDef,
+  WorkflowBoundTemplate,
+  WorkflowMapSource,
+  WorkflowValueBinding,
 } from '../shared/workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
@@ -101,6 +105,40 @@ function parseBranches(value: unknown): Record<string, string> | undefined {
   return Object.fromEntries(entries.map(([verdict, target]) => [verdict, (target as string).trim()]))
 }
 
+function parseBinding(value: unknown): WorkflowValueBinding {
+  const raw = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  return raw as WorkflowValueBinding
+}
+
+function parseBindings(value: unknown): Record<string, WorkflowValueBinding> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const entries = Object.entries(value as Record<string, unknown>).map(([name, binding]) => [name, parseBinding(binding)])
+  return entries.length ? Object.fromEntries(entries) : undefined
+}
+
+function parseChildWorkflow(value: unknown): ChildWorkflowConfig | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  const ref = raw.ref && typeof raw.ref === 'object' && !Array.isArray(raw.ref)
+    ? raw.ref as Record<string, unknown>
+    : {}
+  return { ...raw, ref, inputs: parseBindings(raw.inputs) } as ChildWorkflowConfig
+}
+
+function parseMapSource(value: unknown): WorkflowMapSource | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  return raw as WorkflowMapSource
+}
+
+function parseTitle(value: unknown): WorkflowBoundTemplate | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  return { ...raw, bindings: parseBindings(raw.bindings) } as WorkflowBoundTemplate
+}
+
 function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[], source: string): RawStep | null {
   if (!v || typeof v !== 'object') {
     errors.push({ source, message: `${id}: step ${i + 1} must be a table` })
@@ -151,6 +189,10 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
     childStep: child,
+    childWorkflow: parseChildWorkflow(o.child_workflow),
+    items: parseMapSource(o.items),
+    itemKey: typeof o.item_key === 'string' ? o.item_key : undefined,
+    title: parseTitle(o.title),
     joins: str(o.joins),
     branches: parseBranches(o.branches),
     // Passed through unread: `[steps.with]` belongs to whichever plugin contributed the kind.
@@ -215,6 +257,10 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
       const inner = expand(target, [...chain, step.workflowRef])
       if (!inner) return null
       const prefix = `${step.workflowRef}:`
+      const prefixBinding = (binding: WorkflowValueBinding): WorkflowValueBinding =>
+        binding.from === 'step' ? { ...binding, step: `${prefix}${binding.step}` } : binding
+      const prefixBindings = (bindings: Record<string, WorkflowValueBinding> | undefined) =>
+        bindings ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, prefixBinding(binding)])) : undefined
       steps.push(
         ...inner.map((s) => ({
           ...s,
@@ -227,6 +273,13 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
           prompt: s.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`),
           childStep: s.childStep
             ? { ...s.childStep, prompt: s.childStep.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`) }
+            : undefined,
+          childWorkflow: s.childWorkflow
+            ? { ...s.childWorkflow, inputs: prefixBindings(s.childWorkflow.inputs) }
+            : undefined,
+          items: s.items ? { ...s.items, step: `${prefix}${s.items.step}` } : undefined,
+          title: s.title
+            ? { ...s.title, bindings: prefixBindings(s.title.bindings) }
             : undefined,
         })),
       )

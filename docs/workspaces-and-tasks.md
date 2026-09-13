@@ -113,6 +113,17 @@ and intended ID returns the same task; reusing that ID for another parent or see
 deduplication still considers every other task, because two tasks cannot share one branch worktree.
 Creating the task does not create its worktree.
 
+A workflow dispatch reserves each child ID before calling this seam. The child keeps the workflow
+parent's project and records the parent through `Task.parentId`; workflow run lineage is stored
+separately by the workflows plugin and is never inferred from the task title. A Git project gets a
+unique branch and the usual lazy worktree. A non-Git project has no branch isolation, so the child
+uses the shared project folder.
+
+Completing, failing, cancelling, or retrying a workflow does not archive its child tasks or remove
+their worktrees. The tasks remain in the rail with their final workflow runs and can be archived by
+the owner through the normal task action. Retrying a dispatch reuses the existing tasks and runs;
+starting a new root workflow creates a new set.
+
 ## Worktrees and setup
 
 Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
