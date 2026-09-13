@@ -146,11 +146,24 @@ export function foldSubagentRoster(
   timestamp: number,
 ): AgentSubagent[] {
   const existing = current.find((entry) => entry.id === update.id)
+  // Sticky once seen: the spawn learns it is backgrounded before the launch receipt arrives.
+  const background = existing?.background || update.background || false
+  // A background subagent detaches from the parent's turn. The spawning `Agent` call returns the
+  // instant the child launches, so that call's own `completed` is a launch receipt, not the child's
+  // finish, and the child's own tool calls stream on well past it. Only a real completion summary
+  // settles such a row, and a summary is the one update that carries the harness handle, so a terminal
+  // status with no `providerAgentRef` on it is the launch receipt and must not settle the row.
+  const settlingFromLaunch = background
+    && (update.status === 'completed' || update.status === 'failed')
+    && update.providerAgentRef == null
   const merged: AgentSubagent = {
     id: update.id,
     turnId: existing?.turnId ?? turnId,
     title: update.title || existing?.title || 'Subagent',
-    status: update.status ?? existing?.status ?? 'running',
+    status: settlingFromLaunch
+      ? existing?.status ?? 'running'
+      : update.status ?? existing?.status ?? 'running',
+    background: background || undefined,
     role: update.role ?? existing?.role,
     model: update.model ?? existing?.model,
     providerAgentRef: update.providerAgentRef ?? existing?.providerAgentRef,

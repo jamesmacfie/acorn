@@ -279,8 +279,11 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // subagent's own rather than as one more tool the parent ran.
       const spawn = (meta.toolName != null && SUBAGENT_TOOLS.has(meta.toolName)) || meta.subagent != null
       const subagentId = spawn ? update.toolCallId : meta.parentToolUseId
+      // A backgrounded spawn detaches the child from the parent's turn. The flag rides the spawning
+      // call's input; `subagentFromToolCall` also reads it off the `async_launched` summary.
+      const background = asRecord(update.rawInput)?.run_in_background === true
       const roster: AgentNormalizedEvent[] = spawn
-        ? [{ type: 'subagent', subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta) }]
+        ? [{ type: 'subagent', subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta, background) }]
         : []
       // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
       // it rendered in the parent's stream while the Edit call that produced it sat inside the
@@ -355,6 +358,7 @@ function subagentFromToolCall(
   title: string | null | undefined,
   status: AgentToolCall['status'],
   meta: ClaudeToolMeta,
+  background: boolean,
 ): AgentSubagentUpdate {
   const summary = meta.subagent
   // `contextUsed` rather than input/output tokens: the summary reports one total, and splitting a
@@ -362,14 +366,17 @@ function subagentFromToolCall(
   const usage: AgentUsage | undefined = summary?.totalTokens == null
     ? undefined
     : { contextUsed: summary.totalTokens }
+  // `async_launched` is the launch receipt of a backgrounded `Agent` call: a summary arrives at the
+  // moment the child starts, so reading it as a finish marks the child done before it has done
+  // anything. It means running. Any other summary status is a genuine end, so keep the earlier rule.
+  const launched = summary?.status === 'async_launched'
   return {
     id: toolCallId,
     title: title != null && !SUBAGENT_TOOLS.has(title) ? title : undefined,
-    // A summary means the subagent is done. The update carrying it has no status of its own, and the
-    // one that does say `completed` arrives separately, so take the summary's own word for it.
     status: summary
-      ? summary.status == null || summary.status === 'completed' ? 'completed' : 'failed'
+      ? launched ? 'running' : summary.status == null || summary.status === 'completed' ? 'completed' : 'failed'
       : status,
+    background: background || launched || undefined,
     role: summary?.agentType,
     model: summary?.resolvedModel,
     providerAgentRef: summary?.agentId,
