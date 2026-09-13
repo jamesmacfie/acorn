@@ -52,6 +52,20 @@ const attachButton = (host: HTMLElement) =>
   [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Attach'))!
 
 describe('attaching files', () => {
+  it('keeps the message field focused after a pasted image finishes uploading', async () => {
+    const host = mount()
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message agent"]')!
+    field.focus()
+    const image = new File(['image'], 'pasted.png', { type: 'image/png' })
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [image] } })
+
+    field.dispatchEvent(paste)
+
+    await vi.waitFor(() => expect(host.textContent).toContain('pasted.png'))
+    expect(document.activeElement).toBe(field)
+  })
+
   it('uploads the bytes the host dialog returned', async () => {
     const pick = vi.fn(async (_options: { accept?: readonly string[] }) =>
       [{ name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) }])

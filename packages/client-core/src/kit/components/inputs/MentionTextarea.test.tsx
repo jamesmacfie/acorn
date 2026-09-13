@@ -114,10 +114,15 @@ describe('MentionTextarea', () => {
     expect(host.querySelector('.ui-mentionfield')?.hasAttribute('data-mirrored')).toBe(true)
   })
 
-  it('keeps the field focused after a file paste redraws its caller', async () => {
-    const elsewhere = document.createElement('button')
-    host.append(elsewhere)
-    const onFiles = vi.fn(() => elsewhere.focus())
+  it('keeps the field focused after an asynchronous file paste moves its caller', async () => {
+    let finishUpload: (() => void) | undefined
+    const uploaded = new Promise<void>((resolve) => { finishUpload = resolve })
+    const onFiles = vi.fn(async () => {
+      await uploaded
+      const composer = field().parentElement!
+      composer.remove()
+      host.append(composer)
+    })
     mount({ onFiles })
     field().focus()
     const image = new File(['image'], 'pasted.png', { type: 'image/png' })
@@ -127,9 +132,33 @@ describe('MentionTextarea', () => {
     field().dispatchEvent(paste)
     expect(paste.defaultPrevented).toBe(true)
     expect(onFiles).toHaveBeenCalledWith([image])
-    expect(document.activeElement).toBe(elsewhere)
-
     await Promise.resolve()
     expect(document.activeElement).toBe(field())
+
+    finishUpload!()
+    await uploaded
+    await Promise.resolve()
+    expect(document.activeElement).toBe(field())
+  })
+
+  it('does not reclaim focus from another control after an asynchronous file paste', async () => {
+    let finishUpload: (() => void) | undefined
+    const uploaded = new Promise<void>((resolve) => { finishUpload = resolve })
+    const elsewhere = document.createElement('button')
+    host.append(elsewhere)
+    mount({ onFiles: async () => uploaded })
+    field().focus()
+    const image = new File(['image'], 'pasted.png', { type: 'image/png' })
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [image] } })
+
+    field().dispatchEvent(paste)
+    await Promise.resolve()
+    elsewhere.focus()
+    finishUpload!()
+    await uploaded
+    await Promise.resolve()
+
+    expect(document.activeElement).toBe(elsewhere)
   })
 })
