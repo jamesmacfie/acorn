@@ -39,7 +39,11 @@ import {
   SESSION_TITLE_SYSTEM_PROMPT,
 } from './sessionTitle'
 
-const SESSION_TITLE_TIMEOUT_MS = 5_000
+// This includes starting a second agent CLI and waiting for its final response. Five seconds was
+// shorter than real Codex runs on the development node, so every generation was cancelled after the
+// prompt fallback had already been published. The work stays detached from the accepted turn, which
+// makes a longer bound safe for the user-facing path while still giving shutdown a finite join.
+const SESSION_TITLE_TIMEOUT_MS = 30_000
 
 type SessionTitleOperation = {
   controller: AbortController
