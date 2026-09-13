@@ -19,6 +19,23 @@
 .tabrail-item {
   position: relative;
 }
+.tabrail-item[data-dragging] {
+  opacity: 0.45;
+}
+.tabrail-item[data-dragging] .tabrail-tab {
+  cursor: grabbing;
+}
+.tabrail-item[data-drop-position]::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: calc(var(--task-depth) * 5px + 4px);
+  inset-inline-end: 4px;
+  block-size: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.tabrail-item[data-drop-position="before"]::after { inset-block-start: -1px; }
+.tabrail-item[data-drop-position="after"]::after { inset-block-end: -1px; }
 .tabrail-item[data-task-depth] {
   padding-inline-start: calc(var(--task-depth) * 5px);
 }

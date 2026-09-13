@@ -3,6 +3,8 @@ export type RailOrder = {
   order: string[] // manual order for the rest; unknown ids keep their tasks.sort order after these
 }
 
+export type RailDropPosition = 'before' | 'after'
+
 export const EMPTY_RAIL_ORDER: RailOrder = { pinned: [], order: [] }
 
 export function parseRailOrder(json: string | undefined): RailOrder {
@@ -56,20 +58,27 @@ export function unpinTask(order: RailOrder, id: string): RailOrder {
   return { pinned: order.pinned.filter((x) => x !== id), order: [id, ...order.order.filter((x) => x !== id)] }
 }
 
-// Drag-reorder: place `id` at the visual position of `beforeId` (or the end of its partition when
-// beforeId is null). Cross-partition drags adopt the target partition (dragging above a pinned row
-// pins). The full visible id list is materialised into the pref so the round-trip is stable.
-export function moveTask(order: RailOrder, visibleIds: string[], id: string, beforeId: string | null): RailOrder {
-  if (id === beforeId) return order
+// Drag-reorder: place `id` on the chosen edge of `targetId`. Cross-partition drags adopt the target
+// partition, so either edge of a pinned row pins and either edge of an unpinned row unpins. The full
+// visible id list is materialised into the pref so the round-trip is stable.
+export function moveTask(
+  order: RailOrder,
+  visibleIds: string[],
+  id: string,
+  targetId: string,
+  position: RailDropPosition,
+): RailOrder {
+  if (id === targetId) return order
   const pinnedSet = new Set(order.pinned)
   const rest = visibleIds.filter((x) => !pinnedSet.has(x))
-  const targetPinned = beforeId ? pinnedSet.has(beforeId) : false
+  const targetPinned = pinnedSet.has(targetId)
   const withoutId = (list: string[]) => list.filter((x) => x !== id)
   const insert = (list: string[]): string[] => {
     const base = withoutId(list)
-    if (beforeId == null) return [...base, id]
-    const i = base.indexOf(beforeId)
-    return i < 0 ? [...base, id] : [...base.slice(0, i), id, ...base.slice(i)]
+    const targetIndex = base.indexOf(targetId)
+    if (targetIndex < 0) return [...base, id]
+    const insertAt = targetIndex + (position === 'after' ? 1 : 0)
+    return [...base.slice(0, insertAt), id, ...base.slice(insertAt)]
   }
   if (targetPinned) return { pinned: insert(order.pinned.filter((x) => visibleIds.includes(x) || x === id)), order: withoutId(rest) }
   return { pinned: withoutId(order.pinned), order: insert(rest) }

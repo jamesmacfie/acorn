@@ -28,21 +28,36 @@ describe('pin/unpin', () => {
 })
 
 describe('moveTask (drag-reorder)', () => {
-  it('reorders within the unpinned partition', () => {
+  it('places a task before another task', () => {
     const visible = ['a', 'b', 'c', 'd']
-    const o = moveTask(EMPTY_RAIL_ORDER, visible, 'd', 'b')
+    const o = moveTask(EMPTY_RAIL_ORDER, visible, 'd', 'b', 'before')
     expect(applyRailOrder(tasks, o).map((t) => t.id)).toEqual(['a', 'd', 'b', 'c'])
   })
-  it('dragging onto a pinned row pins the task', () => {
+
+  it('places a task after another task', () => {
+    const visible = ['a', 'b', 'c', 'd']
+    const o = moveTask(EMPTY_RAIL_ORDER, visible, 'a', 'b', 'after')
+    expect(applyRailOrder(tasks, o).map((t) => t.id)).toEqual(['b', 'a', 'c', 'd'])
+  })
+
+  it('can place a task after the final task', () => {
+    const visible = ['a', 'b', 'c', 'd']
+    const o = moveTask(EMPTY_RAIL_ORDER, visible, 'a', 'd', 'after')
+    expect(applyRailOrder(tasks, o).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
+  })
+
+  it('dragging before a pinned row pins the task', () => {
     const start = pinTask(EMPTY_RAIL_ORDER, 'a')
     const visible = applyRailOrder(tasks, start).map((t) => t.id)
-    const o = moveTask(start, visible, 'c', 'a')
+    const o = moveTask(start, visible, 'c', 'a', 'before')
     expect(o.pinned).toEqual(['c', 'a'])
   })
-  it('null beforeId drops at the end', () => {
-    const visible = ['a', 'b', 'c', 'd']
-    const o = moveTask(EMPTY_RAIL_ORDER, visible, 'a', null)
-    expect(applyRailOrder(tasks, o).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
+
+  it('dragging after a pinned row keeps the task in the pinned partition', () => {
+    const start = pinTask(EMPTY_RAIL_ORDER, 'a')
+    const visible = applyRailOrder(tasks, start).map((t) => t.id)
+    const o = moveTask(start, visible, 'c', 'a', 'after')
+    expect(o.pinned).toEqual(['a', 'c'])
   })
 })
 

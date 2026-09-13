@@ -3,7 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
 import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
-import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
+import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/displayMeta'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -41,6 +41,7 @@ import { taskOriginAppearance } from '../tasks/origin'
 import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { taskHierarchy } from '../tasks/taskHierarchy'
+import { createRailDrag } from './createRailDrag'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
@@ -56,7 +57,6 @@ export default function TabRail() {
   const integrations = createQuery(() => integrationsOptions(true))
   const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
-  const [dragId, setDragId] = createSignal<string | null>(null)
   // The right-click door onto the same row actions. One menu for the whole list, with the row it
   // belongs to travelling in the signal.
   const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
@@ -68,12 +68,14 @@ export default function TabRail() {
   const saveOrder = async (o: RailOrder) => {
     await saveJsonPref(queryClient, PrefKeys.railOrder, o)
   }
-  async function onDrop(targetId: string | null) {
-    const id = dragId()
-    setDragId(null)
-    if (!id || id === targetId) return
-    await saveOrder(moveTask(railOrder(), visibleTasks().map((t) => t.id), id, targetId))
+  async function commitDrop(id: string, targetId: string, position: RailDropPosition) {
+    if (id === targetId) return
+    await saveOrder(moveTask(railOrder(), visibleTasks().map((t) => t.id), id, targetId, position))
   }
+  const railDrag = createRailDrag({
+    items: () => visibleTasks(),
+    onDrop: (id, targetId, position) => void commitDrop(id, targetId, position),
+  })
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
   // Chosen icon for the task being created/renamed. null = let the origin derive it.
@@ -158,6 +160,7 @@ export default function TabRail() {
   }
 
   function onRowClick(w: Task) {
+    if (railDrag.consumeClick(w.id)) return
     if (w.id === activeTaskId() && !selectedSource()) {
       setMenuId((v) => (v === w.id ? null : w.id))
       return
@@ -396,9 +399,11 @@ export default function TabRail() {
             return (
             <div
               class="tabrail-item"
+              data-task-id={w.id}
               data-task-depth={taskDepths().get(w.id) || undefined}
+              data-dragging={railDrag.dragId() === w.id || undefined}
+              data-drop-position={railDrag.dropTarget()?.id === w.id ? railDrag.dropTarget()?.position : undefined}
               style={{ '--task-depth': String(taskDepths().get(w.id) ?? 0) }}
-              draggable={true}
               // Warm the panes this task can show, once the pointer has settled on the row
               // (registries/panes/panes.ts). The tasks themselves are already cached; what is cold is
               // each pane's own first read, and a task switch disposes the whole task scope, so
@@ -416,15 +421,7 @@ export default function TabRail() {
                 rowMenuReturnFocus = e.currentTarget.querySelector<HTMLElement>('.tabrail-task') ?? undefined
                 setRowMenu({ at: { x: e.clientX, y: e.clientY }, target: rowTarget(w) })
               }}
-              onDragStart={(e) => {
-                setDragId(w.id)
-                e.dataTransfer?.setData('text/plain', w.id)
-              }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                void onDrop(w.id)
-              }}
+              onMouseDown={(e) => railDrag.begin(e, w.id)}
             >
               {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
                   that decision cannot live inside one menu instance. */}
