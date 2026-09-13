@@ -49,6 +49,7 @@ const registered: Disposable[] = []
 
 beforeEach(() => {
   vi.useFakeTimers()
+  localStorage.clear()
   host = document.createElement('div')
   document.body.append(host)
 })
@@ -60,6 +61,8 @@ afterEach(() => {
   prefetched.length = 0
   setActiveTaskId(null)
   setSelectedSource(null)
+  vi.restoreAllMocks()
+  Reflect.deleteProperty(document, 'elementFromPoint')
   vi.useRealTimers()
 })
 
@@ -76,6 +79,24 @@ const mount = (tasks = [task('t1', 'First'), task('t2', 'Second')]) => {
 
 const hover = (row: HTMLElement) => row.dispatchEvent(new Event('pointerenter', { bubbles: true }))
 const leave = (row: HTMLElement) => row.dispatchEvent(new Event('pointerleave', { bubbles: true }))
+const dispatchMouse = (row: HTMLElement, type: string, clientY: number, clientX = 10) => {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    button: { value: 0 },
+    clientX: { value: clientX },
+    clientY: { value: clientY },
+  })
+  row.dispatchEvent(event)
+  return event
+}
+const taskLabels = () => [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
+  .map((row) => row.querySelector('button')?.getAttribute('aria-label'))
+const pointAt = (element: Element) => {
+  Object.defineProperty(document, 'elementFromPoint', {
+    configurable: true,
+    value: vi.fn(() => element),
+  })
+}
 
 describe('hovering a task row', () => {
   it('warms that task’s panes once the pointer has settled', () => {
@@ -108,6 +129,58 @@ describe('hovering a task row', () => {
     hover(rows[1]!)
     vi.advanceTimersByTime(200)
     expect(prefetched.sort()).toEqual(['agents:t2', 'notes:t2'])
+  })
+})
+
+describe('dragging a task row', () => {
+  it('moves a task after an adjacent row when dropped on its lower half', async () => {
+    const rows = mount()
+    vi.spyOn(rows[1]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
+    pointAt(rows[1]!)
+
+    dispatchMouse(rows[0]!, 'mousedown', 10)
+    dispatchMouse(rows[0]!, 'mousemove', 40)
+    expect(rows[1]!.dataset.dropPosition).toBe('after')
+
+    dispatchMouse(rows[0]!, 'mouseup', 40)
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Second', 'First']))
+    expect(host.querySelector('[data-dragging]')).toBeNull()
+    expect(host.querySelector('[data-drop-position]')).toBeNull()
+  })
+
+  it('moves a root with its descendants without changing the hierarchy', async () => {
+    const rows = mount([
+      task('parent', 'Parent'),
+      task('child', 'Child', 'parent'),
+      task('other', 'Other'),
+    ])
+    vi.spyOn(rows[2]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
+    pointAt(rows[2]!)
+
+    dispatchMouse(rows[0]!, 'mousedown', 10)
+    dispatchMouse(rows[0]!, 'mousemove', 40)
+    dispatchMouse(rows[0]!, 'mouseup', 40)
+
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Other', 'Parent', 'Child']))
+    expect([...host.querySelectorAll<HTMLElement>('.tabrail-item')].map((row) => row.dataset.taskDepth))
+      .toEqual([undefined, undefined, '1'])
+  })
+
+  it('does not offer a drop that would separate a child from its parent', () => {
+    const rows = mount([
+      task('parent', 'Parent'),
+      task('child', 'Child', 'parent'),
+      task('other', 'Other'),
+    ])
+    vi.spyOn(rows[2]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
+    pointAt(rows[2]!)
+
+    dispatchMouse(rows[1]!, 'mousedown', 40)
+    const mouseMove = dispatchMouse(rows[1]!, 'mousemove', 12)
+
+    expect(mouseMove.defaultPrevented).toBe(true)
+    expect(host.querySelector('[data-drop-position]')).toBeNull()
+    expect(taskLabels()).toEqual(['Parent', 'Child', 'Other'])
   })
 })
 
