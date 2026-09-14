@@ -32,7 +32,7 @@ export type RailMarker = {
   icon?: string // an Icon name; exactly one of icon or dotTone
   dotTone?: RailMarkerDot
   tone?: RailTone
-  busy?: boolean // spin this marker's icon. Does not make the whole control busy.
+  busy?: boolean // spin this marker's icon, or pulse its dot. Does not make the whole control busy.
   placements: readonly RailMarkerPosition[] // preferences, in order, never guarantees
   priority?: number
 }

@@ -73,7 +73,8 @@ applying native `disabled`, which would swallow the mouseover the tooltip needs.
 A **marker** is a small non-interactive status icon around the outside edge of a control: CI checks,
 an unread agent, a dirty worktree, a plugin's own state. A marker is data, not markup. It carries an
 id, a label in words, exactly one of an icon name or a `StatusDot` tone, an optional semantic tone,
-an optional `busy` spin, and an ordered list of the positions it would like:
+an optional `busy` flag, and an ordered list of the positions it would like. `busy` means "this state
+is live": it spins an icon marker and pulses a dot one.
 
 ```
 top-start   top-end
@@ -86,7 +87,9 @@ stylesheet. It orders markers by priority (then id, so activation order never sh
 the first position on its list that is still free, renders at most one marker per position, and keeps
 everything that missed out in the tooltip legend and the control's accessible description. Compact
 chrome may hide an icon; it must never hide a state. `bottom-center` is reserved for host lifecycle
-and activity, because it sits under the main glyph rather than in a corner.
+and activity, because it sits under the main glyph rather than in a corner. Two states use it, at
+opposite ends of a task's life: a pulsing dot while its setup script prepares the new worktree, and a
+spinner while teardown removes it.
 
 Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
 `features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are

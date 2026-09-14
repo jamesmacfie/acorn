@@ -17,6 +17,7 @@ import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { railStatusMarkers } from '../tasks/railStatus'
+import { isSettingUp } from '../tasks/agentSessions'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
@@ -388,6 +389,7 @@ export default function TabRail() {
                 unread: !!unreadForTask(w.id),
                 status: st(),
                 archiving: isArchiving(w.id),
+                settingUp: isSettingUp(w.id),
                 pinned: isPinned(railOrder(), w.id),
               }),
               ...markersFor({ kind: 'task', id: w.id }),

@@ -6,7 +6,7 @@ import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, branch: null, head: null, ...p })
 
 const inputs = (over: Partial<RailStatusInputs> = {}): RailStatusInputs => ({
-  checks: null, unread: false, status: status({}), archiving: false, pinned: false, ...over,
+  checks: null, unread: false, status: status({}), archiving: false, settingUp: false, pinned: false, ...over,
 })
 
 const placements = (over: Partial<RailStatusInputs>) =>
@@ -50,5 +50,16 @@ describe('railStatusMarkers', () => {
     const resolved = resolveRailMarkers(railStatusMarkers(inputs({ archiving: true, unread: true })))
     expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([['archiving', 'bottom-center'], ['needs', 'top-end']])
     expect(resolved.placed.find((m) => m.id === 'archiving')?.busy).toBe(true)
+  })
+
+  it('pulses a dot in the same slot while setup runs, and yields it to teardown', () => {
+    const running = resolveRailMarkers(railStatusMarkers(inputs({ settingUp: true })))
+    expect(running.placed.map((m) => [m.id, m.position])).toEqual([['setup', 'bottom-center']])
+    expect(running.placed[0]).toMatchObject({ dotTone: 'ok', busy: true })
+    // Both at once is not a state the task life cycle produces, but the allocator settles it rather
+    // than the caller, and setup keeps its meaning in the tooltip either way.
+    const both = resolveRailMarkers(railStatusMarkers(inputs({ settingUp: true, archiving: true })))
+    expect(both.placed.map((m) => m.id)).toEqual(['archiving'])
+    expect(both.legend.map((item) => item.l)).toContain('Setup script running')
   })
 })
