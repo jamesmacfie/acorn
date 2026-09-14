@@ -92,6 +92,7 @@ export function managedAgentsBridge(
       guarded(() => runtime.attachments.upload(taskId, filename, mediaType, bytes)),
     attachment: (attachmentId) => guarded(() => runtime.attachments.get(attachmentId)),
     removeAttachment: (attachmentId) => guarded(() => runtime.attachments.removeUnreferenced(attachmentId)),
+    attachmentContent: (attachmentId) => guarded(() => runtime.attachments.read(attachmentId)),
     artifacts: (sessionId) => guarded(() => runtime.artifacts.list(sessionId)),
     artifact: (artifactId) => guarded(() => runtime.artifacts.get(artifactId)),
     artifactContent: (artifactId) => guarded(() => runtime.artifacts.read(artifactId)),

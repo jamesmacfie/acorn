@@ -767,7 +767,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
-   Ten bespoke card rules. See docs/ui-design.md § How the kit is built for why the
+   Eleven bespoke card rules. See docs/ui-design.md § How the kit is built for why the
    stripe uses the same --stripe-w marker the diff rows and comment cards use. */
 .ui-card {
   display: block;
@@ -782,6 +782,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   padding: var(--pad-surface);
 }
 .ui-card[data-pad='sm'] { padding: var(--space-4); }
+.ui-card[data-fit] { width: auto; }
 .ui-card[data-interactive] { cursor: pointer; }
 .ui-card[data-interactive]:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
 .ui-card[data-interactive]:disabled { opacity: 0.5; cursor: default; }
@@ -1148,6 +1149,22 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }
 .ui-markdown img { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
+/* The `thumb` image flavour (kit/lib/markdown.ts): a picture standing in for a file, drawn as a band the
+   width of whatever holds it and cropped to fill. Cropping rather than fitting, because a tile is as wide
+   as the filename under it and a fitted image leaves a different gap for every aspect ratio. Square,
+   because the rounding that suits a picture drawn as content reads as a mistake on a band inside an
+   already-rounded control. `zoom-in` because every call site opens the full thing on press, and a cursor
+   that promises it is cheaper than a hint nobody reads. */
+.ui-markdown[data-images="thumb"] img {
+  width: 100%;
+  height: var(--space-11);
+  object-fit: cover;
+  border-radius: var(--radius-0);
+  cursor: zoom-in;
+}
+/* A lone image is still a paragraph to the parser, and a paragraph's margins are what make a thumbnail
+   twice as tall as the tile it sits in. */
+.ui-markdown[data-images="thumb"] p { margin: 0; }
 .ui-markdown blockquote {
   margin: var(--space-4) 0;
   padding-left: var(--space-5);

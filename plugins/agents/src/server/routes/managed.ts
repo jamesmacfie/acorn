@@ -47,6 +47,7 @@ export type ManagedAgentsBridge = {
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
   attachment(attachmentId: string): Promise<AgentAttachment | null>
   removeAttachment(attachmentId: string): Promise<boolean>
+  attachmentContent(attachmentId: string): Promise<{ attachment: AgentAttachment; bytes: Uint8Array } | null>
   artifacts(sessionId: string): Promise<AgentArtifact[]>
   artifact(artifactId: string): Promise<AgentArtifact | null>
   artifactContent(artifactId: string): Promise<{ artifact: AgentArtifact; bytes: Uint8Array } | null>
@@ -181,6 +182,23 @@ export const managedAgents = new Hono<AppEnv>()
     const bytes = new Uint8Array(await file.arrayBuffer())
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.uploadAttachment(parsed.data.taskId, file.name, file.type, bytes))
+  })
+  // The bytes behind an attachment, so a transcript can draw the picture the reader sent rather than a
+  // line of text naming it. Same shape as the artifact download below, including the `nosniff` and the
+  // `no-store`: the content is whatever somebody uploaded, so nothing here lets a browser decide what
+  // it is or keep a copy on disk.
+  .get('/attachments/:attachmentId/content', async (c) => {
+    const bridge = routeCapabilityFor(c, MANAGED_AGENTS)
+    if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    const result = await bridge.attachmentContent(c.req.param('attachmentId'))
+    if (!result) return respondError(c, 404, 'attachment_not_found')
+    const filename = result.attachment.filename.replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 180) || 'attachment'
+    return c.body(Uint8Array.from(result.bytes), 200, {
+      'content-type': result.attachment.mediaType,
+      'content-disposition': `attachment; filename="${filename.replaceAll('"', '')}"`,
+      'x-content-type-options': 'nosniff',
+      'cache-control': 'private, no-store',
+    })
   })
   .get('/attachments/:attachmentId', (c) =>
     viaBridge(c, MANAGED_AGENTS, async (bridge) => {

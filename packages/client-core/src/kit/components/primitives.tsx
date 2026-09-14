@@ -1152,6 +1152,11 @@ export function Card(props: {
   selected?: boolean
   stripe?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'>
   pad?: Extract<Size, 'sm' | 'md'>
+  /** Sized by what is inside it rather than by the room it is given, for several cards standing in a
+   *  row. A surface is full width by default because most of them are the only thing on their line;
+   *  a button is the wrong stand-in for the ones that are not, since a control's padding is zero at
+   *  the top and bottom by design and anything taller than one line touches both edges. */
+  fit?: boolean
   disabled?: boolean
   onPress?: () => void
   title?: string
@@ -1169,6 +1174,7 @@ export function Card(props: {
     'data-selected': props.selected ? '' : undefined,
     'data-stripe': props.stripe,
     'data-pad': props.pad ?? 'md',
+    'data-fit': props.fit ? '' : undefined,
     title: props.title,
   })
   // A rising edge, not a standing order. `focus` is a prop getter, and a pane derives it from a row it

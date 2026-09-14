@@ -166,6 +166,7 @@ export default function Markdown(props: {
     <div
       ref={root}
       class="ui-markdown"
+      data-images={props.images}
       onClick={(event) => {
         // A modified click is the reader asking the browser for something — a new tab, a saved
         // target — and no handler here should take it. Same guard the host's own content-link
