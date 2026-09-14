@@ -5,6 +5,10 @@
   width: var(--tabrail-w);
   display: flex;
   flex-direction: column;
+  /* The top edge closes the rail against the macOS title bar, which paints `--bg` (docs/shell.md §
+     The renderer bridge). The topbar beside it needs no such line because it is the same surface as
+     the bar above it; the rail is `--bg-subtle` and was ending in mid-air. */
+  border-top: var(--chrome-divider);
   border-right: var(--chrome-divider);
   background: var(--bg-subtle);
 }
