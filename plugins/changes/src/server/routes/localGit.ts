@@ -4,8 +4,16 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalStatus } from '@acorn/protocol/terminal.ts'
 import type { CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit, PullOptions, PushOptions } from '../../shared/api'
 import {
-  type AppEnv, BridgeError, ownerId, type Principal, ProviderOperationError, respondError, routeCapability,
-  routeCapabilityFor, setRouteTestCapability, viaBridge,
+  type AppEnv,
+  BridgeError,
+  isProviderOperationError,
+  ownerId,
+  type Principal,
+  respondError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+  viaBridge,
 } from '@acorn/plugin-api/node'
 
 // The ChangesPane's working-tree status, diff and blob reads, plus the staging, commit, discard and
@@ -101,7 +109,7 @@ async function viaModels<T>(c: Context<AppEnv>, fn: (bridge: LocalGitBridge, use
     return c.json(await fn(bridge, ownerId(c)))
   } catch (error) {
     if (error instanceof BridgeError) return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
-    if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+    if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
     // Anything else is flattened, as core does for its own provider calls: an upstream exception
     // message can quote a URL or a response body (docs/integrations.md § Provider boundaries).
     return respondError(c, 502, 'provider_unavailable')

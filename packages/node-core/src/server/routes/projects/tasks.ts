@@ -9,7 +9,7 @@ import { Hono } from 'hono'
 import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../../integrations/connections'
-import { ProviderOperationError } from '../../integrations/types'
+import { isProviderOperationError, ProviderOperationError } from '../../integrations/types'
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { getProject, type ProjectRow } from '../../projects'
@@ -159,7 +159,7 @@ export const tasks = new Hono<AppEnv>()
     try {
       links = await Promise.all(linkInputs.map((link) => stampedLink(db, uid, link)))
     } catch (error) {
-      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
       throw error
     }
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
@@ -249,7 +249,7 @@ export const tasks = new Hono<AppEnv>()
     try {
       link = await stampedLink(db, ownerId(c), body)
     } catch (error) {
-      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
       throw error
     }
     const [inserted] = await db

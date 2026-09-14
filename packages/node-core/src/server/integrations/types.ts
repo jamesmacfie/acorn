@@ -1,4 +1,5 @@
 import type { ContextItem } from '@acorn/protocol/api.ts'
+import { PROVIDER_ERROR_CODES } from '@acorn/protocol/integrations.ts'
 import type { Hono } from 'hono'
 import type {
   CredentialField,
@@ -220,5 +221,30 @@ export class ProviderOperationError extends Error {
     readonly status: 400 | 401 | 403 | 404 | 429 | 502 = 502,
   ) {
     super(code)
+    // Without this the name is 'Error', which is what a log line shows for a failure somebody threw
+    // on purpose and named precisely.
+    this.name = 'ProviderOperationError'
   }
+}
+
+/**
+ * Whether a thrown value is one of these, by shape rather than by identity.
+ *
+ * `instanceof` is the wrong question here and answers it wrongly. Every plugin bundle inlines its
+ * whole dependency graph, this class included, because a loaded plugin's directory has no
+ * node_modules to resolve against (apps/node/scripts/build-plugin.mjs). So a provider error thrown
+ * inside a plugin bundle and caught by a host route is an instance of the plugin's copy of the
+ * class, never the host's, and the reverse holds for a host error caught inside a plugin. Every
+ * `instanceof` across that boundary was false, which sent typed failures like `provider_needs_auth`
+ * to the catch-all and told the owner a working provider was unavailable.
+ *
+ * The shape is checked rather than a brand, because a brand only reaches a plugin package that has
+ * been rebuilt since, and a plugin installed from a folder is rebuilt when its author says so.
+ */
+export const isProviderOperationError = (error: unknown): error is ProviderOperationError => {
+  if (!(error instanceof Error)) return false
+  const failure = error as Partial<ProviderOperationError>
+  return typeof failure.status === 'number'
+    && typeof failure.code === 'string'
+    && (PROVIDER_ERROR_CODES as readonly string[]).includes(failure.code)
 }

@@ -11,7 +11,26 @@ import {
   type RollbarProject,
 } from './'
 import { composeItemDetail, normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, parseJson, ProviderOperationError, type ProviderItemDetail, type ProviderProjectSource, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
+import {
+  type CachedExternalItem,
+  type CachedItemCodec,
+  type CodecResult,
+  defaultBudgets,
+  encodeCached,
+  externalIdsFor,
+  isProviderOperationError,
+  isRecord,
+  type MirroredResourceContribution,
+  parseCached,
+  parseJson,
+  type ProviderItemDetail,
+  ProviderOperationError,
+  type ProviderProjectSource,
+  type ProviderResourceContext,
+  type ProviderResourceRefreshContext,
+  publicProvider,
+  type RouteFailure,
+} from '@acorn/plugin-api/node'
 import {
   createRollbarOccurrenceResources,
   ROLLBAR_OCCURRENCES_RESOURCE,
@@ -358,7 +377,7 @@ export const rollbarProvider = publicProvider({
         if (!response.ok) throw new ProviderOperationError('provider_unavailable', 502)
         return { project: await rollbarData<RollbarProject>(response), secret }
       } catch (error) {
-        if (error instanceof ProviderOperationError) throw error
+        if (isProviderOperationError(error)) throw error
         throw new ProviderOperationError('provider_unavailable', 502)
       }
     },

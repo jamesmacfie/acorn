@@ -11,7 +11,7 @@ import {
   ProviderRequestScheduler,
   providerRequestScheduler,
 } from '../integrations/budgetRuntime'
-import { ProviderOperationError } from '../integrations/types'
+import { isProviderOperationError, ProviderOperationError } from '../integrations/types'
 import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
 import { broadcastConnectionChanged } from '../notify'
@@ -164,7 +164,7 @@ export async function generateTextForConnection(
       ...(generated.usage ? { usage: generated.usage } : {}),
     }
   } catch (error) {
-    if (error instanceof ProviderOperationError) {
+    if (isProviderOperationError(error)) {
       if (error.code === 'provider_needs_auth') {
         await markNeedsAuth(args.db, connection, 'provider_needs_auth')
       }

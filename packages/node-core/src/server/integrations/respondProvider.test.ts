@@ -53,6 +53,37 @@ describe('providerError', () => {
     expect(line).toContain('r76-1789377618767')
   })
 
+  // The bug this shape check exists for. A bundled plugin inlines its whole dependency graph, so the
+  // class its provider throws is compiled into the plugin's own bundle and is not the class this
+  // module holds. `instanceof` was false for every one of them, and a rejected Linear key came back
+  // as "provider unavailable" with nothing anywhere saying otherwise.
+  class ForeignProviderOperationError extends Error {
+    constructor(readonly code: string, readonly status: number) {
+      super(code)
+      this.name = 'ProviderOperationError'
+    }
+  }
+
+  it('recognises a provider error thrown by another bundle, which instanceof cannot', () => {
+    const foreign = new ForeignProviderOperationError('provider_needs_auth', 401)
+    expect(foreign instanceof ProviderOperationError).toBe(false)
+
+    const { c, sent } = context()
+    providerError(c, foreign)
+    expect(sent.status).toBe(401)
+    expect(codeOf(sent)).toBe('provider_needs_auth')
+  })
+
+  // The shape is narrow enough that an unrelated error carrying a `code` does not get to pick its own
+  // status. Node's own system errors are the obvious near miss.
+  it('does not mistake a system error for a provider failure', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { c, sent } = context()
+    providerError(c, Object.assign(new Error('no such file'), { code: 'ENOENT', status: 500 }))
+    expect(sent.status).toBe(502)
+    expect(codeOf(sent)).toBe('provider_unavailable')
+  })
+
   it('survives a thrown value that is not an Error at all', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { c, sent } = context()

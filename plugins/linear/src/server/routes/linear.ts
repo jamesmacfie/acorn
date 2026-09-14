@@ -19,11 +19,11 @@ import {
   connectionHasCapability,
   type CoreServices,
   encodeCached,
+  isProviderOperationError,
   parseCached,
   type PluginFetchHandler,
   type PluginProviderResourceRequest,
   portableCarrier,
-  ProviderOperationError,
   providerRequestScheduler,
   respondError,
   type RouteFailure,
@@ -438,7 +438,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
         mutation.run!({ secret: resolved.key, input }),
       )
     } catch (error) {
-      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
       return respondError(c, 502, 'provider_unavailable')
     }
     return c.json({ ok: true })

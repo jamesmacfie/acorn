@@ -10,7 +10,7 @@ import type { RouteFailure, RouteResult } from '../sync/engine'
 import { providerRequestScheduler } from './budgetRuntime'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { getConnection } from './connections'
-import { ProviderOperationError, type ProviderProject } from './types'
+import { isProviderOperationError, type ProviderProject } from './types'
 import { broadcastConnectionChanged } from '../notify'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
@@ -97,7 +97,7 @@ export async function listConnectionProjects(args: {
     }
     // 400 does not survive as a client status. A provider rejecting its own request is this node's
     // configuration problem, and the owner did not send a bad request by opening a picker.
-    if (error instanceof ProviderOperationError) {
+    if (isProviderOperationError(error)) {
       return failure(error.code, error.status === 400 ? 502 : error.status)
     }
     return failure('provider_unavailable', 502)
