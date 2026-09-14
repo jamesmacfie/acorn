@@ -11,7 +11,7 @@ type WireFunction = { __acornRpc: 'function'; id: number; sync: boolean }
 type WireRequest = { __acornRpc: 'call'; callId: number; functionId: number; args: unknown[] }
 type WireResponse = { __acornRpc: 'result'; callId: number; ok: boolean; value: unknown }
 type WireSyncRequest = { __acornRpc: 'sync-call'; functionId: number; args: unknown[]; reply: SharedArrayBuffer }
-type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; permission?: unknown; resource?: unknown }
+type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; status?: unknown; permission?: unknown; resource?: unknown }
 type WireRequestValue = { __acornRpc: 'request'; url: string; method: string; headers: [string, string][]; body: Uint8Array | null }
 type WireResponseValue = { __acornRpc: 'response'; status: number; statusText: string; headers: [string, string][]; body: Uint8Array }
 type WireAbortSignal = { __acornRpc: 'abort-signal'; aborted: boolean; reason?: unknown }
@@ -36,6 +36,11 @@ const errorToWire = (error: unknown): WireError => {
     message: source.message,
     ...(source.stack ? { stack: source.stack } : {}),
     ...('code' in source ? { code: (source as Error & { code?: unknown }).code } : {}),
+    // `status` travels with `code` because the pair is one answer, not two facts. A provider error
+    // that arrived with its code and no status stopped looking like a provider error to the host
+    // (integrations/types.ts § isProviderOperationError), so a rejected credential was reported as
+    // the provider being unavailable.
+    ...('status' in source ? { status: (source as Error & { status?: unknown }).status } : {}),
     ...('permission' in source ? { permission: (source as Error & { permission?: unknown }).permission } : {}),
     ...('resource' in source ? { resource: (source as Error & { resource?: unknown }).resource } : {}),
   }
@@ -46,6 +51,7 @@ const errorFromWire = (wire: WireError): Error => {
   error.name = wire.name
   if (wire.stack) error.stack = wire.stack
   if (wire.code !== undefined) (error as Error & { code?: unknown }).code = wire.code
+  if (wire.status !== undefined) (error as Error & { status?: unknown }).status = wire.status
   if (wire.permission !== undefined) (error as Error & { permission?: unknown }).permission = wire.permission
   if (wire.resource !== undefined) (error as Error & { resource?: unknown }).resource = wire.resource
   return error
