@@ -367,19 +367,38 @@ export class ManagedAgentEngine {
     }
     await this.record(sessionId, turnId, event)
     if (settlesTurn) {
-      if (event.type === 'turn_completed' && turnId && this.onCompletedTurn) {
-        const session = await this.store.requireSession(sessionId)
-        const turn = await this.store.turn(turnId)
-        if (turn) void this.onCompletedTurn({
-          taskId: session.taskId,
-          sessionId,
-          turnId,
-          source: turn.source,
-          status: turn.status,
-          attempt: turn.attempt,
-        }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
+      if (event.type === 'turn_completed' && turnId) {
+        await this.quietDetachedSubagents(sessionId, turnId)
+        if (this.onCompletedTurn) {
+          const session = await this.store.requireSession(sessionId)
+          const turn = await this.store.turn(turnId)
+          if (turn) void this.onCompletedTurn({
+            taskId: session.taskId,
+            sessionId,
+            turnId,
+            source: turn.source,
+            status: turn.status,
+            attempt: turn.attempt,
+          }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
+        }
       }
       void this.pump()
+    }
+  }
+
+  // A backgrounded child outlives the parent's turn, and Claude Code only streams a session's updates
+  // while a prompt is in flight (docs/managed-agents.md § Subagents). So the moment the turn that
+  // spawned it ends, its "running" row has nothing left feeding it: the completion summary that would
+  // settle it can only ride the next prompt, if there ever is one, and until then the spinner claims a
+  // liveness we can no longer observe. Quiet each still-active background child to `idle` — detached
+  // and resumable by its `providerAgentRef`, not spinning and not falsely "Completed". A real
+  // completion summary on a later turn still folds it to `completed`, so no ground truth is lost.
+  private async quietDetachedSubagents(sessionId: string, turnId: string): Promise<void> {
+    const session = await this.store.requireSession(sessionId)
+    for (const subagent of session.subagents) {
+      if (subagent.background && (subagent.status === 'running' || subagent.status === 'pending')) {
+        await this.record(sessionId, turnId, { type: 'subagent', subagent: { id: subagent.id, status: 'idle' } })
+      }
     }
   }
 

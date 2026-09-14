@@ -326,6 +326,15 @@ update that carries the harness handle. A terminal status with no agent id on it
 and leaves the row running. The parent session still reads as ready meanwhile, by the rule above: a
 backgrounded child is precisely a child that outlives its parent's turn.
 
+That last point has a tail. The adapter only streams a session's updates while a prompt is in flight,
+so once the turn that spawned a background child ends, nothing feeds its row: the completion summary
+that would settle it can only ride the next prompt, if there ever is one, and until then a "running"
+row spins for work no one is watching. So when a turn completes, the runtime quiets each of that
+session's still-active background children to `idle` — detached and resumable by its `providerAgentRef`,
+not spinning and not falsely "completed". If the real summary does arrive on a later turn, it folds the
+row on to `completed` as usual, so nothing is lost. The sweep lives in `runtimeEngine.ts`, on the
+`turn_completed` commit.
+
 Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
 `turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's
 runtime state mid-turn. `drivers/codexChildRouting.ts` owns it, keyed on the root thread id the driver
