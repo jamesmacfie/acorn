@@ -1,13 +1,48 @@
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
+import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({
   default: (props: { text: string }) => { markdownMounts++; return <span>{props.text}</span> },
 }))
 
-const { default: AgentEventCard } = await import('./AgentEventCard')
+// The attachment card behind a sent turn asks the node for the row before it draws anything, so a
+// card under test would otherwise reach the network. A PDF is the case that draws without bytes.
+vi.mock('./managedClient', () => ({
+  managedAgentApi: {
+    attachment: async (id: string) => ({
+      id, taskId: 'task', filename: 'notes.pdf', mediaType: 'application/pdf', byteSize: 2048, createdAt: 0,
+    }),
+    attachmentContent: async () => { throw new Error('bytes are only fetched for a picture') },
+  },
+}))
+
+const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
+
+it('drops the attachment placeholder only when there is an attachment to draw instead', async () => {
+  expect(withoutAttachmentPlaceholders('Have a look\n\n[Attachment: 8f2c]\n\nthanks'))
+    .toBe('Have a look\n\nthanks')
+  // Nothing that merely mentions one: the placeholder is a line of its own, written by the projection.
+  expect(withoutAttachmentPlaceholders('see [Attachment: 8f2c] above')).toBe('see [Attachment: 8f2c] above')
+
+  const item: AgentConversationItem = {
+    key: 'turn', firstSeq: 1, lastSeq: 1, turnId: 'turn-1',
+    event: { type: 'user_message', text: 'Have a look\n\n[Attachment: 8f2c]' },
+  }
+  const turn = { id: 'turn-1', input: [{ type: 'attachment', attachmentId: '8f2c' }] } as AgentTurn
+  const host = document.createElement('div')
+  const dispose = render(() => (
+    <AgentEventCard item={item} taskId="task" sessionId="session" turn={turn} />
+  ), host)
+  try {
+    expect(host.textContent).toContain('Have a look')
+    expect(host.textContent).not.toContain('[Attachment:')
+    // The row is drawn once the node has answered.
+    await vi.waitFor(() => expect(host.textContent).toContain('notes.pdf'))
+  } finally { dispose() }
+})
 
 it('does not render a completed subagent’s history until its disclosure opens', () => {
   markdownMounts = 0

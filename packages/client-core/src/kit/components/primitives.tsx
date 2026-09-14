@@ -1134,6 +1134,14 @@ export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedC
   return <Button {...rest} onPress={() => own.onPressedChange(!props.pressed)} />
 }
 
+/** Whether the reader is mid-sentence somewhere. A text field with the caret in it is the one thing
+ *  nothing may take focus from on its own account. */
+const isTyping = (doc: Document): boolean => {
+  const active = doc.activeElement
+  return active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement
+    || (active instanceof HTMLElement && active.isContentEditable)
+}
+
 /* Card: a bordered grouping surface. No mandated Header/Body/Footer slots; acorn's cards are small
    and dense, and slots would get in the way.
 
@@ -1144,6 +1152,11 @@ export function Card(props: {
   selected?: boolean
   stripe?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'>
   pad?: Extract<Size, 'sm' | 'md'>
+  /** Sized by what is inside it rather than by the room it is given, for several cards standing in a
+   *  row. A surface is full width by default because most of them are the only thing on their line;
+   *  a button is the wrong stand-in for the ones that are not, since a control's padding is zero at
+   *  the top and bottom by design and anything taller than one line touches both edges. */
+  fit?: boolean
   disabled?: boolean
   onPress?: () => void
   title?: string
@@ -1161,6 +1174,7 @@ export function Card(props: {
     'data-selected': props.selected ? '' : undefined,
     'data-stripe': props.stripe,
     'data-pad': props.pad ?? 'md',
+    'data-fit': props.fit ? '' : undefined,
     title: props.title,
   })
   // A rising edge, not a standing order. `focus` is a prop getter, and a pane derives it from a row it
@@ -1172,6 +1186,11 @@ export function Card(props: {
     if (!props.focus || !element) { revealed = false; return }
     if (revealed) return
     revealed = true
+    // And never out of a box someone is typing in. The rising edge above only holds while this card
+    // stays mounted: a list that refetches rebuilds its rows, and the rebuilt row that happens to be
+    // the selected one re-issues a reveal nobody asked for. The reader who finds out is the one whose
+    // sentence lost the caret, so a reveal that would interrupt typing is dropped rather than queued.
+    if (isTyping(element.ownerDocument)) return
     element.scrollIntoView({ block: 'nearest' })
     element.focus({ preventScroll: true })
   })

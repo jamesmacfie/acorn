@@ -215,6 +215,24 @@ export class AgentAttachmentStore {
     return { attachment: rowToAttachment(row), bytes: new Uint8Array(bytes) }
   }
 
+  /**
+   * An attachment and its bytes, whether or not a turn has claimed it.
+   *
+   * Deliberately wider than `readDraft` above, and for a different reader. That one answers a plugin
+   * editing an unsent turn, where a claimed attachment is evidence and out of reach. This one answers
+   * the person looking at their own transcript, where the thing they sent is exactly what they want to
+   * see again. Both sit behind the same route guard, which resolves the attachment's task first.
+   */
+  async read(id: string): Promise<{ attachment: AgentAttachment; bytes: Uint8Array } | null> {
+    const resolved = await this.resolve(id)
+    if (!resolved) return null
+    const bytes = await readFile(resolved.localPath).catch(() => null)
+    if (!bytes) return null
+    // The path stays in this class, for the reason readDraft states.
+    const { localPath: _path, ...attachment } = resolved
+    return { attachment, bytes: new Uint8Array(bytes) }
+  }
+
   /** Is this attachment claimed by a turn? Referenced content is the evidence of what was sent, so it is
    *  never readable as a draft, never replaced, and never deleted. */
   async #referenced(id: string): Promise<boolean> {

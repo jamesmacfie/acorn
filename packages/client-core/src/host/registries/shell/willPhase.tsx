@@ -11,6 +11,7 @@ const log = createLogger('will')
 type Prompt = {
   title: string
   actionLabel: string
+  message?: string
   concerns: Concern[]
   resolve: (decision: WillDecision) => void
 }
@@ -27,12 +28,19 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
   payload: WillEventMap[K]
   title: string
   actionLabel: string
+  message?: string
   alwaysConfirm?: boolean
   concerns?: Concern[]
 }): Promise<WillDecision> {
   const concerns = [...(options.concerns ?? []), ...(await collectConcerns(options.kind, options.payload))]
   if (!options.alwaysConfirm && !concerns.length) return { confirmed: true, checked: [] }
-  return new Promise<WillDecision>((resolve) => setPrompt({ title: options.title, actionLabel: options.actionLabel, concerns, resolve }))
+  return new Promise<WillDecision>((resolve) => setPrompt({
+    title: options.title,
+    actionLabel: options.actionLabel,
+    message: options.message,
+    concerns,
+    resolve,
+  }))
 }
 
 export function WillConfirmationHost() {
@@ -74,6 +82,7 @@ export function WillConfirmationHost() {
           >
             <div class="overlay-title">{current.title}</div>
             <div class="overlay-body">
+              <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
               <Show when={current.concerns.length}>
                 <ul class="will-concerns">
                   {current.concerns.map((concern) => (
