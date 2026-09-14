@@ -23,8 +23,13 @@ export type MarkdownOptions = {
    * tracker or a note. `placeholder` renders the alt text and never issues the request, for output a
    * model produced: a remote image there is a tracking pixel that carries the reader's IP, and the
    * managed-agent transcript is provider text rather than authored text. Defaults to `inline`.
+   *
+   * `thumb` is `inline` drawn as a short band across whatever holds it, cropped to fill, for a picture
+   * that stands for a file rather than being the content: an attachment above its filename, where full
+   * size would push everything else off the card. The flavour is the whole difference, so it rides the
+   * same `<img>` and the stylesheet does the sizing.
    */
-  images?: 'inline' | 'placeholder'
+  images?: 'inline' | 'placeholder' | 'thumb'
 }
 
 // Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores, so tokens

@@ -15,6 +15,7 @@ import { asPlainText } from './copyFormats'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
 import AgentArtifactCard from './AgentArtifactCard'
+import AgentAttachmentCard from './AgentAttachmentCard'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -29,6 +30,14 @@ const usageLine = (usage: AgentUsage): string => [
     : '',
   usage.cost ? `${usage.cost.amount.toFixed(4)} ${usage.cost.currency}` : '',
 ].filter(Boolean).join(' · ')
+
+// The turn's text names each attachment as `[Attachment: <id>]`, which is what the harness is sent
+// (server/sessions/runtimeContext.ts). Once the cards below draw the attachments themselves, the
+// placeholder is the same fact twice, and the uglier of the two. Dropped only when there are cards to
+// draw: a truncated replay can reach a card with no turn behind it, and a reader who loses the line
+// entirely has no idea anything was attached.
+export const withoutAttachmentPlaceholders = (text: string): string =>
+  text.replace(/^\[Attachment: [^\]\n]+\]$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
 
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
@@ -98,11 +107,26 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
+          const attachments = () =>
+            props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
                 <Text emphasis="eyebrow">You</Text>
-                <AgentMarkdown text={message().text} taskId={props.taskId} />
+                <AgentMarkdown
+                  text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
+                  taskId={props.taskId}
+                />
+                <Show when={attachments().length}>
+                  <Inline wrap>
+                    {/* Index, not For: the projection hands out a fresh input array on every snapshot,
+                        and For keys by item identity, so a streaming session would remount these tiles
+                        25 times a second and shut any open picture. A turn's parts never reorder. */}
+                    <Index each={attachments()}>
+                      {(part) => <AgentAttachmentCard attachmentId={part().attachmentId} />}
+                    </Index>
+                  </Inline>
+                </Show>
                 <Show when={props.turn?.input.some((part) => part.type === 'context')}>
                   <Fold label="Context manifest" level="sub">
                     <Stack gap="row">

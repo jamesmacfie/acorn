@@ -663,10 +663,11 @@ export function Lines(props: { lines: MarkdownLine[] }) {
 }
 
 /** reduced: no images, and a link is its text with the URL beside it in dim. The policy is the
- *  shell's; this draws what it decided (./markdown.ts). */
+ *  shell's; this draws what it decided (./markdown.ts). `thumb` is a size, so on a host with no
+ *  images it means what the other two mean here: the alt text on a line. */
 export function Markdown(props: {
   text: string
-  images?: 'inline' | 'placeholder'
+  images?: 'inline' | 'placeholder' | 'thumb'
   copy?: boolean
   onCopy?: (text: string) => void
   onSelect?: (href: string) => void

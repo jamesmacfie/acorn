@@ -102,16 +102,29 @@ export function Timeline(props: {
     target = null
     following = nearBottom(scroller)
   }
+  // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
+  // clamped scrollTop to the only offset left. A card collapsed, a filter dropped rows, a re-render
+  // came back shorter.
+  const clamped = (element: HTMLElement) =>
+    !userDriven && element.scrollTop >= element.scrollHeight - element.clientHeight - 1
   const noteScroll = () => {
     if (!scroller) return
     // Our own writes echo back as scroll events, by which time the list has usually grown again, so
     // the write just made would measure as "scrolled up". Skip them.
     if (scroller.scrollTop === applied) return
+    const clamp = clamped(scroller)
     target = null
     following = nextFollowing({ following, nearBottom: nearBottom(scroller), userDriven })
     userDriven = false
-    if (following) places.delete(viewKey())
-    else rememberPlace(viewKey(), scroller.scrollTop)
+    if (following) return places.delete(viewKey())
+    // The clamp moved the reader; it did not ask to be moved. Keep the place they were reading and
+    // chase it back as the list grows again, or a collapse that leaves the list shorter than the
+    // viewport saves offset zero and every later visit to this view opens at the top.
+    //
+    // Ceiling: if the list never grows back, the target stays pending and the reader sits where the
+    // clamp left them, which is the only offset there is. Their next gesture clears it.
+    target = clamp ? places.get(viewKey()) ?? null : null
+    if (!clamp) rememberPlace(viewKey(), scroller.scrollTop)
   }
   const noteInput = () => {
     userDriven = true
@@ -169,6 +182,10 @@ export function Timeline(props: {
       onTouchMove={noteInput}
       onPointerDown={noteInput}
       onKeyDown={noteInput}
+      // Focus counts as the reader's input too: revealing a card scrolls it into view and then
+      // focuses it, and focus is delivered before the scroll event, so the scroll that follows is
+      // the reveal rather than a clamp to be undone.
+      onFocusIn={noteInput}
     >
       {list}
     </div>

@@ -53,9 +53,14 @@ export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Elemen
   )
 }
 
-export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Element }) {
+export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="row" flexWrap={props.wrap ? 'wrap' : 'nowrap'} gap={spaceCells(props.gap ?? 'inline')}>
+    <box
+      flexDirection="row"
+      flexWrap={props.wrap ? 'wrap' : 'nowrap'}
+      justifyContent={props.spread ? 'space-between' : undefined}
+      gap={spaceCells(props.gap ?? 'inline')}
+    >
       {props.children}
     </box>
   )
@@ -130,6 +135,9 @@ export function Card(props: {
   selected?: boolean
   stripe?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'>
   pad?: Extract<Size, 'sm' | 'md'>
+  /** Sized by what is inside it rather than by the room it is given. Here that is the frame taking
+   *  its width from its widest line instead of the column's. */
+  fit?: boolean
   disabled?: boolean
   onPress?: () => void
   title?: string
@@ -156,7 +164,7 @@ export function Card(props: {
         <Line tone={lit() ? 'accent' : props.stripe}>{borderCell('stripe').glyph}</Line>
       </Show>
       <box
-        flexGrow={1}
+        flexGrow={props.fit ? 0 : 1}
         flexDirection="column"
         {...boxBorder('surface', { when: !isCompact(), ...(lit() ? { tone: 'accent' as const } : {}) })}
         title={props.title}

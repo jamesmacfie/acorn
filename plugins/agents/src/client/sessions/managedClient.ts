@@ -47,6 +47,9 @@ export const managedAgentApi = {
     readJson<AgentAttachment>(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}`),
   removeAttachment: (attachmentId: string) =>
     jsonWrite<{ removed: boolean }>(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE'),
+  // Bytes, not a URL, for the reason artifactContent gives below.
+  attachmentContent: (attachmentId: string) =>
+    readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment.'),
   artifacts: (sessionId: string) =>
     readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string) =>

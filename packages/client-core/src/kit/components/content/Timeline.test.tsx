@@ -117,9 +117,31 @@ describe('Timeline', () => {
     measure(box, 120, 100)
     box.scrollTop = 20
     box.dispatchEvent(new Event('scroll', { bubbles: true }))
-    // A later layout settle — code highlighting, an image — must not be read as a cue to follow.
+    // A later layout settle — code highlighting, an image — must not be read as a cue to follow, and
+    // the place the reader was actually reading is chased back as the list returns.
     grow()
-    expect(box.scrollTop).toBe(20)
+    expect(box.scrollTop).toBe(40)
+  })
+
+  it('does not let a clamp become the place it gives back', () => {
+    // The same shrink, but the reader leaves the view and comes back. The clamp must not have been
+    // saved as where they were, or every later visit opens at the top of the transcript.
+    const [view, setView] = createSignal('session-a')
+    mount(() => ['one', 'two', 'three', 'four'], view)
+    const box = scroller()!
+    measure(box, 400, 100)
+    grow()
+    box.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
+    box.scrollTop = 40
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    // The list collapses to less than a viewport and the browser clamps the reader to the top.
+    measure(box, 100, 100)
+    box.scrollTop = 0
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    measure(box, 400, 100)
+    setView('session-b')
+    setView('session-a')
+    expect(box.scrollTop).toBe(40)
   })
 
   it('gives a reader back the place they left, per view', () => {
