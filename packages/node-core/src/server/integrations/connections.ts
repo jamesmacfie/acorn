@@ -15,6 +15,7 @@ import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
 import { ProviderOperationError, type ProviderCredentials } from './types'
+import { isSecretRef } from '../core/onePassword'
 
 export type StoredConnection = typeof schema.integrations.$inferSelect
 
@@ -85,6 +86,35 @@ export async function getConnection(db: AppDatabase, userId: string, id: string)
   return row ?? null
 }
 
+// Connecting with a 1Password reference is two jobs, not one. The provider has to validate the real
+// token, or "connect" would accept a reference that points at nothing. But what we store has to be
+// the reference, or the whole point is lost and a copy of the token lands in our database anyway.
+//
+// So: resolve first, validate against the resolved values, then swap the reference back in before
+// sealing. The map is by value because `normalize` chooses which credential field becomes the
+// secret and does not tell us which one it picked. Every provider today returns
+// `credentials.<field>.trim()`, so a trimmed value matches; the `??` fallback below means a future
+// provider that derives its secret instead would quietly seal the plaintext. The connect test
+// asserting the stored value is the reference is what catches that.
+async function resolveCredentials(
+  credentials: ProviderCredentials,
+  secrets: SecretService,
+): Promise<{ credentials: ProviderCredentials; refByValue: Map<string, string> }> {
+  const refByValue = new Map<string, string>()
+  const resolved: ProviderCredentials = {}
+  for (const [field, value] of Object.entries(credentials)) {
+    if (!isSecretRef(value.trim())) {
+      resolved[field] = value
+      continue
+    }
+    const ref = value.trim()
+    const plaintext = (await secrets.resolve(ref)).trim()
+    resolved[field] = plaintext
+    refByValue.set(plaintext, ref)
+  }
+  return { credentials: resolved, refByValue }
+}
+
 export async function connectProvider(
   db: AppDatabase,
   userId: string,
@@ -104,15 +134,16 @@ export async function connectProvider(
           throw new ProviderOperationError('provider_bad_config', 400)
         }
       }
-      const validated = await provider.connection.validate(request.credentials)
-      const normalized = provider.connection.normalize(request.credentials, validated)
+      const { credentials, refByValue } = await resolveCredentials(request.credentials, secrets)
+      const validated = await provider.connection.validate(credentials)
+      const normalized = provider.connection.normalize(credentials, validated)
       const now = Date.now()
       const row: StoredConnection = {
         id: randomUUID(),
         userId,
         provider: provider.id,
         label: normalized.label,
-        authRef: await secrets.seal(normalized.secret),
+        authRef: await secrets.seal(refByValue.get(normalized.secret) ?? normalized.secret),
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
         scopes: JSON.stringify(normalized.scopes),
@@ -141,15 +172,16 @@ export async function rotateConnection(
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const provider = connectionProviderRegistry.require(row.provider)
+  const { credentials, refByValue } = await resolveCredentials(request.credentials, secrets)
   const validated = await providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
-    provider.connection.validate(request.credentials),
+    provider.connection.validate(credentials),
   )
-  const normalized = provider.connection.normalize(request.credentials, validated)
+  const normalized = provider.connection.normalize(credentials, validated)
   const now = Date.now()
   await db
     .update(schema.integrations)
     .set({
-      authRef: await secrets.seal(normalized.secret),
+      authRef: await secrets.seal(refByValue.get(normalized.secret) ?? normalized.secret),
       authKind: provider.connection.authKind,
       account: normalized.account ? JSON.stringify(normalized.account) : null,
       scopes: JSON.stringify(normalized.scopes),

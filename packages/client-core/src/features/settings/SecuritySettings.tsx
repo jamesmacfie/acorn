@@ -1,9 +1,25 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
-import type { AuditEntry, NodeSecurityPosture } from '@acorn/protocol/api.ts'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import {
+  ONEPASSWORD_PREF_KEY,
+  parseOnePasswordPref,
+  type AuditEntry,
+  type NodeSecurityPosture,
+  type OnePasswordPref,
+} from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
-import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../../infra/node/nodeSecurity'
-import { Alert, Button, Input, Select } from '../../kit/components/primitives'
+import {
+  createNodeBackup,
+  forgetOnePasswordCache,
+  nodeAuditPage,
+  nodeSecurityPosture,
+  onePasswordStatus,
+  suggestedBackupPath,
+} from '../../infra/node/nodeSecurity'
+import { prefsOptions } from '../../infra/queries'
+import { saveJsonPref } from './savePref'
+import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
 import './settings.css'
 
 // Settings → Security (docs/security.md § Audit, § On-disk).
@@ -38,6 +54,14 @@ const ACTION_LABELS: Record<string, string> = {
   'backup.created': 'Backup created',
 }
 
+// "Until this node restarts" is the default because it costs the fewest unlock prompts. The key,
+// the shape and the parser are in @acorn/protocol, because the node reads this row too.
+const TTL_OPTIONS = [
+  { value: 'restart', label: 'Until this node restarts' },
+  { value: '900000', label: '15 minutes' },
+  { value: '300000', label: '5 minutes' },
+]
+
 const describeActor = (entry: AuditEntry): string => {
   if (entry.actor === 'device') return entry.actorId ? `device ${entry.actorId.slice(0, 8)}` : 'a device'
   if (entry.actor === 'internal') return `an agent (${entry.actorId ?? 'internal'})`
@@ -50,6 +74,7 @@ const describeDetails = (entry: AuditEntry): string =>
     .join(' · ')
 
 export default function SecuritySettings() {
+  const qc = useQueryClient()
   const [target, setTarget] = createSignal<string | null>(null)
   const nodeId = () => target() ?? activeNodeId()
   const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
@@ -95,6 +120,27 @@ export default function SecuritySettings() {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
       setBackingUp(false)
+    }
+  }
+
+  // The `op` CLI, on the node this page is pointed at. Re-read when the node changes, for the same
+  // reason the posture above is: whether a binary is installed is a fact about one machine.
+  const [opStatus, { refetch: refetchOp }] = createResource<{ available: boolean; version?: string } | null, string>(
+    () => nodeId() ?? '',
+    async (id) => (id ? await onePasswordStatus(id).catch(() => null) : null),
+  )
+  const prefs = createQuery(() => prefsOptions(true))
+  const onePassword = (): OnePasswordPref => parseOnePasswordPref(prefs.data?.[ONEPASSWORD_PREF_KEY])
+  const writeOnePassword = (next: OnePasswordPref) => void saveJsonPref(qc, ONEPASSWORD_PREF_KEY, next)
+  const [forgetting, setForgetting] = createSignal(false)
+  const forget = async () => {
+    setForgetting(true)
+    try {
+      await forgetOnePasswordCache(nodeId() ?? undefined)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setForgetting(false)
     }
   }
 
@@ -167,6 +213,50 @@ export default function SecuritySettings() {
             </p>
           </>
         )}
+      </Show>
+
+      <h3 class="settings-heading">1Password</h3>
+      <p class="muted">
+        Any credential field can hold a 1Password reference, such as{' '}
+        <code>op://Vault/Item/credential</code>, instead of the value. When something needs the real
+        credential, this node runs the <code>op</code> command and 1Password asks you to unlock. The
+        value is never written to disk here.
+      </p>
+      <Checkbox
+        label="Read credentials from the 1Password CLI"
+        checked={onePassword().enabled}
+        disabled={opStatus.loading}
+        onChange={(enabled) => writeOnePassword({ ...onePassword(), enabled })}
+      />
+      <Show
+        when={opStatus()?.available}
+        fallback={
+          <p class="muted">
+            <Show when={!opStatus.loading} fallback="Looking for the op command…">
+              The <code>op</code> command isn't on this node's PATH. Install the 1Password CLI and
+              turn on "Integrate with 1Password CLI" in the 1Password app, then reopen this page.
+            </Show>
+          </p>
+        }
+      >
+        <p class="muted">Found <code>op</code> {opStatus()?.version}.</p>
+      </Show>
+      <Show when={onePassword().enabled}>
+        <label class="settings-field">
+          <span>Keep a value in memory for</span>
+          <Select
+            value={onePassword().ttlMs === null ? 'restart' : String(onePassword().ttlMs)}
+            onChange={(value) => writeOnePassword({ ...onePassword(), ttlMs: value === 'restart' ? null : Number(value) })}
+            options={TTL_OPTIONS}
+          />
+        </label>
+        {/* Changing the value inside 1Password is invisible from here, so this is how someone says
+            "I changed it, go and look again" without waiting out the lifetime above. */}
+        <div class="settings-actions">
+          <Button size="sm" disabled={forgetting()} onPress={() => void forget().then(() => refetchOp())}>
+            {forgetting() ? 'Clearing…' : 'Refetch from 1Password now'}
+          </Button>
+        </div>
       </Show>
 
       <h3 class="settings-heading">Backup</h3>

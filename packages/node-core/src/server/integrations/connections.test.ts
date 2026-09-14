@@ -205,3 +205,50 @@ describe('connection-only provider lifecycle', () => {
     expect(await testDb.db.select().from(schema.integrations)).toHaveLength(1)
   })
 })
+
+describe('connecting with a 1Password reference', () => {
+  const REF = 'op://Private/Test/credential'
+  // The reference is what gets stored, so `reveal` on the resolving service would turn it back into
+  // a value. This one resolves, the plain SECRETS above does not, which is what lets the assertions
+  // read the raw stored value back out of the row.
+  const RESOLVING = new SecretService(ENCRYPTION_KEY, async () => 'the-real-key')
+  let testDb: TestDb
+
+  beforeAll(() => {
+    if (!connectionProviderRegistry.get(PROVIDER_ID)) {
+      connectionProviderRegistry.register(connectionOnlyProvider)
+    }
+  })
+  beforeEach(() => {
+    testDb = makeTestDb()
+  })
+  afterEach(() => {
+    testDb.cleanup()
+  })
+
+  it('validates the real credential but stores the reference', async () => {
+    const validate = vi.spyOn(connectionProviderRegistry.require(PROVIDER_ID).connection, 'validate')
+    try {
+      const connected = await connectProvider(
+        testDb.db,
+        'alice',
+        { providerId: PROVIDER_ID, credentials: { apiKey: REF } },
+        RESOLVING,
+      )
+      // The provider saw the real token. Without this, "connect" would happily accept a reference
+      // that points at nothing and only fail much later.
+      expect(validate).toHaveBeenCalledWith({ apiKey: 'the-real-key' })
+
+      // And the row holds the pointer, not the token. This is the whole feature: if this ever reads
+      // 'the-real-key', a copy of the credential has landed in our database after all.
+      const [stored] = await testDb.db.select().from(schema.integrations)
+      expect(await SECRETS.reveal(stored.authRef, 'test')).toBe(REF)
+
+      await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: REF } }, RESOLVING)
+      const [rotated] = await testDb.db.select().from(schema.integrations)
+      expect(await SECRETS.reveal(rotated.authRef, 'test')).toBe(REF)
+    } finally {
+      validate.mockRestore()
+    }
+  })
+})

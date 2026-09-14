@@ -2,6 +2,7 @@
 // of anything thrown from its own scope. It does not stop a caller returning the plaintext out of
 // `use()`, which internal-token scoping closes instead.
 import { decryptSecret, encryptSecret } from '../secretBox'
+import { isSecretRef } from './onePassword'
 
 export class SecretUnavailableError extends Error {
   constructor(readonly purpose: string) {
@@ -66,14 +67,24 @@ function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = 
 }
 
 export class SecretService {
-  constructor(private readonly hexKey: string) {}
+  // `resolveRef` turns a 1Password reference into the value it points at (core/onePassword.ts). A
+  // plain function rather than an injected interface: it needs a database handle and the owner id,
+  // and that is the only reason it cannot live in this file. Optional so a test that only cares
+  // about sealing and unsealing constructs the service with a key and nothing else.
+  constructor(
+    private readonly hexKey: string,
+    private readonly resolveRef?: (ref: string) => Promise<string>,
+  ) {}
 
   // `purpose` is what an audit row shows and what an error names. Required, so every read states a
   // reason at the call site: `getSecret(ref)` against "read the github credential to list pull
   // requests".
   async use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T> {
-    const plaintext = ref ? await decryptSecret(ref, this.hexKey) : null
-    if (!plaintext) throw new SecretUnavailableError(purpose)
+    const stored = ref ? await decryptSecret(ref, this.hexKey) : null
+    if (!stored) throw new SecretUnavailableError(purpose)
+    // A stored credential may be a pointer at 1Password rather than the credential itself. Resolving
+    // it here, rather than at each call site, is what makes every existing reader work unchanged.
+    const plaintext = await this.resolve(stored)
     try {
       return await fn(plaintext)
     } catch (error) {
@@ -92,9 +103,28 @@ export class SecretService {
     }
   }
 
+  // A credential that is still in hand rather than sealed in the database: what someone just typed
+  // into the connect form. Connect and rotate need it, because they have to validate the real token
+  // before they store the reference to it.
+  //
+  // A failure throws OnePasswordError, deliberately not SecretUnavailableError. That distinction
+  // carries: forEachConnection demotes a connection to needs-auth on the latter, and this is not
+  // that. The connection is fine; this machine could not reach 1Password.
+  async resolve(value: string): Promise<string> {
+    return isSecretRef(value) && this.resolveRef ? await this.resolveRef(value) : value
+  }
+
   // Write path. Kept here so the key has exactly one holder.
   seal(plaintext: string): Promise<string> {
     return encryptSecret(plaintext, this.hexKey)
+  }
+
+  // What backs this credential, without resolving it. The integrations list draws a 1Password badge
+  // from this, and drawing a badge must never cost an unlock prompt. Local decryption only: it reads
+  // the prefix and stops. Here rather than at the call site so the key keeps its one holder.
+  async secretRef(ref: string | null | undefined): Promise<string | null> {
+    const stored = ref ? await decryptSecret(ref, this.hexKey) : null
+    return stored && isSecretRef(stored) ? stored : null
   }
 
   // Escape hatch for call sites that hand a credential to a long-lived consumer this scope cannot
