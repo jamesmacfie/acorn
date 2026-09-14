@@ -142,6 +142,15 @@ describe('Codex response and TTY parsing', () => {
     expect(() => parseCodexTtyOutput('Please log in')).toThrowError(expect.objectContaining({ code: 'authentication_required' }))
     expect(() => parseCodexTtyOutput('Codex update available')).toThrowError(expect.objectContaining({ code: 'update_required' }))
   })
+
+  it('blames the flags, not the output, when the CLI rejects an option', () => {
+    // What codex 0.154 printed after it dropped `untrusted` from --ask-for-approval. Read as a plain
+    // parse failure, this said "/status had no limits", which sent the search to the wrong place.
+    const rejected = "error: invalid value 'untrusted' for '--ask-for-approval <APPROVAL_POLICY>'"
+    expect(() => parseCodexTtyOutput(rejected)).toThrowError(
+      expect.objectContaining({ code: 'execution_failure', message: expect.stringContaining('rejected the options') }),
+    )
+  })
 })
 
 describe('collectCodexUsage', () => {
@@ -158,7 +167,7 @@ describe('collectCodexUsage', () => {
         return { output: '5h limit 80% left\nWeekly limit 20% left', exitCode: null }
       },
     })
-    expect(seen).toEqual([{ args: ['-s', 'read-only', '-a', 'untrusted'], input: '/status\r' }])
+    expect(seen).toEqual([{ args: ['-s', 'read-only', '-a', 'never'], input: '/status\r' }])
     expect(provider.quotas.map((quota) => quota.percentRemaining)).toEqual([80, 20])
   })
 
