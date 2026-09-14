@@ -33,6 +33,39 @@ describe('linear project source', () => {
   })
 })
 
+// validate is the trust boundary for Linear's answer, and normalize reads three levels into what it
+// returns. Anything validate lets past unguarded comes back to the owner as "provider unavailable",
+// which names the wrong thing entirely.
+describe('linear connection validate', () => {
+  const validate = (token: string) => linearProvider.connection.validate({ token })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const respond = (body: unknown, status = 200) =>
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
+
+  it('accepts a key that names a workspace', async () => {
+    respond({ data: { viewer: { name: 'Jo', organization: { name: 'Acme' } } } })
+    await expect(validate('lin_api_test')).resolves.toMatchObject({ secret: 'lin_api_test' })
+  })
+
+  // 200, no errors array, and nothing to name the workspace with. An application token looks like
+  // this, and it used to reach normalize and throw a TypeError there.
+  it('refuses a key with no person behind it rather than letting normalize dereference null', async () => {
+    respond({ data: { viewer: null } })
+    await expect(validate('lin_api_test')).rejects.toMatchObject({ code: 'provider_needs_auth' })
+  })
+
+  it('refuses a viewer that has no organization', async () => {
+    respond({ data: { viewer: { name: 'Jo', organization: null } } })
+    await expect(validate('lin_api_test')).rejects.toMatchObject({ code: 'provider_needs_auth' })
+  })
+
+  it('refuses an empty key before it reaches the network', async () => {
+    await expect(validate('  ')).rejects.toMatchObject({ code: 'provider_bad_config' })
+  })
+})
+
 describe('linear provider normalization', () => {
   it('normalizes detail fields, activity, labels, and related issues', () => {
     const detail = linearNodeToDetail({
