@@ -20,7 +20,7 @@ import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/ta
 import { formatChord } from '@acorn/client-core/features/tasks/paneShortcuts.ts'
 import { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
 import TaskPaneHost from '@acorn/client-core/features/tasks/TaskPaneHost.tsx'
-import { confirmWillEvent } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
+import { confirmTaskArchive } from '@acorn/client-core/features/tasks/confirmTaskArchive.ts'
 import { Alert, Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { TaskSlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
@@ -96,10 +96,7 @@ export default function TaskView(props: {
   async function openClose() {
     setCloseError('')
     setTeardownFailed(false)
-    const decision = await confirmWillEvent({
-      kind: 'task:archive', payload: { taskId: props.task.id },
-      title: 'Archive task', actionLabel: 'Archive task',
-    })
+    const decision = await confirmTaskArchive(props.task.id)
     if (!decision.confirmed) return
     // Held rather than passed straight through, because the teardown-failed path re-invokes the
     // archive from a button and the cleanups the owner ticked are still the cleanups they ticked.

@@ -181,11 +181,12 @@ while that claim is held, and archive waits for a worktree creation that was alr
 it reads the path to remove. An archived task also returns no root. This keeps a pane refresh from
 reading a half-removed tree or recreating the directory between removal and the final status write.
 
-Before any of that, the confirmation dialog asks every plugin what it has to say about this task,
-such as running containers, uncommitted files, or live sessions, and offers whatever cleanup each one
-declared. That is a plugin contribution called a task check, and it is the only way anything reaches
-that dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and
-the task is archived anyway.
+Before any of that, archive always opens a confirmation dialog. The dialog asks every plugin what it
+has to say about this task, such as running containers, uncommitted files, or live sessions, and
+offers whatever cleanup each one declared. With no reported concerns it remains as the explicit
+archive barrier. A plugin contribution called a task check is the only way anything else reaches that
+dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and the task
+is archived anyway.
 
 The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
 whichever of the two started the archive. One shared flag in `client-core/features/tasks/archiveLifecycle.ts`

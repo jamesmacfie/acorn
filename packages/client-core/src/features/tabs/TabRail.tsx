@@ -26,7 +26,7 @@ import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { registerKeybindings } from '../../host/registries/commands/keybindings'
-import { confirmWillEvent } from '../../host/registries/shell/willPhase'
+import { confirmTaskArchive } from '../tasks/confirmTaskArchive'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
@@ -314,9 +314,7 @@ export default function TabRail() {
   async function openArchive(w: Task) {
     setMenuId(null)
     setArchiveErr('')
-    const decision = await confirmWillEvent({
-      kind: 'task:archive', payload: { taskId: w.id }, title: 'Archive task', actionLabel: 'Archive task',
-    })
+    const decision = await confirmTaskArchive(w.id)
     if (decision.confirmed) await archive(w, decision.checked)
   }
 
