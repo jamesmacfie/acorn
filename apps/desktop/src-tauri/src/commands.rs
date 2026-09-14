@@ -186,6 +186,18 @@ pub fn set_badge(app: AppHandle, count: Option<i64>) {
     }
 }
 
+/// What to paint behind the transparent macOS title bar (`open_window` in lib.rs), so that strip
+/// follows the theme. The page sends the colour because the theme is a CSS custom property nothing
+/// on this side can read, and the bridge repaints on every theme change. Ignoring the result is
+/// deliberate: `set_background_color` also touches the webview layer, which macOS does not
+/// implement, and the window layer is the one that matters here.
+#[tauri::command]
+pub fn set_window_background(app: AppHandle, red: u8, green: u8, blue: u8) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_background_color(Some(tauri::webview::Color(red, green, blue, 0xff)));
+    }
+}
+
 /// The tag to hand the renderer when the window comes back, given what was last shown and how long
 /// ago. None when nothing was shown, and none when it was long enough ago that the focus is more
 /// likely the owner coming back to work than a click on a banner.

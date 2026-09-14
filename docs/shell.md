@@ -364,6 +364,18 @@ comes back within 30 seconds. That is a guess, and a wrong one costs a task sele
 not ask for. Both halves of the alternative are worse: no click handling at all, or a second
 notifier process to shell out to.
 
+The bridge also tells the shell what colour the app is. On macOS the window is built with
+`TitleBarStyle::Transparent` (`src-tauri/src/lib.rs`), so the title bar paints the window's background
+instead of the system chrome, and the strip above the app can follow the theme. Nothing on the Rust
+side can read a CSS custom property, so the bridge reads the computed background of `body`, which
+carries `--bg`, and invokes `set_window_background` on load and on every appearance change. The window
+is built with the default theme's `--bg` for the one paint before the page answers. This is not a seam
+member and no product code knows about it: the direction is the shell asking its own page, and a
+renderer that grew an opinion about title bars would have to carry it into the terminal and the browser
+too. `TitleBarStyle::Overlay` is the other shape, where the app's own header becomes the title bar.
+It buys back the strip's height and costs a drag region, a gap for the traffic lights, and the
+standing Tauri bug that an unfocused window cannot be dragged.
+
 The same bridge serves both render paths. `packages/client-core/src/host/frames/broker.ts` takes a `MessagePort` and knows
 nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker
 gets one in its first message, and `packages/client-core/src/host/frames/scopes.ts` decides every call the same way for both. A tree
