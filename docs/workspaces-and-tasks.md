@@ -195,6 +195,11 @@ highest-priority marker and it takes the slot under the task's glyph
 other markers the way it used to: anything it outranks keeps its place in the hover tooltip, because a
 marker that loses its corner should lose the pixels, never the state.
 
+Where the owner lands afterwards is decided when the archive finishes, not when it starts, and only
+if they are still on the task being archived. The teardown takes long enough to walk away from, and
+moving someone who has since opened another task takes them off a task they chose. Nothing left to
+show falls back to the default browse.
+
 The same flag pauses the Changes pane's Git reads while the archive runs. The pane remains mounted so
 it can show a teardown failure, but it keeps its last stable status instead of observing worktree
 removal as a list of deleted files. A failed archive clears the flag and triggers a fresh read.
