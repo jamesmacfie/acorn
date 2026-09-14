@@ -528,6 +528,14 @@ caller depends on at least one of them.
   first-in-first-out cache of fence html keyed by the exact text and language, which catches the same
   fence coming back after a scroll or a remount.
 
+The `images` option decides what an image in the source becomes, and the flavour is part of the block
+key, so two surfaces sharing the cache cannot share a block. `inline` renders an `<img>`, for text a person
+wrote. `placeholder` renders the alt text and never issues the request, for text a model produced,
+where a remote image is a tracking pixel carrying the reader's IP. `thumb` is `inline` drawn as a short
+band across whatever holds it and cropped to fill, for a picture that stands in for a file rather than
+being the content: an attachment above its filename, where full size would push the rest of the card off
+screen.
+
 A fence takes its colour from the theme rather than from Shiki. `highlightToHtml` asks for the
 dual-theme html with `defaultColor: false`, so each token leaves carrying both colours as `--l` and
 `--r` and none of them leaves carrying a fixed one, and `.ui-markdown .shiki` picks a side with

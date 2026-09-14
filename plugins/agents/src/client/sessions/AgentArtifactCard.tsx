@@ -4,26 +4,12 @@ import { saveFile } from '@acorn/plugin-api/client'
 import { Card, Icon, Markdown, Row, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
+import { dataUrl, imageAlt, isInlineImageType } from './inlineImage'
 
 type ArtifactEvent = Extract<AgentNormalizedEvent, { type: 'artifact' }>
 
-const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
-
-export const isInlineImageArtifact = (mediaType: string | undefined): boolean =>
-  INLINE_IMAGE_TYPES.has(mediaType?.split(';', 1)[0]?.trim().toLowerCase() ?? '')
-
 const artifactSize = (byteSize?: number): string =>
   byteSize == null ? '' : `${Math.max(1, Math.round(byteSize / 1024)).toLocaleString()} KiB · `
-
-const dataUrl = async (bytes: Uint8Array, mediaType: string): Promise<string | null> => {
-  if (typeof FileReader === 'undefined') return null
-  return await new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onerror = () => resolve(null)
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null)
-    reader.readAsDataURL(new Blob([bytes as unknown as BlobPart], { type: mediaType }))
-  })
-}
 
 async function downloadArtifact(artifact: ArtifactEvent): Promise<void> {
   const { bytes, type, filename } = await managedAgentApi.artifactContent(artifact.artifactId)
@@ -48,17 +34,17 @@ function DownloadRow(props: { artifact: ArtifactEvent }) {
 
 export default function AgentArtifactCard(props: { artifact: ArtifactEvent }) {
   const [image] = createResource(
-    () => isInlineImageArtifact(props.artifact.mediaType) ? props.artifact.artifactId : null,
+    () => isInlineImageType(props.artifact.mediaType) ? props.artifact.artifactId : null,
     async (artifactId) => {
       const content = await managedAgentApi.artifactContent(artifactId).catch(() => null)
-      if (!content || !isInlineImageArtifact(content.type)) return null
+      if (!content || !isInlineImageType(content.type)) return null
       return dataUrl(content.bytes, content.type)
     },
   )
-  const alt = () => props.artifact.title.replaceAll('[', '').replaceAll(']', '').trim() || 'Generated image'
+  const alt = () => imageAlt(props.artifact.title) || 'Generated image'
 
   return (
-    <Show when={isInlineImageArtifact(props.artifact.mediaType)} fallback={<DownloadRow artifact={props.artifact} />}>
+    <Show when={isInlineImageType(props.artifact.mediaType)} fallback={<DownloadRow artifact={props.artifact} />}>
       <Card pad="sm">
         <Stack gap="row">
           <Show when={image()}>

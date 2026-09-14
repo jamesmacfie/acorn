@@ -788,6 +788,15 @@ are revalidated against the owning task. Raster image artifacts are fetched as a
 and drawn inline in the transcript with their download action. Other artifact media types keep the
 download row.
 
+A sent attachment is drawn the same way, from the same kind of route
+(`GET /v2/p/agents/attachments/:id/content`, no-store and `nosniff`, guarded by the attachment's own
+task). Each one is a tile that sizes to its own contents: a picture draws as a cropped band above its
+filename and opens full size in a modal on press, and anything else draws an icon above its filename and
+downloads on press. The turn's text names each attachment as `[Attachment: <id>]`, which is what a
+harness receives, and the transcript drops that line once it has a card to draw in its place. Reading these bytes is deliberately wider than the draft-attachment read
+below: a claimed attachment is out of a plugin's reach and is exactly what its own sender wants to see
+again.
+
 ### Draft attachments, and replacing one
 
 An attachment on an unsent turn is a draft: a row and a content-addressed blob that no turn references

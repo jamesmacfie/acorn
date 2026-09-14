@@ -36,7 +36,8 @@ const unreached = (name: string) => () => {
   throw new Error(`bridge.${name} should not have been reached`)
 }
 const METHODS = [
-  'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'artifacts', 'artifact',
+  'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'attachmentContent',
+  'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
@@ -109,6 +110,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     for (const id of ['a2', 'nope']) {
       expect((await app.fetch(req(`/api/attachments/${id}`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/attachments/${id}`, 'DELETE'), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/attachments/${id}/content`), {} as Env)).status).toBe(404)
     }
     // An artifact resolves through its session, so this is the two-hop path.
     for (const id of ['f2', 'nope']) {
