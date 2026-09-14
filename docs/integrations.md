@@ -41,6 +41,12 @@ provider's rows through it.
 Deleting a connection cascades its cached external items, freshness markers, project links, and task
 links. The provider mirror is disposable and is never treated as the upstream source of truth.
 
+A credential field may hold a 1Password reference instead of a value (see
+[security.md](./security.md) § Credential handling). Connect and rotate resolve it before calling the
+provider, so `validate` tests the real token and a reference pointing at nothing is rejected at the
+point someone enters it. What gets sealed is the reference, not the resolved value. The provider sees
+no difference either way: it is handed a credential, as it always was.
+
 ## Connection and integration contributions
 
 Every provider registers a `ConnectionProviderContribution`: connection lifecycle, capabilities,
