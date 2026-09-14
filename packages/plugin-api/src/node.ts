@@ -181,7 +181,7 @@ export { serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 export type { Cached, RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 
 // ── Integrations and providers ────────────────────────────────────────────────────────────────
-export { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
+export { isProviderOperationError, ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 export type {
   CachedExternalItem,
   CachedItemCodec,

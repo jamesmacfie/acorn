@@ -11,22 +11,29 @@ export type IntegrationProviderKind =
 // being true when GitHub became an ordinary stored connection (it is 'oauth' now, like any other).
 export type IntegrationAuthKind = 'api-key' | 'oauth' | 'installation' | 'none'
 export type IntegrationConnectionStatus = 'connected' | 'needs-auth' | 'degraded' | 'disabled'
-export type ProviderErrorCode =
-  | 'provider_not_connected'
-  | 'provider_needs_auth'
-  | 'provider_missing_scope'
-  | 'provider_rate_limited'
-  | 'provider_unavailable'
-  | 'provider_resource_not_found'
-  | 'provider_resource_deleted'
-  | 'provider_resource_forbidden'
-  | 'provider_bad_config'
-  | 'provider_secret_unreadable'
+// A list rather than a union, because one consumer has to ask the question at runtime. A provider
+// failure crosses a bundle boundary on its way to the route that answers it, and the class it
+// arrives as is not the class that side holds (integrations/types.ts § isProviderOperationError).
+// The type is derived from the list so the two can never drift.
+export const PROVIDER_ERROR_CODES = [
+  'provider_not_connected',
+  'provider_needs_auth',
+  'provider_missing_scope',
+  'provider_rate_limited',
+  'provider_unavailable',
+  'provider_resource_not_found',
+  'provider_resource_deleted',
+  'provider_resource_forbidden',
+  'provider_bad_config',
+  'provider_secret_unreadable',
   // The stored credential is a 1Password reference and this node could not turn it into a value.
   // One code for every cause: op missing, the switch off, the prompt declined, the item gone. The
   // reader does the same thing in all four, which is open Settings, Security, and read what is
   // actually wrong there. A wire code cannot stay that current.
-  | 'provider_secret_ref_unreadable'
+  'provider_secret_ref_unreadable',
+] as const
+
+export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number]
 
 export type CapabilityState = 'available' | 'missing-scope' | 'degraded'
 export type ProviderCapabilities = Record<string, boolean | string | undefined> & {

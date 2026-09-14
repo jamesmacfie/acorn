@@ -1,8 +1,21 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, ownerId, ProviderOperationError, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability } from '@acorn/plugin-api/node'
-import { GENERATE_MAX_DESCRIPTION_CHARS, type WorkflowGenerateRequest, type WorkflowGenerateResult } from '../../shared/api'
+import {
+  type AppEnv,
+  isProviderOperationError,
+  ownerId,
+  requireDevice,
+  respondError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+} from '@acorn/plugin-api/node'
+import {
+  GENERATE_MAX_DESCRIPTION_CHARS,
+  type WorkflowGenerateRequest,
+  type WorkflowGenerateResult,
+} from '../../shared/api'
 
 // Definitions stored as rows (docs/workflows.md § Database definitions). Mounted at the same
 // namespace root as ./workflow.ts, which owns runs and steps.
@@ -137,7 +150,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
         if ('error' in answer) return respondError(c, 422, 'model_answer_unusable', [answer.error])
         return c.json(answer)
       } catch (error) {
-        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         return respondError(c, 502, 'provider_unavailable')
       }
     })
