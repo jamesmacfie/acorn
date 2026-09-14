@@ -191,6 +191,23 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /**
+ * The plan Claude Code hands over when it leaves plan mode, if this call is that handover.
+ *
+ * The whole plan rides in the call's parameters as one markdown string, which `toolInput` below turns
+ * into pretty-printed JSON with every line break spelled out as `\n`. Unreadable, and it is the one
+ * thing in a planning session somebody wants to read. So it comes back out as the agent talking,
+ * which renders as markdown and stays in view when the reader has asked for chat only. The call keeps
+ * its title and its outcome and loses its parameters, because the plan is now above it.
+ *
+ * Only from `tool_call`: the parameters arrive with the call, and reading an update as well would
+ * post the plan twice.
+ */
+const exitPlanModePlan = (update: SessionUpdate, meta: ClaudeToolMeta): string | undefined =>
+  update.sessionUpdate === 'tool_call' && meta.toolName === 'ExitPlanMode'
+    ? str(asRecord('rawInput' in update ? update.rawInput : undefined)?.plan)
+    : undefined
+
+/**
  * A call's own parameters, so a card has something to show before its output arrives. Without this the
  * only thing the ACP path ever filled in was output, which lands on the completion update, so a
  * running call had nothing to disclose and its card could not honour the reader's fold setting until
@@ -297,7 +314,11 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
             subagentId,
           }]
           : [])
-      return [...roster, {
+      const plan = exitPlanModePlan(update, meta)
+      const planned: AgentNormalizedEvent[] = plan
+        ? [{ type: 'assistant_message', text: plan, subagentId }]
+        : []
+      return [...roster, ...planned, {
         type: 'tool',
         tool: {
           id: update.toolCallId,
@@ -306,7 +327,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           title: update.title ?? '',
           kind: update.kind ?? undefined,
           status,
-          input: toolInput(update.rawInput),
+          input: plan ? undefined : toolInput(update.rawInput),
           output: text || undefined,
           subagentId,
         },

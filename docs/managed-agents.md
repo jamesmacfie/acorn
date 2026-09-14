@@ -494,6 +494,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   maps a call's `rawInput` into the card as pretty-printed JSON. Output only lands on the completion
   update there, since Acorn declines ACP's terminal capability, so without the parameters a running
   Claude call had nothing to disclose and could not honour the setting until it was over.
+- **Claude's plan-mode handover is the exception to that.** `ExitPlanMode` carries the whole plan as
+  one markdown string in its parameters, so pretty-printed JSON draws it with every line break spelled
+  out as `\n`, and that plan is the one thing in a planning session somebody wants to read. The
+  normalizer posts it as an assistant message instead, which renders through the transcript Markdown
+  policy and survives the chats-only toggle, and the call keeps its title and its outcome with no
+  parameters to disclose. Only the opening `tool_call` is read that way: the parameters arrive with the
+  call, so reading an update as well would post the plan twice.
 - A plan update is a complete snapshot. Every snapshot remains in the durable ledger, while the
   transcript folds snapshots from one turn into the card the first one opened; a new turn starts a new
   card. Each step has one structured status marker and renders its text through the transcript Markdown
@@ -522,6 +529,12 @@ it fails for any reason a selection can break, not only for the one it was writt
   anybody has answered yet and what they said both live on the row and keep changing long after the
   event is written. An answer to a question the harness marked secret reads as "Answer hidden", since
   the thread is durable and searchable in a way a prompt answered and gone was not.
+- **Chats only keeps the requests.** The toggle above the composer drops the tool calls, the reasoning
+  and the notes, and a question the agent asked with the answer sitting on it is the same conversation
+  as a message. During planning it is most of the conversation, so leaving it out gave a reader a
+  transcript where the agent settled a question it had never asked. An answered permission is already
+  gone by then, dropped by the rule in the bullet above rather than by a second one here, so what
+  survives the toggle is the questions and whatever is still blocking.
 - The task sidebar keeps its own "Needs you" list, which is the way to reach a blocked session the
   reader is not looking at. Picking a row opens that session and brings its card into view.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent

@@ -67,9 +67,17 @@ export const visibleConversationItems = (
   items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
 
 /** A card that is somebody talking — the reader or the agent — as opposed to a tool call, reasoning,
- *  or a note. What the "show chats only" toggle above the composer keeps. */
+ *  or a note. What the "show chats only" toggle above the composer keeps.
+ *
+ *  A request counts. It is the agent asking the reader something and the reader answering, which is
+ *  the same conversation as a message, and during planning it is most of it: hiding it left a chat-only
+ *  transcript where the agent asked nothing and settled a question out of nowhere. `belongsInThread`
+ *  above has already dropped the resolved permissions, so what is left is the questions and whatever
+ *  is still blocking. */
 export const isChatItem = (item: AgentConversationItem): boolean =>
-  item.event.type === 'user_message' || item.event.type === 'assistant_message'
+  item.event.type === 'user_message'
+  || item.event.type === 'assistant_message'
+  || item.event.type === 'request'
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
