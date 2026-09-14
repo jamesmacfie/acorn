@@ -43,9 +43,16 @@ export const integrations = new Hono<AppEnv>()
   .get('/', async (c) => {
     const uid = ownerId(c)
     const rows = await listConnections(getDb(c.env), uid)
+    // Decrypting each row to see whether its credential is a 1Password reference. Local AES, no
+    // `op` call: `secretRef` reads the prefix and stops, because drawing a badge must never cost
+    // someone an unlock prompt.
+    const integrations = await Promise.all(rows.map(async (row) => {
+      const ref = await c.env.SECRETS.secretRef(row.authRef)
+      return ref ? { ...connectionSummary(row), secretRef: ref } : connectionSummary(row)
+    }))
     return c.json({
       providers: connectionProviderRegistry.list().map((provider) => provider.toPublic()),
-      integrations: rows.map(connectionSummary),
+      integrations,
     } satisfies IntegrationsResponse)
   })
   .post('/', async (c) => {

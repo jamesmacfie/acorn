@@ -2,11 +2,13 @@ import type { QueryClient } from '@tanstack/solid-query'
 import {
   coreAuditRoute,
   coreBackupRoute,
+  coreOnePasswordRoute,
   coreSecurityRoute,
   type AuditPage,
   type BackupResult,
   type BackupSuggestion,
   type NodeSecurityPosture,
+  type OnePasswordStatus,
 } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from './apiClient'
 import { pushNotice } from '../../features/notifications/notifications'
@@ -32,6 +34,24 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
   if (options.limit !== undefined) params.set('limit', String(options.limit))
   const query = params.toString()
   return readJson<AuditPage>(`${coreAuditRoute}${query ? `?${query}` : ''}`, options.nodeId ? { nodeId: options.nodeId } : {})
+}
+
+// --- 1Password (docs/security.md § Credential handling) ---
+//
+// Whether `op` is runnable is a fact about one machine, like the disk-encryption answer above, so it
+// is addressed at a node and asked for rather than cached. Whether to *use* it, and for how long to
+// keep a value, are preferences and go through /prefs like every other one.
+
+export function onePasswordStatus(nodeId?: string): Promise<OnePasswordStatus> {
+  return readJson<OnePasswordStatus>(coreOnePasswordRoute, nodeId ? { nodeId } : {})
+}
+
+export function forgetOnePasswordCache(nodeId?: string): Promise<{ ok: boolean }> {
+  return writeJson<{ ok: boolean }>(
+    `${coreOnePasswordRoute}/refresh`,
+    { method: 'POST', ...(nodeId ? { nodeId } : {}) },
+    (res) => `1password refresh ${res.status}`,
+  )
 }
 
 // --- Backup (docs/data-layer.md § Backup and import) ---

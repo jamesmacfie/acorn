@@ -31,6 +31,18 @@ export type CredentialFormController = {
   submit: () => Promise<void>
 }
 
+// The two codes worth their own sentence. `provider_needs_auth` means the provider itself refused
+// the credential, so retrying the same one is pointless and the reader needs to know whose refusal
+// it was. `provider_secret_ref_unreadable` means we never got as far as asking: the value is in
+// 1Password and this machine could not read it, which is a different thing to go and fix.
+const errorCopy = (code: string, label: string): string => {
+  if (code === 'provider_needs_auth') return `Those credentials were rejected by ${label}.`
+  if (code === 'provider_secret_ref_unreadable') {
+    return 'Could not read that 1Password reference. Check Settings, Security, 1Password.'
+  }
+  return 'Could not connect this provider.'
+}
+
 export function createCredentialForm(
   provider: () => PublicIntegrationProvider | undefined,
   onConnected: () => void | Promise<void>,
@@ -76,9 +88,7 @@ export function createCredentialForm(
       // The one code worth its own sentence. The provider itself refused the credential, so retrying
       // the same one is pointless and the reader needs to know whose refusal it was.
       const code = (cause as Error).message
-      setError(code === 'provider_needs_auth'
-        ? `Those credentials were rejected by ${target.label}.`
-        : 'Could not connect this provider.')
+      setError(errorCopy(code, target.label))
     } finally {
       setBusy(false)
     }
