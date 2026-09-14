@@ -20,14 +20,6 @@
   min-height: 0;
   grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
 }
-/* `.app.left-collapsed .panes` (0,3,0) otherwise beats the rule above (0,2,0) and forces the PR
-   view's `0 | mid | 1fr` grid onto the workspace's [Navigator | Diff | switcher] children,
-   collapsing the Navigator and dropping the switcher into the 1fr track (huge right gap). The
-   workspace has no left pane to collapse, so keep its own 3-track grid when the left is collapsed. */
-.app.left-collapsed .panes.panes-workspace {
-  grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
-}
-
 /* Worktree status line is the bottom-most dock: worktree presence + dirty/clean/needs-repair. Keeping it fixed
    lets the independently portalled terminal drawer sit immediately above it. */
 .workspace-footer {
@@ -129,7 +121,7 @@
 }
 .pane-switcher .tabrail-tab.active { border-right-color: var(--accent); }
 /* Close-task sits at the bottom of the rail, set off from the pane switches above it: same
-   `.tabrail-bottom` modifier and the same 52px box as the left rail's "+". Its danger hover comes
+   `.tabrail-bottom` modifier and the same square box as the left rail's "+". Its danger hover comes
    from RailTab's `tone`, not a class here. */
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
@@ -148,10 +140,7 @@
 
 /* Registry-driven flat pane row. Relative weights are persisted by pane id; dividers own the gap
    so resize remains a two-neighbour operation. */
-.panes.panes-workspace.task-layout,
-.app.left-collapsed .panes.panes-workspace.task-layout {
-  display: flex;
-}
+.panes.panes-workspace.task-layout { display: flex; }
 .task-pane-row { flex: 1 1 auto; display: flex; min-width: 0; min-height: 0; overflow-x: auto; overflow-y: hidden; }
 .task-pane-row.maximized { overflow: hidden; }
 .task-slot { position: relative; flex: 1 1 0; display: flex; min-height: 0; overflow: hidden; outline: none; }

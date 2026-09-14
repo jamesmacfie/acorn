@@ -65,8 +65,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // cells (./Rail.tsx § railCells). The one width anything in the chrome reads, and it is this box's
   // rather than the terminal's — the same rule a layout keeps (docs/tui.md § What the TUI never does).
   const [cells, setCells] = createSignal(80)
-  // One way to lose the left column: a reader asked, on `ctrl+b`, which is the desktop's
-  // `leftCollapsed` preference at a chord. There used to be a second — collapsing to a two-cell strip
+  // One way to lose the left column: a reader asked, on `ctrl+b`. There used to be a second —
+  // collapsing to a two-cell strip
   // of marks below 100 columns — and it went with the icons: the strip only ever said anything
   // because each row had a glyph in it, and most of those glyphs drew nothing (../kit/glyphs.ts).
   const [hidden, setHidden] = createSignal(false)

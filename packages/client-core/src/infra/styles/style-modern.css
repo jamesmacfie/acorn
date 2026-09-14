@@ -82,11 +82,6 @@
 /* Escape hatch, every rule here is a bug report against the token vocabulary. Budget 25 selectors
    (docs/ui-design.md § Style packs). Currently 3. */
 
-/* docs/ui-design.md § Style packs covers the collapsed-pane gap sliver this guards against. */
-:root[data-style='modern'] .app.left-collapsed .panes {
-  grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
-  gap: 0 var(--pane-gap);
-}
 
 /* docs/ui-design.md § Style packs covers why selection needs to read from the fill here. */
 :root[data-style='modern'] .ui-row[data-selected] {

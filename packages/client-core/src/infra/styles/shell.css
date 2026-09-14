@@ -3,13 +3,20 @@
  * the flat full-bleed grid into inset rounded cards without touching App.tsx.
  */
 
-/* Shell: workspace tab rail on the far left, the app to its right. */
-.shell { display: flex; height: 100%; }
+/* Shell: the top bar across the window, then the workspace tab rail and the app beside each other
+   under it. The bar spans rather than sitting beside the rail so its bottom border is one unbroken
+   line, which is where the rail, the panes and the fixed pane switcher all begin. */
+.shell { display: flex; flex-direction: column; height: 100%; }
+.shell-body { flex: 1; min-height: 0; display: flex; }
 
-/* Three-pane layout: top bar + independently-scrolling panes. */
-.app { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100%; }
+/* Independently-scrolling panes, and the hosts that draw nothing until something opens. */
+.app { flex: 1; min-width: 0; display: grid; grid-template-rows: 1fr; height: 100%; }
 
 .topbar {
+  /* Stated rather than left to the content, because `.pane-switcher` is fixed at this same offset
+     and the two have to start on the same pixel. Border-box, so the divider is inside the height. */
+  flex: none;
+  height: var(--topbar-h);
   display: grid;
   /* `minmax(0, …)` rather than a bare `1fr`: a `1fr` track will not go below the min-content width
      of what is in it, and the two side clusters are rows of buttons that do not shrink, so on a
@@ -69,12 +76,6 @@
   color: var(--text-muted);
   letter-spacing: 0.2em;
 }
-
-/* Left-pane collapse: zero the left column and hide the pane entirely (no stray border). A
-   zero-width grid column still emits a `gap` (docs/ui-design.md § Style packs), so any pack that
-   sets --pane-gap must also collapse it here or a sliver appears where the left pane was. */
-.app.left-collapsed .panes { grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr); }
-.app.left-collapsed .pane-left { display: none; }
 
 .pane {
   background: var(--pane-bg);

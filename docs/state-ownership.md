@@ -40,7 +40,7 @@ The desktop persists:
 - paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
 - which Node this window talked to last, so the next launch can pick its cache partition before
   the fleet answers ([frontend.md](./frontend.md) § Painting before the node);
-- device-scoped appearance, shortcuts, rail order, collapse state, and window geometry;
+- device-scoped appearance, shortcuts, rail order, and window geometry;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
@@ -52,7 +52,7 @@ while a Node is offline.
 
 **State follows the resource it describes.** State about a Node's resources goes to that Node's
 per-user prefs, so every client renders it; state about this machine or the person at it — theme,
-style, keybindings, window and collapse state, notices, caches, trust, tokens — stays device-local on
+style, keybindings, window state, notices, caches, trust, tokens — stays device-local on
 purpose. There is no "home node" to store things on: `homeNode()` picks which Node a fresh window
 opens on and nothing else, and the remembered last Node is an id this device draws a cache for,
 not a place preferences live. Drafts stay device-local by a separate recorded decision, because losable
@@ -193,8 +193,8 @@ a second function that pulled the pre-scoped aggregate key the scoped keys repla
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
 2026-08-28. The migration was confirmed complete on the live data root first: none of the four
 aggregate keys was still in `prefs`, and the scoped `core:task-layouts:*`, `editor:open-files:*`,
-`github:pr-filters:*` and `context:section-selection:*` keys were all present. The four `app`-scoped
-shell slices (`core.last-path`, `core.last-task`, `core.last-source`, `core.left-collapsed`) had a
+`github:pr-filters:*` and `context:section-selection:*` keys were all present. The `app`-scoped
+shell slices (`core.last-path`, `core.last-task`, `core.last-source`) had a
 `legacy` reader too, and for those it was always a no-op: `storageKeyFor` returns the declared key
 unchanged for an `app` slice, so the canonical read and the legacy read were the same key.
 

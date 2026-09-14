@@ -5,7 +5,7 @@
 //
 // Placement is the host's, never the contributor's: a marker asks for an ordered list of positions
 // and gets the first one still free. Anything that misses out stays in the tooltip legend, because
-// a 52px square can hide an icon but must never hide a state.
+// a rail square can hide an icon but must never hide a state.
 
 export type RailTone = 'neutral' | 'accent' | 'warn' | 'danger'
 

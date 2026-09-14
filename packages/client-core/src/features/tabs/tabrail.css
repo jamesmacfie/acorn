@@ -1,14 +1,11 @@
-/* Workspace tab rail: far-left full-height column. Square tabs with no radius, matching panes, and a
+/* Workspace tab rail: far-left column, starting under the top bar so it begins on the same line as
+   the panes and the pane switcher (styles/shell.css). Square tabs with no radius, matching panes, and a
    bottom-pinned "+". The glyph popover anchors to the active tab. */
 .tabrail {
   flex: none;
   width: var(--tabrail-w);
   display: flex;
   flex-direction: column;
-  /* The top edge closes the rail against the macOS title bar, which paints `--bg` (docs/shell.md §
-     The renderer bridge). The topbar beside it needs no such line because it is the same surface as
-     the bar above it; the rail is `--bg-subtle` and was ending in mid-air. */
-  border-top: var(--chrome-divider);
   border-right: var(--chrome-divider);
   background: var(--bg-subtle);
 }
@@ -53,7 +50,7 @@
 
 .tabrail-tab {
   width: 100%;
-  height: 52px;
+  height: var(--pane-head-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +75,7 @@
 .tabrail-tab[data-tone="danger"]:hover { color: var(--del-marker); }
 .tabrail-tab[data-tone="warn"]:hover { color: var(--warn); }
 
-/* The bottom-pinned action on either rail: the left "+" and the right "close task". Same 52px box
+/* The bottom-pinned action on either rail: the left "+" and the right "close task". Same square box
    as everything above it, with the divider moved to the top edge. */
 .tabrail-tab.tabrail-bottom {
   flex: none;
