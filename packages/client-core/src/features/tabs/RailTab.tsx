@@ -84,7 +84,7 @@ export function RailTab(props: RailTabProps) {
             data-tone={marker.tone}
             aria-hidden="true"
           >
-            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} />}</Show>}>
+            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} pulse={marker.busy} />}</Show>}>
               {(name) => <Icon name={name()} spin={marker.busy} />}
             </Show>
           </span>

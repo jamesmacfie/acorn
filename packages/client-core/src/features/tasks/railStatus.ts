@@ -21,6 +21,7 @@ export type RailStatusInputs = {
   unread: boolean // an unread notice for this task, from any source
   status: TaskStatus | undefined // live worktree status (dirty / missing)
   archiving: boolean // guarded teardown in flight for this task
+  settingUp: boolean // the project's setup script is still running in this task's new worktree
   pinned: boolean // held at the top of the rail
 }
 
@@ -31,12 +32,18 @@ const CHECKS_LABEL: Record<RailChecks, string> = {
   mixed: 'CI checks: some failed, some still running',
 }
 
-export function railStatusMarkers({ checks, unread, status, archiving, pinned }: RailStatusInputs): RailMarker[] {
+export function railStatusMarkers({ checks, unread, status, archiving, settingUp, pinned }: RailStatusInputs): RailMarker[] {
   const markers: RailMarker[] = []
   // Teardown owns the slot under the task's glyph on its own. It used to blank every other marker
   // while it ran; now anything it outranks stays in the tooltip rather than vanishing.
   if (archiving)
     markers.push({ id: 'archiving', label: 'Archiving — removing the worktree', icon: 'loader-circle', tone: 'accent', busy: true, placements: ['bottom-center'], priority: 300 })
+  // The other end of the same life cycle, in the same slot: a worktree being prepared rather than
+  // removed. A pulsing dot rather than a spinner, because setup is the task's own first job and not
+  // something being done to it. Ranked under teardown, which is the allocator's job to settle if the
+  // two ever overlap.
+  if (settingUp)
+    markers.push({ id: 'setup', label: 'Setup script running', dotTone: 'ok', busy: true, placements: ['bottom-center'], priority: 290 })
   if (unread)
     markers.push({ id: 'needs', label: 'Unread notifications', icon: 'circle-alert', tone: 'warn', placements: ['top-end', 'bottom-start'], priority: 280 })
   // Dirty and missing are mutually exclusive: a vanished worktree can't report a file count.

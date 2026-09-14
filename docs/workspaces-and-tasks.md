@@ -142,6 +142,11 @@ A new task branch starts from the branch checked out in the mapped project folde
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
 If the task branch already exists, Acorn checks out that branch without changing its history.
 
+The project's setup script runs in the new worktree as an ordinary terminal session titled "Setup",
+so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
+the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
+task's life ([ui-design.md](./ui-design.md) § Rail controls).
+
 A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
 without a setup script. Missing sources warn rather than fail worktree creation, existing targets
