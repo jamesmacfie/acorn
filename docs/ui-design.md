@@ -459,6 +459,18 @@ on. `Rows` hands back the same item object for an unchanged key, so a list rebui
 reconciles instead of remounting, which is what used to replace a row several times a second while an
 agent was fanning out.
 
+Both of those props answer to the same rule: **a background change never moves the reader.** For
+`Timeline follow` that means the mode and the place only change on the reader's own gesture. A list
+that shrinks — a card collapses, a filter drops rows, a redraw comes back shorter — makes the browser
+clamp the scroll offset and fire a scroll event that by position is indistinguishable from someone
+scrolling. Neither the follow mode nor the saved place may be taken from it; the place is chased back
+as the list grows again. Without that, a collapse while reading saves offset zero, and every later
+visit to that transcript opens at the top. Focus counts as a gesture, because revealing a card scrolls
+it into view and then focuses it. For `Card focus` it means the reveal is dropped outright when the
+caret is in a text box: some callers hold `focus` as state rather than issuing it as a command, so a
+list that refetches rebuilds its rows and re-issues a reveal nobody gave, and the person who finds out
+is the one whose sentence lost the caret.
+
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
 `items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes

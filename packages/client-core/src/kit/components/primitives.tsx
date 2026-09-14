@@ -1134,6 +1134,14 @@ export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedC
   return <Button {...rest} onPress={() => own.onPressedChange(!props.pressed)} />
 }
 
+/** Whether the reader is mid-sentence somewhere. A text field with the caret in it is the one thing
+ *  nothing may take focus from on its own account. */
+const isTyping = (doc: Document): boolean => {
+  const active = doc.activeElement
+  return active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement
+    || (active instanceof HTMLElement && active.isContentEditable)
+}
+
 /* Card: a bordered grouping surface. No mandated Header/Body/Footer slots; acorn's cards are small
    and dense, and slots would get in the way.
 
@@ -1172,6 +1180,11 @@ export function Card(props: {
     if (!props.focus || !element) { revealed = false; return }
     if (revealed) return
     revealed = true
+    // And never out of a box someone is typing in. The rising edge above only holds while this card
+    // stays mounted: a list that refetches rebuilds its rows, and the rebuilt row that happens to be
+    // the selected one re-issues a reveal nobody asked for. The reader who finds out is the one whose
+    // sentence lost the caret, so a reveal that would interrupt typing is dropped rather than queued.
+    if (isTyping(element.ownerDocument)) return
     element.scrollIntoView({ block: 'nearest' })
     element.focus({ preventScroll: true })
   })
