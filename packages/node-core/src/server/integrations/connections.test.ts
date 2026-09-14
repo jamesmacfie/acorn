@@ -226,6 +226,42 @@ describe('connecting with a 1Password reference', () => {
     testDb.cleanup()
   })
 
+  // 1Password's own copy action wraps the reference in quotes, so this is what a great many pastes
+  // actually look like. Unquoted it is a reference; left alone it is a string the provider rejects,
+  // and the owner is told their key is bad.
+  it.each([`"${REF}"`, `'${REF}'`, ` "${REF}" `])('unwraps a quoted reference: %s', async (pasted) => {
+    const validate = vi.spyOn(connectionProviderRegistry.require(PROVIDER_ID).connection, 'validate')
+    try {
+      await connectProvider(
+        testDb.db,
+        'alice',
+        { providerId: PROVIDER_ID, credentials: { apiKey: pasted } },
+        RESOLVING,
+      )
+      expect(validate).toHaveBeenCalledWith({ apiKey: 'the-real-key' })
+      // The quotes must not survive into the row either, or the stored pointer is one nothing reads.
+      const [stored] = await testDb.db.select().from(schema.integrations)
+      expect(await SECRETS.reveal(stored.authRef, 'test')).toBe(REF)
+    } finally {
+      validate.mockRestore()
+    }
+  })
+
+  it('leaves a quoted value that is not a reference alone', async () => {
+    const validate = vi.spyOn(connectionProviderRegistry.require(PROVIDER_ID).connection, 'validate')
+    try {
+      await connectProvider(
+        testDb.db,
+        'alice',
+        { providerId: PROVIDER_ID, credentials: { apiKey: '"a-key-with-quotes"' } },
+        RESOLVING,
+      )
+      expect(validate).toHaveBeenCalledWith({ apiKey: '"a-key-with-quotes"' })
+    } finally {
+      validate.mockRestore()
+    }
+  })
+
   it('validates the real credential but stores the reference', async () => {
     const validate = vi.spyOn(connectionProviderRegistry.require(PROVIDER_ID).connection, 'validate')
     try {

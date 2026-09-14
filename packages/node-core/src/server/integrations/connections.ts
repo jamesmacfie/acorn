@@ -96,6 +96,20 @@ export async function getConnection(db: AppDatabase, userId: string, id: string)
 // `credentials.<field>.trim()`, so a trimmed value matches; the `??` fallback below means a future
 // provider that derives its secret instead would quietly seal the plaintext. The connect test
 // asserting the stored value is the reference is what catches that.
+// 1Password hands a copied reference back wrapped in quotes, and a quoted reference is not one:
+// `isSecretRef` says no, the whole string goes to the provider as the credential itself, and the
+// owner is told their key was rejected by a provider that never saw a key. So the quotes come off
+// before the question is asked, and only when taking them off changes the answer, which leaves a
+// credential that genuinely begins and ends with one alone.
+const QUOTED = /^(["'])([\s\S]*)\1$/
+
+const asSecretRef = (value: string): string | null => {
+  const trimmed = value.trim()
+  if (isSecretRef(trimmed)) return trimmed
+  const inner = QUOTED.exec(trimmed)?.[2]?.trim()
+  return inner && isSecretRef(inner) ? inner : null
+}
+
 async function resolveCredentials(
   credentials: ProviderCredentials,
   secrets: SecretService,
@@ -103,13 +117,15 @@ async function resolveCredentials(
   const refByValue = new Map<string, string>()
   const resolved: ProviderCredentials = {}
   for (const [field, value] of Object.entries(credentials)) {
-    if (!isSecretRef(value.trim())) {
+    const ref = asSecretRef(value)
+    if (!ref) {
       resolved[field] = value
       continue
     }
-    const ref = value.trim()
     const plaintext = (await secrets.resolve(ref)).trim()
     resolved[field] = plaintext
+    // The unquoted reference, because this is what gets sealed into the row. Storing the quoted form
+    // would put a value back in the database that nothing can read.
     refByValue.set(plaintext, ref)
   }
   return { credentials: resolved, refByValue }
