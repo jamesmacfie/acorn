@@ -115,8 +115,8 @@ describe('revealing a request without stealing the caret', () => {
 
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-  const elsewhere = () => {
-    const field = document.createElement('textarea')
+  const elsewhere = (tag: 'textarea' | 'button' = 'textarea') => {
+    const field = document.createElement(tag)
     document.body.append(field)
     hosts.push(() => field.remove())
     field.focus()
@@ -152,7 +152,9 @@ describe('revealing a request without stealing the caret', () => {
     const card = host.querySelector<HTMLElement>('.ui-card')!
     expect(document.activeElement).toBe(card)
 
-    elsewhere()
+    // A button, not a text box: a reveal is always given by a click somewhere, and the kit refuses to
+    // pull the caret out of something being typed in even for a fresh one (client-core primitives.tsx).
+    elsewhere('button')
     setOn(false)
     await flush()
     setOn(true)

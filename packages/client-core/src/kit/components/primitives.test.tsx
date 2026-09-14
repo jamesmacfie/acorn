@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createSignal, For } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Card } from './primitives'
@@ -45,6 +45,25 @@ describe('Card reveal', () => {
     // the command was already spent, so the caret stays where the reader put it.
     setRow({ focused: true })
     expect(document.activeElement).toBe(button)
+  })
+
+  it('does not take the caret out of a box the reader is typing in', () => {
+    // The rising edge only holds while the card stays mounted. A list that refetches — findings review
+    // under a running agent — rebuilds its rows, and the rebuilt selected row would re-issue a reveal
+    // into the middle of someone's sentence.
+    const [rows, setRows] = createSignal([{ id: 'a' }])
+    dispose = render(() => (
+      <>
+        <textarea />
+        <For each={rows()}>{(row) => <Card focus={row.id === 'a'}>card</Card>}</For>
+      </>
+    ), host)
+    const field = host.querySelector('textarea') as HTMLTextAreaElement
+    field.focus()
+    expect(document.activeElement).toBe(field)
+
+    setRows([{ id: 'a' }])
+    expect(document.activeElement).toBe(field)
   })
 
   it('reveals again once focus goes false and true', () => {
