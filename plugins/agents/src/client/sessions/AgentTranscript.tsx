@@ -1,5 +1,5 @@
 import { agentTelemetry } from './agentTelemetry'
-import { createMemo, Index, Show } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
@@ -72,6 +72,11 @@ export default function AgentTranscript(props: {
     agentTelemetry.observe('agents.transcript.items', shown.length)
     return shown
   })
+  // The list is rendered by its rows' own keys, not by array position. Two lookups over the same
+  // `items()`: the ordered keys `For` diffs, and the item behind each key. `record.id` is a global
+  // UUID, so a key is unique across sessions and subagents and never collides when the list swaps.
+  const itemKeys = createMemo(() => items().map((item) => item.key))
+  const itemsByKey = createMemo(() => new Map(items().map((item) => [item.key, item])))
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -144,16 +149,21 @@ export default function AgentTranscript(props: {
       >
         <Timeline follow viewKey={viewId()} ariaLabel="Agent transcript" controls={props.onControls}>
           {/*
-            `Index`, not `For`: buildConversationItems rebuilds every item object on every snapshot, and
-            `For` keys by reference, so it would recreate the whole list on each streamed event and take
-            any in-progress selection with it. Position-keyed rows keep their DOM.
+            `For` over the rows' keys, not `Index` over their positions. buildConversationItems rebuilds
+            every item object on every snapshot, so `For` over those objects would recreate the whole list
+            on each streamed event and take any in-progress selection with it — which is why this was an
+            `Index`. But `Index` keys by position: a filter (chats-only, or a resolved permission leaving
+            the thread) shifts every later row onto a new item while its card keeps the previous item's
+            local state, its open/closed tool fold. Keyed by the projection's stable id instead, a card's
+            DOM stays tied to its own item — the same key reuses the row, an appended key mounts one card,
+            a removed key disposes one — while streamed text and status still update through the accessor.
           */}
           {/* One fold setting for the whole list, read by every tool card below it. See the note on
               createAgentToolFoldSetting for why it is not resolved per card. */}
           <AgentToolFoldContext.Provider value={foldSetting}>
-            <Index each={items()}>
-              {(item) => renderCard(item)}
-            </Index>
+            <For each={itemKeys()}>
+              {(key) => renderCard(() => itemsByKey().get(key)!)}
+            </For>
           </AgentToolFoldContext.Provider>
         </Timeline>
       </Show>

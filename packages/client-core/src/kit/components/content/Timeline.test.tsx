@@ -99,6 +99,29 @@ describe('Timeline', () => {
     expect(box.scrollTop).toBe(10)
   })
 
+  it('leaves a reader in place when the list shrinks under them', () => {
+    // Reading up the list, then the content collapses — a filter drops rows, the tools shut — and the
+    // browser clamps the scroll near the new, closer bottom. That clamp is not the reader asking to
+    // follow, so the view must not snap to the bottom on the next layout.
+    const [turns, setTurns] = createSignal(['one', 'two', 'three', 'four'])
+    mount(turns, () => 'session-a')
+    const box = scroller()!
+    measure(box, 400, 100)
+    grow()
+    box.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
+    box.scrollTop = 40
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    // The list collapses to something that only just overflows, and the browser clamps the reader near
+    // its bottom. No gesture this time: this is the shrink, not the reader.
+    setTurns(['one', 'two'])
+    measure(box, 120, 100)
+    box.scrollTop = 20
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    // A later layout settle — code highlighting, an image — must not be read as a cue to follow.
+    grow()
+    expect(box.scrollTop).toBe(20)
+  })
+
   it('gives a reader back the place they left, per view', () => {
     const [view, setView] = createSignal('session-a')
     mount(() => ['one'], view)

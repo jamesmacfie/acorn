@@ -17,4 +17,10 @@ describe('nextFollowing', () => {
   it('leaves a reader who scrolled up alone when layout moves the scroll', () => {
     expect(nextFollowing({ following: false, nearBottom: false, userDriven: false })).toBe(false)
   })
+
+  it('does not resume following when a shrinking list clamps a reader near the new bottom', () => {
+    // A filter drops rows or the tools collapse, the list is suddenly short, and the clamp lands the
+    // reader near the new bottom. No gesture caused it, so the reader stays where they were reading.
+    expect(nextFollowing({ following: false, nearBottom: true, userDriven: false })).toBe(false)
+  })
 })
