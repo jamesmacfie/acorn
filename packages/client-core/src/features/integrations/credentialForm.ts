@@ -1,5 +1,6 @@
 import { createSignal, type Accessor } from 'solid-js'
 import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import { ApiError } from '../../infra/node/apiClient'
 import { connectIntegration, rotateIntegration } from './integrationClient'
 
 // The typed-credential half of connecting a provider: the fields a descriptor declares, what has been
@@ -35,12 +36,24 @@ export type CredentialFormController = {
 // the credential, so retrying the same one is pointless and the reader needs to know whose refusal
 // it was. `provider_secret_ref_unreadable` means we never got as far as asking: the value is in
 // 1Password and this machine could not read it, which is a different thing to go and fix.
-const errorCopy = (code: string, label: string): string => {
+//
+// Everything else lands in one sentence that names none of its causes: the provider unreachable, a
+// response shaped the way nothing expected, a connection that is no longer there. So the code and
+// the request id go on screen with it. They are what turns "it did not work" into a line someone
+// can find in the node's log, and the envelope already carries both.
+//
+// Read off `ApiError.code` rather than off the message. They are equal only while a route passes no
+// detail to respondError, which copies the code into `message` in that case alone. The first route
+// that passes one would otherwise break every branch here in silence.
+const errorCopy = (cause: unknown, label: string): string => {
+  const failure = cause instanceof ApiError ? cause : undefined
+  const code = failure?.code ?? (cause as Error)?.message
   if (code === 'provider_needs_auth') return `Those credentials were rejected by ${label}.`
   if (code === 'provider_secret_ref_unreadable') {
     return 'Could not read that 1Password reference. Check Settings, Security, 1Password.'
   }
-  return 'Could not connect this provider.'
+  const trail = [code, failure?.requestId].filter(Boolean).join(' · ')
+  return trail ? `Could not connect this provider. (${trail})` : 'Could not connect this provider.'
 }
 
 export function createCredentialForm(
@@ -85,10 +98,7 @@ export function createCredentialForm(
       reset()
       await onConnected()
     } catch (cause) {
-      // The one code worth its own sentence. The provider itself refused the credential, so retrying
-      // the same one is pointless and the reader needs to know whose refusal it was.
-      const code = (cause as Error).message
-      setError(errorCopy(code, target.label))
+      setError(errorCopy(cause, target.label))
     } finally {
       setBusy(false)
     }
