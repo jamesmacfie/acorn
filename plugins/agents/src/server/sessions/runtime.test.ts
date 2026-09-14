@@ -14,6 +14,7 @@ import type {
   AgentDriver,
   AgentDriverSession,
   AgentDriverStartOptions,
+  AgentDriverTurnOptions,
 } from '../drivers/types'
 import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
@@ -272,6 +273,45 @@ class TrailingEventDriver extends FakeAgentDriver {
   override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
     this.#emit = options.onEvent
     return super.start(options)
+  }
+
+  async push(event: AgentNormalizedEvent): Promise<void> {
+    await this.#emit?.(event)
+  }
+}
+
+/** Spawns one backgrounded subagent inside its turn, then lets the turn complete while that child is
+ *  still "running" — the shape Claude Code's `run_in_background` Agent call produces. `push` stands in
+ *  for the child's own later completion summary, which the real adapter only streams on a later turn. */
+class BackgroundSubagentDriver extends FakeAgentDriver {
+  #emit: AgentDriverStartOptions['onEvent'] | null = null
+
+  override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.#emit = options.onEvent
+    const providerSessionRef = options.session.providerSessionRef ?? `fake-${randomUUID()}`
+    let active = false
+    let stopped = false
+    await options.onEvent({ type: 'session_metadata', providerSessionRef })
+    await options.onEvent({ type: 'session_state', state: 'ready' })
+    return {
+      providerSessionRef,
+      get ready() {
+        return !active && !stopped
+      },
+      async sendTurn(turn: AgentDriverTurnOptions) {
+        active = true
+        await options.onEvent({
+          type: 'subagent',
+          subagent: { id: 'sub-bg', title: 'Recon the sessions folder', status: 'running', background: true },
+        })
+        await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        active = false
+        return { providerTurnRef: `fake-turn-${turn.turn.id}` }
+      },
+      async cancel() { active = false },
+      async resolveRequest() {},
+      async stop() { stopped = true },
+    }
   }
 
   async push(event: AgentNormalizedEvent): Promise<void> {
@@ -641,6 +681,62 @@ describe('managed agent runtime conformance', () => {
     expect((await read()).session.runtimeState).toBe('working')
     await runtime.cancelTurn(session.id)
     expect((await read()).session.runtimeState).toBe('ready')
+  })
+
+  it('quiets a backgrounded subagent when its turn ends, and a later summary still settles it', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new BackgroundSubagentDriver()
+    registry.registerNative('fake', () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Recon in the background.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+
+    // The turn ends while the child is still "running". The child outlives the turn and nothing feeds
+    // its row until a later prompt, so the spinner is quieted to `idle` rather than left turning. The
+    // quieting event is recorded just after `turn_completed`, so poll the roster rather than read once.
+    const completed = await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+    expect(completed.session.runtimeState).toBe('ready')
+    const rosterWhen = async (status: string) => {
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const roster = (await runtime!.wait(session.id, 0, 'ready', 0)).session.subagents
+        if (roster[0]?.status === status) return roster
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      return (await runtime!.wait(session.id, 0, 'ready', 0)).session.subagents
+    }
+    expect(await rosterWhen('idle')).toEqual([
+      expect.objectContaining({ id: 'sub-bg', status: 'idle', background: true }),
+    ])
+
+    // The child's real completion summary, when it finally arrives, still folds the row to done.
+    await driver.push({
+      type: 'subagent',
+      subagent: { id: 'sub-bg', status: 'completed', providerAgentRef: 'a97', durationMs: 51_000 },
+    })
+    expect(await rosterWhen('completed')).toEqual([
+      expect.objectContaining({ id: 'sub-bg', status: 'completed', durationMs: 51_000 }),
+    ])
   })
 
   it('acknowledges a durable queued turn even when provider startup fails afterward', async () => {
