@@ -11,6 +11,7 @@ import {
   type WireFetchBody,
   type WireFetchRequest,
 } from './wire'
+import { watchAppearance } from '@acorn/client-core/kit/tokens/appearance.ts'
 import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 
@@ -373,3 +374,32 @@ const acorn = {
 // `window`; `globalThis` is the same object in a page, so this assigns it without spelling the form
 // the arch rule polices.
 ;(globalThis as { acorn?: unknown }).acorn = acorn
+
+// The macOS title bar is transparent and paints the window background instead (src-tauri/src/lib.rs),
+// so that strip has to be told what colour the theme is. Not a seam member: the direction is the
+// shell asking its own page, and no product code has an opinion about title bars.
+//
+// `body` carries `--bg` (client-core styles/base.css), and reading the computed colour rather than
+// the token means a theme written in `color-mix` or `oklch` still resolves to channels. A colour
+// this cannot read leaves the strip on its last one, which beats painting it black.
+function followThemeBackground(): void {
+  const paint = () => {
+    const channels = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g)
+    if (!channels || channels.length < 3) return
+    const [red, green, blue, alpha] = channels.map(Number)
+    // A transparent body means the stylesheet has not arrived, which is what `dev` looks like: Vite
+    // injects the CSS with the module graph rather than as a render-blocking link. Painting black and
+    // waiting for the next theme change is worse than leaving the strip where it is.
+    if (alpha === 0) return
+    void invoke('set_window_background', { red, green, blue })
+  }
+  paint()
+  watchAppearance(paint)
+}
+
+// This runs before any page script, so there is no `body` to measure yet. The `document` guard is for
+// the seam-contract suite, which imports this file in a node environment and has no page at all.
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', followThemeBackground, { once: true })
+  else followThemeBackground()
+}
