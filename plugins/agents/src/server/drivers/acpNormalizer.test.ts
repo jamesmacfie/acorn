@@ -448,3 +448,45 @@ describe('an answer goes back in the shape the agent asked for', () => {
     expect(acpElicitationResponse(askUserQuestion, { answers: {} })).toEqual({ action: 'accept', content: {} })
   })
 })
+
+describe('Claude’s plan-mode handover', () => {
+  const exitPlanMode = (update: Partial<SessionUpdate> = {}): AgentNormalizedEvent[] => normalizeAcpUpdate({
+    sessionUpdate: 'tool_call',
+    toolCallId: 'plan-1',
+    title: 'Ready to code?',
+    kind: 'other',
+    rawInput: { plan: '# The plan\n\n- step one\n- step two' },
+    _meta: { claudeCode: { toolName: 'ExitPlanMode' } },
+    ...update,
+  } as SessionUpdate, 'Claude Code')
+
+  it('posts the plan as the agent talking, in the markdown it was written in', () => {
+    expect(exitPlanMode()[0]).toEqual({
+      type: 'assistant_message',
+      text: '# The plan\n\n- step one\n- step two',
+      subagentId: undefined,
+    })
+  })
+
+  // The call keeps its title and outcome; without this the plan also sits under it as JSON with every
+  // line break spelled out, which is what sent it here in the first place.
+  it('leaves the call itself with no parameters to disclose', () => {
+    const tool = exitPlanMode().find((event) => event.type === 'tool')
+    expect(tool).toMatchObject({ type: 'tool', tool: { title: 'Ready to code?', input: undefined } })
+  })
+
+  it('posts nothing for an update, so the plan cannot arrive twice', () => {
+    const events = exitPlanMode({ sessionUpdate: 'tool_call_update', status: 'failed' })
+    expect(events.some((event) => event.type === 'assistant_message')).toBe(false)
+  })
+
+  it('leaves every other tool’s parameters alone', () => {
+    expect(toolEvent({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'bash-1',
+      title: 'Bash',
+      rawInput: { plan: 'not a plan' },
+      _meta: { claudeCode: { toolName: 'Bash' } },
+    }).input).toBe('{\n  "plan": "not a plan"\n}')
+  })
+})

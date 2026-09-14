@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
   id: String(seq),
@@ -277,5 +277,38 @@ describe('what a request leaves in the thread', () => {
       event(3, { type: 'assistant_message', text: 'After' }),
     ]))
     expect(ordered.map((item) => item.event.type)).toEqual(['assistant_message', 'request', 'assistant_message'])
+  })
+})
+
+describe('what "show chats only" keeps', () => {
+  const chats = (records: AgentEventRecord[], requestFor?: (id: string) => AgentRequest | undefined) =>
+    visibleConversationItems(buildConversationItems(records), requestFor)
+      .filter(isChatItem)
+      .map((item) => item.event.type)
+
+  it('keeps the question the agent asked and the answer on it', () => {
+    expect(chats([
+      event(1, { type: 'assistant_message', text: 'Two ways to do this.' }),
+      event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+      event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
+      event(4, { type: 'assistant_message', text: 'Doing the first one.' }),
+    ])).toEqual(['assistant_message', 'request', 'assistant_message'])
+  })
+
+  it('still drops the tool calls and the notes', () => {
+    expect(chats([
+      event(1, { type: 'user_message', text: 'Go' }),
+      event(2, { type: 'reasoning', text: 'thinking' }),
+      event(3, { type: 'tool', tool: { id: 'bash-1', title: 'Bash' } }),
+      event(4, { type: 'turn_completed', stopReason: 'end_turn' }),
+    ])).toEqual(['user_message'])
+  })
+
+  // `belongsInThread` has already let it go, so chat-only inherits that rather than deciding again.
+  it('does not bring back a permission that was already answered', () => {
+    const rows = () => ({ providerRequestId: 'allow-1', status: 'resolved' } as AgentRequest)
+    expect(chats([
+      event(1, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
+    ], rows)).toEqual([])
   })
 })
