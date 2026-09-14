@@ -117,6 +117,15 @@ export default function IntegrationsSettings() {
                     {connection.status !== 'connected' ? ` · ${connection.status}` : ''}
                   </span>
                 </div>
+                {/* A credential that lives in 1Password rather than in our database. The reference
+                    is a pointer, not a secret, so it can sit in the tooltip. */}
+                <Show when={connection.secretRef}>
+                  {(ref) => (
+                    <span class="integration-secret-ref" title={`Read from 1Password: ${ref()}`}>
+                      <Icon name="brand:onepassword" />
+                    </span>
+                  )}
+                </Show>
                 <div class="integration-actions">
                   <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
                     <Button variant="ghost" tone="danger" onPress={() => void test(connection.id)} disabled={busy()}>Test</Button>
@@ -189,6 +198,12 @@ export default function IntegrationsSettings() {
                     </label>
                   )}
                 </For>
+                {/* Once, under all the fields, rather than in each provider's `hint`: it is true of
+                    every credential field there is, and six copies would drift. */}
+                <p class="integration-add-hint muted">
+                  Any field here takes a 1Password reference, such as <code>op://Vault/Item/credential</code>,
+                  instead of the value. Turn it on in Settings, Security.
+                </p>
                 <Button onPress={() => void form.submit()} disabled={form.busy() || !form.complete()}>
                   {form.busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
                 </Button>

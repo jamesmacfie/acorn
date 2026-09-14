@@ -12,6 +12,7 @@ import { security } from './routes/security/security'
 import { attachment } from './routes/attachment'
 import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
+import { secrets } from './routes/secrets'
 import { models } from './routes/models'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
@@ -115,6 +116,10 @@ export function createApp() {
     // service-scope calls (docs/security.md § Credential handling), never a task-scoped child.
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
+    // Where this node reads credentials from, and clearing what it cached. Same gate as the
+    // connections themselves: it describes the owner's credential setup.
+    .use(`${CORE_NAMESPACE}/secrets`, requireProviderAccess)
+    .use(`${CORE_NAMESPACE}/secrets/*`, requireProviderAccess)
     // Which model backends the owner holds, and which agent CLI is installed here. Device-only: it is a
     // roster of what this machine can spend, and no task-scoped child has any use for it.
     .use(`${CORE_NAMESPACE}/models`, requireDevice)
@@ -127,6 +132,7 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/telemetry/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
+    .route(`${CORE_NAMESPACE}/secrets`, secrets) // Settings → Security: whether the 1Password CLI is runnable here
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // /history: the measure series a stat's trend is drawn from
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)

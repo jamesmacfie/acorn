@@ -22,6 +22,11 @@ export type ProviderErrorCode =
   | 'provider_resource_forbidden'
   | 'provider_bad_config'
   | 'provider_secret_unreadable'
+  // The stored credential is a 1Password reference and this node could not turn it into a value.
+  // One code for every cause: op missing, the switch off, the prompt declined, the item gone. The
+  // reader does the same thing in all four, which is open Settings, Security, and read what is
+  // actually wrong there. A wire code cannot stay that current.
+  | 'provider_secret_ref_unreadable'
 
 export type CapabilityState = 'available' | 'missing-scope' | 'degraded'
 export type ProviderCapabilities = Record<string, boolean | string | undefined> & {
