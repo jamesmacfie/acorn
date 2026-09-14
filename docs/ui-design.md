@@ -40,8 +40,15 @@ The rail's task list goes through the same `rail.taskList` exclusive slot the de
 plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
 on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
 
+The topbar spans the window. The rails and the panes all begin under its bottom border, so that
+border is one unbroken line across the app: the left TabRail is the first thing in `.shell-body`, the
+right pane switcher is fixed at `top: var(--topbar-h)`, and the two meet the same pixel because the
+bar's height is stated rather than left to its content.
+
 Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
-one component: `tabs/RailTab.tsx`, a square 52px control styled by `.tabrail-tab`. Every control in
+one component: `tabs/RailTab.tsx`, a square control styled by `.tabrail-tab`. Its side is
+`--pane-head-h`, the height of the pane header it runs beside, so a rail button, a pane header and
+the top bar read as one row height and a style pack that moves the header moves the rails with it. Every control in
 both rails goes through it, including the bottom-pinned "+" on the left and "close task" on the
 right, which share the `.tabrail-bottom` modifier and therefore the same box. It is not a Button. A
 rail control hovers by changing its icon and background only, and `.ui-btn:hover` also moves
@@ -710,8 +717,8 @@ one surface split by a divider or two surfaces side by side; `.panes` + `.pane` 
 2 / -1` on the last pane is how the chrome source panel says it. A plugin that writes its own
 `grid-template-columns` for `.panes` gets a column width that only resembles the shell's — Docker's
 was `clamp(320px, 30vw, 460px)` against the shell's `clamp(320px, 28vw, 420px)` — and a rule that has
-to out-specify every style pack's own `.app.left-collapsed .panes`. Spanning has neither problem and
-needs no CSS at all.
+to out-specify every style pack's own `.panes` override. Spanning has neither problem and needs no
+CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for

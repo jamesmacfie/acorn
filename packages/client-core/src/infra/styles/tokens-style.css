@@ -87,7 +87,10 @@
      strip's actions slot, and below --pane-head-h, so a strip under a pane header stays subordinate
      to it. */
   --tab-h: 40px;
-  --tabrail-w: 52px;
+  /* Square, and the same side as the pane header the rail runs beside, so a rail button, a pane
+     header and the top bar all read as one row height. A pack that moves --pane-head-h moves the
+     rails with it. */
+  --tabrail-w: var(--pane-head-h);
   --task-footer-h: 27px;
   /* ListDetail's two column genres. The browse list tracks the pane so a wide window gets a wider
      list; the switcher rail holds identifiers and never needs to. Four panes had four values here

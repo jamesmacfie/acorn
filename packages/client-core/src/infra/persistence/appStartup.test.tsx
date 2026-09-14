@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/solid-query'
-import { createRoot, createSignal } from 'solid-js'
+import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
@@ -22,7 +22,6 @@ const PROJECT = { id: 'project-1', name: 'A project' } as Project
 // A whole boot, minus the parts a restore never reads. `path` stays on a project path so the
 // last-path slice has nothing to correct.
 const boot = (prefs: Record<string, string>): (() => void) => createRoot((dispose) => {
-  const [collapsed, setCollapsed] = createSignal(false)
   createAppStartupRestore({
     queryClient: new QueryClient(),
     prefs: () => prefs,
@@ -31,8 +30,6 @@ const boot = (prefs: Record<string, string>): (() => void) => createRoot((dispos
     tasks: () => [TASK],
     path: () => '/p/project-1',
     navigate: () => {},
-    collapsed,
-    setCollapsed,
   })
   return dispose
 })

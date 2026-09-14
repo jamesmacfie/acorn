@@ -23,7 +23,6 @@ export const PrefKeys = {
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',
   prFilters: 'pr_filters',
-  leftCollapsed: 'left_collapsed',
   keybindings: 'keybindings',
   paneShortcuts: 'pane_shortcuts',
   diffView: 'diff_view',

@@ -262,7 +262,6 @@ export default function App() {
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
-  const [collapsed, setCollapsed] = createSignal(false)
 
   createAppStartupRestore({
     queryClient,
@@ -272,8 +271,6 @@ export default function App() {
     tasks: () => tasks.data,
     path: () => location.pathname,
     navigate,
-    collapsed,
-    setCollapsed,
   })
 
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
@@ -424,8 +421,6 @@ export default function App() {
     return source && (source.component || source.regions) ? source : undefined
   }
 
-  const toggleCollapsed = () => setCollapsed((value) => !value)
-
   // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
   const newMatch = useMatch(() => CREATE_TASK_ROUTE)
   const isNew = () => !!newMatch()
@@ -446,18 +441,10 @@ export default function App() {
   return (
     <Show when={!nodeGateHolds() && !isRestoring()} fallback={<NodeGate />}>
     <div class="shell">
-    <TabRail />
-    <div class="app" classList={{ 'left-collapsed': collapsed() }}>
-      <header class="topbar">
+    {/* The bar spans the window rather than sitting beside the rail, so its bottom border is the one
+        line the rail, the panes and the pane switcher all start under. */}
+    <header class="topbar">
         <div class="topbar-side">
-          <Button
-            variant="bare"
-            title={collapsed() ? 'Show left pane' : 'Hide left pane'}
-            pressed={collapsed()}
-            onPress={toggleCollapsed}
-          >
-            {collapsed() ? '»' : '«'}
-          </Button>
           <Show when={fleetWorkspaces().entries.length}>
             <WorkspacePicker
               workspaces={fleetWorkspaces().entries}
@@ -524,7 +511,10 @@ export default function App() {
           <SlotHost slot="topbar.right" context={slotContext()} />
           <OverflowMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
-      </header>
+    </header>
+    <div class="shell-body">
+    <TabRail />
+    <div class="app">
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >
         <Match when={drawnSource()}>
@@ -564,6 +554,7 @@ export default function App() {
           matters: this host sits before the overlay host, so a dialog still paints above the drawer. */}
       <SlotHost slot="drawer" context={slotContext()} />
       <SlotHost slot="overlay" context={slotContext()} />
+    </div>
     </div>
     <Tips />
     {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast

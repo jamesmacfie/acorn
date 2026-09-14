@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, type Accessor, type Setter } from 'solid-js'
+import { createEffect, onCleanup, type Accessor } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { NavigateOptions } from '@solidjs/router'
 import type { Task } from '@acorn/protocol/api.ts'
@@ -62,8 +62,6 @@ export type AppStartupOptions = {
   // now round-trips unchanged.
   path: Accessor<string>
   navigate: Navigate
-  collapsed: Accessor<boolean>
-  setCollapsed: Setter<boolean>
 }
 
 export function createAppStartupRestore(options: AppStartupOptions): { restored: Accessor<boolean> } {
@@ -127,15 +125,6 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
         },
       ),
     },
-    {
-      id: 'core.left-collapsed', key: PrefKeys.leftCollapsed, scope: 'app', restore: 'workspace', version: 1,
-      codec: {
-        parse: (raw) => raw === '1',
-        serialize: (value: boolean) => value ? '1' : '0',
-      },
-      empty: () => false, unknownIds: 'drop', maxBytes: 1,
-      binding: appStateBinding(options.collapsed, options.setCollapsed),
-    } as PersistedStateSlice<unknown>,
   ]
 
   return createStartupRestore({
