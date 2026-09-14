@@ -202,7 +202,8 @@ export default function IntegrationsSettings() {
                     every credential field there is, and six copies would drift. */}
                 <p class="integration-add-hint muted">
                   Any field here takes a 1Password reference, such as <code>op://Vault/Item/credential</code>,
-                  instead of the value. Turn it on in Settings, Security.
+                  instead of the value. Use Copy Secret Reference in 1Password, not the item link.
+                  Turn it on in Settings, Security.
                 </p>
                 <Button onPress={() => void form.submit()} disabled={form.busy() || !form.complete()}>
                   {form.busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
