@@ -15,7 +15,7 @@ import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilitie
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
 import { runApi } from '@acorn/client-core/features/tasks/runClient.ts'
-import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { activeTaskId, dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { formatChord } from '@acorn/client-core/features/tasks/paneShortcuts.ts'
 import { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
@@ -207,7 +207,6 @@ export default function TaskView(props: {
   async function confirmClose(skipTeardown = false) {
     if (closing()) return
     const archivedTaskId = props.task.id
-    const next = nextTask()
     // Held to the end, not just around the request: the spinner runs until the row leaves the rail.
     await withArchiving(archivedTaskId, async () => {
       // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
@@ -229,6 +228,12 @@ export default function TaskView(props: {
         await archiveTask(archivedTaskId)
       }
       completeTaskArchive(archivedTaskId, () => {
+        // Only when the archived task is still the one being looked at. A guarded teardown takes
+        // seconds, and the owner is free to move to another task while it runs; moving them again
+        // when it finishes takes them off whatever they went to, which they chose and this did not.
+        if (activeTaskId() !== archivedTaskId) return
+        // Read now rather than before the request, so the task moved to is one that still exists.
+        const next = nextTask()
         if (next) {
           activateTaskSignals(next)
           navigate(pathForTask(next))
