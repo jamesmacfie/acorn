@@ -463,4 +463,15 @@ A provider failure that is not a deliberate `ProviderOperationError` is flattene
 `provider_unavailable` before it reaches the client (`integrations/respondProvider.ts`), shared by
 core's own connection routes and by plugin-owned connect flows such as GitHub's device flow. An
 upstream exception message can quote a URL, a token fragment, or a response body, so a second copy of
-that mapping would only be a second place for one of those to leak through.
+that mapping would only be a second place for one of those to leak through. The flattening is not
+silent: the name and a scrubbed message go to the log with the request id the client was shown, which
+is the only record an unplanned throw leaves.
+
+Ask `isProviderOperationError(error)`, never `error instanceof ProviderOperationError`. A plugin
+bundle inlines its whole dependency graph, that class included, because a loaded plugin's directory
+has no `node_modules` to resolve against (`apps/node/scripts/build-plugin.mjs`). The class a bundled
+provider throws is therefore compiled into that plugin's bundle and is not the class the host holds,
+so `instanceof` is false in both directions across the boundary and a typed failure such as
+`provider_needs_auth` lands in the catch-all instead. Both copies still agree on the shape, and the
+guard checks that: an `Error` carrying a numeric `status` and a `code` from `PROVIDER_ERROR_CODES`.
+The same caution applies to any other class that crosses this boundary, Hono's included.
