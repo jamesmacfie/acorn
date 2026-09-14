@@ -1163,8 +1163,15 @@ export function Card(props: {
     'data-pad': props.pad ?? 'md',
     title: props.title,
   })
+  // A rising edge, not a standing order. `focus` is a prop getter, and a pane derives it from a row it
+  // rebuilds on every streamed event, so this effect is re-notified while the value stays true. Re-running
+  // the reveal then would yank the reader back to this card and take the caret out of whatever they were
+  // typing. Reveal once when it turns true; act again only after it has gone false and true again.
+  let revealed = false
   createEffect(() => {
-    if (!props.focus || !element) return
+    if (!props.focus || !element) { revealed = false; return }
+    if (revealed) return
+    revealed = true
     element.scrollIntoView({ block: 'nearest' })
     element.focus({ preventScroll: true })
   })

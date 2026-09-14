@@ -7,7 +7,7 @@ import QueuedAgentTurns from '../composer/QueuedAgentTurns'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
-import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
+import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
@@ -89,6 +89,22 @@ export default function AgentConversation(props: AgentConversationProps & {
   const reload = (): void => void managedAgentStore.loadSnapshot(sessionId())
     .catch(() => undefined)
 
+  // The request to reveal is a one-shot navigation command, like the composer focus. A notice or a
+  // dashboard row that opened this pane named a request to scroll the reader to; read it once, hand it
+  // to the transcript, and clear it from the store. Kept there it would replay the scroll-and-focus
+  // every time this session was reopened, pulling a typing reader back to an old request. The latch is
+  // dropped when the shown session changes so a stale reveal cannot cross into another session.
+  const [focusRequest, setFocusRequest] = createSignal<string>()
+  let focusFor = ''
+  createEffect(() => {
+    const id = sessionId()
+    if (id !== focusFor) { focusFor = id; setFocusRequest(undefined) }
+    const requested = focusedManagedRequest(id)
+    if (!requested) return
+    setFocusRequest(requested)
+    clearFocusedManagedRequest(id)
+  })
+
   return (
     <Show when={sessionId()} fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
@@ -105,7 +121,7 @@ export default function AgentConversation(props: AgentConversationProps & {
             <AgentTranscript
               taskId={narrowed().session.taskId}
               snapshot={narrowed()}
-              focusRequestId={focusedManagedRequest(sessionId())}
+              focusRequestId={focusRequest()}
               focusSubagentId={selectedManagedSubagent(sessionId())}
               viewKeyPrefix={props.viewKeyPrefix}
               chatsOnly={chatsOnly()}

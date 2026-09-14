@@ -1,5 +1,6 @@
 import { render } from 'solid-js/web'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSignal } from 'solid-js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
 
 // A question that takes more than one answer. The control is a column of checkboxes rather than the
@@ -103,5 +104,59 @@ describe('answering a question that takes more than one answer', () => {
       },
     })
     expect(host.querySelector('input[type="password"]')).not.toBeNull()
+  })
+})
+
+// The reveal that a "Needs you" notice drives is a navigation command, not a standing state. A pane
+// derives the card's `focus` from a row it rebuilds on every streamed event, so the reveal effect is
+// re-notified while the value stays true. It must land the reader once and then leave the caret alone.
+describe('revealing a request without stealing the caret', () => {
+  beforeEach(() => { Element.prototype.scrollIntoView = vi.fn() })
+
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  const elsewhere = () => {
+    const field = document.createElement('textarea')
+    document.body.append(field)
+    hosts.push(() => field.remove())
+    field.focus()
+    return field
+  }
+
+  it('takes focus once, then leaves it alone through later updates', async () => {
+    const [tick, setTick] = createSignal(0)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentRequestCard request={request(false)} focused={tick() >= 0} />, host)
+    hosts.push(() => { dispose(); host.remove() })
+    await flush()
+    const card = host.querySelector<HTMLElement>('.ui-card')!
+    expect(document.activeElement).toBe(card)
+
+    const field = elsewhere()
+    expect(document.activeElement).toBe(field)
+
+    // A streamed update re-notifies the reveal while `focused` stays true.
+    setTick(1)
+    await flush()
+    expect(document.activeElement).toBe(field)
+  })
+
+  it('reveals again after focus goes off and back on', async () => {
+    const [on, setOn] = createSignal(true)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentRequestCard request={request(false)} focused={on()} />, host)
+    hosts.push(() => { dispose(); host.remove() })
+    await flush()
+    const card = host.querySelector<HTMLElement>('.ui-card')!
+    expect(document.activeElement).toBe(card)
+
+    elsewhere()
+    setOn(false)
+    await flush()
+    setOn(true)
+    await flush()
+    expect(document.activeElement).toBe(card)
   })
 })
