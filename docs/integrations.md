@@ -467,11 +467,16 @@ that mapping would only be a second place for one of those to leak through. The 
 silent: the name and a scrubbed message go to the log with the request id the client was shown, which
 is the only record an unplanned throw leaves.
 
-Ask `isProviderOperationError(error)`, never `error instanceof ProviderOperationError`. A plugin
-bundle inlines its whole dependency graph, that class included, because a loaded plugin's directory
-has no `node_modules` to resolve against (`apps/node/scripts/build-plugin.mjs`). The class a bundled
-provider throws is therefore compiled into that plugin's bundle and is not the class the host holds,
-so `instanceof` is false in both directions across the boundary and a typed failure such as
-`provider_needs_auth` lands in the catch-all instead. Both copies still agree on the shape, and the
-guard checks that: an `Error` carrying a numeric `status` and a `code` from `PROVIDER_ERROR_CODES`.
-The same caution applies to any other class that crosses this boundary, Hono's included.
+Ask `isProviderOperationError(error)`, never `error instanceof ProviderOperationError`. Two things
+break the identity and they compound. A plugin bundle inlines its whole dependency graph, that class
+included, because a loaded plugin's directory has no `node_modules` to resolve against
+(`apps/node/scripts/build-plugin.mjs`). And a plugin runs in an isolated worker, so what it throws is
+torn down by `errorToWire` and rebuilt on this side as a plain `Error` (`packages/node-core/src/server/plugins/pluginRpc.ts`). The
+class never survives either crossing, so `instanceof` is false in both directions and a typed failure
+such as `provider_needs_auth` lands in the catch-all instead.
+
+The shape does survive, and the guard checks that: an `Error` carrying a numeric `status` and a
+`code` from `PROVIDER_ERROR_CODES`. Both fields have to be on the RPC record for that to hold, which
+is why `errorToWire` names `status` beside `code`. A field a host check depends on has to be added
+there or it is gone by the time the route reads it. The same caution applies to any other class that
+crosses this boundary, Hono's included.
