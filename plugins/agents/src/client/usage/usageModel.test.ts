@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
-import { formatReset, providerUsageRows, usageSummaryEntries } from './usageModel'
+import { formatReset, formatTokens, providerMetaLine, providerUsageRows, usageSummaryEntries } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -111,6 +111,22 @@ describe('agent usage detail formatting', () => {
       'Est. cache savings',
     ])
     expect(providerUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('≈$0.42')
+  })
+
+  it('keeps a decimal on every compacted token count', () => {
+    // "1M" beside "132.4M" read as a rounder number than it was.
+    expect([7_890, 1_038_000, 132_400_000].map(formatTokens)).toEqual(['7,890', '1.0M', '132.4M'])
+  })
+
+  it('says who and when in one line, without repeating the harness name', () => {
+    const claude: AgentProviderUsage = {
+      ...provider('claude', 82),
+      plan: 'Claude Max',
+      account: { email: 'james@runn.io', organization: 'James' },
+      capturedAt: 1_000,
+    }
+    expect(providerMetaLine(claude, 1_000)).toBe('Claude Max · james@runn.io · James · updated just now')
+    expect(providerMetaLine(claude, 1_000)).not.toContain('Claude Code')
   })
 
   it('names models that prevent a daily estimate', () => {

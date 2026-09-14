@@ -17,7 +17,10 @@ export function formatUsd(value: number): string {
 }
 
 export function formatTokens(value: number): string {
-  return new Intl.NumberFormat(undefined, { notation: value >= 10_000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value)
+  if (value < 10_000) return new Intl.NumberFormat().format(value)
+  // One decimal always, so a column of compact counts lines up: 1,038,000 formatted as "1M" next to
+  // "132.4M" read like a rounder number than it is.
+  return new Intl.NumberFormat(undefined, { notation: 'compact', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)
 }
 
 export function formatDuration(seconds: number): string {
@@ -49,6 +52,21 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
   if (minutes < 1) return 'updated just now'
   if (minutes < 60) return `updated ${minutes}m ago`
   return `updated ${Math.floor(minutes / 60)}h ago`
+}
+
+// Whose account it is and how fresh the reading is, as one line. The harness's own name is not in it:
+// the block that draws this is already headed by the name.
+export function providerMetaLine(provider: AgentProviderUsage, now = Date.now()): string {
+  return [
+    // Codex names its plan `team`, Claude names its `Claude Max`. The snapshot keeps whatever the
+    // provider said (see the note in formatReset); the sentence case is this line's business.
+    provider.plan && provider.plan[0].toUpperCase() + provider.plan.slice(1),
+    provider.account?.email,
+    provider.account?.organization,
+    `${provider.stale ? 'stale · ' : ''}${formatUpdated(provider.capturedAt, now)}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 // Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row

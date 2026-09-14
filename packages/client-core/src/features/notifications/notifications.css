@@ -17,7 +17,9 @@
    rather than through a class on the node, because the kit takes no class. Without the width the
    surface sizes to its widest row and the bell opens a page-wide sheet. */
 .notify-inbox { width: 340px; display: flex; flex-direction: column; min-width: 0; }
-.ui-popover:has(> .notify-inbox) { padding: 0; }
+/* Carries `[role='dialog']` to outrank the padding the kit gives a dialog surface, which this inbox
+   does not want: a row's hover band has to reach both edges. Specificity, not source order. */
+.ui-popover[role='dialog']:has(> .notify-inbox) { padding: 0; }
 .notify-head {
   display: flex;
   align-items: center;

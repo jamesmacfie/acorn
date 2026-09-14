@@ -125,8 +125,8 @@ export default function ShortcutsSettings() {
               </Show>
             </div>
             <Show when={group.disabled}><p class="shortcut-plugin-state muted">Plugin disabled — shortcuts remain editable and will apply when it is enabled.</p></Show>
-            {/* Stays a plain <dl>: `.help-list` aligns its two columns ACROSS rows, which
-                DescriptionList.Item cannot express — each Item is its own grid. */}
+            {/* Stays a plain <dl>: the label cell here is an editable input and the description
+                carries inline conflict text and its own buttons, all styled by `.help-list`. */}
             <dl class="help-list">
               <For each={group.bindings}>
                 {(binding) => (

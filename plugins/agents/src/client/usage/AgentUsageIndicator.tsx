@@ -21,7 +21,10 @@ export default function AgentUsageIndicator() {
   return (
     <Popover
       placement="bottom-end"
-      minWidth={360}
+      // Wide enough for the longest line the panel draws, a label beside "80% remaining · resets
+      // Sep 17 at 11:59pm": the value column wraps rather than pushing the surface open, so the
+      // width has to be asked for here.
+      minWidth={460}
       ariaLabel="Agent utilization"
       role="dialog"
       trigger={({ toggle, open }) => (

@@ -478,6 +478,12 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   display: flex;
   flex-direction: column;
   padding: var(--space-1);
+}
+/* A menu wants its items against the edge, where the hover band reaches the full width. A dialog
+   holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
+   the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
+.ui-popover[role='dialog'] {
+  padding: var(--space-5);
   background: var(--popover-bg);
   border: var(--surface-border);
   border-radius: var(--radius-popover);
@@ -635,7 +641,12 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    rollbar and linear frames, which had the two best implementations. */
 .ui-dl { display: grid; gap: var(--space-3) var(--space-5); margin: 0; font-size: var(--fs-sm); }
 .ui-dl[data-size='sm'] { font-size: var(--fs-xs); gap: var(--space-2) var(--space-4); }
-.ui-dl[data-layout='columns'] .ui-dl-item { display: grid; grid-template-columns: max-content 1fr; gap: inherit; }
+/* `columns` is a table, so the labels share one column and every value starts at the same x. Giving
+   each item its own `max-content` grid sized the label to that row's own label, which left a list of
+   pairs looking like a ragged run of sentences. `display: contents` hands the dt and dd to the list's
+   grid; the wrapping div only ever existed for `facts` placement. */
+.ui-dl[data-layout='columns'] { grid-template-columns: max-content 1fr; }
+.ui-dl[data-layout='columns'] .ui-dl-item { display: contents; }
 .ui-dl[data-layout='facts'] { grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); }
 .ui-dl[data-layout='facts'] .ui-dl-item { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 /* A value too wide for one tile takes the whole row: a head → base branch pair spilled across the
