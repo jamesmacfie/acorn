@@ -280,11 +280,19 @@ export const linearProvider = publicProvider({
       if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
       const response = await linearFetch(secret, VIEWER_QUERY, {})
       if (linearError(response)) throw new ProviderOperationError('provider_needs_auth', 401)
+      let viewer: Viewer
       try {
-        return { viewer: await linearData<Viewer>(response), secret }
+        viewer = await linearData<Viewer>(response)
       } catch {
         throw new ProviderOperationError('provider_needs_auth', 401)
       }
+      // A key with no person behind it, an application token rather than a personal one, gets a 200
+      // and `{"viewer": null}` with nothing in `errors`, so every check above it passes. `normalize`
+      // then reads the workspace name three levels into this, and the TypeError that follows leaves
+      // validate as something nobody threw on purpose: the owner is told the provider is unavailable
+      // when the truth is that this key cannot name a workspace.
+      if (!viewer.viewer?.organization?.name) throw new ProviderOperationError('provider_needs_auth', 401)
+      return { viewer, secret }
     },
     normalize(_credentials, validated: LinearValidated) {
       const workspace = validated.viewer.viewer.organization.name
