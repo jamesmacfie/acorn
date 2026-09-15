@@ -164,31 +164,6 @@ would need one, and both are out of scope
 `X-Sentry-Auth` header and in the envelope's own header, and nowhere in a payload; the connection's
 label is host and project, never the key.
 
-**A stored credential may be a pointer at 1Password rather than the credential itself.** Any
-credential field accepts a secret reference, `op://Vault/Item/field`. It is sealed and stored exactly
-like a token, and the difference appears when something asks for the plaintext: the node runs the
-`op` CLI, and 1Password asks the owner to unlock. The resolved value is held in memory only, for as
-long as Settings → Security says, and is never written to disk.
-
-Resolution is off until the owner turns it on, per node, because it means running a binary off the
-PATH. Every `op` invocation queues behind the last, so two connections refreshing at once produce one
-unlock prompt rather than two. A reference is a pointer, not a secret, so it is shown in Settings →
-Integrations and travels on the wire as `Integration.secretRef`; the value behind it never does.
-
-The node resolves every reference it holds while it starts, not when the first request wants one.
-`op` is slow enough to matter: on one developer machine a read took 9.5 seconds against a 1Password
-daemon that had just started and 1.6 seconds once that daemon was warm. Paid on the request path,
-that outran the client's per-node deadline, and the first click after a launch showed a healthy
-connection as unavailable. The boot pass moves the cost to a moment when nobody is waiting, and
-failures there are swallowed: a locked or absent vault is not a reason for a node to fail to start,
-and it surfaces again with a real error the next time a request wants that credential.
-
-A failure to read one is `provider_secret_ref_unreadable`, deliberately not "this credential was
-rejected": the credential is fine, and this machine could not reach 1Password. `op`'s own stderr goes
-to the node log and never to a client, for the same reason a failed harness generate's does. It
-quotes vault and item names. A node with no desktop session, such as a standalone one, cannot show
-an unlock prompt and reports the failure rather than hanging on it.
-
 Child environments are built by the process broker. They do not inherit `SESSION_ENC_KEY`, GitHub
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.

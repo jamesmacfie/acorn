@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptSecret } from '../secretBox'
 import { redact, SecretService, SecretUnavailableError } from './secrets'
-import { OnePasswordError } from './onePassword'
 
 const KEY = 'a'.repeat(64)
 const TOKEN = 'ghp_averyrealisticlookinggithubtoken'
@@ -166,53 +165,5 @@ describe('scrub cannot become the leak', () => {
     expect(failure).toBeInstanceOf(Error)
     expect((failure as Error).message).not.toContain(TOKEN)
     expect(((failure as Error).cause as Error).message).not.toContain(TOKEN)
-  })
-})
-
-describe('1Password references', () => {
-  const REF = 'op://Private/Linear/credential'
-
-  it('resolves a stored reference before the scope sees it', async () => {
-    const resolving = new SecretService(KEY, async () => 'the-real-token')
-    const ref = await encryptSecret(REF, KEY)
-    await expect(resolving.use(ref, 'linear: list issues', (value) => value)).resolves.toBe('the-real-token')
-  })
-
-  it('leaves an ordinary credential alone', async () => {
-    const resolveRef = vi.fn(async () => 'unreachable')
-    const resolving = new SecretService(KEY, resolveRef)
-    await expect(resolving.use(await sealed(), 'github: list pulls', (value) => value)).resolves.toBe(TOKEN)
-    expect(resolveRef).not.toHaveBeenCalled()
-  })
-
-  it('scrubs the resolved value, not the reference, out of a throw', async () => {
-    const resolving = new SecretService(KEY, async () => 'the-real-token')
-    const ref = await encryptSecret(REF, KEY)
-    const failure = await resolving
-      .use(ref, 'linear: list issues', (value) => {
-        throw new Error(`upstream rejected ${value}`)
-      })
-      .catch((error: Error) => error)
-    expect(failure.message).not.toContain('the-real-token')
-    expect(failure.message).toContain('[redacted]')
-  })
-
-  it('does not converge a 1Password failure onto "not connected"', async () => {
-    const resolving = new SecretService(KEY, () => Promise.reject(new OnePasswordError('not-installed')))
-    const ref = await encryptSecret(REF, KEY)
-    // useOptional swallows SecretUnavailableError, and forEachConnection demotes a connection to
-    // needs-auth on it. Neither is right here: the credential is fine and this machine is not, so
-    // the failure has to travel rather than be absorbed.
-    await expect(resolving.useOptional(ref, 'linear', (value) => value)).rejects.toThrow(OnePasswordError)
-  })
-
-  it('reports a reference without resolving it', async () => {
-    const resolveRef = vi.fn(async () => 'unreachable')
-    const resolving = new SecretService(KEY, resolveRef)
-    await expect(resolving.secretRef(await encryptSecret(REF, KEY))).resolves.toBe(REF)
-    await expect(resolving.secretRef(await sealed())).resolves.toBeNull()
-    await expect(resolving.secretRef(null)).resolves.toBeNull()
-    // Drawing a badge must never cost someone an unlock prompt.
-    expect(resolveRef).not.toHaveBeenCalled()
   })
 })

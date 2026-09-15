@@ -146,17 +146,6 @@
 .integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
 .integration-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
-/* Sits at the end of the name row, after `.integration-meta` has taken the slack. Faint by default and
-   full strength on hover, because it marks where the credential comes from rather than asking to be
-   read. The mark carries its own colour, so `currentColor` is deliberate. */
-.integration-secret-ref {
-  flex: none;
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-}
-.integration-secret-ref:hover { color: var(--text); }
-.integration-secret-ref svg { width: 16px; height: 16px; display: block; }
 .integration-badge {
   font-size: var(--fs-sm);
   color: var(--text-faint);

@@ -116,11 +116,6 @@ const RULES: readonly RouteRule[] = [
   // hand over credentials or a way to run code.
   { path: shape('/v2/core/security'), scopes: {}, note: 'Node security posture; owner surface.' },
   { path: shape('/v2/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
-  // Read-shaped, and still nothing a plugin frame should see: it says whether this machine can be
-  // made to run `op` and unlock the owner's vault, which is reconnaissance about the credential
-  // store rather than a fact about a plugin's own work.
-  { path: shape('/v2/core/secrets/onepassword'), scopes: {}, note: 'Describes how this node reads credentials.' },
-  { path: shape('/v2/core/secrets/onepassword/refresh'), scopes: {}, note: 'Forces the next read to prompt the owner.' },
   { path: shape('/v2/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
   // The batch route the renderer and the other runtimes post to (docs/telemetry.md § Other
   // runtimes). Unmappable, and it is a write rather than a read: everything admitted there reaches
