@@ -463,16 +463,29 @@ reconciles instead of remounting, which is what used to replace a row several ti
 agent was fanning out.
 
 Both of those props answer to the same rule: **a background change never moves the reader.** For
-`Timeline follow` that means the mode and the place only change on the reader's own gesture. A list
-that shrinks — a card collapses, a filter drops rows, a redraw comes back shorter — makes the browser
-clamp the scroll offset and fire a scroll event that by position is indistinguishable from someone
-scrolling. Neither the follow mode nor the saved place may be taken from it; the place is chased back
-as the list grows again. Without that, a collapse while reading saves offset zero, and every later
-visit to that transcript opens at the top. Focus counts as a gesture, because revealing a card scrolls
-it into view and then focuses it. For `Card focus` it means the reveal is dropped outright when the
-caret is in a text box: some callers hold `focus` as state rather than issuing it as a command, so a
-list that refetches rebuilds its rows and re-issues a reveal nobody gave, and the person who finds out
-is the one whose sentence lost the caret.
+`Card focus` it means the reveal is dropped outright when the caret is in a text box: some callers hold
+`focus` as state rather than issuing it as a command, so a list that refetches rebuilds its rows and
+re-issues a reveal nobody gave, and the person who finds out is the one whose sentence lost the caret.
+
+For `Timeline follow` it means **a place is a turn, not a pixel.** "Two thousand pixels down" only
+means something while everything above those two thousand pixels keeps its height, and in a live
+transcript nothing does: a message keeps streaming, a code fence grows, an image loads, highlighting
+lands a frame or two after the paint. So the reader's place is the turn the viewport starts in and how
+far into it, which is `ReadingPlace` in `kit/lib/readingPlace.ts`, and putting them back is a
+correction measured against that turn's current position rather than an offset replayed. Following is
+the same value's other case, not a flag beside it, because the two used to be kept in agreement by
+hand and every defect found in that code was them disagreeing.
+
+The place only changes on the reader's own gesture. A list that shrinks makes the browser clamp the
+scroll offset and fire a scroll event that by position is indistinguishable from someone scrolling, so
+a scroll with no gesture behind it changes nothing and the next resize puts the turn back. Focus counts
+as a gesture, because revealing a card scrolls it into view and then focuses it.
+
+The timeline does not keep the places. `place` and `onChange` hand them to the caller, because
+navigation disposes a task's panes on purpose ([panes.md](./panes.md)), so a place kept in the
+component is a place lost on every workspace switch, and a map hidden inside a kit node has no owner to
+scope or clear it. The agents plugin owns them, beside the drafts, in
+`plugins/agents/src/client/sessions/readingPlaceStore.ts`.
 
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
@@ -1090,7 +1103,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `viewKey` is dropped: this host keeps one offset per mounted viewport rather than a map of remembered ones. `Timeline.Turn` is a node of its own on both hosts |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |

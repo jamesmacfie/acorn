@@ -1,6 +1,6 @@
 import { createEffect, on, onCleanup, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
-import { nextFollowing } from '../../lib/followScroll'
+import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { reportScrollPlace } from '../../lib/scrollPlace'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
@@ -21,23 +21,9 @@ import { reportScrollPlace } from '../../lib/scrollPlace'
 
    At 80×24: the cards in sequence, a dim rule between turns. */
 
-/* Where each followed timeline was left, by `viewKey`, for the life of the window.
-   Only a place the reader chose is held: a timeline sitting at the newest turn has no entry, because
-   the bottom moves as the list grows and replaying an offset would land short of it.
-
-   Bounded, and by insertion order, because `ui/` may not import the scope-eviction store that would
-   otherwise clear it. Fifty transcripts of scroll offsets is nothing; an unbounded map is a leak. */
-const PLACES = 50
-const places = new Map<string, number>()
-const rememberPlace = (key: string, top: number): void => {
-  places.delete(key)
-  places.set(key, top)
-  if (places.size > PLACES) places.delete(places.keys().next().value as string)
-}
-
 /** The two jumps a caller can drive from outside — a "go to top"/"go to bottom" pair above the
  *  composer, say. Handed out through `controls` because the scroll is the timeline's own, so the
- *  jumps have to move its `following` flag as well as its scrollTop or a stream would pull the view
+ *  jumps have to move the reading place as well as the scrollTop or a stream would pull the view
  *  straight back down. Only meaningful on a followed timeline. */
 export type TimelineControls = {
   /** Jump to the oldest turn and stop following, so new turns no longer pull the view down. */
@@ -45,6 +31,11 @@ export type TimelineControls = {
   /** Jump to the newest turn and follow it again. */
   toBottom: () => void
 }
+
+/** How many frames one settling burst may spend putting the anchor back. The resizes that follow
+ *  re-arm it, so this bounds a burst rather than the whole restore: a transcript whose highlighting
+ *  lands three seconds late gets another go when it does, without a frame loop running in between. */
+const CORRECTIONS = 24
 
 export function Timeline(props: {
   ariaLabel?: string
@@ -56,9 +47,22 @@ export function Timeline(props: {
    * a timeline is a plain run of cards and whatever region it sits in does the scrolling.
    */
   follow?: boolean
-  /** Which list this is, for the place the reader was left at. A timeline that swaps its contents —
-   *  one session's stream for another's — is a different list and wants a different key. */
-  viewKey?: string
+  /**
+   * Where the reader is. Supplying it hands the place to the caller: this component measures and
+   * moves its own scroller, and the caller remembers, so a place outlives the mount that made it.
+   *
+   * Supply both or neither. Without them a followed timeline still holds the reader where they scrolled
+   * to for as long as it is mounted, and forgets it when it goes, which is all a caller with nowhere to
+   * keep a place can be given.
+   *
+   * Hold it in something that does not notify, a plain map rather than a signal. This is read through
+   * an effect, so a store that notified on every write would restart the restore each time any list
+   * moved.
+   */
+  place?: () => ReadingPlace
+  /** The reader's place changed, and only ever because the reader moved. Named `onChange` because a
+   *  callback prop only crosses to a sandboxed host under one of the kit's eleven semantic events. */
+  onChange?: (place: ReadingPlace) => void
   /** Handed the scroll jumps once the scroller exists, for a control that lives outside this element.
    *  Only called on a followed timeline; a plain run of cards has no scroll of its own to drive. */
   controls?: (api: TimelineControls) => void
@@ -74,16 +78,23 @@ export function Timeline(props: {
   if (!props.follow) return list
 
   let scroller: HTMLDivElement | undefined
-  const viewKey = () => props.viewKey ?? ''
-  // Everything below is driven by the list resizing rather than by the data changing: a streamed
-  // message keeps growing after the event that carried it, and code highlighting settles a frame or
-  // two later again, so any write timed off the data lands short of a bottom that has since moved.
-  let following = true
-  let target: number | null = null
-  let applied = -1
+  // The reader's place, as this component last understood it. `props.place` is the truth; this is what
+  // the corrections below are aimed at.
+  let place: ReadingPlace = LIVE
+  let opened = false
+  // Bumped when the caller hands over a different place, so a frame the outgoing list scheduled cannot
+  // move the incoming one.
+  let generation = 0
+  let frame = 0
+  let corrections = 0
+  // Set while this component is the one writing scrollTop, and cleared a frame later. A scroll event
+  // arrives after the write that caused it, and telling ours from the reader's by comparing positions
+  // does not survive the fractional device pixels a WebView reports.
+  let applying = false
+  let releasing = false
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
-  // keeps delivering scroll events long after the gesture, but following is already off by then.
+  // keeps delivering scroll events long after the gesture, but the place is already captured by then.
   let userDriven = false
   // When the reader last touched this, which is a different question from `userDriven` and only the
   // report below asks it. A scrollbar drag and a flick of momentum both deliver many scroll events for
@@ -91,114 +102,178 @@ export function Timeline(props: {
   // nobody made. Nothing scrolls a second after the reader stopped touching it.
   let lastInput = 0
   // Where the view was the last time anything here looked, so a report can say what the move was from
-  // as well as to. Every write sets it beside `applied`.
+  // as well as to.
   let at = 0
+
+  /** This timeline's own turns, in order. `:scope >` because a timeline drawn inside a card of another
+   *  one must not have its turns harvested by the outer scroller. */
+  const turns = (): HTMLElement[] =>
+    [...list.querySelectorAll<HTMLElement>(':scope > .ui-timeline-turn[data-turn]')]
+
+  /**
+   * The turn the viewport starts in, and how far into it.
+   *
+   * The reader's eye is on the first turn whose bottom edge is still below the top of the viewport.
+   * Measured from the scroller's own top edge rather than from `offsetTop`, for two reasons: an
+   * `offsetParent` inside a card would silently change what `offsetTop` means, and every constant in
+   * the expression — the scroller's border, its padding, anything sticky above the list — cancels,
+   * because saving and restoring evaluate the same difference. What is stored is not a coordinate to
+   * replay. It is the input to a correction that is measured again every time it is applied, which is
+   * why content growing above the reader cannot invalidate it.
+   *
+   * Ceiling: a linear scan, one rect read per turn. A transcript is a few hundred cards and the reads
+   * share one layout, so this is microseconds; walk out from the last known index if a list ever holds
+   * thousands.
+   */
+  const measure = (): ReadingPlace | null => {
+    if (!scroller) return null
+    const top = scroller.getBoundingClientRect().top
+    const rows = turns()
+    const index = rows.findIndex((row) => row.getBoundingClientRect().bottom > top)
+    const row = rows[index]
+    return row ? { at: 'turn', key: row.dataset.turn ?? '', index, offset: top - row.getBoundingClientRect().top } : null
+  }
+
+  const write = (top: number) => {
+    if (!scroller) return
+    applying = true
+    scroller.scrollTop = top
+    at = scroller.scrollTop
+    // One release for however many writes are in flight. Scheduling one each would let the first frame
+    // clear the guard while a later write's scroll event is still on its way, and that event would then
+    // read as the reader moving.
+    if (releasing) return
+    releasing = true
+    requestAnimationFrame(() => { applying = false; releasing = false })
+  }
+  const pin = () => { if (scroller) write(scroller.scrollHeight) }
+
+  /** Tell the caller where the reader is, when it has changed. */
+  const adopt = (next: ReadingPlace) => {
+    if (samePlace(next, place)) return
+    place = next
+    props.onChange?.(next)
+  }
+
+  const schedule = () => {
+    if (frame || !scroller) return
+    const era = generation
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      if (era === generation) correct()
+    })
+  }
+
+  /**
+   * Put the anchor turn back where the reader left it, and keep asking until it is there or the list
+   * refuses to move any further.
+   *
+   * "Is the turn where I asked for it" is a question that can be answered. The old code asked "did the
+   * browser accept my pixel", which answers no for ever whenever the list is shorter than the number,
+   * and that is what parked a reader at the top. "The list would not move" is the second way to be
+   * done, for an anchor that cannot be brought any higher because it is the last turn of a short list;
+   * the budget below would end that case anyway, a couple of dozen frames later.
+   */
+  const correct = () => {
+    if (!scroller || place.at !== 'turn') return
+    const rows = turns()
+    // Nothing drawn yet. The resizes that follow re-arm this, so a list still arriving gets another go
+    // without a frame budget of its own.
+    if (!rows.length) return
+    const found = resolveAnchor(place, rows.map((row) => row.dataset.turn ?? ''))
+    if (!found) { adopt(LIVE); pin(); return }
+    const row = rows.find((candidate) => candidate.dataset.turn === found.key)
+    if (!row) return
+    // Clamped in case the turn came back shorter than the reader left it, which "collapse all" does.
+    const want = Math.min(found.offset, Math.max(0, row.offsetHeight - 1))
+    const delta = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + want
+    if (Math.abs(delta) <= 1) { corrections = 0; adopt(measure() ?? place); return }
+    const before = scroller.scrollTop
+    write(before + delta)
+    if (scroller.scrollTop === before) { corrections = 0; adopt(measure() ?? place); return }
+    if (++corrections < CORRECTIONS) schedule()
+    else corrections = 0
+  }
+
   const report = (cause: 'opened' | 'unasked', to: number): void => {
     if (!scroller) return
     reportScrollPlace({
-      view: viewKey(),
+      anchor: place.at === 'live' ? 'live' : place.key,
       cause,
       from: at,
       to,
       height: scroller.scrollHeight,
       viewport: scroller.clientHeight,
-      following,
+      following: place.at === 'live',
     })
   }
-  const nearBottom = (element: HTMLElement) =>
-    element.scrollHeight - element.scrollTop - element.clientHeight < 96
-  const pin = () => {
-    if (!scroller) return
-    scroller.scrollTop = scroller.scrollHeight
-    applied = scroller.scrollTop
-    at = applied
-    places.delete(viewKey())
-  }
-  const applyTarget = () => {
-    if (!scroller || target === null) return
-    scroller.scrollTop = target
-    applied = scroller.scrollTop
-    at = applied
-    // Highlighting resolves after mount and keeps growing the list, so the browser clamps an early
-    // write. Re-apply until it sticks, driven by the list's own resizes.
-    if (scroller.scrollTop < target - 1) return
-    target = null
-    following = nearBottom(scroller)
-  }
+
   const noteScroll = () => {
-    if (!scroller) return
-    // Our own writes echo back as scroll events, by which time the list has usually grown again, so
-    // the write just made would measure as "scrolled up". Skip them.
-    if (scroller.scrollTop === applied) return
+    // Our own write, echoing back. Also the guard that stops a scroll arriving while this subtree is
+    // torn down from being read as the reader moving: cleanup drops the scroller first.
+    if (!scroller || applying) return
     const gesture = userDriven
     const top = scroller.scrollTop
+    const geometry = { scrollTop: top, scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight }
     // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
-    // clamped scrollTop to the only offset left. A card collapsed, a filter dropped rows, a re-render
-    // came back shorter.
-    const clamp = !gesture && top >= scroller.scrollHeight - scroller.clientHeight - 1
+    // clamped scrollTop to the only offset left.
+    const clamp = !gesture && top >= geometry.scrollHeight - geometry.clientHeight - 1
     // Not the reader, not one of our own writes, and not a clamp, and yet the view has moved up by more
-    // than a screen. Said out loud rather than corrected: guessing at the offset it should have been
-    // would be one more thing moving the reader around (../../lib/scrollPlace.ts).
-    const quiet = Date.now() - lastInput > 1000
-    if (quiet && !clamp && top < at - scroller.clientHeight) report('unasked', top)
-    target = null
-    following = nextFollowing({ following, nearBottom: nearBottom(scroller), userDriven })
+    // than a screen. Said out loud, because nothing here can say what did it (../../lib/scrollPlace.ts).
+    if (Date.now() - lastInput > 1000 && !clamp && top < at - geometry.clientHeight) report('unasked', top)
     userDriven = false
     at = top
-    if (following) return places.delete(viewKey())
-    // The clamp moved the reader; it did not ask to be moved. Keep the place they were reading and
-    // chase it back as the list grows again, or a collapse that leaves the list shorter than the
-    // viewport saves offset zero and every later visit to this view opens at the top.
-    //
-    // Ceiling: if the list never grows back, the target stays pending and the reader sits where the
-    // clamp left them, which is the only offset there is. Their next gesture clears it.
-    target = clamp ? places.get(viewKey()) ?? null : null
-    if (!clamp) rememberPlace(viewKey(), top)
+    adopt(placeAfterScroll({ place, gesture, geometry, anchor: measure }))
+    // The reader moved after we did, so a correction in flight is now aimed at where they are. Anything
+    // else moved them without asking, and the next frame puts them back.
+    corrections = 0
+    if (!gesture) schedule()
   }
+
   const noteInput = () => {
     userDriven = true
     lastInput = Date.now()
   }
-  // Driven from outside, so they set `following` by hand rather than inferring it from position: a jump
-  // to the top must survive the next streamed event, which the follow logic would otherwise read as the
-  // list growing under a reader who is still at the bottom.
+
+  // Driven from outside, so they set the place by hand rather than inferring it from position: a jump
+  // to the top must survive the next streamed event, which reading the position back would take as the
+  // list growing under a reader who is still at the foot.
   const toTop = () => {
-    if (!scroller) return
-    target = null
-    following = false
-    scroller.scrollTop = 0
-    applied = scroller.scrollTop
-    at = applied
-    rememberPlace(viewKey(), scroller.scrollTop)
+    const first = turns()[0]
+    if (first) adopt({ at: 'turn', key: first.dataset.turn ?? '', index: 0, offset: 0 })
+    write(0)
   }
-  const toBottom = () => {
-    target = null
-    following = true
-    pin()
-  }
+  const toBottom = () => { adopt(LIVE); pin() }
   props.controls?.({ toTop, toBottom })
-  // The list grows for two reasons and the response differs: while restoring we chase the saved
-  // offset, otherwise we sit on the bottom. The scroller is observed too, because something appearing
-  // above it shortens the viewport without touching the list.
+
+  // The list grows for two reasons and the response is the same rule either way: sit on the foot, or
+  // put the anchor turn back under the reader. The scroller is observed too, because something
+  // appearing above it shortens the viewport without touching the list.
   const growth = new ResizeObserver(() => {
-    if (target !== null) applyTarget()
-    else if (following) pin()
+    if (place.at === 'live') pin()
+    else schedule()
   })
   growth.observe(list)
-  onCleanup(() => growth.disconnect())
-  // A memo as the dep, not an inline getter: `on()` runs its callback on every notification without
-  // comparing the input, so a getter reading a record keyed by every session would reset the place
-  // whenever any other session moved.
-  createEffect(on(viewKey, (key) => {
-    target = places.get(key) ?? null
-    following = target === null
+  onCleanup(() => {
+    growth.disconnect()
+    if (frame) cancelAnimationFrame(frame)
+    scroller = undefined
+  })
+
+  // The caller handing over a different place is the only thing that restarts a restore: a new mount,
+  // or the same component swapping one session's stream for another's.
+  createEffect(on(() => props.place?.() ?? LIVE, (next) => {
+    if (opened && samePlace(next, place)) return
+    opened = true
+    generation += 1
+    corrections = 0
     // The click that changed the view armed this on the way out of the old one. Left armed, it is
-    // spent on the first scroll event the new view produces, and a shorter list clamps scrollTop the
-    // moment it renders, so that event would read as "the reader scrolled up". Whose input it was
-    // does not survive the view it was made in.
+    // spent on the first scroll event the new view produces. Whose input it was does not survive the
+    // view it was made in.
     userDriven = false
-    if (target === null) pin()
-    else applyTarget()
+    place = next
+    if (next.at === 'live') pin()
+    else correct()
     // A remount lands here and nowhere else: a fresh scroll element starts at zero and fires no scroll
     // event, so this is the only record that the reader was put somewhere by a list opening rather
     // than by anything they did.
@@ -219,7 +294,7 @@ export function Timeline(props: {
       onKeyDown={noteInput}
       // Focus counts as the reader's input too: revealing a card scrolls it into view and then
       // focuses it, and focus is delivered before the scroll event, so the scroll that follows is
-      // the reveal rather than a clamp to be undone.
+      // the reveal rather than a move to be undone.
       onFocusIn={noteInput}
     >
       {list}
@@ -228,5 +303,10 @@ export function Timeline(props: {
 }
 
 /** One turn. Wraps its child in the list item the timeline needs, so a caller composes Cards
- *  rather than remembering to write an `<li>`. */
-Timeline.Turn = (props: { children: JSX.Element }) => <li class="ui-timeline-turn">{props.children}</li>
+ *  rather than remembering to write an `<li>`.
+ *
+ *  `key` is what a followed timeline puts the reader back on. Without it the list can still be drawn
+ *  and followed, but it has no places to remember, so give one to every turn or to none. */
+Timeline.Turn = (props: { key?: string; children: JSX.Element }) => (
+  <li class="ui-timeline-turn" data-turn={props.key}>{props.children}</li>
+)

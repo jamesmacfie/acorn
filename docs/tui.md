@@ -952,6 +952,14 @@ from the offset itself. The growth it reacts to is the height of a box sized by 
 box that grows to fill the region: the second changes whenever anything else in the column does, and
 following that would drag the view to the foot every time a menu opened.
 
+What it does not do is put the reader back on the turn they left. The DOM host holds a reading place as
+a turn and an offset into it, handed to it through `place` and `onChange`
+([ui-design.md](./ui-design.md) § Behaviour a pane keeps redoing); this host drops both, and
+`Timeline.Turn` ignores its `key`. A viewport here knows its own offset and the height of the box
+inside it, and finding a turn needs per-turn geometry it does not publish. So `NODE_SUPPORT` calls the
+node `reduced` and says what is lost: a list drawn again opens at the newest turn. The offset a mounted
+viewport already holds is unaffected, so scrolling up to read and staying there still works.
+
 The nesting question is what decides the shape. A viewport's height comes from `flexBasis: 0` on a
 flex line, and the content box inside one is free-sized, so a viewport nested in a viewport has
 nothing to be bounded by — the same reason a scrollbox around a whole pane is refused
