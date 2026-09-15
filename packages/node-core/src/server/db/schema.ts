@@ -31,14 +31,19 @@ export const prefs = sqliteTable(
 
 // Per-user third-party credentials. First-class, multi-row per provider (docs/workspaces-and-tasks.md):
 // a user can connect several Linears or Rollbars, so the key is an opaque `id`, not (userId, provider).
-// `label` disambiguates them in the UI ("Linear – work"). `authRef` is encrypted at rest (JWE via
-// SESSION_ENC_KEY, see secretBox.ts encryptSecret) and never leaves the server, the same posture as
-// the GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
+// `label` and the owner's optional `name` are what tell them apart in the UI ("Linear – work").
+// `authRef` is encrypted at rest (JWE via SESSION_ENC_KEY, see secretBox.ts encryptSecret) and never
+// leaves the server, the same posture as the GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),
   provider: text('provider').notNull(), // registered provider id ('linear', 'rollbar', ...)
-  label: text('label').notNull(), // user-facing name, seeded from the provider (e.g. workspace/org)
+  label: text('label').notNull(), // provider truth, rewritten on every connect and rotate (workspace/org)
+  // What the owner chose to call this connection, or null if they never said. Kept apart from `label`
+  // for two reasons: rotating a credential rewrites `label` from the provider and would wipe a name
+  // stored there, and Rollbar reuses `label` as the name of the project a connection covers, so an
+  // owner renaming a connection would rename a project in the mapping picker.
+  name: text('name'),
   authRef: text('access_token').notNull(), // encrypted secret material; physical name retained for migration compatibility
   authKind: text('auth_kind').notNull().default('api-key'),
   account: text('account'), // JSON ProviderAccountRef; core renders but never interprets provider ids

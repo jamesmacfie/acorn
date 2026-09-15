@@ -23,7 +23,13 @@ import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
 import { AgentStore } from './store'
-import { decideAgentCommand } from './stateMachine'
+import {
+  decideAgentCommand,
+  eventSubagentId,
+  isActiveSubagent,
+  quietedSubagents,
+  SUBAGENT_QUIET_MS,
+} from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 
@@ -77,6 +83,9 @@ export type AgentRuntimeOptions = {
    *  (docs/managed-agents.md § What a session reports). Optional so a test can build an engine with
    *  no host around it. */
   telemetry?: PluginTelemetry
+  /** How long a background child may go quiet before its roster row is settled to `idle`. Overridable
+   *  only so a test does not have to wait out the real minute. */
+  subagentQuietMs?: number
 }
 
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
@@ -129,6 +138,11 @@ export class ManagedAgentEngine {
   // `apps/node/src/service/runtime.test.ts` starts the runtime several times in one process, so a leaked
   // timer from an earlier boot lands inside a later one.
   protected readonly reconnectTimers = new Set<ReturnType<typeof setTimeout>>()
+  // One pending quiet sweep per session, keyed by session id. A background child's traffic resets it,
+  // so it fires only once that child has actually gone silent. Tracked for the same reason the
+  // reconnect delays are: it must not outlive the engine that armed it.
+  protected readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  protected readonly subagentQuietMs: number
   protected readonly listeners = new Set<RuntimeListener>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
@@ -154,6 +168,7 @@ export class ManagedAgentEngine {
     this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
     this.telemetry = options.telemetry
+    this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
@@ -211,6 +226,14 @@ export class ManagedAgentEngine {
         detail: 'The provider process stopped when Acorn last exited. Send a prompt to resume.',
       })
     }
+    // Nothing is streaming into a roster the previous process left behind, so any child still marked
+    // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
+    // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
+    for (const session of await this.store.sessionsWithActiveSubagents()) {
+      for (const id of quietedSubagents(session.subagents, Date.now())) {
+        await this.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
+      }
+    }
     await this.attachments.collectGarbage()
     await this.webhooks.reconcile()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
@@ -225,6 +248,8 @@ export class ManagedAgentEngine {
     this.stopped = true
     for (const timer of this.reconnectTimers) clearTimeout(timer)
     this.reconnectTimers.clear()
+    for (const timer of this.quietTimers.values()) clearTimeout(timer)
+    this.quietTimers.clear()
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     if (this.pumping) {
       await new Promise<void>((resolve) => this.pumpIdleWaiters.add(resolve))
@@ -366,9 +391,13 @@ export class ManagedAgentEngine {
       if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
     }
     await this.record(sessionId, turnId, event)
+    // The two things that change what the roster knows: a roster update, which is also how a child
+    // first appears, and a child's own traffic. Each pushes the quiet sweep back, so a child that
+    // keeps streaming keeps its row and a child that stops loses it a window later. Turn boundaries
+    // are deliberately not on this list, and a session with no children never holds a timer.
+    if (event.type === 'subagent' || eventSubagentId(event)) this.armSubagentQuiet(sessionId)
     if (settlesTurn) {
       if (event.type === 'turn_completed' && turnId) {
-        await this.quietDetachedSubagents(sessionId, turnId)
         if (this.onCompletedTurn) {
           const session = await this.store.requireSession(sessionId)
           const turn = await this.store.turn(turnId)
@@ -386,20 +415,42 @@ export class ManagedAgentEngine {
     }
   }
 
-  // A backgrounded child outlives the parent's turn, and Claude Code only streams a session's updates
-  // while a prompt is in flight (docs/managed-agents.md § Subagents). So the moment the turn that
-  // spawned it ends, its "running" row has nothing left feeding it: the completion summary that would
-  // settle it can only ride the next prompt, if there ever is one, and until then the spinner claims a
-  // liveness we can no longer observe. Quiet each still-active background child to `idle` — detached
-  // and resumable by its `providerAgentRef`, not spinning and not falsely "Completed". A real
-  // completion summary on a later turn still folds it to `completed`, so no ground truth is lost.
-  private async quietDetachedSubagents(sessionId: string, turnId: string): Promise<void> {
-    const session = await this.store.requireSession(sessionId)
-    for (const subagent of session.subagents) {
-      if (subagent.background && (subagent.status === 'running' || subagent.status === 'pending')) {
-        await this.record(sessionId, turnId, { type: 'subagent', subagent: { id: subagent.id, status: 'idle' } })
-      }
+  // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch
+  // receipt and then says nothing more about it, so the only way its row can ever end is if we infer
+  // the end from silence (docs/managed-agents.md § Subagents). This is that inference, debounced:
+  // every event the child produces pushes the sweep back, so it fires a full quiet window after the
+  // last thing we heard. A real completion summary on a later turn still folds the row on to
+  // `completed`, so nothing is lost by guessing `idle` first.
+  protected armSubagentQuiet(sessionId: string): void {
+    const existing = this.quietTimers.get(sessionId)
+    if (existing) clearTimeout(existing)
+    if (this.stopped) return
+    // Unref'd for the same reason the reconnect delays are: a node draining must not be held open by
+    // a sweep nobody is waiting on.
+    const timer = setTimeout(() => {
+      this.quietTimers.delete(sessionId)
+      void this.quietSubagents(sessionId)
+        .catch((error: unknown) => log.warn(`subagent quiet sweep failed: ${describeError(error).message}`))
+    }, this.subagentQuietMs)
+    timer.unref?.()
+    this.quietTimers.set(sessionId, timer)
+  }
+
+  protected async quietSubagents(sessionId: string): Promise<void> {
+    if (this.stopped) return
+    const session = await this.store.getSession(sessionId)
+    if (!session) return
+    const quieted = quietedSubagents(session.subagents, Date.now() - this.subagentQuietMs)
+    for (const id of quieted) {
+      // No turn id: the quieting is this engine's own inference, not something the turn that spawned
+      // the child did, and that turn is usually long gone by now anyway.
+      await this.record(sessionId, null, { type: 'subagent', subagent: { id, status: 'idle' } })
     }
+    // A child that fell silent after this timer was armed is not stale yet, and nothing of its own is
+    // coming to arm the next sweep, so do it here. A child still streaming re-arms with its traffic.
+    const waiting = session.subagents.some((entry) =>
+      entry.background && isActiveSubagent(entry) && !quieted.includes(entry.id))
+    if (waiting) this.armSubagentQuiet(sessionId)
   }
 
   protected async onProviderClosed(sessionId: string, error?: Error): Promise<void> {

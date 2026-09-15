@@ -141,6 +141,7 @@ export type AgentUsage = {
   inputTokens?: number
   outputTokens?: number
   cachedInputTokens?: number
+  cacheWriteInputTokens?: number
   contextUsed?: number
   contextSize?: number
   cost?: { amount: number; currency: string }

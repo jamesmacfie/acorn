@@ -69,6 +69,18 @@ export type CredentialField = {
 
 export type ProviderAccountRef = { id: string; label: string; type?: string }
 
+// The longest name that is still a name. A connection name sits in list rows and rail subtitles, so
+// the cap is about what stays readable there rather than about storage.
+export const MAX_CONNECTION_NAME = 60
+
+// What to call a connection in front of someone. Every surface that names one goes through here, so
+// that renaming a connection reaches all of them and none of them has to remember the fallback.
+// Structural on purpose: it takes a stored row (`name: string | null`) and a wire `Integration`
+// (`name?: string`) without either side converting first. A name of whitespace falls back rather
+// than drawing a blank row.
+export const connectionName = (connection: { name?: string | null; label: string }): string =>
+  connection.name?.trim() || connection.label
+
 export type ModelCatalogEntry = { id: string; label: string }
 
 export type ExternalRef = {

@@ -1,5 +1,6 @@
 import {
   claudePriceCatalog,
+  codexPriceCatalog,
   validateAgentPricingPreferences,
   type AgentModelPrice,
   type AgentPricingPreferences,
@@ -20,10 +21,14 @@ export type AgentPricingCustomDraft = {
   price: AgentPriceDraft
 }
 
-export type AgentPricingDraft = {
+export type AgentPricingProvider = 'claude' | 'codex'
+
+export type AgentPricingProviderDraft = {
   catalog: AgentPricingCatalogDraft[]
   customModels: AgentPricingCustomDraft[]
 }
+
+export type AgentPricingDraft = Record<AgentPricingProvider, AgentPricingProviderDraft>
 
 export const blankAgentPriceDraft = (): AgentPriceDraft => ({
   input: '',
@@ -50,20 +55,27 @@ export function pricingDraftFromPreferences(
   preferences: AgentPricingPreferences,
   at = Date.now(),
 ): AgentPricingDraft {
-  return {
-    catalog: claudePriceCatalog.map((entry) => {
-      const override = preferences.claude.overrides.find((candidate) => candidate.catalogId === entry.id)
+  const providerDraft = (
+    provider: AgentPricingProvider,
+    catalog: typeof claudePriceCatalog,
+  ): AgentPricingProviderDraft => ({
+    catalog: catalog.map((entry) => {
+      const override = preferences[provider].overrides.find((candidate) => candidate.catalogId === entry.id)
       return {
         catalogId: entry.id,
         overridden: !!override,
         price: priceDraft(override?.price ?? entry.defaultPrice(at)),
       }
     }),
-    customModels: preferences.claude.customModels.map((entry, index) => ({
+    customModels: preferences[provider].customModels.map((entry, index) => ({
       id: `saved:${index}:${entry.model}`,
       model: entry.model,
       price: priceDraft(entry.price),
     })),
+  })
+  return {
+    claude: providerDraft('claude', claudePriceCatalog),
+    codex: providerDraft('codex', codexPriceCatalog),
   }
 }
 
@@ -72,14 +84,14 @@ export function preferencesFromPricingDraft(
 ): ReturnType<typeof validateAgentPricingPreferences> {
   return validateAgentPricingPreferences({
     version: 1,
-    claude: {
-      overrides: draft.catalog
+    ...Object.fromEntries((['claude', 'codex'] as const).map((provider) => [provider, {
+      overrides: draft[provider].catalog
         .filter((entry) => entry.overridden)
         .map((entry) => ({ catalogId: entry.catalogId, price: numberPrice(entry.price) })),
-      customModels: draft.customModels.map((entry) => ({
+      customModels: draft[provider].customModels.map((entry) => ({
         model: entry.model,
         price: numberPrice(entry.price),
       })),
-    },
+    }])),
   })
 }

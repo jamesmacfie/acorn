@@ -164,6 +164,9 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-agent-cost':
+        specifier: workspace:*
+        version: link:../../plugins/agent-cost
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
@@ -348,6 +351,9 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-agent-cost':
+        specifier: workspace:*
+        version: link:../../plugins/agent-cost
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
@@ -776,6 +782,37 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+
+  plugins/agent-cost:
+    dependencies:
+      '@acorn/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2)
+    devDependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))

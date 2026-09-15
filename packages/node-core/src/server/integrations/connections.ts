@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import type { ConnectIntegrationRequest, Integration, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integrations.ts'
+import { MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import { broadcastConnectionChanged, broadcastTasksChanged, broadcastWorkspaceProjectsChanged } from '../notify'
 import type { AppDatabase } from '../db'
 import { getDb, schema } from '../db'
@@ -44,6 +45,7 @@ export const connectionSummary = (row: StoredConnection): Integration => ({
   id: row.id,
   providerId: row.provider,
   label: row.label,
+  ...(row.name ? { name: row.name } : {}),
   status: row.status as Integration['status'],
   authKind: row.authKind as Integration['authKind'],
   account: row.account ? json(row.account, null) : null,
@@ -159,6 +161,8 @@ export async function connectProvider(
         userId,
         provider: provider.id,
         label: normalized.label,
+        // Nobody has named this yet, so every surface falls back to the provider's own label.
+        name: null,
         authRef: await secrets.seal(refByValue.get(normalized.secret) ?? normalized.secret),
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
@@ -261,6 +265,21 @@ export async function setConnectionDisabled(db: AppDatabase, userId: string, id:
   await db.update(schema.integrations).set({ status, updatedAt: now }).where(eq(schema.integrations.id, id))
   broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status })
   return connectionSummary({ ...row, status, updatedAt: now })
+}
+
+// Clearing the name is a real request, not a missing field: it puts the connection back to whatever
+// the provider calls it. So `null` and a string of spaces both mean "go back to the label", and
+// `rotateConnection` is deliberately not touched here, which is what keeps a rotate from wiping it.
+export async function renameConnection(db: AppDatabase, userId: string, id: string, name: string | null): Promise<Integration> {
+  const row = await getConnection(db, userId, id)
+  if (!row) throw new ProviderOperationError('provider_not_connected', 404)
+  const trimmed = name?.trim() ?? ''
+  if (trimmed.length > MAX_CONNECTION_NAME) throw new ProviderOperationError('provider_bad_config', 400)
+  const next = trimmed || null
+  const now = Date.now()
+  await db.update(schema.integrations).set({ name: next, updatedAt: now }).where(eq(schema.integrations.id, id))
+  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: row.status as Integration['status'] })
+  return connectionSummary({ ...row, name: next, updatedAt: now })
 }
 
 export async function disconnectConnection(db: AppDatabase, userId: string, id: string): Promise<void> {

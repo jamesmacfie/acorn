@@ -10,6 +10,9 @@ export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/clien
 // `modelBackendsOptions` is everything a Generate control can spend, keys and installed agent CLIs
 // alike. On this barrel because the first-run wizard draws the list on its own step, and the node
 // probes PATH per read, so no plugin can assemble it from the integrations query.
+// `workspaceExternalProjectsOptions` is the workspace's whole external-project map, every provider's
+// rows in one read. A plugin needs it to answer "which of my connections serves this repo", which is
+// the question a task link has to settle before it can name one (github/src/client/pullTasks.ts).
 export {
   integrationsOptions,
   modelBackendsOptions,
@@ -18,6 +21,8 @@ export {
   projectsOptions,
   tasksKey,
   tasksOptions,
+  workspaceExternalProjectsKey,
+  workspaceExternalProjectsOptions,
   workspacesKey,
   workspacesOptions,
 } from '@acorn/client-core/infra/queries.ts'

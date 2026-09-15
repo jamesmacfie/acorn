@@ -210,6 +210,8 @@ client: token
 client: tokenizeAnsiLines
 client: tunnelUrl
 client: watchAppearance
+client: workspaceExternalProjectsKey
+client: workspaceExternalProjectsOptions
 client: workspaceForProject
 client: workspacesKey
 client: workspacesOptions

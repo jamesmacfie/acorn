@@ -326,14 +326,31 @@ update that carries the harness handle. A terminal status with no agent id on it
 and leaves the row running. The parent session still reads as ready meanwhile, by the rule above: a
 backgrounded child is precisely a child that outlives its parent's turn.
 
-That last point has a tail. The adapter only streams a session's updates while a prompt is in flight,
-so once the turn that spawned a background child ends, nothing feeds its row: the completion summary
-that would settle it can only ride the next prompt, if there ever is one, and until then a "running"
-row spins for work no one is watching. So when a turn completes, the runtime quiets each of that
-session's still-active background children to `idle` — detached and resumable by its `providerAgentRef`,
-not spinning and not falsely "completed". If the real summary does arrive on a later turn, it folds the
-row on to `completed` as usual, so nothing is lost. The sweep lives in `runtimeEngine.ts`, on the
-`turn_completed` commit.
+That last point has a tail, and it is where a background child's status actually comes from. The
+completion summary that would settle the row never arrives: the spawning call files a launch receipt
+and then says nothing about that child again. What does arrive is the child's own work. Its tool calls
+stream on for as long as it runs, each tagged with `parentToolUseId`, so that traffic is the only
+honest report that it is still going.
+
+So the roster reads liveness from traffic. Any event the harness attributed to a child marks that
+child heard from, which is what `touchSubagentRoster` in `stateMachine.ts` does, and `updatedAt`
+becomes the clock. The end is then inferred from silence, because nothing else can infer it: a quiet
+window with no traffic in it settles the row to `idle`, meaning detached and resumable by its
+`providerAgentRef` rather than spinning or falsely "completed". Traffic after that revives the row,
+since quieting was a guess and a child that speaks again has disproved it. A real completion summary,
+if one ever comes, still folds the row on to `completed`.
+
+The sweep is a debounced timer per session in `runtimeEngine.ts`, pushed back by every event that
+touches a roster row, and re-armed on boot for any session the previous process left with an active
+child. The window is `SUBAGENT_QUIET_MS`, a minute. That number is measured, not guessed: in a
+captured Claude Code run on Sonnet the longest pause between two events from a child that was still
+working was 16 seconds.
+
+Do not tie any of this to turn boundaries. The end of a turn says nothing about a child that was
+backgrounded precisely so it could outlive one. An earlier version quieted every active child on
+`turn_completed`, and in a captured run that marked a child `idle` while it had 70 more tool calls to
+stream, then left the next child spinning for good because it was spawned after the last turn had
+already ended and no second `turn_completed` was ever coming.
 
 Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
 `turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's

@@ -38,6 +38,26 @@ provider. Every query it makes carries the provider, and a freshness-marker key 
 provider's own `provider:<id>:` namespace is refused, so a plugin can never read or write another
 provider's rows through it.
 
+### Naming a connection
+
+Every connection carries two strings. `label` is the provider's own answer, written by `normalize`
+at connect and rewritten at every rotate: Linear reports the workspace, Rollbar the project, GitHub
+the login. `name` is what the owner typed in Settings, and is null until they type one.
+
+Show a connection with `connectionName` from `protocol/integrations.ts`, which reads the name and
+falls back to the label. Nothing reads either field on its own to put a connection in front of
+someone. `PATCH /v2/core/integrations/:id` carries the rename, and sending `name: null` clears it back
+to the label.
+
+The two are separate columns rather than one editable field for two reasons. A rotate rewrites
+`label`, so a name kept there would vanish the first time someone replaced a key. And Rollbar's
+project source reports `label` as the name of the project a connection covers, so an owner renaming a
+connection would rename a project in the mapping picker.
+
+A provider that can hold several connections is responsible for telling them apart wherever it merges
+their rows into one list. Linear's rail adds a workspace column when, and only when, more than one
+connection contributed rows to it.
+
 Deleting a connection cascades its cached external items, freshness markers, project links, and task
 links. The provider mirror is disposable and is never treated as the upstream source of truth.
 
@@ -152,6 +172,13 @@ Linear uses GraphQL and supports multiple connections. Projects and issues carry
 because issue keys are not globally unique across connections. That is why a rail row and a task link
 both carry the connection, and why a bare `ENG-42` from PR text is resolved by asking each connected
 workspace in turn.
+
+Promoting a pull request to a task has to settle that question before it writes, because a task link
+names one connection. One connected Linear answers it. With several, the repo's own project map
+decides: the Linear connections mapped to this project, or to its workspace as a whole, are the
+candidates, and exactly one candidate is an answer. A repo following two Linears, or none, gets a
+task with no Linear link rather than a link into the wrong workspace
+(`plugins/github/src/client/pullTasks.ts`).
 
 Linear ships as a loaded plugin. Its rail source lists issues, promotes one to a task with the
 issue's own suggested branch, links issues, posts comments, recognises `linear.app` issue URLs, and

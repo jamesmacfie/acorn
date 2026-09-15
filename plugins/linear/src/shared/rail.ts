@@ -20,7 +20,10 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // suggestion, so the row names the branch and the host's modal has nothing left to demand.
 // `origin: 'linear'` must stay: `ownsTaskOrigin` matches the exact plugin id, and changing it splits
 // one provider's task history in two.
-export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
+// `connection` is the name of the workspace the issue came from, and is passed only when the list
+// holds rows from more than one connected Linear. Two workspaces can both have an ENG-42, so without
+// it those rows read identically; with one connection it would be a column repeating itself.
+export function linearRailItem(issue: LinearProjectIssue, connection?: string): PluginRailItem {
   // Title, key, status, row actions, the shape github's PR list has. Two columns, so the reserved tracks
   // leave room to read the title. Assignee, priority, and labels are a click away in the detail pane.
   //
@@ -29,7 +32,9 @@ export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title,
-    fields: [issue.identifier, issue.state?.name ?? ''],
+    fields: connection
+      ? [issue.identifier, issue.state?.name ?? '', connection]
+      : [issue.identifier, issue.state?.name ?? ''],
     task: {
       origin: 'linear',
       title: `${issue.identifier} ${issue.title}`,

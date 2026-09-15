@@ -1,11 +1,13 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import { connectionName, MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import CopyButton from '../../kit/components/inputs/CopyButton'
 import Icon from '../../kit/components/content/Icon'
 import { brandStyle } from '../../kit/tokens/brandMarks'
 import {
   deleteIntegration,
+  renameIntegration,
   setIntegrationDisabled,
   testIntegration,
 } from '../integrations/integrationClient'
@@ -42,6 +44,8 @@ export default function IntegrationsSettings() {
   )
 
   const [adding, setAdding] = createSignal(false)
+  const [renamingId, setRenamingId] = createSignal<string | null>(null)
+  const [draftName, setDraftName] = createSignal('')
   const [rotationId, setRotationId] = createSignal<string | null>(null)
   const [providerId, setProviderId] = createSignal('')
   const selectedProvider = () => byId().get(providerId()) ?? connectable()[0]
@@ -89,6 +93,26 @@ export default function IntegrationsSettings() {
     }
   }
 
+  // An empty box means "go back to what the provider calls it", so it clears the name rather than
+  // being refused. That is also why the box opens holding the name and not the fallback label: typing
+  // over a pre-filled "Linear · Acme" would store the label as a name and freeze it against a later
+  // rotate.
+  const rename = async (id: string) => {
+    setBusy(true)
+    try {
+      await renameIntegration(id, draftName().trim() || null)
+      setRenamingId(null)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startRename = (connection: { id: string; name?: string }) => {
+    setDraftName(connection.name ?? '')
+    setRenamingId(connection.id)
+  }
+
   const setDisabled = async (id: string, disabled: boolean) => {
     setBusy(true)
     try {
@@ -110,7 +134,29 @@ export default function IntegrationsSettings() {
               <div class="integration-card">
                 <IntegrationLogo provider={provider()} />
                 <div class="integration-meta">
-                  <span class="integration-title">{connection.label}</span>
+                  <Show
+                    when={renamingId() === connection.id}
+                    fallback={<span class="integration-title">{connectionName(connection)}</span>}
+                  >
+                    <div class="integration-rename-row">
+                      {/* Focus on the next microtask, not through `autofocus`: the input is created
+                          inside a Show that swaps it in after this row already exists. */}
+                      <input
+                        class="ui-input"
+                        value={draftName()}
+                        placeholder={connection.label}
+                        maxlength={MAX_CONNECTION_NAME}
+                        ref={(el) => queueMicrotask(() => el.focus())}
+                        onInput={(event) => setDraftName(event.currentTarget.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') void rename(connection.id)
+                          if (event.key === 'Escape') setRenamingId(null)
+                        }}
+                      />
+                      <Button variant="ghost" onPress={() => void rename(connection.id)} disabled={busy()}>Save</Button>
+                      <Button variant="ghost" onPress={() => setRenamingId(null)} disabled={busy()}>Cancel</Button>
+                    </div>
+                  </Show>
                   <span class="integration-sub">
                     {provider()?.label ?? connection.providerId}
                     {connection.account?.label ? ` · ${connection.account.label}` : ''}
@@ -128,6 +174,7 @@ export default function IntegrationsSettings() {
                 </Show>
                 <div class="integration-actions">
                   <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
+                    <Button variant="ghost" tone="danger" onPress={() => startRename(connection)} disabled={busy()}>Rename</Button>
                     <Button variant="ghost" tone="danger" onPress={() => void test(connection.id)} disabled={busy()}>Test</Button>
                     {/* Rotation means "submit a new credential for this connection", which a device flow
                         has no shape for — the owner never holds the token. Disconnect and connect again

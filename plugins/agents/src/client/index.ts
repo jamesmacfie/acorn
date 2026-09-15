@@ -48,7 +48,7 @@ export const agentsClientPlugin: ClientPlugin = {
     // conversation. The run pane uses it to hold the transcript, the queue and the composer for the
     // node it has selected, so a step reads the same way in either place.
     ctx.capabilities.provide(AGENTS_CONVERSATION, { Conversation: AgentConversation })
-    // The three places another plugin may come into this pane (docs/plugins.md § Cooperative
+    // The four places another plugin may come into this pane (docs/plugins.md § Cooperative
     // extension points). The tool card is keyed by the harness's own name for what a call did; the
     // attachment chip by the file's media type; the composer's action bar takes everyone who has
     // something to offer a draft, up to the owner's ceiling because it is the owner's bar.
@@ -66,6 +66,9 @@ export const agentsClientPlugin: ClientPlugin = {
     })
     ctx.extensionPoints.register({
       id: 'composer-actions', label: 'Agent composer', kind: 'remote', mode: 'stack', max: 4,
+    })
+    ctx.extensionPoints.register({
+      id: 'session-header', label: 'Agent session header', kind: 'remote', mode: 'stack', max: 2,
     })
     // The task row's agent state, in the rail's top-right corner (railMarkerContribution.ts). The host
     // owns the corner and the collision rules; this plugin only says what is true.

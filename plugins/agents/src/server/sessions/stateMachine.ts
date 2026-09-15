@@ -111,6 +111,69 @@ export function projectAgentEvent(
 // child at rest is resumable rather than finished, which is a display distinction, not a lifecycle one.
 const ACTIVE_SUBAGENT_STATUSES: readonly AgentSubagentStatus[] = ['pending', 'running']
 
+export const isActiveSubagent = (entry: AgentSubagent): boolean =>
+  ACTIVE_SUBAGENT_STATUSES.includes(entry.status)
+
+/**
+ * How long a background child may go quiet before its row stops claiming to be running.
+ *
+ * A background child never reports that it finished, so the end of a row is always inferred from
+ * silence. The number comes from a captured Claude Code run on Sonnet: across two children and 126
+ * events, the longest pause between two events from a child that was still working was 16 seconds.
+ * A minute is about four times that. Raise it if a child that runs one long command starts flipping
+ * to `idle` and back.
+ */
+export const SUBAGENT_QUIET_MS = 60_000
+
+/** The subagent an event belongs to, when the harness attributed it to one. */
+export const eventSubagentId = (event: AgentNormalizedEvent): string | undefined => {
+  switch (event.type) {
+    case 'tool':
+      return event.tool.subagentId
+    case 'assistant_message':
+    case 'reasoning':
+    case 'file_change':
+      return event.subagentId
+    default:
+      return undefined
+  }
+}
+
+/**
+ * Marks a roster row as heard from, returning undefined when there is nothing to write.
+ *
+ * This is where a background child's liveness actually comes from. Its spawning `Agent` call tells us
+ * it started and then never mentions it again, so the roster's own updates stop at the launch receipt
+ * while the child streams tool calls for minutes. Those calls carry its id, so they are the one honest
+ * report that it is still going, and `updatedAt` becomes the clock `quietedSubagents` reads.
+ *
+ * Traffic also revives an `idle` row. Quieting is a guess made from silence, and a child that speaks
+ * again has just disproved it. A settled row is left alone: a late-arriving tool call must not drag
+ * something back out of `completed`.
+ */
+export function touchSubagentRoster(
+  current: AgentSubagent[],
+  subagentId: string,
+  timestamp: number,
+): AgentSubagent[] | undefined {
+  const existing = current.find((entry) => entry.id === subagentId)
+  if (!existing || existing.status === 'completed' || existing.status === 'failed') return undefined
+  return current.map((entry) => entry.id === subagentId
+    ? { ...entry, status: entry.status === 'idle' ? 'running' : entry.status, updatedAt: timestamp }
+    : entry)
+}
+
+/**
+ * Which background children have been silent long enough to stop claiming they are running.
+ *
+ * Only background children: a foreground child is settled by its spawning call's own result, which
+ * always arrives, so silence there means the harness is thinking rather than that the child is gone.
+ */
+export const quietedSubagents = (roster: AgentSubagent[], quietBefore: number): string[] =>
+  roster
+    .filter((entry) => entry.background && isActiveSubagent(entry) && entry.updatedAt <= quietBefore)
+    .map((entry) => entry.id)
+
 // ponytail: keep every in-flight entry plus the last 20 settled ones. The session row is re-serialised
 // and broadcast after every event, so an unbounded roster would grow every frame; the full history
 // stays in the event ledger, which is what the transcript reads. Give the roster its own table and
@@ -118,7 +181,7 @@ const ACTIVE_SUBAGENT_STATUSES: readonly AgentSubagentStatus[] = ['pending', 'ru
 const RETAINED_SETTLED_SUBAGENTS = 20
 
 function capSubagentRoster(roster: AgentSubagent[]): AgentSubagent[] {
-  const settled = roster.filter((entry) => !ACTIVE_SUBAGENT_STATUSES.includes(entry.status))
+  const settled = roster.filter((entry) => !isActiveSubagent(entry))
   if (settled.length <= RETAINED_SETTLED_SUBAGENTS) return roster
   const dropped = new Set(
     [...settled]
