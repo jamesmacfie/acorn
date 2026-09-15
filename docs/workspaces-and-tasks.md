@@ -131,11 +131,17 @@ derives and revalidates the path; clients cannot choose an arbitrary worktree pa
 branch uses the mapped project folder directly.
 
 The directory is keyed by owner, repo, and branch, so revalidation checks the branch as well as the
-path. Before a resolved worktree is handed out, persisted or reused, its on-disk HEAD must still be
-the task's branch. A directory that was pruned, moved, or checked out onto something else is refused
-with a `worktree-stale` 409, and a worktree that cannot be created is refused with
-`worktree-unavailable` rather than falling back to the main checkout. Either fallback hands the task
-another branch's files, which is the tree its agent then reads and edits.
+path. For a worktree the task already owns, the on-disk HEAD is the fact and the row follows it: a
+live worktree checked out onto another branch updates `tasks.branch` to match and carries on, because
+work that needs a second pull request switches branch inside the one worktree. The directory keeps
+the name it was created under, since the path is persisted and only rederived from the branch when
+the task has no worktree yet.
+
+A directory with no branch to adopt is refused with a `worktree-stale` 409: one that was pruned or
+moved, one left on a detached HEAD, and one that holds another branch while the task does not yet own
+it. A worktree that cannot be created is refused with `worktree-unavailable` rather than falling back
+to the main checkout. Either fallback hands the task another branch's files, which is the tree its
+agent then reads and edits.
 
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's

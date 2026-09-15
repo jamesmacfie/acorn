@@ -80,6 +80,7 @@ export const linearUploadTarget = (raw: string | undefined): URL | null => {
 // Generous size for a ticket screenshot. The upload crosses as base64 inside a JSON body over a
 // MessagePort into an iframe, so a large video attachment would stall the frame rather than draw inline.
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+const UPLOAD_TIMEOUT_MS = 30_000
 
 // The portable carrier: docs/plugins.md § Loaded plugins. Linear ships loaded, so these routes run on
 // the one tier a loaded plugin gets, and the identity-bound runtime rides in through `c.env`.
@@ -465,7 +466,8 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     // Same shape as the detail route above: without ?integration, which workspace owns this file is
     // exactly what is unknown, so ask each in turn and take the first that answers.
     for (const { key } of candidates) {
-      const res = await fetch(target, { headers: { Authorization: key } }).catch(() => null)
+      // Longer than an API call because this is a download, still bounded because it is a fetch.
+      const res = await fetch(target, { headers: { Authorization: key }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(() => null)
       if (!res?.ok) continue
       // Images only. Anything else is either a document the reader should open in Linear, or a content
       // type this route has no business turning into a `data:` URL.

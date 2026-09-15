@@ -1,4 +1,4 @@
-import { createEffect, on, onCleanup, type JSX } from 'solid-js'
+import { createEffect, on, onCleanup, onMount, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { reportScrollPlace } from '../../lib/scrollPlace'
@@ -296,16 +296,41 @@ export function Timeline(props: {
     else schedule()
   })
   growth.observe(list)
+
+  /**
+   * Taken off the page and put back by something outside, which is a move like any other.
+   *
+   * A pane region draws inside a `Suspense` (host/registries/panes/panes.ts). A query in the region
+   * that runs with an empty cache suspends that boundary *after* the region has drawn, so every child
+   * leaves the document and comes back a few hundred milliseconds later. A scroller that was detached
+   * comes back at the top, and the browser reports neither a scroll event nor a resize for it, so
+   * every other signal in this file misses it: the reader opens a transcript, watches it land on the
+   * newest turn, and then watches it jump to the first one.
+   *
+   * Watching the parent's children is what catches it. The mutations are rare — a region's children
+   * are its bar, its body and its composer — and the answer is the correction the rest of this file
+   * already runs.
+   */
+  const replaced = new MutationObserver(() => { if (scroller?.isConnected) schedule() })
+  onMount(() => { if (scroller?.parentElement) replaced.observe(scroller.parentElement, { childList: true }) })
+
   onCleanup(() => {
     growth.disconnect()
+    replaced.disconnect()
     if (frame) cancelAnimationFrame(frame)
     scroller = undefined
   })
 
-  // The caller handing over a different place is the only thing that restarts a restore: a new mount,
-  // or the same component swapping one session's stream for another's.
+  // The caller handing over a place is what restarts a restore: a new mount, or the same component
+  // swapping one session's stream for another's.
+  //
+  // An equal place is nothing to do, with one exception. Two live places are equal by value but they
+  // are the foot of two different lists, and a caller only hands one over when the view it belongs to
+  // has changed — it has no other reason to read its store again. Skipping that left a reader who was
+  // following one session sitting at that session's offset, partway down a transcript they had never
+  // seen, until some later resize happened to pin them.
   createEffect(on(() => props.place?.() ?? LIVE, (next) => {
-    if (opened && samePlace(next, place)) return
+    if (opened && next.at !== 'live' && samePlace(next, place)) return
     opened = true
     generation += 1
     corrections = 0

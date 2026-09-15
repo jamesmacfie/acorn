@@ -144,6 +144,9 @@ function mount(turns: () => readonly string[], height = 100) {
   draw()
   return {
     place: () => held,
+    /** Hand over the place for another list, which is what swapping one session's stream for
+     *  another's does: the caller reads its store under the new view's key and passes what it finds. */
+    hand: (next: ReadingPlace) => setPlace(next),
     /** Throw the component away and build it again, which is what a workspace switch does. */
     remount: () => {
       dispose?.()
@@ -349,6 +352,53 @@ describe('Timeline', () => {
     scroller()!.dispatchEvent(new Event('scroll', { bubbles: true }))
     // The frames only. A resize would pin the reader whatever the correction did, and the case that
     // bit is the one where nothing resizes: the agent has stopped and the list is done growing.
+    const queued = frames
+    frames = []
+    for (const run of queued) run()
+    expect(scrollTop).toBe(maxScroll())
+  })
+
+  it('goes to the foot when the list swaps for a session the reader has no place in', () => {
+    // Following one session, then the pane is pointed at another. The caller has no place stored for
+    // the new one, so it hands over a live place — the same value the reader already had, for a
+    // different list. Compared by value that reads as "nothing to do", and the reader was left at the
+    // old list's offset partway down a transcript they have never seen.
+    const [turns, setTurns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    expect(scrollTop).toBe(maxScroll())
+
+    setTurns(['f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'])
+    heights.clear()
+    for (const key of ['f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']) heights.set(key, 100)
+    view.hand({ at: 'live' })
+    // The frames only. The new list is a different height, so a resize would pin the reader whatever
+    // the swap did; two lists of the same height report no resize at all and there is nothing to
+    // rescue it.
+    layout()
+    const queued = frames
+    frames = []
+    for (const run of queued) run()
+    expect(scrollTop).toBe(maxScroll())
+  })
+
+  it('puts the reader back when the page takes the list away and returns it', async () => {
+    // A pane region suspends after it has drawn — a query in it running with an empty cache — so every
+    // child leaves the document and comes back. The browser resets a detached scroller to the top and
+    // reports neither a scroll event nor a resize for it, which is why this is the one move the
+    // timeline cannot hear about from the scroller itself.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    mount(turns)
+    expect(scrollTop).toBe(maxScroll())
+
+    const box = scroller()!
+    const parent = box.parentElement!
+    box.remove()
+    parent.append(box)
+    scrollTop = 0
+    // Mutation records are delivered on a microtask.
+    await Promise.resolve()
+    // The frames only. A resize would pin the reader whatever this did, and a list that is put back
+    // the same size as it left reports no resize at all.
     const queued = frames
     frames = []
     for (const run of queued) run()

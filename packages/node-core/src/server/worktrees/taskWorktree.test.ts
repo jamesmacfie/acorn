@@ -159,17 +159,29 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
   })
 
-  // The directory is keyed by owner/repo/branch and was trusted forever once persisted, so a worktree
-  // that drifted kept serving the task another branch's files, which is what put an agent in a tree
-  // that wasn't its task's. Both drifts, wrong branch and pruned admin dir, must refuse rather than
-  // degrade.
-  it('refuses a worktree that has drifted onto another branch', async () => {
+  // A path persisted once was trusted forever, so a worktree that drifted kept serving the task
+  // another branch's files, which is what put an agent in a tree that wasn't its task's. HEAD is now
+  // the fact and the row follows it, because work that needs a second pull request switches branch
+  // in the one worktree and the task has to survive that.
+  it('adopts the branch its worktree has drifted onto', async () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
-    git(res.cwd, 'checkout', '-b', 'someone-elses-branch')
+    git(res.cwd, 'checkout', '-b', 'second-pr')
+    broadcasts.length = 0
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(
-      /checked out on 'someone-elses-branch', not 'feat-x'/,
-    )
+    const again = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    expect(again).toMatchObject({ cwd: res.cwd, isWorktree: true, created: false })
+    expect((await loadTask(t.db, TASK))?.branch).toBe('second-pr')
+    expect(broadcasts.filter((f) => f.channel === 'tasks:changed')).toEqual([{ channel: 'tasks:changed', taskId: TASK }])
+  })
+
+  // A detached HEAD has no branch to adopt, and a null branch means something else entirely: run in
+  // the project root, on whatever the checkout is sitting on.
+  it('refuses a worktree left on a detached HEAD', async () => {
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    git(res.cwd, 'checkout', '--detach')
+
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)).rejects.toThrow(/no longer a live git worktree/)
+    expect((await loadTask(t.db, TASK))?.branch).toBe('feat-x')
   })
 
   it('refuses a worktree directory whose git link is gone', async () => {

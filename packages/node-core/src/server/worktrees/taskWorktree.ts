@@ -192,6 +192,28 @@ function assertOnBranch(path: string, branch: string): void {
   if (on !== branch) throw new BridgeError(409, 'worktree-stale', staleWorktreeReason(path, branch, on))
 }
 
+// For a worktree the task already owns, HEAD is the fact and the task row follows it. Work that
+// needs two pull requests switches branch inside the one worktree, and the task has to keep working
+// across that, so a live worktree on another branch updates `tasks.branch` rather than refusing.
+// The column is not decoration: it is the head a pull request opens from and the ACORN_BRANCH every
+// process reads, so leaving it behind makes those lie about the tree on disk.
+//
+// A directory that is no longer a live worktree, or whose HEAD is detached, still refuses. There is
+// no branch to adopt, and a null branch means something else here: run in the project root.
+//
+// The directory keeps the name it was created under, since the path is persisted and only rederived
+// from the branch when there is no worktree yet.
+async function adoptBranch(db: AppDatabase, t: TaskRef, path: string, branch: string): Promise<void> {
+  const on = worktreeBranch(path)
+  if (!on) throw new BridgeError(409, 'worktree-stale', staleWorktreeReason(path, branch, on))
+  if (on === branch) return
+  await db.update(schema.tasks).set({ branch: on, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+  log.info(`task ${t.id} adopted branch '${on}' from ${path}, was '${branch}'`)
+  // Same event worktree creation uses: consumers re-read the task row (docs/plugins.md § Hearing a
+  // core event).
+  broadcastTasksChanged({ taskId: t.id })
+}
+
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 
 // Archive claims the task first, then awaits any creator that passed the gate before the claim. A
@@ -222,7 +244,7 @@ export async function resolveTaskCwd(
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
     // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks.md §
     // Worktrees and setup: verify rather than assume before handing a persisted path back.
-    if (!isProjectRoot) assertOnBranch(t.worktreePath, t.branch)
+    if (!isProjectRoot) await adoptBranch(db, t, t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
   }
   const branch = t.branch
