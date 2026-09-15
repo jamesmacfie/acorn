@@ -1,10 +1,10 @@
-import type { AgentSessionHeaderProps } from '@acorn/protocol/extensionPoints.ts'
-import { Chip } from '@acorn/plugin-api/ui'
+import { Chip } from 'acorn-plugin-sdk/remote'
 import { Show } from 'solid-js'
 import { estimateSessionCost } from './sessionCost'
 import { sessionCostLabel } from './sessionCostLabel'
+import type { SessionHeaderProps } from './sessionHeaderContract'
 
-export default function SessionCostBadge(props: AgentSessionHeaderProps) {
+export function SessionCostBadge(props: SessionHeaderProps) {
   const cost = () => estimateSessionCost(props)
   return (
     <Show when={cost()}>

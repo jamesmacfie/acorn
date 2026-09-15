@@ -440,6 +440,15 @@ as a stale row rather than a failure. The banner that says a Node has never answ
 a Node whose cache is empty. Conflating the two would make an offline Node look unreachable and a
 never-reachable Node look stale.
 
+That banner also has to clear itself. A Node that is still booting is listed as `online` the whole
+time, so the fan-out's source never changes and nothing re-runs it, and the surface keeps a banner
+for a Node that is fine seconds later. This is the ordinary shape of a cold launch: the desktop shell
+opens the window as soon as the helper is listening, which is a socket bind rather than a Node boot.
+So a run that reports any Node unavailable schedules another at 2, 5, and 10 seconds, and then stops.
+A ladder rather than a poll, because what it covers has an end: a Node is either up within the boot
+window or it is actually down. A Node that comes back later is picked up by a fleet change, a write,
+or a remount, each of which re-runs the fan-out anyway.
+
 ## The three parties, and what a control plane may hold
 
 There are two parties today and an optional third. The **client** coordinates across the Nodes it can

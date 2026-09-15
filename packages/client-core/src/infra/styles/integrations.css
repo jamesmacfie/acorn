@@ -115,7 +115,7 @@
 
 .integration-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-6);
   padding: var(--space-5) var(--space-6);
   background: var(--bg-subtle);
@@ -139,11 +139,14 @@
 .integration-logo svg { width: 18px; height: 18px; display: block; }
 .integration-logo-mono { font-weight: 700; font-size: var(--fs-md); line-height: 1; font-family: var(--font-glyph); }
 
+/* Everything but the logo: the name and details on one row, the buttons on the next. */
+.integration-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; flex: 1; }
+.integration-head { display: flex; align-items: center; gap: var(--space-4); }
 .integration-meta { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
 .integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
-.integration-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
-/* Sits just left of the actions, after `.integration-meta` has taken the slack. Faint by default and
+.integration-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+/* Sits at the end of the name row, after `.integration-meta` has taken the slack. Faint by default and
    full strength on hover, because it marks where the credential comes from rather than asking to be
    read. The mark carries its own colour, so `currentColor` is deliberate. */
 .integration-secret-ref {
@@ -151,7 +154,6 @@
   display: flex;
   align-items: center;
   color: var(--text-faint);
-  margin-right: var(--space-3);
 }
 .integration-secret-ref:hover { color: var(--text); }
 .integration-secret-ref svg { width: 16px; height: 16px; display: block; }

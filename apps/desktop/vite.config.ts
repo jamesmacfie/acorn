@@ -37,6 +37,11 @@ export default defineConfig({
   },
   // Rust edits must not retrigger the renderer, and the port is fixed so tauri.dev.json's devUrl and
   // the shell's dev-only CSP can both name it.
+  //
+  // `.acorn` is a data root, not source. A node puts its worktrees there, so under a checkout it can
+  // hold whole clones of unrelated repositories, and Vite's own ignores cover node_modules and .git
+  // but not this. Left in, a cold start crawls and watches tens of thousands of files nobody is
+  // editing.
   clearScreen: false,
-  server: { port: 4319, strictPort: true, watch: { ignored: ['**/src-tauri/**'] } },
+  server: { port: 4319, strictPort: true, watch: { ignored: ['**/src-tauri/**', '**/.acorn/**'] } },
 })

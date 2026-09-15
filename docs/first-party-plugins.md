@@ -302,6 +302,13 @@ whether a contribution can be expressed as data plus async messages.
 These worked examples use only mechanisms a third-party plugin has, or will have once the named gap closes.
 Read them as the worked examples — they are what an outside author should copy, in this order:
 
+**agent-cost** — the client-only loaded example. It has no node bundle and requests no permissions.
+Its remote tree fills `agents:session-header`, receives the owner-projected usage and configured model
+prices, and keeps calculation, fallback, and display policy inside its own package. Build it with
+`pnpm --filter @acorn/node build:plugin agent-cost`. Read it when a feature belongs inside another
+plugin's UI but should remain independently installable; its local README records the boundary that
+lets the directory move to another repository.
+
 **model-providers** — the minimal loaded plugin, and node-only. Registers connection providers and
 model adapters through `ctx.providers`, no client half, no tables, no capabilities, no `secrets`.
 Build it with `pnpm --filter @acorn/node build:plugin model-providers`. Start here to see how small a

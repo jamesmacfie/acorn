@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSessionHeaderProps, AgentSessionHeaderTurn } from '@acorn/protocol/extensionPoints.ts'
 import { estimateSessionCost } from './sessionCost'
+import type { SessionHeaderProps, SessionHeaderTurn } from './sessionHeaderContract'
 
 const price = { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 }
 const turn = (
   turnId: string,
-  usage: AgentSessionHeaderTurn['usage'],
-  turnPrice: AgentSessionHeaderTurn['price'] = price,
-): AgentSessionHeaderTurn => ({ turnId, model: 'gpt-5.6-terra', usage, price: turnPrice })
+  usage: SessionHeaderTurn['usage'],
+  turnPrice: SessionHeaderTurn['price'] = price,
+): SessionHeaderTurn => ({ turnId, model: 'gpt-5.6-terra', usage, price: turnPrice })
 const context = (
-  turns: AgentSessionHeaderTurn[],
-  over: Partial<AgentSessionHeaderProps> = {},
-): AgentSessionHeaderProps => ({
+  turns: SessionHeaderTurn[],
+  over: Partial<SessionHeaderProps> = {},
+): SessionHeaderProps => ({
   taskId: 'task-1', sessionId: 'session-1', providerId: 'codex',
   tokenAccounting: 'cumulative', costAccounting: 'cumulative', turns, ...over,
 })

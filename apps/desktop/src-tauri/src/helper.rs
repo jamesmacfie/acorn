@@ -132,9 +132,61 @@ fn spawn(launch: &Launch) -> std::io::Result<Child> {
 }
 
 #[cfg(unix)]
-fn signal_group(child: &Child, signal: i32) {
+fn signal_group(group: i32, signal: i32) {
     // Negative pid means "the group whose id this is", which is the whole point of the setpgid above.
-    unsafe { libc::kill(-(child.id() as i32), signal) };
+    unsafe { libc::kill(-group, signal) };
+}
+
+/// Whether anything is still in the group. Signal 0 checks for delivery without delivering, so this
+/// is the difference between "the helper has exited" and "the helper and the node it supervises have
+/// both exited". Only the second one is safe to leave.
+#[cfg(unix)]
+fn group_has_members(group: i32) -> bool {
+    unsafe { libc::kill(-group, 0) == 0 }
+}
+
+/// SIGTERM the group, wait for it to empty, then SIGKILL whatever is left.
+///
+/// The wait is on the group rather than on the helper, and that is the whole point. The helper exits
+/// promptly and politely; the node it supervises is the one that can wedge, and the node is what
+/// holds the data root's exclusive lock. Returning as soon as the helper was reaped left a live node
+/// behind in an abandoned group, so the next launch failed with "Another acorn node already holds
+/// <dataDir>" until somebody killed a pid by hand.
+///
+/// The ceiling is that the group id is the helper's pid, which the kernel may reuse once the helper
+/// is reaped. Escalating onto a recycled group would need that exact pid to be handed to a new group
+/// leader inside the escalation window, which is why this is a comment rather than a lock file.
+#[cfg(unix)]
+fn terminate_group(child: &mut Child, escalation: Duration) -> bool {
+    let group = child.id() as i32;
+    signal_group(group, libc::SIGTERM);
+
+    let deadline = std::time::Instant::now() + escalation;
+    let mut reaped = false;
+    loop {
+        if !reaped && matches!(child.try_wait(), Ok(Some(_))) {
+            reaped = true;
+        }
+        if reaped && !group_has_members(group) {
+            return false;
+        }
+        if std::time::Instant::now() >= deadline {
+            signal_group(group, libc::SIGKILL);
+            if !reaped {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(not(unix))]
+fn terminate_group(child: &mut Child, _escalation: Duration) -> bool {
+    let _ = child.kill();
+    let _ = child.wait();
+    true
 }
 
 impl Helper {
@@ -212,22 +264,8 @@ impl Helper {
         let mut held = self.child.lock().unwrap();
         let Some(child) = held.as_mut() else { return };
 
-        #[cfg(unix)]
-        signal_group(child, libc::SIGTERM);
-
-        let deadline = std::time::Instant::now() + KILL_ESCALATION;
-        loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) if std::time::Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
-                _ => {
-                    #[cfg(unix)]
-                    signal_group(child, libc::SIGKILL);
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break;
-                }
-            }
+        if terminate_group(child, KILL_ESCALATION) {
+            eprintln!("[shell] the helper's process group had to be killed; a node may not have drained cleanly");
         }
         *held = None;
     }
@@ -252,6 +290,67 @@ mod tests {
         let Some(Signal::Ready(ready)) = ready else { panic!("expected a ready line") };
         assert_eq!(ready.port, 51234);
         assert_eq!(ready.node_version, "v24.11.0");
+    }
+
+    /// The orphaned-node regression, in the shape that produced it: a parent that exits at once,
+    /// leaving a child alive in the same process group. Waiting on the parent says "done" while the
+    /// thing holding the data root's lock is still running.
+    #[cfg(unix)]
+    #[test]
+    fn a_child_that_outlives_the_helper_is_still_killed() {
+        use std::os::unix::process::CommandExt;
+
+        let mut command = Command::new("/bin/sh");
+        // The shell backgrounds a long sleep and exits immediately. The sleep inherits the group.
+        command.arg("-c").arg("sleep 120 & exit 0").stdout(Stdio::null()).stderr(Stdio::null());
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setpgid(0, 0) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let mut child = command.spawn().expect("a shell");
+        let group = child.id() as i32;
+
+        // Let the shell exit and the sleep settle, so the group really is "parent gone, child alive".
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(group_has_members(group), "the backgrounded sleep should still hold the group");
+
+        // `sleep` does not ignore SIGTERM, so the polite signal is enough and no escalation is
+        // reported. The property under test is that the wait did not end when the shell did.
+        let escalated = terminate_group(&mut child, Duration::from_secs(5));
+        assert!(!escalated, "SIGTERM alone should have emptied the group");
+        assert!(!group_has_members(group), "nothing may be left in the group");
+    }
+
+    /// And the other half: a child that refuses SIGTERM is killed rather than waited on forever.
+    #[cfg(unix)]
+    #[test]
+    fn a_child_that_ignores_sigterm_is_killed() {
+        use std::os::unix::process::CommandExt;
+
+        let mut command = Command::new("/bin/sh");
+        command.arg("-c").arg("trap '' TERM; sleep 120").stdout(Stdio::null()).stderr(Stdio::null());
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setpgid(0, 0) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let mut child = command.spawn().expect("a shell");
+        let group = child.id() as i32;
+        std::thread::sleep(Duration::from_millis(300));
+
+        let started = std::time::Instant::now();
+        let escalated = terminate_group(&mut child, Duration::from_millis(500));
+        assert!(escalated, "a child that ignores SIGTERM must be reported as killed");
+        assert!(started.elapsed() < Duration::from_secs(5), "the escalation must not wait out the sleep");
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(!group_has_members(group), "SIGKILL must have emptied the group");
     }
 
     #[test]

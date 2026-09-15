@@ -268,3 +268,34 @@ describe('loading rollbar from disk', () => {
     }
   })
 })
+
+describe('building a client-only plugin', () => {
+  it('emits a loadable package without a synthetic node entrypoint', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-client-only-'))
+    const packageRoot = join(dataRoot, 'plugins')
+    try {
+      execFileSync(
+        process.execPath,
+        [join(NODE_APP, 'scripts/build-plugin.mjs'), 'agent-cost', '--package-root', packageRoot],
+        { cwd: NODE_APP, stdio: 'pipe' },
+      )
+      const built = join(packageRoot, 'agent-cost')
+      const manifest = JSON.parse(readFileSync(join(built, 'acorn-plugin.json'), 'utf8')) as {
+        node?: string
+        client?: string
+      }
+      expect(manifest.node).toBeUndefined()
+      expect(manifest.client).toBe('./dist/client.js')
+      expect(existsSync(join(built, 'dist/client.js'))).toBe(true)
+      expect(existsSync(join(built, 'dist/node.js'))).toBe(false)
+
+      const { loaded, installed, failures } = await loadExternalPlugins(dataRoot, { builtins: ['agents'] })
+      expect(failures).toEqual([])
+      expect(loaded).toEqual([])
+      expect(installed.map((entry) => entry.manifest.id)).toEqual(['agent-cost'])
+      expect(installed[0]?.client?.bytes).toBeGreaterThan(1_000)
+    } finally {
+      rmSync(dataRoot, { recursive: true, force: true })
+    }
+  }, 120_000)
+})

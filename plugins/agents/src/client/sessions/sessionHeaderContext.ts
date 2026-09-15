@@ -67,7 +67,7 @@ export function sessionHeaderContext(
     sessionId: session.id,
     providerId: session.providerId,
     tokenAccounting: session.providerId === 'codex' ? 'cumulative' : 'per-turn',
-    costAccounting: 'cumulative',
+    costAccounting: session.providerId === 'codex' ? 'cumulative' : 'per-turn',
     turns: turns.flatMap((turn) => {
       const turnUsage = usage.get(turn.id)
       if (!turnUsage) return []
