@@ -5,10 +5,14 @@ import type {
   AgentPlanEntry,
   AgentQuestion,
   AgentToolCall,
+  AgentWebAction,
+  AgentWebActivity,
+  AgentWebResult,
 } from '@acorn/protocol/managedAgents.ts'
 import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
+import { webToolTitle } from './webActivity'
 
 type JsonObject = Record<string, unknown>
 
@@ -56,6 +60,77 @@ export function codexGeneratedArtifact(notification: JsonRpcNotification): Agent
     mediaType: format.mediaType,
     bytes,
   }
+}
+
+
+// ── Web activity ──────────────────────────────────────────────────────────────────────────────
+// Codex's `webSearch` thread item, read into the provider-neutral shape
+// (@acorn/protocol/managedAgents.ts § AgentWebActivity). A live capture of both a search and a page
+// open is in ./__fixtures__/codexWebSearchWire.json, and it is why nothing here is read off
+// `item/started`: that notification carries an empty query and two nulls. Everything a card shows
+// arrives on `item/completed`, and the transcript's fold is what keeps the two as one card.
+
+/** The queries a search ran, in the order Codex listed them and without the repeats. Three places
+ *  say it — the action's list, the action's single query, the item's own — and the captures show the
+ *  last two agreeing while the list is null. First non-empty wins; the dedupe is for the day a model
+ *  fans out to the same phrase twice. */
+function codexQueries(action: JsonObject | null, item: JsonObject): string[] {
+  const listed = Array.isArray(action?.queries)
+    ? action.queries.flatMap((entry) => {
+        const query = stringValue(entry)
+        return query ? [query] : []
+      })
+    : []
+  const candidates = listed.length
+    ? listed
+    : [stringValue(action?.query) ?? stringValue(item.query) ?? ''].filter(Boolean)
+  return [...new Set(candidates)]
+}
+
+function codexWebAction(item: JsonObject): AgentWebAction | undefined {
+  const action = asObject(item.action)
+  switch (stringValue(action?.type)) {
+    case 'search':
+      return { type: 'search', queries: codexQueries(action, item) }
+    case 'openPage':
+      return { type: 'open_page', url: stringValue(action?.url) ?? undefined }
+    case 'findInPage':
+      return {
+        type: 'find_in_page',
+        url: stringValue(action?.url) ?? undefined,
+        pattern: stringValue(action?.pattern) ?? undefined,
+      }
+    case 'other':
+      return { type: 'other' }
+    default:
+      // No action at all. A query on its own is still a search; nothing at all is the start
+      // notification, which has nothing to report and must not overwrite what completion said.
+      return stringValue(item.query) ? { type: 'search', queries: codexQueries(null, item) } : undefined
+  }
+}
+
+/** The display fields of a result row. Codex types each row as opaque JSON on purpose, so unknown
+ *  fields — `ref_id`, `type`, `thumbnail_url` — are read past rather than carried: a ledger is not the
+ *  place to mirror a provider's object, and a thumbnail is a fetch this card refuses to make. */
+function codexWebResults(value: unknown): AgentWebResult[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.flatMap((entry) => {
+    const row = asObject(entry)
+    const url = stringValue(row?.url)
+    if (!url) return []
+    return [{
+      url,
+      title: stringValue(row?.title) ?? undefined,
+      domain: stringValue(row?.domain) ?? undefined,
+      snippet: stringValue(row?.snippet) ?? undefined,
+    }]
+  })
+}
+
+function codexWebActivity(item: JsonObject): AgentWebActivity | undefined {
+  const action = codexWebAction(item)
+  const results = codexWebResults(item.results)
+  return action || results?.length ? { ...(action ? { action } : {}), ...(results?.length ? { results } : {}) } : undefined
 }
 
 function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | null {
@@ -119,8 +194,10 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
         input: stringValue(item.prompt) ?? undefined,
       }
     }
-    case 'webSearch':
-      return { id, title: 'Web search', kind: 'search', status }
+    case 'webSearch': {
+      const web = codexWebActivity(item)
+      return { id, title: webToolTitle(web?.action?.type), kind: 'search', status, ...(web ? { web } : {}) }
+    }
     case 'imageView':
       return { id, title: `Viewed ${stringValue(item.path) ?? 'image'}`, kind: 'read', status }
     case 'imageGeneration':

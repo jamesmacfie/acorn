@@ -312,3 +312,55 @@ describe('what "show chats only" keeps', () => {
     ], rows)).toEqual([])
   })
 })
+
+// One provider call is several updates, and a web payload is the first thing on a tool card with a
+// shape of its own. Both live captures split the request from the sources, so a merge that replaced
+// the whole `web` object would lose one half or the other depending on which arrived last.
+describe('folding a tool call’s web activity', () => {
+  const webCard = (records: AgentEventRecord[]) => {
+    const [item] = buildConversationItems(records)
+    return item.event.type === 'tool' ? item.event.tool.web : undefined
+  }
+
+  it('adds the sources a completion reports to the action the start reported', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', web: { results: [{ url: 'https://example.com' }] } } }),
+    ])).toEqual({ action: { type: 'search', queries: ['acp'] }, results: [{ url: 'https://example.com' }] })
+  })
+
+  it('keeps the action when a later update repeats nothing of it', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Fetch page', web: { action: { type: 'fetch_page', url: 'https://example.com' } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', output: 'the page' } }),
+    ])).toEqual({ action: { type: 'fetch_page', url: 'https://example.com' } })
+  })
+
+  it('is unchanged when a completion repeats the action it already had', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: 'Search web', status: 'completed', web: { action: { type: 'search', queries: ['acp'] } } } }),
+    ])).toEqual({ action: { type: 'search', queries: ['acp'] } })
+  })
+
+  it('lets a provider say it found nothing, and tells that apart from saying nothing', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { results: [{ url: 'https://example.com' }] } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [] } } }),
+    ])?.results).toEqual([])
+  })
+
+  it('keeps everything else on the card when only sources arrive', () => {
+    const [item] = buildConversationItems([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', kind: 'search', status: 'running', input: '{}', subagentId: 'child-1' } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [{ url: 'https://example.com' }] } }, ...{} }),
+    ])
+    expect(item.event.type === 'tool' && item.event.tool).toMatchObject({
+      title: 'Search web',
+      kind: 'search',
+      status: 'running',
+      input: '{}',
+      subagentId: 'child-1',
+    })
+  })
+})

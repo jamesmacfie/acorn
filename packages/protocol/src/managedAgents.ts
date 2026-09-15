@@ -162,6 +162,41 @@ export type AgentQuestion = {
   secret?: boolean
 }
 
+/**
+ * What an agent did on the web, said the same way whichever harness did it.
+ *
+ * A search, a page opened, a pattern looked for on a page, a page fetched with a question about it.
+ * The names are Acorn's: Codex spells the first two `search` and `openPage`, Claude Code spells the
+ * last one `WebFetch`, and neither spelling reaches a card. A driver that cannot recognise its
+ * provider's web call leaves this off and the call renders as any other tool
+ * (docs/managed-agents.md § Web activity).
+ *
+ * Every field is optional for the same reason `AgentToolCall.status` is: a provider reports the
+ * request and the results on different updates, and absent has to mean unchanged rather than empty.
+ */
+export type AgentWebAction =
+  | { type: 'search'; queries: string[]; allowedDomains?: string[]; blockedDomains?: string[] }
+  | { type: 'open_page'; url?: string }
+  | { type: 'find_in_page'; url?: string; pattern?: string }
+  | { type: 'fetch_page'; url?: string; prompt?: string }
+  | { type: 'other' }
+
+/** One source a provider reported. `url` is what makes it a result; the rest is what it chose to say
+ *  about it, and a card that has no `domain` shows the URL's own host rather than storing a derived
+ *  one. Nothing here is fetched, ranked or checked — the transcript records the answer the provider
+ *  gave, it does not search again. */
+export type AgentWebResult = {
+  url: string
+  title?: string
+  domain?: string
+  snippet?: string
+}
+
+export type AgentWebActivity = {
+  action?: AgentWebAction
+  results?: AgentWebResult[]
+}
+
 export type AgentToolCall = {
   id: string
   parentId?: string
@@ -177,6 +212,10 @@ export type AgentToolCall = {
   paths?: string[]
   /** The subagent that ran this call, when a harness attributes it (see AgentSubagent). */
   subagentId?: string
+  /** Web activity, when the driver recognised this call as some. It sits beside `input` and `output`
+   *  rather than replacing them: a renderer that has never heard of it still has the request and the
+   *  provider's own text to draw. */
+  web?: AgentWebActivity
 }
 
 export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' | 'failed'
@@ -381,6 +420,21 @@ export type AgentWsFrame =
   | { channel: 'agent:request'; request: AgentRequest }
   | { channel: 'agent:deleted'; sessionId: string }
 
+/** The words in a web call, so a reader can find a run by what it searched for or by a page it read.
+ *  Beside the call's title and text rather than instead of them: the structured payload is the only
+ *  copy of a query Codex reports, and the provider's own output is the only copy of the answer. */
+const webSearchText = (web: AgentWebActivity | undefined): string[] => {
+  if (!web) return []
+  const action = web.action
+  return [
+    ...(action?.type === 'search' ? [...action.queries, ...action.allowedDomains ?? [], ...action.blockedDomains ?? []] : []),
+    ...(action && 'url' in action && action.url ? [action.url] : []),
+    ...(action?.type === 'find_in_page' && action.pattern ? [action.pattern] : []),
+    ...(action?.type === 'fetch_page' && action.prompt ? [action.prompt] : []),
+    ...(web.results ?? []).flatMap((result) => [result.title, result.domain, result.url, result.snippet]),
+  ].filter((value): value is string => Boolean(value))
+}
+
 export const agentEventSearchText = (event: AgentNormalizedEvent): string | null => {
   switch (event.type) {
     case 'user_message':
@@ -388,7 +442,13 @@ export const agentEventSearchText = (event: AgentNormalizedEvent): string | null
     case 'reasoning':
       return event.text
     case 'tool':
-      return [event.tool.title, event.tool.input, event.tool.output, ...(event.tool.paths ?? [])].filter(Boolean).join(' ')
+      return [
+        event.tool.title,
+        event.tool.input,
+        event.tool.output,
+        ...(event.tool.paths ?? []),
+        ...webSearchText(event.tool.web),
+      ].filter(Boolean).join(' ')
     case 'subagent':
       return [event.subagent.title, event.subagent.role].filter(Boolean).join(' ') || null
     case 'file_change':

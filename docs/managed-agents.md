@@ -404,6 +404,98 @@ rows still being created. The child inherits the intersection of the parent's si
 and any narrower ceiling requested at spawn. General session configuration updates cannot widen or
 remove that persisted ceiling.
 
+## Web activity
+
+A reader should be able to answer, from the transcript alone, what an agent searched for, which pages
+it opened, and which sources came back. Both built-in harnesses report all three. Neither reported any
+of it to a reader, for different reasons: the Codex normalizer mapped a `webSearch` item to an id, a
+title and a status and threw the rest away before the event was recorded, and the ACP path kept
+Claude's request but showed it as pretty-printed JSON under a title the adapter had written.
+
+The fix is one optional field on the tool call rather than an event type of its own. A web search has
+the same identity and the same lifecycle as any other tool call, so a parallel kind would duplicate
+status, output, subagent ownership, folding, the extension point and the search index:
+
+```ts
+type AgentWebAction =
+  | { type: 'search'; queries: string[]; allowedDomains?: string[]; blockedDomains?: string[] }
+  | { type: 'open_page'; url?: string }
+  | { type: 'find_in_page'; url?: string; pattern?: string }
+  | { type: 'fetch_page'; url?: string; prompt?: string }
+  | { type: 'other' }
+
+type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[] }
+type AgentToolCall = { /* … */ web?: AgentWebActivity }
+```
+
+The names are Acorn's, not any provider's. Both fields are optional because a provider reports the
+request and the sources on different updates, so absent has to mean unchanged, the same convention
+`AgentToolCall.status` follows. `input` and `output` stay filled in beside it: the structured payload
+drives the card and the index, and the generic text is what a renderer that has never heard of the
+field still has to draw.
+
+**Each driver owns its own mapping, and nothing downstream knows which executable ran.** The Codex
+normalizer reads `item.type === 'webSearch'`. The ACP normalizer reads `_meta.claudeCode.toolName`,
+never ACP's `kind`, because Claude's `WebSearch` and `WebFetch` both arrive as `fetch` and another
+harness may well call a repository grep `search`. An ACP harness whose tool identity the driver does
+not recognize keeps the generic card. A new harness earns the card by mapping its own confirmed wire
+shape to `AgentWebActivity` and nothing else.
+
+**The row is named after the action, not by the provider.** `Search web`, `Open page`, `Find on page`,
+`Fetch page`, `Web activity` for an action a provider declined to name, and `Web search` for a call
+that has not said yet. The table is in `plugins/agents/src/server/drivers/webActivity.ts`, shared
+between the drivers so that a second one does not import the first. Claude Code's adapter titles a
+search `"the query" (allowed: docs.example)`; that title no longer reaches a transcript, because the
+query can be a paragraph and the title is what a reader scans by. The query goes in the fold's summary
+slot beside the title instead.
+
+What the two providers actually send is checked in, sanitized, under
+`plugins/agents/src/server/drivers/__fixtures__`. Two things in those captures contradicted the plan
+this work was written from, which is why they are the authority:
+
+- Codex sends nothing on `item/started`. The query is the empty string and both the action and the
+  results are null, so the start event carries no payload at all and the fold is what puts the call
+  back together. The same model reading a page reported it once as `openPage` and once as `other`.
+- Claude Code does forward structured results, on `_meta.claudeCode.toolResponse.results`, whose
+  object entries hold `content` arrays of title and URL with the model's prose as a sibling string.
+  So a Claude card shows the same list of sources a Codex card does. The adapter also converts
+  recognized result blocks to `Title (url)` text in other paths; that format belongs to the adapter
+  and is never parsed back.
+
+Claude reports no domain for a result and Codex does. The card reads the host off the URL when the
+field is absent rather than storing a derived one, so the two read the same without the ledger
+carrying a second thing to keep true.
+
+**The payload is bounded twice before it reaches SQLite**, in `boundProviderEvent.ts`: every string
+and collection on its own, and then the whole payload against the 64 KiB the inline tool budget uses.
+Overflow drops trailing sources and only that. The per-field limits are chosen so the action fits
+inside the budget by itself, which is what lets that trim finish and what keeps the one field that
+explains the call. Oversized web data is not promoted to an artifact the way command output and
+patches are: a reader wants those in full, and the fortieth search result is not that.
+
+**Only `http:` and `https:` URLs become links.** The card parses with `URL` and checks the protocol.
+Anything else stays visible as text, so a reader can see what the provider tried, and no result can
+become a `javascript:`, `data:`, `file:` or Acorn deep link. Scheme is a rendering decision, so the
+bounds layer stores a hostile URL whole rather than truncating it into something that no longer looks
+like what it is.
+
+Queries and result metadata join `agentEventSearchText()`, so Agent Center finds a run by what it
+searched for, by a result title, domain, URL fragment or snippet. Bounds run before the index string
+is built. Nothing about a web call reaches telemetry, lifecycle events, session rows or notification
+text: a query is written from task context and can hold anything that context held.
+
+One card is drawn for both hosts by `plugins/agents/src/client/sessions/webToolCard.tsx`, selected by
+the presence of `tool.web` and wrapped by the same `agents:tool-card` slot as the generic one, so a
+contributed renderer still wins. It uses kit nodes only. In a terminal a focused result link prints
+its address on the line below, which is what that host does with every address it cannot open.
+
+No migration and no schema-version bump: the field is additive and optional, readers already tolerate
+an absent optional tool field, and `agent_events.search_text` accepts the longer string for rows
+inserted from here on. Codex rows recorded before this change hold no query, because normalization
+discarded it, and they keep rendering as the flat `Web search` row they always did. Codex rollout
+files may still hold the payload, but they are private provider storage that can be pruned or live on
+another node, so a transcript read never touches `~/.codex` or `~/.claude`.
+
 ## Client surfaces
 
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's

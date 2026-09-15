@@ -14,8 +14,12 @@ import type {
   AgentSubagentUpdate,
   AgentToolCall,
   AgentUsage,
+  AgentWebAction,
+  AgentWebActivity,
+  AgentWebResult,
 } from '@acorn/protocol/managedAgents.ts'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
+import { webToolTitle } from './webActivity'
 
 const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
   kind === 'allow_once' || kind === 'allow_always' || kind === 'reject_once' || kind === 'reject_always'
@@ -135,10 +139,13 @@ function unfenced(text: string): string {
 // 0.54.1 (drivers/__fixtures__/claudeSubagentWire.json):
 //   toolName          the CLI's own name for the tool, on every tool_call and most updates
 //   parentToolUseId   the spawning `Agent` call, on everything a subagent did
-//   toolResponse      the structured result; for a subagent it names the agent and reports its usage
+//   toolResponse      the structured result; for a subagent it names the agent and reports its usage,
+//                     and for a WebSearch it holds the sources (see webActivity below)
 type ClaudeToolMeta = {
   toolName?: string
   parentToolUseId?: string
+  /** The raw `toolResponse`, for readers that want more of it than the subagent fields below. */
+  response?: Record<string, unknown>
   /** A progress ping rather than a call. See the early return in normalizeAcpUpdate. */
   heartbeat?: boolean
   subagent?: {
@@ -169,6 +176,7 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
   return {
     toolName: str(claude.toolName),
     parentToolUseId: str(claude.parentToolUseId),
+    response: response ?? undefined,
     // The heartbeat is the one toolResponse that reports elapsed time and nothing else. A real result
     // that happens to carry a duration also names its agent, so the two cannot be confused.
     heartbeat: agentId == null && num(response?.elapsedTimeSeconds) != null,
@@ -185,6 +193,88 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
       : undefined,
   }
 }
+
+// ── Web activity ──────────────────────────────────────────────────────────────────────────────
+// Claude Code's two web tools, read into the provider-neutral shape
+// (@acorn/protocol/managedAgents.ts § AgentWebActivity) so a search reads the same here as it does
+// on the Codex path. Held to `_meta.claudeCode.toolName` and `rawInput`, never to ACP's `kind`:
+// WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository grep
+// `search`. A harness whose tool identity this file does not know keeps the generic card.
+//
+// Captured on Claude Code 2.1.241 with adapter 0.54.1
+// (./__fixtures__/claudeWebSearchWire.json). Three updates make up one call: the opening `tool_call`
+// with an empty rawInput, a refining update carrying the request, and a later one carrying the
+// result. Each maps only what it holds, and the transcript's fold puts them back together.
+
+const strings = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.flatMap((entry) => {
+    const text = str(entry)
+    return text ? [text] : []
+  })
+  return entries.length ? entries : undefined
+}
+
+/**
+ * The sources a WebSearch returned.
+ *
+ * `toolResponse.results` is a mixed list: objects holding a `content` array of `{ title, url }`, and
+ * the model's own prose as sibling strings. The prose is already the call's output, so only the
+ * objects are read. This is an upstream structured field rather than the `Title (url)` line the
+ * adapter writes into text elsewhere — that format belongs to the adapter and parsing it back would
+ * make Acorn depend on its prose.
+ */
+function claudeWebResults(response: Record<string, unknown> | undefined): AgentWebResult[] | undefined {
+  const rows = Array.isArray(response?.results) ? response.results : []
+  const results = rows.flatMap((row) => {
+    const content = asRecord(row)?.content
+    if (!Array.isArray(content)) return []
+    return content.flatMap((entry) => {
+      const source = asRecord(entry)
+      const url = str(source?.url)
+      const title = str(source?.title)
+      return url ? [{ url, ...(title ? { title } : {}) }] : []
+    })
+  })
+  return results.length ? results : undefined
+}
+
+function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebActivity | undefined {
+  const input = asRecord(rawInput)
+  if (meta.toolName === 'WebSearch') {
+    const query = str(input?.query)
+    const allowedDomains = strings(input?.allowed_domains)
+    const blockedDomains = strings(input?.blocked_domains)
+    // An update with neither the request nor the results says nothing about the web; leaving it off
+    // is what keeps the fold from blanking what an earlier update reported.
+    const action: AgentWebActivity['action'] | undefined = input
+      ? {
+        type: 'search',
+        queries: query ? [query] : [],
+        ...(allowedDomains ? { allowedDomains } : {}),
+        ...(blockedDomains ? { blockedDomains } : {}),
+      }
+      : undefined
+    const results = claudeWebResults(meta.response)
+    return action || results ? { ...(action ? { action } : {}), ...(results ? { results } : {}) } : undefined
+  }
+  if (meta.toolName === 'WebFetch' && input) {
+    const url = str(input.url)
+    const prompt = str(input.prompt)
+    return { action: { type: 'fetch_page', ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } }
+  }
+  return undefined
+}
+
+/** Which action each of Claude's web tools performs, so the row can be named from the tool alone.
+ *  Off the tool's name rather than off the payload, because the updates that carry only a status or
+ *  only a result would otherwise fall back to the adapter's quoted-query title halfway through a
+ *  call. Claude's tools are one action each; Codex's one tool is several, which is why that driver
+ *  reads the action instead. */
+const CLAUDE_WEB_TOOLS = new Map<string, AgentWebAction['type']>([
+  ['WebSearch', 'search'],
+  ['WebFetch', 'fetch_page'],
+])
 
 // The CLI's two names for delegating to a subagent. `Agent` is what Claude Code 2.1.241 sends, `Task`
 // is the older name the adapter still maps, and both land on the same tool.
@@ -314,6 +404,8 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
             subagentId,
           }]
           : [])
+      const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
+      const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
       const plan = exitPlanModePlan(update, meta)
       const planned: AgentNormalizedEvent[] = plan
         ? [{ type: 'assistant_message', text: plan, subagentId }]
@@ -323,13 +415,16 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
         tool: {
           id: update.toolCallId,
           // Empty rather than a made-up name: a tool_call always names itself, an update need not,
-          // and the fold keeps the name the call arrived with.
-          title: update.title ?? '',
+          // and the fold keeps the name the call arrived with. A web call is the exception: its row
+          // is named after what it did, so the adapter's `"query" (allowed: host)` title never
+          // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
+          title: webAction ? webToolTitle(webAction) : update.title ?? '',
           kind: update.kind ?? undefined,
           status,
           input: plan ? undefined : toolInput(update.rawInput),
           output: text || undefined,
           subagentId,
+          ...(web ? { web } : {}),
         },
       }, ...diffs]
     }

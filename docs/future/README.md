@@ -37,7 +37,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [session_name.md](./session_name.md) | Generated managed-session titles after the first accepted prompt, with user rename precedence and semantic lifecycle events. | Proposal, 2026-09-12. Not started. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
-| [web_search_run.md](./web_search_run.md) | Provider-neutral web searches, page actions, and result details in managed-run transcripts, verified against Codex and Claude Code. | Proposal, 2026-09-12. Not started. |
 | [data-capability.md](./data-capability.md) | A host-owned `ctx.core.data` facet so a sandboxed plugin can query a database the host connects to, with the database plugin as first consumer. | Proposal, 2026-09-14. Not started. |
 
 ## How these relate
@@ -59,7 +58,18 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
 `notifications/`, and
-the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
+where its behaviour moved.
+
+`web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
+and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.
+[managed-agents.md](../managed-agents.md) § Web activity owns the behaviour: the optional `web` payload
+on a tool call and why it is not an event kind of its own, the per-driver mapping and the rule against
+reading ACP's `kind`, the shared action-to-title table, the two live captures and the two things in
+them that contradicted the proposal, the two layers of bounds and why overflow drops sources instead of
+becoming an artifact, the `http`-and-`https`-only link rule, and what happens to rows recorded before
+it. [testing.md](../testing.md) has the captures under managed-agent coverage and the manual pass as
+item 70.
 
 `ai-harness/` was six phases that gave acorn one "generate with" list over stored API keys and the
 agent CLIs already on the machine, so someone holding `claude` or `codex` and no key stops seeing a

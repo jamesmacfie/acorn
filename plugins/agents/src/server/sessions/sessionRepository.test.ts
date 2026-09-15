@@ -123,3 +123,58 @@ describe('subagent roster on the session row', () => {
     })
   })
 })
+
+// Web activity through the index, against the real FTS5 table rather than against the string the
+// protocol builds. A query is often the only durable record of why a run went the way it did, and
+// before this the Codex path discarded it at normalization, so there was nothing to find.
+describe('finding a run by what it did on the web', () => {
+  let ctx: TestNodeContext
+  let store: AgentStore
+
+  beforeEach(() => {
+    ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    store = new AgentStore(ctx.storage.open(), ctx.core)
+  })
+
+  afterEach(() => {
+    ctx.cleanup()
+  })
+
+  it('indexes the query, the filters, the sources and their words', async () => {
+    const created = await store.createSession({
+      taskId: randomUUID(),
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    }, PROVIDER)
+    await store.recordEvent(created.id, null, {
+      type: 'tool',
+      tool: {
+        id: 'w',
+        title: 'Search web',
+        status: 'completed',
+        web: {
+          action: { type: 'search', queries: ['piranhagram'], allowedDomains: ['zaphodhost.example'] },
+          results: [{
+            url: 'https://zaphodhost.example/betelgeuse',
+            title: 'Ravenousbugblatter',
+            domain: 'zaphodhost.example',
+            snippet: 'A sentence about frogstarcorp.',
+          }],
+        },
+      },
+    })
+
+    for (const needle of [
+      'piranhagram',
+      'zaphodhost.example',
+      'betelgeuse',
+      'Ravenousbugblatter',
+      'frogstarcorp',
+    ]) {
+      expect((await store.searchSessions(needle)).map((session) => session.id), needle).toEqual([created.id])
+    }
+    expect(await store.searchSessions('vogonpoetry')).toEqual([])
+  })
+})
