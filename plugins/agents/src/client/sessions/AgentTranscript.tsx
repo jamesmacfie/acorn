@@ -10,6 +10,7 @@ import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar, type Timelin
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
+import { readingPlace, rememberReadingPlace } from './readingPlaceStore'
 
 // The session's stream, as a `Timeline` of cards.
 //
@@ -93,7 +94,7 @@ export default function AgentTranscript(props: {
   queueMicrotask(() => { measuringInitialCards = false })
   const renderCard = (item: () => ReturnType<typeof items>[number]) => {
     const draw = () => (
-      <Timeline.Turn>
+      <Timeline.Turn key={item().key}>
         <AgentEventCard
           item={item()}
           taskId={props.taskId}
@@ -147,7 +148,13 @@ export default function AgentTranscript(props: {
           </EmptyState>
         }
       >
-        <Timeline follow viewKey={viewId()} ariaLabel="Agent transcript" controls={props.onControls}>
+        <Timeline
+          follow
+          place={() => readingPlace(viewId())}
+          onChange={(next) => rememberReadingPlace(viewId(), next)}
+          ariaLabel="Agent transcript"
+          controls={props.onControls}
+        >
           {/*
             `For` over the rows' keys, not `Index` over their positions. buildConversationItems rebuilds
             every item object on every snapshot, so `For` over those objects would recreate the whole list

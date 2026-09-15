@@ -15,6 +15,7 @@ import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'
 import { clearComposerDraft, clearComposerDrafts } from '../composer/composerState'
+import { clearReadingPlaces } from './readingPlaceStore'
 
 // This plugin's client half has no `ctx.log`: a client context is contribution points and nothing
 // else, so the tag and the owner are stated here (docs/plugin-authoring.md § Telemetry and logging).
@@ -129,6 +130,8 @@ function removeSession(sessionId: string): void {
   // The unsent turn goes with the session it addressed (../composer/composerState.ts). Nothing else
   // reaps that map, and an attachment id in it names a row the node has dropped.
   clearComposerDraft(sessionId)
+  // And where the reader was left in it, for the same reason (./readingPlaceStore.ts).
+  clearReadingPlaces(sessionId)
   const refreshTimer = snapshotRefreshTimers.get(sessionId)
   if (refreshTimer) clearTimeout(refreshTimer)
   snapshotRefreshTimers.delete(sessionId)

@@ -1,6 +1,22 @@
 # Agent transcript scroll, focus, and view-state repair
 
-Implementation proposal, 2026-09-14. Not started. Investigation baseline: commit `49f57369`
+Implementation proposal, 2026-09-14. Partly shipped; the reading-position half is done and the owning
+documents now hold it, so read them first and this only for what is left.
+
+Shipped: stable row identity (`For` over the projection's keys), the one-shot reveal intent, the Card
+reveal's rising edge and its refusal to take the caret out of a text box, the gesture-gated follow
+decision, and — on 2026-09-15 — the anchored reading place. That last one is this document's phase 4
+and the reading-position part of phase 2: a place is a turn and an offset into it rather than a pixel,
+the timeline is controlled through `place` and `onChange`, and the agents plugin owns the store. See
+[ui-design.md](../ui-design.md) § Behaviour a pane keeps redoing and
+[state-ownership.md](../state-ownership.md) § Where a list's place lives.
+
+Not built: the rest of phase 2 and phase 3, which put the chats-only filter and each tool card's
+open-or-shut state into the same store, and the reveal-token work. None of those is a reported
+problem. Phase 5's contract audit was done only as far as this change reached: `Timeline` on the
+terminal host is now `reduced`, with the loss written down.
+
+Investigation baseline: commit `49f57369`
 plus the working-tree changes present during the investigation. The requested filename is
 `scoll_fix.md`. Paths and line numbers are navigation hints; verify the implementation before editing.
 Where this proposal disagrees with an owning reference document, investigate and update the design
@@ -95,11 +111,13 @@ in sessions where no such intent was issued.
 
 ### Scroll events overwrite reader intent
 
-Timeline's `noteScroll()` clears the pending restoration target, updates following mode, and saves
-the new offset for any scroll event other than an exact echo of its last assigned offset. It does
-not restrict saved reading-position changes to reader navigation. Its helper,
-`packages/client-core/src/kit/lib/followScroll.ts`, resumes following whenever `nearBottom` is true,
-including after a browser clamp caused by a shrinking list.
+Timeline's `noteScroll()` cleared the pending restoration target, updated following mode, and saved
+the new offset for any scroll event other than an exact echo of its last assigned offset. It did
+not restrict saved reading-position changes to reader navigation, and its helper resumed following
+whenever `nearBottom` was true, including after a browser clamp caused by a shrinking list. Both are
+fixed: the rule is `placeAfterScroll` in
+`packages/client-core/src/kit/lib/readingPlace.ts`, and a scroll with no gesture behind it changes
+nothing.
 
 Two diagnostics confirmed the state transitions with simulated geometry:
 
