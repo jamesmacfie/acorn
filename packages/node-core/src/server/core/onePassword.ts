@@ -88,7 +88,21 @@ export async function probe(): Promise<{ available: boolean; version?: string }>
   return { available: true, version: result.stdout.trim() }
 }
 
+// `op` keeps a background daemon and a cached session, and it finds both through TMPDIR. A node
+// started without one lands on /tmp, sees no session, starts a daemon of its own, and pays a cold
+// start on every read while every other process on the machine shares a warm one. From the outside
+// that is indistinguishable from 1Password being slow, which is what makes it worth a line. Said once
+// per boot, and only when it is true, so a healthy node stays quiet.
+let announcedTempDir = false
+function announceTempDir(): void {
+  if (announcedTempDir) return
+  announcedTempDir = true
+  if (process.env.TMPDIR) return
+  log.warn('this node has no TMPDIR, so op falls back to /tmp and cannot share the warm daemon the rest of this machine uses')
+}
+
 async function read(ref: string): Promise<string> {
+  announceTempDir()
   // `--` so a reference can never be read as a flag, on top of the pattern check above. runProcess
   // spawns directly with no shell, so this is about argv parsing rather than injection.
   const result = await runProcess({

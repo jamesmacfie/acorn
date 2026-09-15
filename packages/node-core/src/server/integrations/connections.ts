@@ -17,6 +17,9 @@ import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
 import { ProviderOperationError, type ProviderCredentials } from './types'
 import { isSecretRef } from '../core/onePassword'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('integrations:connections')
 
 export type StoredConnection = typeof schema.integrations.$inferSelect
 
@@ -334,6 +337,40 @@ export async function forEachConnection<T>(
     if (value !== undefined) out.push(value)
   }
   return out
+}
+
+/**
+ * Resolve every 1Password-backed credential once, at boot, while nobody is waiting on one.
+ *
+ * The resolver caches a resolved value until the node restarts, so without this the first surface to
+ * want a credential is the one that pays for the `op` round trip. That is seconds, not milliseconds,
+ * and longer than the client's per-node deadline, which means the first click after every launch drew
+ * an "unavailable" banner over a connection that was perfectly healthy.
+ *
+ * Every failure is swallowed. 1Password switched off, locked, or not installed is not a reason for a
+ * node to fail to start, and whatever is wrong surfaces again with a real error the first time a
+ * request actually wants that credential.
+ */
+export async function warmOnePasswordCache(db: AppDatabase, userId: string | null, secrets: SecretService): Promise<void> {
+  if (!userId) return
+  const refs = new Set<string>()
+  for (const row of await listConnections(db, userId)) {
+    // Local decryption only, so collecting the list costs nothing and prompts for nothing.
+    const ref = await secrets.secretRef(row.authRef)
+    if (ref) refs.add(ref)
+  }
+  if (!refs.size) return
+  // One at a time, because the resolver queues `op` invocations anyway so that two unlock prompts
+  // cannot stack. Asking for them all at once would only fill that queue faster.
+  const started = Date.now()
+  let resolved = 0
+  for (const ref of refs) {
+    if (await secrets.resolve(ref).then(() => true, () => false)) resolved += 1
+  }
+  // The elapsed time is the point, not the count. A warm 1Password daemon answers in a second or two
+  // and a cold one takes closer to ten, and the difference is the whole reason this pass exists. A
+  // node that reports ten seconds on every boot is starting a daemon of its own each time.
+  log.info(`resolved ${resolved} of ${refs.size} 1Password credentials in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 }
 
 export function externalRefForConnection(row: StoredConnection, identifier: string, input?: Partial<ExternalRef>): ExternalRef {
