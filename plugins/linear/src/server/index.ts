@@ -2,6 +2,13 @@
 // with no "Bearer" prefix, since that one is for OAuth tokens. Returns parsed GraphQL data or throws;
 // callers map errors via linearError on the fetch Response. Linear has one endpoint: POST /graphql.
 
+// Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 10s
+// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so an
+// unbounded fetch here reads to the user as "your machine is down" rather than "this API is slow".
+// ponytail: per-request, not per-route. A route that loops over several connections can still add up
+// past the client's 10s; give it a shared budget if anyone hits that with enough workspaces.
+const REQUEST_TIMEOUT_MS = 8_000
+
 const LINEAR_GRAPHQL = 'https://api.linear.app/graphql'
 
 type GraphQLResponse<T> = { data?: T; errors?: { message: string }[] }
@@ -12,6 +19,7 @@ export const linearFetch = (apiKey: string, query: string, variables: Record<str
     method: 'POST',
     headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
 export const linearError = (res: Response): { error: string; status: 401 | 502 } | null =>

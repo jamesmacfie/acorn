@@ -485,6 +485,19 @@ drag across a line, so the gesture it armed used to sit there until something el
 that move was then filed as the place the reader chose. Focus counts as a gesture when it lands on a
 turn in this list, because revealing a card scrolls it into view and then focuses it.
 
+A list that the reader has no place in opens at the foot, and so does a list they were following.
+Those two are the same value, `{ at: 'live' }`, which is also why the timeline acts on a place equal
+to the one it already holds: the caller only reads its store again when the view has changed, so two
+live places in a row are the feet of two different lists. Treating that as nothing to do left a reader
+who switched sessions sitting at the old transcript's offset, partway down one they had never seen.
+
+One move has no signal of its own: the page taking the list away and putting it back. A pane region
+draws inside a `Suspense` ([panes.md](./panes.md)), and a query in that region running with an empty
+cache suspends the boundary *after* it has drawn, so every child leaves the document for a few hundred
+milliseconds. A scroller that was detached comes back at the top, and the browser reports neither a
+scroll event nor a resize for it. The timeline watches its parent's children for that and runs the
+same correction it runs for every other move nobody asked for.
+
 The timeline does not keep the places. `place` and `onChange` hand them to the caller, because
 navigation disposes a task's panes on purpose ([panes.md](./panes.md)), so a place kept in the
 component is a place lost on every workspace switch, and a map hidden inside a kit node has no owner to

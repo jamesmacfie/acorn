@@ -62,6 +62,9 @@ const handler = (req: import('node:http').IncomingMessage, res: import('node:htt
   req.on('end', () => {
     received.push({ method: req.method ?? '', path: req.url ?? '', headers: req.headers, body: Buffer.concat(chunks) })
     const reply = respond(req.url ?? '')
+    // Status 0 means "never answer", which is how a route that waits on `op` or on a third-party API
+    // looks to the broker. The socket stays open and the response never comes.
+    if (reply.status === 0) return
     res.writeHead(reply.status, reply.headers ?? {})
     res.end(reply.body)
   })
@@ -214,6 +217,37 @@ describe('broker HTTP', () => {
     broker.abort('r-cancel')
     await expect(pending).rejects.toThrow()
     expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
+  })
+
+  // The regression: one slow route took the whole node down. A plugin panel waiting on a credential
+  // or a third-party API passed the broker's own deadline, the timeout was read as evidence about the
+  // transport, and every other surface in the app then said the node was unreachable.
+  it('does not mark a node offline when one route passes the request deadline', async () => {
+    const { origin } = await listen(false)
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
+
+    respond = () => ({ status: 0, body: '' })
+    await expect(broker.fetch('n1', { requestId: 'r-slow', path: '/slow', timeoutMs: 50 })).rejects.toThrow(/did not answer within/)
+    expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
+
+    // Still answering, and still reachable as far as the broker is concerned.
+    respond = () => ({ status: 200, body: 'ok' })
+    await expect(broker.fetch('n1', { requestId: 'r-after', path: '/x' })).resolves.toMatchObject({ status: 200 })
+  })
+
+  // The other half: a node that is genuinely not there still has to reach `offline`, or nothing in
+  // the fleet UI ever says so.
+  it('marks a node offline when the transport itself fails', async () => {
+    const { origin, server } = await listen(false)
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
+
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    await expect(broker.fetch('n1', { requestId: 'r-dead', path: '/x' })).rejects.toThrow()
+    expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'unreachable' } })
   })
 
   it('rejects a request for an unknown node', async () => {

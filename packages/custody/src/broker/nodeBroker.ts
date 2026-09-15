@@ -235,18 +235,27 @@ export class NodeBroker {
       this.noteHttpResult(connection, response)
       return response
     } catch (error) {
-      // A cancellation the renderer asked for says nothing about the node's health. Marking it
-      // `offline` here was a live bug: a query aborted on unmount flipped a healthy node to
-      // `offline`, and apiClient then failed every mutation with "This node is offline" until the
-      // next successful read cleared it.
-      if (isAbort(error) && !timedOut) throw error
-      this.noteHttpFailure(connection, error)
-      // Renamed so the two aborts stay distinguishable one layer up. `helperServer.ts` answers the
-      // renderer's own cancellation with a 499 and must not swallow this one. "The operation was
-      // aborted" also tells someone whose node stopped answering nothing.
+      // Neither abort is evidence about the node, so neither one changes its state.
+      //
+      // A cancellation the renderer asked for says nothing at all. Marking it `offline` here was a
+      // live bug: a query aborted on unmount flipped a healthy node to `offline`, and apiClient then
+      // failed every mutation with "This node is offline" until the next successful read cleared it.
+      //
+      // Our own timeout is a fact about one route, not about the transport. A route that reads a
+      // credential out of 1Password waits on the `op` command, and a provider route waits on a third
+      // party. Either can pass this deadline while the socket is open and every other route on the
+      // node answers normally. Marking the node `offline` for it took the whole app down over one
+      // slow plugin panel. Liveness is the heartbeat's job: missed pings terminate the socket, and
+      // `downState` then picks `offline` or `degraded` with the HTTP evidence folded in.
       if (isAbort(error)) {
+        if (!timedOut) throw error
+        // Renamed so the two aborts stay distinguishable one layer up. `helperServer.ts` answers the
+        // renderer's own cancellation with a 499 and must not swallow this one. "The operation was
+        // aborted" also tells someone whose node stopped answering nothing.
         throw Object.assign(new Error(`The node did not answer within ${request.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`), { name: 'TimeoutError' })
       }
+      // Everything left is the transport itself: connection refused, socket hang-up, pin mismatch.
+      this.noteHttpFailure(connection, error)
       throw error
     } finally {
       clearTimeout(timeout)

@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { linearUploadTarget } from './routes/linear'
-import { issuesFilter, linearData, linearError, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
+import { issuesFilter, linearData, linearError, linearFetch, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
 
 describe('linear server helpers', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it('parses issue identifiers and ignores malformed identifiers in filters', () => {
     expect(parseIdentifier('ENG-42')).toEqual({ key: 'ENG', number: 42 })
     expect(parseIdentifier('eng-42')).toBeNull()
@@ -63,6 +65,18 @@ describe('linear server helpers', () => {
 })
 
 describe('linearUploadTarget', () => {
+  // The regression: an unbounded call to Linear outlived the fan-out's 10s per-node deadline, so a
+  // slow API drew "this node is unavailable" over a node that was answering everything else.
+  it('gives every call to Linear a deadline', async () => {
+    let init: RequestInit | undefined
+    vi.stubGlobal('fetch', (_url: string, options: RequestInit) => {
+      init = options
+      return Promise.resolve(new Response('{"data":{}}'))
+    })
+    await linearFetch('key', 'query { viewer { name } }', {})
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
+
   it('accepts only https uploads.linear.app', () => {
     expect(linearUploadTarget('https://uploads.linear.app/w/f/a.png')?.href).toBe('https://uploads.linear.app/w/f/a.png')
     // Every one of these would otherwise be a request this route makes with the owner's Linear key.

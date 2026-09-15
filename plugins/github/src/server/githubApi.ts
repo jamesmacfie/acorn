@@ -1,3 +1,10 @@
+// Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 10s
+// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so an
+// unbounded fetch here reads to the user as "your machine is down" rather than "this API is slow".
+// ponytail: per-request, not per-route. A route that loops over several connections can still add up
+// past the client's 10s; give it a shared budget if anyone hits that with enough workspaces.
+const REQUEST_TIMEOUT_MS = 8_000
+
 const ghHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: 'application/vnd.github+json',
@@ -21,6 +28,8 @@ export const gh = (token: string, path: string, init?: RequestInit) =>
     ? fetch(`https://api.github.com${path}`, {
         ...init,
         headers: { ...ghHeaders(token), ...init?.headers },
+        // A caller that brought its own signal keeps it, deadline included.
+        signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
     : Promise.resolve(notConnected())
 
@@ -31,6 +40,7 @@ export const ghGraphQL = (token: string, query: string, variables: Record<string
         method: 'POST',
         headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, variables }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
     : Promise.resolve(notConnected())
 
