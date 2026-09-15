@@ -20,6 +20,7 @@
     "@acorn/client-core": "workspace:*",
     "@acorn/custody": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-agent-cost": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-changes": "workspace:*",

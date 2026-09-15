@@ -19,7 +19,7 @@
 // did not declare simply has nothing delivered into it. See docs/plugins.md § Cooperative extension
 // points and § There is no uncooperative extension.
 
-import type { AgentToolCall } from './managedAgents'
+import type { AgentToolCall, AgentUsage } from './managedAgents'
 
 /**
  * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
@@ -312,6 +312,39 @@ export type AgentToolCardProps = {
 /** Room in the agent composer's own action bar, beside Attach and the two pickers. A `stack` point,
  *  because "everyone with something to offer this draft" is a real answer for a toolbar. */
 export const AGENT_COMPOSER_ACTIONS_POINT = 'agents:composer-actions'
+
+/** A compact contribution immediately after the managed session title. Agents projects its private
+ *  ledger into these bounded, JSON-safe facts; contributors decide what those facts mean and draw.
+ *  This is intentionally not a cost contract: a token counter, budget warning or provider badge can
+ *  consume the same point without inheriting another contributor's product decision. */
+export const AGENT_SESSION_HEADER_POINT = 'agents:session-header'
+
+export type AgentSessionTokenPrice = {
+  input: number
+  output: number
+  cacheWrite: number
+  cacheRead: number
+}
+
+export type AgentSessionHeaderTurn = {
+  turnId: string
+  model: string | null
+  usage: AgentUsage
+  /** The owner's configured USD price per million tokens for this turn's model. `null` keeps an
+   *  unknown or privately-priced model explicit instead of turning it into a plausible zero. */
+  price: AgentSessionTokenPrice | null
+}
+
+export type AgentSessionHeaderProps = {
+  taskId: string
+  sessionId: string
+  providerId: string
+  /** Whether each turn's counters stand alone or include all preceding turns in the session. */
+  tokenAccounting: 'per-turn' | 'cumulative'
+  /** Whether successive provider cost reports stand alone or replace the previous session total. */
+  costAccounting: 'per-turn' | 'cumulative'
+  turns: AgentSessionHeaderTurn[]
+}
 
 /** How one attachment on an unsent turn is drawn, keyed by its media type. `replace`, because a chip
  *  is one thing and two plugins drawing the same file would be two chips for one attachment. */

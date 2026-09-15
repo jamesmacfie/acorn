@@ -6,6 +6,7 @@ import {
   connectProvider,
   disconnectConnection,
   externalRefForConnection,
+  renameConnection,
   rotateConnection,
   setConnectionDisabled,
   testConnection,
@@ -13,6 +14,7 @@ import {
 import { publicConnectionProvider } from './providerShared'
 import { ProviderOperationError } from './types'
 import { SecretService } from '../core/secrets'
+import { connectionName, MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 
 // The socket is the boundary worth stubbing: everything above it is the code under test, and a real hub
 // has no connections in a unit test, so a broadcast would be a silent no-op and prove nothing.
@@ -78,6 +80,39 @@ describe('connection-only provider lifecycle', () => {
 
   afterEach(() => {
     testDb.cleanup()
+  })
+
+  it('keeps an owner-given name through a rotate, and clears it back to the provider label', async () => {
+    const connected = await connectProvider(
+      testDb.db,
+      'alice',
+      { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
+      SECRETS,
+    )
+    // Nothing named yet, so the provider's own label is what a surface shows.
+    expect(connected.name).toBeUndefined()
+    expect(connectionName(connected)).toBe('Connection only')
+
+    await expect(renameConnection(testDb.db, 'alice', connected.id, '  Work  ')).resolves.toMatchObject({
+      name: 'Work',
+    })
+    // The whole reason the name is its own column: a new credential rewrites `label` from the
+    // provider, and a name kept there would go with it.
+    await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: 'rotated-key' } }, SECRETS)
+    const [afterRotate] = await testDb.db.select().from(schema.integrations)
+    expect(afterRotate.name).toBe('Work')
+    expect(connectionName(afterRotate)).toBe('Work')
+
+    await expect(renameConnection(testDb.db, 'alice', connected.id, 'x'.repeat(MAX_CONNECTION_NAME + 1)))
+      .rejects.toMatchObject({ code: 'provider_bad_config' })
+
+    // Blank and null both mean "go back to the provider's label" rather than storing an empty name.
+    // The summary drops the key rather than sending `name: null`, so a client reads one absent field.
+    const blanked = await renameConnection(testDb.db, 'alice', connected.id, '   ')
+    expect('name' in blanked).toBe(false)
+    const [cleared] = await testDb.db.select().from(schema.integrations)
+    expect(cleared.name).toBeNull()
+    expect(connectionName(cleared)).toBe('Connection only')
   })
 
   it('encrypts, summarizes, rotates, tests, and deletes a connection-only provider', async () => {

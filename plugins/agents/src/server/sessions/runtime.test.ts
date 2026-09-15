@@ -683,7 +683,7 @@ describe('managed agent runtime conformance', () => {
     expect((await read()).session.runtimeState).toBe('ready')
   })
 
-  it('quiets a backgrounded subagent when its turn ends, and a later summary still settles it', async () => {
+  it('keeps a backgrounded subagent running while it streams, quiets it when it goes silent', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
     const driver = new BackgroundSubagentDriver()
@@ -696,6 +696,8 @@ describe('managed agent runtime conformance', () => {
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
+      // The real window is a minute. This test is about the mechanism, not the duration.
+      subagentQuietMs: 120,
     })
 
     const session = await runtime.createSession({
@@ -712,9 +714,6 @@ describe('managed agent runtime conformance', () => {
       idempotencyKey: randomUUID(),
     })
 
-    // The turn ends while the child is still "running". The child outlives the turn and nothing feeds
-    // its row until a later prompt, so the spinner is quieted to `idle` rather than left turning. The
-    // quieting event is recorded just after `turn_completed`, so poll the roster rather than read once.
     const completed = await runtime.wait(session.id, 0, 'turn_completed', 2_000)
     expect(completed.session.runtimeState).toBe('ready')
     const rosterWhen = async (status: string) => {
@@ -725,8 +724,24 @@ describe('managed agent runtime conformance', () => {
       }
       return (await runtime!.wait(session.id, 0, 'ready', 0)).session.subagents
     }
+
+    // The turn is over and the child is still working. The end of a turn says nothing about a child
+    // that was backgrounded precisely so it could outlive one, so the row keeps its spinner.
+    await driver.push({ type: 'tool', tool: { id: 'ls-1', title: 'ls', subagentId: 'sub-bg' } })
+    expect(await rosterWhen('running')).toEqual([
+      expect.objectContaining({ id: 'sub-bg', status: 'running', background: true }),
+    ])
+
+    // Its own traffic is the only report a background child files, so silence is the only end anyone
+    // can observe. A quiet window with nothing in it settles the row.
     expect(await rosterWhen('idle')).toEqual([
       expect.objectContaining({ id: 'sub-bg', status: 'idle', background: true }),
+    ])
+
+    // And a child that speaks again has disproved the guess, so the row goes back to running.
+    await driver.push({ type: 'tool', tool: { id: 'ls-2', title: 'ls', subagentId: 'sub-bg' } })
+    expect(await rosterWhen('running')).toEqual([
+      expect.objectContaining({ id: 'sub-bg', status: 'running', background: true }),
     ])
 
     // The child's real completion summary, when it finally arrives, still folds the row to done.
@@ -736,6 +751,12 @@ describe('managed agent runtime conformance', () => {
     })
     expect(await rosterWhen('completed')).toEqual([
       expect.objectContaining({ id: 'sub-bg', status: 'completed', durationMs: 51_000 }),
+    ])
+
+    // A settled row stays settled. A tool call that arrives after the summary is late, not alive.
+    await driver.push({ type: 'tool', tool: { id: 'ls-3', title: 'ls', subagentId: 'sub-bg' } })
+    expect((await runtime.wait(session.id, 0, 'ready', 0)).session.subagents).toEqual([
+      expect.objectContaining({ id: 'sub-bg', status: 'completed' }),
     ])
   })
 

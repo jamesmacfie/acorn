@@ -478,17 +478,15 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   display: flex;
   flex-direction: column;
   padding: var(--space-1);
-}
-/* A menu wants its items against the edge, where the hover band reaches the full width. A dialog
-   holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
-   the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
-.ui-popover[role='dialog'] {
-  padding: var(--space-5);
   background: var(--popover-bg);
   border: var(--surface-border);
   border-radius: var(--radius-popover);
   box-shadow: var(--elev-popover);
 }
+/* A menu wants its items against the edge, where the hover band reaches the full width. A dialog
+   holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
+   the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
+.ui-popover[role='dialog'] { padding: var(--space-5); }
 
 /* ── Kbd ────────────────────────────────────────────────────────────────────────────────────
    The union of three separate keycap rules (.rail-tip-key, .help-key, .plugin-trust-escape kbd).

@@ -237,6 +237,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
           inputTokens: numberValue(total?.inputTokens) ?? undefined,
           outputTokens: numberValue(total?.outputTokens) ?? undefined,
           cachedInputTokens: numberValue(total?.cachedInputTokens) ?? undefined,
+          cacheWriteInputTokens: numberValue(total?.cacheWriteInputTokens) ?? undefined,
           contextUsed: numberValue(total?.totalTokens) ?? undefined,
           contextSize: numberValue(usage?.modelContextWindow) ?? undefined,
         },

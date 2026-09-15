@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { AgentSubagent } from '@acorn/protocol/managedAgents.ts'
 import {
   decideAgentCommand,
+  eventSubagentId,
   evolveAgentState,
   foldSubagentRoster,
   initialAgentMachineState,
   projectAgentEvent,
+  quietedSubagents,
+  touchSubagentRoster,
 } from './stateMachine'
 
 describe('managed agent state machine', () => {
@@ -128,5 +131,34 @@ describe('subagent roster projection', () => {
       attention: 'unread',
       activeTurnId: null,
     })
+  })
+  it('reads a background child\u2019s liveness from its own traffic', () => {
+    // The only report a background child files is the work it does. Its spawning call says nothing
+    // after the launch receipt, so without this the roster’s clock stops the moment the child starts.
+    const at = (status: AgentSubagent['status'], updatedAt: number): AgentSubagent[] => [
+      { id: 'bg', turnId: null, title: 'bg', status, background: true, startedAt: 0, updatedAt },
+    ]
+    expect(eventSubagentId({ type: 'tool', tool: { id: 't1', title: 'ls', subagentId: 'bg' } })).toBe('bg')
+    expect(eventSubagentId({ type: 'assistant_message', text: 'hi', subagentId: 'bg' })).toBe('bg')
+    expect(eventSubagentId({ type: 'assistant_message', text: 'hi' })).toBeUndefined()
+
+    expect(touchSubagentRoster(at('running', 0), 'bg', 900)?.[0]).toMatchObject({ status: 'running', updatedAt: 900 })
+    // Quieting is a guess made from silence, and a child that speaks again has disproved it.
+    expect(touchSubagentRoster(at('idle', 0), 'bg', 900)?.[0]).toMatchObject({ status: 'running', updatedAt: 900 })
+    // A settled row is the harness’s own word, so late traffic must not reopen it.
+    expect(touchSubagentRoster(at('completed', 0), 'bg', 900)).toBeUndefined()
+    expect(touchSubagentRoster(at('running', 0), 'nobody', 900)).toBeUndefined()
+  })
+
+  it('quiets only a background child that has gone silent', () => {
+    const roster: AgentSubagent[] = [
+      { id: 'bg-quiet', turnId: null, title: 'quiet', status: 'running', background: true, startedAt: 0, updatedAt: 100 },
+      { id: 'bg-live', turnId: null, title: 'live', status: 'running', background: true, startedAt: 0, updatedAt: 900 },
+      { id: 'bg-done', turnId: null, title: 'done', status: 'completed', background: true, startedAt: 0, updatedAt: 100 },
+      // Foreground: its spawning call always returns a real result, so silence here means the harness
+      // is thinking rather than that the child is gone.
+      { id: 'fg', turnId: null, title: 'fg', status: 'running', startedAt: 0, updatedAt: 100 },
+    ]
+    expect(quietedSubagents(roster, 500)).toEqual(['bg-quiet'])
   })
 })

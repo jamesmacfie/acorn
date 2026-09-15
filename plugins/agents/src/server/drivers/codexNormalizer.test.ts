@@ -116,11 +116,11 @@ describe('Codex app-server normalization', () => {
       method: 'thread/tokenUsage/updated',
       params: {
         tokenUsage: {
-          total: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, totalTokens: 17 },
+          total: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, cacheWriteInputTokens: 1, totalTokens: 17 },
           modelContextWindow: 100,
         },
       },
-    })).toEqual([{ type: 'usage', usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, contextUsed: 17, contextSize: 100 } }])
+    })).toEqual([{ type: 'usage', usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, cacheWriteInputTokens: 1, contextUsed: 17, contextSize: 100 } }])
   })
 
   it('maps each Codex plan snapshot with its structured status intact', () => {

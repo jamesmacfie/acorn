@@ -88,6 +88,17 @@
   gap: var(--space-4);
   align-items: center;
 }
+/* The rename box and its two buttons, standing in for the title while a connection is being renamed.
+   The box takes the slack so the buttons keep their size on a narrow card. */
+.integration-rename-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+.integration-rename-row .ui-input {
+  flex: 1;
+  min-width: 0;
+}
 .integration-setting-head {
   display: flex;
   align-items: baseline;

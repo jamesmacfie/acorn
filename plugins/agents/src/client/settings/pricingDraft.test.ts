@@ -12,17 +12,20 @@ describe('agent pricing settings draft', () => {
     const result = preferencesFromPricingDraft(draft)
     expect(result).toMatchObject({
       ok: true,
-      value: { claude: { overrides: [], customModels: [] } },
+      value: {
+        claude: { overrides: [], customModels: [] },
+        codex: { overrides: [], customModels: [] },
+      },
     })
   })
 
   it('turns edited and exact rows into validated preferences', () => {
     const draft = pricingDraftFromPreferences(emptyAgentPricingPreferences())
-    const opus = draft.catalog.find((entry) => entry.catalogId === 'opus-5')
+    const opus = draft.claude.catalog.find((entry) => entry.catalogId === 'opus-5')
     if (!opus) throw new Error('missing Opus 5 draft')
     opus.overridden = true
     opus.price.input = '6.5'
-    draft.customModels.push({
+    draft.claude.customModels.push({
       id: 'new:1',
       model: 'claude-future',
       price: { input: '1', output: '2', cacheWrite: '1.25', cacheRead: '0.1' },
@@ -41,7 +44,7 @@ describe('agent pricing settings draft', () => {
 
   it('rejects a blank custom row instead of treating blank prices as zero', () => {
     const draft = pricingDraftFromPreferences(emptyAgentPricingPreferences())
-    draft.customModels.push({ id: 'new:1', model: 'claude-future', price: blankAgentPriceDraft() })
+    draft.claude.customModels.push({ id: 'new:1', model: 'claude-future', price: blankAgentPriceDraft() })
     expect(preferencesFromPricingDraft(draft).ok).toBe(false)
   })
 })

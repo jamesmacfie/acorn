@@ -21,7 +21,12 @@ export type IntegrationProvider = string
 export type Integration = {
   id: string // 'github' for the synthesized entry; opaque uuid otherwise
   providerId: IntegrationProvider
+  // Seeded from the provider, rewritten on every rotate. Read `name` first when showing a connection
+  // to someone: use `connectionName` rather than either field on its own.
   label: string
+  // What the owner called this connection. Absent until they rename it, which is why every surface
+  // has to fall back to `label`.
+  name?: string
   status: IntegrationConnectionStatus
   authKind: IntegrationAuthKind
   account: ProviderAccountRef | null

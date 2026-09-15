@@ -1,4 +1,5 @@
 import type { ClientPlugin } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { agentCostClientPlugin } from '@acorn/plugin-agent-cost/client/index.ts'
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
 import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
 import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
@@ -14,6 +15,7 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 
 export const clientPlugins: readonly ClientPlugin[] = [
   agentsClientPlugin,
+  agentCostClientPlugin,
   changesClientPlugin,
   contextClientPlugin,
   dockerClientPlugin,

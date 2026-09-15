@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { ConnectIntegrationRequest, IntegrationMappingsResponse, IntegrationProjectsResponse, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
+import { MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import { auditRequest } from '../auditRequest'
 import { getDb, schema } from '../db'
 import {
@@ -11,6 +12,7 @@ import {
   disconnectConnection,
   getConnection,
   listConnections,
+  renameConnection,
   rotateConnection,
   setConnectionDisabled,
   testConnection,
@@ -25,7 +27,15 @@ import { projectInWorkspace } from './projects/workspaces'
 import { broadcastWorkspaceProjectsChanged } from '../notify'
 
 // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
-const setDisabledBody = z.object({ disabled: z.boolean() })
+// One PATCH, two independent edits: turn a connection off, or rename it. Both fields are optional so
+// a caller sends only the one it means, and `name: null` is how the owner clears a name and goes back
+// to the provider's label. `.refine` is what stops an empty body from being a silent success.
+const patchBody = z
+  .object({
+    disabled: z.boolean().optional(),
+    name: z.string().max(MAX_CONNECTION_NAME).nullable().optional(),
+  })
+  .refine((body) => body.disabled !== undefined || body.name !== undefined)
 const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional() })
 // The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
 // (routes/workspaces.ts) because both land in the same table.
@@ -191,11 +201,20 @@ export const integrations = new Hono<AppEnv>()
   })
   .patch('/:id', async (c) => {
     // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
-    const parsed = setDisabledBody.safeParse(await c.req.json().catch(() => ({})))
+    const parsed = patchBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
     const body = parsed.data
+    const db = getDb(c.env)
+    const id = c.req.param('id')
     try {
-      const integration = await setConnectionDisabled(getDb(c.env), ownerId(c), c.req.param('id'), body.disabled)
+      // A body carrying both applies both, and the second call returns the row that has them.
+      let integration = body.disabled === undefined
+        ? null
+        : await setConnectionDisabled(db, ownerId(c), id, body.disabled)
+      // Not audited, unlike the calls around it: `CoreAuditAction` is the write side of credentials,
+      // and a rename changes a display string rather than what the connection can reach.
+      if (body.name !== undefined) integration = await renameConnection(db, ownerId(c), id, body.name)
+      if (!integration) return respondError(c, 400, 'provider_bad_config')
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)

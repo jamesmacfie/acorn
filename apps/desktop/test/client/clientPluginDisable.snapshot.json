@@ -65,6 +65,7 @@
       "agents:tool-card",
       "agents:attachment",
       "agents:composer-actions",
+      "agents:session-header",
       "changes:diff-line",
       "changes:push-actions",
       "context:section",
@@ -74,6 +75,7 @@
       "github:summary-badges"
     ],
     "extensions": [
+      "agent-cost.session-header",
       "changes.tool-card",
       "github.push-actions",
       "memory.section"
@@ -129,6 +131,11 @@
     ]
   },
   "owned": {
+    "agent-cost": {
+      "extensions": [
+        "agent-cost.session-header"
+      ]
+    },
     "changes": {
       "panes": [
         "changes"

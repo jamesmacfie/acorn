@@ -46,6 +46,7 @@ import type {
   LinearRailItemsResponse,
   LinearUploadResponse,
 } from '../../shared/api'
+import { connectionName } from '@acorn/protocol/integrations.ts'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
 import { LINEAR_ISSUES_COLLECTION_ID, linearIssuesCollection } from '../../shared/collections'
@@ -208,6 +209,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
     const mapped = await mappedProjects(c, c.req.query('project'), projects)
     const issues: LinearProjectIssue[] = []
+    // Named per connection that actually returned rows, not per connection that exists: a workspace
+    // that is connected but mapped to nothing, or that failed, must not put a column on this list.
+    const names = new Map<string, string>()
     for (const { row, key } of connections) {
       const projectIds = mapped?.get(row.id) ?? []
       // Nothing mapped for this connection, whether the workspace maps other connections or none at
@@ -217,12 +221,16 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
         const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(projectIds) })
         if (linearError(res)) continue
         const { issues: found } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+        if (found.nodes.length) names.set(row.id, connectionName(row))
         issues.push(...found.nodes.map((node) => triageRow(row, node)))
       } catch {
         // Partial success is honest: one workspace failing must not erase another's rows.
       }
     }
-    return c.json({ items: sortLinearIssues(issues).map(linearRailItem) } satisfies LinearRailItemsResponse)
+    const named = names.size > 1
+    return c.json({
+      items: sortLinearIssues(issues).map((issue) => linearRailItem(issue, named ? names.get(issue.integrationId) : undefined)),
+    } satisfies LinearRailItemsResponse)
   })
   // The `Find a Linear issue` command's rows (docs/plugins.md § Command kinds).
   //
@@ -259,7 +267,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
           continue
         }
         const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        for (const node of issues.nodes) rows.push({ issue: triageRow(row, node), connectionLabel: row.label })
+        for (const node of issues.nodes) rows.push({ issue: triageRow(row, node), connectionLabel: connectionName(row) })
       } catch {
         failed++
         failure ??= { code: 'provider_unavailable', status: 502 }

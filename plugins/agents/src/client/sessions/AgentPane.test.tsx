@@ -1,6 +1,7 @@
 import { createRoot, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { CommandExecutionContext, ContributedCommand } from '@acorn/plugin-api/client'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { AgentPaneModel, SessionAction } from './agentPaneModel'
@@ -37,6 +38,7 @@ const session = (over: Partial<AgentSession>): AgentSession => ({
 
 const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel => ({
   selected: () => current,
+  snapshot: () => undefined,
   selectedManagedParent: () => parent,
   openManagedParent,
   sessionActions: () => [],
@@ -52,7 +54,18 @@ let dispose: (() => void) | undefined
 const mount = (current: AgentSession, parent?: AgentSession): void => {
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />, host)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  queryClient.setQueryData(['agents', 'pricing'], {
+    version: 1,
+    claude: { overrides: [], customModels: [] },
+    codex: { overrides: [], customModels: [] },
+  })
+  queryClient.setQueryData(['prefs'], {})
+  dispose = render(() => (
+    <QueryClientProvider client={queryClient}>
+      <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />
+    </QueryClientProvider>
+  ), host)
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
