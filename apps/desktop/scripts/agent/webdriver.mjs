@@ -97,6 +97,9 @@ function scrollRegion(delta) {
   const top = box.getBoundingClientRect().top
   const turn = [...box.querySelectorAll('[data-turn]')].find((row) => row.getBoundingClientRect().bottom > top)
   return {
+    // Which box this picked, because the heuristic can pick the wrong one and a reading that does not
+    // say what it measured is a reading you can believe by mistake.
+    element: `${box.tagName.toLowerCase()}${box.className ? `.${String(box.className).trim().split(/\s+/).join('.')}` : ''}`.slice(0, 120),
     scrollTop: Math.round(box.scrollTop),
     maxScroll: Math.round(Math.max(0, box.scrollHeight - box.clientHeight)),
     viewport: Math.round(box.clientHeight),
@@ -230,5 +233,9 @@ export function renderSnapshot(snapshot) {
 
 export function renderPlace(place) {
   const where = place.turn ? `turn ${place.turn} (${place.offset}px above the top)` : 'no turn under the top'
-  return `scroll ${place.scrollTop} of ${place.maxScroll}, viewport ${place.viewport}\n${where}`
+  return [
+    `${place.element}`,
+    `scroll ${place.scrollTop} of ${place.maxScroll}, viewport ${place.viewport}`,
+    where,
+  ].join('\n')
 }
