@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
+import { openFirstSession } from './agentsDriving'
 
 // Its own file, for the reason ./workspaceFocus.test.tsx is: the managed-session store is module
 // state and its snapshots outlive a render, so a case that wants a different transcript from the one
@@ -16,17 +17,7 @@ describe('a transcript that is still growing', () => {
     try {
       const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
       try {
-        // Tab to the session list and open the row, the same walk ./agents.test.tsx makes, and the
-        // same wait in front of it: the list is a query and the walk is a fixed budget of presses.
-        await screen.until('Write src/login.ts')
-        let found = false
-        for (let step = 0; step < 10 && !found; step += 1) {
-          const caret = (await screen.frame()).split('\n').find((line) => line.includes('›')) ?? ''
-          found = caret.includes('Write src/login.ts')
-          if (!found) await screen.press('TAB')
-        }
-        expect(found).toBe(true)
-        await screen.press('RETURN')
+        await openFirstSession(screen)
 
         const frame = await screen.until('Ask the agent')
         // The foot of the transcript, not its head, and the composer under it.

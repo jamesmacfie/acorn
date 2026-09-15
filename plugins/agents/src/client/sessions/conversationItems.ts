@@ -4,6 +4,7 @@ import type {
   AgentRequest,
   AgentSubagentUpdate,
   AgentToolCall,
+  AgentWebActivity,
 } from '@acorn/protocol/managedAgents.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
@@ -104,6 +105,16 @@ const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): AgentToolC
     : next.output ?? previous.output,
   paths: next.paths ?? previous.paths,
   subagentId: next.subagentId ?? previous.subagentId,
+  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
+})
+
+// Same convention, one level down. A provider reports the request and the sources on different
+// updates — Claude Code sends the query, then the results, then the status, all on the same call id
+// — so a spread would let each of those wipe the last. An explicit empty result list is the
+// provider saying it found nothing and does replace; an absent one means it had nothing to add.
+const mergeWebActivity = (previous: AgentWebActivity, next: AgentWebActivity): AgentWebActivity => ({
+  action: next.action ?? previous.action,
+  results: next.results ?? previous.results,
 })
 
 

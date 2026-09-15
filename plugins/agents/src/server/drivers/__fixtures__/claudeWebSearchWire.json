@@ -1,0 +1,182 @@
+{
+ "capturedWith": {
+  "cli": "Claude Code 2.1.241",
+  "adapter": "@agentclientprotocol/claude-agent-acp 0.54.1"
+ },
+ "prompt": "WebSearch for the ACP specification limited to one allowed domain, then WebFetch one page with a prompt",
+ "notes": [
+  "Only the session/update notifications whose `_meta.claudeCode.toolName` is WebSearch or WebFetch.",
+  "The opening tool_call has an empty rawInput and the adapter's generic title; the request arrives on",
+  "the refining tool_call_update, which is where query, allowed_domains, url and prompt live.",
+  "WebSearch results are structured, against what this repo assumed: `toolResponse.results` is a list",
+  "whose object entries hold `content` arrays of { title, url }, with the model's prose as a sibling",
+  "string entry. That update names its own tool, so nothing has to be guessed from shape.",
+  "WebFetch's toolResponse reports bytes/code/durationMs/url and the fetched text as `result`.",
+  "No domain or snippet is reported for a search result, so a card derives the host from the URL.",
+  "Long strings are truncated with an ellipsis and result lists cut to three; field names and nesting",
+  "are verbatim."
+ ],
+ "updates": [
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebSearch"
+    }
+   },
+   "toolCallId": "toolu_01MT1P1PTGRPUHAWqmSif4SX",
+   "sessionUpdate": "tool_call",
+   "rawInput": {},
+   "status": "pending",
+   "title": "Web search",
+   "kind": "fetch",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebSearch"
+    }
+   },
+   "toolCallId": "toolu_01MT1P1PTGRPUHAWqmSif4SX",
+   "sessionUpdate": "tool_call_update",
+   "rawInput": {
+    "query": "Agent Client Protocol specification",
+    "allowed_domains": [
+     "agentclientprotocol.com"
+    ]
+   },
+   "title": "\"Agent Client Protocol specification\" (allowed: agentclientprotocol.com)",
+   "kind": "fetch",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebFetch"
+    }
+   },
+   "toolCallId": "toolu_01K3vJ8PsrtHeTkViLgVvf6j",
+   "sessionUpdate": "tool_call",
+   "rawInput": {},
+   "status": "pending",
+   "title": "Fetch",
+   "kind": "fetch",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebFetch"
+    }
+   },
+   "toolCallId": "toolu_01K3vJ8PsrtHeTkViLgVvf6j",
+   "sessionUpdate": "tool_call_update",
+   "rawInput": {
+    "url": "https://agentclientprotocol.com/protocol/overview",
+    "prompt": "what is a session"
+   },
+   "title": "Fetch https://agentclientprotocol.com/protocol/overview",
+   "kind": "fetch",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "what is a session"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "bytes": 8050,
+      "code": 200,
+      "codeText": "OK",
+      "result": "# What is a Session in Agent Client Protocol?\n\nBased on the documentation, a session represents a conversation between a Client and an Agent. The protocol supports two ways to establish sessions:\n\n1.  \u2026",
+      "durationMs": 7651,
+      "url": "https://agentclientprotocol.com/protocol/overview"
+     },
+     "toolName": "WebFetch"
+    }
+   },
+   "toolCallId": "toolu_01K3vJ8PsrtHeTkViLgVvf6j",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebFetch"
+    }
+   },
+   "toolCallId": "toolu_01K3vJ8PsrtHeTkViLgVvf6j",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "# What is a Session in Agent Client Protocol?\n\nBased on the documentation, a session represents a conversation between a Client and an Agent. The protocol supports two ways to establish sessions:\n\n1. **Creating a new session** via the `sess \u2026",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "# What is a Session in Agent Client Protocol?\n\nBased on the documentation, a session represents a conversation between a Client and an Agent. The protocol supports two ways to establish sessions:\n\n1. **Creating a new session** via the `sess \u2026"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "query": "Agent Client Protocol specification",
+      "results": [
+       {
+        "tool_use_id": "srvtoolu_0165teNuBu2zzKJa5GLiRC73",
+        "content": [
+         {
+          "title": "Introduction - Agent Client Protocol",
+          "url": "https://agentclientprotocol.com/get-started/introduction"
+         },
+         {
+          "title": "Overview - Agent Client Protocol",
+          "url": "https://agentclientprotocol.com/protocol/v1/overview"
+         },
+         {
+          "title": "Architecture - Agent Client Protocol",
+          "url": "https://agentclientprotocol.com/get-started/architecture"
+         }
+        ]
+       },
+       "I found comprehensive information about the Agent Client Protocol specification. Here's what the specification covers:\n\n## Overview\n\nThe Agent Client Protocol ( \u2026"
+      ],
+      "durationSeconds": 11.274125709000002,
+      "searchCount": 1
+     },
+     "toolName": "WebSearch"
+    }
+   },
+   "toolCallId": "toolu_01MT1P1PTGRPUHAWqmSif4SX",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "WebSearch"
+    }
+   },
+   "toolCallId": "toolu_01MT1P1PTGRPUHAWqmSif4SX",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "Web search results for query: \"Agent Client Protocol specification\"\n\nLinks: [{\"title\":\"Introduction - Agent Client Protocol\",\"url\":\"https://agentclientprotocol.com/get-started/introduction\"},{\"title\":\"Overview - Agent Client Protocol\",\"url\" \u2026",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Web search results for query: \"Agent Client Protocol specification\"\n\nLinks: [{\"title\":\"Introduction - Agent Client Protocol\",\"url\":\"https://agentclientprotocol.com/get-started/introduction\"},{\"title\":\"Overview - Agent Client Protocol\",\"url\" \u2026"
+     }
+    }
+   ]
+  }
+ ]
+}
