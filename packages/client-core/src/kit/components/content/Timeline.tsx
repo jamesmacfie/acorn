@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { nextFollowing } from '../../lib/followScroll'
+import { reportScrollPlace } from '../../lib/scrollPlace'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
    shape, and both drew it themselves.
@@ -84,38 +85,66 @@ export function Timeline(props: {
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
   // keeps delivering scroll events long after the gesture, but following is already off by then.
   let userDriven = false
+  // When the reader last touched this, which is a different question from `userDriven` and only the
+  // report below asks it. A scrollbar drag and a flick of momentum both deliver many scroll events for
+  // one gesture, and `userDriven` is spent on the first of them, so the rest would read as moves
+  // nobody made. Nothing scrolls a second after the reader stopped touching it.
+  let lastInput = 0
+  // Where the view was the last time anything here looked, so a report can say what the move was from
+  // as well as to. Every write sets it beside `applied`.
+  let at = 0
+  const report = (cause: 'opened' | 'unasked', to: number): void => {
+    if (!scroller) return
+    reportScrollPlace({
+      view: viewKey(),
+      cause,
+      from: at,
+      to,
+      height: scroller.scrollHeight,
+      viewport: scroller.clientHeight,
+      following,
+    })
+  }
   const nearBottom = (element: HTMLElement) =>
     element.scrollHeight - element.scrollTop - element.clientHeight < 96
   const pin = () => {
     if (!scroller) return
     scroller.scrollTop = scroller.scrollHeight
     applied = scroller.scrollTop
+    at = applied
     places.delete(viewKey())
   }
   const applyTarget = () => {
     if (!scroller || target === null) return
     scroller.scrollTop = target
     applied = scroller.scrollTop
+    at = applied
     // Highlighting resolves after mount and keeps growing the list, so the browser clamps an early
     // write. Re-apply until it sticks, driven by the list's own resizes.
     if (scroller.scrollTop < target - 1) return
     target = null
     following = nearBottom(scroller)
   }
-  // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
-  // clamped scrollTop to the only offset left. A card collapsed, a filter dropped rows, a re-render
-  // came back shorter.
-  const clamped = (element: HTMLElement) =>
-    !userDriven && element.scrollTop >= element.scrollHeight - element.clientHeight - 1
   const noteScroll = () => {
     if (!scroller) return
     // Our own writes echo back as scroll events, by which time the list has usually grown again, so
     // the write just made would measure as "scrolled up". Skip them.
     if (scroller.scrollTop === applied) return
-    const clamp = clamped(scroller)
+    const gesture = userDriven
+    const top = scroller.scrollTop
+    // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
+    // clamped scrollTop to the only offset left. A card collapsed, a filter dropped rows, a re-render
+    // came back shorter.
+    const clamp = !gesture && top >= scroller.scrollHeight - scroller.clientHeight - 1
+    // Not the reader, not one of our own writes, and not a clamp, and yet the view has moved up by more
+    // than a screen. Said out loud rather than corrected: guessing at the offset it should have been
+    // would be one more thing moving the reader around (../../lib/scrollPlace.ts).
+    const quiet = Date.now() - lastInput > 1000
+    if (quiet && !clamp && top < at - scroller.clientHeight) report('unasked', top)
     target = null
     following = nextFollowing({ following, nearBottom: nearBottom(scroller), userDriven })
     userDriven = false
+    at = top
     if (following) return places.delete(viewKey())
     // The clamp moved the reader; it did not ask to be moved. Keep the place they were reading and
     // chase it back as the list grows again, or a collapse that leaves the list shorter than the
@@ -124,10 +153,11 @@ export function Timeline(props: {
     // Ceiling: if the list never grows back, the target stays pending and the reader sits where the
     // clamp left them, which is the only offset there is. Their next gesture clears it.
     target = clamp ? places.get(viewKey()) ?? null : null
-    if (!clamp) rememberPlace(viewKey(), scroller.scrollTop)
+    if (!clamp) rememberPlace(viewKey(), top)
   }
   const noteInput = () => {
     userDriven = true
+    lastInput = Date.now()
   }
   // Driven from outside, so they set `following` by hand rather than inferring it from position: a jump
   // to the top must survive the next streamed event, which the follow logic would otherwise read as the
@@ -138,6 +168,7 @@ export function Timeline(props: {
     following = false
     scroller.scrollTop = 0
     applied = scroller.scrollTop
+    at = applied
     rememberPlace(viewKey(), scroller.scrollTop)
   }
   const toBottom = () => {
@@ -168,6 +199,10 @@ export function Timeline(props: {
     userDriven = false
     if (target === null) pin()
     else applyTarget()
+    // A remount lands here and nowhere else: a fresh scroll element starts at zero and fires no scroll
+    // event, so this is the only record that the reader was put somewhere by a list opening rather
+    // than by anything they did.
+    report('opened', scroller?.scrollTop ?? 0)
   }))
 
   return (

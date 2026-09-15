@@ -1,8 +1,9 @@
 import { createSignal, Index } from 'solid-js'
 import { render } from 'solid-js/web'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Card } from '../primitives'
 import { Timeline } from './Timeline'
+import { setScrollPlaceHandler, type ScrollPlaceReport } from '../../lib/scrollPlace'
 
 // The transcript's two guardrails, at the node that owns them: appending a turn must not replace the
 // ones already drawn, and following the newest turn must stop when the reader scrolls away from it
@@ -31,6 +32,9 @@ const measure = (element: HTMLElement, scrollHeight: number, clientHeight: numbe
 const grow = () => observers.forEach((run) => run())
 
 beforeEach(() => {
+  // A clock this test can move: the timeline tells a drag from a move nobody made by how long ago the
+  // reader last touched it, and a test does everything in the same millisecond.
+  vi.useFakeTimers()
   observers = []
   ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
   host = document.createElement('div')
@@ -38,10 +42,19 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   dispose?.()
   dispose = undefined
+  setScrollPlaceHandler(null)
   host.remove()
 })
+
+/** Collect what the timeline says about where it put the reader (../../lib/scrollPlace.ts). */
+const watchPlaces = (): ScrollPlaceReport[] => {
+  const seen: ScrollPlaceReport[] = []
+  setScrollPlaceHandler((report) => seen.push(report))
+  return seen
+}
 
 const scroller = () => host.querySelector('.ui-timeline-scroll') as HTMLElement | null
 
@@ -158,5 +171,54 @@ describe('Timeline', () => {
     expect(box.scrollTop).toBe(400)
     setView('session-a')
     expect(box.scrollTop).toBe(40)
+  })
+
+  it('says so when something other than the reader moves the view', () => {
+    // The open question behind this: a transcript that jumps to the top while an agent streams into
+    // it. Neither the reader nor this component asked, and the position alone cannot say who did, so
+    // the move is reported with the numbers around it rather than guessed at.
+    const seen = watchPlaces()
+    mount(() => ['one', 'two', 'three'], () => 'session-a')
+    const box = scroller()!
+    measure(box, 4000, 100)
+    grow()
+    box.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
+    box.scrollTop = 2000
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    seen.length = 0
+
+    // Long enough after the reader last touched it that a drag or a flick of momentum is out.
+    vi.advanceTimersByTime(2000)
+    // Nowhere near the bottom either, so this is neither the reader nor a clamp.
+    box.scrollTop = 0
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    expect(seen).toEqual([
+      { view: 'session-a', cause: 'unasked', from: 2000, to: 0, height: 4000, viewport: 100, following: false },
+    ])
+  })
+
+  it('does not report a clamp, which it can account for', () => {
+    const seen = watchPlaces()
+    mount(() => ['one', 'two'], () => 'session-a')
+    const box = scroller()!
+    measure(box, 400, 100)
+    grow()
+    box.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
+    box.scrollTop = 200
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    seen.length = 0
+
+    measure(box, 100, 100)
+    box.scrollTop = 0
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    expect(seen).toEqual([])
+  })
+
+  it('reports the place a list opens at, which is the only sign of a remount', () => {
+    const seen = watchPlaces()
+    mount(() => ['one'], () => 'session-a')
+    const box = scroller()!
+    measure(box, 400, 100)
+    expect(seen.map((report) => report.cause)).toEqual(['opened'])
   })
 })
