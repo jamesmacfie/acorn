@@ -35,6 +35,7 @@ describe('agent session header context', () => {
     expect(sessionHeaderContext('task-1', row, snapshot, emptyAgentPricingPreferences())).toMatchObject({
       providerId: 'codex',
       tokenAccounting: 'cumulative',
+      costAccounting: 'cumulative',
       turns: [{
         turnId: 'turn-1',
         model: 'gpt-5.6-terra',
@@ -42,5 +43,11 @@ describe('agent session header context', () => {
         price: { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 },
       }],
     })
+  })
+
+  it('declares independent accounting for a provider whose usage belongs to each turn', () => {
+    const row = { ...session(), providerId: 'claude', profileId: 'claude', driverKind: 'acp' }
+    expect(sessionHeaderContext('task-1', row, undefined, emptyAgentPricingPreferences()))
+      .toMatchObject({ tokenAccounting: 'per-turn', costAccounting: 'per-turn' })
   })
 })

@@ -129,6 +129,24 @@ processes, workflows, Docker, provider clients, reconciliation, and shutdown dra
 to close the listener, dispose plugin engines, close SQLite, and release the data-root lock with a
 30-second overall deadline.
 
+**Nothing may outlive the thing that supervises it.** The node holds the data root's exclusive lock,
+so a node that survives its helper makes the next launch fail with "Another acorn node already holds
+`<dataDir>`" until somebody kills a pid by hand. Two rules keep that from happening, and both were
+once broken in the same way, by giving up as soon as the parent was gone:
+
+- `ServiceHost.stop` waits for the child to exit and does not unref its SIGKILL timer. The helper
+  runs `process.exit` as soon as `dispose` resolves, so an unref'd timer is guaranteed never to fire
+  on the one path that needs it. Waiting is also what makes a restart safe: `restartLocalNode` stops
+  and then starts, and a stop that returned before the old node released the lock raced its own
+  replacement.
+- `Helper::stop` on the Rust side waits for the process *group* to empty, not for the helper to exit,
+  then SIGKILLs whatever is left. The helper exits promptly and politely; the node is the one that
+  can wedge. This is the backstop that still works when the helper crashes outright rather than
+  shutting down.
+
+A wedged node therefore costs about 8 seconds at quit, which is the Rust escalation deadline. Two
+Rust tests cover the split: a child that outlives its parent, and a child that ignores SIGTERM.
+
 The supervised child and the standalone node consume the same `apps/node/src/composition/composition.ts`
 graph and the same reconciliation and drain plan. The shell supplies supervision and native adapters;
 it does not assemble a parallel plugin graph.
@@ -211,6 +229,14 @@ parses as JSON is the worst answer available.
 
 Development proxies the Vite dev server through this same handler rather than loading `devUrl`
 directly, so developers exercise the origin the shipped app uses.
+
+**The proxy forwards what Vite said, including a refusal.** A non-2xx is an answer, not a transport
+failure, and `ureq` reports both as `Err`. Two of them turn up on a cold launch: 504 is how Vite asks
+the page to reload after re-bundling a dependency it only discovered when a lazily imported plugin
+pane was requested, and 500 carries the transform error in its body. Collapsing either into a
+bodyless 502 fails the module script's MIME check and blanks the window, with nothing left to say
+which one it was. Only an unreachable dev server is a 502 now, and it logs first. Two Rust tests hold
+the split.
 
 The handler is registered asynchronously and answers each request on its own thread. The synchronous
 form runs the whole response on the thread that delivered the request, which is the thread the webview

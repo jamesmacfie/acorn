@@ -69,6 +69,16 @@ yours:
 | `client` | `'./dist/client.js'` when a client is declared | your own, e.g. `'./client.js'` |
 | `migrations` | always `'./migrations'` in the built package | wherever your chain actually is |
 
+The repository builder emits only the runtimes the config declares. A client-only plugin names
+`client` and omits `entry`/`factory`; a descriptor-only plugin omits both. Removing a node entry also
+removes the old `dist/node.js` rather than carrying executable bytes the next manifest no longer
+names.
+
+A Solid remote-tree client that uses the published SDK sets
+`client.treeModule: 'acorn-plugin-sdk/remote'`. The builder then points the JSX transform at the same
+runtime that the plugin imports. Repository plugins that omit `treeModule` retain the private
+`@acorn/plugin-api/ui/tree` default.
+
 Everything else in the generated manifest — `name`, `icon`, `icons`, `permissions`,
 `contributions` — is copied through from the config untouched, so a `acorn-plugin.config.mjs` in the
 repository is a faithful reference for what those blocks look like. `plugins/http/acorn-plugin.config.mjs`

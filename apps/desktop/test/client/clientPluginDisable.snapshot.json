@@ -75,7 +75,6 @@
       "github:summary-badges"
     ],
     "extensions": [
-      "agent-cost.session-header",
       "changes.tool-card",
       "github.push-actions",
       "memory.section"
@@ -131,11 +130,6 @@
     ]
   },
   "owned": {
-    "agent-cost": {
-      "extensions": [
-        "agent-cost.session-header"
-      ]
-    },
     "changes": {
       "panes": [
         "changes"

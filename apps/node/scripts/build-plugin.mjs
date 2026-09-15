@@ -54,7 +54,8 @@ const CONFIG_FILE = 'acorn-plugin.config.mjs'
 // value. A bundle drawing a rectangle instead writes no JSX and is unaffected — the transform has
 // nothing to rewrite — and a tree built through the SDK's own node functions rather than JSX is in the
 // same position.
-const treeTransform = () => solid({ solid: { generate: 'universal', moduleName: '@acorn/plugin-api/ui/tree' } })
+const treeTransform = (moduleName = '@acorn/plugin-api/ui/tree') =>
+  solid({ solid: { generate: 'universal', moduleName } })
 
 const buildable = () =>
   readdirSync(PLUGINS_DIR).filter((dir) => existsSync(join(PLUGINS_DIR, dir, CONFIG_FILE)))
@@ -95,40 +96,54 @@ try {
 }
 if (!apiMajor) throw new Error(`${API_VERSION_SOURCE} exported no PLUGIN_API_MAJOR`)
 
-// A temporary entry inside apps/node so Vite resolves the workspace package exactly as the app does.
+// A temporary entry inside apps/node so Vite resolves a declared node package exactly as the app
+// does. Client-only and descriptor-only plugins need no stand-in: their absence of a node half is a
+// real manifest capability, not a reason to manufacture an empty lifecycle.
+//
 // One directory per plugin id, because the cleanup below removes the directory whole: two builds
 // running at once used to share `.plugin-build`, and the first to finish deleted the other's entry.
 const entryDir = join(NODE_APP, '.plugin-build', id)
 const entryFile = join(entryDir, `${id}.js`)
-mkdirSync(entryDir, { recursive: true })
-writeFileSync(entryFile, `import { ${spec.factory} } from '${spec.entry}'\nexport default ${spec.factory}()\n`)
+if (spec.entry) {
+  if (!spec.factory) throw new Error(`${id} declares a node entry but no factory`)
+  mkdirSync(entryDir, { recursive: true })
+  writeFileSync(entryFile, `import { ${spec.factory} } from '${spec.entry}'\nexport default ${spec.factory}()\n`)
+}
+// A descriptor-only package has no Vite build to create its directory. Clear the previous package
+// now so removing a runtime from a plugin also removes its old executable bytes.
+if (!spec.entry && !spec.client) {
+  rmSync(outDir, { recursive: true, force: true })
+  mkdirSync(outDir, { recursive: true })
+}
 
 try {
-  await build({
-    root: NODE_APP,
-    logLevel: 'warn',
-    resolve: { conditions: ['node'], mainFields: ['module', 'jsnext:main', 'jsnext'] },
-    ssr: { noExternal: true },
-    define: { 'process.env': 'process.env' },
-    build: {
-      target: 'node22',
-      outDir: join(outDir, 'dist'),
-      ssr: true,
-      minify: false,
-      emptyOutDir: true,
-      reportCompressedSize: false,
-      rollupOptions: {
-        input: entryFile,
-        // Node builtins only. Everything else — hono, zod, drizzle, every @acorn/* package — is
-        // inlined, because a loaded plugin's directory has no node_modules of its own. That means
-        // the bundle carries its OWN Hono, and the instance it hands to ctx.providers.integration is
-        // not the host's class. Structurally compatible at the same version; if the provider routes
-        // ever stop answering after a hono bump, this is the reason.
-        external: (source) => builtinModules.includes(source.replace(/^node:/, '')),
-        output: { format: 'es', entryFileNames: 'node.js', chunkFileNames: 'chunks/[name]-[hash].js' },
+  if (spec.entry) {
+    await build({
+      root: NODE_APP,
+      logLevel: 'warn',
+      resolve: { conditions: ['node'], mainFields: ['module', 'jsnext:main', 'jsnext'] },
+      ssr: { noExternal: true },
+      define: { 'process.env': 'process.env' },
+      build: {
+        target: 'node22',
+        outDir: join(outDir, 'dist'),
+        ssr: true,
+        minify: false,
+        emptyOutDir: true,
+        reportCompressedSize: false,
+        rollupOptions: {
+          input: entryFile,
+          // Node builtins only. Everything else — hono, zod, drizzle, every @acorn/* package — is
+          // inlined, because a loaded plugin's directory has no node_modules of its own. That means
+          // the bundle carries its OWN Hono, and the instance it hands to ctx.providers.integration is
+          // not the host's class. Structurally compatible at the same version; if the provider routes
+          // ever stop answering after a hono bump, this is the reason.
+          external: (source) => builtinModules.includes(source.replace(/^node:/, '')),
+          output: { format: 'es', entryFileNames: 'node.js', chunkFileNames: 'chunks/[name]-[hash].js' },
+        },
       },
-    },
-  })
+    })
+  }
 
   if (spec.client) {
     await build({
@@ -137,7 +152,7 @@ try {
       configFile: false,
       root: NODE_APP,
       logLevel: 'warn',
-      plugins: [treeTransform()],
+      plugins: [treeTransform(spec.client.treeModule)],
       build: {
         target: 'es2022',
         // The node bundle is built first in this process. Be explicit that this second build is a
@@ -145,7 +160,10 @@ try {
         ssr: false,
         outDir: join(outDir, 'dist'),
         minify: false,
-        emptyOutDir: false,
+        // Preserve node.js when there is a node half. Otherwise clear a node.js left by an older
+        // version of this package; the generated manifest would rightly stop naming it, but a
+        // package builder should not carry dead executable bytes forward.
+        emptyOutDir: !spec.entry,
         reportCompressedSize: false,
         rollupOptions: {
           input: resolve(PLUGINS_DIR, id, spec.client.entry),
@@ -192,7 +210,7 @@ writeFileSync(
     version,
     apiVersion: apiMajor,
     ...(spec.emits?.length ? { emits: spec.emits } : {}),
-    node: './dist/node.js',
+    ...(spec.entry ? { node: './dist/node.js' } : {}),
     ...(spec.client ? { client: './dist/client.js' } : {}),
     // Always './migrations' in the built package regardless of where the source chain lives, so the
     // manifest path the loader confines is one the builder placed.

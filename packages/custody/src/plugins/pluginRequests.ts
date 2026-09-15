@@ -3,6 +3,7 @@ import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGr
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
+import { pluginExtensionGrantSchema } from './grantSchemas'
 
 // What the renderer may say about a third-party plugin bundle, and what it gets back. These schemas
 // live beside the stores they guard rather than in a shell, because a schema that drifted between two
@@ -74,11 +75,7 @@ export const disclosureSchema = z.object({
   // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
   // disclosure with no such field, and refusing it would put a decision beyond recording, which is
   // the re-queueing loop this schema was split up to escape.
-  extensions: z.array(z.strictObject({
-    kind: z.enum(['hosts', 'extends', 'replaces']),
-    target: z.string().min(1).max(130),
-    label: z.string().min(1).max(80),
-  })).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
+  extensions: z.array(pluginExtensionGrantSchema).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
   // Defaulted for the same reason `extensions` is.
   schedules: z.array(z.strictObject({
     id: z.string().min(1).max(64),
