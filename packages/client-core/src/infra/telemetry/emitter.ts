@@ -34,6 +34,7 @@ import type {
 import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/workTelemetry'
+import { setScrollPlaceHandler } from '../../kit/lib/scrollPlace'
 import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
 
@@ -651,6 +652,20 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       attrs: { seam: 'contribution.render', 'contribution.id': contributionId },
     })
   })
+  // Where a followed timeline put the reader, through the seam `kit/` has for it
+  // (kit/lib/scrollPlace.ts). An event rather than a log: it is a fact worth counting and correlating,
+  // and it rides along as a breadcrumb on any error raised near it.
+  setScrollPlaceHandler((place) => {
+    emitEvent('core', 'ui.scroll.place', {
+      cause: place.cause,
+      view: place.view,
+      from: Math.round(place.from),
+      to: Math.round(place.to),
+      height: Math.round(place.height),
+      viewport: Math.round(place.viewport),
+      following: place.following,
+    })
+  })
   if (state.enabled) arm()
 }
 
@@ -660,6 +675,7 @@ export function _resetClientTelemetry(): void {
   setWorkTelemetry(null)
   activity = null
   setContributionErrorHandler(null)
+  setScrollPlaceHandler(null)
   disarm()
   state.generation += 1
   state.enabled = false

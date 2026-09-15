@@ -494,6 +494,7 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Every remote tree apply | `host/tree/treeState.ts` | histogram `tree.apply`, owned by the plugin whose tree it is |
 | Every plugin channel frame | `host/plugins/pluginChannel.ts` | histogram `plugin.frame` |
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
+| Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
 | Uncaught error, unhandled rejection | `apps/desktop/src/client/index.tsx` | a fatal, unhandled error with its stack |
 | Console lines | everywhere under `packages/client-core/src`, `apps/desktop/src/client` and `apps/desktop/src/shell` | log records through `createLogger(tag)` |
