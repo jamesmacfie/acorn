@@ -258,6 +258,39 @@ describe('Timeline', () => {
     expect(turnTop('d')).toBe(0)
   })
 
+  it('does not let settling redefine which turn the reader chose', () => {
+    // The one that got through. A list too short to bring the anchor all the way up settles against the
+    // clamp, and the old code then re-measured and adopted whatever was under the viewport — a turn or
+    // two earlier. Every resize did it again, so the place walked up the list and the reader ended at
+    // the top, a beat after landing in the right spot.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+    const view = mount(turns, 200)
+    reader(scroller()!, 1300)
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'g' })
+
+    // Every card collapses. The list is now too short to bring `g` to the top, so each correction ends
+    // against the clamp rather than on the turn.
+    for (const key of turns()) heights.set(key, 30)
+    for (let i = 0; i < 5; i++) settle()
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'g' })
+  })
+
+  it('does not read a rebuilt pane restoring its own focus as the reader scrolling', () => {
+    // A pane that comes back puts focus somewhere, and focus used to arm the next scroll event as the
+    // reader's. The scroll that followed was the restore's own, measured while the list was still at
+    // the top, so the top became the reader's place and stayed there.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    reader(scroller()!, 200)
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+
+    const list = host.querySelector('.ui-timeline')!
+    list.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    scroller()!.scrollTop = 0
+    scroller()!.dispatchEvent(new Event('scroll', { bubbles: true }))
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+  })
+
   it('does not take a place from a scroll that arrives while it is being torn down', () => {
     // The list drains as the subtree goes, and the scroll events that produces are nobody's reading
     // position. Writing one down poisoned the key for the life of the window.

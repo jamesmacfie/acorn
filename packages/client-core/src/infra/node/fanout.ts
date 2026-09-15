@@ -164,8 +164,42 @@ export function createFleetQuery<T, D = void>(
     { initialValue: cachedFleet<T>(queryKey(deps()), options) },
   )
   createEffect(() => onCleanup(onFleetInvalidation(queryKey(deps()), () => void resource[1].refetch())))
+  // A node that is still booting answers nothing inside the deadline above, and it is listed as
+  // `online` the whole time, so the resource's source never changes and nothing re-runs the fan-out.
+  // The surface keeps a banner for a node that is fine a few seconds later. This is the ordinary
+  // shape of a cold launch, not an edge case: the shell opens the window as soon as the helper is
+  // listening, which is a socket bind rather than a node boot (apps/desktop/src-tauri/src/lib.rs).
+  let attempt = 0
+  createEffect(() => {
+    const unavailable = resource[0]().unavailable.length
+    if (resource[0].loading) return
+    // Only a clean run resets the ladder. Running out of attempts must not, or the next settle for
+    // any other reason would start it over and turn this into the poll it is meant not to be.
+    if (unavailable === 0) {
+      attempt = 0
+      return
+    }
+    const delay = retryDelayMs(attempt, unavailable)
+    if (delay === null) return
+    attempt += 1
+    const timer = setTimeout(() => void resource[1].refetch(), delay)
+    onCleanup(() => clearTimeout(timer))
+  })
   return resource
 }
+
+// How long to wait before asking an unavailable node again, or `null` to stop asking.
+//
+// A short ladder rather than a poll, because the thing it covers has an end: a node is either up
+// within the boot window or it is actually down. The ceiling is that a node which comes back after
+// the ladder runs out is not picked up until something else re-runs the fan-out, which a fleet
+// change, a write, or a remount all do. Widen RETRY_DELAYS_MS before reaching for a poll.
+export const retryDelayMs = (attempt: number, unavailable: number): number | null =>
+  unavailable === 0 ? null : (RETRY_DELAYS_MS[attempt] ?? null)
+
+// Covers about 17 seconds, then stops. A node that really is down costs three requests per surface,
+// not one every few seconds for as long as the surface is open.
+const RETRY_DELAYS_MS = [2_000, 5_000, 10_000]
 
 // A write invalidates the domain key on the node's own QueryClient, which is all a `createQuery`
 // reader needs. A resource hears nothing, so a fan-out surface keeps showing the pre-write list until

@@ -4,20 +4,17 @@
   "description": "A compact managed-session cost estimate beside the session title.",
   "private": true,
   "type": "module",
-  "exports": {
-    "./client/index.ts": "./src/client/index.ts"
-  },
   "scripts": {
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/plugin-api": "workspace:*",
-    "@acorn/protocol": "workspace:*",
+    "acorn-plugin-sdk": "workspace:*",
     "solid-js": "catalog:"
   },
   "devDependencies": {
-    "@acorn/client-core": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

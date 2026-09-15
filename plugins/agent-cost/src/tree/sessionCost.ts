@@ -1,9 +1,9 @@
 import type {
-  AgentSessionHeaderProps,
-  AgentSessionHeaderTurn,
-  AgentSessionTokenPrice,
-} from '@acorn/protocol/extensionPoints.ts'
-import type { AgentUsage } from '@acorn/protocol/managedAgents.ts'
+  SessionHeaderProps,
+  SessionHeaderTokenPrice,
+  SessionHeaderTurn,
+  SessionHeaderUsage,
+} from './sessionHeaderContract'
 
 export type SessionCostEstimate = {
   amountUsd: number
@@ -13,7 +13,7 @@ export type SessionCostEstimate = {
 const finiteCount = (value: number | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
 
-function reportedUsdCost(props: AgentSessionHeaderProps): number | null {
+function reportedUsdCost(props: SessionHeaderProps): number | null {
   const amounts = props.turns.flatMap((turn) => {
     const cost = turn.usage.cost
     return cost?.currency.toUpperCase() === 'USD' && finiteCount(cost.amount) !== null
@@ -27,9 +27,9 @@ function reportedUsdCost(props: AgentSessionHeaderProps): number | null {
 }
 
 function tokenCost(
-  usage: AgentUsage,
-  previous: AgentUsage,
-  price: AgentSessionTokenPrice,
+  usage: SessionHeaderUsage,
+  previous: SessionHeaderUsage,
+  price: SessionHeaderTokenPrice,
 ): number | null {
   const inputTotal = finiteCount(usage.inputTokens)
   if (inputTotal === null) return null
@@ -52,10 +52,10 @@ function tokenCost(
 }
 
 function estimatedTokenCost(
-  turns: readonly AgentSessionHeaderTurn[],
-  accounting: AgentSessionHeaderProps['tokenAccounting'],
+  turns: readonly SessionHeaderTurn[],
+  accounting: SessionHeaderProps['tokenAccounting'],
 ): number | null {
-  let previous: AgentUsage = {}
+  let previous: SessionHeaderUsage = {}
   let amountUsd = 0
   let priced = false
   for (const turn of turns) {
@@ -72,7 +72,7 @@ function estimatedTokenCost(
 
 /** The plugin's complete pricing policy. Provider-reported USD takes precedence; otherwise the
  *  owner-projected token snapshots are priced according to their declared accounting mode. */
-export function estimateSessionCost(props: AgentSessionHeaderProps): SessionCostEstimate | null {
+export function estimateSessionCost(props: SessionHeaderProps): SessionCostEstimate | null {
   const reported = reportedUsdCost(props)
   if (reported !== null) return { amountUsd: reported, source: 'provider' }
   const estimated = estimatedTokenCost(props.turns, props.tokenAccounting)

@@ -133,60 +133,66 @@ export default function IntegrationsSettings() {
               <div class="integration-entry">
               <div class="integration-card">
                 <IntegrationLogo provider={provider()} />
-                <div class="integration-meta">
-                  <Show
-                    when={renamingId() === connection.id}
-                    fallback={<span class="integration-title">{connectionName(connection)}</span>}
-                  >
-                    <div class="integration-rename-row">
-                      {/* Focus on the next microtask, not through `autofocus`: the input is created
-                          inside a Show that swaps it in after this row already exists. */}
-                      <input
-                        class="ui-input"
-                        value={draftName()}
-                        placeholder={connection.label}
-                        maxlength={MAX_CONNECTION_NAME}
-                        ref={(el) => queueMicrotask(() => el.focus())}
-                        onInput={(event) => setDraftName(event.currentTarget.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') void rename(connection.id)
-                          if (event.key === 'Escape') setRenamingId(null)
-                        }}
-                      />
-                      <Button variant="ghost" onPress={() => void rename(connection.id)} disabled={busy()}>Save</Button>
-                      <Button variant="ghost" onPress={() => setRenamingId(null)} disabled={busy()}>Cancel</Button>
+                {/* Name and details on top, the buttons on their own row underneath: five actions on the
+                    same line as the name squeezed both, and the name is what the row is about. */}
+                <div class="integration-body">
+                  <div class="integration-head">
+                    <div class="integration-meta">
+                      <Show
+                        when={renamingId() === connection.id}
+                        fallback={<span class="integration-title">{connectionName(connection)}</span>}
+                      >
+                        <div class="integration-rename-row">
+                          {/* Focus on the next microtask, not through `autofocus`: the input is created
+                              inside a Show that swaps it in after this row already exists. */}
+                          <input
+                            class="ui-input"
+                            value={draftName()}
+                            placeholder={connection.label}
+                            maxlength={MAX_CONNECTION_NAME}
+                            ref={(el) => queueMicrotask(() => el.focus())}
+                            onInput={(event) => setDraftName(event.currentTarget.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') void rename(connection.id)
+                              if (event.key === 'Escape') setRenamingId(null)
+                            }}
+                          />
+                          <Button variant="ghost" onPress={() => void rename(connection.id)} disabled={busy()}>Save</Button>
+                          <Button variant="ghost" onPress={() => setRenamingId(null)} disabled={busy()}>Cancel</Button>
+                        </div>
+                      </Show>
+                      <span class="integration-sub">
+                        {provider()?.label ?? connection.providerId}
+                        {connection.account?.label ? ` · ${connection.account.label}` : ''}
+                        {connection.status !== 'connected' ? ` · ${connection.status}` : ''}
+                      </span>
                     </div>
-                  </Show>
-                  <span class="integration-sub">
-                    {provider()?.label ?? connection.providerId}
-                    {connection.account?.label ? ` · ${connection.account.label}` : ''}
-                    {connection.status !== 'connected' ? ` · ${connection.status}` : ''}
-                  </span>
-                </div>
-                {/* A credential that lives in 1Password rather than in our database. The reference
-                    is a pointer, not a secret, so it can sit in the tooltip. */}
-                <Show when={connection.secretRef}>
-                  {(ref) => (
-                    <span class="integration-secret-ref" title={`Read from 1Password: ${ref()}`}>
-                      <Icon name="brand:onepassword" />
-                    </span>
-                  )}
-                </Show>
-                <div class="integration-actions">
-                  <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
-                    <Button variant="ghost" tone="danger" onPress={() => startRename(connection)} disabled={busy()}>Rename</Button>
-                    <Button variant="ghost" tone="danger" onPress={() => void test(connection.id)} disabled={busy()}>Test</Button>
-                    {/* Rotation means "submit a new credential for this connection", which a device flow
-                        has no shape for — the owner never holds the token. Disconnect and connect again
-                        is the honest path, so the button is simply absent. */}
-                    <Show when={provider()?.connection.kind !== 'device-flow'}>
-                      <Button variant="ghost" tone="danger" onPress={() => { setProviderId(connection.providerId); setRotationId(connection.id); form.reset(); setAdding(true) }} disabled={busy()}>Rotate</Button>
+                    {/* A credential that lives in 1Password rather than in our database. The reference
+                        is a pointer, not a secret, so it can sit in the tooltip. */}
+                    <Show when={connection.secretRef}>
+                      {(ref) => (
+                        <span class="integration-secret-ref" title={`Read from 1Password: ${ref()}`}>
+                          <Icon name="brand:onepassword" />
+                        </span>
+                      )}
                     </Show>
-                    <Button variant="ghost" tone="danger" onPress={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
-                      {connection.status === 'disabled' ? 'Enable' : 'Disable'}
-                    </Button>
-                    <Button variant="ghost" tone="danger" onPress={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</Button>
-                  </Show>
+                  </div>
+                  <div class="integration-actions">
+                    <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
+                      <Button variant="ghost" onPress={() => startRename(connection)} disabled={busy()}>Rename</Button>
+                      <Button variant="ghost" onPress={() => void test(connection.id)} disabled={busy()}>Test</Button>
+                      {/* Rotation means "submit a new credential for this connection", which a device flow
+                          has no shape for — the owner never holds the token. Disconnect and connect again
+                          is the honest path, so the button is simply absent. */}
+                      <Show when={provider()?.connection.kind !== 'device-flow'}>
+                        <Button variant="ghost" onPress={() => { setProviderId(connection.providerId); setRotationId(connection.id); form.reset(); setAdding(true) }} disabled={busy()}>Rotate</Button>
+                      </Show>
+                      <Button variant="ghost" onPress={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
+                        {connection.status === 'disabled' ? 'Enable' : 'Disable'}
+                      </Button>
+                      <Button variant="ghost" tone="danger" onPress={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</Button>
+                    </Show>
+                  </div>
                 </div>
               </div>
               {/* Only a provider that enumerates projects has a map to draw. A disabled connection

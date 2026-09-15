@@ -164,9 +164,6 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
-      '@acorn/plugin-agent-cost':
-        specifier: workspace:*
-        version: link:../../plugins/agent-cost
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
@@ -351,9 +348,6 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
-      '@acorn/plugin-agent-cost':
-        specifier: workspace:*
-        version: link:../../plugins/agent-cost
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
@@ -788,19 +782,19 @@ importers:
 
   plugins/agent-cost:
     dependencies:
+      acorn-plugin-sdk:
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2)
+    devDependencies:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.13(patch_hash=80bb5d08abeb1d414ff3b40f443cdd96797d1125ebfd740f19d8dee99764e6d2)
-    devDependencies:
-      '@acorn/client-core':
-        specifier: workspace:*
-        version: link:../../packages/client-core
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

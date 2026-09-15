@@ -27,6 +27,11 @@ export type ServiceHostEvents = {
 // worse than a hard kill. See server/storage/dataRoot.ts.
 const KILL_ESCALATION_MS = 5_000
 
+// How long to keep waiting after SIGKILL before leaving anyway. SIGKILL cannot be caught or ignored,
+// so reaching this means the child is stuck in an uninterruptible syscall, and holding the shell's
+// quit open for it forever is worse than the orphan.
+const GIVE_UP_MS = 2_000
+
 export class ServiceHost {
   private child: ChildProcess | null = null
   private peer: ServiceRpcPeer | null = null
@@ -120,7 +125,7 @@ export class ServiceHost {
       log.warn(`graceful stop failed: ${describeError(error).message}`)
     }
     this.disposeConnection('Service stopped')
-    this.terminate(child)
+    await this.terminate(child)
     this.child = null
   }
 
@@ -128,11 +133,29 @@ export class ServiceHost {
   // cleanly, so the polite signal is the one that matters. A wedged child holding the data root's
   // exclusive lock blocks the next launch, though, and a signal with no follow-up once left a probe
   // alive as an orphan for four days.
-  private terminate(child: ChildProcess): void {
-    child.kill('SIGTERM')
-    const escalate = setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS)
-    escalate.unref?.() // never the reason the app cannot quit
-    child.once('exit', () => clearTimeout(escalate))
+  //
+  // Awaited, and the escalation timer is not unref'd. Both matter, and for the same reason: this
+  // process must not exit while the service is still alive. It used to, every time. The caller's
+  // shutdown runs `process.exit` as soon as this resolves, an unref'd timer does not hold the event
+  // loop open, and `process.exit` does not wait for one anyway, so the SIGKILL was guaranteed never
+  // to be sent on the path that needed it most. A service that ignored SIGTERM was then orphaned
+  // holding the data root's lock, and the next launch refused to start until somebody killed a pid
+  // by hand.
+  private terminate(child: ChildProcess): Promise<void> {
+    if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const timers = [
+        setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS),
+        setTimeout(() => finish(), KILL_ESCALATION_MS + GIVE_UP_MS),
+      ]
+      const finish = (): void => {
+        for (const timer of timers) clearTimeout(timer)
+        child.off('exit', finish)
+        resolve()
+      }
+      child.once('exit', finish)
+      child.kill('SIGTERM')
+    })
   }
 
   private handleExit(child: ChildProcess, code: number): void {

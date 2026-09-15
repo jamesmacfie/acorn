@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { clientFor, refreshFleet, _resetFleet } from './fleet'
-import { cachedFleet, fetchFleet, onFleetInvalidation } from './fanout'
+import { cachedFleet, fetchFleet, onFleetInvalidation, retryDelayMs } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
 // page" (docs/architecture-overview.md § Client state and fleet behavior) true in one place. These
@@ -205,5 +205,23 @@ describe('onFleetInvalidation', () => {
     expect(fired).toBe(0)
 
     stop()
+  })
+})
+
+// `createFleetQuery` itself cannot run here (see `cachedFleet`'s comment), so the ladder it drives is
+// asserted as the pure function it was split out into.
+describe('retryDelayMs', () => {
+  it('waits longer each time, then gives up rather than polling', () => {
+    expect(retryDelayMs(0, 1)).toBe(2_000)
+    expect(retryDelayMs(1, 1)).toBe(5_000)
+    expect(retryDelayMs(2, 1)).toBe(10_000)
+    // The property that keeps a genuinely offline node from costing a request every few seconds for
+    // as long as the surface is open.
+    expect(retryDelayMs(3, 1)).toBeNull()
+    expect(retryDelayMs(99, 1)).toBeNull()
+  })
+
+  it('does not retry a run where every node answered', () => {
+    expect(retryDelayMs(0, 0)).toBeNull()
   })
 })

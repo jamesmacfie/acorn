@@ -242,13 +242,38 @@ fn read(root: &Path, pathname: &str) -> Option<(u16, String, Vec<u8>)> {
     Some((200, mime.to_string(), fs::read(path).ok()?))
 }
 
+/// Forward what the dev server said, including when it said no.
+///
+/// A non-2xx from Vite is an answer, not a transport failure, and `ureq` reports both as `Err`. The
+/// two that matter here arrive during a cold launch: 504, which is how Vite asks the page to reload
+/// after re-bundling a dependency it only discovered when a lazily imported plugin pane was
+/// requested, and 500, whose body carries the transform error. Answering either with the bodyless
+/// 502 the caller produces for `None` fails the module script's MIME check, blanks the window, and
+/// leaves nothing behind to say which it was.
+///
+/// So only a transport failure returns `None`, and it logs first. Anything with a status is passed
+/// through untouched.
 fn proxy(origin: &str, uri: &Uri) -> Option<(u16, String, Vec<u8>)> {
     let path = uri.path_and_query().map(|p| p.as_str()).unwrap_or("/");
-    let response = ureq::get(&format!("{origin}{path}")).call().ok()?;
+    let url = format!("{origin}{path}");
+    let response = match ureq::get(&url).call() {
+        Ok(response) => response,
+        Err(ureq::Error::Status(_, response)) => response,
+        Err(error) => {
+            eprintln!("[shell] dev server unreachable for {path}: {error}");
+            return None;
+        }
+    };
     let status = response.status();
     let mime = response.content_type().to_string();
     let mut body = Vec::new();
-    response.into_reader().read_to_end(&mut body).ok()?;
+    if let Err(error) = response.into_reader().read_to_end(&mut body) {
+        eprintln!("[shell] dev server cut off {path} after {status}: {error}");
+        return None;
+    }
+    if status >= 400 {
+        eprintln!("[shell] dev server answered {status} for {path}");
+    }
     Some((status, mime, body))
 }
 
@@ -400,6 +425,44 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("acorn-app-scheme-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
         std::fs::create_dir_all(&dir).expect("a temp directory");
         dir
+    }
+
+    /// The white-window regression: Vite answers a cold launch's plugin-pane request with a status,
+    /// and the window has to be told which one. A 502 here means the shell threw the answer away.
+    #[test]
+    fn a_dev_server_error_reaches_the_window_as_itself() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().expect("one request");
+            let mut seen = [0u8; 1024];
+            let _ = socket.read(&mut seen);
+            let _ = socket.write_all(
+                b"HTTP/1.1 504 Gateway Timeout\r\nContent-Type: text/plain\r\nContent-Length: 18\r\n\r\nOutdated Optimize\n",
+            );
+        });
+
+        let request = Request::builder().uri("app://acorn/@fs/plugins/preview/src/client/PreviewTaskPane.tsx").body(Vec::new()).unwrap();
+        let response = serve(&Source::DevServer(origin), None, 51234, &request);
+        assert_eq!(response.status(), 504);
+        assert_eq!(response.body(), b"Outdated Optimize\n");
+        assert_eq!(response.headers().get("content-type").unwrap(), "text/plain");
+        // And the policy still rides along, because the page this reaches is the renderer.
+        assert!(response.headers().contains_key("content-security-policy"));
+    }
+
+    /// Only a dev server that is not there at all is a 502, which is what makes the status above
+    /// meaningful.
+    #[test]
+    fn an_absent_dev_server_is_the_one_case_that_is_a_502() {
+        // Bound and dropped, so the port is closed rather than merely quiet.
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let request = Request::builder().uri("app://acorn/index.html").body(Vec::new()).unwrap();
+        let response = serve(&Source::DevServer(format!("http://127.0.0.1:{port}")), None, 51234, &request);
+        assert_eq!(response.status(), 502);
     }
 
     #[test]

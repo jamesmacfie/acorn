@@ -181,21 +181,42 @@ export function Timeline(props: {
     // without a frame budget of its own.
     if (!rows.length) return
     const found = resolveAnchor(place, rows.map((row) => row.dataset.turn ?? ''))
-    if (!found) { adopt(LIVE); pin(); return }
+    if (!found) {
+      report('took', scroller.scrollTop)
+      adopt(LIVE)
+      pin()
+      return
+    }
     const row = rows.find((candidate) => candidate.dataset.turn === found.key)
     if (!row) return
     // Clamped in case the turn came back shorter than the reader left it, which "collapse all" does.
     const want = Math.min(found.offset, Math.max(0, row.offsetHeight - 1))
     const delta = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + want
-    if (Math.abs(delta) <= 1) { corrections = 0; adopt(measure() ?? place); return }
     const before = scroller.scrollTop
-    write(before + delta)
-    if (scroller.scrollTop === before) { corrections = 0; adopt(measure() ?? place); return }
-    if (++corrections < CORRECTIONS) schedule()
-    else corrections = 0
+    let settled = Math.abs(delta) <= 1
+    if (!settled) {
+      write(before + delta)
+      // Asked and refused: this list cannot bring that turn any closer, so this is as near as the
+      // reader can be put and there is nothing to gain by asking again.
+      settled = scroller.scrollTop === before
+    }
+    if (!settled) {
+      if (++corrections < CORRECTIONS) schedule()
+      else corrections = 0
+      return
+    }
+    corrections = 0
+    // Settling does not redefine where the reader wants to be. It used to: it re-measured and adopted
+    // whatever was under the viewport, so a settle that happened while the list was still short adopted
+    // the top and wrote it to the caller's store, and every later visit opened there. The one thing
+    // worth adopting is a substitute, because the turn the reader chose has left the list for good and
+    // chasing its key would cost a correction on every resize from here on.
+    if (found.key === place.key) return
+    report('took', scroller.scrollTop)
+    adopt({ at: 'turn', key: found.key, index: rows.indexOf(row), offset: found.offset })
   }
 
-  const report = (cause: 'opened' | 'unasked', to: number): void => {
+  const report = (cause: 'opened' | 'unasked' | 'took', to: number): void => {
     if (!scroller) return
     reportScrollPlace({
       anchor: place.at === 'live' ? 'live' : place.key,
@@ -292,10 +313,14 @@ export function Timeline(props: {
       onTouchMove={noteInput}
       onPointerDown={noteInput}
       onKeyDown={noteInput}
-      // Focus counts as the reader's input too: revealing a card scrolls it into view and then
-      // focuses it, and focus is delivered before the scroll event, so the scroll that follows is
-      // the reveal rather than a move to be undone.
-      onFocusIn={noteInput}
+      // Focus counts as the reader's input, but only when it lands on a turn in this list: revealing a
+      // card scrolls it into view and then focuses it, and focus is delivered before the scroll event,
+      // so the scroll that follows is the reveal rather than a move to be undone. Focus arriving
+      // anywhere else inside the scroller is not a scroll, and treating it as one let a rebuilt pane
+      // hand its own focus restoration to the next scroll event as if the reader had made it.
+      onFocusIn={(event) => {
+        if ((event.target as HTMLElement | null)?.closest('.ui-timeline-turn')) noteInput()
+      }}
     >
       {list}
     </div>
