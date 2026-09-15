@@ -10,6 +10,7 @@ import {
   rotateConnection,
   setConnectionDisabled,
   testConnection,
+  warmOnePasswordCache,
 } from './connections'
 import { publicConnectionProvider } from './providerShared'
 import { ProviderOperationError } from './types'
@@ -321,5 +322,87 @@ describe('connecting with a 1Password reference', () => {
     } finally {
       validate.mockRestore()
     }
+  })
+})
+
+describe('warming the 1Password cache at boot', () => {
+  const REF = 'op://Private/Test/credential'
+  const OTHER = 'op://Private/Other/credential'
+  let testDb: TestDb
+
+  beforeEach(() => {
+    testDb = makeTestDb()
+  })
+  afterEach(() => {
+    testDb.cleanup()
+  })
+
+  const seed = async (id: string, credential: string): Promise<void> => {
+    const now = Date.now()
+    await testDb.db.insert(schema.integrations).values({
+      id,
+      userId: 'alice',
+      provider: PROVIDER_ID,
+      label: 'Connection only',
+      name: null,
+      authRef: await SECRETS.seal(credential),
+      authKind: 'api-key',
+      account: null,
+      scopes: '[]',
+      capabilities: '{}',
+      config: '{}',
+      status: 'connected',
+      lastValidatedAt: now,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+
+  it('asks for each reference once and leaves plain credentials alone', async () => {
+    await seed('a', REF)
+    await seed('b', REF)
+    await seed('c', OTHER)
+    await seed('d', 'a-plain-token')
+    const asked: string[] = []
+    const secrets = new SecretService(ENCRYPTION_KEY, async (ref) => {
+      asked.push(ref)
+      return 'the-real-key'
+    })
+
+    await warmOnePasswordCache(testDb.db, 'alice', secrets)
+
+    // A plain token never reaches the resolver, and two connections behind one reference cost one
+    // unlock rather than two.
+    expect(asked).toEqual([REF, OTHER])
+  })
+
+  it('keeps going when one reference cannot be read', async () => {
+    await seed('a', REF)
+    await seed('b', OTHER)
+    const asked: string[] = []
+    const secrets = new SecretService(ENCRYPTION_KEY, async (ref) => {
+      asked.push(ref)
+      if (ref === REF) throw new Error('1Password is locked')
+      return 'the-real-key'
+    })
+
+    // A vault that will not answer must not stop the node booting, and must not cost the credential
+    // behind it either.
+    await expect(warmOnePasswordCache(testDb.db, 'alice', secrets)).resolves.toBeUndefined()
+    expect(asked).toEqual([REF, OTHER])
+  })
+
+  it('does nothing before an owner is bound', async () => {
+    await seed('a', REF)
+    const asked: string[] = []
+    const secrets = new SecretService(ENCRYPTION_KEY, async (ref) => {
+      asked.push(ref)
+      return 'the-real-key'
+    })
+
+    await warmOnePasswordCache(testDb.db, null, secrets)
+
+    expect(asked).toEqual([])
   })
 })

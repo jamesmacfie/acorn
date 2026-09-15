@@ -175,6 +175,14 @@ PATH. Every `op` invocation queues behind the last, so two connections refreshin
 unlock prompt rather than two. A reference is a pointer, not a secret, so it is shown in Settings →
 Integrations and travels on the wire as `Integration.secretRef`; the value behind it never does.
 
+The node resolves every reference it holds while it starts, not when the first request wants one.
+`op` is slow enough to matter: on one developer machine a read took 9.5 seconds against a 1Password
+daemon that had just started and 1.6 seconds once that daemon was warm. Paid on the request path,
+that outran the client's per-node deadline, and the first click after a launch showed a healthy
+connection as unavailable. The boot pass moves the cost to a moment when nobody is waiting, and
+failures there are swallowed: a locked or absent vault is not a reason for a node to fail to start,
+and it surfaces again with a real error the next time a request wants that credential.
+
 A failure to read one is `provider_secret_ref_unreadable`, deliberately not "this credential was
 rejected": the credential is fine, and this machine could not reach 1Password. `op`'s own stderr goes
 to the node log and never to a client, for the same reason a failed harness generate's does. It
