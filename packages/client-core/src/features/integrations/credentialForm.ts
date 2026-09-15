@@ -32,10 +32,9 @@ export type CredentialFormController = {
   submit: () => Promise<void>
 }
 
-// The two codes worth their own sentence. `provider_needs_auth` means the provider itself refused
-// the credential, so retrying the same one is pointless and the reader needs to know whose refusal
-// it was. `provider_secret_ref_unreadable` means we never got as far as asking: the value is in
-// 1Password and this machine could not read it, which is a different thing to go and fix.
+// One code is worth its own sentence. `provider_needs_auth` means the provider itself refused the
+// credential, so retrying the same one is pointless and the reader needs to know whose refusal it
+// was.
 //
 // Everything else lands in one sentence that names none of its causes: the provider unreachable, a
 // response shaped the way nothing expected, a connection that is no longer there. So the code and
@@ -49,20 +48,9 @@ const errorCopy = (cause: unknown, label: string): string => {
   const failure = cause instanceof ApiError ? cause : undefined
   const code = failure?.code ?? (cause as Error)?.message
   if (code === 'provider_needs_auth') return `Those credentials were rejected by ${label}.`
-  if (code === 'provider_secret_ref_unreadable') {
-    return 'Could not read that 1Password reference. Check Settings, Security, 1Password.'
-  }
   const trail = [code, failure?.requestId].filter(Boolean).join(' · ')
   return trail ? `Could not connect this provider. (${trail})` : 'Could not connect this provider.'
 }
-
-// 1Password's right-click menu offers a secret reference and an item link, and both read as "the
-// thing I copied from 1Password". Only the reference resolves. A link goes to the provider as the
-// credential itself, comes back as the provider rejecting it, and sends the reader off to reissue a
-// key that was never the problem. Caught here rather than on the node because it is a typo, not a
-// trust question: the node passing an unrecognised string through to the provider is already the
-// right thing for it to do, and this is the layer both the desktop and the terminal wizard share.
-const ONEPASSWORD_LINK = /^(https?:\/\/[a-z0-9.-]*1password\.com\/|onepassword:\/\/)/i
 
 export function createCredentialForm(
   provider: () => PublicIntegrationProvider | undefined,
@@ -97,11 +85,6 @@ export function createCredentialForm(
     // Guarded rather than trusted: Enter in a field reaches this with a half-filled form, and the node
     // would answer 400 for a missing field with no way to say which.
     if (!target || !complete()) return
-    const link = Object.values(credentials()).find((entry) => ONEPASSWORD_LINK.test(entry.trim()))
-    if (link) {
-      setError('That is a 1Password item link, not a secret reference. In 1Password, use Copy Secret Reference to get an op://Vault/Item/field value.')
-      return
-    }
     setBusy(true)
     setError('')
     try {

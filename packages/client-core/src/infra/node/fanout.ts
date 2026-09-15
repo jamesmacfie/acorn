@@ -17,16 +17,9 @@ import { freshnessOf, type Freshness } from './freshness'
 // value. Otherwise use a private key such as `['node-stat', id]`, or one reader corrupts another's
 // cache entry.
 
-// Past this a node is treated as not-answering for aggregation purposes, whatever its socket says.
-//
-// It deliberately no longer matches the broker's DEGRADED_AFTER_MS. That number describes how long a
-// WebSocket may go quiet, not how long a route may take, and a route that reads a credential out of
-// 1Password waits on the `op` command: 9.5s on one developer machine against a cold 1Password daemon,
-// 1.6s once it was warm. Five seconds drew an "unavailable" banner over a node that was answering
-// normally. The node resolves those credentials during boot now
-// (node-core server/integrations/connections.ts, warmOnePasswordCache), so this is headroom rather
-// than the fix.
-const DEFAULT_TIMEOUT_MS = 10_000
+// Matches the broker's DEGRADED_AFTER_MS. Past this a node is treated as not-answering for aggregation
+// purposes, whatever its socket says.
+const DEFAULT_TIMEOUT_MS = 5_000
 
 export type FleetRow<T> = {
   nodeId: string

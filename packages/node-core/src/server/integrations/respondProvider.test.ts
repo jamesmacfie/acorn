@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OnePasswordError } from '../core/onePassword'
 import { providerError } from './respondProvider'
 import { ProviderOperationError } from './types'
 
@@ -30,12 +29,6 @@ describe('providerError', () => {
     providerError(c, new ProviderOperationError('provider_needs_auth', 401))
     expect(sent.status).toBe(401)
     expect(codeOf(sent)).toBe('provider_needs_auth')
-  })
-
-  it('tells an unreadable 1Password reference apart from a rejected credential', () => {
-    const { c, sent } = context()
-    providerError(c, new OnePasswordError('not-installed'))
-    expect(codeOf(sent)).toBe('provider_secret_ref_unreadable')
   })
 
   // The reason this file exists. `provider_unavailable` is the shrug every unplanned throw lands on,

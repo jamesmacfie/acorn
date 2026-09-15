@@ -5,8 +5,6 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createApp } from '../index'
 import { makeBindings, type RuntimeBindings } from '../bindings'
-import { trackBackgroundRefresh } from '../background'
-import { warmOnePasswordCache } from '../integrations/connections'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { openDataRoot, type DataRoot } from '../storage/dataRoot'
 import { resolveDatabasePath } from '../storage/paths'
@@ -79,14 +77,6 @@ export function startListener(
   // the composition root (apps/node's service/runtime.ts under the desktop shell, server/standalone.ts otherwise)
   // before this is called. Core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
-
-  // Turn 1Password references into values now, so no request is the one that waits for the `op`
-  // command. Fire-and-forget on purpose: the listener must not wait for a vault, and a node with
-  // 1Password off resolves nothing (../integrations/connections.ts, warmOnePasswordCache).
-  trackBackgroundRefresh(
-    'onepassword credentials',
-    warmOnePasswordCache(runtime.DB, runtime.ACTIVE_IDENTITY.get(), runtime.SECRETS),
-  )
 
   // No static assets and no SPA fallback: the node serves API and event traffic only. The renderer ships
   // with the desktop app and loads from app://acorn, so a node that answered with an HTML shell would only

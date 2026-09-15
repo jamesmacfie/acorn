@@ -16,10 +16,6 @@ import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
 import { ProviderOperationError, type ProviderCredentials } from './types'
-import { isSecretRef } from '../core/onePassword'
-import { createLogger } from '../telemetry/logger'
-
-const log = createLogger('integrations:connections')
 
 export type StoredConnection = typeof schema.integrations.$inferSelect
 
@@ -91,51 +87,6 @@ export async function getConnection(db: AppDatabase, userId: string, id: string)
   return row ?? null
 }
 
-// Connecting with a 1Password reference is two jobs, not one. The provider has to validate the real
-// token, or "connect" would accept a reference that points at nothing. But what we store has to be
-// the reference, or the whole point is lost and a copy of the token lands in our database anyway.
-//
-// So: resolve first, validate against the resolved values, then swap the reference back in before
-// sealing. The map is by value because `normalize` chooses which credential field becomes the
-// secret and does not tell us which one it picked. Every provider today returns
-// `credentials.<field>.trim()`, so a trimmed value matches; the `??` fallback below means a future
-// provider that derives its secret instead would quietly seal the plaintext. The connect test
-// asserting the stored value is the reference is what catches that.
-// 1Password hands a copied reference back wrapped in quotes, and a quoted reference is not one:
-// `isSecretRef` says no, the whole string goes to the provider as the credential itself, and the
-// owner is told their key was rejected by a provider that never saw a key. So the quotes come off
-// before the question is asked, and only when taking them off changes the answer, which leaves a
-// credential that genuinely begins and ends with one alone.
-const QUOTED = /^(["'])([\s\S]*)\1$/
-
-const asSecretRef = (value: string): string | null => {
-  const trimmed = value.trim()
-  if (isSecretRef(trimmed)) return trimmed
-  const inner = QUOTED.exec(trimmed)?.[2]?.trim()
-  return inner && isSecretRef(inner) ? inner : null
-}
-
-async function resolveCredentials(
-  credentials: ProviderCredentials,
-  secrets: SecretService,
-): Promise<{ credentials: ProviderCredentials; refByValue: Map<string, string> }> {
-  const refByValue = new Map<string, string>()
-  const resolved: ProviderCredentials = {}
-  for (const [field, value] of Object.entries(credentials)) {
-    const ref = asSecretRef(value)
-    if (!ref) {
-      resolved[field] = value
-      continue
-    }
-    const plaintext = (await secrets.resolve(ref)).trim()
-    resolved[field] = plaintext
-    // The unquoted reference, because this is what gets sealed into the row. Storing the quoted form
-    // would put a value back in the database that nothing can read.
-    refByValue.set(plaintext, ref)
-  }
-  return { credentials: resolved, refByValue }
-}
-
 export async function connectProvider(
   db: AppDatabase,
   userId: string,
@@ -155,9 +106,8 @@ export async function connectProvider(
           throw new ProviderOperationError('provider_bad_config', 400)
         }
       }
-      const { credentials, refByValue } = await resolveCredentials(request.credentials, secrets)
-      const validated = await provider.connection.validate(credentials)
-      const normalized = provider.connection.normalize(credentials, validated)
+      const validated = await provider.connection.validate(request.credentials)
+      const normalized = provider.connection.normalize(request.credentials, validated)
       const now = Date.now()
       const row: StoredConnection = {
         id: randomUUID(),
@@ -166,7 +116,7 @@ export async function connectProvider(
         label: normalized.label,
         // Nobody has named this yet, so every surface falls back to the provider's own label.
         name: null,
-        authRef: await secrets.seal(refByValue.get(normalized.secret) ?? normalized.secret),
+        authRef: await secrets.seal(normalized.secret),
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
         scopes: JSON.stringify(normalized.scopes),
@@ -195,16 +145,15 @@ export async function rotateConnection(
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const provider = connectionProviderRegistry.require(row.provider)
-  const { credentials, refByValue } = await resolveCredentials(request.credentials, secrets)
   const validated = await providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
-    provider.connection.validate(credentials),
+    provider.connection.validate(request.credentials),
   )
-  const normalized = provider.connection.normalize(credentials, validated)
+  const normalized = provider.connection.normalize(request.credentials, validated)
   const now = Date.now()
   await db
     .update(schema.integrations)
     .set({
-      authRef: await secrets.seal(refByValue.get(normalized.secret) ?? normalized.secret),
+      authRef: await secrets.seal(normalized.secret),
       authKind: provider.connection.authKind,
       account: normalized.account ? JSON.stringify(normalized.account) : null,
       scopes: JSON.stringify(normalized.scopes),
@@ -337,40 +286,6 @@ export async function forEachConnection<T>(
     if (value !== undefined) out.push(value)
   }
   return out
-}
-
-/**
- * Resolve every 1Password-backed credential once, at boot, while nobody is waiting on one.
- *
- * The resolver caches a resolved value until the node restarts, so without this the first surface to
- * want a credential is the one that pays for the `op` round trip. That is seconds, not milliseconds,
- * and longer than the client's per-node deadline, which means the first click after every launch drew
- * an "unavailable" banner over a connection that was perfectly healthy.
- *
- * Every failure is swallowed. 1Password switched off, locked, or not installed is not a reason for a
- * node to fail to start, and whatever is wrong surfaces again with a real error the first time a
- * request actually wants that credential.
- */
-export async function warmOnePasswordCache(db: AppDatabase, userId: string | null, secrets: SecretService): Promise<void> {
-  if (!userId) return
-  const refs = new Set<string>()
-  for (const row of await listConnections(db, userId)) {
-    // Local decryption only, so collecting the list costs nothing and prompts for nothing.
-    const ref = await secrets.secretRef(row.authRef)
-    if (ref) refs.add(ref)
-  }
-  if (!refs.size) return
-  // One at a time, because the resolver queues `op` invocations anyway so that two unlock prompts
-  // cannot stack. Asking for them all at once would only fill that queue faster.
-  const started = Date.now()
-  let resolved = 0
-  for (const ref of refs) {
-    if (await secrets.resolve(ref).then(() => true, () => false)) resolved += 1
-  }
-  // The elapsed time is the point, not the count. A warm 1Password daemon answers in a second or two
-  // and a cold one takes closer to ten, and the difference is the whole reason this pass exists. A
-  // node that reports ten seconds on every boot is starting a daemon of its own each time.
-  log.info(`resolved ${resolved} of ${refs.size} 1Password credentials in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 }
 
 export function externalRefForConnection(row: StoredConnection, identifier: string, input?: Partial<ExternalRef>): ExternalRef {

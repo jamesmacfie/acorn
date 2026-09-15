@@ -36,41 +36,7 @@ export type Integration = {
   updatedAt: number
   lastValidatedAt?: number
   lastError?: ProviderErrorCode
-  // Set when this connection's credential is a 1Password reference rather than a stored token. The
-  // reference itself, so the UI can show which item it points at. A reference is a pointer, not a
-  // secret; the value behind it never crosses the wire.
-  secretRef?: string
 }
-// Whether the `op` CLI is runnable on the node, for Settings → Security. Not a preference: the
-// preference is whether to use it, and that is the row below.
-export type OnePasswordStatus = { available: boolean; version?: string }
-
-// Settings → Security → 1Password, as one preference row, because it is one decision: whether this
-// node may shell out to `op`, and how long it may remember what it read. `ttlMs: null` means until
-// the node restarts.
-//
-// Here rather than on either side, because both sides parse it: the client to draw the controls, the
-// node to decide whether to run anything. Two copies of this shape would drift, and the way they
-// would drift is a switch that reads as off on one side and on on the other.
-export const ONEPASSWORD_PREF_KEY = 'onepassword'
-export type OnePasswordPref = { enabled: boolean; ttlMs: number | null }
-export const ONEPASSWORD_PREF_DEFAULT: OnePasswordPref = { enabled: false, ttlMs: null }
-
-// A half-written or corrupt value reads as off. Failing open would shell out to a binary nobody
-// asked us to run.
-export function parseOnePasswordPref(raw: string | null | undefined): OnePasswordPref {
-  if (!raw) return ONEPASSWORD_PREF_DEFAULT
-  try {
-    const parsed = JSON.parse(raw) as Partial<OnePasswordPref>
-    return {
-      enabled: parsed.enabled === true,
-      ttlMs: typeof parsed.ttlMs === 'number' && parsed.ttlMs > 0 ? parsed.ttlMs : null,
-    }
-  } catch {
-    return ONEPASSWORD_PREF_DEFAULT
-  }
-}
-
 export type IntegrationsResponse = { providers: PublicIntegrationProvider[]; integrations: Integration[] }
 // Credential values are write-only: the response contains only the normalized connection summary.
 export type ConnectIntegrationRequest = { providerId: IntegrationProvider; credentials: Record<string, string> }
@@ -697,8 +663,6 @@ export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeU
 // warning that cries wolf is worse than no warning.
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v2/core/security'
-// Settings → Security → 1Password: is the `op` CLI runnable on this node, and forget what it cached.
-export const coreOnePasswordRoute = '/v2/core/secrets/onepassword'
 
 // Settings → Nodes: who this node is attached to, and the button that drops it
 // (docs/node-enrollment.md § Detaching). Device-only, like devices and plugins: an attachment is

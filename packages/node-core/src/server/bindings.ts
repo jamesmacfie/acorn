@@ -12,7 +12,6 @@ import { ensureBoundIdentity } from './core/identity'
 import { deviceService, type DeviceService } from './auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from './auth/idempotency'
 import { pairingCodes, type PairingCodes } from './auth/pairingCodes'
-import { createOnePasswordResolver } from './core/onePassword'
 import { SecretService } from './core/secrets'
 import { drizzleOverSqlite, openSqlite } from './storage/sqlite'
 import { ensureSessionKey } from './sessionKey'
@@ -227,10 +226,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
     APP_VERSION: appVersion,
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
-    // A credential may be a 1Password reference rather than a token, and turning one into a value
-    // needs the owner's settings and so the database. Handing SecretService a closure keeps the key
-    // and the database in separate hands (server/core/onePassword.ts).
-    SECRETS: new SecretService(encKey, createOnePasswordResolver(db, () => activeIdentity.get())),
+    SECRETS: new SecretService(encKey),
     INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
     ACTIVE_IDENTITY: activeIdentity,
     DEVICES: deviceService(db),
