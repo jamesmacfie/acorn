@@ -37,6 +37,17 @@ export type TimelineControls = {
  *  lands three seconds late gets another go when it does, without a frame loop running in between. */
 const CORRECTIONS = 24
 
+/** How long the reader's input stays the explanation for a move.
+ *
+ *  Input arms a gesture and the next scroll event spends it, which is right when the input scrolls.
+ *  Plenty of it does not: a click to put the caret in a card, a drag to select a line, a key the list
+ *  ignores. That arm then sat there, and whatever moved the view next — a clamp, a card re-rendering
+ *  shorter, the browser putting something on screen — was written down as the place the reader chose.
+ *
+ *  A scroll caused by input arrives within a frame or two. A second is long enough to cover a slow one
+ *  and short enough that a click the reader has forgotten about cannot claim the next move. */
+const GESTURE_MS = 1000
+
 export function Timeline(props: {
   ariaLabel?: string
   /**
@@ -96,10 +107,11 @@ export function Timeline(props: {
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
   // keeps delivering scroll events long after the gesture, but the place is already captured by then.
   let userDriven = false
-  // When the reader last touched this, which is a different question from `userDriven` and only the
-  // report below asks it. A scrollbar drag and a flick of momentum both deliver many scroll events for
-  // one gesture, and `userDriven` is spent on the first of them, so the rest would read as moves
-  // nobody made. Nothing scrolls a second after the reader stopped touching it.
+  // When the reader last touched this, which is a different question from `userDriven`: that says an
+  // input has not been spent yet, this says how long ago it was. A scrollbar drag and a flick of
+  // momentum both deliver many scroll events for one gesture, and `userDriven` is spent on the first of
+  // them, so the rest would read as moves nobody made. Nothing scrolls a second after the reader
+  // stopped touching it (`GESTURE_MS`).
   let lastInput = 0
   // Where the view was the last time anything here looked, so a report can say what the move was from
   // as well as to.
@@ -175,7 +187,12 @@ export function Timeline(props: {
    * the budget below would end that case anyway, a couple of dozen frames later.
    */
   const correct = () => {
-    if (!scroller || place.at !== 'turn') return
+    if (!scroller) return
+    // Following: the reader's place is the foot, so putting them back is pinning them there. This used
+    // to return, which left `noteScroll`'s undertaking that "the next frame puts them back" false for
+    // the one reader who had asked to be held on the newest turn. The resizes a live list produces hid
+    // it, right up until the agent stopped and there were none.
+    if (place.at !== 'turn') { pin(); return }
     const rows = turns()
     // Nothing drawn yet. The resizes that follow re-arm this, so a list still arriving gets another go
     // without a frame budget of its own.
@@ -233,7 +250,11 @@ export function Timeline(props: {
     // Our own write, echoing back. Also the guard that stops a scroll arriving while this subtree is
     // torn down from being read as the reader moving: cleanup drops the scroller first.
     if (!scroller || applying) return
-    const gesture = userDriven
+    // Armed, and recently enough to be about this move. Without the second half a click that scrolled
+    // nothing stayed armed until something else moved the view, and that move was then adopted as the
+    // reader's place and written to the caller's store, where it outlived the mount that invented it.
+    const fresh = Date.now() - lastInput < GESTURE_MS
+    const gesture = userDriven && fresh
     const top = scroller.scrollTop
     const geometry = { scrollTop: top, scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight }
     // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
@@ -241,7 +262,7 @@ export function Timeline(props: {
     const clamp = !gesture && top >= geometry.scrollHeight - geometry.clientHeight - 1
     // Not the reader, not one of our own writes, and not a clamp, and yet the view has moved up by more
     // than a screen. Said out loud, because nothing here can say what did it (../../lib/scrollPlace.ts).
-    if (Date.now() - lastInput > 1000 && !clamp && top < at - geometry.clientHeight) report('unasked', top)
+    if (!fresh && !clamp && top < at - geometry.clientHeight) report('unasked', top)
     userDriven = false
     at = top
     adopt(placeAfterScroll({ place, gesture, geometry, anchor: measure }))

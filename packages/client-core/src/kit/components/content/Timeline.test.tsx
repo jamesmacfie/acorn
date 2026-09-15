@@ -320,6 +320,41 @@ describe('Timeline', () => {
     expect(seen.map((report) => report.cause)).toEqual(['unasked'])
   })
 
+  it('does not hand a move nobody made to a reader who clicked a card a while ago', () => {
+    // A click arms a gesture and nothing spends it, because a click scrolls nothing. The arm used to
+    // sit there until something else moved the view, and that move was then written down as the place
+    // the reader chose — so it survived the correction that would otherwise have undone it, and the
+    // caller stored it. Enough of them in a row and the place walks to the top and stays there.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    reader(scroller()!, 200)
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+
+    scroller()!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    vi.advanceTimersByTime(2000)
+    scroller()!.scrollTop = 0
+    scroller()!.dispatchEvent(new Event('scroll', { bubbles: true }))
+    settle()
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+    expect(turnTop('c')).toBe(0)
+  })
+
+  it('brings a reader who is following the newest turn back to it after a move nobody made', () => {
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    mount(turns)
+    expect(scrollTop).toBe(maxScroll())
+
+    vi.advanceTimersByTime(2000)
+    scroller()!.scrollTop = 0
+    scroller()!.dispatchEvent(new Event('scroll', { bubbles: true }))
+    // The frames only. A resize would pin the reader whatever the correction did, and the case that
+    // bit is the one where nothing resizes: the agent has stopped and the list is done growing.
+    const queued = frames
+    frames = []
+    for (const run of queued) run()
+    expect(scrollTop).toBe(maxScroll())
+  })
+
   it('reports the place a list opens at, which is the only sign of a remount', () => {
     const seen = watchPlaces()
     const [turns] = createSignal(['a', 'b'])

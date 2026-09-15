@@ -476,10 +476,14 @@ correction measured against that turn's current position rather than an offset r
 the same value's other case, not a flag beside it, because the two used to be kept in agreement by
 hand and every defect found in that code was them disagreeing.
 
-The place only changes on the reader's own gesture. A list that shrinks makes the browser clamp the
-scroll offset and fire a scroll event that by position is indistinguishable from someone scrolling, so
-a scroll with no gesture behind it changes nothing and the next resize puts the turn back. Focus counts
-as a gesture, because revealing a card scrolls it into view and then focuses it.
+The place only changes on the reader's own gesture, and a gesture lasts a second. A list that shrinks
+makes the browser clamp the scroll offset and fire a scroll event that by position is
+indistinguishable from someone scrolling, so a scroll with no gesture behind it changes nothing and
+the next frame puts the reader back: on their turn, or on the foot if they were following. The second
+counts for as much as the gesture does. Most input scrolls nothing at all, a click into a card or a
+drag across a line, so the gesture it armed used to sit there until something else moved the view, and
+that move was then filed as the place the reader chose. Focus counts as a gesture when it lands on a
+turn in this list, because revealing a card scrolls it into view and then focuses it.
 
 The timeline does not keep the places. `place` and `onChange` hand them to the caller, because
 navigation disposes a task's panes on purpose ([panes.md](./panes.md)), so a place kept in the
