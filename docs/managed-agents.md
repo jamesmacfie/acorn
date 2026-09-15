@@ -256,7 +256,8 @@ answering each with `cancel` and recording a `request_resolved`, which is what r
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
-are not stored by the model-provider plugin. Plan usage is per harness: the built-in CLI probes and a
+are not stored by the model-provider plugin. The same pricing page holds the built-in Claude and Codex
+catalogues plus exact-model overrides. Plan usage is per harness: the built-in CLI probes and a
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
@@ -421,6 +422,15 @@ transcript is a `Timeline` with `follow` set, which means the kit owns the scrol
 newest turn until the reader scrolls away from it, picks the bottom up again when they scroll back,
 and gives a reader the place they left when they come back to a session. The bar above it and the
 composer below it are pinned by being that scroller's siblings.
+
+Immediately after the title, the header hosts the `agents:session-header` remote `stack` point. Its
+props are a public projection rather than the ledger itself: task and session ids, provider id,
+per-turn usage and resolved prices, and explicit token/cost accounting modes. The owner stops there.
+The bundled `agent-cost` loaded plugin prices and formats those facts, preferring provider-reported USD
+and otherwise showing an API-equivalent estimate; disabling that plugin removes the badge without
+changing Agents. The point is not cost-specific, so independently installed plugins can fill the same
+seat with a token counter or budget warning. The complete contract lives in
+[`plugins/cooperative-extension-points.md`](./plugins/cooperative-extension-points.md#remote-trees).
 
 That is a property of the region, not of this pane, which is why the conversation reaches its region as
 a fragment and never wraps itself in a box: the region is the flex column the scroller sizes against,

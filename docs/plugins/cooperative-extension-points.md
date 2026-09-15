@@ -208,6 +208,7 @@ owner's own words, which is why no two of these agree on a shape:
 | `agents:tool-card` | `replace`, keyed by tool name | `{ tool, taskId, defaultOpen }` |
 | `agents:attachment` | `replace`, keyed by media type | `{ attachment, taskId, sessionId }` |
 | `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
+| `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
 | `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
@@ -222,6 +223,14 @@ had to import it, which is the coupling the point exists to remove.
 
 With nobody filling it the slot draws nothing and takes no space, which is what lets an owner reserve
 room for a plugin the reader has not installed.
+
+`agents:session-header` is the example for derived UI over owner-held facts. Agents folds its private
+event ledger, resolves each turn's captured model against the reader's price preferences, and declares
+whether a provider's successive counters replace or add. It does **not** calculate or format a cost.
+The `agent-cost` loaded plugin makes that product decision in its own worker; another plugin can use
+the same point and props for a token count, a budget warning, or provider metadata. The split keeps
+ledger and preference access with their owner while keeping the derived feature removable and
+portable.
 
 **What a slot's tree may reach.** The host hands the contributor's tree the owner's `taskId` and
 `projectId`, read-only, as its scope — the same two the host gives a rectangle occupant. Without them a

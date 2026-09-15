@@ -2,11 +2,12 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { pluginExtensionGrantSchema } from './grantSchemas'
 
 const log = createLogger('plugins')
 
@@ -40,13 +41,6 @@ const navigationDestinationGrantSchema = z.strictObject({
   targetKind: z.string().min(1).max(64),
   noticeKind: z.string().min(1).max(64).optional(),
 }) as z.ZodType<PluginNavigationDestinationGrant>
-
-const extensionGrantSchema = z.strictObject({
-  kind: z.enum(['hosts', 'extends', 'replaces']),
-  // A `<pluginId>:<pointId>` reference or a designated core slot id, both bounded by the manifest.
-  target: z.string().min(1).max(130),
-  label: z.string().min(1).max(80),
-}) as z.ZodType<PluginExtensionGrant>
 
 // The cadence is the whole grant beside the name, so it is parsed rather than kept as an opaque
 // blob. A snapshot that cannot be compared is one the update prompt cannot diff.
@@ -109,7 +103,7 @@ const ackSchema = z.strictObject({
   navigationDestinations: z.array(navigationDestinationGrantSchema).max(64).default([]),
   // Default keeps acknowledgements written before the cooperative cross-plugin seam readable. An old
   // acknowledgement says the accepted bundle reached into nothing outside itself, which was true.
-  extensions: z.array(extensionGrantSchema).max(32).default([]),
+  extensions: z.array(pluginExtensionGrantSchema).max(32).default([]),
   // Default keeps acknowledgements written before schedules existed readable. An old acknowledgement
   // says the accepted bundle ran nothing on its own, which was true.
   schedules: z.array(scheduleGrantSchema).max(4).default([]),
