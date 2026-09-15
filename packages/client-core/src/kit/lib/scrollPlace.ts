@@ -21,8 +21,12 @@ export type ScrollPlaceReport = {
    * `unasked`: a scroll nobody made. Not the reader, since no gesture was armed; not the timeline,
    * since it echoes its own writes; and not the browser clamping under a shrinking list, since that
    * lands against the bottom. Whatever moved the reader here, this is the only record of it.
+   *
+   * `took`: the reader's place changed without the reader, which happens only when the turn they were
+   * on has left the list. `anchor` is what it changed to. Rare, and worth a record: the reader sees a
+   * jump they did not ask for and this is the only thing that can say which turn went.
    */
-  cause: 'opened' | 'unasked'
+  cause: 'opened' | 'unasked' | 'took'
   from: number
   to: number
   /** The list's height and the viewport's, so a report can say whether `to` is a real place or the
