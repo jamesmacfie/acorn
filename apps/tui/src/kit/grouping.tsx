@@ -18,6 +18,7 @@ import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport, type Viewport } from './scrolling'
 import type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+import type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -194,15 +195,19 @@ export function Card(props: {
  *  Without `follow` it is a plain column and whatever is around it scrolls, which is what github's
  *  pull request conversation wants.
  *
- *  `viewKey` is dropped. It is the DOM's per-view scroll memory, and this host has one offset per
- *  mounted viewport rather than a map of remembered ones.
+ *  `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`. Putting a reader back on
+ *  a turn needs per-turn geometry, and a viewport here knows its own offset and the height of the box
+ *  inside it and nothing else. So this host keeps one offset per mounted viewport: the foot is held
+ *  while the reader is at the foot, and a list that is drawn again opens there. `NODE_SUPPORT` calls
+ *  the node `reduced` and says so (client-core kit/tokens/support.ts).
  *
  *  `props.follow` is read once rather than through a `Show`, because it is a constant at every call
  *  site and a reactive read would rebuild every turn the moment it flipped. */
 export function Timeline(props: {
   ariaLabel?: string
   follow?: boolean
-  viewKey?: string
+  place?: () => ReadingPlace
+  onChange?: (place: ReadingPlace) => void
   controls?: (api: TimelineControls) => void
   children: JSX.Element
 }) {
@@ -235,7 +240,7 @@ export function Timeline(props: {
  *  with no `Turn` is `undefined` passed to `createComponent`, which is a pane that fails to draw
  *  rather than a pane that draws badly. Found by the pane sweep, on the PR conversation
  *  (docs/tui.md). */
-Timeline.Turn = (props: { children: JSX.Element }) => (
+Timeline.Turn = (props: { key?: string; children: JSX.Element }) => (
   <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
 )
 

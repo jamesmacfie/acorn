@@ -11,8 +11,9 @@
 // top" is unattributable; from in here it is a cause and four numbers.
 
 export type ScrollPlaceReport = {
-  /** The list this is, the timeline's `viewKey`. */
-  view: string
+  /** The turn the reader is held on, or `live` for the end of the list. A turn's key is the id of the
+   *  record that drew it, so a report can be looked up against the stream it came from. */
+  anchor: string
   /**
    * `opened`: the timeline mounted or swapped lists, and went to the offset in `to`. A remount lands
    * here and nowhere else, because a fresh element fires no scroll event.

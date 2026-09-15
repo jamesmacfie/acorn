@@ -188,6 +188,17 @@ Neither is persisted. Where you are in a list is a reading posture, not a prefer
 one across a relaunch would need a scope and an eviction rule nobody has asked for. See
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
 
+A scrolled list answers to the same rule, and for a while one list did not. A followed `Timeline` keeps
+the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/readingPlace.ts`,
+and the timeline does not hold it: `plugins/agents/src/client/sessions/readingPlaceStore.ts` does,
+keyed by the view, cleared when the node drops the session and on a node switch. It used to be a pixel
+offset in a module map inside the kit node itself, which broke both halves of the rule above. The unit
+was wrong, because an offset means nothing once the content above it has changed height, which a live
+transcript does continuously. And the owner was wrong: a map inside a kit component cannot be scoped,
+cleared or seen, and its own comment said as much, bounding itself at fifty entries because `kit/` may
+not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
+rather than by position, and clear it where you clear everything else about that entity.
+
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
