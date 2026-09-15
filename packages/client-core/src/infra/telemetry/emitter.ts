@@ -658,7 +658,7 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
   setScrollPlaceHandler((place) => {
     emitEvent('core', 'ui.scroll.place', {
       cause: place.cause,
-      view: place.view,
+      anchor: place.anchor,
       from: Math.round(place.from),
       to: Math.round(place.to),
       height: Math.round(place.height),
