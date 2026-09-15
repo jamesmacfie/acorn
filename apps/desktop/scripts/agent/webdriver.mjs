@@ -64,6 +64,47 @@ function snapshotDocument() {
   }
 }
 
+/**
+ * Move the page's scroller and say where that leaves the reader.
+ *
+ * Injected whole, like `snapshotDocument` above, because it has to run in the window.
+ *
+ * The position alone is not the answer. A pixel offset means nothing once the content above it has
+ * changed height, which is the entire reason the transcript's reading place is a turn
+ * (client-core kit/lib/readingPlace.ts). So this also reports which turn the viewport starts in,
+ * read off the `data-turn` the kit publishes, and that is the thing to compare across a navigation.
+ *
+ * A `wheel` event before the write, because a scroller that owns its position tells the reader's
+ * gesture from a browser clamp, and a bare `scrollTop =` is neither. The event is untrusted; nothing
+ * in the kit tests `isTrusted`, deliberately.
+ *
+ * Ceiling: finds the scroller by walking every element and asking for its computed style, then takes
+ * the largest. Fine for one diagnostic call, and it means the driver needs no class name from the
+ * kit. Pass a ref if a page ever has two worth telling apart.
+ */
+function scrollRegion(delta) {
+  const scrollers = [...document.querySelectorAll('*')].filter((element) => {
+    if (element.scrollHeight - element.clientHeight < 8) return false
+    const overflow = getComputedStyle(element).overflowY
+    return overflow === 'auto' || overflow === 'scroll'
+  })
+  const box = scrollers.sort((a, b) => b.clientHeight * b.clientWidth - a.clientHeight * a.clientWidth)[0]
+  if (!box) return null
+  if (delta) {
+    box.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: delta }))
+    box.scrollTop += delta
+  }
+  const top = box.getBoundingClientRect().top
+  const turn = [...box.querySelectorAll('[data-turn]')].find((row) => row.getBoundingClientRect().bottom > top)
+  return {
+    scrollTop: Math.round(box.scrollTop),
+    maxScroll: Math.round(Math.max(0, box.scrollHeight - box.clientHeight)),
+    viewport: Math.round(box.clientHeight),
+    turn: turn ? turn.getAttribute('data-turn') : null,
+    offset: turn ? Math.round(top - turn.getBoundingClientRect().top) : null,
+  }
+}
+
 export class WebDriverClient {
   constructor(endpoint, sessionId = null) {
     this.endpoint = endpoint.replace(/\/$/, '')
@@ -132,6 +173,10 @@ export class WebDriverClient {
     return this.execute(`return (${snapshotDocument.toString()})()`)
   }
 
+  scroll(delta) {
+    return this.execute(`return (${scrollRegion.toString()})(arguments[0])`, [delta])
+  }
+
   async resolveElement(ref) {
     const value = await this.request('POST', this.sessionPath('/element'), {
       using: 'css selector',
@@ -181,4 +226,9 @@ export function renderSnapshot(snapshot) {
     'Elements:',
     elements || '(none)',
   ].join('\n')
+}
+
+export function renderPlace(place) {
+  const where = place.turn ? `turn ${place.turn} (${place.offset}px above the top)` : 'no turn under the top'
+  return `scroll ${place.scrollTop} of ${place.maxScroll}, viewport ${place.viewport}\n${where}`
 }
