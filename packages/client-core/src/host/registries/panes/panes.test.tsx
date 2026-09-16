@@ -1,4 +1,4 @@
-import { createResource, onCleanup } from 'solid-js'
+import { createResource, createSignal, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
@@ -129,6 +129,52 @@ describe('the model a pane’s regions share', () => {
     expect(disposed).toEqual(['t1'])
     evictScope({ scope: 'task', taskId: 't2' })
     expect(disposed).toEqual(['t1', 't2'])
+  })
+})
+
+// A region draws under a `Suspense` of its own, and that boundary exists for exactly one thing: a
+// `lazy()` region renders as an empty string until its module lands, which the cell host refuses
+// (./panes.ts). Everything else under it shares the boundary, and `@tanstack/solid-query` suspends
+// whenever `.data` is read on an empty cache. So a query that only starts once the region has drawn —
+// a pull request's conflicts, the Linear issues found in its body — used to take the whole region out
+// of the document again for the length of its fetch. The reader watched a rendered diff vanish, and
+// the virtualized scroller inside it came back detached and at the top with no event to say so
+// (docs/diff-rendering.md).
+//
+// Held by the solid-js patch rather than by anything here: a boundary that has drawn never swaps back
+// to its fallback (patches/README.md). This is the test for it.
+describe('a region that has already drawn', () => {
+  it('stays in the document while a later query inside it is in flight', async () => {
+    let releaseLate: () => void = () => {}
+    const [lateStarted, startLate] = createSignal(false)
+    register(pane({
+      layout: 'single',
+      regions: { body: () => {
+        const [files] = createResource(async () => 'diff')
+        const [late] = createResource(lateStarted, () => new Promise<string>((resolve) => {
+          releaseLate = () => resolve('conflicts')
+        }))
+        return <span data-region="body">{files()}{lateStarted() ? late() : ''}</span>
+      } },
+    }))
+    const Pane = paneRegistry.get('notes')!.component
+    dispose = render(() => <Pane task={task} />, host)
+
+    // Same generous poll as the tests above: the layout module is behind `lazy`.
+    for (let tries = 0; tries < 400 && !host.querySelector('[data-region]'); tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(host.querySelector('[data-region]')?.textContent).toBe('diff')
+
+    startLate(true)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(host.querySelector('[data-region]')?.textContent).toBe('diff')
+
+    releaseLate()
+    for (let tries = 0; tries < 400 && host.querySelector('[data-region]')?.textContent !== 'diffconflicts'; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(host.querySelector('[data-region]')?.textContent).toBe('diffconflicts')
   })
 })
 

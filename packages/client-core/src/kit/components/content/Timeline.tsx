@@ -300,16 +300,17 @@ export function Timeline(props: {
   /**
    * Taken off the page and put back by something outside, which is a move like any other.
    *
-   * A pane region draws inside a `Suspense` (host/registries/panes/panes.ts). A query in the region
-   * that runs with an empty cache suspends that boundary *after* the region has drawn, so every child
-   * leaves the document and comes back a few hundred milliseconds later. A scroller that was detached
-   * comes back at the top, and the browser reports neither a scroll event nor a resize for it, so
-   * every other signal in this file misses it: the reader opens a transcript, watches it land on the
-   * newest turn, and then watches it jump to the first one.
+   * A scroller that was detached comes back at the top, and the browser reports neither a scroll
+   * event nor a resize for it, so every other signal in this file misses it: the reader opens a
+   * transcript, watches it land on the newest turn, and then watches it jump to the first one.
    *
-   * Watching the parent's children is what catches it. The mutations are rare — a region's children
-   * are its bar, its body and its composer — and the answer is the correction the rest of this file
-   * already runs.
+   * What produced it was the `Suspense` around every pane region (host/registries/panes/panes.ts):
+   * a query in the region reading an empty cache suspended that boundary after the region had drawn,
+   * and every child left the document for the length of the fetch. The solid-js patch closed that off
+   * — a boundary that has drawn never swaps back to its fallback (patches/README.md) — and this stays
+   * because re-parenting is not only that boundary's to do. It costs one observer on a parent whose
+   * children are its bar, its body and its composer, and the answer is the correction the rest of
+   * this file already runs.
    */
   const replaced = new MutationObserver(() => { if (scroller?.isConnected) schedule() })
   onMount(() => { if (scroller?.parentElement) replaced.observe(scroller.parentElement, { childList: true }) })

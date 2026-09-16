@@ -135,10 +135,18 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task), owner ?? 'core') : undefined)
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
-        // renders as an empty string. On the DOM that is an empty text node nobody sees; a cell host
-        // refuses it, because a run of text there must have a `text` parent, and the mount fails
-        // (docs/tui.md). One boundary per region rather than one per pane, so a
-        // slow region does not blank the ones beside it.
+        // renders as an empty string, which draws the region's rectangle empty until the module
+        // lands. One boundary per region rather than one per pane, so a slow region does not blank
+        // the ones beside it. It used to be here for a harder reason, a cell host that refused a bare
+        // string outright; that rule went with the terminal rewrite
+        // (apps/tui/src/tree/renderer.ts).
+        //
+        // The boundary covers the module arriving and nothing after it. Everything under a region
+        // shares it, and `@tanstack/solid-query` suspends whatever boundary is above it whenever
+        // `.data` is read on an empty cache, so a query that starts once the region is already on
+        // screen used to take the region back out of the document for the length of its fetch. The
+        // solid-js patch is what stops that: a boundary that has drawn never swaps back to its
+        // fallback, and patches/README.md holds the reasoning.
         regions[name] = () => {
           // Opened here, where the host asks for the region, and ended when the region's content
           // mounts. A region that suspends is the case worth measuring: everything between those two
