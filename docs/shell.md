@@ -20,9 +20,9 @@ window that opened before the helper existed could not ask.
 `apps/desktop/src/helper/helperMain.ts` adopts any legacy custody, loads the env files, builds the
 helper, binds the WebSocket server, and prints the ready line. Only then does it start the node, with
 `helper.startInBackground()`. So the window opens on a helper that can answer the fleet question, and
-the node's own boot — a few hundred milliseconds of plugin loading and migrations — happens behind the
-first frame and arrives as a `node-status` push the renderer already handles. The shell draws that
-node's persisted query cache in the meantime ([frontend.md](./frontend.md) § Painting before the node).
+the Node's own boot happens behind the startup loader. Its first `node-status` push releases the
+renderer gate and mounts the shell from the selected Node's persisted query cache
+([frontend.md](./frontend.md) § Startup readiness).
 
 `startInBackground` rather than a bare `void helper.start()`, and the difference is the failure path.
 A `start()` that rejects never spawned a child, so `unexpectedExit` cannot fire and nothing would

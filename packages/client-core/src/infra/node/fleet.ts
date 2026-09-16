@@ -93,6 +93,13 @@ export { nodes }
 
 export const nodeStatus = (nodeId: string): NodeStatus | undefined => statuses()[nodeId]
 
+// A supervised local node that membership knows about but the broker has not reported on yet. This
+// is the desktop cold-start interval: the helper can answer the fleet read before the node process
+// has finished booting and opened its connection. A remote node with no status is offline, not
+// starting, because this app does not supervise its process.
+export const nodeIsStarting = (nodeId: string): boolean =>
+  !nodeStatus(nodeId) && !!nodes().find((node) => node.nodeId === nodeId)?.local
+
 // Unknown nodes read as `offline` rather than a sixth "unknown" state. The UI asks whether it can
 // trust what it has, and for a node the broker has not reported on the answer is no.
 export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nodeId]?.state ?? 'offline'

@@ -1,7 +1,7 @@
 import { createSignal, Match, Show, Switch } from 'solid-js'
 import Acorn from '../../kit/components/content/Acorn'
 import { recoveryActions } from '../../infra/platform'
-import { nodeReadiness, selectActiveNode } from '../../infra/node/activeNode'
+import { activeNodeStarting, nodeReadiness, selectActiveNode } from '../../infra/node/activeNode'
 import { Button } from '../../kit/components/primitives'
 
 export default function NodeGate() {
@@ -11,7 +11,7 @@ export default function NodeGate() {
   return (
     <main class="node-gate">
       <Switch>
-        <Match when={readiness().kind === 'starting'}>
+        <Match when={readiness().kind === 'starting' || activeNodeStarting()}>
           <Acorn label="starting local node…" />
         </Match>
         <Match when={readiness().kind === 'unpaired'}>

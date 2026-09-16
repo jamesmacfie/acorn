@@ -39,7 +39,7 @@ The desktop persists:
 
 - paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
 - which Node this window talked to last, so the next launch can pick its cache partition before
-  the fleet answers ([frontend.md](./frontend.md) § Painting before the node);
+  the fleet answers ([frontend.md](./frontend.md) § Startup readiness);
 - device-scoped appearance, shortcuts, rail order, and window geometry;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.

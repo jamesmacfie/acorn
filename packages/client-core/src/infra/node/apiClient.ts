@@ -151,7 +151,7 @@ async function deliver(
   if (!transport || !nodeId) {
     // A host that HAS a broker but no node picked yet. That used to be unreachable, because the window
     // opened after the fleet had answered; it now happens for the first moments of a launch with
-    // nothing remembered (docs/frontend.md § Painting before the node), and a module-level prime can
+    // nothing remembered (docs/frontend.md § Startup readiness), and a module-level prime can
     // land here. Falling through to the same-origin branch below would fetch a node route off the
     // shell's own scheme handler, which refuses those on purpose and answers with a message about the
     // API being the helper — true, and misleading about what actually went wrong. Retryable, because
