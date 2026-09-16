@@ -22,7 +22,7 @@ lived in `docs/future/performance/` while it ran and were deleted when it closed
 | --- | --- |
 | The icon split, and why an unmatched icon name still renders as itself | [ui-design.md](../ui-design.md) § Icons |
 | The renderer's startup budget and its denylist | [frontend.md](../frontend.md) § Startup budget |
-| The window opening before the node, and what the shell draws meanwhile | [frontend.md](../frontend.md) § Painting before the node, [shell.md](../shell.md) § The shell process |
+| The window opening before the node, and what the shell draws meanwhile | [frontend.md](../frontend.md) § Startup readiness, [shell.md](../shell.md) § The shell process |
 | Boot marks, the request line, and the git and SQLite histograms | [local-development.md](../local-development.md) § Timing a cold start |
 | The collector those histograms fold into, and the record model behind them | [telemetry.md](../telemetry.md) |
 | The node's boot order, and the login-shell probe leaving it | [node-distribution.md](../node-distribution.md) § Boot order |

@@ -24,7 +24,7 @@ const store = new Map<string, string>([['acorn.last-node', 'node-remembered']])
   clear: () => store.clear(),
 }
 
-const { activeCacheId, activeNodeId, nodeGateHolds, nodeReadiness, nodeReady, selectActiveNode, setActiveNode } = await import('./activeNode')
+const { activeCacheId, activeNodeId, activeNodeStarting, nodeGateHolds, nodeReadiness, nodeReady, selectActiveNode, setActiveNode } = await import('./activeNode')
 const { _resetFleet, cacheKeyFor, clientFor, ORIGIN_NODE_ID, refreshFleet } = await import('./fleet')
 
 const record = (nodeId: string, local = true): NodeRecord => ({
@@ -84,15 +84,29 @@ describe('the remembered node', () => {
 })
 
 describe('nodeGateHolds', () => {
-  it('lets the shell draw as soon as there is a node to address', async () => {
-    // Start from the state that used to be a wall: no node, and a readiness that is not `ready`.
-    stubBridge([])
-    await selectActiveNode()
+  it('holds the loader until the selected local node reports its first status', async () => {
+    setActiveNode('node-a')
+    stubBridge([record('node-a')])
+    const selected = selectActiveNode()
+    expect(nodeGateHolds()).toBe(true)
+    await selected
+
+    // Fleet membership has confirmed the selection, but the supervised process has not connected.
+    expect(nodeReady()).toBe(true)
+    expect(activeNodeStarting()).toBe(true)
     expect(nodeGateHolds()).toBe(true)
 
-    // A remembered node is enough. The fleet has still confirmed nothing, and the shell draws anyway.
-    setActiveNode('node-a')
-    expect(nodeReady()).toBe(false)
+    stubBridge([record('node-a')], [{ nodeId: 'node-a', state: 'online' }])
+    await refreshFleet()
+    expect(activeNodeStarting()).toBe(false)
+    expect(nodeGateHolds()).toBe(false)
+  })
+
+  it('does not turn an offline remote node into an open-ended startup loader', async () => {
+    setActiveNode('remote-a')
+    stubBridge([record('remote-a', false)], [{ nodeId: 'remote-a', state: 'offline' }])
+    await selectActiveNode()
+    expect(activeNodeStarting()).toBe(false)
     expect(nodeGateHolds()).toBe(false)
   })
 
@@ -130,7 +144,7 @@ describe('nodeGateHolds', () => {
   })
 })
 
-describe('membership that arrives after the first paint', () => {
+describe('membership that arrives after the loader paints', () => {
   it('re-reads the fleet when a status names a node the list does not have', async () => {
     // A first-ever launch: the helper is listening, its fleet file is empty, and the local node is
     // adopted a few hundred milliseconds later. Its first status is the only news that it exists.

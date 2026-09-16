@@ -66,7 +66,7 @@ structural: identical task or repository IDs on separate Nodes cannot collide.
 
 Which partition the shell mounts on comes from the last-known active Node id, read synchronously on
 the renderer's first tick. It has to: the window opens before anything has asked the helper which
-Nodes there are ([frontend.md](./frontend.md) § Painting before the node), and a partition picked a
+Nodes there are ([frontend.md](./frontend.md) § Startup readiness), and a partition picked a
 tick late would mount the shell on the `origin` cache and then remount it on the real one, throwing
 away the first paint. So the device remembers the id
 (`packages/client-core/src/infra/node/activeNode.ts`), the fleet answer corrects it, and a Node that

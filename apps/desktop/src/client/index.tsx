@@ -107,9 +107,9 @@ wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ r
 // `nodeGateHolds()` puts the onboarding screen up until this resolves.
 void selectActiveNode().then(() => bootMark('node selected'))
 
-// Membership can now arrive after the first paint. On a first-ever launch the fleet is empty when the
-// call above reads it, because the local node has not been adopted yet, and `fleet.ts` re-reads
-// membership when the first status for an unknown node lands. This is what turns that into a
+// Membership can arrive after the loader's first paint. On a first-ever launch the fleet is empty
+// when the call above reads it, because the local node has not been adopted yet, and `fleet.ts`
+// re-reads membership when the first status for an unknown node lands. This is what turns that into a
 // selection; once there is one it is a no-op.
 createRoot(() => {
   createEffect(() => {
@@ -124,10 +124,9 @@ createRoot(() => {
 // whole design is for — register everything and correct later, never wait.
 void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins applied'))
 
-// The node's arrival, which is behind the first paint now. Whatever the shell asked for while nothing
-// was listening came back as an error, and the first `online` push is when those are worth asking
-// again. `wsOnReconnect` above cannot do this: it deliberately ignores a node's FIRST connect, which
-// used to be in front of the window and no longer is.
+// The node's arrival is behind the loader's first paint. Startup work can still have asked for data
+// while nothing was listening, and the first usable status is when those reads are worth asking
+// again. `wsOnReconnect` above cannot do this: it deliberately ignores a node's first connect.
 createRoot(() => {
   createEffect(() => {
     const nodeId = activeNodeId()
