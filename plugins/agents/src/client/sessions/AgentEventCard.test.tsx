@@ -128,3 +128,30 @@ it('answers a blocking question in the thread, and keeps the answer in the same 
     expect(settled.textContent).toContain('Coffee')
   } finally { disposeSettled() }
 })
+
+it('closes a turn with the context window on the right of the line', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'end_turn' },
+    context: { used: 94_358, size: 1_000_000 },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    // One row, the reason first and the figure last, which is what `Inline spread` puts at each end.
+    const row = host.querySelector('.ui-inline[data-spread]')
+    expect(row?.textContent).toBe('Turn complete · end_turn94,358 / 1,000,000 context')
+  } finally { dispose() }
+})
+
+it('closes a turn that reported no context with the reason alone', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'refusal' },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    expect(host.textContent).toBe('Turn complete · refusal')
+  } finally { dispose() }
+})

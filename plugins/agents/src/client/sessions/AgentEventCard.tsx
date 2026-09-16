@@ -1,6 +1,6 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
@@ -20,16 +20,12 @@ import AgentAttachmentCard from './AgentAttachmentCard'
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
 
-// Both of these build their whole string in one call, so the card can read the event through a getter
-// rather than freezing a copy of it. See the note on Show's children below.
-const usageLine = (usage: AgentUsage): string => [
-  usage.inputTokens != null ? `${usage.inputTokens.toLocaleString()} in` : '',
-  usage.outputTokens != null ? `${usage.outputTokens.toLocaleString()} out` : '',
-  usage.contextUsed != null && usage.contextSize != null
-    ? `${usage.contextUsed.toLocaleString()} / ${usage.contextSize.toLocaleString()} context`
-    : '',
-  usage.cost ? `${usage.cost.amount.toFixed(4)} ${usage.cost.currency}` : '',
-].filter(Boolean).join(' · ')
+// Builds its whole string in one call, so the card can read the item through a getter rather than
+// freezing a copy of it. See the note on Show's children below.
+const contextLine = (context: { used: number; size?: number }): string =>
+  context.size === undefined
+    ? `${context.used.toLocaleString()} tokens`
+    : `${context.used.toLocaleString()} / ${context.size.toLocaleString()} context`
 
 // The turn's text names each attachment as `[Attachment: <id>]`, which is what the harness is sent
 // (server/sessions/runtimeContext.ts). Once the cards below draw the attachments themselves, the
@@ -373,12 +369,6 @@ export default function AgentEventCard(props: {
           )
         }}
       </Show>
-      <Show when={event().type === 'usage'}>
-        {(_shown) => {
-          const usage = () => (event() as Extract<ReturnType<typeof event>, { type: 'usage' }>).usage
-          return <Text emphasis="muted" wrap>{usageLine(usage())}</Text>
-        }}
-      </Show>
       <Show when={event().type === 'error'}>
         {(_shown) => {
           const error = () => event() as Extract<ReturnType<typeof event>, { type: 'error' }>
@@ -391,12 +381,21 @@ export default function AgentEventCard(props: {
         </Text>
       </Show>
       <Show when={event().type === 'turn_completed'}>
-        <Text emphasis="muted">
-          Turn complete
-          {(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason
-            ? ` · ${(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason}`
-            : ''}
-        </Text>
+        {/* The turn's own footer: what ended it on the left, how much of the model's context window it
+            had used on the right. The figure is stamped onto the item by the fold, because the usage
+            that carries it is a separate event and often arrives after this one
+            (./conversationItems.ts § stampTurnContext). */}
+        <Inline spread>
+          <Text emphasis="muted">
+            Turn complete
+            {(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason
+              ? ` · ${(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason}`
+              : ''}
+          </Text>
+          <Show when={props.item.context}>
+            {(context) => <Text emphasis="muted">{contextLine(context())}</Text>}
+          </Show>
+        </Inline>
       </Show>
     </>
   )
