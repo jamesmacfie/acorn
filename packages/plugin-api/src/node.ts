@@ -102,7 +102,24 @@ export type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
 // the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
-export type { CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/server/core/index.ts'
+export type {
+  CoreFsService,
+  CoreGitService,
+  CoreProcService,
+  CoreServices,
+  DataCell,
+  DataColumn,
+  DataQueryOptions,
+  DataQueryResult,
+  DataSchemaResult,
+  DataSchemaSource,
+  DataSourceService,
+  DataTable,
+  GenerateTextRequest,
+  ModelService,
+  ProjectRef,
+  TaskRef,
+} from '@acorn/node-core/server/core/index.ts'
 export { SecretUnavailableError } from '@acorn/node-core/server/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/server/core/prefs.ts'

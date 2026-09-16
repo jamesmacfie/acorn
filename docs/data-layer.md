@@ -143,10 +143,10 @@ because the provider may have accepted work before the terminal usage event was 
 
 The database plugin's pane connects to a Postgres database per task, for browsing and editing the
 task's dev database. That connection is not part of acorn's own data root: it is the user's own
-database, reached over `pg`, and everything the pane shows is re-derived from it per call rather
-than cached in `plugins/database.sqlite`.
+database, reached by core's `DataSourceService` over `pg`, and everything the pane shows is re-derived
+from it per call rather than cached in `plugins/database.sqlite`.
 
-`resolveDbUrl` (`plugins/database/src/server/database.ts`) resolves the connection URL for a task
+`resolveTaskDataUrl` (`packages/node-core/src/server/core/data.ts`) resolves the connection URL for a task
 without persisting it, trying in order: a committed `.acorn/config.toml [database].url_script`
 (run inside the worktree), then `<worktree>/.env`'s `DATABASE_URL`, then `process.env.DATABASE_URL`.
 A committed `url_script` is executable content from the checkout, so resolving it goes through the
@@ -157,9 +157,11 @@ user or the database authored (`dbUrlFromRepo` false) is the user's own input an
 Every identifier the pane sends to Postgres (schema, table, and column names) is validated against
 the live introspected schema before it is quoted, because identifiers cannot be parameterized the way
 values can. Values are always parameterized. Arbitrary SQL typed into the editor runs verbatim,
-because it is the user's own database and writes are the point.
+because it is the user's own database and writes are the point. The loaded plugin builds those
+pane-specific statements but executes them only through `ctx.core.data`; it never imports `pg`, opens
+a raw socket, or receives the resolved URL.
 
-The introspected catalog behind table and column completions is cached per task and invalidated on
+Core's introspected catalog behind table and column completions is cached per task and invalidated on
 connect, on disconnect, and after any statement that is not a plain read or write, as a cheap
 approximation for "DDL ran through this pane." A stale completion popup is a small bug, but a
 visible one, and someone running a migration in the editor above the results grid is exactly who

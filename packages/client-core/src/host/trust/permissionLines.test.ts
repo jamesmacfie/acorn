@@ -81,6 +81,17 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('draws database writes high and keeps reads ordinary', () => {
+    const lines = nodePermissionLines(permissions({
+      node: { core: ['data:query', 'data:write'], capabilities: [], secrets: false, exec: false, net: [] },
+    }))
+    expect(texts(lines)).toEqual([
+      'Query the databases you’ve connected',
+      'Change data in the databases you’ve connected',
+    ])
+    expect(lines.map((entry) => entry.high)).toEqual([false, true])
+  })
+
   it('discloses a plugin\'s own live channel without echoing the verb it named', () => {
     // Core cannot enumerate a plugin's verbs, so the channel is admitted by shape
     // (frames/channels.ts). The sentence stays the host's, because a verb is manifest copy.

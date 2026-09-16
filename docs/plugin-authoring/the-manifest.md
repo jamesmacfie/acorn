@@ -396,7 +396,8 @@ Three groups, enforced at the boundary that owns each one.
 undeclared host facet is absent, so the first call is a `TypeError` the author sees immediately.
 Filesystem, environment, process, and network grants are also absent unless declared.
 
-- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`, plus
+- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`,
+  `data:query`, `data:write`, plus
   `projects:read`, `projects:config`, `projects:write`. The project grants nest — `config` and
   `write` each imply `read` — and they are split because `checkouts()` returns where every codebase
   on the machine lives, and `config()` returns shell commands the node executes. An unknown token is
@@ -447,6 +448,15 @@ the person picking from the dropdown, or by your own fallback to the first avail
 cannot name a CLI the owner does not have, and you cannot make one run with tools or inside a
 worktree, because core owns that process. There is no second token for the CLI half: `models` is the
 host operation being granted, whichever host-owned backend the person later chooses.
+
+**Database access is host-mediated.** `data:query` supplies `ctx.core.data`: connect or disconnect a
+task's configured PostgreSQL source, inspect its catalog or configured schema description, and run a
+bounded read. Core resolves the transient URL, applies the repo-config trust gate, owns `pg` and the
+pool, normalizes cells, caps rows and timeouts, and runs reads in a read-only transaction. Your plugin
+never sees the URL or opens a socket. `data:write` implies that read surface and additionally permits
+`query(..., { readOnly: false })`; it draws as a separate high-risk trust line. Parameters belong in
+`options.parameters`, never interpolated into SQL. Identifiers cannot be parameters, so validate them
+against `catalog()` before quoting them.
 
 `permissions.api` is the **frame's** scope list, and unlike the node block it is genuinely enforced —
 by an allowlist of (path shape, method) pairs at

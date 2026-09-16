@@ -272,7 +272,6 @@ describe('architecture boundaries', () => {
       'plugins/agents/src/server/usage/codexUsage.ts',
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
-      'plugins/database/src/server/database.ts',
       'plugins/editor/src/server/search.ts', // ripgrep, streamed
       'plugins/http/src/server/send.ts',
     ])

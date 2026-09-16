@@ -36,7 +36,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
-| [data-capability.md](./data-capability.md) | A host-owned `ctx.core.data` facet so a sandboxed plugin can query a database the host connects to, with the database plugin as first consumer. | Proposal, 2026-09-14. Not started. |
+| [data-capability.md](./data-capability.md) | Historical landing page for the host-owned `ctx.core.data` facet; the owning docs are `database.md`, `data-layer.md`, and the plugin manifest guide. | Shipped, 2026-09-16. |
 
 ## How these relate
 

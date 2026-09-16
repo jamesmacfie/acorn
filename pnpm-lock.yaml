@@ -670,6 +670,9 @@ importers:
       jose:
         specifier: ^6.2.3
         version: 6.2.3
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       smol-toml:
         specifier: ^1.7.0
         version: 1.7.0
@@ -686,6 +689,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@types/ws':
         specifier: ^8.5.13
         version: 8.18.1
@@ -1015,9 +1021,6 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.12.32
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
@@ -1034,9 +1037,6 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
-      '@types/pg':
-        specifier: ^8.20.0
-        version: 8.20.0
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10

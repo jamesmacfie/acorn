@@ -244,6 +244,14 @@ node: CoreGitService
 node: CoreProcService
 node: CoreServices
 node: DEFAULT_PROFILE_ID
+node: DataCell
+node: DataColumn
+node: DataQueryOptions
+node: DataQueryResult
+node: DataSchemaResult
+node: DataSchemaSource
+node: DataSourceService
+node: DataTable
 node: Disposable
 node: Extension
 node: ExtensionPointId

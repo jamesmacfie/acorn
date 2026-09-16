@@ -28,6 +28,7 @@ const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
   remove: async () => ({ ok: true, rowCount: 1 }),
   schema: async () => ({ schema: 'CREATE TABLE "public"."users" ();', source: 'auto' }),
   catalog: async () => ({ tables: [] }),
+  dispose: async () => {},
   ...over,
 })
 
