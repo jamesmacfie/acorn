@@ -1,6 +1,7 @@
 import type { AppDatabase } from '../db'
 import type { ActiveIdentityStore } from '../activeIdentity'
 import { createContextService, type ContextService } from './context'
+import { createDataSourceService, type DataSourceService } from './data'
 import * as fs from './fs'
 import * as git from './git'
 import { createIdentityService, type IdentityService } from './identity'
@@ -61,6 +62,9 @@ export type CoreServices = {
   // Text generation through a stored model-provider connection. The plugin owns the prompt; core owns
   // credential resolution and the provider adapters.
   models: ModelService
+  // Host-mediated database access. Core owns URL resolution, credentials, the driver, pools and
+  // enforcement; a plugin receives only the permission-scoped methods in this service.
+  data: DataSourceService
   // One (userId, key) row of core's `prefs` table. The server-side half of a preference the node
   // itself has to read, such as plugins/agents' model-pricing overrides, which the usage service
   // needs before it can price a token count.
@@ -83,6 +87,8 @@ export function createCoreServices(options: {
   // a process-local identity by omission. Tests pass memoryIdentityStore() from server/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
 }): CoreServices {
+  const tasks = createTaskService(options.db)
+  const projects = createProjectService(options.db)
   return {
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
@@ -90,12 +96,13 @@ export function createCoreServices(options: {
     git: git satisfies CoreGitService,
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
-    tasks: createTaskService(options.db),
+    tasks,
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
+    data: createDataSourceService({ tasks, projects, fs, proc }),
     prefs: createPrefService(options.db),
     identity: createIdentityService(options.activeIdentity),
-    projects: createProjectService(options.db),
+    projects,
     telemetry: createTelemetryService(),
   }
 }
@@ -114,6 +121,16 @@ export type { ContextService } from './context'
 export type { PrefService } from './prefs'
 export type { TelemetryService, TelemetrySink } from './telemetry'
 export type { GenerateTextRequest, ModelService } from './models'
+export type {
+  DataCell,
+  DataColumn,
+  DataQueryOptions,
+  DataQueryResult,
+  DataSchemaResult,
+  DataSchemaSource,
+  DataSourceService,
+  DataTable,
+} from './data'
 export { SecretUnavailableError, redact } from './secrets'
 export type { ProcResult, ProcSpec } from './proc'
 export type { ConfineFailure, ConfineResult } from './fs'

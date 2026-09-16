@@ -43,7 +43,8 @@ const WRITES = /\b(insert|update|delete|merge|create|drop|alter|truncate|grant|r
  * A guard over authored SQL, not a sandbox. It reads the leading keyword of each statement, and for a
  * `WITH` it also refuses a write anywhere in the body. A function called from a `SELECT` can still
  * write, which no amount of text matching would catch; the refusal that would catch it is a
- * read-only transaction, and that is the seam `database:write` opens (docs/database.md).
+ * read-only transaction. The workflow bridge explicitly requests that transaction even though the
+ * same plugin holds `data:write` for its interactive pane (docs/database.md).
  */
 export function readOnlyRefusal(sql: string): string | null {
   const statements = sql

@@ -18,6 +18,7 @@ const CORE = {
   tasks: marker('tasks'),
   context: marker('context'),
   models: marker('models'),
+  data: marker('data'),
   prefs: marker('prefs'),
   identity: marker('identity'),
   telemetry: marker('telemetry'),
@@ -55,8 +56,20 @@ describe('scopeCore', () => {
   })
 
   it('covers every simple facet name', () => {
-    const all = ['fs', 'git', 'tasks', 'context', 'models', 'prefs', 'identity', 'telemetry']
-    expect(keys(scoped({ core: all }))).toEqual([...all].sort())
+    const all = ['fs', 'git', 'tasks', 'context', 'models', 'data:query', 'prefs', 'identity', 'telemetry']
+    expect(keys(scoped({ core: all }))).toEqual(['context', 'data', 'fs', 'git', 'identity', 'models', 'prefs', 'tasks', 'telemetry'])
+  })
+
+  it('keeps writes behind data:write while data:query stays read-only', async () => {
+    const query = vi.fn(async () => marker('result'))
+    const data = { ...CORE.data, query } as CoreServices['data']
+    const read = scoped({ core: ['data:query'] }, { ...CORE, data } as CoreServices)
+    const write = scoped({ core: ['data:write'] }, { ...CORE, data } as CoreServices)
+
+    await expect(read.data.query('task-1', 'update things set done = true', { readOnly: false }))
+      .rejects.toThrow(/data:write/)
+    await write.data.query('task-1', 'update things set done = true', { readOnly: false })
+    expect(query).toHaveBeenCalledWith('task-1', 'update things set done = true', { readOnly: false })
   })
 
   it('ignores a facet name this build does not have, rather than failing the plugin', () => {

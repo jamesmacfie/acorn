@@ -807,6 +807,12 @@ A loaded plugin sees only `plugin:<id>:*`, the same namespace its sandboxed fram
 preference service for core-owned keys. The scoping prevents cooperative loaded plugins from using
 the preference table as a hidden cross-plugin channel or corrupting another frame's state.
 
+`ctx.core.data` is the host-mediated version of the same rule for databases. `data:query` exposes
+connect, catalog, schema and bounded reads while core retains the URL, driver, socket and pools.
+Reads run in a read-only Postgres transaction with a host-side timeout and row cap. `data:write` is a
+separate high-risk grant and is the only scoped projection that accepts `{ readOnly: false }`; a
+plugin cannot turn its read grant into a write by changing an options object.
+
 Two things it does not do. It is not a barrier — a loaded bundle can still open `core.sqlite` and
 read the config columns directly; only rung 2 changes that. And even used exactly as intended,
 `checkouts()` returns the local filesystem path of every mapped project on the machine. That is a

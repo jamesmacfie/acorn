@@ -60,10 +60,10 @@ type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 // `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
 // one exception, and not a tier one: its big facets are compared one at a time below.
 type LoadedContext = Omit<NodePluginContext, 'core'> & {
-  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
+  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>>
 }
 type PublishedContext = Omit<Published.NodePluginContext<Real[0], Real[1]>, 'core'> & {
-  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git' | 'telemetry'>>
+  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>>
 }
 
 const _context: Mutual<Hole<LoadedContext, (typeof HOLES.context)[number]>, Hole<PublishedContext, (typeof HOLES.context)[number]>> = [true, true]
@@ -74,6 +74,7 @@ const _capabilities: Mutual<NodePluginContext['capabilities'], Published.PluginC
 const _fs: Mutual<CoreServices['fs'], Published.CoreServices['fs']> = [true, true]
 const _git: Mutual<WidenNumbers<CoreServices['git']>, WidenNumbers<Published.CoreServices['git']>> = [true, true]
 const _prefs: Mutual<CoreServices['prefs'], Published.CoreServices['prefs']> = [true, true]
+const _data: Mutual<CoreServices['data'], Published.CoreServices['data']> = [true, true]
 const _identity: Mutual<CoreServices['identity'], Published.CoreServices['identity']> = [true, true]
 const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[number]>>, WidenNumbers<Hole<Published.CoreServices['proc'], (typeof HOLES.proc)[number]>>> = [true, true]
 const _tasks: Mutual<Hole<CoreServices['tasks'], (typeof HOLES.tasks)[number]>, Hole<Published.CoreServices['tasks'], (typeof HOLES.tasks)[number]>> = [true, true]
@@ -87,7 +88,7 @@ const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'
 // repository is the whole reason it exists (`agents.draftAttachments`). The row it hands back is
 // protocol's `AgentAttachment`, so this is what stops the published copy drifting from the real one.
 const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
+void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _data, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
 
 // Public authoring fixture: these are manifest values an out-of-tree package can type without a
 // runtime import or a Zod dependency.

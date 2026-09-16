@@ -4,6 +4,7 @@
 import type { CoreServices } from '../core'
 import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'
+import { dataSourceFor } from '../core/data'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
@@ -44,10 +45,12 @@ const SIMPLE_FACETS = {
 
 // The whole `permissions.node.core` vocabulary, exported as one list so the agent-facing authoring
 // projection answers "what may I declare" from the running node rather than a copied list. Derived
-// from SIMPLE_FACETS, so a facet added above lands here for free. The four spelled out are the ones
+// from SIMPLE_FACETS, so a facet added above lands here for free. The tokens spelled out are the ones
 // scopeCore handles itself, and pluginAuthoring.test.ts asserts each still grants something.
 export const NODE_CORE_FACETS = [
   ...Object.keys(SIMPLE_FACETS),
+  'data:query',
+  'data:write',
   'prefs',
   'projects:read',
   'projects:config',
@@ -103,6 +106,12 @@ export function scopeCore(
   for (const token of permissions.core) {
     if (token === 'prefs') {
       granted.prefs = prefsFor(core.prefs, pluginId)
+      continue
+    }
+    if (token === 'data:query' || token === 'data:write') {
+      // Write implies read, while the projection itself ensures a caller holding only data:query
+      // cannot opt out of the read-only transaction with an options object.
+      granted.data = dataSourceFor(core.data, permissions.core.includes('data:write'))
       continue
     }
     const simple = SIMPLE_FACETS[token as keyof typeof SIMPLE_FACETS]

@@ -17,9 +17,16 @@ The Node resolves a task's connection URL from trusted repository configuration,
 executable repository configuration and requires the exact config-trust acknowledgement. The
 connection URL is never sent to the renderer or stored in plugin rows.
 
-Pools are task-scoped, opened by the plugin's own node half, and closed when the plugin is disposed.
+Pools are task-scoped and owned by `CoreServices.data`. Core resolves the URL, opens the `pg` socket,
+normalizes cells, enforces timeouts and row caps, and closes the task pools the plugin opened when the
+plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
+`DATABASE_URL` environment grant, or process broker.
+
 The plugin declares `secrets: false`, and that is not an oversight: because the URL is resolved per
 connect and never persisted, there is no credential at rest for the host secret service to hold.
+Instead it declares `data:query` and `data:write`. The first grants host-mediated reads and schema
+introspection. The second is a separate high-risk line because the existing pane deliberately
+supports primary-key edits and arbitrary SQL.
 
 ## Database pane
 
@@ -40,8 +47,9 @@ to the plugin's frame. The statement that runs is always the one on screen.
 Table and column completions come from the plugin's own node route. The host forwards a position and
 renders what comes back. Every judgement about SQL lives in `src/server/completions.ts`: after `FROM`
 offer tables, after `alias.` offer that table's columns. The introspected catalog is cached per task
-and dropped on connect, on disconnect, and after any statement whose command was not a plain read or
-write, so a migration run in the editor does not leave stale columns in the popup.
+inside the core data service and dropped on connect, on disconnect, and after any statement whose
+command was not a plain read or write, so a migration run in the editor does not leave stale columns
+in the popup.
 
 The model-provider capability is optional. If no compatible provider is connected, the database pane
 keeps manual SQL available and hides **Generate**. The frame learns which connections exist from a
@@ -119,8 +127,10 @@ are the point of the pane.
 This plugin contributes two step kinds to `workflows:step-kind`
 ([workflows.md](./workflows.md) § Contributed step kinds), and one capability behind them.
 
-`database.query` (`plugins/database/src/contract/query.ts`) is the bridge's own query with a row cap
-and a read-only refusal applied. One path, so a caller cannot forget either. Its result is
+`database.query` (`plugins/database/src/contract/query.ts`) is the plugin's cooperative capability
+over `CoreServices.data.query`, with a 200-row cap and an early read-only refusal applied. Core also
+runs it in a read-only Postgres transaction, so the text check is an actionable error and the host
+transaction is the enforcement boundary. Its result is
 `{ columns, rows, rowCount, truncated }`, capped at 200 rows. It connects the task's pool itself when
 nothing has, because a step has no pane to have pressed **Connect** in.
 
@@ -140,8 +150,9 @@ prompt, so a result too big to read is a failure rather than something quietly c
 The read-only rule reads the leading keyword of each statement and, for a `WITH`, refuses a write
 anywhere in the body, which is how PostgreSQL lets a statement that starts like a read change data. It
 is a guard over authored SQL, not a sandbox: a function called from a `SELECT` can still write, and
-catching that needs a read-only transaction. That transaction is the seam `database:write` would
-open, and `database:write` is deferred.
+catching that needs the host's read-only transaction. The plugin also holds `data:write` for the
+interactive pane, but the workflow bridge explicitly requests read-only execution, so that grant
+cannot silently make a workflow statement writable.
 
 `database:generate` spends a model connection, so the plugin declares the `identity` core facet: a
 step has no request to read an owner from, and a connection is spent as somebody.

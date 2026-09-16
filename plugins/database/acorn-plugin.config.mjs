@@ -18,18 +18,13 @@
 //
 // On the permissions, and where they differ from what the migration brief sketched:
 //
-//   exec: true — and this is the line to look at twice. `main/database.ts` really does run
-//     `execFile('bash', ['-lc', script])`, in TWO places: the repo's `[database].url_script` to resolve a
-//     connection URL, and the repo's schema script for AI generation. So "Run commands on the node" is
-//     exactly what this plugin does, and the declaration is honest disclosure rather than an
-//     over-declaration. Contrast rollbar/linear's `secrets: false`, the opposite case, where the plugin
-//     genuinely never touches the host service.
-//   core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'] — `tasks.load` to validate a task and
-//     resolve its project, `tasks.root` for the worktree the script runs in, `projects.byId` for the
-//     checkout path, `projects.config` for the connection script, the schema mode/value and the schema
-//     notes, and `projects.assertConfigTrusted` before running any of it — cloning a repo must not be
-//     enough to run its commands. `fs.resolveInRoot` confines the `file`-mode schema path to the
-//     worktree. `models` is the AI generate feature: `models.available` for the connection dropdown and
+//   exec: false — URL and schema scripts execute inside the host data service after core applies the
+//     repo-config trust gate. The loaded package has no process broker.
+//   core: ['tasks', 'projects:read', 'models', 'identity', 'data:query', 'data:write'] — `tasks.load`
+//     validates a task and resolves its project, and `projects.byId` scopes saved queries. The data
+//     facets keep URL resolution, repo-config trust, DATABASE_URL, the driver and sockets in core;
+//     writes are separate because the pane deliberately supports editing and arbitrary SQL. `models`
+//     is the AI generate feature: `models.available` for the connection dropdown and
 //     `models.generateText` for the SQL itself — core still resolves the provider key, this plugin only
 //     ever sees ids and labels. `identity` is the `database:generate` workflow step: a step has no
 //     request to read an owner from, and a model connection is spent as somebody. The brief listed
@@ -38,9 +33,7 @@
 //     plugin has: the connection URL is resolved per connect and NEVER PERSISTED, so there is no
 //     credential at rest for the host secret service to hold. Postgres credentials live in the reader's
 //     own `.env` or come out of their own script.
-//   net: [] — the plugin opens a TCP connection to whatever Postgres the reader pointed it at, which is
-//     not an HTTP destination and not something a host allowlist can describe. Listing nothing says
-//     "this plugin has no destination of its own", which is true.
+//   net: [] — core opens the PostgreSQL socket. The plugin has no destination of its own.
 //   api: ['core.tasks:read'] — one scope, and it is nearly nothing: the host hands the frame its
 //     `taskId` in `context`, and everything the panel does goes through this plugin's own routes. The
 //     scope is there for the task label the panel header shows. `core.projects:read` is NOT declared —
@@ -59,12 +52,11 @@ export default {
     api: ['core.tasks:read'],
     events: [],
     node: {
-      core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models', 'identity'],
+      core: ['tasks', 'projects:read', 'models', 'identity', 'data:query', 'data:write'],
       capabilities: [],
       secrets: false,
-      exec: true,
+      exec: false,
       net: [],
-      env: ['DATABASE_URL'],
     },
   },
   contributions: {
