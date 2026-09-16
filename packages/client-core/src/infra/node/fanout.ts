@@ -17,8 +17,13 @@ import { freshnessOf, type Freshness } from './freshness'
 // value. Otherwise use a private key such as `['node-stat', id]`, or one reader corrupts another's
 // cache entry.
 
-// Matches the broker's DEGRADED_AFTER_MS. Past this a node is treated as not-answering for aggregation
-// purposes, whatever its socket says.
+// Past this a node is treated as not-answering for aggregation purposes, whatever its socket says.
+//
+// It is the same number as the broker's DEGRADED_AFTER_MS by coincidence, not by rule: that one says
+// how long a WebSocket may go quiet, which has nothing to do with how long a route may take. What
+// this number does govern is every provider deadline on the node, because a fetch that outlasts it
+// draws "unavailable" over the machine instead of over the API that was slow. Move it and the
+// per-request deadlines in the provider plugins have to move with it.
 const DEFAULT_TIMEOUT_MS = 5_000
 
 export type FleetRow<T> = {
