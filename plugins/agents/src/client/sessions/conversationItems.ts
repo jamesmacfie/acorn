@@ -4,6 +4,7 @@ import type {
   AgentRequest,
   AgentSubagentUpdate,
   AgentToolCall,
+  AgentUsage,
   AgentWebActivity,
 } from '@acorn/protocol/managedAgents.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
@@ -19,6 +20,9 @@ export type AgentConversationItem = {
   event: AgentNormalizedEvent
   /** Present on a subagent card: what that subagent did, in its own order. */
   children?: AgentConversationItem[]
+  /** Present on a `turn_completed` card: how much of the model's context window was in use when the
+   *  turn ended. Stamped from the turn's own usage card by `stampTurnContext` below. */
+  context?: { used: number; size?: number }
 }
 
 // Which events are worth a card. `session_state`, `session_metadata` and `request_resolved` are all
@@ -32,7 +36,6 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'subagent',
   'plan',
   'request',
-  'usage',
   'file_change',
   'terminal',
   'artifact',
@@ -40,6 +43,11 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'error',
   'diagnostic',
 ])
+
+// `usage` is deliberately absent above. Its tokens and its provider cost used to be a line of their own
+// at the head of each turn; the cost is a plugin's job now (agents:session-header) and the context
+// figure rides the turn's closing line, so the card had nothing left to say that the transcript did
+// not already say twice. The events still fold, because that fold is what feeds the closing line.
 
 // Anything the agent is blocked on is drawn where it asked, because that is the moment it interrupted
 // and answering it there costs no hunting. What happens afterwards differs by kind. A question stays:
@@ -272,5 +280,36 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     }
     stream.items.push(item)
   }
+  stampTurnContext(top.items)
   return top.items
+}
+
+/**
+ * Put each turn's context figure on the line that closes the turn.
+ *
+ * Positional rather than by turn id, because a `turn_completed` often has no turn id to match on: the
+ * Codex driver clears the current turn before it emits the event (server/drivers/codexDriver.ts), so
+ * the completion arrives unattributed. What "the context at that point" means is anyway where the
+ * reader is looking, and the usage card above the closing line is the last one before it.
+ *
+ * A second pass rather than a branch in the loop above, so the trailing usage update needs no special
+ * case. That update lands after the turn is already complete and folds into the card it is updating,
+ * which is the card this pass then reads.
+ *
+ * Only the session's own stream, which is where every usage event lands: `subagentIdOf` does not
+ * attribute one, and a subagent reports its own tokens on its roster card instead.
+ */
+function stampTurnContext(items: AgentConversationItem[]): void {
+  let latest: AgentUsage | undefined
+  for (const [at, item] of items.entries()) {
+    if (item.event.type === 'usage') latest = item.event.usage
+    if (item.event.type !== 'turn_completed' || latest?.contextUsed === undefined) continue
+    items[at] = {
+      ...item,
+      context: {
+        used: latest.contextUsed,
+        ...(latest.contextSize === undefined ? {} : { size: latest.contextSize }),
+      },
+    }
+  }
 }

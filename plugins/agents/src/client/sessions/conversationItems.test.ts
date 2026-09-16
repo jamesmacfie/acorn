@@ -66,6 +66,39 @@ describe('conversation projection', () => {
     })
   })
 
+  it('closes each turn with the context it had used, and draws no usage line of its own', () => {
+    const items = buildConversationItems([
+      event(1, { type: 'usage', usage: { contextUsed: 94_358, contextSize: 1_000_000 } }, 'turn-1'),
+      event(2, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
+      event(3, { type: 'usage', usage: { contextUsed: 180_004, contextSize: 1_000_000 } }, 'turn-2'),
+      // Codex clears the turn before it emits the completion, so this one arrives unattributed.
+      event(4, { type: 'turn_completed', stopReason: 'end_turn' }, null),
+    ])
+    expect(items.filter((item) => item.event.type === 'turn_completed').map((item) => item.context)).toEqual([
+      { used: 94_358, size: 1_000_000 },
+      { used: 180_004, size: 1_000_000 },
+    ])
+    expect(visibleConversationItems(items).map((item) => item.event.type))
+      .toEqual(['turn_completed', 'turn_completed'])
+  })
+
+  it('picks up a usage update that lands after the turn already closed', () => {
+    const items = buildConversationItems([
+      event(1, { type: 'usage', usage: { contextUsed: 94_358, contextSize: 1_000_000 } }, 'turn-1'),
+      event(2, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
+      // The last usage of a turn arrives unattributed, after the completion. It folds onto the line it
+      // belongs to, which sits above the closing card, so the second pass reads the final figure.
+      event(3, { type: 'usage', usage: { contextUsed: 96_100 } }, null),
+    ])
+    expect(items.find((item) => item.event.type === 'turn_completed')?.context)
+      .toEqual({ used: 96_100, size: 1_000_000 })
+  })
+
+  it('leaves a turn that reported no context without a figure', () => {
+    const items = buildConversationItems([event(1, { type: 'turn_completed', stopReason: 'refusal' })])
+    expect(items[0].context).toBeUndefined()
+  })
+
   it('starts a new usage line for a new turn', () => {
     const items = buildConversationItems([
       event(1, { type: 'usage', usage: { contextUsed: 10 } }, 'turn-1'),

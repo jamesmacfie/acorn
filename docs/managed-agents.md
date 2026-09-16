@@ -636,6 +636,15 @@ it fails for any reason a selection can break, not only for the one it was writt
   so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
+- **A folded usage line has no card of its own.** It used to draw at the head of each turn as tokens,
+  context and a provider cost on one row. The cost belongs to whichever plugin fills
+  `agents:session-header` and already sits beside the session title, and the token counts said the
+  same thing twice for a reader scrolling the thread. So the fold feeds the line that closes the turn
+  instead: `Turn complete` and its stop reason on the left, the share of the model's context window
+  the turn had used on the right. `stampTurnContext` in `conversationItems.ts` copies the figure onto
+  the `turn_completed` card by position rather than by turn id, because Codex clears the current turn
+  before it emits the completion and the event arrives unattributed. A turn whose harness reported no
+  context window closes with its reason alone.
 - Anything the agent is blocked on is drawn in the transcript at the point it asked, and that one card
   has two states. While it is blocking, it is the control that answers it: a dropdown, a column of
   checkboxes for a question that takes several answers, a free-text box, or a row of buttons for a
