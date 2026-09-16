@@ -65,8 +65,8 @@ describe('linear server helpers', () => {
 })
 
 describe('linearUploadTarget', () => {
-  // The regression: an unbounded call to Linear outlived the fan-out's 10s per-node deadline, so a
-  // slow API drew "this node is unavailable" over a node that was answering everything else.
+  // The regression: an unbounded call to Linear outlived the fan-out's per-node deadline, so a slow
+  // API drew "this node is unavailable" over a node that was answering everything else.
   it('gives every call to Linear a deadline', async () => {
     let init: RequestInit | undefined
     vi.stubGlobal('fetch', (_url: string, options: RequestInit) => {

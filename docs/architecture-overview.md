@@ -431,6 +431,18 @@ show partial availability with a Node label. A mutation always targets the Node 
 resource. Node IDs are part of cache and persisted-state scope, so identical IDs on different Nodes
 cannot collide.
 
+Two deadlines sit on that path and the order between them is a contract. The client gives each Node a
+fixed window per fan-out request, and every route that waits on something outside the Node has to
+finish inside it. A provider plugin's per-request deadline is therefore always below the fan-out's,
+because a fetch that outlasts the client draws "this machine is unavailable" over a Node that is
+answering everything else, and the plugin's own "this API is unavailable" answer never reaches
+anyone. Changing the client's window means changing those deadlines with it.
+
+A route that passes its deadline is a fact about that route, not about the Node. The broker does not
+read its own request timeout as evidence that a Node is gone; liveness comes from the WebSocket
+heartbeat, and a Node that misses two pings is the one that gets terminated and reconnected. Reading
+a slow route as an unreachable Node took the whole app down over a single slow plugin panel.
+
 The Fleet source and the node switcher appear only once more than one Node is paired
 (`SourceContribution.when`). With a single bundled local Node the rail never mentions Nodes, so
 first-run stays a one-Node product. When a Node stops answering, its card in the Fleet view keeps

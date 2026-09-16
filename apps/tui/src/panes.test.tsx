@@ -164,11 +164,13 @@ describe('every pane at 80 by 24', () => {
 
     drewCleanly(frame, 'agents')
     fitsIn(frame, 120)
-    // The transcript, as the reader's own words and the agent's answer. Asserted to where the turn
-    // wraps: the left column takes about a third of the shell, so the detail column is 52 cells here
-    // and a message longer than that runs onto a second line — which is the transcript working, not
-    // failing (../chrome/Rail.tsx § railCells).
-    expect(frame).toContain('Why does the old password still work')
+    // The agent's answer, asserted to where the turn wraps: the left column takes about a third of the
+    // shell, so the detail column is 52 cells here and a message longer than that runs onto a second
+    // line, which is the transcript working rather than failing (../chrome/Rail.tsx § railCells).
+    //
+    // The reader's own opening words are not on this screen, and that is the pane behaving. A session
+    // with no saved reading mark opens at the foot, so the newest turn is what you land on and the
+    // first prompt is above the fold. The rule itself is pinned in client-core's readingPlace suite.
     expect(frame).toContain('The reset writes a new hash but signIn still')
     // A tool card, folded.
     expect(frame).toContain('Read src/login.ts')

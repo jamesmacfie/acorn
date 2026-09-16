@@ -241,12 +241,12 @@ export class NodeBroker {
       // live bug: a query aborted on unmount flipped a healthy node to `offline`, and apiClient then
       // failed every mutation with "This node is offline" until the next successful read cleared it.
       //
-      // Our own timeout is a fact about one route, not about the transport. A route that reads a
-      // credential out of 1Password waits on the `op` command, and a provider route waits on a third
-      // party. Either can pass this deadline while the socket is open and every other route on the
-      // node answers normally. Marking the node `offline` for it took the whole app down over one
-      // slow plugin panel. Liveness is the heartbeat's job: missed pings terminate the socket, and
-      // `downState` then picks `offline` or `degraded` with the HTTP evidence folded in.
+      // Our own timeout is a fact about one route, not about the transport. A provider route waits
+      // on a third party, and a loaded plugin's route waits on a worker thread, so either can pass
+      // this deadline while the socket is open and every other route on the node answers normally.
+      // Marking the node `offline` for it took the whole app down over one slow plugin panel.
+      // Liveness is the heartbeat's job: missed pings terminate the socket, and `downState` then
+      // picks `offline` or `degraded` with the HTTP evidence folded in.
       if (isAbort(error)) {
         if (!timedOut) throw error
         // Renamed so the two aborts stay distinguishable one layer up. `helperServer.ts` answers the

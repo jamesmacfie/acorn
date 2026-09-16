@@ -522,7 +522,7 @@ The bundled `agent-cost` loaded plugin prices and formats those facts, preferrin
 and otherwise showing an API-equivalent estimate; disabling that plugin removes the badge without
 changing Agents. The point is not cost-specific, so independently installed plugins can fill the same
 seat with a token counter or budget warning. The complete contract lives in
-[`plugins/cooperative-extension-points.md`](./plugins/cooperative-extension-points.md#remote-trees).
+[cooperative extension points](./plugins/cooperative-extension-points.md#remote-trees).
 
 That is a property of the region, not of this pane, which is why the conversation reaches its region as
 a fragment and never wraps itself in a box: the region is the flex column the scroller sizes against,

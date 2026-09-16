@@ -352,6 +352,7 @@ node: gitOrThrow
 node: gitText
 node: invalidateWorktreeStatus
 node: isDir
+node: isProviderOperationError
 node: isRecord
 node: isRepoConfigTrustError
 node: isTaskConfined
@@ -673,6 +674,7 @@ ui: PickerRow
 ui: Popover
 ui: PtyEvent
 ui: PtyIo
+ui: ReadingPlace
 ui: Rectangle
 ui: Row
 ui: RowActions
@@ -698,6 +700,7 @@ ui: Text
 ui: Textarea
 ui: ThreadCollapseController
 ui: Timeline
+ui: TimelineControls
 ui: ToggleButton
 ui: Toolbar
 ui: ToolbarSpacer

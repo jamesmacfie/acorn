@@ -4,6 +4,7 @@
   "description": "A compact managed-session cost estimate beside the session title.",
   "private": true,
   "type": "module",
+  "exports": {},
   "scripts": {
     "lint": "tsc --noEmit",
     "test": "vitest run"

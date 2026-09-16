@@ -284,6 +284,18 @@ check behavior stays *declared*: acorn controls when and where it executes, but 
 The route to an OS adversarial and crash boundary remains rung 3 in `security.md`; the current worker
 boundary deliberately preserves the public plugin API, including its synchronous registration seams.
 
+A synchronous seam costs the calling thread. The caller sits in `Atomics.wait` until the other realm
+answers, and on the host that thread is the node's event loop, so nothing else on the node runs in
+the meantime. Two rules keep that bounded. Each realm answers a synchronous call the moment it
+arrives, ahead of any promise-shaped work already in flight, because a route handler waiting on the
+blocked realm would otherwise leave both sides waiting on each other for good. And a call that goes
+unanswered for five seconds throws instead of waiting, so a plugin worker that crashed or wedged
+costs one call rather than the whole node. Anything a plugin exposes across a synchronous seam has to
+return straight away.
+
+Promise-shaped calls run concurrently. One route waiting on a slow third party does not stop the
+plugin answering anything else, which matches how a compiled plugin already behaves.
+
 ## Bundled plugins: shipped, but loaded
 
 Moving Rollbar out of the binary created a category the product did not have: **plugins we ship,

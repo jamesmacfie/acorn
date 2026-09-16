@@ -25,7 +25,10 @@ plugins/<name>/
 
 The exports map has five kinds, and a plugin declares the ones it has: `./node/index.ts` for the Node
 activation entrypoint, `./client/index.ts` for the client one, `./contract/*` for the cross-plugin
-surface, `./testkit` for node-side test helpers, and `./testkit/client` for client-side ones.
+surface, `./testkit` for node-side test helpers, and `./testkit/client` for client-side ones. A plugin
+that has none of them declares an empty map rather than leaving the field out. `agent-cost` is the
+case: it draws a remote tree from a relative entry in its plugin config, so nothing outside the
+package resolves a subpath, and `{}` says that where a missing field would only say nobody decided.
 
 **`contract/` holds only what another package imports; `shared/` holds what both halves of this plugin
 read.** That is the whole rule, the arch test enforces the first half, and a test file never belongs

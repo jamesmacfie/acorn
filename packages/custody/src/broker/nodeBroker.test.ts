@@ -62,8 +62,8 @@ const handler = (req: import('node:http').IncomingMessage, res: import('node:htt
   req.on('end', () => {
     received.push({ method: req.method ?? '', path: req.url ?? '', headers: req.headers, body: Buffer.concat(chunks) })
     const reply = respond(req.url ?? '')
-    // Status 0 means "never answer", which is how a route that waits on `op` or on a third-party API
-    // looks to the broker. The socket stays open and the response never comes.
+    // Status 0 means "never answer", which is how a route waiting on a third-party API looks to the
+    // broker. The socket stays open and the response never comes.
     if (reply.status === 0) return
     res.writeHead(reply.status, reply.headers ?? {})
     res.end(reply.body)
