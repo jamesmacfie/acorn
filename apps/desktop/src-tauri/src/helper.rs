@@ -292,17 +292,18 @@ mod tests {
         assert_eq!(ready.node_version, "v24.11.0");
     }
 
-    /// The orphaned-node regression, in the shape that produced it: a parent that exits at once,
-    /// leaving a child alive in the same process group. Waiting on the parent says "done" while the
-    /// thing holding the data root's lock is still running.
+    /// A shell in its own process group, with stdout piped so it can say when it is ready.
+    ///
+    /// Both group tests below used to set their scene with `sleep(300ms)` and then assert on it. That
+    /// was long enough on an idle machine and not inside a full `pnpm test`, where the assert read
+    /// "the backgrounded sleep should still hold the group" and told nobody why. The scene is
+    /// observable, so these wait for it.
     #[cfg(unix)]
-    #[test]
-    fn a_child_that_outlives_the_helper_is_still_killed() {
+    fn shell_in_its_own_group(script: &str) -> (Child, i32, Receiver<String>) {
         use std::os::unix::process::CommandExt;
 
         let mut command = Command::new("/bin/sh");
-        // The shell backgrounds a long sleep and exits immediately. The sleep inherits the group.
-        command.arg("-c").arg("sleep 120 & exit 0").stdout(Stdio::null()).stderr(Stdio::null());
+        command.arg("-c").arg(script).stdout(Stdio::piped()).stderr(Stdio::null());
         unsafe {
             command.pre_exec(|| {
                 if libc::setpgid(0, 0) == -1 {
@@ -313,9 +314,56 @@ mod tests {
         }
         let mut child = command.spawn().expect("a shell");
         let group = child.id() as i32;
+        let stdout = child.stdout.take().expect("piped stdout");
+        // On a thread, so a shell that never reaches its `echo` is a failed `recv_timeout` rather than
+        // a test that hangs. `cargo test` has no per-test deadline to catch that.
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut line = String::new();
+            let _ = BufReader::new(stdout).read_line(&mut line);
+            let _ = tx.send(line);
+        });
+        (child, group, rx)
+    }
 
-        // Let the shell exit and the sleep settle, so the group really is "parent gone, child alive".
-        std::thread::sleep(Duration::from_millis(300));
+    /// The shell says `up` once its scene is set. Ten seconds is not a guess at how long that takes;
+    /// it is long enough that reaching it means the shell is not coming.
+    #[cfg(unix)]
+    fn wait_until_up(rx: &Receiver<String>) {
+        let line = rx.recv_timeout(Duration::from_secs(10)).expect("the shell never said it was up");
+        assert_eq!(line.trim(), "up", "the shell said something else");
+    }
+
+    /// Poll a condition to a deadline. A group empties when the kernel reaps the last member, which is
+    /// not an event this side can wait on.
+    #[cfg(unix)]
+    fn within(deadline: Duration, mut done: impl FnMut() -> bool) -> bool {
+        let end = std::time::Instant::now() + deadline;
+        loop {
+            if done() {
+                return true;
+            }
+            if std::time::Instant::now() >= end {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// The orphaned-node regression, in the shape that produced it: a parent that exits at once,
+    /// leaving a child alive in the same process group. Waiting on the parent says "done" while the
+    /// thing holding the data root's lock is still running.
+    #[cfg(unix)]
+    #[test]
+    fn a_child_that_outlives_the_helper_is_still_killed() {
+        // The shell backgrounds a long sleep and exits immediately. The sleep inherits the group, and
+        // `echo` after the `&` is what says the fork happened.
+        let (mut child, group, rx) = shell_in_its_own_group("sleep 120 & echo up; exit 0");
+        wait_until_up(&rx);
+        assert!(
+            within(Duration::from_secs(10), || matches!(child.try_wait(), Ok(Some(_)))),
+            "the shell should have exited",
+        );
         assert!(group_has_members(group), "the backgrounded sleep should still hold the group");
 
         // `sleep` does not ignore SIGTERM, so the polite signal is enough and no escalation is
@@ -329,28 +377,18 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_child_that_ignores_sigterm_is_killed() {
-        use std::os::unix::process::CommandExt;
-
-        let mut command = Command::new("/bin/sh");
-        command.arg("-c").arg("trap '' TERM; sleep 120").stdout(Stdio::null()).stderr(Stdio::null());
-        unsafe {
-            command.pre_exec(|| {
-                if libc::setpgid(0, 0) == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-        let mut child = command.spawn().expect("a shell");
-        let group = child.id() as i32;
-        std::thread::sleep(Duration::from_millis(300));
+        // `echo` after the trap is what says the trap is installed, which is the whole scene here.
+        let (mut child, group, rx) = shell_in_its_own_group("trap '' TERM; echo up; sleep 120");
+        wait_until_up(&rx);
 
         let started = std::time::Instant::now();
         let escalated = terminate_group(&mut child, Duration::from_millis(500));
         assert!(escalated, "a child that ignores SIGTERM must be reported as killed");
         assert!(started.elapsed() < Duration::from_secs(5), "the escalation must not wait out the sleep");
-        std::thread::sleep(Duration::from_millis(200));
-        assert!(!group_has_members(group), "SIGKILL must have emptied the group");
+        assert!(
+            within(Duration::from_secs(10), || !group_has_members(group)),
+            "SIGKILL must have emptied the group",
+        );
     }
 
     #[test]

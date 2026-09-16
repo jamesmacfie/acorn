@@ -491,12 +491,18 @@ to the one it already holds: the caller only reads its store again when the view
 live places in a row are the feet of two different lists. Treating that as nothing to do left a reader
 who switched sessions sitting at the old transcript's offset, partway down one they had never seen.
 
-One move has no signal of its own: the page taking the list away and putting it back. A pane region
-draws inside a `Suspense` ([panes.md](./panes.md)), and a query in that region running with an empty
-cache suspends the boundary *after* it has drawn, so every child leaves the document for a few hundred
-milliseconds. A scroller that was detached comes back at the top, and the browser reports neither a
-scroll event nor a resize for it. The timeline watches its parent's children for that and runs the
-same correction it runs for every other move nobody asked for.
+One move has no signal of its own: the page taking the list away and putting it back. A scroller that
+was detached comes back at the top, and the browser reports neither a scroll event nor a resize for
+it, so the timeline watches its parent's children for that and runs the same correction it runs for
+every other move nobody asked for.
+
+What produced it was the `Suspense` around every pane region ([panes.md](./panes.md)). A query in the
+region reading an empty cache suspends that boundary *after* it has drawn, so every child left the
+document for the length of the fetch, and a reader who created a task from a pull request watched the
+diff appear and then go. Solid is patched so a boundary that has drawn never swaps back to its
+fallback (`patches/README.md`), which leaves the boundary covering the module it was put there for and
+nothing else. The timeline keeps its observer, because re-parenting is not only that boundary's to
+do.
 
 The timeline does not keep the places. `place` and `onChange` hand them to the caller, because
 navigation disposes a task's panes on purpose ([panes.md](./panes.md)), so a place kept in the
