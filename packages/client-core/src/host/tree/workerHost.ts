@@ -178,7 +178,14 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
       if (--live.refs > 0) return
       // Not stopped on the spot: a reader scrolling a transcript unmounts and remounts these
       // constantly, and restarting a bundle per scroll is how a tool card becomes a stutter.
-      live.grace = setTimeout(() => stop(input.hash, 'no trees left'), GRACE_MS)
+      //
+      // The timer names this worker, not the hash. A handle outlives the worker it was taken from — the
+      // bundle stops answering, the host stops it, and the next tree starts a fresh one under the same
+      // hash — so a late release from the old generation was arming a timer that stopped the new
+      // worker thirty seconds later and told every tree on it there were no trees left.
+      live.grace = setTimeout(() => {
+        if (workers.get(input.hash) === live) stop(input.hash, 'no trees left')
+      }, GRACE_MS)
     },
   }
 }

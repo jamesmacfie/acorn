@@ -154,6 +154,42 @@ describe('what reaches a tree', () => {
     expect(failures).toEqual(['this plugin stopped responding', 'this plugin stopped responding'])
   })
 
+  it('does not let a handle from a dead worker stop the one that replaced it', async () => {
+    start()
+    vi.useFakeTimers()
+    // Two tool cards from the one bundle.
+    const first = acquire()
+    const second = acquire()
+    first.mount('s1', 'toolCard', {})
+    second.mount('s2', 'toolCard', {})
+
+    // The bundle stops answering, so the host stops it and both cards say so.
+    await vi.advanceTimersByTimeAsync(25_000)
+    const dead = sandbox!
+    expect(dead.terminated).toBe(true)
+
+    // A card mounts again and gets a fresh worker under the same hash.
+    first.unmount('s1')
+    first.release()
+    start()
+    const third = acquire()
+    const failures: string[] = []
+    third.transport('s3').onFailed((message) => failures.push(message))
+    third.mount('s3', 'toolCard', {})
+    // This one is healthy, so the heartbeat is not what the assertion below is measuring.
+    sandbox!.port.onmessage = (event: MessageEvent) => {
+      sandbox!.seen.push(event.data)
+      if ((event.data as { kind?: string }).kind === 'tree:ping') sandbox!.port.postMessage({ kind: 'tree:pong' })
+    }
+
+    // The late release belongs to the worker that died, not to this one.
+    second.unmount('s2')
+    second.release()
+    for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(10_000)
+    expect(sandbox!.terminated).toBe(false)
+    expect(failures).toEqual([])
+  })
+
   it('keeps a worker alive while it answers the heartbeat', async () => {
     start()
     vi.useFakeTimers()
