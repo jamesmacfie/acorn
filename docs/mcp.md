@@ -78,6 +78,26 @@ own declaration (`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns
 exchange only — remove, then add, through a login shell, with the failure turned into a sentence — and
 knows neither CLI by name.
 
+**There is a second door, and a harness gets one of the two.** An agent that speaks ACP takes MCP
+declarations in the protocol, on `session/new` and again on the call that picks a session back up, so
+acorn names its own server there instead of writing a config file. That door is for a contributed
+harness: it has no `mcp add` command, and a manifest has no field to declare one, so the protocol is
+the only way it could ever reach these tools. Claude Code and Codex keep the config-file door, and
+`mcpRegistration` on the profile is what the runtime tests to decide — whoever already has a door keeps
+it, and nothing is offered twice
+(`acornMcpServers` in `plugins/agents/src/server/sessions/runtimeEngine.ts`).
+
+The whole launch environment is named in the declaration rather than left to inheritance. The agent
+process already holds these values, because they are the session environment acorn spawned it with,
+but an agent is free to scrub credential-shaped names out of what it hands its own children, and
+DeepSeek's does exactly that: a stdio server that loses `ACORN_API_TOKEN` fails every call. The token
+is re-declared on every start for the same reason it is minted there — the previous one is already
+dead, so an agent that kept the old declaration would hold nothing useful.
+
+A standalone node offers no server through either door. It receives no service handshake, so it never
+learns the staging directory its own `mcp.js` sits in (`configureAcornMcp` in
+`node-core/server/mcpRegister.ts`).
+
 Registration also refreshes once at boot for every installed agent CLI, not only at session spawn.
 The registered launcher command is the Node's own binary path, which in a dev build is a checkout
 path that goes stale after a reinstall. A restored tmux session never re-spawns, so without the boot

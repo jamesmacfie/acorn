@@ -3442,40 +3442,45 @@
                       "minLength": 1,
                       "maxLength": 4096
                     }
-                  },
-                  "oneShot": {
-                    "type": "object",
-                    "properties": {
-                      "args": {
-                        "maxItems": 16,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        }
-                      },
-                      "modelFlag": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "output": {
-                        "type": "string",
-                        "enum": [
-                          "text",
-                          "json-lines"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "args",
-                      "output"
-                    ]
                   }
                 },
                 "required": [
                   "command"
+                ]
+              },
+              "oneShot": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "args": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "modelFlag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "output": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "json-lines"
+                    ]
+                  }
+                },
+                "required": [
+                  "args",
+                  "output"
                 ]
               }
             },

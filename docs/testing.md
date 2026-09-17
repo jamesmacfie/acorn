@@ -701,6 +701,24 @@ cover the corresponding state and rendering contracts.
     confirm its status-only row still draws as the flat `Web search` row
     ([managed-agents.md](./managed-agents.md) § Web activity).
 
+71. The reconnect an agent advertises rather than declares, which needs `dsh` installed and the
+    DeepSeek plugin at `../acorn-deepseek` loaded from a folder. Start a DeepSeek session, get an
+    answer, quit the app and start it again, then ask the agent about something only the earlier turn
+    could know. It should remember, and the transcript should carry no "starts fresh" warning: that is
+    `session/resume`, and before it acorn silently began a new agent under the unchanged transcript.
+    Check the pane while you are there, because DeepSeek's surface is narrower than Claude's on
+    purpose: permission cards work, the model picker lists its models and reasoning effort, cancel
+    stops a turn, and there is no plan section, no mode picker and no question card
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+
+72. The two doors a harness declares and the one it does not. With the same plugin loaded, ask DeepSeek
+    something only an acorn tool can answer, such as what the task is about or what the local diff
+    contains: it reaches them over the protocol, because it has no `mcp add` command to register
+    through ([mcp.md](./mcp.md) § Configuration). Then ask Claude Code the same in a task terminal and
+    confirm each acorn tool still appears once, not twice. Last, press the commit-message wand and open
+    **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
+    entry should be absent throughout, because `dsh` alone has no interactive mode.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

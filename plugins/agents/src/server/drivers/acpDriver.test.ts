@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { AgentDriverStartOptions } from './types'
-import { AcpDriver, clientFor, type PendingRequest } from './acpDriver'
+import { AcpDriver, acpMcpServers, clientFor, type PendingRequest } from './acpDriver'
 import { harnessCapabilities } from './harness'
 
 const sessionWithRef = (providerSessionRef: string): AgentSession => ({
@@ -105,6 +105,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       session: sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f'),
       cwd: process.cwd(),
       env: {},
+      mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
         if (event.type !== 'generated_artifact') events.push(event)
@@ -124,6 +125,92 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     } finally {
       await handle.stop()
     }
+  })
+
+  // The other half of the reconnect, and the one acorn used to miss. An agent that keeps its sessions
+  // may offer `session/resume` instead of `session/load`, which is what DeepSeek's ACP server does, and
+  // acorn reading only the older capability meant a fresh agent under the old transcript every time.
+  it('resumes a stored provider session when the agent offers resume rather than load', async () => {
+    const events: AgentNormalizedEvent[] = []
+    const handle = await new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: {
+        entry: () => fileURLToPath(new URL('./__fixtures__/resumableAcpAgent.mjs', import.meta.url)),
+      },
+      // No quirks on purpose: which reconnect an agent supports is on the wire, so a harness declares
+      // nothing to get this.
+    }).start({
+      session: sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f'),
+      cwd: process.cwd(),
+      env: {},
+      mcpServers: [],
+      noProviderExecutionHistory: false,
+      onEvent: (event) => {
+        if (event.type !== 'generated_artifact') events.push(event)
+      },
+      onClosed: () => {},
+    })
+
+    try {
+      expect(handle.providerSessionRef).toBe('d2c6edee-10be-460b-a636-083f68dcde6f')
+      // Nothing was lost, so the reader is told nothing.
+      expect(events.filter((event) => event.type === 'diagnostic')).toHaveLength(0)
+      expect(events).toContainEqual(expect.objectContaining({ type: 'session_state', state: 'ready' }))
+    } finally {
+      await handle.stop()
+    }
+  })
+
+  it('starts a fresh provider session when a resuming agent refuses the stored one', async () => {
+    const events: AgentNormalizedEvent[] = []
+    const handle = await new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: {
+        entry: () => fileURLToPath(new URL('./__fixtures__/resumableAcpAgent.mjs', import.meta.url)),
+      },
+    }).start({
+      session: sessionWithRef('unresumable-session-id'),
+      cwd: process.cwd(),
+      env: {},
+      mcpServers: [],
+      noProviderExecutionHistory: false,
+      onEvent: (event) => {
+        if (event.type !== 'generated_artifact') events.push(event)
+      },
+      onClosed: () => {},
+    })
+
+    try {
+      // Resume answers invalid params rather than resource-not-found, and it is the same dead reference.
+      expect(handle.providerSessionRef).toBe('fresh-session-id')
+      expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(1)
+    } finally {
+      await handle.stop()
+    }
+  })
+
+  // ACP spells an environment as an ordered list of pairs, so a server naming the same variable twice
+  // is a protocol error the agent reports rather than a silent last-wins.
+  it('hands acorn\u2019s own tool server to the agent as ordered environment pairs', () => {
+    expect(acpMcpServers([{
+      name: 'acorn-dev',
+      command: '/opt/acorn/node',
+      args: ['/opt/acorn/mcp.js'],
+      env: { ACORN_MCP_NAME: 'acorn-dev', ACORN_API_TOKEN: 'signed' },
+    }])).toEqual([{
+      name: 'acorn-dev',
+      command: '/opt/acorn/node',
+      args: ['/opt/acorn/mcp.js'],
+      env: [
+        { name: 'ACORN_MCP_NAME', value: 'acorn-dev' },
+        { name: 'ACORN_API_TOKEN', value: 'signed' },
+      ],
+    }])
+    expect(acpMcpServers([])).toEqual([])
   })
 
   it('derives capabilities from the protocol baseline plus the declared quirks', () => {
@@ -202,6 +289,7 @@ describe('a question the agent stopped waiting for is released with the turn', (
       session: sessionWithRef(''),
       cwd: process.cwd(),
       env: {},
+      mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event) },
       onClosed: () => {},

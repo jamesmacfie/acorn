@@ -905,6 +905,12 @@ const harnessQuirks = z.object({
 // in every Generate list beside a connected API key (docs/integrations.md § Model providers), and it
 // is the only argv a manifest may assemble.
 //
+// It sits beside `terminal` rather than inside it, because answering one question and holding a
+// conversation are two different things an agent may do, and some agents do only one. DeepSeek is the
+// case that proved it: `dsh --profile headless` answers a prompt and exits, and `dsh` on its own has
+// no interactive mode at all, so nesting this under a required interactive command locked it out of a
+// list it belongs in.
+//
 // `headlessArgv` and `resumeArgv` stay refused, because a manifest that can say "if resuming, add
 // these two arguments" is a template language. This one is admitted because it has two variables in
 // fixed positions and nothing to branch on: the model goes after `args` when a caller names one and
@@ -912,6 +918,11 @@ const harnessQuirks = z.object({
 // grows a placeholder syntax. A CLI that wants the prompt in the middle, or a flag whose value
 // depends on another flag, is asking for a code-tier profile instead.
 const harnessOneShot = z.object({
+  // The executable, for a harness that declares no `terminal` to borrow one from. A harness has exactly
+  // one binary, because it is reported as installed or not by looking one up on PATH, so declaring this
+  // beside a `terminal` is refused rather than resolved. Both rules are in
+  // node-core/server/plugins/manifest.ts.
+  command: z.string().min(1).max(128).optional(),
   // The subcommand and switches that make the CLI answer once and exit, such as `run` for opencode.
   // Written out rather than defaulted, because this is the invocation the trust prompt discloses.
   args: z.array(z.string().min(1).max(256)).max(16),
@@ -929,16 +940,14 @@ const harnessOneShot = z.object({
   output: z.enum(['text', 'json-lines']),
 })
 
-// The interactive TUI beside the managed session: the data half of an agent profile. `headlessArgv`,
-// `resumeArgv` and a stream shape of the harness's own have no manifest form, so a data-only harness
-// runs no agentic workflow step, but `oneShot` carries the one-shot text turn.
+// The interactive TUI beside the managed session: the data half of an agent profile. Declaring it is
+// what offers the harness in a task terminal, so a harness with no interactive mode leaves it out.
+// `headlessArgv`, `resumeArgv` and a stream shape of the harness's own have no manifest form, so a
+// data-only harness runs no agentic workflow step.
 const harnessTerminal = z.object({
   command: z.string().min(1).max(128),
   backendPreference: z.enum(['node-pty', 'tmux']).default('tmux'),
   launchArgs: z.array(z.string().min(1).max(4_096)).max(16).default([]),
-  // Runs `command` again with these arguments, so it belongs beside the interactive launch rather than
-  // beside `spawn`, which is the ACP connection and takes no prompt.
-  oneShot: harnessOneShot.optional(),
 })
 
 const harnessDescriptor = z.object({
@@ -962,6 +971,8 @@ const harnessDescriptor = z.object({
     auth: pluginRoute.optional(),
   }).optional(),
   terminal: harnessTerminal.optional(),
+  // One contained text turn. Independent of `terminal`: a harness may offer both, either, or neither.
+  oneShot: harnessOneShot.optional(),
 })
 
 // `api` and `events` are enforced by the UI bridge (client-core/host/plugins/frames). `contributions` stays

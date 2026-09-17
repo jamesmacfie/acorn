@@ -237,10 +237,8 @@ This is the whole plugin that adds OpenCode:
         "spawn": { "command": "opencode", "args": ["acp"] },
         "envPassthrough": ["OPENCODE_*"],
         "quirks": { "manualCompaction": true },
-        "terminal": {
-          "command": "opencode",
-          "oneShot": { "args": ["run"], "modelFlag": "--model", "output": "text" }
-        }
+        "terminal": { "command": "opencode" },
+        "oneShot": { "args": ["run"], "modelFlag": "--model", "output": "text" }
       }
     ]
   }
@@ -266,7 +264,7 @@ compatibility break for your users rather than a label edit.
 | `label`, `glyph` | Every surface: Agent Center rows, the pane header, usage sections, notifications |
 | `quirks` | Enables or hides the matching affordance, per harness |
 | `terminal` | Registers the terminal profile: task terminals, handoff, the input-controller lease |
-| `terminal.oneShot` | Lists your agent in every Generate control, and runs one contained turn when it is picked |
+| `oneShot` | Lists your agent in every Generate control, and runs one contained turn when it is picked |
 | `probes` | Fetches them and draws the answers |
 | nothing else | The ACP connection, the normalizer, the durable event ledger, transcript rendering, permission plumbing, attachments, session persistence, reconnect, replay |
 
@@ -296,8 +294,9 @@ record sees it.
 rather than by a list of ids inside acorn:
 
 - `manualCompaction` — the agent implements a compaction command, so the pane offers Compact.
-- `sessionPersistence` — sessions outlive the agent process and can be reloaded, so resume and the
-  terminal handoff exist.
+- `sessionPersistence` — sessions outlive the agent process, so the terminal handoff exists. You do not
+  need it for acorn to pick a session back up after a restart: if your agent advertises `session/load`
+  or `session/resume`, the driver finds that at `initialize` and uses it.
 
 Do not restate anything the agent already says through ACP capability negotiation. The driver reads
 those off the wire, and a manifest repeating them would only drift.
@@ -312,11 +311,19 @@ those off the wire, and a manifest repeating them would only drift.
   provider-health row. `null` means "cannot tell", which is different from `false`; an answer acorn
   cannot read is treated as `null` rather than as signed out.
 
-**One-shot text generation.** `terminal.oneShot` describes how your CLI answers a single prompt and
-exits. Declare it and your agent appears in every Generate control in acorn — the commit message wand,
-the SQL draft, the workflow definition generator — beside whatever API keys the owner has connected.
-Three fields:
+**One-shot text generation.** `oneShot` describes how your CLI answers a single prompt and exits.
+Declare it and your agent appears in every Generate control in acorn — the commit message wand, the
+SQL draft, the workflow definition generator — beside whatever API keys the owner has connected.
 
+It sits beside `terminal` rather than inside it, because holding a conversation and answering one
+question are two different things and some agents do only one. DeepSeek is the second kind:
+`dsh --profile headless "…"` answers and exits, and `dsh` on its own has no interactive mode, so it
+declares `oneShot` and no `terminal`. Then it is in the Generate lists and not in the terminal menu,
+which is the truth about it. Four fields:
+
+- `command` — the executable, for a harness with no `terminal` to borrow one from. Leave it out
+  whenever there is a `terminal`, because a harness runs one binary and acorn decides whether it is
+  installed by looking that one up on `PATH`. Naming a second one is refused rather than resolved.
 - `args` (required) — the subcommand and switches for one prompt in, one answer out. `["run"]` for
   OpenCode.
 - `modelFlag` — the flag a model id goes behind, in your CLI's own spelling. OpenCode wants

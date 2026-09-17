@@ -334,6 +334,7 @@ node: TelemetryService
 node: TelemetrySink
 node: ToolContext
 node: ToolError
+node: acornMcp
 node: agentProfileRegistry
 node: brokerEnv
 node: buildHeadlessArgv
@@ -342,6 +343,7 @@ node: capabilityId
 node: childEnv
 node: chunkRowsByColumnBudget
 node: codexJsonAdapter
+node: configureAcornMcp
 node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability
@@ -358,6 +360,7 @@ node: getProfile
 node: git
 node: gitOrThrow
 node: gitText
+node: interactiveProfile
 node: invalidateWorktreeStatus
 node: isDir
 node: isProviderOperationError

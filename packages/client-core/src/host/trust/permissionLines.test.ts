@@ -276,7 +276,8 @@ describe('the harness grant', () => {
       label: 'OpenCode',
       spawn: { command: 'opencode', args: ['acp'] },
       envPassthrough: [],
-      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [], oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) } },
+      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+      oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) },
     }])
 
     const lines = harnessPermissionLines(harnessGrants(withOneShot(['run'], '--model')))
@@ -297,6 +298,19 @@ describe('the harness grant', () => {
     expect(harnessPermissionLines(harnessGrants(contributions([
       { id: 'opencode', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
     ])))).toHaveLength(1)
+
+    // A harness with no interactive mode names its own command, and the line reads the same either way,
+    // because what an owner consents to is the program and its arguments.
+    expect(texts(harnessPermissionLines(harnessGrants(contributions([{
+      id: 'deepseek',
+      label: 'DeepSeek',
+      spawn: { command: 'dsh', args: ['--profile', 'acp'] },
+      envPassthrough: [],
+      oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+    }]))))).toEqual([
+      'Run “dsh --profile acp” as the “DeepSeek” agent',
+      'Runs “dsh --profile headless” to generate text',
+    ])
   })
 
   it('discloses nothing for a spawn the node already refused', () => {
