@@ -390,6 +390,15 @@ comes back within 30 seconds. That is a guess, and a wrong one costs a task sele
 not ask for. Both halves of the alternative are worse: no click handling at all, or a second
 notifier process to shell out to.
 
+macOS attaches a banner to an installed app, not to a running process, and `tauri dev` runs a bare
+binary with no bundle around it. The plugin's answer is to post dev banners as `com.apple.Terminal`,
+which is why they arrive titled Terminal with a terminal icon. `borrow_installed_identity` in
+`src-tauri/src/commands.rs` looks up whichever acorn the machine has installed and claims its
+identity before the plugin claims Terminal's, so a dev banner carries the acorn name and icon. It
+needs an acorn in `/Applications` or a `tauri build` bundle the system has seen; with neither, the
+Terminal banner stands, because an identity macOS cannot resolve leaves the process unable to post at
+all rather than falling back.
+
 The bridge also tells the shell what colour the app is. On macOS the window is built with
 `TitleBarStyle::Transparent` (`src-tauri/src/lib.rs`), so the title bar paints the window's background
 instead of the system chrome, and the strip above the app can follow the theme. Nothing on the Rust

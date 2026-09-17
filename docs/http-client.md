@@ -139,14 +139,17 @@ only once the row is stored. Sending stays a separate act the reader takes in th
 request in front of them.
 
 All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
-components (`docs/plugins.md` § The tree contract). Three consequences are visible in the UI, and all
-three are the same consequence — the plugin has no document of its own.
+components (`docs/plugins.md` § The tree contract). Four consequences are visible in the UI, and all
+four are the same consequence — the plugin has no document of its own.
 
 - Deleting a request or a variable takes two clicks rather than raising a dialog, and "Copy as curl"
   goes through the host (`bridge.ui.copy`).
 - **Pasting a curl command into the URL bar expands it on commit, not on paste.** Press Enter or leave
   the field and the whole request fills in. A paste is a DOM event and there is no DOM to raise one in;
   the check runs where the committed text arrives instead.
+- The Body and Auth mode selectors sit immediately below the request tab strip. `Tabs.actions` is a
+  JSX-valued shell slot, while a remote node's props are JSON; the selectors therefore travel as
+  ordinary sibling nodes rather than as UI nested inside a prop.
 - The method chip in the request tree is no longer colour-coded per verb. A plugin names a role, never
   a colour, and the kit has no role that means POST.
 

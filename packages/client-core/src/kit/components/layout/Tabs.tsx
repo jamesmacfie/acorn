@@ -29,9 +29,13 @@ export function Tabs(props: {
   /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
   actions?: JSX.Element
 }) {
+  // A remote tree's props arrive one at a time and the host drops a bad one on its own, so this node
+  // has to survive arriving without its list rather than throw and take the whole region with it.
+  const tabs = (): readonly TabDef[] => props.tabs ?? []
+
   const collection = createCollection({
     id: () => props.idPrefix,
-    items: () => props.tabs.map((tab) => ({ key: tab.id, label: tab.label })),
+    items: () => tabs().map((tab) => ({ key: tab.id, label: tab.label })),
     itemId: (key) => `${props.idPrefix}-tab-${key}`,
     role: 'tablist',
     orientation: 'horizontal',
@@ -42,7 +46,7 @@ export function Tabs(props: {
 
   return (
     <div class="ui-tabs" aria-label={props.ariaLabel} {...collection.containerProps}>
-      <For each={props.tabs}>{(t) => (
+      <For each={tabs()}>{(t) => (
         <button
           {...collection.itemProps(t.id)}
           type="button"
