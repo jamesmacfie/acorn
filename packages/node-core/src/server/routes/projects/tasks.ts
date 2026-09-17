@@ -9,6 +9,7 @@ import { Hono } from 'hono'
 import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../../integrations/connections'
+import { providerRefusal } from '../../integrations/respondProvider'
 import { isProviderOperationError, ProviderOperationError } from '../../integrations/types'
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
@@ -99,11 +100,11 @@ const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
 
 async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: LinkInput) {
   const parsed = parseLinkInput(input)
-  if (!parsed) throw new ProviderOperationError('provider_bad_config', 400)
+  if (!parsed) throw new ProviderOperationError('provider_bad_config', 400, 'A task link needs both a connectionId and an identifier.')
   const connection = await getConnection(db, userId, parsed.connectionId)
   if (!connection) throw new ProviderOperationError('provider_not_connected', 403)
   if (parsed.claimedProviderId && parsed.claimedProviderId !== connection.provider) {
-    throw new ProviderOperationError('provider_bad_config', 400)
+    throw new ProviderOperationError('provider_bad_config', 400, `The link claims provider '${parsed.claimedProviderId}', but connection ${connection.id} is a ${connection.provider} connection.`)
   }
   const ref = externalRefForConnection(connection, parsed.identifier, parsed.ref)
   return {
@@ -159,7 +160,7 @@ export const tasks = new Hono<AppEnv>()
     try {
       links = await Promise.all(linkInputs.map((link) => stampedLink(db, uid, link)))
     } catch (error) {
-      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+      if (isProviderOperationError(error)) return providerRefusal(c, error)
       throw error
     }
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
@@ -249,7 +250,7 @@ export const tasks = new Hono<AppEnv>()
     try {
       link = await stampedLink(db, ownerId(c), body)
     } catch (error) {
-      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+      if (isProviderOperationError(error)) return providerRefusal(c, error)
       throw error
     }
     const [inserted] = await db

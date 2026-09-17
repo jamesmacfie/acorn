@@ -149,14 +149,18 @@ const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue 
 type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProjects'>
 
 /**
- * Which Linear projects this rail should show, keyed by connection. A link hangs off the workspace,
- * and may narrow itself to one project in it (docs/workspaces-and-tasks.md § Workspace and project),
- * so the routed project decides twice: it names the workspace, then it filters that workspace's links
- * down to the ones that either name it or name no project at all.
+ * Which Linear scopes this rail should show, keyed by connection. A scope is a Linear project, or a
+ * whole team where the workspace mapped one (docs/integrations.md § Linear); either way it is an
+ * opaque id core stored and this plugin reads back.
+ *
+ * A link hangs off the workspace, and may narrow itself to one project in it
+ * (docs/workspaces-and-tasks.md § Workspace and project), so the routed project decides twice: it
+ * names the workspace, then it filters that workspace's links down to the ones that either name it or
+ * name no project at all.
  *
  * `null` and an empty map mean the same thing to the only caller: no rows.
  */
-async function mappedProjects(
+async function mappedScopes(
   c: Context<AppEnv>,
   projectId: string | undefined,
   projects?: LinearProjectScope,
@@ -181,7 +185,7 @@ async function mappedProjects(
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
 export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {}) => new Hono<AppEnv>()
-  // Active issues for the given project ids within one connection (?integration=<id>&ids=). No shell
+  // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). No shell
   // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
   // form, and as the one place a test covers the active-only filter and the branch-suggestion
   // passthrough.
@@ -208,18 +212,18 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
-    const mapped = await mappedProjects(c, c.req.query('project'), projects)
+    const mapped = await mappedScopes(c, c.req.query('project'), projects)
     const issues: LinearProjectIssue[] = []
     // Named per connection that actually returned rows, not per connection that exists: a workspace
     // that is connected but mapped to nothing, or that failed, must not put a column on this list.
     const names = new Map<string, string>()
     for (const { row, key } of connections) {
-      const projectIds = mapped?.get(row.id) ?? []
+      const scopeIds = mapped?.get(row.id) ?? []
       // Nothing mapped for this connection, whether the workspace maps other connections or none at
       // all, means this connection contributes no rows.
-      if (!projectIds.length) continue
+      if (!scopeIds.length) continue
       try {
-        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(projectIds) })
+        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(scopeIds) })
         if (linearError(res)) continue
         const { issues: found } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
         if (found.nodes.length) names.set(row.id, connectionName(row))
@@ -236,7 +240,8 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // The `Find a Linear issue` command's rows (docs/plugins.md § Command kinds).
   //
   // Same scope as the rail above and by the same code: the routed project names its workspace, the
-  // workspace's links name the Linear projects, and a connection with nothing mapped is never asked.
+  // workspace's links name the Linear projects and teams, and a connection with nothing mapped is
+  // never asked.
   // Both things this route is given are the host's — `projectId` is the project the palette session
   // captured, `q` is the typed text — and neither the manifest nor a previous answer can write either.
   //
@@ -249,18 +254,18 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // finished; a search that quietly empties is a reader retyping a word that was never the problem.
   .get('/palette/issues', async (c) => {
     const connections = await linearConnections(c)
-    const mapped = await mappedProjects(c, c.req.query('projectId'), projects)
-    const filter = (projectIds: string[]) => projectIssueSearchFilter(projectIds, c.req.query('q') ?? '')
+    const mapped = await mappedScopes(c, c.req.query('projectId'), projects)
+    const filter = (scopeIds: string[]) => projectIssueSearchFilter(scopeIds, c.req.query('q') ?? '')
     const rows: LinearSearchRow[] = []
     let asked = 0
     let failed = 0
     let failure: { code: string; status: 401 | 502 } | null = null
     for (const { row, key } of connections) {
-      const projectIds = mapped?.get(row.id) ?? []
-      if (!projectIds.length) continue
+      const scopeIds = mapped?.get(row.id) ?? []
+      if (!scopeIds.length) continue
       asked++
       try {
-        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: filter(projectIds) })
+        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: filter(scopeIds) })
         const err = linearError(res)
         if (err) {
           failed++

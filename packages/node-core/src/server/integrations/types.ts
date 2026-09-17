@@ -219,8 +219,13 @@ export class ProviderOperationError extends Error {
   constructor(
     readonly code: ProviderErrorCode,
     readonly status: 400 | 401 | 403 | 404 | 429 | 502 = 502,
+    // Which check refused, in the reader's words. The code names a category; on a route with several
+    // ways to answer `provider_bad_config` the category alone sends whoever hit it to read the
+    // source. It rides in `message` rather than in a field of its own, because that is what survives
+    // a bundle boundary (`isProviderOperationError` below). Never put a credential or a secret here.
+    detail?: string,
   ) {
-    super(code)
+    super(detail ?? code)
     // Without this the name is 'Error', which is what a log line shows for a failure somebody threw
     // on purpose and named precisely.
     this.name = 'ProviderOperationError'

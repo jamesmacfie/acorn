@@ -161,7 +161,10 @@ describe('connection-only provider lifecycle', () => {
       status: 'connected',
     })
     expect(() => externalRefForConnection(rotated, 'ITEM-1')).toThrow(ProviderOperationError)
-    expect(() => externalRefForConnection(rotated, 'ITEM-1')).toThrow('provider_bad_config')
+    // The code is the contract; the message is the reason, and a connection-only provider has no
+    // entry in the integration registry to stamp a reference with.
+    expect(() => externalRefForConnection(rotated, 'ITEM-1'))
+      .toThrow(expect.objectContaining({ code: 'provider_bad_config', message: expect.stringContaining('No integration provider named') }))
 
     await disconnectConnection(testDb.db, 'alice', connected.id)
     expect(await testDb.db.select().from(schema.integrations)).toEqual([])

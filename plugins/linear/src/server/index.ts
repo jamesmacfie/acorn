@@ -45,6 +45,17 @@ export type Viewer = { viewer: { name: string; organization: { name: string } } 
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 
+// Teams, offered to the same picker. An issue belongs to exactly one team and may belong to no
+// project at all, so a workspace that works out of team backlogs has nothing to map without this
+// (docs/integrations.md § Linear).
+export const TEAMS_QUERY = `query { teams(first: 250) { nodes { id name } } }`
+
+// How a team is spelled in a `workspace_external_projects` row. Core stores an external id opaquely,
+// so the prefix is this plugin's business alone. An id without it is a project id, which is what
+// every row written before teams were offered holds, so old rows keep their meaning.
+const TEAM_PREFIX = 'team:'
+export const linearTeamScopeId = (teamId: string): string => `${TEAM_PREFIX}${teamId}`
+
 // The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote
 // default. `description` is the issue's own prose, capped before it reaches a row: a workflow
 // started from a row menu puts the title and this in its `issue` input, and the alternative was a
@@ -62,10 +73,30 @@ export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
     }
   }
 }`
-export const projectIssuesFilter = (projectIds: string[]): Record<string, unknown> => ({
-  project: { id: { in: projectIds } },
-  state: { type: { nin: ['completed', 'canceled'] } },
-})
+/**
+ * The mapped ids split into the clauses `IssueFilter` wants, one per kind that is actually mapped.
+ *
+ * The project clause is kept when nothing is mapped at all, because `in: []` matches nothing and a
+ * caller that passed no ids must not be handed the whole workspace.
+ */
+const scopeClauses = (ids: string[]): Record<string, unknown>[] => {
+  const teams = ids.filter((id) => id.startsWith(TEAM_PREFIX)).map((id) => id.slice(TEAM_PREFIX.length))
+  const projects = ids.filter((id) => !id.startsWith(TEAM_PREFIX))
+  const clauses: Record<string, unknown>[] = []
+  if (projects.length || !teams.length) clauses.push({ project: { id: { in: projects } } })
+  if (teams.length) clauses.push({ team: { id: { in: teams } } })
+  return clauses
+}
+
+export const projectIssuesFilter = (mappedIds: string[]): Record<string, unknown> => {
+  const clauses = scopeClauses(mappedIds)
+  return {
+    // One kind mapped reads as itself; both read as either, since an issue is in one project or in
+    // none and the team is what the second kind matches on.
+    ...(clauses.length === 1 ? clauses[0] : { or: clauses }),
+    state: { type: { nin: ['completed', 'canceled'] } },
+  }
+}
 
 /**
  * The same filter, narrowed by what somebody typed. The palette's search sends this
@@ -83,8 +114,8 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
  * — that is a different question from "find the ticket I am thinking of", and it is the field most
  * likely to differ between plans.
  */
-export function projectIssueSearchFilter(projectIds: string[], query: string): Record<string, unknown> {
-  const base = projectIssuesFilter(projectIds)
+export function projectIssueSearchFilter(mappedIds: string[], query: string): Record<string, unknown> {
+  const base = projectIssuesFilter(mappedIds)
   const text = query.trim()
   if (!text) return base
   const or: Record<string, unknown>[] = [{ title: { containsIgnoreCase: text } }]
@@ -95,9 +126,10 @@ export function projectIssueSearchFilter(projectIds: string[], query: string): R
     const number = /^#?(\d{1,9})$/.exec(text)
     if (number) or.push({ number: { eq: Number(number[1]) } })
   }
-  // Top-level fields are ANDed and `or` ORs its own list, so this reads: in these projects, still
-  // active, and matching one of these.
-  return { ...base, or }
+  // The scope whole, ANDed with one of the typed alternatives. Merging the two into one object would
+  // put this `or` where the scope's own `or` sits when a workspace maps both projects and teams, and
+  // the search would quietly widen to every issue in the workspace.
+  return { and: [base, { or }] }
 }
 
 // The same query with a different filter: active issues assigned to whoever owns the credential,
