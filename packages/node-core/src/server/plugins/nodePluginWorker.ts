@@ -6,6 +6,7 @@ import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { workerData, type MessagePort } from 'node:worker_threads'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pluginFunctionMode } from './functionMode.ts'
 import { PluginRpcEndpoint, rpcError } from './pluginRpc.ts'
 import type { NodePlugin, NodePluginContext } from '../pluginHost/types.ts'
 import type { WorkerPluginDatabase } from './workerStorage.ts'
@@ -82,17 +83,6 @@ if (options.allowNetwork) {
 }
 for (const name of ['WebSocket', 'XMLHttpRequest', 'EventSource', 'navigator']) {
   delete (globalThis as Record<string, unknown>)[name]
-}
-
-const pluginFunctionMode = (path: string, fn: (...args: never[]) => unknown): 'sync' | 'async' => {
-  if (path === 'plugin.init' || path === 'plugin.ready' || path === 'plugin.dispose') return 'async'
-  if (fn.constructor.name === 'AsyncFunction') return 'async'
-  // These callbacks sit in contracts whose callers consume a value synchronously. Everything else
-  // crosses as a promise, including route handlers, schedules, hooks and capability implementations.
-  const leaf = path.match(/\.([A-Za-z0-9_$]+)(?:\]|$)/g)?.at(-1)?.replace(/[.\]]/g, '')
-  return ['normalize', 'toPublic', 'externalIds', 'refs', 'key', 'encode', 'decode', 'enabled'].includes(leaf ?? '')
-    ? 'sync'
-    : 'async'
 }
 
 const endpoint = new PluginRpcEndpoint(options.port, pluginFunctionMode)
