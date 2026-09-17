@@ -81,8 +81,10 @@ export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
 export const linearIssuesRoute = '/v2/p/linear/issues'
 export const linearProjectsRoute = '/v2/p/linear/projects'
-export const linearProjectIssuesRoute = (integrationId: string, projectIds: string[]) =>
-  `/v2/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(projectIds.join(','))}`
+// `scopeIds` holds what the workspace mapped, which is a Linear project id or a prefixed team id
+// (server/index.ts's `linearTeamScopeId`).
+export const linearProjectIssuesRoute = (integrationId: string, scopeIds: string[]) =>
+  `/v2/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(scopeIds.join(','))}`
 const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
 export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`

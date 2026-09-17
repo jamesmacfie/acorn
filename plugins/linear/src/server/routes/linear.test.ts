@@ -78,9 +78,10 @@ describe('Linear palette search', () => {
     expect(sent).toHaveLength(1)
     expect(sent[0].key).toBe('key-for-linear-a')
     expect(sent[0].variables.filter).toEqual({
-      project: { id: { in: ['proj-a'] } },
-      state: { type: { nin: ['completed', 'canceled'] } },
-      or: [{ title: { containsIgnoreCase: 'login' } }],
+      and: [
+        { project: { id: { in: ['proj-a'] } }, state: { type: { nin: ['completed', 'canceled'] } } },
+        { or: [{ title: { containsIgnoreCase: 'login' } }] },
+      ],
     })
     expect(await response.json()).toEqual({
       items: [{
@@ -126,7 +127,8 @@ describe('Linear palette search', () => {
     const sent = stubLinear(() => ({ nodes: [] }))
 
     await fetchRoutes(search('eng-42'), context)
-    expect(sent[0].variables.filter.or).toEqual([
+    const clauses = sent[0].variables.filter.and as Record<string, unknown>[]
+    expect(clauses[1].or).toEqual([
       { title: { containsIgnoreCase: 'eng-42' } },
       { team: { key: { eq: 'ENG' } }, number: { eq: 42 } },
     ])

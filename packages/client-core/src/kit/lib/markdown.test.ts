@@ -12,6 +12,20 @@ describe('renderMarkdown', () => {
     )
   })
 
+  it('links a bare URL, once, and leaves the trailing punctuation out of it', () => {
+    expect(renderMarkdown('PR is up: https://github.com/a/b/pull/1.')).toBe(
+      '<p>PR is up: <a href="https://github.com/a/b/pull/1" target="_blank" rel="noreferrer">'
+      + 'https://github.com/a/b/pull/1</a>.</p>',
+    )
+    // A link already written in the bracket form keeps its own text and gains no second anchor.
+    expect(renderMarkdown('[the PR](https://x.com/1) and **[bold](https://x.com/2)**')).toBe(
+      '<p><a href="https://x.com/1" target="_blank" rel="noreferrer">the PR</a> and '
+      + '<strong><a href="https://x.com/2" target="_blank" rel="noreferrer">bold</a></strong></p>',
+    )
+    // A URL inside a code span is text somebody meant to read, not a destination.
+    expect(renderMarkdown('`curl https://x.com`')).toBe('<p><code>curl https://x.com</code></p>')
+  })
+
   it('is XSS-safe: escapes raw HTML and drops dangerous link schemes', () => {
     expect(renderMarkdown('<script>alert(1)</script>')).toBe('<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>')
     // javascript: link → href dropped, text kept
