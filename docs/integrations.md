@@ -120,6 +120,10 @@ or over-long one is dropped rather than truncated into a different project. The 
 the workspace-mapping write already accepts through Zod: up to 500 projects, ids and labels capped at
 200 bytes each, generous enough that no honest provider notices.
 
+An id is opaque to core: it is stored and handed back to the provider that offered it, and nothing
+between the two reads it. A provider that groups its work in more than one way can therefore offer
+both here and tell them apart itself, which is what Linear does with teams below.
+
 ### The map itself
 
 A link is a row in `workspace_external_projects`: a workspace, a connection, one of that connection's
@@ -180,8 +184,20 @@ renders the reference panel github's PR detail shows, all as manifest descriptor
 frame rather than compiled contributions. It contributes a project source, so its workspaces appear
 in core's project picker.
 
-The rail lists only the issues of the projects a workspace has linked, and with none linked the shell
-does not draw the source at all (see the source gates in [the frontend doc](./frontend.md)). Its
+A workspace can map a Linear team as well as a Linear project. An issue belongs to exactly one team
+and may belong to no project, so a team that works out of its backlog rather than out of projects has
+nothing to map otherwise, and its issues reach Acorn only by being pasted or referenced from a pull
+request. The project source lists both, and a team's id carries a `team:` prefix so the rail's filter
+knows to match Linear's `team` field instead of its `project` field. Core stores that id and never
+reads it, which is the whole of what makes this work without a schema change. An id with no prefix is
+a project, so rows written before teams were offered keep their meaning.
+
+Mapping a team is a wider net than mapping a project, and a busy team makes a long rail. It is also a
+coarser unit than a repository, so pointing one at a single project fits less often than a Linear
+project does.
+
+The rail lists only the issues of the projects and teams a workspace has linked, and with none linked
+the shell does not draw the source at all (see the source gates in [the frontend doc](./frontend.md)). Its
 `emptyState` therefore speaks to the case that remains: projects are linked and none of them has an
 active issue. See descriptors in [the plugins doc](./plugins.md). An earlier version fell back to the
 viewer's own open issues, cover for a rail that had no way to explain an empty list. That fallback is
