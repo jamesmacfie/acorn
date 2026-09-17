@@ -74,13 +74,65 @@ export const nextSibling = (node: RemoteNode): RemoteNode | null => {
   return siblings[siblings.indexOf(node) + 1] ?? null
 }
 
-// A function is only ever sendable as one of the kit's semantic events. Anything else is dropped here
-// rather than at the host, so the author sees it in their own console rather than as a silently
-// missing prop.
+type WireJson = string | number | boolean | null | WireJson[] | { [key: string]: WireJson }
+
+const notWireable = Symbol('not-wireable')
+
+/**
+ * Copy a prop into the data-only shape the tree protocol accepts.
+ *
+ * This is a copy, not just a check. Solid stores expose otherwise ordinary arrays and records through
+ * proxies, and a MessagePort refuses a proxy even though JSON.stringify can read it. Copying here
+ * keeps the worker boundary honest and also means a nested function or class instance is rejected
+ * before one bad prop can stop every mounted tree from the same plugin.
+ */
+const wireJson = (value: unknown, ancestors: Set<object>): WireJson | typeof notWireable => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : notWireable
+  if (typeof value !== 'object') return notWireable
+
+  try {
+    if (ancestors.has(value)) return notWireable
+    ancestors.add(value)
+    if (Array.isArray(value)) {
+      const out: WireJson[] = []
+      for (const item of value) {
+        const next = wireJson(item, ancestors)
+        if (next === notWireable) return notWireable
+        out.push(next)
+      }
+      return out
+    }
+
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return notWireable
+    const out: Record<string, WireJson> = {}
+    for (const [key, item] of Object.entries(value)) {
+      // A key whose value is `undefined` is left out, which is what `JSON.stringify` does with one.
+      // An optional field written as `count: rows.length || undefined` is ordinary, and dropping the
+      // whole prop over it would hand the host a `Tabs` with no `tabs`.
+      if (item === undefined) continue
+      const next = wireJson(item, ancestors)
+      if (next === notWireable) return notWireable
+      out[key] = next
+    }
+    return out
+  } catch {
+    return notWireable
+  } finally {
+    ancestors.delete(value)
+  }
+}
+
+// A function is only ever sendable as one of the kit's semantic events. Anything else, including a
+// nested function, is dropped here rather than being allowed to kill the plugin's shared worker.
 const wireValue = (root: Attached, name: string, value: unknown): unknown => {
-  if (typeof value !== 'function') return value
-  if (!isKitEvent(name)) return undefined
-  return { $handler: root.handlerFor(value as (payload: unknown) => void) }
+  if (typeof value === 'function') {
+    if (!isKitEvent(name)) return undefined
+    return { $handler: root.handlerFor(value as (payload: unknown) => void) }
+  }
+  const json = wireJson(value, new Set())
+  return json === notWireable ? undefined : json
 }
 
 const serialize = (root: Attached, node: RemoteNode): TreeNode => {
