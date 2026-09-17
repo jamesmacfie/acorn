@@ -76,6 +76,24 @@ describe('a tree becomes the host’s own components', () => {
     expect(badge.textContent).toBe('shipped')
   })
 
+  it('puts the shared resize handle between a remote tree’s list and detail', async () => {
+    const h = harness()
+    h.mount()
+    h.apply([{ op: 'insert', parent: null, index: 0, node: node('n1', 'ListDetail', { split: true }, [
+      node('n2', 'ListColumn', { label: 'Tables' }, [node('n3', '#text', { value: 'users' })]),
+      node('n4', 'DetailColumn', {}, [node('n5', '#text', { value: 'rows' })]),
+    ]) }])
+    await frame()
+
+    const root = host.querySelector<HTMLElement>('.ui-listdetail')!
+    expect([...root.children].map((element) => element.className)).toEqual([
+      'ui-listdetail-list',
+      'ui-split-handle',
+      'ui-listdetail-detail',
+    ])
+    expect(root.querySelector('[role="separator"]')?.getAttribute('aria-label')).toBe('Resize list')
+  })
+
   it('patches one node without rebuilding its siblings', async () => {
     const h = harness()
     h.mount()

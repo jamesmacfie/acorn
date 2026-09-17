@@ -1067,9 +1067,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   min-height: 0;
   overflow: hidden;
 }
-.ui-listdetail[data-list] { grid-template-columns: var(--listdetail-w) minmax(0, 1fr); }
-.ui-listdetail[data-list='narrow'] { grid-template-columns: var(--listdetail-w-narrow) minmax(0, 1fr); }
-.ui-listdetail[data-list='wide'] { grid-template-columns: var(--listdetail-w-wide) minmax(0, 1fr); }
+.ui-listdetail[data-list] { grid-template-columns: var(--listdetail-w) 1px minmax(0, 1fr); }
+.ui-listdetail[data-list='narrow'] { grid-template-columns: var(--listdetail-w-narrow) 1px minmax(0, 1fr); }
+.ui-listdetail[data-list='wide'] { grid-template-columns: var(--listdetail-w-wide) 1px minmax(0, 1fr); }
 /* A flex column so a caller can stack a header, a scrolling list and a footer link in it, the
    arrangement http's sidebar already had and the other three grew towards. */
 .ui-listdetail-list {
@@ -1078,7 +1078,6 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-right: var(--chrome-divider);
 }
 /* A list column that is a document: it scrolls as one region and takes the pane's inline padding,
    the same rule `single` and `header-body-footer` apply to their bodies. */
