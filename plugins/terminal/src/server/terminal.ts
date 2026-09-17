@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, invalidateWorktreeStatus, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { acornMcp, buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, interactiveProfile, invalidateWorktreeStatus, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -374,6 +374,12 @@ async function spawnOne(
   task?: TaskRef,
 ): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
+  // The profile menu never offers one of these, but the route takes an id, and a caller that names a
+  // generate-only profile would get a PTY that exits on its own usage error. A command override is the
+  // exception: it runs its own program through a shell, so the profile's own binary never runs.
+  if (!interactiveProfile(profile) && !opts.command?.trim()) {
+    throw new Error(`The ${profile.label} agent has no interactive mode.`)
+  }
   // Dev-server pane: a command override runs via the user's shell with env merged in; otherwise the
   // profile's binary. resolveCommand stays the path for shells and agents.
   const command = opts.command?.trim() || resolveCommand(profile)
@@ -448,16 +454,10 @@ const mcpRegistered = new Set<string>()
 
 // The acorn MCP server launcher and build-flavoured name. Whether and how a CLI registers it is declared
 // by that profile contribution rather than a second profile-id lookup table.
-let configuredMcp: { name: string; launcher: Launcher } | null = null
-
-export function configureTerminalMcp(name: string, launcher: Launcher): void {
-  configuredMcp = { name, launcher }
-}
-
 // The fallback name is the packaged one: a plain Node process has no build flavour of its own, and the
-// composition root passes the real one through configureTerminalMcp before any session spawns.
-const mcpName = () => configuredMcp?.name ?? serverName(true)
-const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+// composition root sets the real one through configureAcornMcp before any session spawns.
+const mcpName = () => acornMcp()?.name ?? serverName(true)
+const mcpLauncher = () => acornMcp()?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 
 // Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
 // this covers restored and tmux-reattached sessions, which never respawn. Idempotent (remove then

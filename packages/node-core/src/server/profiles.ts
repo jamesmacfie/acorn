@@ -27,12 +27,18 @@ export const tmuxAvailable = (): boolean => onPath('tmux')
 // The shell profile is always available; agents only if their command is on PATH (docs/terminal-and-agents.md).
 export const profileAvailable = (p: ProfileDef): boolean => (p.kind === 'shell' ? true : onPath(p.command))
 
+// A profile that cannot be opened interactively is not a terminal, whatever else it can do. One that
+// only answers a single prompt reaches the Generate lists through `aiArgv` instead
+// (./modelProviders/harnessRuntime.ts), so leaving it out here costs it nothing and spares whoever
+// picked it a command that exits with a usage error.
+export const interactiveProfile = (p: ProfileDef): boolean => p.interactive !== false
+
 // `tmuxMissing` means the profile prefers the durable tmux backend but tmux is not on PATH, so
 // sessions degrade to node-pty and do not survive an app restart. The profile menu shows it as a
 // hint.
 export const listProfiles = (): TerminalProfile[] => {
   const tmux = tmuxAvailable()
-  return listProfileDefs().map((p) => ({
+  return listProfileDefs().filter(interactiveProfile).map((p) => ({
     id: p.id,
     label: p.label,
     kind: p.kind,

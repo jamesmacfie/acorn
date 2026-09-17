@@ -114,6 +114,16 @@ declared quirks. Everything downstream is shared, including the normalizer, the 
 the transcript, and permission plumbing. This is the default path for a new agent and the only path a
 loaded plugin can reach.
 
+**Picking a session back up is read off the wire, not declared.** The protocol has two ways back into a
+session the agent still holds, and they are different calls: `session/load` replays the history the
+agent kept, and `session/resume` restores the context and sends nothing back. An agent advertises
+whichever it implements at `initialize`, Claude Code the first and DeepSeek the second, so the driver
+takes it from there and a harness declares nothing. Reading only the older capability is what used to
+put a brand-new agent under an unchanged transcript on every reconnect, silently. Either call can also
+answer that it has never heard of the reference, which is an ordinary outcome for a moved checkout or a
+pruned store: the driver starts a fresh session and says so in the transcript. The
+`sessionPersistence` quirk is now about the terminal handoff alone.
+
 **Tier 2 is a native driver, first-party only, for what ACP cannot say.** Codex is the reason it
 exists. Its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
 `thread/delete`, and Codex-specific per-turn model, effort, permission, and collaboration-mode
@@ -180,6 +190,15 @@ owner's tier and per-tool preferences narrowed by the step's own ceiling, so thi
 gate to match acorn's rather than replacing it. `aiArgv` keeps `dontAsk`, because it passes
 `--tools ''`: with nothing to approve, denying whatever tries anyway is the point.
 
+**A harness may answer one question without holding a conversation.** The manifest's `oneShot` block
+sits beside `terminal` rather than inside it, so an agent with no interactive command-line interface
+still reaches every Generate control. DeepSeek is that case: `dsh --profile headless` answers a prompt
+and exits, and `dsh` alone prints a usage error. Such a harness still gets a profile row, because a
+Generate backend is read off the profile registry, and the row carries `interactive: false` so the
+terminal's profile menu leaves it out and the spawn route refuses it by name. One binary per harness
+either way: `oneShot.command` exists for a harness with no `terminal` to borrow one from, and declaring
+both is refused, because "is this installed" is a single lookup on `PATH`.
+
 **`aiArgv` is the one-shot text mode, and declaring it is the whole opt-in.** A profile that returns
 an argv from it can answer one prompt with its tools off, and that makes it two things at once: a
 profile a workflow `decide` step may name, and a backend every Generate control in acorn lists beside
@@ -224,13 +243,24 @@ declared read ceiling, and the provider's native invocation prevents file writes
 and ceiling escape. A prompt that asks the model to be read-only is not evidence. A provider without
 that conformance is shown as unavailable for the preset instead of being allowed by convention.
 
+**A contributed harness reaches acorn's own tools through the protocol.** ACP carries MCP declarations
+on `session/new` and on the call that picks a session back up, so the driver names acorn's server there
+for any harness that has no `mcp add` command of its own to register through. Claude Code and Codex
+keep the config-file door they already had, and a harness gets one door, never both.
+[mcp.md](./mcp.md) § Configuration owns this, including why the launch environment is spelled out
+rather than inherited.
+
 **What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
-answers no to `fs`, `terminal`, and `mcpServers` at `initialize`. Each is worth adopting on its own
+answers no to `fs` and `terminal` at `initialize`. `mcpServers`, the client capability, stays declined
+too, and it is a different thing from the declarations above: it would have the agent ask acorn to
+proxy an MCP server on its behalf, rather than connect to one acorn named. Each is worth adopting on its own
 merits and none of them blocks, or is blocked by, harness contributions. `fs` would make the agent ask
 acorn to read and write files, which is one audit point and the precondition for the agent and the
 worktree living on different machines. `terminal` would put agent-run commands through acorn's process
-lifecycle and into the task's terminal surfaces. `mcpServers` would replace per-CLI config-file
-registration with per-session MCP carrying the task-scoped internal token.
+lifecycle and into the task's terminal surfaces. The `mcpServers` client capability would let an agent
+hand acorn a server of its own to run and proxy, which is a different consent question from acorn
+naming its own; replacing config-file registration was the other half of that idea, and that half
+shipped through the session declarations above.
 
 **Form elicitation is declared, and it is what lets an agent ask a question at all.** Declining it is
 not neutral: Claude Code's adapter puts its own `AskUserQuestion` tool in `disallowedTools` whenever

@@ -345,6 +345,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         envPassthrough: descriptor.envPassthrough,
         quirks: descriptor.quirks,
         ...(descriptor.terminal ? { terminal: descriptor.terminal } : {}),
+        ...(descriptor.oneShot ? { oneShot: descriptor.oneShot } : {}),
         ...(descriptor.probes?.usage ? { probeUsage: probe(descriptor.probes.usage) } : {}),
         ...(descriptor.probes?.auth ? { probeAuth: probe(descriptor.probes.auth) } : {}),
       })

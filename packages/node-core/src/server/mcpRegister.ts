@@ -25,6 +25,22 @@ export const launcherSpec = (hostRuntimePath: string, mcpEntry: string, name: st
   env: { ACORN_MCP_NAME: name },
 })
 
+// The one acorn MCP server this node offers, set by whichever composition root started it, because only
+// the root knows the node binary's path and whether this is a packaged build. Read by the two plugins
+// that hand it to an agent: terminal, through the CLI's own config file, and agents, over a harness
+// protocol that carries MCP declarations (docs/mcp.md § Configuration).
+//
+// A module singleton rather than a threaded dependency, because it is a property of the process and
+// there is exactly one. `null` before the root sets it, and on a standalone node, which receives no
+// service handshake and so learns no staging directory.
+let configuredMcp: { name: string; launcher: Launcher } | null = null
+
+export const configureAcornMcp = (name: string, launcher: Launcher): void => {
+  configuredMcp = { name, launcher }
+}
+
+export const acornMcp = (): { name: string; launcher: Launcher } | null => configuredMcp
+
 export type Argv = { file: string; args: string[] }
 
 // The two command lines a harness declares. `add` is given the launcher because every CLI spells the

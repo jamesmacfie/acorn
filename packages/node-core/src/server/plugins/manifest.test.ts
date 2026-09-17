@@ -828,6 +828,51 @@ describe('chrome descriptors', () => {
     expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H-DASH'] }] }).success).toBe(false)
   })
 
+  // A harness may chat, answer one prompt, or both, and the two blocks are independent. What stays
+  // fixed is that it runs one binary, because "is this installed" is one lookup on PATH.
+  it('accepts a one-shot harness with no interactive mode, and holds it to one command', () => {
+    const deepseek = manifest({
+      harnesses: [{
+        id: 'deepseek',
+        label: 'DeepSeek',
+        spawn: { command: 'dsh', args: ['--profile', 'acp'] },
+        oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+      }],
+    })
+    expect(deepseek.success).toBe(true)
+    expect(deepseek.success && deepseek.data.contributions.harnesses[0]).toMatchObject({
+      oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+    })
+    expect(deepseek.success && deepseek.data.contributions.harnesses[0].terminal).toBeUndefined()
+
+    // Borrowing the interactive command is the common case, and needs no command of its own.
+    expect(manifest({
+      harnesses: [{
+        id: 'h',
+        label: 'H',
+        spawn: { command: 'opencode', args: ['acp'] },
+        terminal: { command: 'opencode' },
+        oneShot: { args: ['run'], output: 'text' },
+      }],
+    }).success).toBe(true)
+
+    // Nothing to run at all.
+    expect(messages(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, oneShot: { args: ['run'], output: 'text' } }],
+    }))).toEqual(['a one-shot turn needs a command, either its own or the one terminal declares'])
+
+    // Two binaries, which would give the availability check two answers.
+    expect(messages(manifest({
+      harnesses: [{
+        id: 'h',
+        label: 'H',
+        spawn: { command: 'h' },
+        terminal: { command: 'h' },
+        oneShot: { command: 'h-gen', args: ['run'], output: 'text' },
+      }],
+    }))).toEqual(['a harness runs one command; oneShot borrows the one terminal declares'])
+  })
+
   it('confines harness probe routes and insists there is a node half to serve them', () => {
     expect(nodeManifest({
       harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/board/h/usage', auth: '/v2/p/board/h/auth' } }],

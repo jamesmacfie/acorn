@@ -120,6 +120,8 @@ describe('a contributed harness becomes a driver like any other', () => {
       transport: 'pty',
       launchArgs: ['--acorn'],
     }])
+    // A `terminal` block is what makes it a terminal, so nothing says otherwise here.
+    expect(profiles[0].interactive).toBeUndefined()
     // No headless argv and no stream-JSON adapter, so a workflow step cannot name this harness. That is
     // the design, not an oversight.
     expect(profiles[0].headlessArgv).toBeUndefined()
@@ -130,16 +132,43 @@ describe('a contributed harness becomes a driver like any other', () => {
     handle.dispose()
     expect(profiles).toEqual([])
   })
+
+  // DeepSeek is the case: `dsh --profile headless` answers one prompt, and `dsh` alone has no
+  // interactive mode at all. The row still has to exist, because a Generate backend is read off the
+  // profile registry, so what keeps it out of the terminal menu is the flag rather than the absence.
+  it('registers a one-shot harness as a profile that is not a terminal', () => {
+    const { profiles, registry } = registries()
+    registry.register(harness({ oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' } }))
+
+    expect(profiles[0]).toMatchObject({
+      command: 'dsh',
+      interactive: false,
+      launchArgs: [],
+      backendPreference: 'tmux',
+    })
+    // It reaches every Generate control, which is the whole point of the row.
+    expect(profiles[0].aiArgv).toBeDefined()
+    expect(profiles[0].aiArgv!('dsh', { prompt: 'Write a commit message.' })).toEqual({
+      file: 'dsh',
+      args: ['--profile', 'headless', 'Write a commit message.'],
+    })
+  })
+
+  it('registers nothing for a harness that neither chats nor answers once', () => {
+    const { profiles, registry } = registries()
+    registry.register(harness({}))
+    expect(profiles).toEqual([])
+  })
 })
 
 // The one argv a manifest may assemble. Two variables in fixed positions, which is why it is admitted
 // where `headlessArgv` and `resumeArgv` are refused, so what these pin is the positions.
 
-const oneShotHarness = (oneShot: NonNullable<NonNullable<ManifestHarness['terminal']>['oneShot']>) =>
-  harness({ terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [], oneShot } })
+const oneShotHarness = (oneShot: NonNullable<ManifestHarness['oneShot']>) =>
+  harness({ terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] }, oneShot })
 
 const aiArgv = (
-  oneShot: NonNullable<NonNullable<ManifestHarness['terminal']>['oneShot']>,
+  oneShot: NonNullable<ManifestHarness['oneShot']>,
   opts: Parameters<NonNullable<AgentProfileContribution['aiArgv']>>[1],
 ) => {
   const { profiles, registry } = registries()

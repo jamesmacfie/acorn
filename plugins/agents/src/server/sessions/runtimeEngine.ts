@@ -1,5 +1,5 @@
-import type { CoreServices, InternalEnvFactory, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { createLogger, describeError } from '@acorn/plugin-api/node'
+import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, createLogger, describeError } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -8,7 +8,7 @@ import type {
   AgentSessionSnapshot,
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
-import type { AgentDriverEvent } from '../drivers/types'
+import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame, AgentTurnChangedEvent } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
@@ -32,6 +32,41 @@ import {
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+
+/**
+ * acorn's own tool servers for one session, or none.
+ *
+ * Two doors exist and a harness gets one. Claude Code and Codex register acorn through their own CLI
+ * (`claude mcp add`, `codex mcp add`), which their profile declares as `mcpRegistration`; telling them
+ * again over the protocol would list every acorn tool twice. A contributed harness has no such command
+ * and no manifest field for one, so the protocol is its only door. `mcpRegistration` is therefore the
+ * test, rather than a new declaration: whoever already has a door keeps it.
+ *
+ * An unregistered profile gets nothing either. The session could not have started without one, so this
+ * is a broken state rather than a case, and the conservative answer is not to hand a credential to it.
+ *
+ * The environment is spelled out rather than inherited. The agent process already holds these values,
+ * because the session environment is what acorn spawned it with, but an agent is free to scrub
+ * credential-shaped names out of what it passes its own children, and a stdio MCP server that loses
+ * `ACORN_API_TOKEN` fails every call. `ACORN_SESSION_ID` is provenance for notes and memory writes, the
+ * same value a task terminal passes; the token, not this, is what the node trusts for the session and
+ * the tool ceiling (docs/mcp.md § Launch environment).
+ */
+export function acornMcpServers(
+  mcp: { name: string; launcher: Launcher } | null,
+  session: Pick<AgentSession, 'id' | 'profileId'>,
+  sessionEnv: Record<string, string>,
+): AgentDriverMcpServer[] {
+  if (!mcp) return []
+  const profile = agentProfileRegistry.get(session.profileId)
+  if (!profile || profile.mcpRegistration) return []
+  return [{
+    name: mcp.name,
+    command: mcp.launcher.command,
+    args: mcp.launcher.args,
+    env: { ...mcp.launcher.env, ...sessionEnv, ACORN_SESSION_ID: session.id },
+  }]
+}
 
 type PublishedFrame = AgentWsFrame
   | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
@@ -66,6 +101,10 @@ export type AgentRuntimeOptions = {
   // whether a webhook's task exists.
   core: CoreServices
   internalEnv: InternalEnvFactory
+  // acorn's own MCP server, read per session rather than captured, because the composition root sets it
+  // and a test sets nothing. `null` means a session is offered no acorn tools, which is the honest
+  // answer on a standalone node: it receives no service handshake, so it learns no staging directory.
+  mcp?: () => { name: string; launcher: Launcher } | null
   secrets: SecretService
   currentUserId(): string | null
   registry?: AgentDriverRegistry
@@ -112,6 +151,7 @@ export class ManagedAgentEngine {
   protected readonly db: PluginDatabase
   protected readonly core: CoreServices
   protected readonly internalEnv: InternalEnvFactory
+  protected readonly mcp: () => { name: string; launcher: Launcher } | null
   // Every internal token this engine has handed to a provider child, so a leaked value can still be
   // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
   protected readonly mintedSecrets: string[] = []
@@ -160,6 +200,7 @@ export class ManagedAgentEngine {
     this.db = options.db
     this.core = options.core
     this.internalEnv = options.internalEnv
+    this.mcp = options.mcp ?? (() => null)
     this.currentUserId = options.currentUserId
     this.registry = options.registry ?? agentDriverRegistry
     this.publish = options.publish
@@ -333,6 +374,7 @@ export class ManagedAgentEngine {
       session,
       cwd,
       env: sessionEnv,
+      mcpServers: acornMcpServers(this.mcp(), session, sessionEnv),
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),
       onClosed: (error) => this.onProviderClosed(session.id, error),

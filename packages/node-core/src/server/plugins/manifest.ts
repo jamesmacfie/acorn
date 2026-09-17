@@ -440,11 +440,12 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: at, message: 'a task check calls a node route; declare `node` in the manifest' })
     }
   })
-  // Managed agent harnesses (docs/managed-agents.md § Harnesses). Four rules, and each one exists so a
+  // Managed agent harnesses (docs/managed-agents.md § Harnesses). Five rules, and each one exists so a
   // manifest that parses can actually run: a spawn that names neither a command nor an entry describes
   // nothing, an entry that escapes the package directory is the confinement rule every other manifest
-  // path follows, `requires` says which CLI an adapter drives and means nothing without one, and a probe
-  // route with no node half would 404 on every read.
+  // path follows, `requires` says which CLI an adapter drives and means nothing without one, a harness
+  // runs exactly one command however its two blocks name it, and a probe route with no node half would
+  // 404 on every read.
   harnesses.forEach((entry, i) => {
     const at = ['contributions', 'harnesses', i] as (string | number)[]
     const spawn = entry.spawn
@@ -456,6 +457,23 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
         code: 'custom',
         path: [...at, 'spawn', 'requires'],
         message: 'requires names the CLI an adapter drives, so it is only valid with entry',
+      })
+    }
+    // A harness has one binary, and these two rules keep it that way. A `oneShot` with no command
+    // anywhere has nothing to run; a `oneShot` naming its own beside a `terminal` names a second one,
+    // and then "is this harness installed" has two answers.
+    if (entry.oneShot !== undefined && entry.oneShot.command === undefined && entry.terminal === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'oneShot', 'command'],
+        message: 'a one-shot turn needs a command, either its own or the one terminal declares',
+      })
+    }
+    if (entry.oneShot?.command !== undefined && entry.terminal !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'oneShot', 'command'],
+        message: 'a harness runs one command; oneShot borrows the one terminal declares',
       })
     }
     if (entry.probes?.usage !== undefined) route(entry.probes.usage, [...at, 'probes', 'usage'])

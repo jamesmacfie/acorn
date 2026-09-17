@@ -12,8 +12,9 @@ import type { AgentCapability } from '@acorn/protocol/managedAgents.ts'
 export type HarnessQuirks = {
   /** The agent accepts an explicit compaction request. Gates the pane's Compact action. */
   manualCompaction?: boolean
-  /** Sessions outlive the agent process and can be reloaded. Gates resume, and with it the terminal
-   *  handoff and every "continue where you left off" path. */
+  /** Sessions outlive the agent process and can be reloaded. Gates the terminal handoff, which needs a
+   *  reference a second process can pick up. Not the driver's own reconnect: which of `session/load` and
+   *  `session/resume` an agent supports is on the wire, so the driver reads it there. */
   sessionPersistence?: boolean
 }
 

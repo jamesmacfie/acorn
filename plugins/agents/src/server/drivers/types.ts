@@ -23,10 +23,29 @@ export type AgentDriverGeneratedArtifact = {
 
 export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact
 
+/**
+ * An MCP server acorn asks the agent to connect to, for the session it is starting.
+ *
+ * Neutral of any one protocol's spelling: the generic driver converts it to ACP's stdio form. Every
+ * field is what a child process needs, so `command` is absolute (an agent may reject a relative one)
+ * and `env` carries the whole launch environment rather than relying on inheritance. An agent that
+ * scrubs credential-shaped names out of what it passes down would otherwise drop the token, which is
+ * exactly what DeepSeek does.
+ */
+export type AgentDriverMcpServer = {
+  name: string
+  command: string
+  args: string[]
+  env: Record<string, string>
+}
+
 export type AgentDriverStartOptions = {
   session: AgentSession
   cwd: string
   env: Record<string, string>
+  /** acorn's own tool servers, or empty for a harness that registers them through its CLI's config
+   *  instead (docs/mcp.md § Configuration). Empty is a real answer, never a forgotten one. */
+  mcpServers: readonly AgentDriverMcpServer[]
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>

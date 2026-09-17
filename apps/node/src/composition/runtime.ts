@@ -15,9 +15,9 @@ import { closeListener, makeRuntime, startListener } from '@acorn/node-core/serv
 import { openDataRoot, type DataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
-import { launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+import { configureAcornMcp, launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
-import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
+import { refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
 import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry/collector.ts'
@@ -77,7 +77,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   // the whole boot (node-core server/core/loginShellPath.ts, docs/node-distribution.md § Boot order).
   beginLoginShellPath(config.isPackaged)
   mark('login-shell')
-  configureTerminalMcp(
+  configureAcornMcp(
     serverName(config.isPackaged),
     launcherSpec(config.hostRuntimePath, config.mcpEntry, serverName(config.isPackaged)),
   )

@@ -1,5 +1,5 @@
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import { acornMcp, agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -130,6 +130,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         hooks: ctx.hooks,
         telemetry: ctx.telemetry,
         internalEnv: deps.internalEnv,
+        // Whatever the root configured, read here rather than captured: a harness session started
+        // before the root set it would otherwise keep offering no tools for the life of the process.
+        mcp: acornMcp,
         secrets: core.secrets,
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
