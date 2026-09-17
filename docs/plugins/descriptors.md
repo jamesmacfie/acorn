@@ -332,7 +332,13 @@ are the same either way, and a plugin cannot tell which entry answered.
 **A node is `{ id, type, props, children }`.** `type` is a kit node name. `id` is minted by the
 sandbox adapter and is stable for the node's life; it is what events and patches address. `props` is a
 plain object. Text is its own node (`#text`), never an attribute, so the wire has one node shape
-rather than two.
+rather than two. A prop cannot contain more UI: a shell component may accept a JSX-valued slot such
+as `Tabs.actions`, but a remote tree spells that control as an ordinary child or sibling node. The
+sandbox copies JSON data out of framework proxies before posting it, leaves out a field whose value is
+`undefined` the way `JSON.stringify` does, and drops a prop containing a function, cycle or class
+instance, so one bad prop cannot stop the shared plugin worker. A kit node reads its props
+defensively for the same reason: the host validates them one at a time and draws the node without the
+ones it refused, so a node that throws on a missing prop would take its whole region down.
 
 **Five mutation kinds, in a coalesced batch** — per animation frame on the desktop, per timer turn in
 a terminal, which is the host's decision rather than the protocol's: `insert(parent, index, node)`, `remove(id)`,

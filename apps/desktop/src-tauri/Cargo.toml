@@ -46,3 +46,9 @@ tauri-plugin-notification = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# One function, for one problem: lending a dev build an installed acorn's identity so its banners
+# are not labelled Terminal (src/commands.rs). tauri-plugin-notification already pulls this crate in
+# under notify-rust, so naming it here compiles nothing new.
+mac-notification-sys = "0.6"
