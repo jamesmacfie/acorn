@@ -289,8 +289,12 @@ export async function forEachConnection<T>(
 }
 
 export function externalRefForConnection(row: StoredConnection, identifier: string, input?: Partial<ExternalRef>): ExternalRef {
-  if (input?.providerId && input.providerId !== row.provider) throw new ProviderOperationError('provider_bad_config', 400)
-  if (input?.connectionId && input.connectionId !== row.id) throw new ProviderOperationError('provider_bad_config', 400)
+  if (input?.providerId && input.providerId !== row.provider) {
+    throw new ProviderOperationError('provider_bad_config', 400, `The reference claims provider '${input.providerId}', but connection ${row.id} is a ${row.provider} connection.`)
+  }
+  if (input?.connectionId && input.connectionId !== row.id) {
+    throw new ProviderOperationError('provider_bad_config', 400, `The reference claims connection '${input.connectionId}', but it is being stamped onto ${row.id}.`)
+  }
   const fallback = {
     providerId: row.provider,
     connectionId: row.id,
@@ -300,9 +304,11 @@ export function externalRefForConnection(row: StoredConnection, identifier: stri
     locator: input?.locator,
   }
   const provider = integrationProviderRegistry.get(row.provider)
-  if (!provider) throw new ProviderOperationError('provider_bad_config', 400)
+  if (!provider) throw new ProviderOperationError('provider_bad_config', 400, `No integration provider named '${row.provider}' is registered on this node.`)
   const parsed = provider.externalIds.parse(fallback, fallback)
-  if (!parsed || parsed.connectionId !== row.id || parsed.displayId !== identifier) throw new ProviderOperationError('provider_bad_config', 400)
+  if (!parsed || parsed.connectionId !== row.id || parsed.displayId !== identifier) {
+    throw new ProviderOperationError('provider_bad_config', 400, `Provider '${row.provider}' did not accept its own reference for '${identifier}'.`)
+  }
   return parsed
 }
 

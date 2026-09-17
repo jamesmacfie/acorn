@@ -13,11 +13,24 @@ describe('linear project source', () => {
   const respond = (body: unknown, status = 200) =>
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
 
-  it('projects Linear projects onto the host shape', async () => {
-    respond({ data: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } } })
+  // The source asks twice, once per kind, so the stub answers on what the query names.
+  const respondByQuery = (bodies: { projects: unknown; teams: unknown }) =>
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {
+      const query = String(JSON.parse(String(init.body)).query)
+      return Promise.resolve(new Response(JSON.stringify({ data: query.includes('teams') ? bodies.teams : bodies.projects })))
+    }))
+
+  it('projects Linear projects and teams onto the host shape', async () => {
+    respondByQuery({
+      projects: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } },
+      teams: { teams: { nodes: [{ id: 'team-1', name: 'Engineering' }] } },
+    })
     await expect(list()).resolves.toEqual([
       { id: 'proj-1', label: 'Platform' },
       { id: 'proj-2', label: 'Mobile' },
+      // Prefixed, because core stores this id as-is and the rail's filter reads the prefix back to
+      // decide which Linear field to match on.
+      { id: 'team:team-1', label: 'Engineering (team)' },
     ])
   })
 

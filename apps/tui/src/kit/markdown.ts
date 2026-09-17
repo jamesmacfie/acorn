@@ -130,7 +130,10 @@ export function htmlLines(html: string): Line[] {
     if (name === 'a' && closing) {
       const opened = html.slice(0, tag.index).lastIndexOf('<a ')
       const href = opened >= 0 ? attr(html.slice(opened, tag.index), 'href') : undefined
-      if (href) runs.push({ text: ` (${href})`, role: 'muted' })
+      // Not when the link's text is already the URL, which is what an autolinked bare address is:
+      // printing it twice is noise, not information.
+      const text = decodeHTML(html.slice(opened, tag.index).replace(/^[^>]*>/, ''))
+      if (href && text !== href) runs.push({ text: ` (${href})`, role: 'muted' })
     }
   }
   const tail = decodeHTML(html.slice(at))
