@@ -746,13 +746,13 @@ region holds a `ListDetail`, because its two columns are one surface over one mo
 regions the host mounts apart.
 
 A pane or a region that puts a list beside a detail uses that node, not a hand-rolled grid. It
-owns the split, the three column widths (`narrow` for an identifier switcher, the default for a browse
-list, `wide` for a column that holds a document rather than a picker), the `--chrome-divider` between
-them, and each column's flex/overflow behaviour. Its consumers are the Rollbar, Linear, API and
-Database panes plus the Editor, Notes, Agents and Changes task panes, and Rollbar's occurrence
-workbench and GitHub's browse each nest one inside another; before it existed those eight had eight
-column widths and two different border roles, which is why they read as variations on a pane rather
-than the same pane.
+owns the split, the drag handle, the three column widths (`narrow` for an identifier switcher, the
+default for a browse list, `wide` for a column that holds a document rather than a picker), the
+`--chrome-divider` between them, and each column's flex/overflow behaviour. GitHub and Workflows
+reach it through `SourceSurface`; Linear, Database, Rollbar, Docker, Editor and the workflow editor
+use it directly, including the nested splits in GitHub and Rollbar. HTTP and the compiled task panes
+whose list and detail are separate host regions use the `list-detail` layout instead. Both paths own
+the same resize behaviour, so a plugin never supplies its own grid or pointer handlers.
 
 A list column is flush and scrolls its own rows. A column holding a document instead says so with
 `scroll`, and then it scrolls as one region and takes the pane's inline padding, the same rule

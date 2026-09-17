@@ -5,7 +5,7 @@ import {
 import { Dynamic, Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from '../lib/anchor'
 import { createArmedConfirm } from '../lib/confirm'
-import type { SplitDrag } from '../lib/split'
+import { createSplitDrag, type SplitDrag } from '../lib/split'
 import { createCollection, createDomCollection, type ItemProps } from '../keys/collection'
 import type { Size, Tone } from '../tokens/tokens'
 
@@ -1458,6 +1458,9 @@ export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
 
 /* ListDetail: list beside detail. See docs/ui-design.md § Two-column panes for what it replaces,
    the layout rules, and when not to use it. */
+const MIN_LIST_DETAIL_WIDTH = 120
+const MAX_LIST_DETAIL_FRACTION = 0.6
+
 export function ListDetail(props: {
   list?: JSX.Element
   /** Two columns given as `ListColumn` and `DetailColumn` children instead of through `list`. */
@@ -1481,24 +1484,61 @@ export function ListDetail(props: {
   // column came out empty, because the three copies fought over the same nodes. `children()`
   // resolves the prop once and hands the same nodes to all three readers.
   const list = children(() => props.list)
+  const columns = children(() => props.children)
+  const [width, setWidth] = createSignal(0)
+  let root: HTMLDivElement | undefined
+  let dragStart: number | null = null
+  const currentListWidth = () => {
+    const first = root?.firstElementChild
+    return width() || (first instanceof HTMLElement ? first.offsetWidth : 0) || MIN_LIST_DETAIL_WIDTH
+  }
+  // Clamp to this split, not the window: ListDetail is also nested inside detail columns (Rollbar
+  // and GitHub), and each nesting level owns only the room its parent gave it.
+  const ceiling = () => {
+    const extent = root?.offsetWidth ?? 0
+    return extent > 0 ? extent * MAX_LIST_DETAIL_FRACTION : Number.POSITIVE_INFINITY
+  }
+  const drag = createSplitDrag({
+    axis: 'x',
+    label: 'Resize list',
+    onStart: () => { dragStart = currentListWidth() },
+    onDelta: (deltaPx) => {
+      const from = dragStart ?? currentListWidth()
+      setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_DETAIL_WIDTH), ceiling()))
+    },
+    onCommit: () => { dragStart = null },
+  })
+  const handle = () => <SplitHandle axis="x" drag={drag} />
   return (
     <div
+      ref={root}
       class="ui-listdetail"
       data-list={list() !== undefined || props.split ? (props.listWidth ?? 'default') : undefined}
+      style={width() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
     >
-      <Show when={list() !== undefined} fallback={props.children}>
+      <Show
+        when={list() !== undefined}
+        fallback={
+          <Show when={props.split} fallback={columns()}>
+            {columns.toArray()[0]}
+            {handle()}
+            {columns.toArray().slice(1)}
+          </Show>
+        }
+      >
         <>
           {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
               screen reader tells two same-shaped columns apart. */}
           <aside class="ui-listdetail-list" aria-label={props.listLabel}>
             {list()}
           </aside>
+          {handle()}
           <Dynamic
             component={props.detailAs ?? 'div'}
             class="ui-listdetail-detail"
             data-scroll={props.scrollDetail ? '' : undefined}
           >
-            {props.children}
+            {columns()}
           </Dynamic>
         </>
       </Show>

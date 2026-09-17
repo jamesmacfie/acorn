@@ -146,6 +146,9 @@
 .task-slot { position: relative; flex: 1 1 0; display: flex; min-height: 0; overflow: hidden; outline: none; }
 .task-slot:focus-visible { box-shadow: var(--ring); }
 .task-slot > .pane { flex: 1; min-width: 0; }
+/* The fixed switcher owns the shared edge. A pane keeps its right divider everywhere else, but
+   leaving it on the final task pane would stack it with the switcher's left divider. */
+.task-pane-row > .task-slot:last-child > .pane { border-right: 0; }
 /* SplitHandle owns the hit area, the hairline and the hover/focus tone (ui/split.ts + primitives.css). */
 .pane-slot-actions { position: absolute; top: 4px; right: 4px; z-index: calc(var(--z-resizer) + 1); display: flex; gap: var(--space-1); }
 .contribution-failed { align-items: center; justify-content: center; gap: var(--space-4); }
