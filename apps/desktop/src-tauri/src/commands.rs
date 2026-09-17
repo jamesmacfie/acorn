@@ -156,8 +156,33 @@ const ACTIVATION_WINDOW: Duration = Duration::from_secs(30);
 ///
 /// No sound is ever asked for. The chime is the client's, and it plays whether or not the OS agreed
 /// to draw a banner, so asking for both is how you get two sounds for one event.
+/// Dev banners say "Terminal" because `tauri-plugin-notification` hands macOS `com.apple.Terminal`
+/// whenever `tauri::is_dev()`: an unbundled binary has no identity LaunchServices can resolve, and a
+/// banner needs one. An installed acorn has an identity we can borrow, and the plugin sets its own
+/// through a `Once`, so getting in first is the whole trick.
+///
+/// No installed acorn means no change, on purpose: an identity macOS cannot resolve does not fall
+/// back to Terminal, it burns the `Once` and leaves the process unable to post at all. The ceiling
+/// is that the banner then belongs to whichever acorn is installed rather than to the dev build, so
+/// a click on it may wake that copy instead. Clicks are read from window focus (`window_focused`),
+/// which is unaffected.
+#[cfg(target_os = "macos")]
+fn borrow_installed_identity() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        if !tauri::is_dev() {
+            return;
+        }
+        if let Some(bundle) = mac_notification_sys::get_bundle_identifier("acorn") {
+            let _ = mac_notification_sys::set_application(&bundle);
+        }
+    });
+}
+
 #[tauri::command]
 pub fn show_notification(app: AppHandle, title: String, body: Option<String>, tag: String) -> bool {
+    #[cfg(target_os = "macos")]
+    borrow_installed_identity();
     let notification = app.notification();
     let granted = matches!(notification.permission_state(), Ok(PermissionState::Granted))
         || matches!(notification.request_permission(), Ok(PermissionState::Granted));

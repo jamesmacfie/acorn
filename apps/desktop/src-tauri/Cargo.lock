@@ -11,6 +11,7 @@ dependencies = [
  "hex",
  "keyring",
  "libc",
+ "mac-notification-sys",
  "serde",
  "serde_json",
  "tauri",

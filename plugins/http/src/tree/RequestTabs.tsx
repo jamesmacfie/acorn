@@ -2,7 +2,7 @@
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
 // panels, Bruno's arrangement, and it keeps the current mode visible from any tab.
 import { createMemo, createSignal, Show } from 'solid-js'
-import { Field, Input, KeyValueEditor, Select, Stack, TabPanel, Tabs, Text, Textarea } from '@acorn/plugin-api/ui/tree'
+import { Field, Input, KeyValueEditor, Select, Stack, TabPanel, Tabs, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui/tree'
 import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
 import type { Draft } from './draft'
 
@@ -152,26 +152,28 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
 
   return (
     <Stack gap="row">
-      {/* The mode selectors sit in the strip's trailing slot rather than inside their panels —
-          Bruno's arrangement, and it keeps the current mode visible from any tab. Was a sibling div
-          plus a `.ui-tabs` override to make room for it. */}
-      <Tabs
-        tabs={tabs()}
-        active={tab()}
-        onChange={(id: string) => setTab(id as RequestTab)}
-        idPrefix="http-request"
-        ariaLabel="Request"
-        actions={
-          <>
-            <Show when={tab() === 'body'}>
-              <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: m === 'form' ? 'form-urlencoded' : m }))]} />
-            </Show>
-            <Show when={tab() === 'auth'}>
-              <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: m === 'apikey' ? 'API key' : m }))]} />
-            </Show>
-          </>
-        }
-      />
+      <Stack gap="none">
+        <Tabs
+          tabs={tabs()}
+          active={tab()}
+          onChange={(id: string) => setTab(id as RequestTab)}
+          idPrefix="http-request"
+          ariaLabel="Request"
+        />
+        {/* A remote-tree prop is data, not another tree. Passing these controls through Tabs.actions
+            put Solid nodes and handlers onto the worker message and stopped both API regions with a
+            DataCloneError. Keep them adjacent to the strip as ordinary tree children instead. */}
+        <Show when={tab() === 'body'}>
+          <Toolbar variant="actions" size="sm">
+            <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: m === 'form' ? 'form-urlencoded' : m }))]} />
+          </Toolbar>
+        </Show>
+        <Show when={tab() === 'auth'}>
+          <Toolbar variant="actions" size="sm">
+            <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: m === 'apikey' ? 'API key' : m }))]} />
+          </Toolbar>
+        </Show>
+      </Stack>
 
       <TabPanel idPrefix="http-request" id={tab()} active={tab()}>
         <Show when={tab() === 'params'}>
