@@ -812,6 +812,16 @@ A snapshot read and the socket can disagree about a usage line, because both sid
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
 unions the two payloads, socket first, so no reported field is lost either way.
 
+**The snapshot route caps its event list, so loading a session is a walk, not a read.** `GET
+/sessions/:id` returns at most 2,000 events, oldest first, and a session reaches that in about half an
+hour of streaming: text deltas land at 40 ms each and a 7,000-event session on this machine's database
+is 5,500 deltas against 26 messages. `loadSnapshot` compares the session row's `lastEventSeq` against
+the highest event it holds and pages `GET /sessions/:id/events?afterSeq=` until the two agree. Without
+that walk the store stopped at the cap, and because the socket appends past it live, the gap only
+appeared on a reload — a long transcript reopened hours behind its last message, which read as lost
+messages rather than a short read. The events were always in SQLite; the Node commits each one as it
+arrives.
+
 ## New-session defaults
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
