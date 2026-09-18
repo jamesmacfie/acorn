@@ -165,6 +165,30 @@ function indexEvents(sessionId: string, events: AgentEventRecord[]): void {
   else usageLines.set(sessionId, { at, turnId: events[at].turnId })
 }
 
+// Walk the event pages the snapshot route left behind.
+//
+// That route caps its event list, so a session past the cap arrives with its *oldest* events and
+// nothing after them. Live that went unnoticed, because the socket appends each new event to the
+// store as it lands; a reload dropped the in-memory half and refilled from the capped read, so a long
+// transcript reopened at the cap and every message after it looked lost. They were never lost: the
+// node writes each event to SQLite as it arrives, and this is the read catching up to the write.
+//
+// `lastEventSeq` on the session row counts the whole ledger, so it is what says whether there is more
+// to fetch. A page that comes back empty ends the walk too, so a ledger whose rows were pruned below
+// the counter costs one request rather than looping.
+async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot): Promise<AgentEventRecord[]> {
+  const events = [...snapshot.events]
+  let cursor = events.at(-1)?.seq ?? 0
+  while (cursor < snapshot.session.lastEventSeq) {
+    const page = await managedAgentApi.events(sessionId, cursor)
+    const last = page.events.at(-1)
+    if (!last) break
+    events.push(...page.events)
+    cursor = last.seq
+  }
+  return events
+}
+
 // Seat one event in a seq-ordered array. Almost always a push: events arrive in order, so the old
 // `[...events, event].sort()` was copying a few thousand rows and sorting an already-sorted array on
 // every frame. A reconnect replay can still deliver one out of order, and that has to stay correct,
@@ -393,9 +417,10 @@ export const managedAgentStore = {
     const run: Promise<AgentSessionSnapshot> = (async () => {
       const incoming = await managedAgentApi.snapshot(sessionId)
       if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
-      let snapshot = incoming
+      const full = { ...incoming, events: await pageToEnd(sessionId, incoming) }
+      let snapshot = full
       setSnapshots((current) => {
-        snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(current[sessionId], incoming))
+        snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(current[sessionId], full))
         return { ...current, [sessionId]: snapshot }
       })
       agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)

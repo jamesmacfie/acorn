@@ -22,9 +22,16 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   const [suppressed, setSuppressed] = createSignal(false)
   let ensureVersion = 0
 
+  // Where the view was last told to sit. The poll below asks the same question five times a second
+  // and the answer is usually the same one, which is not worth a message across the seam.
+  let placed = ''
+
   const syncRect = () => {
     if (!preview || !host) return
     const r = host.getBoundingClientRect()
+    const next = `${r.left},${r.top},${r.width},${r.height}`
+    if (next === placed) return
+    placed = next
     preview.setBounds(props.taskId, { x: r.left, y: r.top, width: r.width, height: r.height })
   }
 
@@ -47,7 +54,16 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     // page is observed too, in place of the `window` resize listener this used to carry.
     ro.observe(host)
     ro.observe(document.documentElement)
-    const poll = setInterval(checkOcclusion, 200)
+    // Size is observed above; nothing reports that the box has *moved*. An ancestor scrolling, a
+    // fixed rail arriving beside the panes, a stylesheet landing a frame late in dev — each leaves
+    // the view sitting where the box used to be, and somebody else's pixels over the tab rails is
+    // what that looks like. So the question is asked again on the tick the occlusion check already
+    // runs on. The ceiling is a fifth of a second of lag behind a fast drag, and the observer above
+    // still covers everything that does change size.
+    const poll = setInterval(() => {
+      syncRect()
+      checkOcclusion()
+    }, 200)
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
       setLoading(s.loading)
@@ -85,6 +101,10 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     }
     void preview.ensure(taskId, url).then((ready) => {
       if (!ready || version !== ensureVersion) return
+      // A view the shell has just created is a 1x1 square in the corner, and the bounds call that
+      // ran before `ensure` found no view to move, so this one placement cannot be the one the
+      // memo above skips.
+      placed = ''
       syncRect()
       if (!suppressed()) preview.show(taskId)
     })
