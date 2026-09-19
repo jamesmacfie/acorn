@@ -186,6 +186,17 @@ pub fn run() {
                     menu::request_quit(app);
                 }
             }
+            // The keyboard, on a window nobody has clicked yet. `open_window` runs in `setup`, before
+            // the event loop, so wry makes the webview the window's first responder while macOS has
+            // not activated the app; activation can then settle on the window itself, and a first
+            // responder that is not the webview means no key reaches the page at all. Ready is the
+            // first tick after activation, and the last one before the renderer exists to have a
+            // child webview of its own that the focus would be taken from.
+            RunEvent::Ready => {
+                if let Some(webview) = app.get_webview("main") {
+                    let _ = webview.set_focus();
+                }
+            }
             // The click on a system notification, as near as desktop Tauri gets to one
             // (src/commands.rs, `window_focused`).
             RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {

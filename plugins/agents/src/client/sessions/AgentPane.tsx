@@ -7,8 +7,8 @@ import {
 } from '@acorn/protocol/extensionPoints.ts'
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import {
-  Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker,
-  Stack, Text, Toolbar,
+  Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, IconButton, Inline, Input, Menu, Modal,
+  Picker, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { registerSessionActionCommands } from '../commands'
@@ -123,16 +123,14 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               ariaLabel="Session actions"
               placement="bottom-end"
               trigger={({ toggle, open }) => (
-                <Button
-                  size="sm"
-                  iconOnly
+                <IconButton
+                  variant="outline"
+                  icon="ellipsis"
                   label="Session actions"
                   opens="menu"
                   expanded={open()}
                   onPress={toggle}
-                >
-                  <Icon name="ellipsis" />
-                </Button>
+                />
               )}
             >
               {(menu) => (
@@ -171,15 +169,12 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         isDisabled={(item) => !item.installed || model.creating()}
         onSelect={(item) => void model.createSession(item)}
         tools={
-          <Button
-            variant="bare"
-            iconOnly
+          <IconButton
+            icon="refresh-cw"
             title="Refresh provider health"
             label="Refresh provider health"
             onPress={() => void model.refreshProviders()}
-          >
-            <Icon name="refresh-cw" />
-          </Button>
+          />
         }
       />
     </Toolbar>

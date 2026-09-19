@@ -2,8 +2,8 @@ import { Show } from 'solid-js'
 import { bytesOf, formatSize, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Button, Checkbox, EmptyState, Input, Markdown, Row, Rows, Section, Stack, Text, Textarea,
-  ToggleButton, Toolbar,
+  Alert, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Row, Rows, Section, Stack, Text,
+  Textarea, ToggleButton, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
 import type { NoteScope, NoteSummary } from './notesClient'
@@ -19,7 +19,7 @@ const authorBadge = (author: NoteSummary['author']): string => (author === 'agen
 export function NotesHeader(props: { task: Task; model: NotesModel }) {
   const model = () => props.model
   return (
-    <Toolbar size="sm" ariaLabel="Notes library">
+    <Toolbar ariaLabel="Notes library">
       <Text emphasis="muted">{model().workspace()?.name ?? 'workspace'}</Text>
       <Input kind="filter" size="sm" label="Filter notes" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
     </Toolbar>
@@ -31,14 +31,12 @@ export function NotesHeader(props: { task: Task; model: NotesModel }) {
 function LibraryToggle(props: { task: Task }) {
   const collapsed = () => libraryCollapsed(props.task.id)
   return (
-    <Button
-      variant="bare"
-      size="sm"
-      iconOnly
+    <IconButton
+      icon={collapsed() ? 'chevron-right' : 'chevron-left'}
       title={collapsed() ? 'Show library' : 'Hide library'}
       label={collapsed() ? 'Show library' : 'Hide library'}
       onPress={() => setLibraryCollapsed(props.task.id, !collapsed())}
-    >{collapsed() ? '▶' : '◀'}</Button>
+    />
   )
 }
 
@@ -70,14 +68,12 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
         leading={<IncludeBox scope={rowProps.scope} note={rowProps.note} />}
         meta={authorBadge(rowProps.note.author)}
         trailing={
-          <Button
-            variant="bare"
-            size="sm"
-            iconOnly
+          <IconButton
+            icon={armed() ? 'circle-help' : 'x'}
             title={armed() ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
             label="Delete note"
             onPress={() => void model().remove(rowProps.scope, rowProps.note.slug)}
-          >{armed() ? '?' : '✕'}</Button>
+          />
         }
       >
         {rowProps.note.title}
@@ -86,10 +82,8 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
   }
 
   const NewButton = (headProps: { label: string; scope: NoteScope }) => (
-    <Button
-      variant="bare"
-      size="sm"
-      iconOnly
+    <IconButton
+      icon="plus"
       tone="accent"
       title={`New ${headProps.label} note`}
       label={`New ${headProps.label} note`}
@@ -100,7 +94,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
         // asks for the focus and the title field answers.
         if (made) model().requestTitleFocus()
       })}
-    >+</Button>
+    />
   )
 
   const virtualScratchpad = (): NoteSummary => ({
@@ -160,14 +154,14 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
           when={model().selected()}
           fallback={
             <>
-              <Toolbar size="sm" ariaLabel="Note actions"><LibraryToggle task={props.task} /></Toolbar>
+              <Toolbar ariaLabel="Note actions"><LibraryToggle task={props.task} /></Toolbar>
               <EmptyState>Select or create a note.</EmptyState>
             </>
           }
         >
           {(sel) => (
             <>
-              <Toolbar size="sm" ariaLabel="Note actions">
+              <Toolbar ariaLabel="Note actions">
                 <LibraryToggle task={props.task} />
                 <Input
                   kind="bare"

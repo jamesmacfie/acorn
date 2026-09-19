@@ -1,6 +1,6 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
-import Icon from '../content/Icon'
-import { Button, StatusDot } from '../primitives'
+import { IconButton } from '../inputs/IconButton'
+import { StatusDot } from '../primitives'
 
 export type DocTabDef = {
   id: string
@@ -104,15 +104,11 @@ export function DocumentTabs(props: {
               </Show>
             </button>
             <Show when={props.onClose}>
-              <Button
-                variant="bare"
-                size="sm"
-                iconOnly
+              <IconButton
+                icon="x"
                 label={`Close ${tab.label}`}
                 onPress={() => props.onClose?.(tab.id)}
-              >
-                <Icon name="x" />
-              </Button>
+              />
             </Show>
           </div>
         )}</For>

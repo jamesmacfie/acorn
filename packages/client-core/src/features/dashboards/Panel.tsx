@@ -6,7 +6,7 @@ import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { runChromeAction } from '../../host/chrome/actions'
 import { createActiveWorkspaceId } from '../workspaces/activeWorkspaceId'
 import { Alert, Button, Card, EmptyState } from '../../kit/components/primitives'
-import Icon from '../../kit/components/content/Icon'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { createPanelData } from './data'
 import type { PanelDefinition } from './model'
 import PanelBody from './views/PanelBody'
@@ -139,16 +139,14 @@ export default function Panel(props: PanelProps) {
             <span class="muted">{FRESHNESS_LABELS[data.freshness()!]}</span>
           </Show>
         </span>
-        <Button
+        <IconButton
           size="xs"
           variant="ghost"
-          iconOnly
+          icon="refresh-cw"
           title={data.refreshSeconds() ? `Refreshes every ${data.refreshSeconds()}s` : 'Refresh'}
           label={`Refresh ${props.definition.title}`}
           onPress={() => data.refresh()}
-        >
-          <Icon name="refresh-cw" />
-        </Button>
+        />
         {props.actions}
       </div>
 

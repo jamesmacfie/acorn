@@ -1,8 +1,8 @@
 import { createSignal, Index, Show } from 'solid-js'
-import { Button, Input } from '../../kit/components/primitives'
+import { Input } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { createArmedConfirm } from '../../kit/lib/confirm'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
-import Icon from '../../kit/components/content/Icon'
 import { ContextMenu, Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
@@ -199,16 +199,14 @@ export default function DashboardTabs(props: {
                 ariaLabel={`${tab().name} dashboard actions`}
                 placement="bottom-start"
                 trigger={({ open, toggle }) => (
-                  <Button
+                  <IconButton
                     size="xs"
                     variant="ghost"
-                    iconOnly
+                    icon="chevron-down"
                     label={`${tab().name} dashboard actions`}
                     {...(open() ? { 'data-open': '' } : {})}
                     onPress={toggle}
-                  >
-                    <Icon name="chevron-down" />
-                  </Button>
+                  />
                 )}
               >
                 {(menu) => verbs(tab(), menu)}
@@ -220,17 +218,15 @@ export default function DashboardTabs(props: {
 
       {/* The ghost `+`. Past the cap it stays visible and disabled: a button that vanishes at eight
           is a bug report. */}
-      <Button
+      <IconButton
         size="xs"
         variant="ghost"
-        iconOnly
+        icon="plus"
         label="New dashboard"
         title={props.tabs.length >= MAX_TABS ? `${MAX_TABS} dashboards is the limit.` : 'New dashboard'}
         disabled={props.tabs.length >= MAX_TABS}
         onPress={create}
-      >
-        <Icon name="plus" />
-      </Button>
+      />
 
       <ContextMenu
         at={menuAt}

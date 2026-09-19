@@ -44,6 +44,12 @@ stages them with the pinned Node runtime and the migration chains, then runs `ta
 Vite renderer on port 4319. `pnpm dev:node` runs the standalone Node and prints one JSON handshake
 line containing endpoint, fingerprint, certificate, Node ID, and device token.
 
+`pnpm dev:no-watch` is the same run with the Rust watcher off. `tauri dev` otherwise rebuilds and
+relaunches the app on every change under `src-tauri`, which takes the window away from whoever is
+using it, so start this way when somebody is working in the app while the shell is being edited.
+Pick the new binary up by stopping it and starting `pnpm dev` again. Renderer hot reload is Vite's
+and works the same either way.
+
 ### Agent-driven desktop development
 
 An agent on a graphical development host can launch and drive a real Acorn window without using the

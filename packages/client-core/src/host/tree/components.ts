@@ -25,6 +25,7 @@ import Picker from '../../kit/components/inputs/Picker'
 import PickerRow from '../../kit/components/inputs/PickerRow'
 import Popover from '../../kit/components/overlays/Popover'
 import CopyButton from '../../kit/components/inputs/CopyButton'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import MentionTextarea from '../../kit/components/inputs/MentionTextarea'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { RowActions } from '../../kit/components/layout/RowActions'
@@ -75,7 +76,7 @@ export const KIT_COMPONENTS: KitTable = {
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log,
   EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
-  Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
+  Button, IconButton, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
   Rectangle,
   Only, Fallback,

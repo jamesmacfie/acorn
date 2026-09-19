@@ -527,6 +527,11 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   background: var(--bg-subtle);
   border-bottom: var(--chrome-divider);
 }
+/* `sm` is a strip inside a pane's contents — a filter row, a find bar, a status line under a body.
+   It is not a size to pick for a pane's own top bar, a list column's header or a detail column's
+   header: those are chrome, they sit at `--pane-head-h` like `SectionHeader` does, and four of them
+   had drifted to this rung, which is why the browser preview's address bar was half the height of
+   the agents header one pane over. Chrome is 48, a strip inside it is 26. */
 .ui-toolbar[data-size='sm'] { min-height: var(--control-h-sm); gap: var(--space-3); padding: 0 var(--space-4); }
 /* A filter strip is an input, not a row of buttons, and an input flush against the divider above
    and the first row below reads as part of the list. Only the filter strip gets the inset, so the

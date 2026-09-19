@@ -561,6 +561,7 @@ ui/tree: Fold
 ui/tree: Grid
 ui/tree: Heading
 ui/tree: Icon
+ui/tree: IconButton
 ui/tree: Inline
 ui/tree: Input
 ui/tree: KIT_NODE_COMPONENTS
@@ -656,6 +657,7 @@ ui: GraphPoint
 ui: Grid
 ui: Heading
 ui: Icon
+ui: IconButton
 ui: Inline
 ui: Input
 ui: Kbd

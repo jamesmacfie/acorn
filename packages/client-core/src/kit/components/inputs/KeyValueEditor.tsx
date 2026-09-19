@@ -1,6 +1,6 @@
 import { createMemo, Index, Show, type JSX } from 'solid-js'
-import Icon from '../content/Icon'
-import { Button, Checkbox, Input } from '../primitives'
+import { IconButton } from './IconButton'
+import { Checkbox, Input } from '../primitives'
 
 export type KVRow = { enabled?: boolean; key: string; value: string }
 
@@ -83,15 +83,11 @@ export function KeyValueEditor(props: {
                 {(column) => <>{column().render(row(), (patch) => write(index, patch), index)}</>}
               </Index>
               <Show when={index < props.rows.length} fallback={<span />}>
-                <Button
-                  variant="bare"
-                  size="sm"
-                  iconOnly
+                <IconButton
+                  icon="x"
                   label="Remove row"
                   onPress={() => props.onChange(props.rows.filter((_, i) => i !== index))}
-                >
-                  <Icon name="x" />
-                </Button>
+                />
               </Show>
             </div>
             <Show when={props.rowHint?.(row())}>

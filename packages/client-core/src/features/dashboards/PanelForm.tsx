@@ -1,5 +1,6 @@
 import { createMemo, createResource, Index, Show } from 'solid-js'
 import { Alert, Button, Field, Input, SectionHeader, SegmentedControl, Select } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Fold } from '../../kit/components/layout/Fold'
 import Icon from '../../kit/components/content/Icon'
 import { chartAxisFields, type ChartShape } from './chart'
@@ -76,9 +77,7 @@ const AGGREGATES: readonly { value: PanelAggregate; label: string }[] = [
 ]
 
 export const removeButton = (label: string, onClick: () => void) => (
-  <Button size="xs" variant="ghost" iconOnly label={label} onPress={onClick}>
-    <Icon name="x" />
-  </Button>
+  <IconButton size="xs" variant="ghost" icon="x" label={label} onPress={onClick} />
 )
 
 /** The chosen collections, each removable. */
@@ -606,39 +605,31 @@ export function ShapingSection(props: { draft: PanelDraft }) {
         <Index each={draft().visible()}>
           {(id, index) => (
             <li class="dash-editor-field">
-              <Button size="xs" variant="ghost" iconOnly label="Hide field" onPress={() => draft().toggleField(id(), false)}>
-                <Icon name="eye" />
-              </Button>
+              <IconButton size="xs" variant="ghost" icon="eye" label="Hide field" onPress={() => draft().toggleField(id(), false)} />
               <span class="dash-editor-field-name">{draft().fieldById(id())?.name ?? id()}</span>
-              <Button
+              <IconButton
                 size="xs"
                 variant="ghost"
-                iconOnly
+                icon="chevron-up"
                 label="Move up"
                 disabled={index === 0}
                 onPress={() => draft().moveField(index, -1)}
-              >
-                <Icon name="chevron-up" />
-              </Button>
-              <Button
+              />
+              <IconButton
                 size="xs"
                 variant="ghost"
-                iconOnly
+                icon="chevron-down"
                 label="Move down"
                 disabled={index === draft().visible().length - 1}
                 onPress={() => draft().moveField(index, 1)}
-              >
-                <Icon name="chevron-down" />
-              </Button>
+              />
             </li>
           )}
         </Index>
         <Index each={draft().hidden()}>
           {(field) => (
             <li class="dash-editor-field" data-hidden="">
-              <Button size="xs" variant="ghost" iconOnly label="Show field" onPress={() => draft().toggleField(field().id, true)}>
-                <Icon name="eye-off" />
-              </Button>
+              <IconButton size="xs" variant="ghost" icon="eye-off" label="Show field" onPress={() => draft().toggleField(field().id, true)} />
               <span class="dash-editor-field-name muted">{field().name}</span>
             </li>
           )}

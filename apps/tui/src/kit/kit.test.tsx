@@ -22,6 +22,7 @@ import {
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
   MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  IconButton,
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
@@ -642,6 +643,15 @@ const CASES: Case[] = [
     check: (frame) => has(frame, '[Save]'),
   },
   {
+    node: 'IconButton',
+    draws: 'one cell: the mark, not the words a bar has no room for',
+    render: () => <IconButton icon="arrow-up-to-line" label="Go to top" />,
+    check: (frame) => {
+      has(frame, '⇑')
+      expect(frame).not.toContain('Go to top')
+    },
+  },
+  {
     node: 'ConfirmButton',
     draws: 'the label at rest; the armed button is the prompt',
     render: () => <ConfirmButton label="Delete" onConfirm={() => {}} />,
@@ -1022,6 +1032,16 @@ const BEHAVIOURS: Behaviour[] = [
     render: (record) => <Button label="Save" onPress={() => record('press')} />,
     drive: async (screen, pressed) => {
       lit(screen, '[Save]')
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+    },
+  },
+  {
+    node: 'IconButton',
+    does: 'presses on Enter like any other button, with the mark in place of a label',
+    render: (record) => <IconButton icon="arrow-up-to-line" label="Go to top" onPress={() => record('press')} />,
+    drive: async (screen, pressed) => {
+      lit(screen, '⇑')
       await screen.press('RETURN')
       expect(pressed).toEqual(['press'])
     },

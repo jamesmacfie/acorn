@@ -8,6 +8,7 @@ import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchPr
 import { canPickFolder, pickFolder } from '../../infra/platform'
 import { projectImporterRegistry } from '../../host/registries/sources/projectImporters'
 import { Alert, Button, Input, Select } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
 import { Modal } from '../../kit/components/overlays/Modal'
 import './onboarding.css'
@@ -358,16 +359,13 @@ function ProjectRows(props: {
               onChange={(event) => props.onColor(project().id, event.currentTarget.value)}
             />
             <Show when={project().color}>
-              <Button
-                variant="bare"
-                iconOnly
+              <IconButton
+                icon="x"
                 label={`Clear task tab colour for ${project().name}`}
                 title="Clear task tab colour"
                 disabled={project().hidden || props.busy}
                 onPress={() => props.onColor(project().id, null)}
-              >
-                <Icon name="x" />
-              </Button>
+              />
             </Show>
           </span>
           <RenameField
@@ -411,18 +409,14 @@ function ProjectRows(props: {
                 {project().path ? 'Change folder' : 'Add folder'}
               </Button>
             </Show>
-            <Button
-              size="sm"
-              variant="bare"
+            <IconButton
               tone="danger"
-              iconOnly
+              icon="trash-2"
               label={`Delete ${project().name}`}
               title="Delete this project"
               disabled={props.busy}
               onPress={() => props.onDelete(project())}
-            >
-              <Icon name="trash-2" />
-            </Button>
+            />
           </span>
         </div>
       )}

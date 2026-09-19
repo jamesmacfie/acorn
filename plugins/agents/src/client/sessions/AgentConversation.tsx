@@ -1,6 +1,6 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, Button, EmptyState, Icon, Text, type TimelineControls } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, IconButton, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
@@ -160,47 +160,31 @@ export default function AgentConversation(props: AgentConversationProps & {
               // model and effort selects. They act on the sibling transcript; the composer only hosts them.
               viewControls={(
                 <>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  <IconButton
+                    icon="arrow-up-to-line"
                     label="Scroll to the top of the transcript"
                     tip="Go to top"
                     onPress={() => scrollControls()?.toTop()}
-                  >
-                    <Icon name="arrow-up-to-line" />
-                  </Button>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  />
+                  <IconButton
+                    icon="arrow-down-to-line"
                     label="Scroll to the bottom of the transcript"
                     tip="Go to bottom"
                     onPress={() => scrollControls()?.toBottom()}
-                  >
-                    <Icon name="arrow-down-to-line" />
-                  </Button>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  />
+                  <IconButton
+                    icon="messages-square"
                     label="Show only agent and user messages"
                     tip="Chats only"
                     pressed={chatsOnly()}
                     onPress={() => setChatsOnly((on) => !on)}
-                  >
-                    <Icon name="messages-square" />
-                  </Button>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  />
+                  <IconButton
+                    icon="fold-vertical"
                     label="Collapse every tool card"
                     tip="Collapse all"
                     onPress={() => setCollapseTick((tick) => tick + 1)}
-                  >
-                    <Icon name="fold-vertical" />
-                  </Button>
+                  />
                 </>
               )}
               onSessionUpdated={managedAgentStore.upsertSession}

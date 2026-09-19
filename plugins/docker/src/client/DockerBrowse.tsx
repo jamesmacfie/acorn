@@ -13,7 +13,7 @@ import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRe
 import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
-  Alert, Badge, Button, ConfirmButton, EmptyState, Input, ListDetail, Row, Rows, Section,
+  Alert, Badge, Button, ConfirmButton, EmptyState, IconButton, Input, ListDetail, Row, Rows, Section,
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
@@ -188,17 +188,13 @@ export default function DockerBrowse() {
         meta={c.status}
         trailing={
           <>
-            <Button
-              variant="bare"
-              size="sm"
-              iconOnly
+            <IconButton
+              icon={isActive(c) ? 'square' : 'play'}
               title={isActive(c) ? 'Stop' : 'Start'}
               label={isActive(c) ? 'Stop' : 'Start'}
               disabled={rowBusy() === c.id}
               onPress={() => void rowAction(c, 'toggle')}
-            >
-              {isActive(c) ? '◼' : '▶'}
-            </Button>
+            />
             <ConfirmButton
               variant="bare"
               size="sm"
@@ -243,17 +239,13 @@ export default function DockerBrowse() {
           }
           trailing={
             <>
-              <Button
-                variant="bare"
-                size="sm"
-                iconOnly
+              <IconButton
+                icon={g.running > 0 ? 'square' : 'play'}
                 title={g.running > 0 ? 'Stop project' : 'Start project'}
                 label={g.running > 0 ? 'Stop project' : 'Start project'}
                 disabled={groupBusy() === g.project}
                 onPress={() => void groupAction(g.project!, g.running > 0 ? 'stop' : 'start')}
-              >
-                {g.running > 0 ? '◼' : '▶'}
-              </Button>
+              />
               <ConfirmButton
                 variant="bare"
                 size="sm"
@@ -295,7 +287,7 @@ export default function DockerBrowse() {
   const list = (
     <>
       <SectionHeader
-        actions={<Button variant="bare" iconOnly title="Refresh" label="Refresh" busy={loading()} onPress={() => void refreshDocker()}>↻</Button>}
+        actions={<IconButton icon="refresh-cw" title="Refresh" label="Refresh" busy={loading()} onPress={() => void refreshDocker()} />}
       >
         Docker{dockerInfo()?.available ? ` · ${runningCount()} running` : ''}
       </SectionHeader>

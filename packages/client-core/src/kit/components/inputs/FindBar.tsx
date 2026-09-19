@@ -1,6 +1,6 @@
 import { Show, type JSX } from 'solid-js'
-import Icon from '../content/Icon'
-import { Button, Input, Toolbar } from '../primitives'
+import { IconButton } from './IconButton'
+import { Input, Toolbar } from '../primitives'
 
 // The in-content search strip. Three surfaces had one and all three disagreed on the keyboard
 // contract; this owns it so they finally agree:
@@ -59,36 +59,26 @@ export function FindBar(props: {
       </Show>
       <Show when={props.status}><span class="ui-findbar-status muted">{props.status}</span></Show>
       <Toolbar.Group>
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="chevron-up"
           disabled={!props.count?.total}
           tip="Previous match"
           tipKey="⇧⏎"
           label="Previous match"
           onPress={() => props.onPrev()}
-        >
-          <Icon name="chevron-up" />
-        </Button>
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        />
+        <IconButton
+          icon="chevron-down"
           disabled={!props.count?.total}
           tip="Next match"
           tipKey="⏎"
           label="Next match"
           onPress={() => props.onNext()}
-        >
-          <Icon name="chevron-down" />
-        </Button>
+        />
       </Toolbar.Group>
       <Show when={props.toggles}>{props.toggles}</Show>
       <Show when={props.onClose}>
-        <Button variant="bare" size="sm" iconOnly tip="Close find" tipKey="Esc" label="Close find" onPress={() => props.onClose?.()}>
-          <Icon name="x" />
-        </Button>
+        <IconButton icon="x" tip="Close find" tipKey="Esc" label="Close find" onPress={() => props.onClose?.()} />
       </Show>
     </Toolbar>
   )

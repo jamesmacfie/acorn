@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm run stage && ACORN_DEV_SERVER=http://localhost:4319 tauri dev --config src-tauri/tauri.dev.json",
+    "dev:no-watch": "pnpm run dev --no-watch",
     "dev:agent": "node scripts/agent/session.mjs",
     "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
     "dev:agent:ui": "node scripts/agent/ui.mjs",
@@ -24,6 +25,7 @@
     "test": "pnpm run stage && pnpm run build:renderer && vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri"
   },
+  "//dev:no-watch": "`tauri dev` rebuilds and relaunches the app whenever a file under src-tauri changes, which takes the window away from whoever is using it. This is the same dev run with the watcher off: the app keeps running while the Rust changes, and you pick the new binary up by restarting with `dev`. The renderer's own hot reload is Vite's and is unaffected either way.",
   "//build": "The renderer is built here rather than by `beforeBuildCommand` so the startup-budget check runs against the bytes that get bundled and the bundler pass does not repeat a build that already happened; the inline config empties the hook for that one invocation. CI=true is what makes the DMG's Finder-cosmetics AppleScript get skipped — it needs Automation permission a build machine does not have, so the runner skips it either way and this keeps a local DMG the same shape as the shipped one.",
   "//dependencies": "The node's runtime dependencies. The staged service.js and the helper both resolve their externals from this package's node_modules, so they are declared here rather than in apps/node.",
   "dependencies": {

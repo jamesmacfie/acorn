@@ -242,13 +242,19 @@
 .diff-code span { color: light-dark(var(--l), var(--r)); }
 
 /* Diff view-mode toggle (Unified | Split), persisted via the `diff_view` pref. Sits above the
-   diff scroller; segmented control styled with the shared button tokens. */
+   diff scroller; segmented control styled with the shared button tokens.
+
+   ponytail: this is a `Toolbar` written out by hand, and it borrows `Toolbar`'s geometry rather
+   than being one. Two things hold it back: `.layout-region-detail:has(> .diff-toolbar)` in
+   shell.css is how the detail column recognises that it holds a diff and drops its padding, and
+   the find bar nested inside is itself a `Toolbar`, which would draw a second background and a
+   second divider inside this one. Untangle both and this becomes `<Toolbar>` with a spacer. */
 .diff-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 40px;
-  padding: 6px var(--pane-pad);
+  min-height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
   border-bottom: var(--chrome-divider);
   background: var(--bg);
 }

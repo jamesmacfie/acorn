@@ -11,7 +11,7 @@ import {
   Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 import {
-  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
+  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
   MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
@@ -45,7 +45,7 @@ export const KIT_COMPONENTS: KitTable = {
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
-  Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
+  Button, IconButton, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
   ModelBackendPicker,
   Rectangle,

@@ -2,7 +2,7 @@ import { createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { projectsOptions } from '@acorn/plugin-api/client'
-import { Button, EmptyState, Sections } from '@acorn/plugin-api/ui'
+import { EmptyState, IconButton, Sections } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from './changedFiles'
 import { makeContentLinkHandler } from './contentLinks'
 import { requestFileScroll, routeKey } from './fileNavigation'
@@ -96,7 +96,7 @@ export default function PullDetail() {
                   id: 'diff',
                   label: 'Diff',
                   actions: () => (
-                    <Button variant="bare" iconOnly tip="Refresh diff" label="Refresh diff" busy={refreshing()} onPress={() => void refresh()}>↻</Button>
+                    <IconButton icon="refresh-cw" tip="Refresh diff" label="Refresh diff" busy={refreshing()} onPress={() => void refresh()} />
                   ),
                   render: () => (
                     <DiffForPull
