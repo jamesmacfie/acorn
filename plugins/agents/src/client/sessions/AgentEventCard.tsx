@@ -5,7 +5,7 @@ import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, Inline, Menu, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
@@ -50,17 +50,13 @@ function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalize
   return (
     <Menu ariaLabel="Copy this response" placement="bottom-end"
       trigger={({ toggle, open }) => (
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="ellipsis"
           label="Copy this response"
           opens="menu"
           expanded={open()}
           onPress={toggle}
-        >
-          <Icon name="ellipsis" />
-        </Button>
+        />
       )}
     >
       {(menu) => (

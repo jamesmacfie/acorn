@@ -795,6 +795,11 @@ export function Alert(props: {
       </span>
       <Show when={props.actions}><span class="ui-alert-actions">{props.actions}</span></Show>
       <Show when={props.onDismiss}>
+        {/* The one icon button in the app that is not an `IconButton`, for two reasons rather than
+            neglect. `IconButton` imports `Button` from this file, so reaching back for it here is a
+            cycle. And the literal is what the terminal host wants anyway: `Button` prints `label` in
+            place of a child it cannot read text off, so an `<Icon>` here would widen the dismiss from
+            one cell to the word "Dismiss" in every alert a terminal draws. */}
         <Button variant="bare" size="sm" iconOnly label="Dismiss" onPress={() => props.onDismiss?.()}>✕</Button>
       </Show>
     </div>

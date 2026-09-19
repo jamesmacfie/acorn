@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, previewViews } from '@acorn/plugin-api/client'
-import { Button, EmptyState, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -129,11 +129,15 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
             the address box is an `Input`, so it takes the reader's style pack like every other box
             in the app instead of the three rules this plugin used to ship for it. */}
-        <Toolbar size="sm" ariaLabel="Preview">
-          <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
-          <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
-          <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
-          <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
+        <Toolbar ariaLabel="Preview">
+          <IconButton icon="chevron-left" label="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')} />
+          <IconButton icon="chevron-right" label="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')} />
+          <IconButton
+            icon={loading() ? 'x' : 'rotate-cw'}
+            label={loading() ? 'Stop loading the page' : 'Reload the page'}
+            onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}
+          />
+          <IconButton icon="house" label="Back to the run target's URL" onPress={() => props.url && preview?.load(props.taskId, props.url)} />
           <Input
             size="sm"
             label="Preview address"
@@ -142,7 +146,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
             onInput={(value) => setAddr(value)}
             onKeyDown={(event) => { if (event.key === 'Enter') go() }}
           />
-          <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
+          <IconButton icon="code-xml" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')} />
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>
       </Show>

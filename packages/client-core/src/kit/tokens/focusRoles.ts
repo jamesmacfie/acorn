@@ -99,6 +99,7 @@ export const NODE_FOCUS = {
   Button: 'stop',
   // A stop, and the second press is the confirmation: the armed button IS the prompt.
   ConfirmButton: 'stop',
+  IconButton: 'stop',
   Input: 'stop',
   Textarea: 'stop',
   Select: 'stop',

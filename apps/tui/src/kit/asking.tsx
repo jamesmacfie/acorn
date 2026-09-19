@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, For, Index, on, onCleanup, Show, untrack, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, Index, on, onCleanup, Show, splitProps, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
+import { GLYPHS } from './glyphs'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import {
   COLLECTION_INTENTS, createCollectionIntents,
@@ -516,6 +517,22 @@ export function Checkbox(props: {
       <Show when={props.hint}><Line role="muted">{props.hint!}</Line></Show>
     </box>
   )
+}
+
+/** reduced: one cell, the same glyph `Icon` would draw, rather than the words. `./glyphs.ts` states
+ *  the rule this follows — a name is one character here or it is nothing, because words in a bar push
+ *  every row sideways. `Button` alone cannot do this: it prints `label` for any child it cannot read
+ *  text off, so a row of four transcript controls came to fifty cells of an eighty-cell pane.
+ *
+ *  The label is the fallback, for a name with no glyph yet. Wide, but a button drawing nothing is a
+ *  button nobody can find, and the width is the thing that says which name to add to the map. */
+export function IconButton(props: Omit<ButtonProps, 'children' | 'iconOnly' | 'label'> & {
+  icon: string
+  label: string
+  spin?: boolean
+}) {
+  const [own, rest] = splitProps(props, ['icon', 'spin'])
+  return <Button {...rest} variant={rest.variant ?? 'bare'} label={GLYPHS[own.icon] ?? props.label} />
 }
 
 /** `[x] label`, the same two cells as a Checkbox, because in a terminal a switch is a checkbox that

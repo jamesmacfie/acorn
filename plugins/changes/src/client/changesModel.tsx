@@ -6,7 +6,7 @@ import {
   sendReferenceToAgent, taskBridge, taskStatus, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Badge, Button, Inline, Stack, Text } from '@acorn/plugin-api/ui'
+import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
 import type { CodeRow, DiffFile, DiffSource } from '@acorn/plugin-api/ui/diff'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { emptyLocalStatus, reviewNotesRoute, type ModelPick, type ReviewNote } from '../shared/api'
@@ -185,15 +185,13 @@ export function createChangesModel(task: Task) {
             <Inline gap="inline">
               <Badge size="xs" tone={note.sentAt ? 'ok' : 'warn'}>{note.sentAt ? '✓ sent' : '● unsent'}</Badge>
               <Text emphasis="muted" wrap>{note.body}</Text>
-              <Button
-                variant="bare"
-                size="sm"
-                iconOnly
+              <IconButton
+                icon="x"
                 tone="danger"
                 title="Delete note"
                 label="Delete note"
                 onPress={() => void deleteReviewNote(task.id, note.id).then(() => refetchNotes())}
-              >✕</Button>
+              />
             </Inline>
           </Stack>
         )}

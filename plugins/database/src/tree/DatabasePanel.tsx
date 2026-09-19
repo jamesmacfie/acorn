@@ -231,7 +231,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   return (
     <Stack gap="row">
-      <Toolbar variant="bar" size="sm" ariaLabel="Connection">
+      <Toolbar variant="bar" ariaLabel="Connection">
         <SectionHeader>Database</SectionHeader>
         <Text tone={status() === 'error' ? 'danger' : status() === 'connected' ? 'ok' : 'muted'}>
           {status() === 'connected' ? dbName() || 'connected' : status() === 'connecting' ? 'connecting…' : 'error'}

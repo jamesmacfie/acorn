@@ -5,9 +5,8 @@ import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts
 import { managedAgentApi } from '../sessions/managedClient'
 import { agentContextContributions, clearLocal, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, Inline, Kbd, MentionTextarea, Picker,
-  Popover, Select, Stack, Text, Toolbar,
-  type MentionSegment, type MentionSource,
+  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Picker,
+  Popover, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
@@ -620,18 +619,14 @@ export default function AgentComposer(props: {
           }
         }}
         overlay={
-          <Button
-            variant="bare"
-            size="sm"
-            iconOnly
+          <IconButton
+            icon={expanded() ? 'minimize-2' : 'maximize-2'}
             label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
             pressed={expanded()}
             tip={expanded() ? 'Collapse' : 'Expand'}
             tipKey="⌘⇧↩"
             onPress={() => setExpanded((current) => !current)}
-          >
-            <Icon name={expanded() ? 'minimize-2' : 'maximize-2'} size={12} />
-          </Button>
+          />
         }
       />
 

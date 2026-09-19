@@ -19,7 +19,7 @@ export {
   Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 export {
-  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
+  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
   MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'

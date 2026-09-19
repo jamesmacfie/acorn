@@ -1,5 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Button, Facts, Icon, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Facts, IconButton, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { agentUsageStore } from './usageStore'
 import { providerMetaLine, providerUsageRows } from './usageModel'
 import { usageTone } from '../sessions/stateTone'
@@ -18,17 +18,13 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
         <Toolbar ariaLabel="Agent provider usage">
           <Text emphasis="eyebrow">Usage</Text>
           <Toolbar.Spacer />
-          <Button
-            variant="bare"
-            size="sm"
-            iconOnly
+          <IconButton
+            icon="refresh-cw"
             label="Refresh agent usage"
             busy={agentUsageStore.refreshing()}
             disabled={agentUsageStore.refreshing()}
             onPress={() => void agentUsageStore.refresh()}
-          >
-            <Icon name="refresh-cw" />
-          </Button>
+          />
         </Toolbar>
       </Show>
       <Show when={agentUsageStore.error()}>{(message) => <Alert>{message()}</Alert>}</Show>

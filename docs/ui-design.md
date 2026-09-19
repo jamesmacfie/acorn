@@ -56,6 +56,14 @@ rail control hovers by changing its icon and background only, and `.ui-btn:hover
 unrelated. `.pane-switcher` restates only what genuinely differs on the right: the glyph font and an
 active accent on the right edge instead of the left.
 
+That same `--pane-head-h` is the height of every bar that is a pane's chrome, whichever component
+draws it: a plain `Toolbar`, a pane-level `SectionHeader`, and the hand-written `.diff-toolbar`.
+Chrome means the bar at the top of a pane, the header of a list column, or the header of a detail
+column. `Toolbar`'s `size="sm"` is for a strip *inside* the contents — a filter row, a find bar, a
+status line under a body — and picking it for chrome is what left the browser preview's address bar
+at half the height of the agents header one pane over. Tab strips are the deliberate exception at
+`--tab-h`: a strip under a pane header should read as subordinate to it, not as a second header.
+
 ### Rail controls and status markers
 
 `RailTab` is presentation only. It takes a `label` (which becomes both the tooltip title and the
@@ -638,6 +646,26 @@ provider. `spin` turns the mark, for a state that is in flight. It carries no re
 unlike `.spin`: on a state icon the turn is the whole signal that something is running, and a 12px
 rotation is not the motion that setting exists to stop.
 
+### A button whose face is a mark
+
+Reach for `IconButton`, not a `Button` with `iconOnly` written out. It takes an `icon` name, a
+required `label`, and defaults to `variant="bare"` and `size="sm"` — the small square affordance the
+agents pane uses for go-to-top, go-to-bottom and chats-only. A caller that wants a different pair
+still says so, which is how the dashboards keep their `ghost`/`xs` buttons.
+
+The three props behind it were written out at sixty call sites before the node existed, and seven of
+those had lost the `size` along the way and drew a third larger than the rest. A handful more never
+reached `Icon` at all and typed a character in: the browser preview's chrome was `‹ › ↻ ⌂`, which is
+four glyphs that no style pack, tone or spin can touch.
+
+`label` is required rather than optional because a mark has no text in it. A button whose only child
+is a glyph announced itself to a screen reader as "‹", and on a terminal it is the fallback for a
+name that has no glyph yet.
+
+On the terminal the node paints the mark, one cell, which a plain `Button` cannot do: `Button` prints
+`label` for any child it cannot read text off, so the four transcript controls came to about fifty
+cells of an eighty-cell pane and the GitHub browse header clipped "Reviews" to "Revi".
+
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of the Lucide name list
 `kit/components/inputs/IconPicker.tsx` enumerates for user-chosen task icons. Putting them in that
@@ -1189,6 +1217,7 @@ and code blocks while preserving child state on subsequent toggles.
 | --- | --- | --- |
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
+| `IconButton` | stop | reduced: one cell, the mark itself, per `apps/tui/src/kit/glyphs.ts`. A name with no glyph yet falls back to the `label`, which is wide on purpose — the width is what says which name to add to the map |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
