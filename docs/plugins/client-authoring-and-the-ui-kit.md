@@ -220,7 +220,7 @@ the host with its own components, under constraints the source declares:
 }] } }
 ```
 
-`panels: {}` is the whole opt-in and means this plugin's own collections, every view and four panels;
+`panels: {}` is the whole opt-in and means this plugin's own data sources, every view and four panels;
 the block is the same one a `pane.aside` extension point takes, and
 [dashboards.md](../dashboards.md) § Placements owns what it means. **Instead**, not as well: a source
 declaring both `panels` and a `navigate` `onSelect` is a parse error, because the detail half of a
@@ -348,7 +348,7 @@ GET  /v2/p/<id>/archive/check?taskId=…   → { concern } | { concern: null }
 POST /v2/p/<id>/archive/apply            ← { taskId }
 ```
 
-Two feeders, one registry, exactly like schedules and collections: a compiled plugin calls
+Two feeders, one registry, exactly like schedules and data sources: a compiled plugin calls
 `ctx.taskChecks.register({ id, check, apply? })`, a loaded one declares `contributions.taskChecks` in
 its manifest and the host synthesises the same registration over the two routes above. Nothing
 downstream can tell which one answered. The registry is
@@ -418,7 +418,7 @@ The two-feeder pattern again, with one difference that matters. A compiled plugi
 spec directly with the driver registry in plugins/agents; a loaded one declares the harness in its
 manifest and the host synthesises the registration through a host-only seam (`HostPluginContext` in
 `server/pluginHost/types.ts`; there is no `ctx.harnesses` for a plugin to call). The difference is where
-the registration lands: schedules, collections and task checks land in a node-core registry, and a harness
+the registration lands: schedules, data sources, and task checks land in a node-core registry, and a harness
 lands in **another plugin's**, through the `agents.harnessRegistry` capability that plugins/agents
 publishes. The contract is `packages/node-core/src/server/pluginHost/harnesses.ts`, in node-core rather
 than in the agents plugin because the host is what delivers a harness and neither package may import

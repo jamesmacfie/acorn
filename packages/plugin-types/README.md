@@ -41,7 +41,7 @@ your manifest at it and every contribution array is validated as you type:
   "id": "my-widget",
   "name": "My widget",
   "version": "0.1.0",
-  "apiVersion": "12"
+  "apiVersion": "13"
 }
 ```
 

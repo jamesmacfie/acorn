@@ -51,7 +51,7 @@ void [_sourceRegistry, _publishedSourceRegistry]
 // Adding a name to a list below is the deliberate act. It means "acorn no longer promises the shape of
 // this one member", and it should be argued for in review like any other narrowing.
 const HOLES = {
-  context: ['storage', 'providers', 'collections', 'taskChecks'],
+  context: ['storage', 'providers', 'taskChecks'],
   tasks: ['runConfig'],
   projects: ['config', 'setup'],
   proc: ['ProcessError'],
@@ -133,16 +133,16 @@ void [_loadedTool, _loadedContext]
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
-  expect(HOLES.context).toHaveLength(4)
-  expect(Object.values(HOLES).flat()).toHaveLength(9)
-  // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
+  expect(HOLES.context).toHaveLength(3)
+  expect(Object.values(HOLES).flat()).toHaveLength(8)
+  // Thirteen of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
     'name', 'routes', 'schedules', 'dataSources', 'taskChecks',
     'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
     'telemetry', 'log',
   ]
-  expect(published.length - HOLES.context.length).toBe(12)
+  expect(published.length - HOLES.context.length).toBe(13)
 })
 
 it('names every capability the first-party plugins publish', () => {

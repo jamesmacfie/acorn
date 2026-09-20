@@ -94,17 +94,17 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 ## Subfolders
 
-- [future/](./future/README.md) — designs, analyses, and sequenced plans for work that has not shipped,
-  plus the refusals that keep it from being re-argued. Its README indexes every programme and single
-  file. Behaviour that ships moves out of here into an owning doc above.
+- [future/](./future/README.md) — designs, analyses, sequenced plans, and delivery records retained
+  while acceptance remains open. Its README indexes every programme and single file. Shipped
+  behaviour belongs in an owning doc above.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
 ## Documentation ownership
 
-The [workflow v2 programme](./future/workflow_v2/README.md) records the workflow, shared data,
-dashboard-authoring, and scheduling implementation through slice 19 and owns the remaining slice-20
-acceptance plan. It builds on the shipped
+The [workflow v2 programme](./future/workflow_v2/README.md) records the completed workflow, shared
+data, dashboard-authoring, and scheduling implementation. Slice 20 owns the remaining release
+evidence. It builds on the shipped
 [workflow tasks](./future/workflow_tasks/README.md) and supersedes the separate
 [scheduled workflows proposal](./future/scheduled_workflows/README.md).
 
@@ -119,7 +119,9 @@ links; review the implementation to verify API signatures and behavior.
 
 ## Workflow v2 implementation programme
 
-Accepted design, implementation not started, 2026-09-13. These are proposed contracts, not shipped APIs.
+Implementation complete, 2026-09-20. The owning reference pages above define the shipped contracts.
+Slice 20 records the remaining connected-provider and model, native desktop keyboard, and full-suite
+evidence.
 
 - [Programme and implementation order](./future/workflow_v2/README.md)
 - [Context and decisions](./future/workflow_v2/context.md)

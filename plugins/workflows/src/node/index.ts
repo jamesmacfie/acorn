@@ -246,11 +246,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           await scheduleService?.settleRun(runId).catch(error => ctx.log.warn(`workflow schedule settlement failed: ${describeError(error).message}`))
+          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
+          // `setRun` announces the terminal status before this callback. Repeat it after schedule
+          // settlement so clients that refresh both read models cannot race the schedule write.
+          if (run) ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status: run.status })
           const handoff = await ctx.capabilities
             .require(NOTES_STORE)
             .read({ scope: 'task', taskId }, `workflow-handoffs-${runId}`)
             .catch(() => null)
-          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
           if (deps.reviewBoundary) {
             await deps.reviewBoundary({ taskId, runId, status: run?.status ?? 'unknown', transcriptTail: handoff?.body ?? null }).catch(() => undefined)
           } else if (deps.memoryReviewTrigger) {
@@ -318,10 +321,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const userId = core.identity.active()
           if (!userId) throw new Error('Schedule review requires an active owner')
           const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
-          const resolved = await ctx.dataSources.resolveQuery(scope, destinationQuery(reference, scope), { inputs }, invocation)
+          // Resolution scopes also carry repo and user directories for workflow loading. The query
+          // and source seams deliberately accept only their public scope fields, so do not leak the
+          // wider workflow object across that validation boundary.
+          const queryScope = { workspaceId: scope.workspaceId, projectId: scope.projectId }
+          const resolved = await ctx.dataSources.resolveQuery(queryScope, destinationQuery(reference, queryScope), { inputs }, invocation)
           const [description, catalog] = await Promise.all([
             ctx.dataSources.invoke({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, invocation),
-            ctx.dataSources.list({ ...scope, parameters: {} }, invocation),
+            ctx.dataSources.list({ ...queryScope, parameters: {} }, invocation),
           ])
           const source = catalog.sources.find(candidate => candidate.pluginId === resolved.query.source.pluginId && candidate.sourceId === resolved.query.source.sourceId)
           return {

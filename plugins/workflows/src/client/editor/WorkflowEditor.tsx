@@ -412,15 +412,17 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             <Show
               when={tab() === 'graph'}
               fallback={(
-                <NodeInspector
-                  draft={draft()}
-                  catalog={store.catalog()}
-                  providers={store.providers()}
-                  projectId={props.projectId}
-                  workspaceId={workspaceId()}
-                  readOnly={store.readOnly()}
-                  actions={actions}
-                />
+                <Show when={workflowCatalogKey()} keyed>{(_catalogKey) => (
+                  <NodeInspector
+                    draft={draft()}
+                    catalog={store.catalog()}
+                    providers={store.providers()}
+                    projectId={props.projectId}
+                    workspaceId={workspaceId()}
+                    readOnly={store.readOnly()}
+                    actions={actions}
+                  />
+                )}</Show>
               )}
             >
               <GraphView

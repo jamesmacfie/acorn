@@ -1,7 +1,6 @@
 # Workflow v2
 
-Date: 2026-09-20. Status: slices 01–19 implemented; slice 20 acceptance remains.
-Code survey baseline: `8e006e6b`. Recheck cited code before implementing a slice.
+Date: 2026-09-20. Status: implementation complete; release acceptance remains incomplete.
 
 Make plugin data equally usable in dashboards and workflows without assuming that every record is
 a ticket. Preserve source-specific fields, support structured values throughout workflows, and
@@ -48,14 +47,10 @@ remain slice-20 acceptance work. Slice 18 implementation and automated checks ar
 real-window rail evidence recorded; its live-created record-table and disconnected-state journeys
 remain acceptance work. Slice 19 is complete: every remaining consumer uses Node-owned typed sources,
 the legacy collection and direct fan-out contracts are removed, and the versioned development-state
-transition is covered against copied fixture roots. Slice 20 remains the final acceptance pass.
-Implementation proceeds sequentially, with one phase agent at a time and a
-final review, documentation pass, and commit after acceptance.
-
-Numbers are the default implementation order; prerequisites are
-explicit so unrelated work is distinguishable from dependent work. Do not delegate unless requested.
-Each slice is one bounded handoff. If repository changes make it too large for one session, split
-the slice into linked children before implementation, preserving its acceptance boundary.
+transition is covered against copied fixture roots. Slice 20 completed the implementation review,
+controlled-host journeys, terminal pairing, and focused automation. Connected GitHub, Linear,
+Rollbar, and model-provider journeys, native desktop keyboard input, and a completed repository-wide
+test run remain release evidence rather than implementation work.
 
 | Slice | Demonstrable result | Prerequisites |
 | --- | --- | --- |
@@ -80,10 +75,6 @@ the slice into linked children before implementation, preserving its acceptance 
 | [19](./phase-19-transition.md) | Migrate all collection consumers and remove superseded paths. | 03–18 |
 | [20](./phase-20-acceptance.md) | Record complete automated and real-window acceptance evidence. | 19 |
 
-Intermediate code can use an internal rollout gate. Do not make an unfinished authoring path the
-default or expose unattended execution before its runtime and UI gates pass. Remove the temporary
-gate and compatibility code at cutover. An intermediate fixture is not release completion.
-
 ## Completion
 
 All three [example journeys](./verification.md#example-journeys) work through manual and AI authoring.
@@ -93,9 +84,3 @@ The old flat collection and direct child-agent fan-out paths are removed.
 
 Record commands, outcomes, and UI evidence in each slice's evidence section. Move shipped behavior
 into its owning reference documentation. Keep this index as the programme status until retirement.
-
-## Verify before building
-
-Read the repository guide, [context](./context.md), and the selected slice's prerequisites. Check
-the worktree and preserve unrelated work. Verify source paths against the current checkout rather
-than assuming this survey baseline still applies.
