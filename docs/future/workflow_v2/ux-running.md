@@ -1,6 +1,6 @@
 # Running, scheduling, and history UX
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-13. Status: implemented through slices 16–18; remaining acceptance is tracked in slice 20.
 Context: [decisions](./context.md). Runtime rules are in [workflows](./workflow-contract.md) and
 [scheduling](./scheduling.md).
 

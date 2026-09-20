@@ -3,8 +3,7 @@ import { createAgentPaneModel, type AgentPaneModel } from './sessions/agentPaneM
 import { managedAgentStore } from './sessions/managedStore'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
-/** The pane id, spelled once: the collection's row action and the pane-intent listener both name it
- *  (collectionContribution.ts, managedSelection.ts). */
+/** The pane id, spelled once: the source record action and the pane-intent listener both name it. */
 export const AGENT_PANE_ID = 'agents'
 
 const AgentPaneDetail = lazy(() => import('./sessions/AgentPane'))

@@ -1,7 +1,7 @@
 // A loaded plugin's NodePluginContext comes from its manifest's `permissions.node` block rather than
 // the full context a built-in gets. Rung 2 sends this owner-bound projection over RPC to a
 // permission-scoped worker, making it the plugin's host authority rather than a cooperative view.
-import type { CoreServices } from '../core'
+import type { CompiledCoreServices, CoreServices } from '../core'
 import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'
 import { dataSourceFor } from '../core/data'
@@ -31,7 +31,6 @@ const PROJECT_WRITES = ['create', 'update'] as const
 const SIMPLE_FACETS = {
   fs: 'fs',
   git: 'git',
-  tasks: 'tasks',
   context: 'context',
   models: 'models',
   identity: 'identity',
@@ -49,6 +48,7 @@ const SIMPLE_FACETS = {
 // scopeCore handles itself, and pluginAuthoring.test.ts asserts each still grants something.
 export const NODE_CORE_FACETS = [
   ...Object.keys(SIMPLE_FACETS),
+  'tasks',
   'data:query',
   'data:write',
   'prefs',
@@ -108,6 +108,13 @@ export function scopeCore(
       granted.prefs = prefsFor(core.prefs, pluginId)
       continue
     }
+    if (token === 'tasks') {
+      // Intended root creation is an internal orchestration seam. A loaded plugin may retain the
+      // existing task facet without gaining the ability to mint arbitrary top-level work.
+      const { createRoot: _createRoot, ...tasks } = core.tasks as CompiledCoreServices['tasks']
+      granted.tasks = tasks as CoreServices['tasks']
+      continue
+    }
     if (token === 'data:query' || token === 'data:write') {
       // Write implies read, while the projection itself ensures a caller holding only data:query
       // cannot opt out of the read-only transaction with an options object.
@@ -152,7 +159,7 @@ export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegi
 // loaded plugin calling `require` on something it never declared is a bug worth being loud about.
 //
 // `provide` is bound to the plugin's own namespace, the same binding the host already applies to its
-// routes, schedules, collections, integration flows and extension points (docs/extensibility.md § The
+// routes, schedules, data sources, integration flows and extension points (docs/extensibility.md § The
 // host binds every namespace). Without it a package could publish `github.mirror` or `preview.rules`
 // while the real plugin is disabled, and the composition root would resolve the impostor: a
 // capability is a typed function another plugin calls, so squatting one is not a name clash, it is a

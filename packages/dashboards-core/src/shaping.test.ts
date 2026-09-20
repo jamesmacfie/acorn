@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PluginCollectionRow, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import {
   aggregateRows,
   boardColumns,
@@ -12,7 +12,7 @@ import {
   visibleFields,
 } from './shaping'
 
-const schema: PluginCollectionSchema = {
+const schema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'size', name: 'Size', type: 'number', unit: 'MB' },
@@ -26,16 +26,16 @@ const schema: PluginCollectionSchema = {
   ],
 }
 
-const row = (id: string, values: PluginCollectionRow['values']): PluginCollectionRow =>
-  ({ id, values, pluginId: 'github', collectionId: 'pulls-mine' })
+const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow =>
+  ({ id, values, pluginId: 'github', sourceId: 'pulls-mine' })
 
-const rows: PluginCollectionRow[] = [
+const rows: DashboardDisplayRow[] = [
   row('a', { title: 'Alpha', size: 12, status: 'ready', updated: 300, flagged: true }),
   row('b', { title: 'Bravo', size: 3, status: 'draft', updated: 100, flagged: false }),
   row('c', { title: 'Charlie', size: null, status: 'open', updated: 200, flagged: true }),
 ]
 
-const ids = (result: readonly PluginCollectionRow[]) => result.map((entry) => entry.id)
+const ids = (result: readonly DashboardDisplayRow[]) => result.map((entry) => entry.id)
 
 describe('shapeRows: filtering', () => {
   it('narrows on equality against the enum id, not its label', () => {
@@ -205,7 +205,7 @@ describe('grouping: a board is group-by, not a component', () => {
   })
 
   it('builds every column from the data when the schema declares no values', () => {
-    const open: PluginCollectionSchema['fields'][number] = { id: 'status', name: 'Status', type: 'enum' }
+    const open: DashboardDisplaySchema['fields'][number] = { id: 'status', name: 'Status', type: 'enum' }
     const columns = boardColumns(rows, open)
     // First-appearance order, which over already-sorted rows is deterministic.
     expect(columns.map((column) => column.id)).toEqual(['ready', 'draft', 'open'])

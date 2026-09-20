@@ -36,6 +36,41 @@
       "when": 1789222441793,
       "tag": "0004_productive_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789322300175,
+      "tag": "0005_huge_tigra",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789853458341,
+      "tag": "0006_illegal_smiling_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789856929821,
+      "tag": "0007_odd_marvel_zombies",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789878856205,
+      "tag": "0008_outgoing_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789881944239,
+      "tag": "0009_bored_warstar",
+      "breakpoints": true
     }
   ]
 }

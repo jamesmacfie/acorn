@@ -93,7 +93,8 @@
     ],
     "railMarkers": [
       "agents",
-      "docker"
+      "docker",
+      "workflows.task-groups"
     ],
     "persistedStateSlices": [
       "agents.tool-fold",
@@ -110,10 +111,6 @@
       "agents.sessions",
       "memory.proposals",
       "workflows.gates"
-    ],
-    "collections": [
-      "agents:sessions",
-      "github:pulls-mine"
     ],
     "contentLinks": [
       "github.pull-request",
@@ -240,9 +237,6 @@
       "persistedStateSlices": [
         "github.pr-filters"
       ],
-      "collections": [
-        "github:pulls-mine"
-      ],
       "contentLinks": [
         "github.pull-request",
         "github.repository"
@@ -284,6 +278,9 @@
       ],
       "schedules": [
         "workflows.task-runs"
+      ],
+      "railMarkers": [
+        "workflows.task-groups"
       ],
       "attentionSources": [
         "workflows.gates"

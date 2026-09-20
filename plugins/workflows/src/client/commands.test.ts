@@ -123,7 +123,7 @@ describe('the workflows plugin catalogue', () => {
   it('creates a row and opens it, for "New workflow"', async () => {
     mocks.createDef.mockResolvedValue({ id: 'row-1' })
     expect(await create.run(context('task-1'))).toEqual({ effect: 'close' })
-    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { name: 'Untitled workflow', steps: [] } })
+    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { formatVersion: 2, name: 'Untitled workflow', steps: [] } })
     expect(navigate).toHaveBeenCalledWith('/p/p-1/x/workflows/db%3Arow-1')
   })
 

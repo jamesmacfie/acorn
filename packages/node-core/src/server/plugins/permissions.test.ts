@@ -72,6 +72,13 @@ describe('scopeCore', () => {
     expect(query).toHaveBeenCalledWith('task-1', 'update things set done = true', { readOnly: false })
   })
 
+  it('keeps intended root creation on the compiled orchestration seam', () => {
+    const tasks = { byId: marker('byId'), createChild: marker('createChild'), createRoot: marker('createRoot') }
+    const granted = scoped({ core: ['tasks'] }, { ...CORE, tasks } as unknown as CoreServices).tasks as unknown as Record<string, unknown>
+    expect(Object.keys(granted).sort()).toEqual(['byId', 'createChild'])
+    expect(granted.createRoot).toBeUndefined()
+  })
+
   it('ignores a facet name this build does not have, rather than failing the plugin', () => {
     expect(keys(scoped({ core: ['git', 'quantum'] }))).toEqual(['git'])
   })

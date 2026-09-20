@@ -39,6 +39,7 @@ export const workflowsSourceContribution: SourceContribution<never> = {
   order: 50,
   glyph: 'workflow',
   label: 'Workflows',
+  origins: { 'workflows:child': 'workflow' },
   projectScoped: true,
   routes: workflowsRouteContributions,
   regions: { list: WorkflowsBrowseList, detail: WorkflowsBrowseDetail },

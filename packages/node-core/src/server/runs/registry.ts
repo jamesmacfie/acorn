@@ -8,7 +8,7 @@ const log = createLogger('runs')
 // The unified run list's node half (@acorn/protocol/runs.ts explains why this is a registry and what
 // would justify a core table instead).
 //
-// Shaped like the collection-read registry beside it, and for the same reason: a plugin declares a
+// Shaped like the source-read registry beside it, and for the same reason: a plugin declares a
 // route, the host calls it with no client and no request in sight, and the answer is parsed and
 // stamped here. Nothing joins, nothing migrates, and neither producer knows the other exists.
 
@@ -24,7 +24,7 @@ export type RunSource = {
  *  runs under a stranger's name. */
 export type RunSourceRegistration = Omit<RunSource, 'pluginId'>
 
-// A module singleton, like the route, collection and node-action registries beside it, with the same
+// A module singleton, like the route, source and node-action registries beside it, with the same
 // lifecycle answer: the host clears a plugin's entries before re-registering them.
 const sources = new Map<string, RunSource>()
 
@@ -50,7 +50,7 @@ const SOURCE_TIMEOUT_MS = 2_000
 /** Every run this node knows about, newest first.
  *
  * A source that throws, times out, or answers with something that will not parse contributes nothing
- * and does not fail the call. That asymmetry is deliberate and it is the opposite of the collection
+ * and does not fail the call. That asymmetry is deliberate and it is the opposite of the source
  * sampler's: a measurement with a missing source is a wrong number, while a run list with a missing
  * source is a shorter list, and refusing to show the eight runs you can see because a ninth source is
  * wedged helps nobody. `failed` names who could not answer, so the shortfall is visible rather than

@@ -7,7 +7,6 @@ import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
-import { agentSessionsCollection } from './collectionContribution'
 import { managedAgentApi } from './sessions/managedClient'
 import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
 import { activateManagedAgentNotifications } from './sessions/managedStore'
@@ -82,9 +81,6 @@ export const agentsClientPlugin: ClientPlugin = {
     // The two agent defaults the palette can change. A mounted component rather than a line here,
     // because both write through accessors that take a query client (./AgentCommands.tsx).
     ctx.slots.register(agentCommandsSlotContribution)
-    // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
-    // can be composed over running agents (collectionContribution.ts).
-    ctx.collections.register(agentSessionsCollection)
     // How a transcript's tool cards start out (toolFoldPrefs.ts). This device's, so the slice is
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)

@@ -16,10 +16,6 @@ import {
   type AgentContextSnapshot,
 } from '@acorn/protocol/agentContext.ts'
 import {
-  pluginCollectionResponseSchema,
-  type PluginCollectionPage,
-} from '@acorn/protocol/collections.ts'
-import {
   acceptCommandSearchItems,
   commandInputResultSchema,
   commandSettingValueSchema,
@@ -32,7 +28,6 @@ import {
   pluginRefResolutionsSchema,
   type PluginRefResolution,
 } from '@acorn/protocol/refResolvers.ts'
-import { emptyCollectionPage } from '../registries/sources/collections'
 import { readJson, writeJson } from '../../infra/node/apiClient'
 import { wsOnStatus } from '../../infra/node/wsClient'
 import { onPluginPush } from '../plugins/pluginChannel'
@@ -41,7 +36,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugin-chrome')
 
-// Reads a plugin's descriptor routes (badges, rail items, collections, agent context). The manifest's
+// Reads a plugin's descriptor routes (badges, rail items, and agent context). The manifest's
 // routes were confined to `/v2/p/<id>/` at parse time, but this arrives as a roster row, so the path is
 // re-checked here and a malformed body is dropped rather than thrown into the shell chrome
 // (docs/security.md § Third-party plugin bundles; docs/plugins.md § Cooperative extension points).
@@ -617,47 +612,6 @@ export async function resolveRefs(
   // `providerId` is stamped from the plugin whose route answered, never read from the row. A resolver
   // that could name its own provider could put its rows behind a stranger's reference panel.
   return parsed.data.map((row) => ({ ...row, providerId: pluginId }))
-}
-
-// ── Collections ───────────────────────────────────────────────────────────────────────────────────
-//
-// The third parsed descriptor response (@acorn/protocol/collections.ts). These rows draw as the host's
-// own table beside another plugin's rows, so the reader cannot tell whose answer was malformed.
-
-/** Declared params ride as query parameters, minted here rather than pasted onto the path by a caller,
- * so a collection route cannot be handed a second `nodeId` or a scope it was not given. */
-const collectionItemsPath = (path: string, params: Record<string, string>): string => {
-  const query = new URLSearchParams(params).toString()
-  if (!query) return path
-  return `${path}${path.includes('?') ? '&' : '?'}${query}`
-}
-
-/** One collection's page, parsed and stamped. */
-export async function readCollection(
-  pluginId: string,
-  collectionId: string,
-  path: string,
-  nodeId: string,
-  params: Record<string, string>,
-  signal: AbortSignal,
-): Promise<PluginCollectionPage> {
-  const body = await read<unknown>(pluginId, collectionItemsPath(path, params), nodeId, signal)
-  const parsed = pluginCollectionResponseSchema.safeParse(body)
-  if (!parsed.success) {
-    // All-or-nothing, unlike the per-row rail sanitiser. A half-parsed collection renders a
-    // complete-looking list missing the row someone was looking for. An empty panel says nothing
-    // instead of saying something false.
-    drop(pluginId, `collection '${collectionId}'`, body)
-    return emptyCollectionPage()
-  }
-  // Provenance is stamped from the contribution whose route answered, never read from the row, the
-  // same rule `resolveRefs` applies to `providerId`. A mixed board renders source badges and row
-  // actions on this stamp, so a row naming its own plugin could put its clicks into a stranger's pane.
-  // The schema omits both fields, so a body that states them is stripped before this line runs.
-  return {
-    schema: parsed.data.schema,
-    rows: parsed.data.rows.map((row) => ({ ...row, pluginId, collectionId })),
-  }
 }
 
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {

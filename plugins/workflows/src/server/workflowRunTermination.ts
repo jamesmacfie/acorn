@@ -3,8 +3,8 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type { WorkflowRunRow, WorkflowStepRow } from '../shared/workflowContracts'
 
-const TERMINAL_RUN = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
-const TERMINAL_STEP = new Set(['done', 'failed', 'skipped', 'safety-rail', 'cancelled'])
+const TERMINAL_RUN = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
+const TERMINAL_STEP = new Set(['done', 'completed-with-failures', 'failed', 'skipped', 'safety-rail', 'cancelled'])
 
 type WorkflowRunTerminationDeps = {
   run(runId: string): Promise<WorkflowRunRow | undefined>
@@ -144,7 +144,7 @@ export class WorkflowRunTermination {
     if (!this.deps.cancelChildTask) return
     const ids = new Set<string>()
     for (const step of steps) {
-      // Workflow dispatch tasks are durable history. Only legacy fan-out and isolated agent steps
+      // Workflow dispatch tasks are durable history. Only isolated agent steps
       // store disposable child tasks directly in the step input snapshot.
       if (step.kind === 'workflow' || step.kind === 'workflow-map') continue
       if (!step.inputsJson) continue

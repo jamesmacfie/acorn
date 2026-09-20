@@ -113,7 +113,7 @@ export const disclosureSchema = z.object({
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
 export const NO_DISCLOSURE = {
-  permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+  permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
   webviews: [],
   keyClaims: [],
   navigationDestinations: [],

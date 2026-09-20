@@ -57,6 +57,33 @@ const CONFIG_FILE = 'acorn-plugin.config.mjs'
 const treeTransform = (moduleName = '@acorn/plugin-api/ui/tree') =>
   solid({ solid: { generate: 'universal', moduleName } })
 
+// Rolldown emits this import when a bundled CommonJS dependency remains inside an otherwise ESM
+// plugin. Loaded realms deliberately deny node:module because raw createRequire would bypass the
+// ESM resolver hook. Replace only Rolldown's generated one-name import with the worker's scoped
+// builtin loader; explicit namespace or multi-name imports remain and are refused at runtime.
+const loadedPluginRequireShim = () => ({
+  name: 'acorn-loaded-plugin-require',
+  enforce: 'post',
+  renderChunk(code) {
+    const generated = /^import \{ createRequire \} from ["']node:module["'];$/m
+    if (!generated.test(code)) return null
+    return {
+      code: code.replace(
+        generated,
+        'const createRequire = () => globalThis[Symbol.for("acorn.plugin.safe-require.v1")];',
+      ),
+      map: null,
+    }
+  },
+  generateBundle(_options, bundle) {
+    for (const output of Object.values(bundle)) {
+      if (output.type === 'chunk' && /from ["']node:module["']/.test(output.code)) {
+        throw new Error(`loaded plugin chunk '${output.fileName}' retains a raw node:module import`)
+      }
+    }
+  },
+})
+
 const buildable = () =>
   readdirSync(PLUGINS_DIR).filter((dir) => existsSync(join(PLUGINS_DIR, dir, CONFIG_FILE)))
 
@@ -121,6 +148,7 @@ try {
     await build({
       root: NODE_APP,
       logLevel: 'warn',
+      plugins: [loadedPluginRequireShim()],
       resolve: { conditions: ['node'], mainFields: ['module', 'jsnext:main', 'jsnext'] },
       ssr: { noExternal: true },
       define: { 'process.env': 'process.env' },

@@ -32,20 +32,22 @@ const resolved = (root: WorkflowDef, child: WorkflowDef): ResolvedWorkflowGraph 
 })
 
 const rootDefinition = (tail = true): WorkflowDef => ({
+  formatVersion: 2,
   name: 'Parent run',
-  inputs: [{ name: 'fallback', default: 'ABC-0' }],
+  inputs: [{ name: 'fallback', schema: { type: 'string' }, default: 'ABC-0' }],
   steps: [
-    { name: 'source', after: [], prompt: 'Find the ticket.', schema: { type: 'object' } },
+    { id: 'source', name: 'source', after: [], prompt: 'Find the ticket.', schema: { type: 'object' } },
     {
+      id: 'dispatch',
       name: 'dispatch',
       kind: 'workflow',
       after: ['source'],
       childWorkflow: {
         ref: { source: 'database', id: 'child-def' },
-        inputs: { ticket: { from: 'step', step: 'source', pointer: '/ticket' } },
+        inputs: { ticket: { address: { from: 'step', stepId: 'source', pointer: '/ticket' } } },
       },
     },
-    ...(tail ? [{ name: 'after-child', after: ['dispatch'], prompt: 'Summarize.' }] : []),
+    ...(tail ? [{ id: 'after-child', name: 'after-child', after: ['dispatch'], prompt: 'Summarize.' }] : []),
   ],
 })
 
@@ -94,7 +96,6 @@ describe('single-child workflow lifecycle', () => {
       failingChecks: async () => '',
       notify: vi.fn(),
       cancelChildTask: async (taskId) => void cancelledTasks.push(taskId),
-      runtimeWorkflowDispatchEnabled: true,
       ...overrides,
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
@@ -120,6 +121,50 @@ describe('single-child workflow lifecycle', () => {
     return (await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.parentRunId, parentRunId)))[0]!
   }
 
+  it('runs renamed stable steps, carries typed child inputs and returns declared named outputs', async () => {
+    const { runner } = makeRunner({ runStep: async (_taskId, step) => result(step.id === 'source-id'
+      ? { record: { id: 7, nullable: null }, count: 3, enabled: false }
+      : step.id === 'child-id' ? { accepted: false } : null) })
+    const child: WorkflowDef = {
+      formatVersion: 2, name: 'Typed child',
+      inputs: [
+        { name: 'record', required: true, schema: { type: 'object' } },
+        { name: 'count', required: true, schema: { type: 'number' } },
+        { name: 'enabled', required: true, schema: { type: 'boolean' } },
+      ],
+      outputs: [{ name: 'accepted', schema: { type: 'boolean' }, binding: { address: { from: 'step', stepId: 'child-id', pointer: '/accepted' } } }],
+      steps: [{ id: 'child-id', name: 'Human child label', after: [], prompt: '${inputs.record}', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } }],
+    }
+    const root: WorkflowDef = {
+      formatVersion: 2, name: 'Typed parent', steps: [
+        { id: 'source-id', name: 'Renamed source', after: [], prompt: 'Source', schema: { type: 'object' } },
+        { id: 'dispatch', name: 'Renamed dispatch', kind: 'workflow', after: ['source-id'], childWorkflow: {
+          ref: { source: 'database', id: 'child-def' },
+          inputs: Object.fromEntries(['record', 'count', 'enabled'].map(name => [name, { address: { from: 'step' as const, stepId: 'source-id', pointer: `/${name}` } }])),
+        } },
+      ],
+    }
+    const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
+    await waitForRun(runner, runId, ['done'])
+    const childRow = await childRun(runId)
+    expect(JSON.parse(childRow.defJson).inputs.map((input: { default: unknown }) => input.default)).toEqual([{ id: 7, nullable: null }, 3, false])
+    const dispatch = (await runner.steps(runId)).find(step => step.name === 'Renamed dispatch')!
+    expect(JSON.parse(dispatch.structuredJson!)).toMatchObject({ outputs: { accepted: false } })
+  })
+
+  it('rejects a structured result on the Node before a successor executes', async () => {
+    const calls: string[] = []
+    const { runner } = makeRunner({ runStep: async (_taskId, step) => { calls.push(step.id!); return result({ accepted: 'false' }) } })
+    const runId = await runner.start('parent-task', {
+      formatVersion: 2, name: 'Validate result', steps: [
+        { id: 'first', name: 'A human label', prompt: 'Answer', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } },
+        { id: 'next', name: 'Successor', after: ['first'], prompt: 'Continue' },
+      ],
+    })
+    expect((await waitForRun(runner, runId, ['failed'])).error).toContain('Invalid structured output')
+    expect(calls).toEqual(['first'])
+  })
+
   it('passes bound inputs, completes the parent graph, and publishes a bounded terminal summary', async () => {
     const seen: { taskId: string; prompt: string; tools: unknown }[] = []
     const childChanged = vi.fn()
@@ -131,10 +176,11 @@ describe('single-child workflow lifecycle', () => {
       },
     })
     const child: WorkflowDef = {
+      formatVersion: 2,
       name: 'Child review',
       tools: { allow: ['notes_list', 'task_current'], maxRisk: 'write' },
-      inputs: [{ name: 'ticket', required: true }],
-      steps: [{ name: 'review', prompt: 'Review ${inputs.ticket}.', schema: { type: 'object' } }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.ticket}.', schema: { type: 'object' } }],
     }
     const root = rootDefinition()
     root.tools = { allow: ['notes_list', 'task_current', 'notes_write'], maxRisk: 'write' }
@@ -172,7 +218,7 @@ describe('single-child workflow lifecycle', () => {
         ? result({ ticket: 'ABC-7' })
         : { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'review failed' },
     })
-    const child: WorkflowDef = { name: 'Child review', inputs: [{ name: 'ticket', required: true }], steps: [{ name: 'review' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Child review', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'review', name: 'review' }] }
     const root = rootDefinition(false)
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
 
@@ -190,9 +236,10 @@ describe('single-child workflow lifecycle', () => {
 
   it('restores a gated child wait after restart and continues when the child gate is approved', async () => {
     const child: WorkflowDef = {
+      formatVersion: 2,
       name: 'Gated child',
-      inputs: [{ name: 'ticket', required: true }],
-      steps: [{ name: 'approve', kind: 'gate-human' }, { name: 'finish', prompt: 'Finish.' }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
     }
     const root = rootDefinition(false)
     const first = makeRunner()
@@ -215,13 +262,14 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('keeps the parent gated when a child finishes beside a parent gate', async () => {
-    const child: WorkflowDef = { name: 'Child', steps: [{ name: 'finish', prompt: 'Finish.' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Child', steps: [{ id: 'finish', name: 'finish', prompt: 'Finish.' }] }
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Parallel gates',
       steps: [
-        { name: 'approve-parent', kind: 'gate-human', after: [] },
+        { id: 'approve-parent', name: 'approve-parent', kind: 'gate-human', after: [] },
         {
-          name: 'dispatch',
+          id: 'dispatch', name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -242,9 +290,10 @@ describe('single-child workflow lifecycle', () => {
 
   it('recovers a waiting parent from an already-terminal child without creating another invocation', async () => {
     const child: WorkflowDef = {
+      formatVersion: 2,
       name: 'Gated child',
-      inputs: [{ name: 'ticket', required: true }],
-      steps: [{ name: 'approve', kind: 'gate-human' }, { name: 'finish', prompt: 'Finish.' }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+      steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
     }
     const root = rootDefinition(false)
     const first = makeRunner()
@@ -270,14 +319,15 @@ describe('single-child workflow lifecycle', () => {
 
   it('treats duplicate terminal wake-ups as hints and settles from the durable child row once', async () => {
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Parent',
       steps: [{
-        name: 'dispatch',
+        id: 'dispatch', name: 'dispatch',
         kind: 'workflow',
         childWorkflow: { ref: { source: 'database', id: 'child-def' } },
       }],
     }
-    const child: WorkflowDef = { name: 'Child', steps: [] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Child', steps: [] }
     const at = Date.now()
     await store.db.insert(schema.workflowRuns).values([
       {
@@ -350,7 +400,7 @@ describe('single-child workflow lifecycle', () => {
       taskIds.add(intended!)
       return intended!
     })
-    const child: WorkflowDef = { name: 'Child', inputs: [{ name: 'ticket', required: true }], steps: [{ name: 'work' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
     const root = rootDefinition(false)
     const { runner } = makeRunner({}, createChild)
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
@@ -370,7 +420,7 @@ describe('single-child workflow lifecycle', () => {
 
   it('cancels a child agent session before settling the parent run', async () => {
     const cancelledSessions: { taskId: string; sessionId: string }[] = []
-    const child: WorkflowDef = { name: 'Child', inputs: [{ name: 'ticket', required: true }], steps: [{ name: 'work' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
     const root = rootDefinition(false)
     const { runner } = makeRunner({
       cancelAgentSession: async (taskId, sessionId) => void cancelledSessions.push({ taskId, sessionId }),
@@ -398,17 +448,18 @@ describe('single-child workflow lifecycle', () => {
   it('cancels an admitted child before a parallel failure settles the parent', async () => {
     let fail = () => {}
     const failure = new Promise<void>((resolve) => { fail = resolve })
-    const child: WorkflowDef = { name: 'Gated child', steps: [{ name: 'approve', kind: 'gate-human' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Parallel failure',
       steps: [
         {
-          name: 'dispatch',
+          id: 'dispatch', name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
         },
-        { name: 'fail', after: [], prompt: 'Fail.' },
+        { id: 'fail', name: 'fail', after: [], prompt: 'Fail.' },
       ],
     }
     const { runner } = makeRunner({
@@ -437,17 +488,18 @@ describe('single-child workflow lifecycle', () => {
     let siblingStarted = () => {}
     const siblingStart = new Promise<void>((resolve) => { siblingStarted = resolve })
     const siblingAborted = vi.fn()
-    const child: WorkflowDef = { name: 'Failing child', steps: [{ name: 'child-work', prompt: 'Fail.' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Failing child', steps: [{ id: 'child-work', name: 'child-work', prompt: 'Fail.' }] }
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Child failure',
       steps: [
         {
-          name: 'dispatch',
+          id: 'dispatch', name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
         },
-        { name: 'sibling', after: [], prompt: 'Wait.' },
+        { id: 'sibling', name: 'sibling', after: [], prompt: 'Wait.' },
       ],
     }
     const { runner } = makeRunner({
@@ -476,13 +528,14 @@ describe('single-child workflow lifecycle', () => {
 
   it('waits for a child while all four agent slots are occupied', async () => {
     const blockers = new Set(['block-1', 'block-2', 'block-3', 'block-4'])
-    const child: WorkflowDef = { name: 'Gated child', steps: [{ name: 'approve', kind: 'gate-human' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Parallel parent',
       steps: [
-        ...[...blockers].map((name) => ({ name, after: [] as string[], prompt: 'Wait.' })),
+        ...[...blockers].map((name) => ({ id: name, name, after: [] as string[], prompt: 'Wait.' })),
         {
-          name: 'dispatch',
+          id: 'dispatch', name: 'dispatch',
           kind: 'workflow',
           after: [],
           childWorkflow: { ref: { source: 'database', id: 'child-def' } },
@@ -504,7 +557,7 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('restores an expired absolute deadline as a tree safety rail after restart', async () => {
-    const definition: WorkflowDef = { name: 'Expired root', steps: [{ name: 'approve', kind: 'gate-human' }] }
+    const definition: WorkflowDef = { formatVersion: 2, name: 'Expired root', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const expiredAt = Date.now() - 1
     await store.db.insert(schema.workflowRuns).values({
       id: 'expired-root',
@@ -554,11 +607,12 @@ describe('single-child workflow lifecycle', () => {
       }),
     })
     const runId = await runner.start('parent-task', {
+      formatVersion: 2,
       name: 'Gated budget',
       budget: { maxCostUsd: 1 },
       steps: [
-        { name: 'approval', kind: 'gate-human', after: [] },
-        { name: 'spender', after: [] },
+        { id: 'approval', name: 'approval', kind: 'gate-human', after: [] },
+        { id: 'spender', name: 'spender', after: [] },
       ],
     })
 
@@ -571,15 +625,16 @@ describe('single-child workflow lifecycle', () => {
 
   it('cancels an active descendant when the ancestor deadline expires', async () => {
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Deadline parent',
       budget: { maxWallTimeMs: 100 },
       steps: [{
-        name: 'dispatch',
+        id: 'dispatch', name: 'dispatch',
         kind: 'workflow',
         childWorkflow: { ref: { source: 'database', id: 'child-def' } },
       }],
     }
-    const child: WorkflowDef = { name: 'Slow child', steps: [{ name: 'work' }] }
+    const child: WorkflowDef = { formatVersion: 2, name: 'Slow child', steps: [{ id: 'work', name: 'work' }] }
     const { runner } = makeRunner({
       runStep: async (_taskId, _def, opts) => new Promise((resolve) => {
         opts.signal?.addEventListener('abort', () => resolve({
@@ -596,13 +651,4 @@ describe('single-child workflow lifecycle', () => {
     expect(cancelledTasks).not.toContain(childRow.taskId)
   })
 
-  it('honors an explicit single-child dispatch release gate', async () => {
-    const child: WorkflowDef = { name: 'Child', inputs: [{ name: 'ticket', required: true }], steps: [{ name: 'work' }] }
-    const root = rootDefinition(false)
-    const { runner } = makeRunner({ runtimeWorkflowDispatchEnabled: false })
-
-    await expect(runner.start('parent-task', root, { resolvedGraph: resolved(root, child) }))
-      .rejects.toThrow('runtime workflow dispatch, which is not available in this build')
-    expect(await store.db.select().from(schema.workflowRuns)).toEqual([])
-  })
 })

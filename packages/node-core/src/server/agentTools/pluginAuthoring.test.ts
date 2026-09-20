@@ -138,7 +138,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
     secrets: {}, proc: {}, telemetry: { onBatch: () => ({ dispose: () => {} }) },
   } as unknown as CoreServices
   const scope = (token: string) =>
-    scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [] }, 'p', { idsForOwner: () => [] })
+    scopeCore(core, { core: [token], capabilities: [], secrets: false, exec: false, net: [], sockets: false }, 'p', { idsForOwner: () => [] })
 
   it('grants something for every facet the guide lists', () => {
     for (const token of NODE_CORE_FACETS) expect(Object.keys(scope(token)), token).not.toEqual([])
@@ -157,6 +157,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
       'secrets',
       'exec',
       'net',
+      'sockets',
       'env',
       'files',
     ])

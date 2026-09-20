@@ -59,16 +59,18 @@ const validation = (over: Partial<WorkflowCatalog> = {}): WorkflowValidationCata
 const prompt = (over: Partial<WorkflowCatalog> = {}) => buildGenerateSystemPrompt({ catalog: catalog(over) })
 
 const chain = (name: string, steps = 3): WorkflowDef => ({
+  formatVersion: 2,
   name,
-  steps: Array.from({ length: steps }, (_, index) => ({ name: `step-${index + 1}`, prompt: 'Do the thing.' })),
+  steps: Array.from({ length: steps }, (_, index) => ({ id: `step-${index + 1}`, name: `Step ${index + 1}`, prompt: 'Do the thing.' })),
 })
 
 const fanIn = (name: string): WorkflowDef => ({
+  formatVersion: 2,
   name,
   steps: [
-    { name: 'left', after: [], prompt: 'Look from the left.' },
-    { name: 'right', after: [], prompt: 'Look from the right.' },
-    { name: 'both', after: ['left', 'right'], prompt: 'Read both.' },
+    { id: 'left', name: 'Left', after: [], prompt: 'Look from the left.' },
+    { id: 'right', name: 'Right', after: [], prompt: 'Look from the right.' },
+    { id: 'both', name: 'Both', after: ['left', 'right'], prompt: 'Read both.' },
   ],
 })
 
@@ -115,7 +117,7 @@ describe('the two kind spellings', () => {
     expect(text).toContain('- `prompt` (prompt).')
     // A select with no fixed options is an identifier, so it renders as the JSON type it really is.
     // `select` is not a JSON type and the preamble never explains the word.
-    expect(text).toContain('- `joins` (string, required).')
+    expect(text).toContain('- `policy` (string, required).')
     expect(text).not.toContain('(select')
     expect(text).not.toContain('- `with.prompt`')
   })
@@ -124,9 +126,9 @@ describe('the two kind spellings', () => {
   // the kind's key list, so the list has to name every key the kind really takes.
   it('names the keys a kind takes that its description leaves out', () => {
     const text = renderStepKinds(catalog())
-    expect(text).toContain('- `branches` (object of verdict to step name, required).')
-    expect(text).toContain('- `schema` (textarea, required).')
-    expect(text).toContain('- `childStep.name` (text).')
+    expect(text).toContain('- `branches` (object of verdict to downstream step ID, required).')
+    expect(text).toContain('- `schema` (textarea).')
+    expect(text).not.toContain('### `fan-out`')
   })
 
   it('renders a contributed kind namespaced with everything in with', () => {
@@ -141,7 +143,7 @@ describe('the two kind spellings', () => {
     const text = renderStepKinds(catalog())
     expect(text).not.toContain('`requiresRun`')
     expect(text).not.toContain('`childStep.model`')
-    expect(text).toContain('`childStep.profileId`')
+    expect(text).not.toContain('`childStep.profileId`')
   })
 
   it('says what to do with a kind that ships no description', () => {
@@ -291,16 +293,10 @@ describe('the built-in worked examples', () => {
   // is something the runner handles. Both are wrong only against what the prose says, so the prose
   // and the examples are what these check against each other.
 
-  it('never offers a fan-out planner an empty list, which fails the step', () => {
-    // `runFanOut` answers 'Plan emitted no task list' on an empty array as well as a missing one
-    // (./workflowBuiltins.ts), so a planning prompt that invites one teaches a broken definition.
-    const planners = prompt().split('\n').filter((line) => line.includes('"prompt"') && line.includes('tasks array'))
-    expect(planners.length).toBeGreaterThanOrEqual(2)
-    for (const line of planners) {
-      expect(line).toContain('At least one entry')
-      expect(line).not.toMatch(/empty (array|list)/i)
-    }
-    expect(prompt()).toContain('An empty `tasks` array is not an answer.')
+  it('allows empty structured plans and requires For each to select a workflow', () => {
+    expect(prompt()).toContain('An empty array succeeds without tasks.')
+    expect(prompt()).toContain('Choose childWorkflow.ref from the available workflow catalog')
+    expect(prompt()).not.toContain('Plan emitted no task list')
   })
 
   it('gives each verdict its own step, and says why `default` may share one', () => {
@@ -314,18 +310,22 @@ describe('the built-in worked examples', () => {
     }
   })
 
-  it('shows a fan-out, its join, and a decision with a default branch', () => {
+  it('teaches a stable-key structured plan without a second execution mechanism', () => {
     const second = BUILTIN_EXAMPLES[1]!.def
-    const kinds = second.steps.map((step) => step.kind)
-    expect(kinds).toContain('fan-out')
-    expect(kinds).toContain('join')
-    const decide = second.steps.find((step) => step.kind === 'decide')
-    expect(Object.keys(decide?.branches ?? {})).toContain('default')
+    expect(second.steps.map(step => step.kind)).toEqual(['agent'])
+    expect(second.steps[0]!.schema).toMatchObject({ properties: { items: { items: { required: ['id', 'title'] } } } })
   })
 })
 
 describe('the workspace examples', () => {
-  const example = (id: string, def: WorkflowDef): WorkflowExample => ({ id, def })
+  const example = (id: string, def: WorkflowDef): WorkflowExample => ({
+    id,
+    def: {
+      ...def,
+      formatVersion: 2,
+      steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
+    },
+  })
   const select = (examples: readonly WorkflowExample[], over: Partial<Parameters<typeof selectExamples>[0]> = {}) =>
     selectExamples({ examples, validation: validation(), ...over })
 

@@ -78,7 +78,7 @@ const codexNumber = (usage: Record<string, unknown>, key: string): number | unde
 // cannot see whether a schema was asked for, and that narrow rule is what keeps the guess safe: a prose
 // answer such as "Blue" does not parse at all, and a bare `42` is not what any caller of
 // `structuredOutput` reads. Every one of them wants a shape (`{ verdict }` for a workflow decision,
-// `{ tasks }` for a fan-out plan, an array for a memory review), and a workflow `decide` step on codex
+// `{ tasks }` for a delegated-agent plan, an array for a memory review), and a workflow `decide` step on codex
 // fails on the spot without this, because it refuses an outcome with no verdict object.
 function codexStructured(text: string | null): unknown | null {
   if (!text) return null

@@ -144,6 +144,11 @@ describe('portable provider routes', () => {
     } as unknown as Env)
 
     expect(await actual.json()).toEqual(expected)
+    // Explicit source detail reads cannot silently turn a failed refresh into cached success.
+    const contribution = integrationProviderRegistry.require(PROVIDER)
+    contribution.resources[0]!.refresh = async () => ({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
+    expect(await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, force: true })).toEqual(expected)
+    expect(await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, requireFresh: true })).toEqual({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
     testDb.cleanup()
   })
 })

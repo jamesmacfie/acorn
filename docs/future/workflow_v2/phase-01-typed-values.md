@@ -1,6 +1,6 @@
 # Slice 01: Typed values and structural schemas
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-13. Status: complete.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./data-contract.md) and [verification](./verification.md).
@@ -36,8 +36,23 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented pure protocol modules `dataValues.ts`, `dataSchemas.ts`, and `dataBindings.ts`, exported
+through the protocol map and both plugin facades. Published Node declarations have bidirectional
+type checks. The installed-source fixture at
+`apps/node/test/__fixtures__/typed-source/schema.json` passes the same parser through both facades.
+It contains nested objects, arrays, optional values, observed metadata, and dynamic choices.
+
+Verification on 2026-09-13:
+
+- `rtk pnpm --filter @acorn/protocol test`: 23 files, 168 tests passed.
+- `rtk pnpm --filter @acorn/plugin-api test`: three files, 12 tests passed.
+- `rtk pnpm --filter acorn-plugin-types test`: two files, four tests passed.
+- `rtk pnpm --filter @acorn/arch-tests test`: four files, 63 tests passed.
+- `rtk pnpm lint`: 33 tasks passed. Existing oxlint warnings and shared-cache permission warnings
+  remain nonfatal. An initial test type annotation failure was corrected before the passing run.
+
+No UI or execution consumer changed, so real-window checks do not apply to this phase.
+The [data-layer reference](../../data-layer.md#shared-typed-values) documents the implemented contract.
 
 ## Verify before building
 

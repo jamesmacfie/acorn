@@ -73,6 +73,7 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
       ? [line('node.secrets', { text: 'Use your saved credentials to make requests on its behalf', icon: 'key-round', high: true })]
       : []),
     ...(permissions.node.exec ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })] : []),
+    ...(permissions.node.sockets ? [line('node.sockets', { text: 'Open unrestricted network connections', icon: 'globe', high: true })] : []),
     ...permissions.node.net.map((host) => line(`node.net:${host}`, { text: `Reach ${host}`, icon: 'globe' })),
     ...(permissions.node.env ?? []).map((name) =>
       line(`node.env:${name}`, { text: `Read the node environment value ${name}`, icon: 'key-round', high: true })),

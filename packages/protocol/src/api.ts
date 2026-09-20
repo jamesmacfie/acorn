@@ -162,7 +162,7 @@ export type Task = {
   worktreePath: string | null
   pullNumber: number | null
   status: 'active' | 'archived' | 'cancelled'
-  parentId: string | null // task tree (docs/workflows.md): fan-out children point at their root
+  parentId: string | null // task tree (docs/workspaces-and-tasks.md): delegated and nested-workflow tasks point at their creating task
   sort: number
   links: TaskLink[]
 }

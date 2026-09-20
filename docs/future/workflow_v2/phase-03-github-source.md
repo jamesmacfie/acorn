@@ -1,6 +1,6 @@
 # Slice 03: GitHub pull-request source
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-13. Status: implemented.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./data-contract.md) and [verification](./verification.md).
@@ -36,8 +36,26 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented `github/pull-requests` with an explicit connection/repository, typed state/author/draft/
+timestamps/merge fields, repository options, exact predicates, stable ordering, and bounded search
+pagination. The [GitHub reference](../../github-integration.md#typed-pull-request-source) owns shipped
+behavior and links the provider documentation checked on September 13, 2026. Details and incremental
+reads are not advertised. Legacy dashboard readers remain for their migration phase.
+
+Verification on September 13, 2026:
+
+- `rtk pnpm --filter @acorn/plugin-github test`: 33 files, 166 tests passed before the final take regression was added.
+- `rtk pnpm --filter @acorn/plugin-github test src/server/data/pullSourceHandler.test.ts`: 16 tests passed, including paged take, search ceilings, actual state versus readiness, exact time boundaries, qualifier rejection, provider errors, duplicate IDs/cursors, and expired/foreign continuations.
+- `rtk pnpm --filter @acorn/node test test/integration/githubDataSource.test.ts`: passed. Exercises the registered source through the host runtime with real connection storage, host provenance, exact bounded take across pages, and preview continuation.
+- `rtk pnpm lint`: passed across 33 tasks after the final integration and runtime changes. Existing oxlint warnings and sandbox cache-write warnings remain non-failing.
+- `rtk pnpm --filter @acorn/arch-tests test`: 4 files, 63 tests passed after the final integration test export.
+- `rtk pnpm --filter @acorn/node-core test src/server/dataSources`: 3 files, 20 tests passed after the preview-count correction.
+
+The integration test exposed a shared-runtime check that compared one preview page with the whole
+authored `take`. Full execution still validates the exact total; preview continuation keeps its
+preview mode and can end with the provider's bounded marker.
+
+No UI changes in this slice. Connected-account UI journeys remain part of release acceptance.
 
 ## Verify before building
 

@@ -44,6 +44,7 @@ export const placementScopeKey = (scope: PlacementScope): string => {
 }
 
 export type DashboardState = {
+  version: 2
   panels: Record<PanelId, PanelDefinition>
   /** Placement scope key → the panels placed there, in render order. */
   placements: Record<string, PanelId[]>
@@ -71,7 +72,7 @@ export type DashboardState = {
  *  `workspaceId` absent is the pre-workspace board (`adoptLegacyHome`). */
 export type DashboardTab = { id: string; name: string; workspaceId?: string }
 
-export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {}, layouts: {} })
+export const emptyDashboards = (): DashboardState => ({ version: 2, panels: {}, placements: {}, layouts: {} })
 
 // The geometry codec (docs/dashboards.md § Persistence): a malformed rect is dropped rather than
 // repaired, a placed panel with no rect is auto-placed at render (layout.ts § firstFit), and an
@@ -155,7 +156,7 @@ export function homeTabs(state: DashboardState, workspaceId?: string): Dashboard
 
 export function parseDashboards(raw: unknown): DashboardState {
   const value = parseJson(raw)
-  if (!isRecord(value)) return emptyDashboards()
+  if (!isRecord(value) || value.version !== 2) return emptyDashboards()
   // Definitions and placements come from the shared codec, which the node's measure sampler also
   // calls (@acorn/dashboards-core/definition.ts). Two parsers over one blob is how a client and a
   // node come to disagree about what a panel is. Geometry stays here; a rect is a rendering concern.
@@ -173,7 +174,7 @@ export function parseDashboards(raw: unknown): DashboardState {
     }
   }
   const tabs = parseTabs(value.tabs)
-  return { panels, placements, layouts, ...(tabs.length ? { tabs } : {}) }
+  return { version: 2, panels, placements, layouts, ...(tabs.length ? { tabs } : {}) }
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────────────────────
@@ -360,7 +361,7 @@ export const dashboardsSlice: PersistedStateSlice<DashboardState> = {
   // every surface that draws one. The precedent is `agentTools.perms`.
   scope: 'app',
   restore: 'view',
-  version: 1,
+  version: 2,
   codec: { parse: parseDashboards, serialize: (value) => value },
   empty: emptyDashboards,
   unknownIds: 'retain-inert',

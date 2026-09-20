@@ -230,6 +230,55 @@ describe('the isolated node realm', () => {
     expect(loaded).toEqual([])
     expect(failures[0]?.reason).toContain('may not import files outside its package')
   })
+
+  it('lets a built bundle require safe builtins through the scoped CommonJS bridge', async () => {
+    install(
+      'bundled-cjs',
+      manifest('bundled-cjs'),
+      `const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
+const { randomUUID } = require('node:crypto')
+export default { name: 'bundled-cjs', marker: randomUUID(), init() {} }
+`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(failures).toEqual([])
+    expect((loaded[0].plugin as { marker?: unknown }).marker).toEqual(expect.any(String))
+  })
+
+  it('keeps denied and non-builtin modules behind the scoped CommonJS bridge', async () => {
+    const bundle = (name: string, specifier: string) =>
+      `globalThis[Symbol.for('acorn.plugin.safe-require.v1')](${JSON.stringify(specifier)})
+export default { name: ${JSON.stringify(name)}, init() {} }
+`
+    install('cjs-sqlite', manifest('cjs-sqlite'), bundle('cjs-sqlite', 'node:sqlite'))
+    install('cjs-package', manifest('cjs-package'), bundle('cjs-package', 'some-package'))
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(loaded).toEqual([])
+    expect(failures.map(failure => failure.reason)).toEqual([
+      expect.stringContaining("may not require non-builtin 'some-package'"),
+      expect.stringContaining("may not require 'node:sqlite'"),
+    ])
+  })
+
+  it('allows socket builtins only with the explicit broad grant', async () => {
+    install(
+      'socket-client',
+      manifest('socket-client', { permissions: { node: { sockets: true } } }),
+      `const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
+const dns = require('node:dns')
+export default { name: 'socket-client', marker: typeof dns.lookup, init() {} }
+`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(failures).toEqual([])
+    expect((loaded[0].plugin as { marker?: unknown }).marker).toBe('function')
+  })
 })
 
 // What the node offers to devices (docs/plugins.md § Loaded plugins). The hash here is a claim the
@@ -317,7 +366,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], collections: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
+      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

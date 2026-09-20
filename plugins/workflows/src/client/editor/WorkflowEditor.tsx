@@ -1,7 +1,8 @@
-import { createMemo, createResource, createSignal, For, Index, Show } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
-import { createQuery } from '@tanstack/solid-query'
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { useNavigate, useSearchParams } from '@solidjs/router'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeTaskId, projectPath, toast, workspacesOptions } from '@acorn/plugin-api/client'
+import { addAiList } from './aiListDraft'
 import {
   Alert,
   Badge,
@@ -12,25 +13,23 @@ import {
   Link,
   ListColumn,
   ListDetail,
-  Menu,
-  Modal,
-  ModalActions,
-  ModalBody,
   Stack,
   Tabs,
   Text,
   Toolbar,
   ToolbarSpacer,
 } from '@acorn/plugin-api/ui'
+import { AuthoringConversation } from '@acorn/plugin-api/ui/data-sources'
 import { workflowsSurfacePath } from '../surfacePath'
-import type { WorkflowGenerateNote, WorkflowGenerateRequest, WorkflowGenerateResult } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { workflowApi } from '../workflowsClient'
 import {
   addNode,
+  addForEach,
   connect,
   disconnect,
   missingRequiredFields,
+  moveNode,
   removeNode,
   select as selectRow,
   setDefinition,
@@ -41,13 +40,18 @@ import {
   type DraftSelection,
 } from './draft'
 import { createDraftStore, defRefKey, SOURCE_GLYPH } from './draftStore'
-import GenerateModal from './GenerateModal'
+import FilePublicationReview from './FilePublicationReview'
 import GraphView from './GraphView'
 import JsonTab from './JsonTab'
 import NodeInspector from './NodeInspector'
 import NodeList from './NodeList'
 import { requestWorkflowStart } from './startRequest'
 import { forgetNodeInLayout } from '../layoutPrefs'
+import { childWorkflowDefinition, connectCreatedChild } from './childAuthoring'
+import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
+import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
+import { mergeWorkflow } from '../../shared/workflowMerge'
+import { requestWorkflowSchedule } from '../schedules/scheduleRequest'
 
 // The editor: one definition as a list of nodes with an inspector, on both hosts
 // (docs/workflows.md § Authoring).
@@ -58,6 +62,8 @@ import { forgetNodeInLayout } from '../layoutPrefs'
 
 export default function WorkflowEditor(props: { projectId: string; item?: string }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const store = createDraftStore({ projectId: () => props.projectId, item: () => props.item })
   const [tab, setTab] = createSignal<'nodes' | 'graph' | 'json'>('nodes')
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -74,6 +80,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     const source = store.ref()?.source
     return source ? SOURCE_GLYPH[source] : undefined
   }
+  const workflowCatalogKey = () => JSON.stringify(store.catalog()?.workflows ?? [])
 
   const apply = (change: Parameters<typeof store.apply>[0], coalesce = false): void => store.apply(change, { coalesce })
 
@@ -91,7 +98,48 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       const ref = store.ref()
       if (ref) forgetNodeInLayout(defRefKey(ref), name)
     },
+    addForEach: (sourceId: string) => apply(current => addForEach(current, sourceId)),
+    createChild: (stepId: string, itemSchema: DataSchema) => { void createChild(stepId, itemSchema) },
   }
+
+  async function createChild(stepId: string, itemSchema: DataSchema): Promise<void> {
+    if (!workspaceId()) {
+      store.setMessage('Choose a workspace before creating a child workflow.')
+      return
+    }
+    const parent = store.ref()
+    if (!parent) return
+    let childId: string | undefined
+    try {
+      const row = await workflowApi.createDef({
+        workspaceId: workspaceId(), projectId: props.projectId,
+        def: childWorkflowDefinition(draft().def.name, itemSchema),
+      })
+      childId = row.id
+      const current = draft().def.steps.find(step => (step.id ?? step.name) === stepId)
+      if (!current) return
+      apply(value => setStep(value, stepId, connectCreatedChild(current, row.id)))
+      if (!(await store.save())) {
+        await workflowApi.deleteDef(row.id).catch(() => undefined)
+        return
+      }
+      childId = undefined
+      await store.refetchCatalog()
+      const returnTo = workflowsSurfacePath(props.projectId, defRefKey(parent))
+      navigate(`${workflowsSurfacePath(props.projectId, defRefKey({ source: 'database', id: row.id }))}?returnTo=${encodeURIComponent(returnTo)}&returnStep=${encodeURIComponent(stepId)}`)
+    } catch (error) {
+      if (childId) await workflowApi.deleteDef(childId).catch(() => undefined)
+      store.setMessage(error instanceof Error ? error.message : 'The child workflow could not be created.')
+    }
+  }
+
+  createEffect(() => {
+    const stepId = typeof searchParams.step === 'string' ? searchParams.step : undefined
+    if (!stepId || store.loading()) return
+    if (draft().def.steps.some(step => (step.id ?? step.name) === stepId)) {
+      store.select(current => selectRow(current, { kind: 'node', name: stepId }))
+    }
+  })
 
   // The node's answer, plus the same required-field question asked here so Save greys out as a box is
   // emptied rather than after the validate debounce (./draft.ts § missingRequiredFields).
@@ -116,7 +164,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   }
 
   // What the owner can generate with: a stored key, or an agent CLI installed on this machine. The
-  // Generate button is drawn only when there is one, on the rule
+  // AI authoring button is drawn only when there is one, on the rule
   // ../../../changes/src/client/GenerateButton.tsx sets out: a control whose only message is "connect
   // a provider first" is a control in the way of the four beside it, and Settings is where
   // connections are made. A node that cannot answer counts as none.
@@ -125,37 +173,30 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // and answers 400 without one, which reads as the model having failed rather than as a list that
   // has not arrived. The workspaces query resolves long before a description is typed.
   const canGenerate = () => !store.readOnly() && !!workspaceId() && (backends()?.length ?? 0) > 0
-  const [generationMode, setGenerationMode] = createSignal<WorkflowGenerateRequest['mode'] | null>(null)
-  const [notes, setNotes] = createSignal<WorkflowGenerateNote[]>([])
+  const [authoringOpen, setAuthoringOpen] = createSignal(false)
   // A row loaded from the node is saved even when its graph is empty. `dirty` also covers a future
-  // editor-owned draft before it has a row: once there is work to preserve, Generate becomes the
-  // choice between replacing it and editing it.
-  const hasCurrentWorkflow = () => !!store.ref() || store.dirty()
-
-  // Through the same door the JSON tab's Apply uses, so a whole generated definition is one entry on
-  // the undo stack rather than none or a dozen.
-  const applyGenerated = (result: WorkflowGenerateResult): void => {
-    const mode = generationMode()
-    setGenerationMode(null)
-    const refused = store.applyText(toJson(result.def))
-    if (refused) {
-      store.setMessage(refused)
-      return
+  // editor-owned draft before it has a row: once there is work to preserve, authoring can propose an
+  // edit without saving or publishing it.
+  const applyProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
+    const current = draft().def
+    const base = proposal.base as typeof current
+    const proposed = proposal.candidate as typeof current
+    const merged = JSON.stringify(current) === JSON.stringify(base)
+      ? { value: proposed, conflicts: [] }
+      : mergeWorkflow(base, proposed, current)
+    if (merged.conflicts.length) {
+      return `The draft changed while AI was working. Review these conflicts first: ${merged.conflicts.map(conflict => conflict.path).join(', ')}.`
     }
-    setNotes(result.notes)
-    toast(mode === 'edit' ? 'Workflow edited.' : 'Workflow generated.')
+    const checked = await workflowApi.validateDef(merged.value, props.projectId)
+    if (checked.problems.length) return `The reconciled proposal is no longer valid: ${checked.problems.join(' ')}`
+    const refused = store.applyText(toJson(merged.value))
+    if (refused) return refused
+    toast('AI proposal applied. Undo restores the previous draft.')
+    return undefined
   }
 
   // Two steps, because saving to the repository is a decision about where this definition lives from
   // now on (docs/workflows.md § Authoring). The modal asks it; the terminal draws the same one.
-  const [askingRepo, setAskingRepo] = createSignal(false)
-  const saveToRepo = async (keepRow: boolean): Promise<void> => {
-    setAskingRepo(false)
-    const path = await store.saveToRepo({ taskId: activeTaskId() ?? undefined, keepRow })
-    if (!path) return
-    toast(keepRow ? `Written to ${path}. The copy here is still yours to edit.` : `Written to ${path}.`)
-    if (!keepRow) navigate(projectPath(props.projectId))
-  }
 
   const copyToDatabase = async (): Promise<void> => {
     const id = await store.copyToDatabase(workspaceId())
@@ -173,21 +214,47 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const run = (): void => {
     const ref = store.ref()
     if (!ref) return
+    const executable = ref.source === 'database' ? store.publishedDef() : draft().def
+    if (!executable) return
     void requestWorkflowStart({
       defId: ref.source === 'database' ? ref.id : `${ref.source}:${ref.id}`,
-      name: draft().def.name,
-      inputs: draft().def.inputs,
+      name: executable.name,
+      inputs: executable.inputs,
       projectId: props.projectId,
       taskId: activeTaskId() ?? undefined,
     })
   }
 
+  const schedule = (): void => {
+    const ref = store.ref()
+    const published = store.publishedDef()
+    if (!ref || ref.source !== 'database' || !published) return
+    requestWorkflowSchedule({
+      workflowId: ref.id,
+      name: published.name,
+      projectId: props.projectId,
+      inputs: published.inputs ?? [],
+    })
+  }
+
+  const publish = async (): Promise<void> => {
+    await store.publish()
+    await queryClient.invalidateQueries({ queryKey: ['workflow-schedules'] })
+  }
+
   const header = (
     <Toolbar variant="actions" size="sm">
       <Link onPress={() => navigate(projectPath(props.projectId))}>← Workflows</Link>
+      <Show when={typeof searchParams.returnTo === 'string' && searchParams.returnTo.startsWith('/p/')}>
+        <Link onPress={() => {
+          const path = typeof searchParams.returnTo === 'string' ? searchParams.returnTo : ''
+          const step = typeof searchParams.returnStep === 'string' ? searchParams.returnStep : ''
+          navigate(`${path}?step=${encodeURIComponent(step)}`)
+        }}>← Parent workflow</Link>
+      </Show>
       <Text emphasis="strong">{draft().def.name}</Text>
       <Show when={sourceGlyph()}>{(glyph) => <Icon name={glyph().icon} title={glyph().title} />}</Show>
-      <Show when={store.dirty()}><Badge tone="warn">unsaved</Badge></Show>
+      <Show when={!store.readOnly()}><Badge tone={store.dirty() ? 'warn' : undefined}>{store.saveState()}</Badge></Show>
       <ToolbarSpacer />
     </Toolbar>
   )
@@ -201,33 +268,11 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       idPrefix="workflows-editor"
       ariaLabel="Editor view"
       active={tab()}
-      tabs={[{ id: 'nodes', label: 'Nodes' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'JSON' }]}
+      tabs={[{ id: 'nodes', label: 'Outline' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'Code' }]}
       onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
       actions={(
         <>
-          <Show when={canGenerate()}>
-            <Show
-              when={hasCurrentWorkflow()}
-              fallback={<Button size="sm" disabled={store.busy()} onPress={() => setGenerationMode('overwrite')}>Generate</Button>}
-            >
-              <Menu
-                ariaLabel="Generate workflow"
-                placement="bottom-end"
-                trigger={({ open, toggle }) => (
-                  <Button size="sm" disabled={store.busy()} opens="menu" expanded={open()} onPress={toggle}>
-                    Generate <Icon name="chevron-down" />
-                  </Button>
-                )}
-              >
-                {(menu) => (
-                  <>
-                    <Menu.Item context={menu} onSelect={() => setGenerationMode('overwrite')}>Overwrite</Menu.Item>
-                    <Menu.Item context={menu} onSelect={() => setGenerationMode('edit')}>Edit</Menu.Item>
-                  </>
-                )}
-              </Menu>
-            </Show>
-          </Show>
+          <Show when={canGenerate()}><Button size="sm" disabled={store.busy()} onPress={() => setAuthoringOpen(value => !value)}>AI authoring</Button></Show>
           <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
           <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
           <Show
@@ -235,10 +280,16 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
           >
             <Button size="sm" variant="solid" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
-            <Button size="sm" disabled={store.busy()} onPress={() => setAskingRepo(true)}>Save to repo</Button>
-            <Button size="sm" variant="bare" disabled={store.busy()} onPress={() => void remove()}>Delete</Button>
+            <Button size="sm" disabled={store.busy() || store.conflicts().length > 0} onPress={() => void store.preparePublication()}>Review publication</Button>
+            <Show when={store.ref()?.source === 'database'}>
+              <Button size="sm" disabled={store.busy() || !store.publishedRevision()} onPress={() => void store.prepareExport()}>Export to repository</Button>
+              <Button size="sm" variant="bare" disabled={store.busy()} onPress={() => void remove()}>Delete</Button>
+            </Show>
           </Show>
-          <Button size="sm" onPress={run}>Run…</Button>
+          <Show when={store.ref()?.source === 'database'}>
+            <Button size="sm" disabled={!store.publishedRevision()} onPress={schedule}>Schedule…</Button>
+          </Show>
+          <Button size="sm" disabled={store.ref()?.source === 'database' && !store.publishedRevision()} onPress={run}>Run published…</Button>
         </>
       )}
     />
@@ -281,51 +332,53 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       {header}
       {tabs}
       <Show when={store.message()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
-      <Show when={askingRepo()}>
-        <Modal onDismiss={() => setAskingRepo(false)} title="Save this workflow into the repository" size="sm">
-          <ModalBody>
-            <Text wrap>
-              It is written to .acorn/workflows in the task's checkout, where a reviewer can read it in a
-              pull request. From then on the repository's trust snapshot covers it, so the next run from
-              the file asks you to acknowledge it.
-            </Text>
-          </ModalBody>
-          <ModalActions>
-            <Button variant="bare" onPress={() => setAskingRepo(false)}>Cancel</Button>
-            <Button onPress={() => void saveToRepo(false)}>Write it and delete the copy here</Button>
-            <Button variant="solid" onPress={() => void saveToRepo(true)}>Write it and keep both</Button>
-          </ModalActions>
-        </Modal>
-      </Show>
-      <Show when={generationMode()}>{(mode) => (
-        <GenerateModal
-          mode={mode()}
-          backends={backends() ?? []}
-          context={{
-            workspaceId: workspaceId(),
-            projectId: props.projectId,
-            // Only a row can be an example of itself: the worked examples the node picks are rows.
-            ...(store.ref()?.source === 'database' ? { defId: store.ref()?.id } : {}),
-            draft: draft().def,
-          }}
-          onDismiss={() => setGenerationMode(null)}
-          onGenerated={applyGenerated}
-        />
-      )}</Show>
-      {/* Above the list rather than in a toast: a list of things that were changed is not something
-          to read in three seconds. What the definition still gets wrong is the footer's job. */}
-      <Show when={notes().length}>
-        <Alert
-          tone="warn"
-          title="Changed before this was applied"
-          // Dismissed through `actions` rather than `onDismiss`, which the terminal host's `Alert`
-          // accepts and draws nothing for. One prop, one control, both hosts.
-          actions={<Button size="sm" variant="bare" onPress={() => setNotes([])}>Dismiss</Button>}
-        >
-          <Stack gap="row">
-            <Index each={notes()}>{(note) => <Text wrap>{note().message}</Text>}</Index>
-          </Stack>
+      <Show when={store.ref()?.source === 'database' && !store.publishedRevision()}>
+        <Alert tone="warn" title="Run unavailable">
+          <Inline gap="inline" wrap>
+            <Text>Publish this workflow before running it.</Text>
+            <Button size="sm" disabled={store.busy()} onPress={() => void store.preparePublication()}>Review publication</Button>
+          </Inline>
         </Alert>
+      </Show>
+      <Show when={store.ref()?.source === 'database' && store.publishedRevision() && store.dirty()}>
+        <Alert title={`Run uses published revision ${store.publishedRevision()}.`}>
+          Publish the current draft changes when they are ready to run.
+        </Alert>
+      </Show>
+      <Show when={store.loadError()}><Alert tone="danger">{String(store.loadError())}</Alert></Show>
+      <FilePublicationReview store={store} />
+      <For each={store.conflicts()}>{conflict => <Alert tone="warn" title={`Conflict: ${conflict.path}`}>
+        <Stack gap="row">
+          <Text wrap>{`Your change: ${JSON.stringify(conflict.local)}`}</Text>
+          <Text wrap>{`Changed elsewhere: ${JSON.stringify(conflict.external)}`}</Text>
+          <Inline gap="inline">
+            <Button onPress={() => store.resolveConflict(conflict.path, 'local')}>Keep your change</Button>
+            <Button onPress={() => store.resolveConflict(conflict.path, 'external')}>Keep external change</Button>
+          </Inline>
+        </Stack>
+      </Alert>}</For>
+      <Show when={store.publication()}>{operation => <Alert tone={operation().state === 'complete' ? undefined : 'warn'} title={`Publication: ${operation().state}`}>
+        <Stack gap="row">
+          <For each={operation().writes}>{write => <Text>{`${write.name} · ${write.kind} · revision ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>}</For>
+          <Show when={operation().consumers.length}><Text wrap>{`Affected: ${operation().consumers.map(consumer => consumer.name).join(', ')}`}</Text></Show>
+          <Show when={operation().error}><Text wrap>{operation().error}</Text></Show>
+          <Show when={operation().landed.length}><Text wrap>{`Published: ${operation().landed.map(write => `${write.kind} ${write.id} revision ${write.revision}`).join(', ')}`}</Text></Show>
+          <Show when={operation().state !== 'complete'}><Button disabled={store.busy()} onPress={() => void publish()}>{operation().state === 'prepared' ? 'Publish reviewed set' : 'Resume publication'}</Button></Show>
+          <Show when={operation().state !== 'complete' && !operation().landed.length}><Button disabled={store.busy()} onPress={() => void store.discardPublication()}>Discard review</Button></Show>
+        </Stack>
+      </Alert>}</Show>
+      <Show when={authoringOpen() && workspaceId()}>
+        <AuthoringConversation
+          endpoint="/v2/p/workflows/defs/authoring/turn"
+          target="workflow"
+          targetId={store.ref()?.id ?? `new:${props.projectId}`}
+          scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
+          baseRevision={store.revision()}
+          base={draft().def}
+          label={draft().def.name}
+          disabled={store.readOnly() || store.busy()}
+          onApply={applyProposal}
+        />
       </Show>
       <Show when={store.readOnly()}>
         <Show
@@ -343,27 +396,33 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             is `list-detail`'s own rule rather than anything this pane decides. */}
         <ListDetail split>
           <ListColumn>
-            <NodeList
-              draft={draft()}
-              catalog={store.catalog()}
-              readOnly={store.readOnly()}
-              onSelect={(selection: DraftSelection) => store.select((current) => selectRow(current, selection))}
-              onAdd={(kind) => apply((current) => addNode(current, kind))}
-              onRemove={actions.remove}
-            />
+            <Show when={workflowCatalogKey()} keyed>{(_catalogKey) => (
+              <NodeList
+                draft={draft()}
+                catalog={store.catalog()}
+                readOnly={store.readOnly()}
+                onSelect={(selection: DraftSelection) => store.select((current) => selectRow(current, selection))}
+                onAdd={(kind) => apply((current) => kind === 'ai-list' ? addAiList(current) : addNode(current, kind))}
+                onRemove={actions.remove}
+                onMove={(name, direction) => apply(current => moveNode(current, name, direction))}
+              />
+            )}</Show>
           </ListColumn>
           <DetailColumn scroll={tab() === 'nodes'}>
             <Show
               when={tab() === 'graph'}
               fallback={(
-                <NodeInspector
-                  draft={draft()}
-                  catalog={store.catalog()}
-                  providers={store.providers()}
-                  projectId={props.projectId}
-                  readOnly={store.readOnly()}
-                  actions={actions}
-                />
+                <Show when={workflowCatalogKey()} keyed>{(_catalogKey) => (
+                  <NodeInspector
+                    draft={draft()}
+                    catalog={store.catalog()}
+                    providers={store.providers()}
+                    projectId={props.projectId}
+                    workspaceId={workspaceId()}
+                    readOnly={store.readOnly()}
+                    actions={actions}
+                  />
+                )}</Show>
               )}
             >
               <GraphView

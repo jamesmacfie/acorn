@@ -7,8 +7,8 @@
 A rail source, a badge in the task footer or the topbar, commands and keybindings, attention items,
 node stats, context-menu rows (`contextMenus`), restricted URL recognizers (`contentLinks`), renderer
 routes (`routes`), agent-context entries (`agentContexts`), batch reference resolvers
-(`refResolvers`), typed record sets (`collections`), periodic node-side work (`schedules`), and colour
-themes (`themes`). These are data, not code: the host renders them with its own components and fetches their content
+(`refResolvers`), typed data sources (`dataSources` and `dataSourceDiscoveries`), periodic node-side
+work (`schedules`), and colour themes (`themes`). These are data, not code: the host renders them with its own components and fetches their content
 from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
 mounted anywhere (`packages/client-core/src/host/chrome/`). Freshness rides the existing
 invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
@@ -148,72 +148,13 @@ slope this tier has declined more than once. The route spends provider credentia
 and is already behind `requireProviderAccess` through the provider mount — that gate is the
 authorisation, the identifier cap is the budget, and neither replaces the other.
 
-A `collections` entry is the descriptor tier grown one size: from a node stat's one integer with a
-label to a **typed set of records**. The plugin declares what a route answers with — fields with a
-semantic `type`, an optional `role`, and their display hints — and the host draws the rows with its
-own components. It is the same argument the rest of this tier makes, at the point where it stops
-being obvious, so the boundary is worth stating: this does **not** reverse the master/detail refusal
-below. What was refused is reproducing a plugin's *bespoke* UI from data, an unbounded fidelity
-chase; a collection feeds the host's *own* generic surface, where uniformity across providers is the
-entire point — two plugins' rows can only share one board if neither of them draws anything.
-
-```json
-{
-  "contributions": {
-    "collections": [{
-      "id": "issues-mine",
-      "name": "My Linear issues",
-      "items": "/v2/p/linear/collections/issues-mine",
-      "refresh": 600
-    }]
-  }
-}
-```
-
-The route answers `{ schema: { fields }, rows: [{ id, values, action? }] }`, parsed against
-`@acorn/protocol/collections.ts`. `(pluginId, collectionId)` is the universal reference and nothing
-else addresses a collection. Four rules carry the whole design:
-
-- **The field vocabulary is closed and budgeted**: seven types (`text`, `number`, `boolean`,
-  `datetime`, `enum`, `person`, `link`) and five roles (`title`, `status`, `assignee`, `url`,
-  `updated`). Semantic rather than primitive, because the type is what lets the host render a person
-  as an avatar and *derive* which views a collection supports — only an `enum` can become kanban
-  columns. Every type added is a rendering rule every provider inherits forever; when the vocabulary
-  cannot express something, the answer is a frame pane, not a wider wire format.
-- **Display hints live on the field, never on a panel** — a `number`'s unit, an `enum`'s declared
-  values with their labels and tones — so they survive a view switch and a cross-source mapping.
-- **Row identity is required and provenance is host-stamped.** `id` must be stable across refreshes;
-  `pluginId` and `collectionId` are not in the body at all, and the host binds both from the
-  contribution whose route answered — the same rule as `refResolvers`' `providerId`, for the same
-  reason. A mixed board routes clicks on that stamp.
-- **A row action takes the context-free verb set only.** A panel row has no rail row to promote and
-  no routed project to substitute, so `createTask` and `navigate` are not in the union. `openTask` is
-  in it, and is the one verb that needs nothing but the row's own `taskId`: go to that task and stop,
-  for a row whose thing *is* a task. From a click site with no row, a command or a slot badge, it has
-  nothing to aim at and the host refuses it out loud rather than doing nothing. An action
-  may declare an optional `risk` tier — `read` | `write` | `execute`, the same vocabulary an agent
-  tool uses — and anything above `read` is armed: the *host* draws the confirmation from the tier
-  and dispatches nothing until it is accepted. Never a new verb, and never plugin-drawn
-  confirmation UI, because a plugin that could draw its own dialog could draw a reassuring one over
-  a destructive call.
-
-A collection may also declare `params`: up to eight named inputs, each `text` or `enum`. The host
-renders one control per param in the panel editor and appends the values to the route as query
-parameters; it never interprets them. The plugin owns what `repo` means, and the day it means
-something else the host does not change.
-
-The manifest `schema` is optional, because the response carries its own. The declared one is the
-*static* case — a promise about the route, so an editor can offer views before any data exists — and
-a collection whose columns cannot be known at build time simply omits it. Linear does: only a Linear
-workflow state's `type` means the same thing in every workspace, so its rows group by the type and
-the response labels each group with the workspace's own name for it. A malformed page is dropped
-whole and logged, never half-parsed: a table missing some of its rows reads as complete and is not.
-The cost of omitting the schema is real and worth knowing before you do: nothing can be configured
-over that collection until it has been fetched once.
-
-Everything the host does with the answer — panels, the views it derives, the cross-source mapping
-layer, per-panel refresh, and where compositions are persisted — is
-[dashboards.md](../dashboards.md). A plugin needs none of it to provide a collection.
+A `dataSources` entry extends the descriptor tier from scalar facts to structured records. The
+plugin declares its schema, query capabilities, identity scope, and Node-owned handler. The host
+binds provenance, validates responses, and supplies the shared query editor and dashboard views.
+Dynamic catalogues use `dataSourceDiscoveries`; they do not depend on a client cache or an initial
+record read. Compiled plugins register the same descriptors through `ctx.dataSources`, and both
+carriers enter one Node registry. For the schema, operations, limits, provider scoping, and examples,
+see [Typed data sources](../data-sources.md) and [The manifest](../plugin-authoring/the-manifest.md).
 
 A `schedules` entry is the one descriptor that acts **when nobody is watching**. It names a route in
 the plugin's own namespace, a cadence from the vocabulary in [schedules.md](../schedules.md), and an
@@ -259,16 +200,11 @@ One trap worth naming: a manifest-declared schedule on a dev-installed package n
 **rebuilt** before the node sees it. Reconciliation will not do it, and the symptom is a plugin that
 reloads fine and schedules nothing.
 
-Two smaller node-side registries follow the same two-feeders shape, and both exist so that something
-can happen while nobody is watching (`docs/schedules.md`):
-
-- **`ctx.collections.register({ collectionId, items })`** — where this plugin's collection can be
-  read *from the node*. Not a second way to declare a collection: the client-side registration is
-  still what puts one in a panel editor, and this is the pointer the measure sampler dispatches
-  through. A loaded plugin registers nothing here; the host synthesises its entries from the
-  manifest's `collections` descriptors, which already carry `items`.
-`ctx.collections` is owner-bound by the host and cleared with everything else a plugin registered,
-and it re-checks route confinement on every call rather than only at registration.
+Typed sources follow the same two-carrier lifecycle. A compiled plugin calls
+`ctx.dataSources.register` or `ctx.dataSources.discover`; the host synthesises the same registrations
+from a loaded plugin's manifest. The registry owns cleanup on reload and disable. Node consumers,
+including unattended dashboard sampling, invoke that registry rather than a client callback. For
+the complete API, see [Typed data sources](../data-sources.md).
 
 **Node actions have no `ctx` member.** Which of this plugin's actions a person may put on a schedule
 is declared in the manifest, as a **command** whose verb is `runNodeAction`, and the host replays

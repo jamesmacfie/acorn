@@ -1,6 +1,6 @@
 // How a pull request is named outside its own pane: `owner/repo#number`.
 //
-// One module, because four places had grown their own spelling of the same identity: the collection
+// One module, because four places had grown their own spelling of the same identity: the source
 // row's `id`, the content-link recogniser's `item`, the reference panel parsing it back, and the "is
 // there already a task for this?" check. Each was correct in isolation, and a set of
 // independently-correct spellings of one identity is what produced the owner-casing bug.

@@ -1,13 +1,13 @@
 // The test seam for this package (docs/architecture-overview.md § Package boundaries).
 //
-//   apps/node/test/integration/workflowFiles.test.ts    loadWorkflowFiles, normalizePersistedWorkflow
+//   apps/node/test/integration/workflowFiles.test.ts    loadWorkflowFiles
 //   apps/node/test/integration/plugins/workflowRunner.test.ts  the runner and its schema tables
 //   apps/node/test/integration/plugins/workflowTasks.test.ts   the complete saved-child fixture
 export { loadWorkflowFiles } from '../server/workflowFiles'
-export { normalizePersistedWorkflow } from '../server/workflowValidation'
 export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/workflowRunner'
 export { WorkflowDispatcher } from '../server/workflowDispatch'
 export { createDef } from '../server/workflowDefs'
+export { createPublishedDef } from './publishedDefinition'
 export { generateWorkflowRequest } from '../server/generateWorkflowRequest'
 export { catalogValidation } from '../server/generateWorkflow'
 export { resolveWorkflowGraph } from '../server/workflowResolution'

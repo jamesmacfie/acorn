@@ -1,6 +1,6 @@
 # Slice 16: Approved occurrences and incremental checks
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-13. Status: complete.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./scheduling.md) and [verification](./verification.md).
@@ -36,8 +36,25 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Completed on September 20, 2026.
+
+- `pnpm lint` passed all 33 package type checks. Oxlint reported the repository's warning baseline and
+  no errors.
+- The focused node-core run passed 63 tests across scheduler, node-action, root-task replay, repository
+  trust, and loaded-plugin permission boundaries.
+- The phase-focused workflows run passed 31 tests across occurrences, route admission, processing
+  history, dispatch recovery, baseline behavior, child settlement, and restart reconciliation. The
+  complete workflows package then passed all 462 tests in 52 files.
+- The focused protocol run passed 10 query-time, query-resolution, and typed-value tests.
+- `pnpm --filter @acorn/arch-tests test boundaries.test.ts contributionKinds.test.ts docPaths.test.ts`
+  passed 59 tests. The plugin API surface and published plugin contract tests also passed.
+- `pnpm db:check` applied all migration chains to fresh databases, including nine workflow migrations.
+
+The controlled-clock and temporary-SQLite cases cover manual and timer races, due-time replay, crash
+recovery at each root transition, zero-match continuation, changed approval, authority revocation,
+active gated descendants, pause versus cancellation, **Run now** history, baseline start and terminal
+failure, expired continuation tokens, incomplete source results, and daylight-saving gaps and folds.
+This slice changes no client UI, so it requires no real-window artifact. Slice 17 owns that UI.
 
 ## Verify before building
 

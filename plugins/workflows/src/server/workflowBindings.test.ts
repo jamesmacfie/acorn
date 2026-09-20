@@ -29,27 +29,27 @@ const step = (structured: unknown): WorkflowStepRow => ({
 describe('child workflow input bindings', () => {
   it('reads literals, frozen parent inputs, and safe structured-output pointers', () => {
     expect(resolveChildWorkflowInputs({
-      literal: { from: 'literal', value: 'fixed' },
-      parent: { from: 'input', name: 'fallback' },
-      ticket: { from: 'step', step: 'source', pointer: '/tickets/0/number' },
-      escaped: { from: 'step', step: 'source', pointer: '/a~1b/~0value' },
+      literal: { address: { from: 'literal', value: 'fixed' } },
+      parent: { address: { from: 'input', name: 'fallback', pointer: '' } },
+      ticket: { address: { from: 'step', stepId: 'source', pointer: '/tickets/0/number' } },
+      escaped: { address: { from: 'step', stepId: 'source', pointer: '/a~1b/~0value' } },
     }, { fallback: 'ABC-0' }, [step({
       tickets: [{ number: 'ABC-7' }],
       'a/b': { '~value': 'escaped' },
     })])).toEqual({ literal: 'fixed', parent: 'ABC-0', ticket: 'ABC-7', escaped: 'escaped' })
   })
 
-  it('refuses missing, non-string, and prototype-traversing values', () => {
+  it('preserves typed values, omits missing optional values, and refuses prototype traversal', () => {
     const rows = [step({ ticket: { number: 7 } })]
+    expect(resolveChildWorkflowInputs({
+      ticket: { address: { from: 'step', stepId: 'source', pointer: '/ticket/number' } },
+    }, {}, rows)).toEqual({ ticket: 7 })
+    expect(resolveChildWorkflowInputs({
+      ticket: { address: { from: 'step', stepId: 'source', pointer: '/missing' } },
+    }, {}, rows)).toEqual({})
     expect(() => resolveChildWorkflowInputs({
-      ticket: { from: 'step', step: 'source', pointer: '/ticket/number' },
-    }, {}, rows)).toThrow("Child input 'ticket' must resolve to a string")
-    expect(() => resolveChildWorkflowInputs({
-      ticket: { from: 'step', step: 'source', pointer: '/missing' },
-    }, {}, rows)).toThrow('does not resolve to a value')
-    expect(() => resolveChildWorkflowInputs({
-      ticket: { from: 'step', step: 'source', pointer: '/constructor/name' },
-    }, {}, rows)).toThrow('not a safe JSON Pointer')
+      ticket: { address: { from: 'step', stepId: 'source', pointer: '/constructor/name' } },
+    }, {}, rows)).toThrow('Invalid data pointer')
   })
 
   it('freezes an ordered map roster from item, parent-input, and predecessor bindings', () => {
@@ -61,14 +61,14 @@ describe('child workflow input bindings', () => {
       childWorkflow: {
         ref: { source: 'database' as const, id: 'child' },
         inputs: {
-          ticket: { from: 'item' as const, pointer: '/number' },
-          fallback: { from: 'input' as const, name: 'fallback' },
-          batch: { from: 'step' as const, step: 'source', pointer: '/batch' },
+          ticket: { address: { from: 'item' as const, pointer: '/number' } },
+          fallback: { address: { from: 'input' as const, name: 'fallback', pointer: '' } },
+          batch: { address: { from: 'step' as const, stepId: 'source', pointer: '/batch' } },
         },
       },
       title: {
         template: '  Review\n${ticket}  ',
-        bindings: { ticket: { from: 'item' as const, pointer: '/number' } },
+        bindings: { ticket: { address: { from: 'item' as const, pointer: '/number' } } },
       },
     }
     expect(resolveWorkflowMapRoster(def, { fallback: 'ABC-0' }, [step({
@@ -95,7 +95,7 @@ describe('child workflow input bindings', () => {
     })
   })
 
-  it('refuses a non-array source, duplicate or empty keys, and non-string item inputs', () => {
+  it('refuses a non-array source, duplicate or empty keys, and unsafe pointers', () => {
     const definition = (structured: unknown, itemKey = '/id', inputPointer = '/number') => () => resolveWorkflowMapRoster({
       name: 'dispatch',
       kind: 'workflow-map',
@@ -103,16 +103,18 @@ describe('child workflow input bindings', () => {
       itemKey,
       childWorkflow: {
         ref: { source: 'database', id: 'child' },
-        inputs: { ticket: { from: 'item', pointer: inputPointer } },
+        inputs: { ticket: { address: { from: 'item', pointer: inputPointer } } },
       },
-      title: { template: '${ticket}', bindings: { ticket: { from: 'item', pointer: '/number' } } },
+      title: { template: '${ticket}', bindings: { ticket: { address: { from: 'item', pointer: '/number' } } } },
     }, {}, [step(structured)])
 
     expect(definition({ tickets: 'ABC-1' })).toThrow('must resolve to an array')
     expect(definition({ tickets: [{ id: 'same', number: 'ABC-1' }, { id: 'same', number: 'ABC-2' }] }))
       .toThrow("item key 'same' is repeated")
     expect(definition({ tickets: [{ id: '', number: 'ABC-1' }] })).toThrow('key must resolve to a nonempty string')
-    expect(definition({ tickets: [{ id: 'one', number: { value: 'ABC-1' } }] })).toThrow("input 'ticket' must resolve to a string")
+    expect(definition({ tickets: [{ id: 'one', number: { value: 'ABC-1' } }] })()).toMatchObject({
+      entries: [{ inputs: { ticket: { value: 'ABC-1' } } }],
+    })
     expect(definition({ tickets: [{ id: 'one', number: 'ABC-1' }] }, '/constructor/name')).toThrow('not a safe JSON Pointer')
   })
 })

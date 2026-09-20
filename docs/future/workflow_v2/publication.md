@@ -1,6 +1,6 @@
 # Drafts, publication, and repository files
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented through slice 19; cross-surface acceptance remains in slice 20.
 Context: [decisions](./context.md). User flows are in [authoring UX](./ux-authoring.md).
 
 ## Ownership and persistence

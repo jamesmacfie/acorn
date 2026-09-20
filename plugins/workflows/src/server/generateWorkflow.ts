@@ -67,8 +67,8 @@ export const GENERATE_MAX_REPAIR_PROBLEMS = 40
  *  `requiresRun` is also a described field of the built-in `agent` kind, so the generated section
  *  below filters it out. That filter is derived from this list rather than written out again: a key
  *  added here has to vanish from the field lists too, and a second list is a second place to forget.
- *  A field whose last dotted part is forbidden goes with it, which is what keeps `childStep.model`
- *  out of a prompt that has just said never to write `model`. */
+ *  A field whose last dotted part is forbidden goes with it, so a nested contributed field cannot
+ *  smuggle a protected execution setting into the prompt. */
 export const FORBIDDEN_KEYS = ['trigger', 'tools.allow', 'model', 'configOptions', 'requiresRun'] as const
 
 const FORBIDDEN_FIELD_IDS = new Set<string>(FORBIDDEN_KEYS.flatMap((key) => [key, key.split('.').pop() ?? key]))
@@ -91,6 +91,12 @@ const SECTION_ROLE = [
   '',
   'Answer with one JSON object and nothing else. No code fence, no prose in front of it, no prose',
   'after it, no comments, no trailing commas. The whole reply has to pass JSON.parse.',
+  'Write formatVersion: 2. Each step has a stable id separate from its human name. Keep IDs when editing.',
+  'All after entries, branch targets, step template references and bindings use IDs. Reordering or renaming must preserve these references.',
+  'Inputs declare schema (string, number, integer, boolean, null, object or array), optional typed default, label and required.',
+  'Declare named outputs as {name, schema, binding}; bindings use {address: {from, ...}, fallback?, conversion?}.',
+  'Step addresses use stepId and pointer; input addresses use name and pointer; item addresses use pointer; literal addresses use value.',
+  'An empty pointer selects the whole typed value. Conversions are scalar-to-text or json-to-text only. Missing optional values are omitted; null remains a value.',
 ].join('\n')
 
 // --- 2. what a workflow is ---
@@ -105,18 +111,19 @@ const SECTION_CONCEPTS = [
   '### The shape',
   '',
   '{',
+  '  "formatVersion": 2,',
   '  "name": "Investigate an issue",',
   '  "posture": "gated",',
   '  "tools": { "maxRisk": "write" },',
   '  "inputs": [',
-  '    { "name": "issue", "description": "The issue to work on", "required": true }',
+  '    { "name": "issue", "schema": { "type": "string" }, "description": "The issue to work on", "required": true }',
   '  ],',
   '  "steps": [',
-  '    { "name": "reproduce", "after": [], "prompt": "Reproduce the issue and say which command shows it." }',
+  '    { "id": "reproduce", "name": "Reproduce", "after": [], "prompt": "Reproduce the issue and say which command shows it." }',
   '  ]',
   '}',
   '',
-  'Only `name` and `steps` are required, and `posture` defaults to `gated`. `steps` always holds at',
+  '`formatVersion`, `name` and `steps` are required, and `posture` defaults to `gated`. `steps` always holds at',
   'least one step: a definition with none is refused.',
   '',
   'An input is a value the person supplies when they start the run. Its `name` starts with a letter',
@@ -128,6 +135,7 @@ const SECTION_CONCEPTS = [
   '### A step',
   '',
   '{',
+  '  "id": "reproduce",',
   '  "name": "reproduce",',
   '  "kind": "agent",',
   '  "after": ["plan"],',
@@ -136,9 +144,8 @@ const SECTION_CONCEPTS = [
   '  "inputs": "append"',
   '}',
   '',
-  'A step name is a slug: letters, digits, hyphens and underscores, starting with a letter or a',
-  'digit. Never a space. Names are unique within a definition, and every edge, branch and reference',
-  'names a step by it, so keep them short and readable: `reproduce`, `write-the-fix`, `review`.',
+  'A step id is stable and unique within its definition. A name is a human-readable label and can contain spaces.',
+  'Edges, branches and references identify a step by id. Never change an existing id when renaming a step.',
   '',
   '`kind` says what the step does. Leave it out for an ordinary agent step, which is most of them.',
   'Section 3 lists every kind this node can run.',
@@ -178,7 +185,8 @@ const SECTION_CONCEPTS = [
   '`after` naming both and a prompt saying what to do with them:',
   '',
   '{',
-  '  "name": "synthesise",',
+  '  "id": "synthesise",',
+  '  "name": "Synthesise",',
   '  "after": ["security-review", "performance-review"],',
   '  "prompt": "Two reviews of the same change follow, one for security and one for performance. Write one summary: what they agree on, where they disagree, and what to do first."',
   '}',
@@ -189,11 +197,10 @@ const SECTION_CONCEPTS = [
   '',
   'Two references reach a value from somewhere else:',
   '',
-  '  ${steps.<name>.output}   what that step answered.',
+  '  ${steps.<id>.output}     what that step answered.',
   '  ${inputs.<name>}         a value the person supplied when starting the run.',
   '',
-  "They work in three places and nowhere else: a step's `prompt`, a fan-out step's",
-  "`childStep.prompt`, and any string inside a contributed kind's `with`. Anywhere else they are",
+  "They work in a step's `prompt` and any string inside a contributed kind's `with`. Anywhere else they are",
   'literal text.',
   '',
   'Three rules:',
@@ -290,11 +297,13 @@ const SECTION_KINDS_PREAMBLE = [
   'A contributed kind is namespaced, `"kind": "http:request"`, and every input it takes goes inside',
   '`with`. Nothing else on the step belongs to it.',
   '',
-  'A dotted key is a nested one: `childStep.prompt` means `prompt` inside a `childStep` object.',
+  'A dotted key is a nested contributed setting; preserve its object structure.',
   '',
   "A field's JSON type follows the word in brackets. `text`, `textarea`, `prompt` and `string` are",
   'all strings, `number` is a number, `boolean` is true or false, and a field written as "one of" takes',
-  'one of the values listed. The single exception is `schema`, which is a JSON Schema object, as above.',
+  'one of the values listed. Structured fields schema, query, record, and condition are JSON objects, not JSON-encoded strings.',
+  'Find records query is {kind:"saved",queryId,revision,bindings} or {kind:"inline",content,bindings}. Each binding uses {address:{from:"input",name,pointer}} or {address:{from:"step",stepId,pointer}}.',
+  'Get record details record binds the exact /ref object, retaining its scope. If condition is {kind:"comparison",left:<binding>,operator:"eq",right:{address:{from:"literal",value:true}}}, or a bounded all/any group of predicates.',
   '',
   'A kind marked "runs an agent" may also take `profileId`, `isolation` and `inputs`. On any other',
   'kind `isolation` and `inputs` are errors and `profileId` does nothing, so leave all three off.',
@@ -307,7 +316,7 @@ const optionValues = (options: readonly StepFieldOption[], detail: KindDetail): 
 }
 
 const fieldType = (field: StepField, detail: KindDetail): string => {
-  // A select with no fixed options — a policy, a fan-out step name, a child profile — has nothing to
+  // A select with no fixed options — a policy, a predecessor id, a child profile — has nothing to
   // list, and the bare word `select` is not a JSON type and means nothing to a model with no form in
   // front of it. Each one holds an identifier, so say what the model actually writes: a string.
   if (field.type === 'select') return field.options?.length ? `one of ${optionValues(field.options, detail)}` : 'string'
@@ -330,18 +339,14 @@ const fieldLine = (field: PromptField, prefix: string, detail: KindDetail): stri
 /** Keys a built-in kind really takes that its `describe` does not list.
  *
  *  `describe` is the editor's form, and these three have no control on it: a decide's branches are
- *  drawn as edges on the graph, a fan-out's schema is written for it, and a child step's name is a
- *  slug the runner defaults. A model has no graph to draw on and no form to fill in, so it has to be
- *  handed the keys. They live here rather than in `describe` because adding them there would put
- *  three empty boxes in the inspector to fix a problem the inspector does not have.
+ *  drawn as edges on the graph. A model has no graph to draw on and no form to fill in, so it has
+ *  to be handed the key. It lives here rather than in `describe` because adding it there would put
+ *  an empty box in the inspector to fix a problem the inspector does not have.
  *
  *  Only built-ins appear here. A contributed kind's `describe` is the whole contract it has. */
 const UNDESCRIBED_FIELDS: Readonly<Record<string, readonly PromptField[]>> = {
-  decide: [{ id: 'branches', shape: 'object of verdict to step name, required', hint: 'Section 4 shows one.' }],
-  'fan-out': [
-    { id: 'schema', shape: 'textarea, required', hint: 'JSON Schema for the task list. Section 4 has it.' },
-    { id: 'childStep.name', shape: 'text', hint: 'A slug naming each child. Defaults to `child`.' },
-  ],
+  decide: [{ id: 'branches', shape: 'object of verdict to downstream step ID, required', hint: 'Section 4 shows one.' }],
+  if: [{ id: 'branches', shape: 'object with true and otherwise keys naming downstream step IDs, required', hint: 'Deterministic condition; no AI call. condition uses the shared typed predicate and bindings.' }],
 }
 
 type CatalogKind = WorkflowCatalog['kinds'][number]
@@ -359,8 +364,8 @@ const kindFields = (kind: CatalogKind, detail: KindDetail): PromptField[] => [
       hint: field.hint,
     })),
   ...(kind.pluginId === null ? UNDESCRIBED_FIELDS[kind.id] ?? [] : []),
-  // Top-level keys, then the nested ones, so a `childStep` is not split in half by a key added
-  // above. The sort is stable, so each group keeps the order it was described in.
+  // Top-level keys, then nested ones, so an object is not split around one child key. The sort is
+  // stable, so each group keeps the order it was described in.
 ].sort((a, b) => Number(a.id.includes('.')) - Number(b.id.includes('.')))
 
 const kindBlock = (kind: CatalogKind, detail: KindDetail): string => {
@@ -418,61 +423,20 @@ export function renderStepKinds(catalog: WorkflowCatalog, budget = GENERATE_MAX_
 const SECTION_CONTRACTS = [
   '## 4. Two shapes nothing else tells you',
   '',
-  '### The task list a fan-out needs',
+  '### Structured plans and For each',
   '',
-  '`fan-out` asks an agent for a list of jobs, then runs one child agent per item, each in a worktree',
-  'of its own. The planning agent has to answer with exactly this, or the step fails with "Plan',
-  'emitted no task list":',
-  '',
-  '{ "tasks": [ { "title": "Update the parser", "branch": "fix/parser", "prompt": "anything extra for this one child" } ] }',
-  '',
-  '`title` and `branch` are required and `prompt` is optional. `branch` is a git branch name and has',
-  'to be unique across every task on the machine, so build it out of something from the run. At most',
-  '12 entries.',
-  '',
-  'An empty `tasks` array is not an answer. It fails the step with that same message, exactly as a',
-  'missing array does. So write the planning prompt to ask for at least one entry, and only reach for',
-  'a fan-out where the work is certainly there to split up. When the description says there may be',
-  'nothing to do, an ordinary agent step handles it, or a `decide` in front that branches on whether',
-  'there is anything.',
-  '',
-  'So a fan-out step needs three things: a prompt asking for that list and saying what one entry is,',
-  'a `schema` matching it, and a `childStep.prompt` telling each child what to do with its own entry.',
-  'Each child is handed its title and its extra prompt automatically.',
-  '',
-  '{',
-  '  "name": "plan",',
-  '  "kind": "fan-out",',
-  '  "after": [],',
-  '  "prompt": "List the packages in this repository that carry their own dependency manifest. Answer with a tasks array holding one entry per package, with title set to the package name and branch set to deps/ followed by the package name. At least one entry and at most 12.",',
-  '  "schema": {',
-  '    "type": "object",',
-  '    "required": ["tasks"],',
-  '    "properties": {',
-  '      "tasks": {',
-  '        "type": "array",',
-  '        "items": {',
-  '          "type": "object",',
-  '          "required": ["title", "branch"],',
-  '          "properties": { "title": { "type": "string" }, "branch": { "type": "string" }, "prompt": { "type": "string" } }',
-  '        }',
-  '      }',
-  '    }',
-  '  },',
-  '  "childStep": {',
-  '    "name": "update",',
-  '    "prompt": "Bring the dependencies of the package this task names up to date. Run that package\'s tests until they pass and change nothing outside it. Answer with what you moved."',
-  '  }',
-  '}',
-  '',
-  'A `join` step collects those children. It names the fan-out in `joins`, and waits for it in',
-  '`after`.',
+  'Use an agent step with an object schema containing an items array. Every item has a stable key.',
+  'Follow it with workflow-map (For each), items: { step: "plan", pointer: "/items" }, itemKey: "/id".',
+  'Choose childWorkflow.ref from the available workflow catalog and bind each typed item to its declared inputs.',
+  'Do not invent a child reference. Ask which workflow to use when no suitable target exists.',
+  'An empty array succeeds without tasks. For each returns ordered children; ordinary graph convergence uses after edges.',
   '',
   '### The branches a decide takes',
   '',
   '`decide` asks an agent for one verdict and takes the branch matching it.',
   '',
   '{',
+  '  "id": "triage",',
   '  "name": "triage",',
   '  "kind": "decide",',
   '  "after": ["reproduce"],',
@@ -506,7 +470,7 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
     lines.push('', 'A `gate-policy` step asks a policy for a verdict and fails the run when it says no. Its `policy`')
     lines.push(`is one of: ${policies.map((policy) => `\`${policy.id}\``).join(', ')}.`)
     if (!compact) {
-      lines.push('', `{ "name": "checks", "kind": "gate-policy", "after": ["open-a-pull-request"], "policy": "${policies[0]!.id}" }`)
+      lines.push('', `{ "id": "checks", "name": "Checks", "kind": "gate-policy", "after": ["open-a-pull-request"], "policy": "${policies[0]!.id}" }`)
     }
   }
 
@@ -583,7 +547,6 @@ const SECTION_RULES = [
   '- A step `tools.maxRisk` looser than the workflow ceiling.',
   '- An autonomous workflow with no `tools.maxRisk`.',
   '- A `decide` step with no `branches`, or a branch target that does not wait for the decision.',
-  '- A `join` step whose `joins` does not name a fan-out behind it.',
   '- A required field of a kind left empty.',
   '- `isolation` or `inputs` on a kind that does not run an agent.',
   '- A child workflow reference that section 6 does not list.',
@@ -600,12 +563,11 @@ const SECTION_RULES = [
   '- Giving a decide branch target no `after` of its own, so it starts beside the decision rather',
   '  than after it.',
   '- Leaving out a `default` branch when the verdict could be a word you did not list.',
-  '- A `join` with no `fan-out` behind it in `joins`.',
-  '- A `fan-out` whose prompt does not ask for the task list, that has no `schema`, or that offers an',
-  '  empty list as an answer. An empty list fails the step.',
+  '- A For each without a stable item key or available child workflow.',
+  '- An AI plan without a structural schema or stable item key. Empty arrays are valid.',
   '- A dash in an input name, or a digit at the front of one. An input name starts with a letter and',
-  '  then takes letters, digits and underscores. Step names take dashes.',
-  '- A space in a step name.',
+  '  then takes letters, digits and underscores. Stable step IDs may also contain colons and dashes.',
+  '- A missing, repeated, or unstable step id. Human step names may contain spaces.',
   '- An autonomous workflow with no `tools.maxRisk`.',
   '- Inventing a kind, a policy or a profile. Sections 3 and 5 list what exists.',
   '',
@@ -617,11 +579,12 @@ const SECTION_RULES = [
   'so this is a three-step chain:',
   '',
   '{',
+  '  "formatVersion": 2,',
   '  "name": "Investigate",',
   '  "steps": [',
-  '    { "name": "check-the-logs", "prompt": "Read the logs for this failure and say what they show." },',
-  '    { "name": "read-the-code", "prompt": "Find the code behind this failure and say what looks wrong." },',
-  '    { "name": "write-it-up", "prompt": "Write the diagnosis." }',
+  '    { "id": "check-the-logs", "name": "Check the logs", "prompt": "Read the logs for this failure and say what they show." },',
+  '    { "id": "read-the-code", "name": "Read the code", "prompt": "Find the code behind this failure and say what looks wrong." },',
+  '    { "id": "write-it-up", "name": "Write it up", "prompt": "Write the diagnosis." }',
   '  ]',
   '}',
   '',
@@ -629,11 +592,12 @@ const SECTION_RULES = [
   '`inputs` defaults to `append`:',
   '',
   '{',
+  '  "formatVersion": 2,',
   '  "name": "Investigate",',
   '  "steps": [',
-  '    { "name": "check-the-logs", "after": [], "prompt": "Read the logs for this failure and say what they show." },',
-  '    { "name": "read-the-code", "after": [], "prompt": "Find the code behind this failure and say what looks wrong." },',
-  '    { "name": "write-it-up", "after": ["check-the-logs", "read-the-code"], "prompt": "A log reading and a code reading of one failure follow. Write the diagnosis: what is broken, why, and the smallest change that fixes it." }',
+  '    { "id": "check-the-logs", "name": "Check the logs", "after": [], "prompt": "Read the logs for this failure and say what they show." },',
+  '    { "id": "read-the-code", "name": "Read the code", "after": [], "prompt": "Find the code behind this failure and say what looks wrong." },',
+  '    { "id": "write-it-up", "name": "Write it up", "after": ["check-the-logs", "read-the-code"], "prompt": "A log reading and a code reading of one failure follow. Write the diagnosis: what is broken, why, and the smallest change that fixes it." }',
   '  ]',
   '}',
 ].join('\n')
@@ -644,21 +608,6 @@ const SECTION_RULES = [
 // can never teach something the checker refuses. The first is the motivating case: parallel work,
 // a fan-in, and a person approving before anything leaves the machine.
 
-const TASK_LIST_SCHEMA = {
-  type: 'object',
-  required: ['tasks'],
-  properties: {
-    tasks: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['title', 'branch'],
-        properties: { title: { type: 'string' }, branch: { type: 'string' }, prompt: { type: 'string' } },
-      },
-    },
-  },
-}
-
 export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
   {
     note: [
@@ -667,33 +616,39 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
       '`append`. Nothing leaves the machine until a person presses approve.',
     ].join(' '),
     def: {
+      formatVersion: 2,
       name: 'Investigate an issue from two angles',
       posture: 'gated',
       tools: { maxRisk: 'execute' },
-      inputs: [{ name: 'issue', description: 'The issue to investigate', required: true }],
+      inputs: [{ name: 'issue', schema: { type: 'string' }, description: 'The issue to investigate', required: true }],
       steps: [
         {
+          id: 'reproduce',
           name: 'reproduce',
           after: [],
           prompt: 'Reproduce this issue. Answer with the exact command that shows it and what it prints, or say you could not reproduce it and what you tried.\n\nIssue: ${inputs.issue}',
         },
         {
+          id: 'read-the-code',
           name: 'read-the-code',
           after: [],
           prompt: 'Find the code behind this issue without running anything. Answer with the files and functions involved, one line each, and what you think is going wrong.\n\nIssue: ${inputs.issue}',
         },
         {
+          id: 'diagnose',
           name: 'diagnose',
           after: ['reproduce', 'read-the-code'],
           prompt: 'A reproduction attempt and a code reading of the same issue follow. Write the diagnosis: what is broken, why, and the smallest change that would fix it.',
         },
         {
+          id: 'write-the-fix',
           name: 'write-the-fix',
           after: ['diagnose'],
           prompt: 'Make the change the diagnosis describes and run the tests that cover it. Commit nothing and push nothing.',
         },
-        { name: 'approve', kind: 'gate-human', after: ['write-the-fix'] },
+        { id: 'approve', name: 'approve', kind: 'gate-human', after: ['write-the-fix'] },
         {
+          id: 'open-a-pull-request',
           name: 'open-a-pull-request',
           after: ['approve'],
           prompt: 'Commit the change, push the branch, and open a pull request. The title says what changed and the body says why.',
@@ -702,53 +657,17 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
     },
   },
   {
-    note: [
-      'One fan-out planning the work, a join collecting it, and a decision with a branch each way. The',
-      'planning prompt asks for at least one entry, because a fan-out that plans nothing fails.',
-      '`default` shares a step with `dirty`, which is how an unexpected verdict is treated as the',
-      'careful one. `write-it-up` waits for both branches, and the skipped one contributes nothing,',
-      'which is why it reads them with `append` rather than a reference.',
-    ].join(' '),
+    note: 'A structured plan can return zero items. Select a published child workflow, then add For each using /items and the stable /id key. Do not infer identity from array position.',
     def: {
-      name: 'Update the dependencies in every package',
-      posture: 'gated',
-      tools: { maxRisk: 'execute' },
-      steps: [
-        {
-          name: 'plan',
-          kind: 'fan-out',
-          after: [],
-          prompt: 'List the packages in this repository that carry their own dependency manifest. Answer with a tasks array holding one entry per package, with title set to the package name and branch set to deps/ followed by the package name. At least one entry and at most 12.',
-          schema: TASK_LIST_SCHEMA,
-          childStep: {
-            name: 'update',
-            prompt: "Bring the dependencies of the package this task names up to date. Run that package's tests until they pass and change nothing outside it. Answer with what you moved and the command you ran.",
-          },
-        },
-        { name: 'collect', kind: 'join', after: ['plan'], joins: 'plan' },
-        {
-          name: 'verdict',
-          kind: 'decide',
-          after: ['collect'],
-          prompt: 'The result of every package update follows. Answer with a verdict of either clean, when every package passes, or dirty, when any of them still fails.',
-          branches: { clean: 'note-what-changed', dirty: 'second-pass', default: 'second-pass' },
-        },
-        {
-          name: 'second-pass',
-          after: ['verdict'],
-          prompt: 'One or more packages still fail. Fix what is left in this checkout, run the whole suite, and answer with what you changed.',
-        },
-        {
-          name: 'note-what-changed',
-          after: ['verdict'],
-          prompt: 'Every package passes. Answer with one line per package saying which dependencies moved.',
-        },
-        {
-          name: 'write-it-up',
-          after: ['second-pass', 'note-what-changed'],
-          prompt: 'Write the summary for the person who started this run: which packages moved, what broke, and anything still outstanding.',
-        },
-      ],
+      formatVersion: 2,
+      name: 'Plan package updates',
+      steps: [{
+        id: 'plan', name: 'Plan package updates', kind: 'agent',
+        prompt: 'List packages needing an update. Return items with a stable id and title; return an empty array when none need updates.',
+        schema: { type: 'object', required: ['items'], properties: {
+          items: { type: 'array', items: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } } },
+        } },
+      }],
     },
   },
 ]
@@ -912,7 +831,7 @@ export function buildGenerateUserPrompt(args:
       '',
       'Return the whole edited definition, not a patch. Keep every name, step, prompt, edge, input,',
       'policy, budget and setting that the request does not need to change. Some protected settings',
-      'have been omitted; keep the step names and kinds for unaffected steps so acorn can restore them.',
+      'have been omitted; keep the stable step ids and kinds for unaffected steps so acorn can restore them.',
       '',
       'Answer with the JSON object and nothing else.',
     ].join('\n')

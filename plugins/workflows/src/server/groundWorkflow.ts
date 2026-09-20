@@ -9,12 +9,12 @@
 //
 // Grounding touches three things and nothing else: an identifier the catalog can refute, a key
 // outside the vocabulary of the four types, and a reference token that cannot resolve. A decide with
-// no branches, a widened budget, a duplicate step name and a cycle are all left where they are. The
+// no branches, a widened budget, a duplicate step ID and a cycle are all left where they are. The
 // checker already says something better about each of them than this file could invent, and the
 // repair pass sends those messages back verbatim (./workflowValidation.ts).
 //
 // Nothing here deletes a step. An invented kind becomes an agent step rather than a hole, because a
-// deletion cascades through every `after`, `joins` and `branches` that names it. The one exception
+// deletion cascades through every `after` and `branches` target that names it. The one exception
 // is an array entry that is not a step at all, which is dropped while parsing, before any name can
 // point at it.
 //
@@ -25,13 +25,11 @@
 // key is the one mistake that passes every validator and every handler in silence, which is the
 // class this file exists for.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../shared/api'
-import { STEP_NAME_RE, uniqueStepName } from '../shared/stepNames'
 import type {
   WorkflowCatalog,
   WorkflowDef,
   WorkflowInput,
   WorkflowStepDef,
-  WorkflowValueBinding,
 } from '../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generateWorkflow'
 import { groundWorkflowDispatch } from './groundWorkflowDispatch'
@@ -46,14 +44,13 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
  *  model writes is a key acorn never reads, so it is dropped rather than carried around looking
  *  meaningful. The forbidden ones stay in these lists and are caught by the set below, so this
  *  reads as the type it mirrors. */
-const DEF_KEYS = ['name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'steps']
+const DEF_KEYS = ['maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
 const STEP_KEYS = [
-  'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
-  'schema', 'policy', 'maxIterations', 'requiresRun', 'childStep', 'childWorkflow', 'items', 'itemKey',
-  'title', 'joins', 'branches', 'with', 'tools', 'budget',
+  'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
+  'schema', 'policy', 'maxIterations', 'requiresRun', 'childWorkflow', 'items', 'itemKey',
+  'title', 'branches', 'with', 'tools', 'budget',
 ]
-const CHILD_STEP_KEYS = ['name', 'profileId', 'model', 'prompt', 'schema', 'tools', 'budget']
-const INPUT_KEYS = ['name', 'description', 'required', 'default']
+const INPUT_KEYS = ['name', 'label', 'schema', 'description', 'required', 'default']
 
 /** The keys the prompt forbids, read from the prompt's own list so the two cannot drift. The nested
  *  ones are split off below, because a key list is checked against the keys of one record. */
@@ -216,62 +213,6 @@ function pruneCeiling<T extends object>(tools: T | undefined, report: (key: stri
   return Object.keys(rest).length ? rest : undefined
 }
 
-/** Rename one step everywhere its name is written: the edges, the branch targets, the `joins`, and
- *  every `${steps.<name>.output}` in a prompt, a child prompt or a `with` string. The editor's
- *  rename does the same (../client/editor/draft.ts); this one adds no `after` key of its own. */
-function renameStep(def: WorkflowDef, from: string, to: string): WorkflowDef {
-  const rewrite = (value: string): string => value.split(`\${steps.${from}.output}`).join(`\${steps.${to}.output}`)
-  const bindings = (table: Record<string, WorkflowValueBinding> | undefined) =>
-    table && Object.fromEntries(Object.entries(table).map(([name, binding]) => [
-      name,
-      binding.from === 'step' && binding.step === from ? { ...binding, step: to } : binding,
-    ]))
-  const steps = def.steps.map((step) => {
-    const next: WorkflowStepDef = { ...step }
-    if (next.name === from) next.name = to
-    if (Array.isArray(next.after)) next.after = next.after.map((parent) => (parent === from ? to : parent))
-    if (typeof next.prompt === 'string') next.prompt = rewrite(next.prompt)
-    if (next.joins === from) next.joins = to
-    if (isRecord(next.branches)) {
-      next.branches = Object.fromEntries(Object.entries(next.branches).map(([verdict, target]) => [verdict, target === from ? to : target]))
-    }
-    if (isRecord(next.childStep) && typeof next.childStep.prompt === 'string') {
-      next.childStep = { ...next.childStep, prompt: rewrite(next.childStep.prompt) }
-    }
-    if (isRecord(next.with)) {
-      next.with = Object.fromEntries(Object.entries(next.with).map(([key, value]) => [key, typeof value === 'string' ? rewrite(value) : value]))
-    }
-    if (next.childWorkflow?.inputs) next.childWorkflow = { ...next.childWorkflow, inputs: bindings(next.childWorkflow.inputs) }
-    if (next.items?.step === from) next.items = { ...next.items, step: to }
-    if (next.title?.bindings) next.title = { ...next.title, bindings: bindings(next.title.bindings) }
-    return next
-  })
-  return { ...def, steps }
-}
-
-/** Every step name shaped the way the editor and the reference syntax need it.
- *
- *  The checker never asks: `STEP_NAME_RE` lives in ../shared/stepNames.ts and the server checks only
- *  that a name is there and unique. So "Reproduce the bug" validates, breaks the rename field, and
- *  produces a `${steps.Reproduce the bug.output}` that the template regex matches.
- *
- *  One rename per name, not per step. `renameStep` rewrites every step called `from`, so two steps
- *  sharing one ill-formed name are both done on the first pass, and going round again would mint a
- *  second name, rename nothing, and leave a note naming a step that is not in the draft. The
- *  duplicate that survives is the checker's to report and the repair pass's to fix. */
-function groundNames(def: WorkflowDef, notes: Notes): WorkflowDef {
-  let next = def
-  const done = new Set<string>()
-  for (const step of def.steps) {
-    if (STEP_NAME_RE.test(step.name) || done.has(step.name)) continue
-    done.add(step.name)
-    const renamed = uniqueStepName(next, step.name)
-    add(notes, 'renamed-step', `Step '${step.name}' is not a step name acorn can use, so it is now '${renamed}'.`, renamed)
-    next = renameStep(next, step.name, renamed)
-  }
-  return next
-}
-
 /** A string `with.prompt` moved onto the step, for a step that is about to lose its `with`. */
 function hoistPrompt(step: WorkflowStepDef): { step: WorkflowStepDef; hoisted: boolean } {
   const candidate = step.with?.prompt
@@ -325,18 +266,9 @@ function groundStep(step: WorkflowStepDef, catalog: WorkflowCatalog, kinds: Map<
     add(notes, 'unknown-profile', `Step '${label}' named the profile '${next.profileId}', which this node does not have, so the step runs on the default.`, label)
     next = without(next, 'profileId')
   }
-  if (next.childStep && typeof next.childStep.profileId === 'string' && !knownProfile(next.childStep.profileId)) {
-    add(notes, 'unknown-profile', `Step '${label}' gave its children the profile '${next.childStep.profileId}', which this node does not have, so they run on the default.`, label)
-    next = { ...next, childStep: without(next.childStep, 'profileId') }
-  }
-
   if (next.schema !== undefined && !isRecord(next.schema)) {
     add(notes, 'dropped-schema', `Step '${label}' set a schema that is not a JSON object, so it was dropped.`, label)
     next = without(next, 'schema')
-  }
-  if (next.childStep && next.childStep.schema !== undefined && !isRecord(next.childStep.schema)) {
-    add(notes, 'dropped-schema', `Step '${label}' set a child schema that is not a JSON object, so it was dropped.`, label)
-    next = { ...next, childStep: without(next.childStep, 'schema') }
   }
   return next
 }
@@ -384,20 +316,6 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
     })
     if (stepCeiling !== ahead.tools) ahead = stepCeiling ? { ...ahead, tools: stepCeiling } : without(ahead, 'tools')
 
-    if (ahead.childStep !== undefined && !isRecord(ahead.childStep)) {
-      add(notes, 'unknown-key', `Step '${step.name}' set \`childStep\` to something that is not an object, so it was dropped.`, step.name)
-      ahead = without(ahead, 'childStep')
-    } else if (ahead.childStep) {
-      let child = pruneKeys(ahead.childStep, CHILD_STEP_KEYS, (key, code) => {
-        const why = code === 'forbidden-key' ? 'which a generated workflow cannot set' : 'which is not part of a child step'
-        add(notes, code, `Step '${step.name}' set 'childStep.${key}', ${why}, so it was dropped.`, step.name)
-      })
-      const childCeiling = pruneCeiling(child.tools, (key) => {
-        add(notes, 'forbidden-key', `Step '${step.name}' set \`childStep.tools.${key}\`, which a generated workflow cannot set, so it was dropped.`, step.name)
-      })
-      if (childCeiling !== child.tools) child = childCeiling ? { ...child, tools: childCeiling } : without(child, 'tools')
-      if (child !== ahead.childStep) ahead = { ...ahead, childStep: child }
-    }
     return ahead
   })
   return steps.some((step, index) => step !== next.steps[index]) ? { ...next, steps } : next
@@ -410,6 +328,7 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
  *  reference to a step that does not exist loses the token, because a step cannot be conjured from a
  *  sentence, while an input declaration is recoverable from a reference in full. */
 function groundReferences(def: WorkflowDef, notes: Notes): WorkflowDef {
+  if (def.formatVersion === 2) return def // Keep invalid references visible for the validation/repair pass.
   const steps = [...def.steps]
   const names = new Set(steps.map((step) => step.name))
   const declared = new Set((def.inputs ?? []).map((input) => input?.name).filter((name): name is string => typeof name === 'string'))
@@ -473,7 +392,6 @@ function groundReferences(def: WorkflowDef, notes: Notes): WorkflowDef {
     const before = steps[index]!
     const owner = before.name
     const prompt = typeof before.prompt === 'string' ? rewrite(owner, before.prompt) : undefined
-    const childPrompt = typeof before.childStep?.prompt === 'string' ? rewrite(owner, before.childStep.prompt) : undefined
     const table = isRecord(before.with)
       ? Object.fromEntries(Object.entries(before.with).map(([key, value]) => [key, typeof value === 'string' ? rewrite(owner, value) : value]))
       : undefined
@@ -481,7 +399,6 @@ function groundReferences(def: WorkflowDef, notes: Notes): WorkflowDef {
     // named, and that write must not be lost under the rewritten strings.
     let next = steps[index]!
     if (prompt !== undefined && prompt !== next.prompt) next = { ...next, prompt }
-    if (childPrompt !== undefined && childPrompt !== next.childStep?.prompt) next = { ...next, childStep: { ...next.childStep, prompt: childPrompt } }
     if (table && Object.entries(table).some(([key, value]) => value !== next.with?.[key])) next = { ...next, with: table }
     steps[index] = next
   }
@@ -506,7 +423,7 @@ export function groundWorkflow(def: WorkflowDef, catalog: WorkflowCatalog): Grou
   const kinds = new Map(catalog.kinds.map((kind) => [kind.id, kind]))
   // Names first, so every note below names a step by the name the reader will see in the editor,
   // and so the reference pass reads tokens the rename has already rewritten.
-  let next = groundNames(def, notes)
+  let next = def
   next = groundKeys(next, notes)
   const steps = next.steps.map((step) => groundStep(step, catalog, kinds, notes))
   if (steps.some((step, index) => step !== next.steps[index])) next = { ...next, steps }

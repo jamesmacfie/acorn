@@ -7,9 +7,18 @@ import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets
 import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
-import { createDef, defsForProject, getDef, listDefs, mergedList, removeDef, saveDefToRepo, updateDef } from '../server/workflowDefs'
+import { defsForProject, getDef, listDefs, mergedList } from '../server/workflowDefs'
+import { workflowFileAuthoring } from '../server/workflowFileAuthoring'
+import { destinationQuery, validateWorkflowDestination } from '../server/workflowDestination'
+import { workflowDraftQueries } from '../server/workflowDraftQueries'
+import { workflowPublication } from '../server/workflowPublication'
+import { publishedWorkflow } from '../server/workflowPublicationStore'
 import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
+import { authorWorkflowConversation } from '../server/workflowAuthoringConversation'
 import { WorkflowDispatcher } from '../server/workflowDispatch'
+import { WorkflowProcessingStore } from '../server/workflowProcessingStore'
+import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/workflowProcessingReadModel'
+import { prepareWorkflowReprocess } from '../server/workflowReprocess'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
@@ -22,8 +31,11 @@ import { workflowTaskResolutionScope } from '../server/workflowResolution'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { workflowRuns, workflowSteps } from './schema'
-import { workflowRunList, workflowStepProjections } from '../server/workflowRunProjection'
+import { workflowRunList, workflowStepProjections, workflowTaskNavigation } from '../server/workflowRunProjection'
 import { WorkflowStartService } from '../server/workflowStartService'
+import { assertWorkflowDataScope } from '../server/workflowDataSteps'
+import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/workflowSchedules'
+import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
@@ -39,6 +51,7 @@ export type WorkflowsPluginDeps = {
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
   // treats null as a hard failure and '' as done.
   failingChecks: (taskId: string) => Promise<string | null>
+  scheduler?: () => WorkflowScheduleScheduler
 }
 
 export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
@@ -46,6 +59,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
   let defsCapability: { dispose(): void } | null = null
+  let schedulesCapability: { dispose(): void } | null = null
   // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
   // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
   // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
@@ -74,7 +88,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
     // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
-    init: (ctx) => {
+    init: async (ctx) => {
       // Opened and migrated by the host before init returns. The runner and the bridge below both
       // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
@@ -98,7 +112,29 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         allows: ['observe', 'veto'],
       })
       let dispatcher: WorkflowDispatcher
+      let scheduleService: WorkflowScheduleService | null = null
       const runner = new WorkflowRunner(store, {
+        dataAccess: async (taskId, signal) => {
+          const task = await core.tasks.load(taskId)
+          const project = task?.projectId ? await core.projects.byId(task.projectId) : null
+          if (!project) throw new Error('Workflow data access requires a project')
+          const scope = { workspaceId: project.workspaceId, projectId: project.id }
+          const userId = core.identity.active()
+          if (!userId) throw new Error('Workflow data access requires an active owner')
+          const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal }
+          return {
+            scope,
+            resolve: async (reference, values) => {
+              const resolved = await ctx.dataSources.resolveQuery(scope, destinationQuery(reference, scope), values, invocation)
+              assertWorkflowDataScope(scope, resolved.query.scope)
+              return resolved
+            },
+            invoke: request => {
+              assertWorkflowDataScope(scope, request.operation === 'query' ? request.query.scope : request.scope)
+              return ctx.dataSources.invoke(request, invocation)
+            },
+          }
+        },
         hooks: ctx.hooks,
         telemetry: ctx.telemetry,
         runStep: async (taskId, def, opts) => {
@@ -209,11 +245,15 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         gateChanged: (taskId, runId, stepId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
+          await scheduleService?.settleRun(runId).catch(error => ctx.log.warn(`workflow schedule settlement failed: ${describeError(error).message}`))
+          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
+          // `setRun` announces the terminal status before this callback. Repeat it after schedule
+          // settlement so clients that refresh both read models cannot race the schedule write.
+          if (run) ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status: run.status })
           const handoff = await ctx.capabilities
             .require(NOTES_STORE)
             .read({ scope: 'task', taskId }, `workflow-handoffs-${runId}`)
             .catch(() => null)
-          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
           if (deps.reviewBoundary) {
             await deps.reviewBoundary({ taskId, runId, status: run?.status ?? 'unknown', transcriptTail: handoff?.body ?? null }).catch(() => undefined)
           } else if (deps.memoryReviewTrigger) {
@@ -230,7 +270,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const status = await runTargets.status(taskId, targetId)
           return { ok: true, url: status.url }
         },
-        // Materialises a child task (docs/workflows.md covers fan-out, branch dedup, and lazy worktree
+        // Materialises a child task (docs/workflows.md covers dispatch, branch dedup, and lazy worktree
         // creation). Core owns `tasks`, so the insert is core's.
         createChildTask: (parentTaskId, seed, intendedTaskId) => core.tasks.createChild(parentTaskId, seed, intendedTaskId),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
@@ -239,9 +279,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
         dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
+        selectWorkflowRecords: (request, signal) => new WorkflowProcessingStore(store, dispatcher).dispatch(request, signal),
         childChanged: (event) => ctx.events.send({ channel: pluginChannel('workflows', 'child-changed'), ...event }),
-        // Runtime dispatch is available only after the complete workflow-task acceptance gate.
-        runtimeWorkflowDispatchEnabled: true,
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
       }, ctx.extensionPoints)
       dispatcher = new WorkflowDispatcher(store, runner, core.tasks, {
@@ -258,8 +297,63 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         taskScope,
         project: (projectId) => core.projects.byId(projectId),
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+        authorizeProjectConfig: (projectId) => core.projects.assertProjectConfigTrusted(projectId),
         onTrustRequired: (taskId) => ctx.events.repoConfigTrustNotice(taskId),
+        validateDestination: async (graph, scope) => {
+          const userId = core.identity.active()
+          if (!userId) throw new Error('Destination validation requires an active owner')
+          await validateWorkflowDestination(graph, { workspaceId: scope.workspaceId, projectId: scope.projectId }, (reference, inputs) =>
+            ctx.dataSources.resolveQuery({ workspaceId: scope.workspaceId, projectId: scope.projectId }, reference, { inputs },
+              { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) }))
+        },
+        queryRevision: async (queryId, scope) => {
+          const userId = core.identity.active()
+          if (!userId) throw new Error('Query resolution requires an active owner')
+          const result = await ctx.dataSources.queryPublication({ action: 'inspect', queryId, workspaceId: scope.workspaceId, projectId: scope.projectId },
+            { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) })
+          if (!result.published) throw new Error('Query is not published')
+          return result.published.revision
+        },
       }, homedir())
+      scheduleService = new WorkflowScheduleService(store, starts, core, deps.reconciled, {
+        scheduler: deps.scheduler,
+        describeSource: async (reference, scope, inputs) => {
+          const userId = core.identity.active()
+          if (!userId) throw new Error('Schedule review requires an active owner')
+          const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
+          // Resolution scopes also carry repo and user directories for workflow loading. The query
+          // and source seams deliberately accept only their public scope fields, so do not leak the
+          // wider workflow object across that validation boundary.
+          const queryScope = { workspaceId: scope.workspaceId, projectId: scope.projectId }
+          const resolved = await ctx.dataSources.resolveQuery(queryScope, destinationQuery(reference, queryScope), { inputs }, invocation)
+          const [description, catalog] = await Promise.all([
+            ctx.dataSources.invoke({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, invocation),
+            ctx.dataSources.list({ ...queryScope, parameters: {} }, invocation),
+          ])
+          const source = catalog.sources.find(candidate => candidate.pluginId === resolved.query.source.pluginId && candidate.sourceId === resolved.query.source.sourceId)
+          return {
+            label: source?.plural ?? source?.name ?? resolved.query.source.sourceId,
+            schema: description.schema,
+            fields: description.fields,
+            incremental: description.operations.incremental,
+            ...(description.incremental?.semantics ? { incrementalReason: description.incremental.semantics } : {}),
+          }
+        },
+      })
+      ctx.schedules.registerTarget({
+        kind: 'workflow',
+        parse: raw => {
+          const parsed = parseWorkflowScheduleTarget(raw)
+          return parsed && scheduleService?.get(parsed.scheduleId) ? parsed : null
+        },
+        risk: () => 'execute',
+        timezone: target => scheduleService?.timezone((target as { scheduleId: string }).scheduleId),
+        run: (target, signal, _consent, context) => scheduleService!.dispatch(
+          (target as { scheduleId: string }).scheduleId,
+          { reason: context.reason, dueAt: context.dueAt, requestKey: context.requestKey },
+        ).then(result => signal.aborted ? Promise.reject(signal.reason) : result),
+        remove: target => scheduleService!.remove((target as { scheduleId: string }).scheduleId),
+      })
 
       // `plugin:workflows:defs-changed` (docs/plugins.md § Hearing another plugin): the rail list and
       // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
@@ -279,7 +373,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const files = loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
           if (!includeRows || !scope.project) return files
           const ids = new Set(files.workflows.map((workflow) => workflow.id))
-          const rows = await defsForProject(store, scope.project.workspaceId, scope.project.id)
+          const rows = (await Promise.all((await defsForProject(store, scope.project.workspaceId, scope.project.id)).map(row => publishedWorkflow(store, row.id).catch(() => null)))).filter(row => row !== null)
           return {
             ...files,
             // A file wins an id collision, the rule the merged rail list applies as well.
@@ -296,7 +390,17 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // not the rows: the merged list is display-shaped and deliberately narrow, and a caller that
         // wants a run's steps comes back to this plugin addressing it by id.
         allRuns: () => workflowRunList(store),
+        taskNavigation: () => workflowTaskNavigation(store),
         steps: (runId) => workflowStepProjections(runner, runId),
+        records: async (runId, selectionId, after, limit, stepId, filter) =>
+          workflowSelectionPage(store, runId, selectionId, after, limit, stepId, filter),
+        recordAttempts: async (runId, recordId, after, limit) => workflowRecordAttemptPage(store, runId, recordId, after, limit),
+        recordSnapshot: async (runId, recordId) => workflowRecordSnapshot(store, runId, recordId),
+        prepareReprocess: async (runId, recordId) => prepareWorkflowReprocess(store, runId, recordId),
+        reprocess: async (runId, recordId, digest, requestId) => {
+          await deps.reconciled
+          return new WorkflowProcessingStore(store, dispatcher).reprocess({ sourceRunId: runId, recordId, digest, requestId })
+        },
         gate: async (runId, stepId, approved) => {
           await deps.reconciled // an approval resumes a step the restart sweep could otherwise clobber
           await runner.resolveGate(runId, stepId, approved)
@@ -330,7 +434,63 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // The second store a definition can live in (docs/workflows.md § Database definitions). Every
       // route behind it is device-only, because a row is executable configuration with no committed
       // bytes for the trust snapshot to hash.
+      const draftQueries = workflowDraftQueries(store, (scope, id, consumer, remove) => {
+        const userId = core.identity.active()
+        if (!userId) throw new Error('Draft query references require an active owner')
+        return ctx.dataSources.setQueryConsumer(scope, id, consumer,
+          { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) }, remove)
+      })
       defsCapability = ctx.capabilities.provide(WORKFLOW_DEFS_ROUTE, {
+        files: async request => {
+          const result = await workflowFileAuthoring(store, {
+          catalog: runner.validationCatalog(),
+          scope: async (projectId, source) => {
+            const project = await core.projects.byId(projectId)
+            if (!project || (source === 'repo' && !project.path)) throw new Error('Choose a local project for file authoring')
+            return { root: source === 'repo' ? project.path! : homedir(), workspaceId: project.workspaceId, resolveInRoot: core.fs.resolveInRoot }
+          },
+          query: async (scope, queryId, revision) => {
+            const userId = core.identity.active()
+            if (!userId) throw new Error('Export requires an active owner')
+            const result = await ctx.dataSources.queryPublication({ ...scope, action: 'inspect', queryId, revision },
+              { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) })
+            if (!result.published) throw new Error('Publish the saved query before exporting')
+            return result.published.content
+          },
+          })(request)
+          const projectId = result.operation?.projectId ?? result.draft?.projectId
+          const project = projectId ? await core.projects.byId(projectId) : null
+          if (project && request.action !== 'open' && request.action !== 'list') defsChanged(project.workspaceId)
+          return result
+        },
+        ...(() => {
+          const invocation = () => {
+            const userId = core.identity.active()
+            if (!userId) throw new Error('Publication requires an active owner')
+            return { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
+          }
+          const publications = workflowPublication(store, {
+            catalog: runner.validationCatalog(),
+            scope: async (workspaceId, projectId) => {
+              const project = projectId ? await core.projects.byId(projectId) : null
+              if (projectId && (!project || project.workspaceId !== workspaceId)) throw new Error('Project is outside this workspace')
+              return { workspaceId, projectId: projectId ?? '', repoDir: project?.path ?? null, userDir: homedir() }
+            },
+            query: request => ctx.dataSources.queryPublication(request, invocation()),
+            validateQuery: async (scope, reference, context) => { await ctx.dataSources.resolveQuery(scope, reference, context, invocation()) },
+            queryConsumer: (scope, id, consumer, remove) => ctx.dataSources.setQueryConsumer(scope, id, consumer, invocation(), remove),
+          })
+          return {
+            preparePublication: publications.prepare,
+            discardPublication: publications.discard,
+            publications: async (workspaceId: string) => publications.list(workspaceId),
+            publish: async (id: string) => {
+              const result = await publications.publish(id)
+              defsChanged(result.workspaceId)
+              return result
+            },
+          }
+        })(),
         list: async (workspaceId) =>
           mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
         // A row, or a committed file the editor opens read-only. The merged list carries a summary of
@@ -338,7 +498,12 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // fattening every list read (docs/workflows.md § Authoring).
         get: async (id, projectId) => {
           const file = /^(repo|user):(.+)$/.exec(id)
-          if (!file) return getDef(store, id)
+          if (!file) {
+            const row = await getDef(store, id)
+            if (!row) return null
+            const published = row.publishedRevision ? await publishedWorkflow(store, id, row.publishedRevision) : null
+            return { ...row, ...(published ? { publishedDef: published.def } : {}) }
+          }
           const project = projectId ? await core.projects.byId(projectId) : null
           const loaded = loadWorkflowFiles(file[1] === 'repo' ? project?.path ?? null : null, homedir(), runner.validationCatalog())
           const found = loaded.workflows.find((workflow) => workflow.id === file[2] && workflow.source === file[1])
@@ -352,19 +517,19 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // the way: it has no steps the moment it is created, and a step has no prompt until one is
         // typed. `validate` reports and the editor draws what it says; `start` is what refuses.
         create: async ({ workspaceId, projectId, def }) => {
-          const row = await createDef(store, { workspaceId, projectId, def: def as WorkflowDef })
+          const row = await draftQueries.create({ workspaceId, projectId, def: def as WorkflowDef })
           defsChanged(workspaceId)
           return { row }
         },
         update: async (id, def, revision) => {
-          const answer = await updateDef(store, id, def as WorkflowDef, revision)
+          const answer = await draftQueries.update(id, def as WorkflowDef, revision)
           if (answer && 'row' in answer) defsChanged(answer.row.workspaceId)
           return answer
         },
         remove: async (id) => {
           const row = await getDef(store, id)
           if (!row) return { ok: true }
-          await removeDef(store, id)
+          await draftQueries.remove(id)
           defsChanged(row.workspaceId)
           return { ok: true }
         },
@@ -397,25 +562,42 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             generateText: (args) => core.models.generateText({ userId, ...args }),
           })
         },
-        modelBackends: (userId) => core.models.available(userId),
-        saveToRepo: async (id, { taskId, keepRow }) => {
-          const row = await getDef(store, id)
-          if (!row) return { notFound: true }
-          const scope = taskId ? await taskScope(taskId) : null
-          if (taskId && !scope) return { error: 'That task no longer exists.' }
-          if (scope?.project && scope.project.workspaceId !== row.workspaceId) return { error: 'That task is in another workspace.' }
-          // The task's checkout when one is named, and its worktree is created here if the task has
-          // not needed one yet: the file has to land on the branch the person is working on. Otherwise
-          // the project folder, which is why an unbound row cannot be saved without a task.
-          const checkoutDir = scope
-            ? (await core.tasks.resolveCwd(scope.task, undefined)).cwd
-            : row.projectId ? (await core.projects.byId(row.projectId))?.path ?? null : null
-          if (!checkoutDir) return { error: 'This workflow has no repository to save into. Open it from a task, or bind it to a project.' }
-          const saved = await saveDefToRepo(store, id, { checkoutDir, keepRow, resolveInRoot: core.fs.resolveInRoot })
-          if ('error' in saved) return saved.error === 'not_found' ? { notFound: true } : { error: 'That file would land outside the checkout.' }
-          defsChanged(row.workspaceId)
-          return { path: saved.path }
+        author: async ({ userId, principal, signal, ...request }) => {
+          const projectId = request.scope.projectId
+          const project = projectId ? await core.projects.byId(projectId) : null
+          if (projectId && (!project || project.workspaceId !== request.scope.workspaceId)) {
+            throw new Error('The selected project is not in this workspace.')
+          }
+          const catalog = await starts.generationCatalog(projectId, request.targetId)
+          return authorWorkflowConversation({
+            request,
+            catalog,
+            validation: { ...runner.validationCatalog(), workflowTargets: catalog.workflows },
+            principal,
+            signal,
+            sources: ctx.dataSources,
+            generate: input => core.models.generateText({
+              userId, backendId: request.backendId,
+              input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
+            }),
+          })
         },
+        modelBackends: (userId) => core.models.available(userId),
+        saveToRepo: async () => ({ error: 'Use Export to repository to review the published dependency graph before writing files.' }),
+      })
+      schedulesCapability = ctx.capabilities.provide(WORKFLOW_SCHEDULES_ROUTE, {
+        list: () => scheduleService!.views(),
+        get: id => scheduleService!.view(id),
+        defaults: () => ({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }),
+        prepare: input => scheduleService!.prepare(input),
+        save: input => scheduleService!.saveManaged(input),
+        approve: async (id, firstCheck, freshEpoch) => {
+          await scheduleService!.approve(id, firstCheck, freshEpoch)
+          return scheduleService!.view(id)
+        },
+        pause: (id, paused) => scheduleService!.pause(id, paused),
+        runNow: id => scheduleService!.runNow(id),
+        remove: id => scheduleService!.deleteManaged(id),
       })
 
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
@@ -423,6 +605,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
       ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
+      ctx.routes.register(workflowScheduleRoutes, { prefix: '/workflows/schedules', note: 'approved workflow schedules' })
 
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
       // the route above, so nothing here knows what else is on that list.
@@ -477,6 +660,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           return started ? `started ${started}` : undefined
         },
       })
+      await draftQueries.reconcile().catch(error => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))
+      void deps.reconciled.then(() => scheduleService?.reconcile())
+        .catch(error => ctx.log.warn(`workflow schedule recovery failed: ${describeError(error).message}`))
     },
     // The bridge slot is cleared explicitly rather than trusting teardown order: a second
     // startServiceRuntime in one process would otherwise serve workflow requests through the first
@@ -490,6 +676,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       live = null
       routeCapability?.dispose()
       defsCapability?.dispose()
+      schedulesCapability?.dispose()
     },
   }
 }

@@ -41,7 +41,8 @@ import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
 import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
 import { Menu } from '../../kit/components/overlays/Menu'
-import { taskHierarchy } from '../tasks/taskHierarchy'
+import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
+import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
@@ -71,7 +72,7 @@ export default function TabRail() {
   }
   async function commitDrop(id: string, targetId: string, position: RailDropPosition) {
     if (id === targetId) return
-    await saveOrder(moveTask(railOrder(), visibleTasks().map((t) => t.id), id, targetId, position))
+    await saveOrder(moveTask(railOrder(), orderedTasks().map((t) => t.id), id, targetId, position))
   }
   const railDrag = createRailDrag({
     items: () => visibleTasks(),
@@ -138,9 +139,10 @@ export default function TabRail() {
     const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
     return applyRailOrder(scoped, railOrder())
   }
-  const taskRows = createMemo(() => taskHierarchy(orderedTasks()))
+  const taskRows = createMemo(() => workflowTaskHierarchy(orderedTasks(), expandedWorkflowRoots(), activeTaskId()))
   const visibleTasks = () => taskRows().map((row) => row.task)
   const taskDepths = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row.depth])))
+  const workflowGroups = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row])))
 
   // What other plugins know about the rows on screen (`core:task`, ../tasks/taskAnnotations.ts). One
   // request per contributor for the whole list, re-asked when the list changes and not when the rail
@@ -396,6 +398,7 @@ export default function TabRail() {
             // workspace membership only scopes which task rows are visible.
             const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
             const accent = () => resolveProjectColor(project()?.color) ?? undefined
+            const group = () => workflowGroups().get(w.id)
             return (
             <div
               class="tabrail-item"
@@ -460,6 +463,18 @@ export default function TabRail() {
                   </>
                 )}
               </Menu>
+              <Show when={group()?.workflowDescendants}>
+                <button
+                  type="button"
+                  class="tabrail-task-disclosure"
+                  aria-label={`${group()?.expanded ? 'Collapse' : 'Show'} ${group()?.workflowDescendants} workflow tasks under ${w.title}`}
+                  aria-expanded={group()?.expanded}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => { event.stopPropagation(); toggleWorkflowRoot(w.id) }}
+                >
+                  {group()?.expanded ? '▾' : '▸'}<span>{group()?.workflowDescendants}</span>
+                </button>
+              </Show>
             </div>
             )
           }}

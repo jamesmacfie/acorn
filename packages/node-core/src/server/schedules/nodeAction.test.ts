@@ -18,7 +18,7 @@ import { type Clock, Scheduler } from './scheduler'
 // schedule.
 
 const PLUGIN = 'acme'
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
+const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
 const storage: PluginStorage = { open: () => { throw new Error('this suite never opens a plugin database') } }
 
 const flush = async (): Promise<void> => {

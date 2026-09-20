@@ -41,6 +41,7 @@ const providers: AgentProviderDescriptor[] = [{
 const noActions = {
   rename: vi.fn(), setField: vi.fn(), setStep: vi.fn(), setDefinition: vi.fn(),
   setInputs: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), remove: vi.fn(),
+  addForEach: vi.fn(), createChild: vi.fn(),
 }
 
 let host: HTMLDivElement
@@ -56,6 +57,7 @@ const mount = (def: WorkflowDef, kinds: WorkflowCatalog['kinds'], selected: stri
       catalog={catalog(kinds)}
       providers={providers}
       projectId="p-1"
+      workspaceId="w-1"
       actions={noActions}
     />
   ), host)
@@ -188,7 +190,7 @@ describe('runtime workflow fields', () => {
     }, kinds, 'review')
     expect(labels('button.ui-select')).toContain('Child workflow')
     expect(host.textContent).toContain('Review ticket')
-    expect(host.textContent).toContain('Choose where this required input comes from.')
+    expect(host.textContent).toContain('Choose a field')
     expect(host.textContent).toContain('Ticket number')
   })
 
@@ -206,7 +208,7 @@ describe('runtime workflow fields', () => {
     expect(host.textContent).toContain('This workflow is not available to the selected project.')
   })
 
-  it('offers only structured predecessors as map sources and shows pointer validation', async () => {
+  it('offers structured predecessors through the shared records picker without requiring a pointer field', async () => {
     mount({
       name: 'w',
       steps: [
@@ -223,12 +225,43 @@ describe('runtime workflow fields', () => {
         },
       ],
     }, kinds, 'review')
-    host.querySelector<HTMLButtonElement>('button[aria-label="Source step"]')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const picker = host.querySelector<HTMLButtonElement>('button[aria-label="Records to process"]')
+    expect(picker).not.toBeNull()
+    expect(labels('input')).not.toContain('Array JSON Pointer')
+  })
+})
+
+describe('typed data fields', () => {
+  it('edits structured agent output as fields instead of raw schema JSON', () => {
+    mount({ formatVersion: 2, name: 'w', steps: [{ id: 'agent', name: 'Analyse', after: [], schema: {
+      type: 'object', properties: { severity: { type: 'string' } }, required: ['severity'],
+    } }] }, [], 'agent')
+    expect(host.textContent).toContain('Describe the fields the agent returns')
+    expect(labels('input')).toContain('Field name')
+    expect(labels('textarea')).not.toContain('Result schema')
+  })
+
+  it('edits an If condition with the shared typed field picker', () => {
+    mount({ formatVersion: 2, name: 'w', inputs: [{ name: 'severity', schema: { type: 'string' } }], steps: [{
+      id: 'if', name: 'Urgent?', kind: 'if', after: [],
+      condition: { kind: 'comparison', left: { address: { from: 'input', name: 'severity', pointer: '' } }, operator: 'eq', right: { address: { from: 'literal', value: 'urgent' } } },
+    }] }, [], 'if')
+    expect(labels('button')).toContain('Field')
+    expect(host.textContent).toContain('Choose a typed field')
+    expect(labels('textarea')).not.toContain('Condition')
+  })
+
+  it('uses the shared binding picker for a record and offers compatible workflow inputs', async () => {
+    mount({
+      name: 'w',
+      inputs: [{ name: 'record', description: 'Selected record', schema: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } }],
+      steps: [{ name: 'details', kind: 'get-record-details', after: [], record: { address: { from: 'input', name: 'record', pointer: '/ref' } } }],
+    }, [], 'details')
+    const picker = [...host.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === 'Record reference')
+    expect(picker?.textContent).toContain('Selected record')
+    picker?.click()
     await settle()
-    const options = [...document.body.querySelectorAll('[role="option"]')].map((option) => option.textContent)
-    expect(options).toContain('tickets')
-    expect(options).not.toContain('plain')
-    expect(host.textContent).toContain('Start a JSON Pointer with /')
+    expect(document.body.textContent).toContain('Workflow inputs')
+    expect(document.body.textContent).toContain('ref')
   })
 })

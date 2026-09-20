@@ -230,7 +230,7 @@ export class PluginTrustStore {
     if (!this.devGrantFor(input.pluginId, input.nodeId)) return false
     this.record({
       ...input,
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
       webviews: [],
       keyClaims: [],
       navigationDestinations: [],

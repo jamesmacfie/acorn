@@ -4,6 +4,30 @@ The Node is the only owner of authoritative application data. SQLite uses the ru
 `node:sqlite` and Drizzle, with one core database and one database for each table-owning plugin. The
 owning package contains the schema and migration chain.
 
+## Shared typed values
+
+`packages/protocol/src/dataValues.ts`, `packages/protocol/src/dataSchemas.ts`, and
+`packages/protocol/src/dataBindings.ts` own the version 1 typed-data contract. Node and client
+plugin facades export its parsers and types. `acorn-plugin-types` publishes matching declarations
+for installed plugins; its contract test checks assignability in both directions.
+
+Values preserve finite numbers, booleans, null, arrays, and plain objects. Structural schemas accept
+`type`, `properties`, `required`, `items`, primitive `enum`, and boolean `additionalProperties`.
+Nullable types combine one type with null. Unsupported keywords fail parsing. Allowed additional
+keys survive validation. Field labels, display hints, choices, and query capabilities are separate
+metadata. Observed fields cannot claim choices or query capabilities.
+
+Pointers use escaped JSON Pointer segments and own data properties. Prototype names, malformed
+escapes, and accessors are rejected. Array fields can be addressed whole; metadata does not infer
+element indices from samples. Missing is an internal symbol, distinct from null. Canonical projection
+encoding includes sorted field addresses and explicit missing markers. Object keys sort by code
+unit; array ordering and primitive types remain significant.
+
+`DATA_LIMITS` owns bounds, including 12 nested levels, 256 fields, 2,048-character descriptions,
+four predicate group levels, and 50 comparisons. Comparisons do not coerce values. Ordered
+comparisons require matching strings or numbers; presence tests handle missing explicitly.
+The [workflow v2 programme](./future/workflow_v2/README.md) owns consumer migration.
+
 ## Data root
 
 Development uses `apps/node/.acorn/`, a packaged desktop build uses the OS application-data root, and
@@ -59,8 +83,19 @@ Core owns data shared by multiple features:
 | Node preferences | `prefs` |
 | Schedules | `schedule_state`, `user_schedules`, `schedule_runs` |
 | Dashboard measure history | `dashboard_measure_samples` |
+| Dashboard authoring | `dashboard_drafts`, `dashboard_revisions` |
+| Saved queries | `query_drafts`, `query_revisions`, `query_consumers` |
 
-Core table definitions are in `packages/node-core/src/server/db/schema.ts`. `devices` stores only
+Core table definitions are in `packages/node-core/src/server/db/schema.ts`. Query tables are defined in the feature-owned
+`packages/node-core/src/server/queries/schema.ts` and exported through the core schema. Draft saves
+and publication check affected-row counts. Published query content and digests are immutable;
+revision rows outlive deleted drafts. Consumer references block deletion. See
+[the query library contract](./data-sources.md#workspace-query-library).
+Dashboard draft and revision tables are likewise feature-owned under
+`packages/node-core/src/server/dashboards/schema.ts`. Published rows are immutable, draft saves use
+affected-row compare-and-swap checks, and saved query references register panel consumer records.
+
+`devices` stores only
 token hashes. `integrations` stores encrypted provider credentials plus non-secret provider metadata.
 `task_pulls` stores task-owned PR relations created through Acorn, including managed-agent
 provenance; the GitHub mirror remains plugin-owned and disposable.
@@ -91,7 +126,7 @@ These plugins own SQLite files and migrations:
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
-| `plugins/workflows.sqlite` | `workflow_defs` (definitions typed in the app, scoped to a workspace and optionally a project), runs, steps, gates, and trigger state |
+| `plugins/workflows.sqlite` | Workflow drafts and immutable revisions, dependency/publication journals, recoverable repository-file drafts and write journals, runs, steps, gates, dispatches, approved schedule bindings and occurrences, processing scopes, selections, record states, attempts, and committed source boundaries |
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no
@@ -133,6 +168,13 @@ fingerprint reserve stable task and run IDs before either cross-database effect.
 through `reserved`, `task-created`, `run-started`, `cancelling`, and `terminal`; reconciliation reads
 that state and repeats only the missing transition. Core task IDs are plain cross-database IDs, so
 there is no foreign key or transaction spanning the workflow and core databases.
+
+`workflow_schedules` stores the approved project, published graph, typed inputs, limits, timezone,
+generation, processing epoch, activation state, and first-check choice. Core's `user_schedules` row
+stores only the cadence and `{ scheduleId }` target. `workflow_schedule_occurrences` reserves stable
+root task and run IDs before either database effect. Unique request and generation/due keys make
+manual replay, catch-up, and timer replay converge on one intent. Deletion retains a workflow-owned
+tombstone and its occurrence history after core removes the cadence row.
 
 `workflow_turn_admissions` records each provider turn before dispatch and settles it once with cost
 and token usage. Rows are keyed to the root, run, and step. Root run projections sum the whole tree;
@@ -210,37 +252,14 @@ the core rows keyed to the disconnected integration. It intentionally contains o
 plugin database has a foreign key into `integrations`, so there is no plugin-specific cascade
 declaration to execute. Plugin-local rows are independently retained or pruned by their owning plugin.
 
-## Collections: a projection, never a second store
+## Typed data sources: projections, never second stores
 
-A **collection** is a plugin route that answers with typed records the host draws itself, the data
-side of [the dashboards doc](./dashboards.md). It owns no tables and adds no file. It is a read over
-the mirror the plugin already maintains: github's `pulls-mine` is a select over
-`plugins/github.sqlite` joined to its repos, and linear's `issues-mine` is the same fan-out over
-connections its rail source uses. A plugin that has nothing mirrored has nothing to expose this way,
-and that is the intended shape. The contribution exists to make an existing read composable rather
-than to justify a new one.
-
-Freshness splits across the two sides, and the split is the point:
-
-- **Node-side TTL is the plugin's**, decided per route with whatever that plugin already uses. Linear
-  declares one on the descriptor because its reads fan out per connection and no single resource
-  exists for `serveThenRevalidate` to hold. GitHub's collection route declares none and never drives
-  the mirror. Freshness there stays with the repo-scoped list route a person is waiting on, because a
-  panel polls unattended across every repository at once and revalidating here would multiply one
-  dashboard by the user's repo count against a rate limit the whole plugin shares. The honest cost is
-  rows as old as the last time that repo's PR list was opened.
-- **Client-side refresh is per panel and the user's**, bounded to 30s to 86400s. It is the first
-  contribution whose refetch policy is per-contribution rather than the single shared chrome
-  revision.
-
-The one place a collection is not a read over the mirror is github's `involves` param: "review
-requested of me", "assigned to me", and "authored by me". Two of those three have no answer in the
-mirror. Assignees are not mirrored at all, and review requests arrive only with the PR-detail sync,
-so the mirror knows you were asked to review exactly the pull requests you already opened. That param
-therefore switches the route to one GitHub search (`review-requested:@me`), filling the same columns.
-It is allowed the request the mirror read is not, for the reason above inverted: the objection was
-one poll per repo, and a search is one call whatever the repo count. It also reaches repos that were
-never mirrored, which for "what is waiting on me" is the point rather than a side effect.
+A data source owns no core table merely because dashboards or workflows consume it. It projects the
+owner's existing store or provider API through the bounded Node runtime described in
+[Typed data sources](./data-sources.md). GitHub, Linear, and Rollbar keep their provider-owned
+mirrors and credentials; core tasks read core tables; managed sessions read the agents ledger.
+Record identity, freshness, connection scope, and completeness remain explicit in the source
+contract. The client has no independent fetch authority or record cache.
 
 ## Runs: a merged read, and the trigger for ever making it a table
 
@@ -250,7 +269,7 @@ turn ledger in `plugins/agents.sqlite`, and `schedule_runs` in core. One databas
 means no joins, so nothing could list them together, add up what a task cost, or answer "what is
 running on this machine".
 
-The answer is a registry, not a table, and it is the same shape collections use above. A plugin
+The answer is a registry, not a table. A plugin
 declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
 with no client attached, parses the answer, stamps who answered, and merges
 (`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v2/core/runs` is the merged

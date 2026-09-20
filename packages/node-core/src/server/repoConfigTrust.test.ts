@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
-import { acknowledgeRepoConfig, assertRepoConfigTrusted, readRepoConfigSnapshot, RepoConfigTrustError, repoConfigTrustReview } from './repoConfigTrust'
+import { acknowledgeRepoConfig, assertProjectRepoConfigTrusted, assertRepoConfigTrusted, readRepoConfigSnapshot, RepoConfigTrustError, repoConfigTrustReview } from './repoConfigTrust'
 
 describe('repo config trust', () => {
   let testDb: TestDb
@@ -45,6 +45,14 @@ describe('repo config trust', () => {
     const trusted = await acknowledgeRepoConfig(testDb.db, 'task1', snapshot.hash)
     expect(trusted.trusted).toBe(true)
     await expect(assertRepoConfigTrusted(testDb.db, 'task1')).resolves.toBeUndefined()
+  })
+
+  it('checks project trust before a scheduled root task exists', async () => {
+    writeFileSync(join(repo, '.acorn', 'workflows', 'scheduled.toml'), '[[steps]]\nname = "scheduled"\n')
+    await expect(assertProjectRepoConfigTrusted(testDb.db, 'project-widget')).rejects.toThrow('reviewed and trusted')
+    const snapshot = readRepoConfigSnapshot(repo)!
+    await acknowledgeRepoConfig(testDb.db, 'task1', snapshot.hash)
+    await expect(assertProjectRepoConfigTrusted(testDb.db, 'project-widget')).resolves.toBeUndefined()
   })
 
   it('invalidates trust on change and retains the previous snapshot for a diff', async () => {

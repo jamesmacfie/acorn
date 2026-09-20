@@ -340,7 +340,8 @@ This move added one client contract: a frame surface can declare cooperative des
 maps a local destination ID to a host-owned target kind, which lets Findings open Memory's candidate
 review without calling a Memory route. The same declaration gates the target and notice kind that a
 loaded node notification can retain. Destinations appear in the trust prompt and a changed target is
-treated as a new grant. Plugin API major 12 marks that contract.
+treated as a new grant. Plugin API major 12 marks that contract; major 13 removes the retired
+client-fetched collection contribution in favour of Node-owned typed data sources.
 
 Memory remains compiled because it owns trusted approval and writes knowledge files. It contributes
 review validation, completion callbacks, and legacy proposal contents through public Findings

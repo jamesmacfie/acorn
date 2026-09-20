@@ -1,14 +1,22 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
+import { parseDataValue, DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
+import type { WorkflowRecordFilter } from '../../shared/workflowProcessing'
 
 // Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,
 // resolve a human gate. Commands use HTTP while notices and live events use the shared WebSocket.
 // The routes need the node's WorkflowRunner, so they return 503 under dev:node.
 
 export type WorkflowBridge = {
+  records?(runId: string, selectionId?: string, after?: number, limit?: number, stepId?: string, filter?: WorkflowRecordFilter): Promise<unknown>
+  recordAttempts?(runId: string, recordId: string, after?: string, limit?: number): Promise<unknown>
+  recordSnapshot?(runId: string, recordId: string): Promise<unknown>
+  prepareReprocess?(runId: string, recordId: string): Promise<unknown>
+  reprocess?(runId: string, recordId: string, digest: string, requestId: string): Promise<unknown>
   // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names no
   // task, so the mount over /v2/p/:plugin/tasks/:id never sees it. A workflow step executes an agent
   // CLI in a worktree, so approving another task's gate or killing its step acts on that task.
@@ -22,11 +30,11 @@ export type WorkflowBridge = {
   // Every step kind, policy and profile this node can run, plus saved workflow references scoped to
   // the selected project. Definition metadata is owner-visible executable configuration.
   catalog(projectId?: string): Promise<unknown>
-  start(taskId: string, def: unknown, inputs: Record<string, string> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
+  start(taskId: string, def: unknown, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
   // Start a definition the node resolves itself: `repo:<fileId>` or `user:<fileId>` for a file this
   // task's project loads, anything else for a `workflow_defs` row. Resolving here rather than taking
   // the definition in the body is what lets the repo trust snapshot be checked for real.
-  startById(taskId: string, defId: string, inputs: Record<string, string> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
+  startById(taskId: string, defId: string, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<WorkflowRunProjection[]>
   steps(runId: string): Promise<WorkflowStepProjection[]>
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
@@ -39,6 +47,7 @@ export type WorkflowBridge = {
   // Every run on this node, for the merged run list (@acorn/protocol/runs.ts). Node-wide by
   // construction; core filters it for a confined caller, so this must not.
   allRuns(): Promise<{ runs: unknown[] }>
+  taskNavigation?(): Promise<unknown>
 }
 
 export const WORKFLOW_ROUTE = routeCapability<WorkflowBridge>('workflows.route')
@@ -55,7 +64,10 @@ const startBody = z
     defId: z.string().min(1).max(256).optional(),
     // Values for the definition's declared inputs. Which names are allowed and which are required is
     // the runner's answer, because only the definition knows.
-    inputs: z.record(z.string(), z.string()).optional(),
+    inputs: z.record(z.string(), z.unknown().transform((value, ctx) => {
+      try { return parseDataValue(value, DATA_LIMITS.selectionBytes) }
+      catch { ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' }); return z.NEVER }
+    })).optional(),
   })
   // One or the other, never both and never neither.
   .refine((body) => !!body.def !== !!body.defId)
@@ -78,6 +90,18 @@ const referencesDatabaseChild = (def: unknown): boolean => {
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
 const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
+const recordsQuery = z.object({
+  selectionId: z.string().min(1).optional(),
+  stepId: z.string().min(1).optional(),
+  filter: z.enum(['all', 'running', 'attention', 'failed', 'skipped']).optional(),
+  after: z.coerce.number().int().min(-1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+})
+const attemptsQuery = z.object({ after: z.string().max(100).refine(value => {
+  try { return z.object({ at: z.number().finite(), id: z.string().min(1) }).strict().safeParse(JSON.parse(value)).success }
+  catch { return false }
+}).optional(), limit: z.coerce.number().int().min(1).max(100).optional() })
+const reprocessBody = z.object({ digest: z.string().min(1).max(256), requestId: z.string().min(1).max(256) }).strict()
 
 // The task-scoped half of this router (/tasks/:id/...) inherits core's mounted requireTaskScope. The
 // run-scoped half does not, because the task is not in the path. Same shape as terminal's and
@@ -99,6 +123,8 @@ export const workflow = new Hono<AppEnv>()
   // The editor's list of what a step may be, including project-scoped saved workflow references.
   // Device-only because database definitions are owner-authored executable configuration.
   .get('/catalog', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.catalog(c.req.query('projectId'))))
+  .get('/workflows/task-navigation', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE,
+    b => b.taskNavigation?.() ?? Promise.resolve({ groups: [] })))
   .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'), !isTaskConfined(c))))
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
@@ -111,10 +137,37 @@ export const workflow = new Hono<AppEnv>()
     // A database definition is owner-authored configuration without a repository trust snapshot.
     // The same device-only rule applies when an inline parent refers to one as a child.
     if (isTaskConfined(c) && referencesDatabaseChild(def)) return respondError(c, 403, 'forbidden')
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), def, inputs, !isTaskConfined(c)))
+    return respondError(c, 400, 'published_definition_required', ['Publish this workflow and start it by its definition ID.'])
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
+  .get('/workflows/runs/:runId/records', requireDevice, async (c) => {
+    const parsed = recordsQuery.safeParse(c.req.query())
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.records?.(
+      c.req.param('runId'), parsed.data.selectionId, parsed.data.after, parsed.data.limit,
+      parsed.data.stepId, parsed.data.filter,
+    ) ?? Promise.resolve({ records: [] }))
+  })
+  .get('/workflows/runs/:runId/records/:recordId/attempts', requireDevice, async (c) => {
+    const parsed = attemptsQuery.safeParse(c.req.query())
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.recordAttempts?.(c.req.param('runId'), c.req.param('recordId'), parsed.data.after, parsed.data.limit) ?? Promise.resolve({ attempts: [] }))
+  })
+  .get('/workflows/runs/:runId/records/:recordId', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE,
+    b => b.recordSnapshot?.(c.req.param('runId'), c.req.param('recordId')) ?? Promise.resolve(null)))
+  .post('/workflows/runs/:runId/records/:recordId/prepare-reprocess', requireDevice, async (c) => {
+    const parsed = z.object({}).strict().safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, WORKFLOW_ROUTE, b => b.prepareReprocess?.(c.req.param('runId'), c.req.param('recordId')) ?? Promise.resolve(null))
+  })
+  .post('/workflows/runs/:runId/records/:recordId/reprocess', requireDevice, async (c) => {
+    const parsed = reprocessBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, WORKFLOW_ROUTE, b => b.reprocess?.(
+      c.req.param('runId'), c.req.param('recordId'), parsed.data.digest, parsed.data.requestId,
+    ) ?? Promise.resolve(null))
+  })
   .post('/workflows/runs/:runId/gate', async (c) => {
     const parsed = gateBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

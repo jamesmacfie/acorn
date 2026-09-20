@@ -236,6 +236,7 @@ export { createDeviceFlow } from '@acorn/client-core/features/integrations/devic
 export { createCredentialForm } from '@acorn/client-core/features/integrations/credentialForm.ts'
 export type { CredentialFormController } from '@acorn/client-core/features/integrations/credentialForm.ts'
 export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
+export type { BindingCandidate, BindingCompatibility, BindingOrigin } from '@acorn/client-core/features/dataSources/fieldPickerModel.ts'
 export { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
 // The attention model: an adapter turns a session row into a state, and the gate decides whether
 // that state changing is news (docs/notifications.md).
@@ -290,3 +291,13 @@ export type { RemoteContribution } from '@acorn/client-core/host/tree/treeRegist
 // ./ui carries Solid components: one of those makes the whole entrypoint unloadable there
 // (docs/plugin-authoring.md § Testing). Nothing in the module below imports anything.
 export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib/deviceStorage.ts'
+export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
+export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
+export { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+export type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
+export { DATA_OPERATORS, dataPointerSchema, dataBindingSchema, dataFieldSchema, dataFieldsSchema, parseDataPredicate, compareDataValues } from '@acorn/protocol/dataBindings.ts'
+export type { DataBinding, DataBindingAddress, DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
+export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataSourceDiscovery, DataSourceScope, DataSourceDescription, DataSourceQuery, DataSourceRequest, DataRecordRef, DataRecord, DataSourcePage, DataSourceResult, DataSourceOptions, DataSourceDetails, DataSourceResponse, DataSourceDiscoveryRequest, DataSourceDiscoveryPage } from '@acorn/protocol/dataSources.ts'
+export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery, QueryRecovery, QuerySaveState } from '@acorn/protocol/dataQueries.ts'
+export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
+export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'

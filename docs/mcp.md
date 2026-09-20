@@ -31,6 +31,8 @@ registered groups are:
   core's because Linear and Rollbar ship loaded and cannot register a tool; the read is theirs
   (docs/agent-tools.md § issue_detail).
 - Plugin authoring and the install request, from core: `plugin_authoring`, `plugin_request`.
+- Typed-source metadata, from core: `data_sources_list`, `data_sources_discover`,
+  `data_source_describe`, and `data_source_options`.
 - Local git reads, from `changes`: `local_changes`, `local_diff`, `git_log`.
 - Notes, from `notes`, and memory, from `memory`.
 - The run targets a repo configures, from `terminal`: `run_targets`, `run_start`, `run_stop`,

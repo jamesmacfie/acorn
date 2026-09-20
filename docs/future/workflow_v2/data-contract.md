@@ -1,7 +1,9 @@
 # Typed data and source contract
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
-Context: [decisions and ownership](./context.md). All interface names below are proposed.
+Date: 2026-09-20. Status: implemented through slice 19.
+Context: [decisions and ownership](./context.md). The shipped interface names are documented in [typed data sources](../../data-sources.md).
+
+The implemented source operations and public names are documented in [typed data sources](../../data-sources.md).
 
 ## Values and field descriptions
 
@@ -164,6 +166,6 @@ through the plugin toolkit instead of requiring internal imports.
 
 ## Verify before building
 
-Recheck collection registration, manifest parsing, provider runtime scoping, toolkit generation,
-and the Node sampler against [context](./context.md). Verify current upstream provider APIs during
-adapter implementation before claiming filter or incremental capabilities.
+The source registry, manifest parser, provider runtime scopes, toolkit generation, and unattended
+sampler share the Node-owned contract. Recheck current upstream provider APIs before extending a
+provider's advertised filters or incremental capabilities.

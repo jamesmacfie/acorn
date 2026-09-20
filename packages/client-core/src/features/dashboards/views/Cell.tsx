@@ -1,6 +1,6 @@
 import { createMemo, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayCell, DashboardDisplayField } from '@acorn/dashboards-core/display.ts'
 import { openInAppUrl } from '../../../host/registries/panes/contentLinks'
 import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../../kit/components/content/Icon'
@@ -11,7 +11,7 @@ import { panelDotTone } from './props'
 // One cell, drawn by its semantic field type. Every decision worth testing is in `formatCell`; this file
 // is the JSX for its answers and nothing else, because vitest here can't render a Solid component.
 
-export default function Cell(props: { field: PluginCollectionField; value: PluginCollectionCell | undefined }) {
+export default function Cell(props: { field: DashboardDisplayField; value: DashboardDisplayCell | undefined }) {
   const cell = createMemo(() => formatCell(props.field, props.value))
   const navigate = useNavigate()
   // Narrows the union for `Match`, which can't do it from a `kind ===` comparison on its own.
@@ -22,7 +22,7 @@ export default function Cell(props: { field: PluginCollectionField; value: Plugi
 
   return (
     // An em dash, not a blank: "this row has no value here" is a fact worth showing, and it's a
-    // different fact from an empty string (@acorn/protocol/collections.ts).
+    // different fact from an empty string.
     <Switch fallback={<span class="muted">—</span>}>
       <Match when={of('enum')()}>
         {(value) => (

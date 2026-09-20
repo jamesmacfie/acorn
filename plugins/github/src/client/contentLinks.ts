@@ -31,7 +31,7 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
       // `item` is what makes the panel reachable (docs/plugins.md § Client authoring and the UI kit).
-      // Spelled `owner/repo#number`, the same identity the pulls collection gives its rows, so a row,
+      // Spelled `owner/repo#number`, the same identity the pull-request source gives its rows, so a row,
       // a URL, and the panel name the same thing.
       return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
     },

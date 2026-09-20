@@ -32,16 +32,17 @@ const validation: WorkflowValidationCatalog = {
 }
 
 const clean: WorkflowDef = {
+  formatVersion: 2,
   name: 'Investigate',
   steps: [
-    { name: 'look', after: [], prompt: 'Read the issue and say what is wrong.' },
-    { name: 'fix', after: ['look'], prompt: 'Write the fix.' },
+    { id: 'look', name: 'look', after: [], prompt: 'Read the issue and say what is wrong.' },
+    { id: 'fix', name: 'fix', after: ['look'], prompt: 'Write the fix.' },
   ],
 }
 
 // Two steps with one name: grounding leaves a duplicate alone on purpose, so this is the shortest
 // answer that reaches the repair pass.
-const duplicated: WorkflowDef = { ...clean, steps: [clean.steps[0]!, { ...clean.steps[1]!, name: 'look' }] }
+const duplicated: WorkflowDef = { ...clean, steps: [clean.steps[0]!, { ...clean.steps[1]!, id: 'look' }] }
 
 const reply = (def: WorkflowDef) => JSON.stringify(def)
 
@@ -136,17 +137,19 @@ describe('generateWorkflowRequest', () => {
 
   it('repairs a missing required child input binding', async () => {
     const missing: WorkflowDef = {
+      formatVersion: 2,
       name: 'Dispatch',
-      inputs: [{ name: 'ticket', required: true }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [
-        { name: 'prepare', after: [], prompt: 'Prepare the review.' },
+        { id: 'prepare', name: 'prepare', after: [], prompt: 'Prepare the review.' },
         {
+          id: 'review',
           name: 'review',
           kind: 'workflow',
           after: ['prepare'],
           childWorkflow: { ref: { source: 'database', id: 'approved-target' } },
         },
-        { name: 'summarize', after: ['review'], prompt: 'Summarize the child result.' },
+        { id: 'summarize', name: 'summarize', after: ['review'], prompt: 'Summarize the child result.' },
       ],
     }
     const fixed: WorkflowDef = {
@@ -156,7 +159,7 @@ describe('generateWorkflowRequest', () => {
             ...step,
             childWorkflow: {
               ref: { source: 'database', id: 'approved-target' },
-              inputs: { ticket: { from: 'input', name: 'ticket' } },
+              inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
             },
           }
         : step),
@@ -172,7 +175,7 @@ describe('generateWorkflowRequest', () => {
     ])
   })
 
-  it('keeps a configured child target through an AI edit and its repair pass', async () => {
+  it('does not silently restore a changed child target during an AI edit', async () => {
     const current: WorkflowDef = {
       name: 'Dispatch',
       inputs: [{ name: 'ticket', required: true }],
@@ -210,9 +213,8 @@ describe('generateWorkflowRequest', () => {
       validation,
       generateText: answers(reply(broken), reply(repaired)),
     })
-    expect((result as { def: WorkflowDef }).def.steps[0]?.childWorkflow?.ref)
-      .toEqual({ source: 'database', id: 'approved-target' })
-    expect(result).toMatchObject({ repaired: true, problems: [] })
+    expect((result as { def: WorkflowDef }).def.steps[0]?.childWorkflow?.ref).toBeUndefined()
+    expect(result).toMatchObject({ repaired: true, problems: expect.arrayContaining([expect.any(String)]) })
   })
 
   it('repairs once, on the same system prompt, carrying the description, the definition, the notes and every problem', async () => {
@@ -232,12 +234,16 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('caps the problems it sends and says how many it left out', async () => {
-    const many: WorkflowDef = { name: 'Crowd', steps: Array.from({ length: 60 }, () => ({ name: 'look', prompt: 'Look.' })) }
+    const many: WorkflowDef = {
+      formatVersion: 2,
+      name: 'Crowd',
+      steps: Array.from({ length: 60 }, () => ({ id: 'look', name: 'look', prompt: 'Look.' })),
+    }
     expect(validateWorkflow(many, validation).length).toBeGreaterThan(GENERATE_MAX_REPAIR_PROBLEMS)
     const generateText = answers(reply(many), reply(clean))
     await run(generateText)
     const repair = promptOf(generateText, 1)
-    expect(repair.match(/^- step 'look' is declared more than once$/gm)).toHaveLength(GENERATE_MAX_REPAIR_PROBLEMS)
+    expect(repair.match(/^- Step ID 'look' is repeated\.$/gm)).toHaveLength(GENERATE_MAX_REPAIR_PROBLEMS)
     expect(repair).toMatch(/- and \d+ more of the same kind\./)
   })
 

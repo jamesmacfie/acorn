@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "title": { "type": "string" },
+      "owner": { "type": ["object", "null"], "properties": { "id": { "type": "string" }, "name": { "type": "string" } }, "required": ["id"] },
+      "labels": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" } }, "required": ["id"] } },
+      "state": { "type": "string" },
+      "project": { "type": "string" }
+    },
+    "required": ["id", "title", "labels"],
+    "additionalProperties": true
+  },
+  "fields": [
+    { "pointer": "/id", "label": "ID", "origin": "declared" },
+    { "pointer": "/title", "label": "Title", "origin": "declared", "display": { "kind": "text", "role": "title" } },
+    { "pointer": "/owner/name", "label": "Owner name", "origin": "declared", "display": { "kind": "person" } },
+    { "pointer": "/labels", "label": "Labels", "origin": "declared" },
+    { "pointer": "/state", "label": "State", "origin": "dynamic", "choices": { "kind": "dynamic", "dependsOn": ["/project"] }, "query": { "operators": ["eq", "in"], "sortable": true } },
+    { "pointer": "/extra", "label": "Extra", "origin": "observed" }
+  ],
+  "record": { "id": "sample-1", "title": "Nested fixture", "owner": null, "labels": [{ "id": "a", "name": "First" }], "extra": { "score": 3 } }
+}

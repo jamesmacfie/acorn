@@ -66,7 +66,7 @@ One plugin declares a schedule:
 
 ### How a plugin declares one
 
-Two feeders, one registry, indistinguishable downstream: the collections pattern applied to schedules.
+Two feeders, one registry, indistinguishable downstream: the standard contribution pattern applied to schedules.
 
 A loaded plugin declares it in its manifest, because a manifest is also what the owner is shown at
 install (`docs/plugins.md § Descriptors`). It carries an id, a name, a `run` route confined to the
@@ -146,8 +146,9 @@ Five-field cron syntax is refused. It is a language to parse, explain, and debug
 never rejected. `every` is at least 300s for plugin-declared, at least 60s for core and user, and at
 most 604,800s, a week.
 
-The calendar forms use node-local time, because the node is the owner's machine and "03:30" means
-their 03:30. Daylight saving does what local time does and nobody pretends otherwise.
+Calendar forms use node-local time by default, because the node is the owner's machine and "03:30"
+means their 03:30. A target may bind an explicit IANA timezone when the approved work must keep a
+portable wall clock; the workflow target does so below.
 
 **The renderer has its own `ctx.schedules`, and it is not this one.** A client schedule takes a raw
 `intervalMs` with no floor and no budget (`client-core/src/host/registries/shell/schedules.ts`), because below the
@@ -188,9 +189,10 @@ survive inert, so a row created by a newer build lists, never runs, and says so.
 | Kind | What runs |
 | --- | --- |
 | `node-action` | A plugin action the owner scheduled, dispatched as a POST to that plugin's own route |
+| `workflow` | An approved published workflow, dispatched through the workflows plugin's durable occurrence ledger |
 | `agent-run` | Reserved and unbuilt, gated on a headless agent runtime existing at all |
 
-`collection-sample` is deliberately not a user kind. Measure sampling is one core schedule over every
+Dashboard measure sampling is deliberately not a user kind. It is one core schedule over every
 history-trend panel, not a row per panel, so turning a trend on in the panel editor never conjures a
 hidden schedule. The next `core:sample-measures` pass picks the panel up.
 
@@ -228,19 +230,52 @@ Both are recorded as `skipped`, not as errors — no backoff, no red row. A sche
 behaving correctly, and backing it off exponentially would punish the owner for someone else's edit.
 A target says so by throwing `ScheduleSkipped`.
 
-## Reading a collection from the node
+### `workflow`
 
-The measure sampler needs to read a collection with no client attached, which needed a registry the
-node did not have: `(pluginId, collectionId)` → the route that answers
-(`server/collections/registry.ts`). Every collection was always ultimately a node route — a loaded
-plugin's `items` is one, and a compiled plugin's client-side `fetch` is a thin wrapper over one — so
-this is the missing map and nothing more. Two feeders again: manifest `collections` descriptors for the
-loaded tier, `ctx.collections.register({ collectionId, items })` for the compiled one.
+The target is `{ scheduleId }`. Core owns the cadence row and calls the workflows plugin through the
+same target registry as `node-action`. The workflows plugin owns the approved project, published
+definition graph, typed inputs, limits, timezone, processing epoch, and occurrence history.
 
-Answers take the same parse the client path takes (`pluginCollectionResponseSchema`) and are dropped
-whole on failure; provenance is host-stamped; caps hold. **A sampling read never forces revalidation** —
-it serves whatever the plugin's route serves, at its mirror's age. A plugin that wants fresher
-unattended data declares its own refresh schedule and pays for it from its own rate budget.
+An occurrence reserves stable root task and run IDs before either cross-database effect. Its unique
+request key covers a manual request, and its generation plus due instant covers a timer request.
+Restart reconciliation resumes the missing transition with those IDs. A second manual or timer fire
+records a skipped occurrence while any run in the first occurrence's workflow tree remains active or
+gated.
+
+Approval freezes the resolved root and child graph, published query revisions, inputs, and narrowed
+limits. Every dispatch resolves the graph and source destination again before task creation. A changed
+dependency, revoked connection, missing publication, or untrusted repository moves the schedule to
+review instead of starting work. A temporary source failure leaves the reserved occurrence available
+for scheduler backoff or restart reconciliation.
+
+The workflows plugin assigns an explicit IANA timezone to calendar cadences. A daylight-saving gap
+skips the missing local occurrence. A fold runs the first matching instant once. Targets that do not
+provide a timezone retain the node-local calendar behavior described in [Cadence](#cadence).
+
+Pausing a workflow schedule stops timer admission and does not cancel its active workflow tree.
+**Run now** still admits work for a paused row. Deleting the core row tombstones the workflow binding
+and keeps its task, run, occurrence, and processing history.
+
+The schedule is authored from **Schedule…** on a published database workflow, not from the generic
+schedule target form and not inside ordinary workflow creation. The workflow plugin keeps the setup
+progressive: project, typed inputs, cadence, and timezone first; record repeat/checkpoint policy only
+for applicable loops; then first-check choice, three concrete occurrences, and effective limits.
+Core cadence is created paused and is enabled only after approval, or after a track-from-now baseline
+settles successfully. A failed baseline remains inactive.
+
+The device projection translates internal recovery state into Active, Paused, Needs review, or
+Unavailable and includes repair actions, the latest run link, and next occurrence. It deliberately
+omits approval digests, processing epochs, request keys, and continuation tokens. Editing an approved
+schedule retains processing history by default; **Start fresh** is an explicit advanced choice. The
+client never queues activation while disconnected.
+
+## Sampling a published dashboard
+
+The measure sampler runs without a client. It resolves each placed history panel's immutable
+dashboard publication, resolves its typed queries, and invokes the shared Node data-source runtime
+under a service principal. The same authorization, schema, paging, completeness, and provider
+connection rules apply as an interactive execution. One unavailable query skips the panel with a
+reason; the sampler never invents a zero or reads a renderer cache.
 
 ## Observability
 
@@ -261,7 +296,7 @@ unattended, so declaring one is node administration and a task-scoped agent must
 | `POST /v2/core/schedules/:key/confirm` | re-take consent after a target's tier rose |
 | `PATCH /v2/core/schedules/:key` | pause/resume, retune cadence (clamped), rename (user rows only) |
 | `DELETE /v2/core/schedules/:key` | user rows only — declared schedules are paused, not deleted |
-| `POST /v2/core/schedules/:key/run` | run now (subject to serialization and the cap, not to backoff) |
+| `POST /v2/core/schedules/:key/run` | run now (subject to serialization and the cap, not to backoff); `Idempotency-Key` identifies a manual workflow occurrence |
 | `GET /v2/core/schedules/:key/runs` | the ring, newest first |
 
 Creating is the one non-tolerant edge: a create names a target that must resolve **now**, and the risk

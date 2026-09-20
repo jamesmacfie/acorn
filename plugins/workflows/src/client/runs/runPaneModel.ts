@@ -15,6 +15,7 @@ import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjec
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
 import { graphOrder } from '../editor/draft'
+import { rowIdentity } from '../../shared/workflowIdentity'
 import { workflowApi } from '../workflowsClient'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
@@ -94,13 +95,13 @@ export function createRunPaneModel(task: Task) {
   })
 
   // The run's frozen definition is what says which step waits on which, so the pane's indentation is
-  // the editor's: one `graphOrder`, two lists (../editor/draft.ts). A fan-out child is a row under
-  // the step that spawned it, which the definition cannot know.
+  // the editor's: one `graphOrder`, two lists (../editor/draft.ts). A dispatched child is a row
+  // under the step that spawned it, which the definition cannot know.
   const nodes = createMemo<RunNode[]>(() => {
     const rows = steps()
     const def = parseDef(selectedRun()?.defJson)
     const top = rows.filter((step) => !step.parentStepId)
-    const byName = new Map(top.map((step) => [step.name, step]))
+    const byName = new Map(top.map((step) => [def ? rowIdentity(def, step) : step.name, step]))
     const order = def
       ? graphOrder(def)
       : top.map((step) => ({ name: step.name, depth: 0, parents: [] as string[] }))

@@ -10,7 +10,7 @@ import type { Env } from './bindings'
 // different caller of the same actions, and the tier on the record below is what lets them ask for
 // different confirmations. Nothing here may grow a schedule-shaped assumption.
 //
-// The plainer primitive underneath is ../plugin/dispatch.ts, which schedules, collection reads, task
+// The plainer primitive underneath is ../plugin/dispatch.ts, which schedules, source reads, task
 // checks and harnesses all use directly. What this layer adds is the two things an unattended fire
 // needs and a dispatch does not have: a stable name a stored record can point at, and a declared risk
 // tier stamped onto that record when the owner consents.
@@ -45,7 +45,7 @@ export const riskOf = (action: Pick<NodeAction, 'risk'>): ToolRisk => action.ris
 
 const key = (pluginId: string, actionId: string): string => `${pluginId}:${actionId}`
 
-// A module singleton, like the route and collection registries beside it, with the same lifecycle
+// A module singleton, like the route and source registries beside it, with the same lifecycle
 // answer: the plugin host clears a plugin's entries before re-registering them.
 const actions = new Map<string, NodeAction>()
 

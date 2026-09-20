@@ -1,5 +1,11 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowStepDef, WorkflowStepRow, WorkflowValueBinding } from '../shared/workflowContracts'
 import { parseWorkflowJsonPointer } from './workflowValidation'
+import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
+import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { MISSING, parseDataValue } from '@acorn/protocol/dataValues.ts'
+import { workflowText, WORKFLOW_VALUE_BYTES } from './workflowValues'
+import { workflowRecordIdentity } from './workflowProcessingRules'
 
 const TITLE_LIMIT = 500
 const BOUND_TEMPLATE_RE = /\$\{([A-Za-z][A-Za-z0-9_]*)\}/g
@@ -8,7 +14,7 @@ export type WorkflowMapRosterEntry = {
   index: number
   itemKey: string
   item: unknown
-  inputs: Record<string, string>
+  inputs: Record<string, DataValue>
   title: string
 }
 
@@ -31,7 +37,7 @@ export function readWorkflowJsonPointer(value: unknown, pointer: string): unknow
 }
 
 function structuredOutput(step: WorkflowStepRow): unknown {
-  if (step.status !== 'done' || !step.structuredJson) {
+  if (!['done', 'completed-with-failures'].includes(step.status) || !step.structuredJson) {
     throw new Error(`Binding source step '${step.name}' has no completed structured output.`)
   }
   try {
@@ -43,35 +49,32 @@ function structuredOutput(step: WorkflowStepRow): unknown {
 
 function resolveBindings(
   bindings: Readonly<Record<string, WorkflowValueBinding>>,
-  inputs: Readonly<Record<string, string>>,
+  inputs: Readonly<Record<string, DataValue>>,
   steps: readonly WorkflowStepRow[],
   item?: { value: unknown },
-): Record<string, string> {
-  return Object.fromEntries(Object.entries(bindings).map(([name, binding]) => {
-    let value: unknown
-    if (binding.from === 'literal') value = binding.value
-    else if (binding.from === 'input') value = inputs[binding.name]
-    else if (binding.from === 'step') {
-      const step = steps.find((candidate) => candidate.name === binding.step && candidate.parentStepId == null)
-      if (!step) throw new Error(`Binding source step '${binding.step}' was not found in the parent run.`)
-      value = readWorkflowJsonPointer(structuredOutput(step), binding.pointer)
-    } else if (binding.from === 'item' && item) {
-      value = readWorkflowJsonPointer(item.value, binding.pointer)
-    } else {
-      throw new Error(`Child input '${name}' uses an item binding outside a workflow-map step.`)
+  admitted?: Readonly<Record<string, DataValue>>,
+): Record<string, DataValue> {
+  const completed = admitted ?? Object.fromEntries(steps.filter(step => step.parentStepId == null && ['done', 'completed-with-failures'].includes(step.status) && step.structuredJson)
+    .map(step => [step.name, parseDataValue(structuredOutput(step), WORKFLOW_VALUE_BYTES)]))
+  return Object.fromEntries(Object.entries(bindings).flatMap(([name, binding]) => {
+    const typed = dataBindingSchema.parse(binding)
+    if (typed.address.from === 'item' && !item) throw new Error(`Child input '${name}' uses an item binding outside a workflow-map step.`)
+    const value = readDataBinding(typed, { inputs: { ...inputs }, steps: { ...completed }, ...(item ? { item: parseDataValue(item.value, WORKFLOW_VALUE_BYTES) } : {}) })
+    if (value === MISSING) {
+      return [] // The child's input schema decides whether omission is legal.
     }
-    if (typeof value !== 'string') throw new Error(`Child input '${name}' must resolve to a string.`)
-    return [name, value]
+    return [[name, value]]
   }))
 }
 
 /** Evaluates the non-map binding vocabulary against one frozen parent run. */
 export function resolveChildWorkflowInputs(
   bindings: Readonly<Record<string, WorkflowValueBinding>>,
-  inputs: Readonly<Record<string, string>>,
+  inputs: Readonly<Record<string, DataValue>>,
   steps: readonly WorkflowStepRow[],
-): Record<string, string> {
-  return resolveBindings(bindings, inputs, steps)
+  admitted?: Readonly<Record<string, DataValue>>,
+): Record<string, DataValue> {
+  return resolveBindings(bindings, inputs, steps, undefined, admitted)
 }
 
 function safeTaskTitle(value: string, index: number): string {
@@ -87,33 +90,42 @@ function safeTaskTitle(value: string, index: number): string {
 /** Resolves and validates the complete map before the dispatcher can create its first child task. */
 export function resolveWorkflowMapRoster(
   def: WorkflowStepDef,
-  inputs: Readonly<Record<string, string>>,
+  inputs: Readonly<Record<string, DataValue>>,
   steps: readonly WorkflowStepRow[],
-  defaults: Readonly<Record<string, string>> = {},
+  defaults: Readonly<Record<string, DataValue>> = {},
+  admitted?: Readonly<Record<string, DataValue>>,
+  childName = 'Workflow',
 ): WorkflowMapRoster {
-  if (def.kind !== 'workflow-map' || !def.items || !def.itemKey || !def.childWorkflow || !def.title) {
+  if (def.kind !== 'workflow-map' || !def.items || !def.childWorkflow) {
     throw new Error(`Step '${def.name}' is not a complete workflow-map step.`)
   }
   const source = steps.find((candidate) => candidate.name === def.items!.step && candidate.parentStepId == null)
-  if (!source) throw new Error(`Map source step '${def.items.step}' was not found in the parent run.`)
-  const items = readWorkflowJsonPointer(structuredOutput(source), def.items.pointer)
+  if (!source && !admitted?.[def.items.step]) throw new Error(`Map source step '${def.items.step}' was not found in the parent run.`)
+  const items = readWorkflowJsonPointer(admitted ? admitted[def.items.step] : structuredOutput(source!), def.items.pointer)
   if (!Array.isArray(items)) throw new Error(`Workflow map items pointer '${def.items.pointer}' must resolve to an array.`)
 
   const keys = new Set<string>()
   const entries = items.map((item, index): WorkflowMapRosterEntry => {
-    const itemKey = readWorkflowJsonPointer(item, def.itemKey!)
-    if (typeof itemKey !== 'string' || !itemKey.trim()) {
+    const sourceIdentity = workflowRecordIdentity(item)
+    if (!sourceIdentity && def.itemKey === undefined) throw new Error('Select a stable item key for an ordinary array')
+    const rawKey = sourceIdentity ?? readWorkflowJsonPointer(item, def.itemKey!)
+    if (!((typeof rawKey === 'string' && rawKey.trim()) || (typeof rawKey === 'number' && Number.isFinite(rawKey)))) {
       throw new Error(`Workflow map item ${index + 1} key must resolve to a nonempty string.`)
     }
+    const itemKey = sourceIdentity ?? (def.id ? JSON.stringify([typeof rawKey, rawKey]) : String(rawKey))
     if (keys.has(itemKey)) throw new Error(`Workflow map item key '${itemKey}' is repeated.`)
     keys.add(itemKey)
 
     const childInputs = {
       ...defaults,
-      ...resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }),
+      ...resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }, admitted),
     }
-    const titleBindings = resolveBindings(def.title!.bindings ?? {}, inputs, steps, { value: item })
-    const renderedTitle = def.title!.template.replace(BOUND_TEMPLATE_RE, (_token, name: string) => titleBindings[name] ?? '')
+    const titleBindings = resolveBindings(def.title?.bindings ?? {}, inputs, steps, { value: item }, admitted)
+    const defaultLabel = sourceIdentity ? item.display?.title ?? item.ref.recordId : String(rawKey)
+    const renderedTitle = def.title ? def.title.template.replace(BOUND_TEMPLATE_RE, (_token, name: string) => {
+      if (!Object.hasOwn(titleBindings, name)) throw new Error(`Title binding '${name}' is missing`)
+      return workflowText(titleBindings[name])
+    }) : `${childName}: ${defaultLabel}`
     return {
       index,
       itemKey,

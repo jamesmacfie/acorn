@@ -325,7 +325,7 @@ Every consumer is TypeScript in this repo, so Zod at the boundary is as far as t
 The exceptions are all one boundary, the one that clause does not cover. A loaded plugin's answer is
 not this repo's TypeScript, and the host renders it under its own chrome. Those reads get real
 schemas in `@acorn/protocol` and are parsed on arrival: the manifest itself, agent context options
-and snapshots, batch reference resolutions, and collections, whose rows are drawn as the host's own
+and snapshots, batch reference resolutions, and typed data sources, whose rows are drawn as the host's own
 table beside another plugin's. See [the dashboards doc](./dashboards.md). Each parses
 all-or-nothing rather than sanitising field by field, because a half-accepted answer renders as
 complete and is not. Adding to this list means naming the same argument: untrusted wire, host-drawn.

@@ -79,7 +79,7 @@ export function workspacePluginMigrations(plugin: string): string | null {
   }
 }
 
-export type TestPluginDb = { db: PluginDatabase; dataDir: string; cleanup: () => void }
+export type TestPluginDb = { db: PluginDatabase; dataDir: string; openConnection(): PluginDatabase; cleanup: () => void }
 
 // A real per-plugin SQLite file in a temp data root. See docs/testing.md § Testkit for how the
 // migration chain resolves. Separate schemas mean a plugin's tests exercise the ownership boundary
@@ -93,6 +93,7 @@ export function makeTestPluginDb(plugin: string, migrationsFolder: string | null
   return {
     db,
     dataDir,
+    openConnection: () => openPluginDb(dataDir, plugin, { migrationsFolder }),
     cleanup: () => {
       try {
         db.close()

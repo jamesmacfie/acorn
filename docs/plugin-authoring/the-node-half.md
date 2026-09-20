@@ -44,7 +44,7 @@ editor shows you (plugins.md § The two contexts, one per tier). A Hono instance
 boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.routes.fetch(handler)`
 is the door. The host strips the mount before calling you, so a request to
 `/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
-would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.collections`,
+would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.dataSources`,
 `ctx.taskChecks`, `ctx.runs`, `ctx.audit`, `ctx.extensionPoints`, `ctx.hooks`,
 `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
 manifest.
@@ -56,9 +56,11 @@ plugins use, binds every route to `/v2/p/<id>/`, and removes it with the package
 See [Agent tools](../agent-tools.md#loaded-manifest-carriers) for the schema and response contracts.
 
 Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
-schedule, collection, task check, run source or audit verb cannot be filed under another package's
+schedule, data source, task check, run source, or audit verb cannot be filed under another package's
 name. Several are also manifest keys, and the host synthesises those declarations through this same
-seam, so declare in the manifest by preference — that is the copy the owner reads at install.
+seam, so declare in the manifest by preference. That is the copy the owner reads at install. For
+source registration, discovery, invocation, and provider scoping, see
+[Typed data sources](../data-sources.md).
 
 Three of them are newer than the rest and worth naming:
 

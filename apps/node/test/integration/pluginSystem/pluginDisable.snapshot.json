@@ -3,6 +3,7 @@
     "routes": [
       "agents",
       "agents",
+      "agents/data/sessions",
       "browser/captures",
       "changes/tasks",
       "changes/tasks",
@@ -11,7 +12,7 @@
       "editor/tasks",
       "github",
       "github",
-      "github/collections",
+      "github/data/pulls",
       "github/pins",
       "github/repos",
       "github/repos",
@@ -31,7 +32,8 @@
       "preview",
       "terminal",
       "workflows",
-      "workflows"
+      "workflows",
+      "workflows/workflows/schedules"
     ],
     "tools": [
       "agent_cancel",
@@ -116,7 +118,8 @@
       "workflows.gates",
       "workflows.notices",
       "workflows.route",
-      "workflows.runner"
+      "workflows.runner",
+      "workflows.schedules.route"
     ],
     "databases": [
       "agents.sqlite",
@@ -187,7 +190,7 @@
       "routes": [
         "github",
         "github",
-        "github/collections",
+        "github/data/pulls",
         "github/pins",
         "github/repos",
         "github/repos",
@@ -236,14 +239,16 @@
     "workflows": {
       "routes": [
         "workflows",
-        "workflows"
+        "workflows",
+        "workflows/workflows/schedules"
       ],
       "capabilities": [
         "workflows.defs",
         "workflows.gates",
         "workflows.notices",
         "workflows.route",
-        "workflows.runner"
+        "workflows.runner",
+        "workflows.schedules.route"
       ],
       "databases": [
         "workflows.sqlite"

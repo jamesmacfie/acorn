@@ -1,5 +1,40 @@
 # GitHub integration
 
+## Typed pull-request source
+
+The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection
+and `parameters.repository` in `owner/name` form. Repository options enumerate repositories available
+through that connection, with continuation cursors. Option search filters each returned page; an empty
+page with a cursor is not exhaustion.
+
+Records use GitHub node IDs for identity. Actual `state` is `open`, `closed`, or `merged`; `closed`
+means closed without merging. Draft, mergeability, merge readiness, and auto-merge remain separate
+fields. Author login is nullable, and timestamps use epoch milliseconds. Row URLs retain the
+content-link action that opens a tracked pull request inside Acorn.
+
+Queries support equality on state, author login, and draft, ordered comparisons on created/updated
+time, and `all` groups. Number, created time, and updated time support sorting. The provider search
+narrows candidates, then exact typed comparisons run over the exhausted selection. Author equality
+uses the returned login's case. Repository and author values cannot inject search qualifiers.
+
+The adapter reads at most 10 pages of 100 search matches. A provider count above 1,000 or continuation
+past that limit returns `incomplete`, including when the query requests a smaller `take`. Stable
+sorting uses node ID to break ties before applying `take`. This source advertises neither details
+nor incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
+changes during pagination.
+
+Continuation selections expire after 60 seconds. The plugin holds at most 16 selections and 16 MiB
+across them, bound to owner, connection, full scope/query, evaluation time, and mode. Invalid or expired
+cursors fail; callers must refresh. Connection and principal checks also apply to cached continuation
+reads. Credentials stay inside the provider callback, and cancellation reaches the GitHub request.
+
+Provider APIs were checked on September 13, 2026 against GitHub's
+[search schema](https://docs.github.com/en/graphql/reference/search),
+[pull-request schema](https://docs.github.com/en/graphql/reference/pulls),
+[user repository connection](https://docs.github.com/en/graphql/reference/users), and
+[search qualifiers](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests).
+The mirror and dashboard collection retain their separate readers until the consumer migration.
+
 GitHub is a provider plugin, not the acorn authentication system. Its token is an encrypted
 integration credential and its repositories/PRs are a disposable local mirror.
 

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/host/registries/sources/agentContexts.ts'
 import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
-import { collectionRegistry } from '@acorn/client-core/host/registries/sources/collections.ts'
 import { commandRegistry } from '@acorn/client-core/host/registries/commands/commands.ts'
 import { nodeStatRegistry } from '@acorn/client-core/host/registries/rail/nodeStats.ts'
 import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
@@ -41,7 +40,6 @@ const REGISTRIES = {
   persistedStateSlices: persistedStateRegistry,
   nodeStats: nodeStatRegistry,
   attentionSources: attentionRegistry,
-  collections: collectionRegistry,
   contentLinks: contentLinkRegistry,
   // Core registers its own `github` mark at module scope, so this list is never empty and no plugin
   // owns that row. That is the point: a plugin's marks must come back after a disable, and a bare
