@@ -11,9 +11,9 @@ import './home.css'
 //
 // It is a dashboard and nothing else. It used to open with the workspace's active tasks above the
 // panels, on every visit, for everyone: a list on the screen whether or not it was being read, and
-// the one thing a person could not take off their own home page. The same rows are a collection now
-// (tasks/tasksCollection.ts), so anyone who wants them places them, sorts them and sizes them, and
-// the default is a surface with nothing on it but what its owner put there.
+// the one thing a person could not take off their own home page. Tasks are now a shared Node-owned
+// source, so anyone who wants them publishes and places a dashboard, and the default is a surface
+// with nothing on it but what its owner put there.
 export default function Home() {
   // Dashboards (docs/dashboards.md § Placements): a tab is a placement scope, so all Home owns is
   // which one the grid is pointed at — and which workspace's set of them it is choosing from, since

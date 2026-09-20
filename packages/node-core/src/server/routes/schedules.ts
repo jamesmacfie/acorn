@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { cadenceSchema, type ScheduleTargetOption, type ScheduleTargetsResponse } from '@acorn/protocol/schedules.ts'
-import { nodeActions, riskOf } from '../nodeActions'
+import { cadenceSchema, type ScheduleTargetsResponse } from '@acorn/protocol/schedules.ts'
 import { viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -55,17 +54,10 @@ export const schedules = new Hono<AppEnv>()
   // Declared before '/:key/runs': Hono matches in registration order, and `targets` would otherwise be
   // read as a key.
   .get('/targets', (c) => {
-    const targets: ScheduleTargetOption[] = nodeActions().map((action) => ({
-      kind: 'node-action',
-      pluginId: action.pluginId,
-      actionId: action.actionId,
-      name: action.name,
-      risk: riskOf(action),
-    }))
-    return c.json({ targets } satisfies ScheduleTargetsResponse)
+    return viaBridge(c, SCHEDULER, async scheduler => ({ targets: scheduler.targets() } satisfies ScheduleTargetsResponse))
   })
   .get('/:key/runs', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.runs(c.req.param('key'))))
-  .post('/:key/run', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.runNow(c.req.param('key'))))
+  .post('/:key/run', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.runNow(c.req.param('key'), c.req.header('idempotency-key'))))
   // Re-arm after a tier rise. No body: the node re-stamps from the registry, so a client can only accept
   // the tier the host just showed it.
   .post('/:key/confirm', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.confirm(c.req.param('key'))))

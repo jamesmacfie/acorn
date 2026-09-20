@@ -7,8 +7,15 @@ Client caches and persisted UI state are disposable and never prove that a mutat
 
 The Node is authoritative for workspaces, projects, tasks, branches, worktrees, Git status,
 notes, memories, integrations, provider mirrors, terminal metadata, managed sessions, delegation
-ownership, workflow runs, Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
+ownership, workflow drafts, immutable revisions, publication recovery, workflow runs,
+approved workflow schedule bindings, durable schedule occurrences, processing checkpoints,
+Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
 and audit records.
+
+Workflow schedule drafts are Node-owned too. The renderer may hold unsaved form edits while the
+modal is open, but **Save draft** writes a disabled core cadence plus its workflow-owned binding.
+**Activate** is an immediate device-only mutation: a disconnected renderer reports the failure and
+does not retain an activation intent to replay later.
 
 Whether this node collects telemetry at all is node-owned too: one preference row,
 `telemetry.enabled`, off unless it reads `'1'` ([telemetry.md](./telemetry.md) § The switch). It
@@ -25,15 +32,42 @@ why they are a route the page polls rather than state anything persists
 programme refused one.
 
 It is also authoritative for what the owner *composes* about those resources — a task's pane layout,
-a task's open editor files, a repo's PR filters, a task's context selection, the dashboard panels a
-person built over plugin collections — held as per-user preferences (`GET|PUT /v2/core/prefs`). These
-follow the resource, so any client that pairs with a Node renders that Node's arrangements and the
-agent can read them.
+a task's open editor files, a repo's PR filters, a task's context selection, dashboard placement and
+layout preferences, and core-owned typed dashboard definitions. These follow the resource, so any
+client that pairs with a Node renders that Node's arrangements and the agent can read them.
 
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
 
 ## Client-owned durable state
+
+Saved query drafts are Node-owned, with compare-and-swap revisions. Their device-local recovery
+copies are keyed by Node, entity, and base revision and remain until acknowledgment or explicit
+discard. Reconnection exposes conflicts instead of overwriting Node content. These authoring drafts
+have a different lifetime from the losable comment and commit-message drafts described below.
+See [query recovery](./data-sources.md#workspace-query-library).
+
+The shared query editor applies that contract directly: edits to a saved query autosave to the Node,
+the recovery copy remains until the matching acknowledgment, and a stale save opens explicit conflict
+choices. An inline query stays inside its owning workflow or panel draft. **Customize for this use**
+copies saved content into that consumer; it does not fork another hidden client-side entity.
+
+Typed dashboard drafts follow the same ownership rule: core stores their compare-and-swap draft and
+immutable published revisions, while a device recovery copy remains until acknowledgment. Placement
+lists, tab ownership, and layout rectangles remain in the existing Node-backed dashboard preference
+slice. A placement references the stable published panel ID; publishing changes its definition, not
+the geometry of every surface that already places it.
+
+The workflow-v2 development transition is split by owner. The Node transition exports and removes
+only old workflow/query/dashboard rows and the dashboard preference. Renderer activation removes the
+retired workflow, query, dashboard, and AI-authoring recovery-key namespaces. Neither side scans or
+deletes unrelated product state; agent-session and ordinary presentation keys survive.
+
+AI authoring conversations are device-local draft state. The recovery key includes the active Node,
+feature, and target ID, and the value contains bounded context, a pending clarification or proposal,
+the model pick, and sample opt-in. It is not a workflow run, execution transcript, or Node-owned
+definition. Applying a reviewed proposal enters the owning feature's draft and validation path; the
+conversation itself never proves that a save or publication succeeded.
 
 The desktop persists:
 
@@ -66,6 +100,7 @@ Use the persistence scope that owns the state:
 | Appearance, notification settings ([notifications.md](./notifications.md) § Settings), shortcuts, rail order, notices, trust, tokens | device |
 | How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | device |
 | Where a workflow's nodes sit in the graph view | device |
+| Which workflow task roots are expanded in the rail | device |
 | Which backend and model every Generate control spends (`models.generatePick`) | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |

@@ -6,6 +6,7 @@
 // applied after its answer has been grounded.
 
 import type { ChildWorkflowConfig, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
+import { stepIdentity } from '../shared/workflowIdentity'
 
 type PromptWorkflowStep = Omit<WorkflowStepDef, 'childWorkflow'> & {
   childWorkflow?: Pick<ChildWorkflowConfig, 'inputs'>
@@ -41,26 +42,17 @@ export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
         configOptions: _configOptions,
         requiresRun: _requiresRun,
         tools: hiddenTools,
-        childStep: hiddenChild,
         childWorkflow: hiddenWorkflow,
         with: hiddenWith,
         ...safe
       } = step
       const stepTools = toolsForPrompt(hiddenTools)
-      const child = hiddenChild
-        ? (() => {
-            const { model: _childModel, tools: childHiddenTools, ...childRest } = hiddenChild
-            const childTools = toolsForPrompt(childHiddenTools)
-            return { ...childRest, ...(childTools ? { tools: childTools } : {}) }
-          })()
-        : undefined
       const withFields = hiddenWith
         ? Object.fromEntries(Object.entries(hiddenWith).filter(([key]) => !SCRUBBED_WITH_KEYS.includes(key)))
         : undefined
       return {
         ...safe,
         ...(stepTools ? { tools: stepTools } : {}),
-        ...(child ? { childStep: child } : {}),
         ...(hiddenWorkflow ? {
           childWorkflow: { inputs: hiddenWorkflow.inputs },
         } : {}),
@@ -78,7 +70,7 @@ const protectedSourceFor = (
   step: WorkflowStepDef,
 ): WorkflowStepDef | undefined => {
   const sameIdentity = (candidate: WorkflowStepDef) =>
-    candidate.name === step.name && (candidate.kind ?? 'agent') === (step.kind ?? 'agent')
+    stepIdentity(candidate) === stepIdentity(step) && (candidate.kind ?? 'agent') === (step.kind ?? 'agent')
   const before = current.steps.filter(sameIdentity)
   return before.length === 1 && changed.steps.filter(sameIdentity).length === 1 ? before[0] : undefined
 }
@@ -118,25 +110,6 @@ export function restoreProtectedDefinition(current: WorkflowDef, changed: Workfl
     let next: WorkflowStepDef = { ...step, tools: restoreTools(before.tools, step.tools) }
     for (const key of ['model', 'configOptions', 'requiresRun'] as const) {
       if (Object.hasOwn(before, key)) next = { ...next, [key]: before[key] }
-    }
-    if (before.childStep && next.childStep) {
-      next = {
-        ...next,
-        childStep: {
-          ...next.childStep,
-          ...(Object.hasOwn(before.childStep, 'model') ? { model: before.childStep.model } : {}),
-          tools: restoreTools(before.childStep.tools, next.childStep.tools),
-        },
-      }
-    }
-    if (before.childWorkflow) {
-      next = {
-        ...next,
-        childWorkflow: {
-          ...next.childWorkflow,
-          ref: before.childWorkflow.ref,
-        },
-      }
     }
     const protectedWith = Object.fromEntries(
       SCRUBBED_WITH_KEYS.filter((key) => before.with && Object.hasOwn(before.with, key)).map((key) => [key, before.with![key]]),

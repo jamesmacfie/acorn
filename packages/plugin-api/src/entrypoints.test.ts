@@ -20,6 +20,7 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 // they legitimately need a browser realm, and each says so in its own header:
 const BROWSER_REALM = new Set([
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
+  './ui/data-sources', // connected typed-data authoring components, .tsx
   './ui/host', // registration and connected shell surfaces, also .tsx
 ])
 

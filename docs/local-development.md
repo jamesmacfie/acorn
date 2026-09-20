@@ -132,6 +132,20 @@ internal token stay. The device row goes with the core database, so the desktop 
 next launch. That is the intended fresh-install path, since there is no upgrade path from an older
 database.
 
+For an existing development root crossing to workflow v2, do not use the broad reset. Stop the Node,
+copy the root for rehearsal, then run the one-time targeted transition with explicit paths:
+
+```sh
+pnpm db:transition:workflow-v2 -- --data-dir /path/to/copied-data --export-dir /path/outside/copied-data/workflow-v2-recovery
+```
+
+The command acquires an immediate SQLite writer lock, refuses active workflow runs, dispatches, or
+occurrences, writes private JSON exports plus a SHA-256 manifest outside the data root, and only then
+removes workflow/query/dashboard development state. It preserves tasks and lineage, worktrees,
+notes, managed sessions, credentials, connections, pairings, other schedules, and arbitrary files.
+It writes a version marker and refuses a second run. Validate the copied root and manifest before
+running the same explicit command on a stopped development Node.
+
 ## Timing a cold start
 
 Four processes, four accounts of their own boot, all of them lines on a stream with a running offset.

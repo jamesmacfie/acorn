@@ -611,7 +611,10 @@ export function Picker<T>(props: PickerProps<T>) {
     >
       {(context) => (
         <box flexDirection="column">
-          <Input kind="filter" placeholder={props.placeholder} value={query()} onInput={setQuery} />
+          <Input kind="filter" placeholder={props.placeholder} value={query()} onInput={(value) => {
+            setQuery(value)
+            props.onSearch?.(value)
+          }} />
           {slot(props.tools)}
           {slot(props.status)}
           <Show when={rows().length} fallback={<Line role="muted">{props.emptyText}</Line>}>

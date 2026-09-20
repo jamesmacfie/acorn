@@ -13,6 +13,7 @@ import { activeCacheId } from '../../infra/node/activeNode'
 import { clientFor } from '../../infra/node/fleet'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { wsOnConnectionChanged } from '../../infra/node/wsClient'
+import { invalidateDataSources } from '../dataSources/queries'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
  * the app never calls it. */
@@ -21,6 +22,7 @@ export function watchConnectionChanges(): () => void {
     // The active node's cache only, for the same reason as the task watcher: the socket that delivered
     // this belongs to it, and no other node has a mounted query to refetch.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: integrationsKey })
+    void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId(), { connectionId: event.integrationId })
     clientEvents.emit('connection:changed', event)
   })
 }

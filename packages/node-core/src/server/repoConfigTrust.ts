@@ -93,6 +93,23 @@ async function taskSnapshot(db: AppDatabase, taskId: string): Promise<{ projectI
   return snapshot && project ? { projectId: project.id, snapshot } : null
 }
 
+async function projectSnapshot(db: AppDatabase, projectId: string): Promise<{ projectId: string; snapshot: Snapshot } | null> {
+  const project = await db.select().from(schema.projects).where(eq(schema.projects.id, projectId)).get()
+  if (!project) throw new Error('Project not found.')
+  if (!project.path || !isDir(project.path)) return null
+  const snapshot = readRepoConfigSnapshot(project.path, project)
+  return snapshot ? { projectId, snapshot } : null
+}
+
+export async function assertProjectRepoConfigTrusted(db: AppDatabase, projectId: string): Promise<void> {
+  const current = await projectSnapshot(db, projectId)
+  if (!current) return
+  const ack = await db.select({ hash: schema.configAcks.hash }).from(schema.configAcks).where(and(
+    eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash),
+  )).get()
+  if (!ack) throw new Error('Repository configuration must be reviewed and trusted before this schedule can dispatch.')
+}
+
 export async function repoConfigTrustReview(db: AppDatabase, taskId: string): Promise<RepoConfigTrustReview> {
   const current = await taskSnapshot(db, taskId)
   if (!current) return { taskId, projectId: null, trusted: true, current: null, previous: null }

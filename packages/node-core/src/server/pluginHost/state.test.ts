@@ -10,7 +10,7 @@ const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: []
 const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
   attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
-  contextMenus: [], extensionPoints: [], extensions: [], collections: [],
+  contextMenus: [], extensionPoints: [], extensions: [],
   schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({

@@ -1,3 +1,4 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { createEffect, createMemo, createResource, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -9,12 +10,11 @@ import {
   toast,
   workspaceForProject,
   workspacesOptions,
-  type ItemRowTarget,
   type Task,
 } from '@acorn/plugin-api/client'
 import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { workflowApi } from './workflowsClient'
-import { closeStartFromItem, prefillFromItem, startFromItemTarget } from './startFromItem'
+import { closeStartFromItem, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows.md § Starting a run).
 //
@@ -36,7 +36,7 @@ export default function StartFromItemHost() {
   )
 }
 
-function StartFromItem(props: { target: ItemRowTarget }) {
+function StartFromItem(props: { target: import('./startFromItem').WorkflowSourceItemTarget }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const tasks = createQuery(() => tasksOptions(true))
@@ -58,11 +58,11 @@ function StartFromItem(props: { target: ItemRowTarget }) {
       task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)))
   })
 
-  const prefill = createMemo(() => prefillFromItem({
+  const prefill = createMemo(() => ({ ...prefillFromItem({
     title: props.target.title,
     ...(props.target.body ? { body: props.target.body } : {}),
     ...(props.target.link ? { link: props.target.link } : {}),
-  }))
+  }), ...(props.target.record ? prefillFromRecord(props.target.record) : {}) }))
 
   // Where the run landed, so `onCreated` can address the pane without threading a second callback
   // through the modal. One entry, written and read in the same gesture.
@@ -71,7 +71,7 @@ function StartFromItem(props: { target: ItemRowTarget }) {
   // The node resolves the id and, for a committed file, hashes the bytes on disk. Same call the
   // editor's Run and the palette make, so a refusal reads the same everywhere; the modal catches the
   // throw and keeps itself open with the message.
-  const start = async (taskId: string, defId: string, inputs: Record<string, string>): Promise<void> => {
+  const start = async (taskId: string, defId: string, inputs: Record<string, DataValue>): Promise<void> => {
     const answer = await workflowApi.start(taskId, { defId }, Object.keys(inputs).length ? inputs : undefined)
     if (answer.error) throw new Error(answer.error)
     if (answer.runId) started.set(taskId, answer.runId)

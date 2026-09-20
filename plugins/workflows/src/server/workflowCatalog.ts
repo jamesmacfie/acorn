@@ -5,56 +5,32 @@ import type {
   WorkflowDef,
   WorkflowDefinitionRef,
 } from '../shared/workflowContracts'
-import { validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './workflowValidation'
+import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 import { defsForProject } from './workflowDefs'
 import { loadWorkflowFiles } from './workflowFiles'
 
 export const GENERATE_MAX_WORKFLOW_TARGETS = 40
 export const GENERATE_MAX_WORKFLOW_CATALOG_JSON_CHARS = 12_000
 
-const PRIVATE_SCHEMA_KEYS = new Set(['default', 'example', 'examples', '$comment'])
-
-/** Keeps the output contract while dropping value-bearing annotations that can hold fixture data or
- *  credentials. The catalog needs types and properties, not sample output. */
-const schemaMetadata = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(schemaMetadata)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !PRIVATE_SCHEMA_KEYS.has(key))
-      .map(([key, item]) => [key, schemaMetadata(item)]),
-  )
-}
-
 const outputSchemas = (
   def: WorkflowDef,
-  catalog: WorkflowCatalog,
 ): WorkflowCatalogTarget['outputs'] => {
-  const edges = workflowEdges(def.steps)
-  const parents = new Set([...edges.values()].flat())
-  const described = new Map(catalog.kinds.map((kind) => [kind.id, kind.describe]))
-  const outputs = def.steps.flatMap((step) => {
-    if (parents.has(step.name)) return []
-    const schema = step.schema ?? described.get(step.kind ?? 'agent')?.output?.schema
-    return schema && typeof schema === 'object' && !Array.isArray(schema)
-      ? [{ step: step.name, schema: schemaMetadata(schema) as object }]
-      : []
-  })
-  return outputs.length ? outputs : undefined
+  return (def.outputs ?? []).map(output => ({ name: output.name, schema: structuredClone(output.schema) }))
 }
 
 const target = (
   ref: WorkflowDefinitionRef,
   def: WorkflowDef,
-  catalog: WorkflowCatalog,
+  published = true,
 ): WorkflowCatalogTarget => ({
   ref,
   name: def.name,
+  published,
   inputs: (def.inputs ?? []).map(({ default: inputDefault, ...input }) => ({
     ...input,
-    ...(inputDefault != null ? { hasDefault: true } : {}),
+    ...(inputDefault !== undefined ? { hasDefault: true } : {}),
   })),
-  outputs: outputSchemas(def, catalog),
+  outputs: outputSchemas(def),
 })
 
 /** A child is a valid leaf. A definition with runtime children would exceed the one-level tree limit
@@ -62,6 +38,9 @@ const target = (
 const canBeChild = (def: WorkflowDef, validation: WorkflowValidationCatalog): boolean =>
   !validateWorkflow(def, validation).length
   && !def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map')
+
+const canBecomeChild = (def: WorkflowDef): boolean =>
+  !def.steps.some((step) => step.kind === 'workflow' || step.kind === 'workflow-map')
 
 /** Adds only definitions that the selected project can resolve. File bodies and input defaults stay
  *  on the node; the client and model receive reference metadata only. */
@@ -75,15 +54,15 @@ export async function scopedWorkflowCatalog(args: {
   validation: WorkflowValidationCatalog
 }): Promise<WorkflowCatalog> {
   const rows = (await defsForProject(args.db, args.workspaceId, args.projectId))
-    .filter((row) => canBeChild(row.def, args.validation))
+    .filter((row) => canBecomeChild(row.def))
   const repo = loadWorkflowFiles(args.repoDir, null, args.validation).workflows
     .filter((def) => canBeChild(def, args.validation))
   const user = loadWorkflowFiles(null, args.userDir, args.validation).workflows
     .filter((def) => canBeChild(def, args.validation))
   const workflows = [
-    ...rows.map((row) => target({ source: 'database', id: row.id }, row.def, args.base)),
-    ...repo.map((def) => target({ source: 'repo', path: `.acorn/workflows/${def.id}.toml` }, def, args.base)),
-    ...user.map((def) => target({ source: 'user', id: def.id }, def, args.base)),
+    ...rows.map((row) => target({ source: 'database', id: row.id }, row.def, !!row.publishedRevision)),
+    ...repo.map((def) => target({ source: 'repo', path: `.acorn/workflows/${def.id}.toml` }, def)),
+    ...user.map((def) => target({ source: 'user', id: def.id }, def)),
   ].sort((left, right) => left.name.localeCompare(right.name))
   return { ...args.base, workflows }
 }
@@ -91,6 +70,7 @@ export async function scopedWorkflowCatalog(args: {
 /** The model sees a bounded reference set, and grounding checks against the same set. */
 export function generationWorkflowCatalog(catalog: WorkflowCatalog, excludeDatabaseId?: string): WorkflowCatalog {
   const candidates = (catalog.workflows ?? [])
+    .filter((entry) => entry.published !== false)
     .filter((entry) => !(entry.ref.source === 'database' && entry.ref.id === excludeDatabaseId))
     .map((entry) => ({
       ...entry,

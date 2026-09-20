@@ -120,7 +120,7 @@ const pluginStateCapability = capabilities.provide(
 
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
 // functions over the database; neither needs a window.
-wireAgentTools({ db: runtime.DB, secrets: runtime.SECRETS })
+wireAgentTools({ db: runtime.DB, secrets: runtime.SECRETS, env: runtime })
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers
@@ -251,4 +251,3 @@ function printPairingBanner(code: string | null): void {
 }
 
 printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)
-

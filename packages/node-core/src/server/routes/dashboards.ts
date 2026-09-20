@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
+import { dashboardLibraryRequestSchema } from '@acorn/protocol/dashboards.ts'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { readSeries, type MeasureSeries } from '../dashboards/history'
 import { respondError } from '../respond'
+import { authorizeQueryScope } from '../queries/runtime'
+import { dashboardStore, DashboardLibraryError } from '../dashboards/store'
+import { deleteDashboard, publishDashboard, validateDashboardContent } from '../dashboards/publication'
 
 // The measure-history read route (docs/dashboards.md § Trends).
 //
@@ -27,4 +31,30 @@ export const dashboards = new Hono<AppEnv>().get('/history', async (c) => {
   // just been given a trend has a cold state to render ("collecting since …"), and a 404 would make
   // the client branch on an error to draw it.
   return c.json(await readSeries(getDb(c.env), panelId, since) satisfies MeasureSeries)
+}).post('/:operation', async c => {
+  try {
+    const parsed = dashboardLibraryRequestSchema.safeParse(await c.req.json())
+    if (!parsed.success || parsed.data.operation !== c.req.param('operation')) return respondError(c, 400, 'invalid-request')
+    const input = parsed.data
+    const principal = c.get('principal')!
+    if (principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
+    const invocation = { principal, signal: c.req.raw.signal }
+    await authorizeQueryScope(c.env, input.scope, invocation)
+    const store = dashboardStore(getDb(c.env))
+    switch (input.operation) {
+      case 'list': return c.json(store.list(input.scope))
+      case 'get': return c.json(store.get(input.scope, input.id))
+      case 'create': return c.json(store.create(input.scope, input.content))
+      case 'save': return c.json(store.save(input.scope, input.id, input.expectedRevision, input.content))
+      case 'validate': await validateDashboardContent(c.env, input.scope, input.content, invocation); return c.json({ problems: [] })
+      case 'publish': return c.json(await publishDashboard(c.env, input.scope, input.id, input.expectedRevision, invocation))
+      case 'published': return c.json(store.published(input.scope, input.id, input.revision))
+      case 'delete': deleteDashboard(c.env, input.scope, input.id, input.expectedRevision); return c.json({ ok: true })
+    }
+  } catch (error) {
+    if (error instanceof DashboardLibraryError) {
+      return respondError(c, error.code === 'not-found' ? 404 : error.code === 'invalid-dashboard' ? 400 : 409, error.code)
+    }
+    return respondError(c, 400, 'invalid-dashboard')
+  }
 })

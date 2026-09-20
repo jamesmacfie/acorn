@@ -36,7 +36,7 @@ export default function BoardView(props: PanelViewProps) {
   return (
     <Show
       when={field()}
-      fallback={<EmptyState align="start" size="sm" title="Nothing to group by">This collection declares no field with a fixed set of values.</EmptyState>}
+      fallback={<EmptyState align="start" size="sm" title="Nothing to group by">This source declares no field with a fixed set of values.</EmptyState>}
     >
       <div class="dash-board">
         <For each={columns()}>

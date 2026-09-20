@@ -8,12 +8,12 @@
 // the two definitions must match (./workflowToml.test.ts). Serialising is `smol-toml`'s job rather
 // than ours, apart from the one thing it will not do, below.
 import { stringify } from 'smol-toml'
+import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import type {
   ChildWorkflowConfig,
   ToolCeiling,
   WorkflowBoundTemplate,
   WorkflowBudget,
-  WorkflowChildStepDef,
   WorkflowDef,
   WorkflowMapSource,
   WorkflowStepDef,
@@ -58,26 +58,8 @@ const tomlBudget = (budget: WorkflowBudget | undefined): Record<string, unknown>
   return Object.keys(table).length ? table : undefined
 }
 
-// `schema` is not a child-step key: ./workflowFiles.ts does not read one, so writing one would make
-// a value that vanishes on the next load.
-const tomlChildStep = (child: WorkflowChildStepDef | undefined): Record<string, unknown> | undefined => {
-  if (!child) return undefined
-  const table = drop({
-    name: child.name,
-    profile: child.profileId,
-    model: child.model,
-    prompt: child.prompt,
-    tools: tomlTools(child.tools),
-    budget: tomlBudget(child.budget),
-  })
-  return Object.keys(table).length ? table : undefined
-}
-
 const tomlBinding = (binding: WorkflowValueBinding): Record<string, unknown> => {
-  if (binding.from === 'literal') return { from: binding.from, value: binding.value }
-  if (binding.from === 'input') return { from: binding.from, name: binding.name }
-  if (binding.from === 'step') return { from: binding.from, step: binding.step, pointer: binding.pointer }
-  return { from: binding.from, pointer: binding.pointer }
+  return { binding_json: JSON.stringify(dataBindingSchema.parse(binding)) }
 }
 
 const tomlBindings = (bindings: Record<string, WorkflowValueBinding> | undefined): Record<string, unknown> | undefined =>
@@ -101,6 +83,7 @@ const tomlTitle = (title: WorkflowBoundTemplate | undefined): Record<string, unk
 
 const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
   drop({
+    id: step.id,
     name: step.name,
     kind: step.kind,
     after: step.after,
@@ -111,12 +94,16 @@ const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
     model: step.model,
     prompt: step.prompt,
     schema_json: step.schema ? JSON.stringify(step.schema) : undefined,
+    query_json: step.query ? JSON.stringify(step.query) : undefined,
+    record_json: step.record ? JSON.stringify(step.record) : undefined,
+    condition_json: step.condition ? JSON.stringify(step.condition) : undefined,
+    projection: step.projection,
+    repeat: step.repeat,
+    incremental: step.incremental,
     policy: step.policy,
     max_iterations: step.maxIterations,
     requires_run: step.requiresRun,
-    joins: step.joins,
     branches: some(step.branches),
-    child_step: tomlChildStep(step.childStep),
     child_workflow: tomlChildWorkflow(step.childWorkflow),
     items: tomlMapSource(step.items),
     item_key: step.itemKey,
@@ -143,12 +130,16 @@ export function writeWorkflowToml(def: WorkflowDef): string {
   }
 
   const doc = mark(drop({
+    format_version: def.formatVersion,
     name: def.name,
     posture: def.posture,
     trigger: def.trigger,
     tools: tomlTools(def.tools),
     budget: tomlBudget(def.budget),
-    inputs: some(def.inputs)?.map((input) => drop({ name: input.name, description: input.description, required: input.required === true ? true : undefined, default: input.default })),
+    max_descendants: def.maxDescendants,
+    max_concurrency: def.maxConcurrency,
+    inputs: some(def.inputs)?.map((input) => drop({ name: input.name, connection_json: input.connection ? JSON.stringify(input.connection) : undefined, label: input.label, description: input.description, required: input.required === true ? true : undefined, ...(input.schema ? { schema_json: JSON.stringify(input.schema), default_json: input.default === undefined ? undefined : JSON.stringify(input.default) } : { default: input.default }) })),
+    outputs_json: def.outputs ? JSON.stringify(def.outputs) : undefined,
     steps: def.steps.map(tomlStep),
   }))
 

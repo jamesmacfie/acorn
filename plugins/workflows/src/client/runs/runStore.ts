@@ -12,8 +12,11 @@ import { createSignal } from 'solid-js'
 import { onPluginFrame, wsOnReconnect, type ClientScheduleContribution } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { workflowApi } from '../workflowsClient'
+import type { WorkflowTaskGroup } from '../../shared/api'
 
 const [runCounts, setRunCounts] = createSignal<Record<string, number>>({})
+const [taskGroups, setTaskGroups] = createSignal<Record<string, WorkflowTaskGroup>>({})
+export { taskGroups as workflowTaskGroups }
 
 export const taskHasWorkflowRuns = (taskId: string): boolean => (runCounts()[taskId] ?? 0) > 0
 
@@ -27,12 +30,21 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
   intervalMs: 120_000,
   requires: { plugin: 'workflows' },
   run: async () => {
-    const { runs } = await workflowApi.allRuns().catch(() => ({ runs: [] }))
-    const next: Record<string, number> = {}
-    for (const run of runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
-    // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every
-    // two minutes would rebuild the strip for nothing.
-    setRunCounts((current) => (same(current, next) ? current : next))
+    const [runList, navigation] = await Promise.all([
+      workflowApi.allRuns().catch(() => null),
+      workflowApi.taskNavigation().catch(() => null),
+    ])
+    if (runList) {
+      const next: Record<string, number> = {}
+      for (const run of runList.runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
+      // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every
+      // two minutes would rebuild the strip for nothing.
+      setRunCounts((current) => (same(current, next) ? current : next))
+    }
+    if (navigation) {
+      const groups = Object.fromEntries(navigation.groups.map(group => [group.rootTaskId, group]))
+      setTaskGroups(current => JSON.stringify(current) === JSON.stringify(groups) ? current : groups)
+    }
   },
   subscribe: (refresh) => {
     const offRun = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), refresh)

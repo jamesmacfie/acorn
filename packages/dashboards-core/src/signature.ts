@@ -30,7 +30,7 @@ function fnv1a(text: string): string {
 
 export function measureSignature(panel: PanelDefinition): string {
   return fnv1a(stableStringify({
-    queries: panel.queries.map((query) => ({ pluginId: query.pluginId, collectionId: query.collectionId, params: query.params ?? {} })),
+    sources: (panel.sources ?? []).map((source) => ({ pluginId: source.pluginId, sourceId: source.sourceId })),
     mapping: panel.mapping ?? {},
     filters: panel.shaping.filters ?? [],
     aggregate: panel.view.aggregate ?? 'count',

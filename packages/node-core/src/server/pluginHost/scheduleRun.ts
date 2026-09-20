@@ -3,7 +3,7 @@
 // A loaded plugin declares periodic work as a route rather than as a function, because a manifest is
 // data and a manifest is what the owner is shown at install. So the node has to call one of its own
 // plugin routes with no client and no request in sight: ./dispatch.ts, shared with the measure
-// sampler's collection reads.
+// sampler's source reads.
 import type { Env } from '../bindings'
 import type { PluginScheduleDescriptor } from '../plugins/manifest'
 import { dispatchPluginRoute } from './dispatch'

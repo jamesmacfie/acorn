@@ -102,4 +102,18 @@ describe('the full agent-tool manifest', () => {
     expect(runAgentTools({} as never).map((tool) => tool.name)).toEqual(TERMINAL_TOOLS)
     expect(browserAgentTools({} as never).map((tool) => tool.name)).toEqual(BROWSER_TOOLS)
   })
+
+  it('adds typed-source metadata reads when host bindings are available', () => {
+    const testDb = makeTestDb()
+    try {
+      const tools = buildAgentTools({ db: testDb.db, secrets: testDb.secrets, env: {} as never })
+        .filter(tool => tool.name.startsWith('data_source'))
+      expect(tools.map(tool => tool.name)).toEqual([
+        'data_sources_list', 'data_source_describe', 'data_sources_discover', 'data_source_options',
+      ])
+      expect(tools.every(tool => tool.scope === 'task' && tool.risk === 'read')).toBe(true)
+    } finally {
+      testDb.cleanup()
+    }
+  })
 })

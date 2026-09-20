@@ -1,6 +1,6 @@
 import { RISK_ORDER, type ToolRisk } from '@acorn/protocol/workflow.ts'
 import type { Env } from '../bindings'
-import { nodeAction, riskOf, runNodeAction } from '../nodeActions'
+import { nodeAction, nodeActions, riskOf, runNodeAction } from '../nodeActions'
 import { ScheduleSkipped, type Scheduler } from './scheduler'
 
 // The `node-action` schedule target: what it may do (docs/schedules.md § `node-action`) and where
@@ -39,6 +39,13 @@ export function parseNodeActionTarget(raw: unknown): NodeActionTarget | null {
 export function registerNodeActionTarget(scheduler: Scheduler, env: Env): { dispose(): void } {
   return scheduler.registerTarget({
     kind: 'node-action',
+    options: () => nodeActions().map((action) => ({
+      kind: 'node-action' as const,
+      pluginId: action.pluginId,
+      actionId: action.actionId,
+      name: action.name,
+      risk: riskOf(action),
+    })),
     parse: (raw) => parseNodeActionTarget(raw),
     // Read off the resolved action at create time. This is the value that gets stamped, and the value
     // the confirmation the owner just accepted was drawn from.

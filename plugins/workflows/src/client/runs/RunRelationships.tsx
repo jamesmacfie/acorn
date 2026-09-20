@@ -4,8 +4,8 @@ import { Alert, Badge, Card, CodeBlock, Fold, Icon, Inline, Link, Stack, Text } 
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 import { formatUsage, runGlyph, runTone } from './runDisplay'
 
-const TERMINAL = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
-const FAILED = new Set(['failed', 'safety-rail', 'cancelled'])
+const TERMINAL = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
+const FAILED = new Set(['completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 
 type OpenTarget = (taskId: string, runId?: string) => void
 
@@ -13,14 +13,14 @@ const taskLink = (tasks: readonly Task[], taskId: string, onOpen: OpenTarget) =>
   const task = tasks.find((candidate) => candidate.id === taskId)
   return task
     ? <Link onPress={() => onOpen(taskId)}>{task.title}</Link>
-    : <Text emphasis="mono">{taskId}</Text>
+    : <Text emphasis="muted">Task unavailable ({taskId})</Text>
 }
 
 const runLink = (tasks: readonly Task[], taskId: string, runId: string, label: string, onOpen: OpenTarget) => {
   const task = tasks.find((candidate) => candidate.id === taskId)
   return task
     ? <Link onPress={() => onOpen(taskId, runId)}>{label}</Link>
-    : <Text emphasis="mono">{runId}</Text>
+    : <Text emphasis="muted">Run retained; task unavailable ({runId})</Text>
 }
 
 /** Explicit ancestor links for a child run. */

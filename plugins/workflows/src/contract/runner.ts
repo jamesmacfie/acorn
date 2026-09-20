@@ -1,3 +1,4 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { WorkflowDef } from '../shared/workflowContracts'
 
@@ -13,7 +14,7 @@ import type { WorkflowDef } from '../shared/workflowContracts'
 // declared surface rather than a deep import of server/workflowRunner.ts.
 type WorkflowInternalStartBase = {
   taskId: string
-  inputs?: Record<string, string>
+  inputs?: Record<string, DataValue>
   intendedRunId: string
   callerKey: string
   payloadFingerprint: string

@@ -23,7 +23,8 @@ type Handshake =
 const hostFunctionMode = (path: string): 'sync' | 'async' => {
   const sync = [
     /\.routes\.fetch$/,
-    /\.(schedules|collections|taskChecks|runs|audit)\.(register|declare|record)$/,
+    /\.(schedules|dataSources|taskChecks|runs|audit)\.(register|declare|record)$/,
+    /\.dataSources\.(register|discover)$/,
     /\.extensionPoints\.(declare|handle|handlers|open|contribute|entries)$/,
     /\.hooks\.(declare|handle)$/,
     /\.providers\.(integration|connection|nodes)$/,
@@ -143,7 +144,7 @@ export async function isolateNodePlugin(options: {
     ...[...write].map((path) => `--allow-fs-write=${path}`),
     // Node 26 added network permissions. The supported Node 24 line relies on the bootstrap's raw
     // module deny list and hostname-checking fetch wrapper instead.
-    ...(options.permissions.net.length && Number(process.versions.node.split('.')[0]) >= 26 ? ['--allow-net'] : []),
+    ...((options.permissions.net.length || options.permissions.sockets) && Number(process.versions.node.split('.')[0]) >= 26 ? ['--allow-net'] : []),
     ...(options.permissions.exec ? ['--allow-child-process'] : []),
   ]
   const { port1, port2 } = new MessageChannel()
@@ -157,6 +158,7 @@ export async function isolateNodePlugin(options: {
       databasePath: pluginDbPath(options.dataRoot, options.plugin),
       migrationsFolder: options.migrationsFolder,
       allowNetwork: options.permissions.net.length > 0,
+      allowSockets: options.permissions.sockets,
       networkHosts: [...options.permissions.net],
       allowExec: options.permissions.exec,
     },

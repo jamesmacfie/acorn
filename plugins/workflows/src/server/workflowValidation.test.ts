@@ -15,13 +15,26 @@ const catalog: WorkflowValidationCatalog = {
     BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 }
 
-const check = (def: WorkflowDef) => validateWorkflow({ ...def, steps: def.steps.map((step) => ({ profileId: 'claude-code', ...step })) }, catalog)
+const check = (def: WorkflowDef) => validateWorkflow({
+  ...def,
+  formatVersion: 2,
+  steps: def.steps.map((step, index) => ({
+    id: step.id ?? (/^[A-Za-z0-9][A-Za-z0-9:_-]*$/.test(step.name) ? step.name : `step-${index + 1}`),
+    profileId: 'claude-code',
+    ...step,
+  })),
+}, catalog)
 
 describe('a draft in progress', () => {
   // The editor creates a definition with no steps and draws what this reports in its footer. Storing
   // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
   it('reports a definition with no steps rather than being a shape the store refuses', () => {
     expect(check({ name: 'Untitled workflow', steps: [] })).toEqual(['workflow has no steps'])
+  })
+
+  it('reports the removed definition format with an actionable upgrade', () => {
+    expect(validateWorkflow({ name: 'Old workflow', steps: [{ name: 'work' }] }, catalog))
+      .toContain('Unsupported workflow format. Set formatVersion to 2 and give every step a stable id.')
   })
 })
 
@@ -83,7 +96,7 @@ describe('template references follow the graph, not the list', () => {
 
 describe('inputs', () => {
   it('refuses a reference to an input the definition does not declare', () => {
-    const problems = check({ name: 'w', inputs: [{ name: 'issue' }], steps: [{ name: 'a', prompt: '${inputs.issue} ${inputs.focus}' }] })
+    const problems = check({ name: 'w', inputs: [{ name: 'issue', schema: { type: 'string' } }], steps: [{ name: 'a', prompt: '${inputs.issue} ${inputs.focus}' }] })
     expect(problems).toEqual(["step 'a' references undeclared input 'focus'"])
   })
 
@@ -114,7 +127,7 @@ describe('runtime child workflow contracts', () => {
   it('accepts a single child and a mapped child whose bindings use declared sources', () => {
     const definition: WorkflowDef = {
       name: 'parent',
-      inputs: [{ name: 'ticket' }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' } }],
       steps: [
         { name: 'select', after: [], schema: { type: 'object' } },
         {
@@ -124,8 +137,8 @@ describe('runtime child workflow contracts', () => {
           childWorkflow: {
             ref: { source: 'database', id: 'review' },
             inputs: {
-              ticket: { from: 'input', name: 'ticket' },
-              result: { from: 'step', step: 'select', pointer: '/ticket' },
+              ticket: { address: { from: 'input', name: 'ticket', pointer: '' } },
+              result: { address: { from: 'step', stepId: 'select', pointer: '/ticket' } },
             },
           },
         },
@@ -135,11 +148,11 @@ describe('runtime child workflow contracts', () => {
           after: ['select'],
           childWorkflow: {
             ref: { source: 'repo', path: '.acorn/workflows/review.toml' },
-            inputs: { ticket: { from: 'item', pointer: '/number' } },
+            inputs: { ticket: { address: { from: 'item', pointer: '/number' } } },
           },
           items: { step: 'select', pointer: '/tickets' },
           itemKey: '/id',
-          title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'item', pointer: '/number' } } },
+          title: { template: 'Review ${ticket}', bindings: { ticket: { address: { from: 'item', pointer: '/number' } } } },
         },
       ],
     }
@@ -159,8 +172,8 @@ describe('runtime child workflow contracts', () => {
           childWorkflow: {
             ref: { source: 'repo', path: '../review.toml' },
             inputs: {
-              issue: { from: 'input', name: 'missing' },
-              data: { from: 'step', step: 'source', pointer: '/constructor/value' },
+              issue: { address: { from: 'input', name: 'missing', pointer: '' } },
+              data: { address: { from: 'step', stepId: 'source', pointer: '/constructor/value' } },
             },
           },
           items: { step: 'source', pointer: '/tickets' },
@@ -171,8 +184,7 @@ describe('runtime child workflow contracts', () => {
     })
     expect(problems).toContain("step 'dispatch' child_workflow.ref.path must name a file under .acorn/workflows")
     expect(problems).toContain("step 'dispatch' child_workflow.inputs.issue references undeclared input 'missing'")
-    expect(problems).toContain("step 'dispatch' child_workflow.inputs.data references 'source', which is not one of its predecessors")
-    expect(problems).toContain("step 'dispatch' child_workflow.inputs.data.pointer is not a safe JSON Pointer")
+    expect(problems).toContain("step 'dispatch' child_workflow.inputs.data is not a valid typed binding")
     expect(problems).toContain("step 'dispatch' items references 'source', which is not one of its predecessors")
     expect(problems).toContain("step 'dispatch' item_key is not a safe JSON Pointer")
     expect(problems).toContain("step 'dispatch' title references undeclared binding 'missing'")
@@ -264,14 +276,4 @@ describe('decide and join under the graph rule', () => {
     expect(problems.join('\n')).toContain("target 'beside' does not wait on step 'route'")
   })
 
-  it('refuses a join whose fan-out is not one of its predecessors', () => {
-    const problems = check({
-      name: 'w',
-      steps: [
-        { name: 'plan', kind: 'fan-out', after: [], childStep: { name: 'child' } },
-        { name: 'gather', kind: 'join', after: [], joins: 'plan' },
-      ],
-    })
-    expect(problems.join('\n')).toContain("joins 'plan', which is not a preceding fan-out")
-  })
 })

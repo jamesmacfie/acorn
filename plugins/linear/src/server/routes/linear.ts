@@ -5,7 +5,6 @@ import {
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
   type LinearNode,
-  myIssuesFilter,
   PROJECT_ISSUES_QUERY,
   projectIssuesFilter,
   projectIssueSearchFilter,
@@ -46,9 +45,7 @@ import type {
   LinearRailItemsResponse,
   LinearUploadResponse,
 } from '../../shared/api'
-import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
-import { LINEAR_ISSUES_COLLECTION_ID, linearIssuesCollection } from '../../shared/collections'
 import { linearRailItem } from '../../shared/rail'
 import { sortLinearIssues } from '../../shared/triage'
 import { linearSearchItems, type LinearSearchRow } from '../paletteSearch'
@@ -270,25 +267,6 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     // erasing it would be worse than the failure it reports.
     if (asked > 0 && failed === asked) return respondError(c, failure!.status, failure!.code)
     return c.json({ items: linearSearchItems(rows) })
-  })
-  // The declared collection's page (@acorn/protocol/collections.ts): the viewer's own active issues
-  // across every connected workspace, as typed records the host renders. Same degrade-quietly posture
-  // as the rail above, and the same exemption from serve-then-revalidate (docs/caching.md § Provider
-  // mirrors). The descriptor's `refresh` is the client-side half of LINEAR_ISSUES_STALE_AFTER_MS.
-  .get(`/collections/${LINEAR_ISSUES_COLLECTION_ID}`, async (c) => {
-    const connections = await linearConnections(c)
-    const issues: LinearProjectIssue[] = []
-    for (const { row, key } of connections) {
-      try {
-        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: myIssuesFilter() })
-        if (linearError(res)) continue
-        const { issues: found } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        issues.push(...found.nodes.map((node) => triageRow(row, node)))
-      } catch {
-        // Partial success is honest: one workspace failing must not erase another's rows.
-      }
-    }
-    return c.json(linearIssuesCollection(sortLinearIssues(issues)) satisfies PluginCollectionResponse)
   })
   // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
   // Stale identifiers are resolved across all connections; each result is cached under its connection.

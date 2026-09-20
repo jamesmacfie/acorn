@@ -19,12 +19,12 @@ const workflowTargetBlock = (
     lines.push('', 'Inputs:')
     lines.push(...target.inputs.map((input) => {
       const requirement = input.required && !input.hasDefault ? 'required' : input.hasDefault ? 'has a saved default' : 'optional'
-      return `- \`${input.name}\`, ${requirement}.${input.description ? ` ${input.description}` : ''}`
+      return `- \`${input.name}\`, ${requirement}.${input.description ? ` ${input.description}` : ''}${input.schema ? ` Schema: ${JSON.stringify(input.schema)}` : ''}`
     }))
   }
   if (includeSchemas && target.outputs?.length) {
     lines.push('', 'Terminal structured outputs:')
-    lines.push(...target.outputs.map((output) => `- \`${output.step}\`: ${JSON.stringify(output.schema)}`))
+    lines.push(...target.outputs.map((output) => `- \`${output.name ?? output.step}\`: ${JSON.stringify(output.schema)}`))
   }
   return lines.join('\n')
 }
@@ -44,10 +44,10 @@ export function renderWorkflowTargets(
     '',
     'A child input binding is one of these closed shapes:',
     '',
-    '- `{ "from": "literal", "value": "text" }`.',
-    '- `{ "from": "input", "name": "declaredParentInput" }`.',
-    '- `{ "from": "step", "step": "structured-predecessor", "pointer": "/field" }`.',
-    '- `{ "from": "item", "pointer": "/field" }`, only inside `workflow-map`.',
+    '- `{ "address": { "from": "literal", "value": 7 } }`.',
+    '- `{ "address": { "from": "input", "name": "declaredParentInput", "pointer": "" } }`.',
+    '- `{ "address": { "from": "step", "stepId": "structured-predecessor", "pointer": "/field" } }`.',
+    '- `{ "address": { "from": "item", "pointer": "/field" } }`, only inside `workflow-map`.',
     '',
     'A JSON Pointer starts with `/`, or is empty for the whole value. It never contains `__proto__`,',
     '`prototype`, or `constructor`. A step binding and a map source must name a transitive predecessor',
@@ -62,19 +62,21 @@ export function renderWorkflowTargets(
   const requiredInputs = first.inputs.filter((input) => input.required && !input.hasDefault)
   const singleBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(requiredInputs.map((input) => [
     input.name,
-    { from: 'input', name: input.name },
+    { address: { from: 'input', name: input.name, pointer: '' } },
   ]))
   const mapBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(requiredInputs.map((input) => [
     input.name,
-    { from: 'item', pointer: `/${input.name}` },
+    { address: { from: 'item', pointer: `/${input.name}` } },
   ]))
   const titleName = requiredInputs[0]?.name ?? 'id'
   const singleExample: WorkflowDef = {
+    formatVersion: 2,
     name: `Run ${first.name}`,
     ...(requiredInputs.length ? {
-      inputs: requiredInputs.map((input) => ({ name: input.name, required: true })),
+      inputs: requiredInputs.map((input) => ({ name: input.name, required: true, schema: input.schema ?? { type: 'string' } })),
     } : {}),
     steps: [{
+      id: 'run-child',
       name: 'run-child',
       kind: 'workflow',
       after: [],
@@ -85,9 +87,11 @@ export function renderWorkflowTargets(
     }],
   }
   const mapExample: WorkflowDef = {
+    formatVersion: 2,
     name: `Map ${first.name}`,
     steps: [
       {
+        id: 'select-items',
         name: 'select-items',
         after: [],
         prompt: 'Select the items to process.',
@@ -108,6 +112,7 @@ export function renderWorkflowTargets(
         },
       },
       {
+        id: 'run-for-each-item',
         name: 'run-for-each-item',
         kind: 'workflow-map',
         after: ['select-items'],
@@ -119,7 +124,7 @@ export function renderWorkflowTargets(
         },
         title: {
           template: `Process \${${titleName}}`,
-          bindings: { [titleName]: { from: 'item', pointer: `/${titleName}` } },
+          bindings: { [titleName]: { address: { from: 'item', pointer: `/${titleName}` } } },
         },
       },
     ],

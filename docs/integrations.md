@@ -1,5 +1,10 @@
 # Integrations
 
+Typed Linear and Rollbar query operations are documented in [typed data sources](./data-sources.md).
+Provider resource requests can set `requireFresh: true` to block on a refresh and return its failure.
+This mode refuses cached fallback, including when the connection needs authentication or is disabled.
+Ordinary resource reads and `force` refreshes retain their cache behavior.
+
 Integrations are Node-owned provider connections. The core integration registry stores provider
 identity, account metadata, scopes, capabilities, health, and encrypted credential references. The
 plugin that implements a provider contributes descriptors, validation, routes, and projections.

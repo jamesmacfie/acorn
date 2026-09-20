@@ -2,7 +2,6 @@ import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
 import { attentionRegistry, type AttentionSourceContribution } from '../rail/attention'
-import { collectionKey, collectionRegistry, type CollectionRegistration } from '../sources/collections'
 import { nodeStatRegistry, type NodeStatContribution } from '../rail/nodeStats'
 import { paneRegistry, type PaneRegistration } from '../panes/panes'
 import { refPanelRegistry, type RefPanelContribution } from '../panes/refPanels'
@@ -75,10 +74,6 @@ export type ClientPluginContext = {
   // Rows for the attention inbox: states on a node that need the owner, fetched per node
   // (docs/frontend.md § Shell state; registries/attention.ts).
   attentionSources: ClientContributionPoint<AttentionSourceContribution>
-  // A typed set of records a user can compose a panel over (docs/dashboards.md § Collections). The
-  // compiled feeder. A loaded plugin declares `collections` in its manifest and the descriptor pass
-  // builds the same contribution. `pluginId` and the registry id are bound here, not declared.
-  collections: ClientContributionPoint<CollectionRegistration>
   // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design.md §
   // Icons).
   brandMarks: ClientContributionPoint<BrandMark>
@@ -207,11 +202,6 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
       record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }, name))
     },
   }
-  const ownCollection: ClientContributionPoint<CollectionRegistration> = {
-    register: (entry) => {
-      record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }, name))
-    },
-  }
   return {
     name,
     panes: own<PaneRegistration>(paneRegistry),
@@ -233,7 +223,6 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     persistedStateSlices: own(persistedStateRegistry),
     nodeStats: own(nodeStatRegistry),
     attentionSources: own(attentionRegistry),
-    collections: ownCollection,
     brandMarks: own(brandMarkRegistry),
     contentLinks: own(contentLinkRegistry),
     // Straight through `own`, so a plugin-published registry gets the same ownership check and the

@@ -1,6 +1,6 @@
 # Workflow v2
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: slices 01–19 implemented; slice 20 acceptance remains.
 Code survey baseline: `8e006e6b`. Recheck cited code before implementing a slice.
 
 Make plugin data equally usable in dashboards and workflows without assuming that every record is
@@ -9,8 +9,8 @@ provide a readable authoring experience with complexity disclosed only when need
 
 This programme includes scheduling and supersedes the separate
 [scheduled workflows proposal](../scheduled_workflows/README.md). It builds on the shipped
-[workflow tasks](../workflow_tasks/README.md). These files describe proposed behavior, not shipped APIs.
-Writing this programme changes no application code and deletes no data.
+[workflow tasks](../workflow_tasks/README.md). The owning reference documents describe the shipped
+interfaces; this directory retains the design decisions, slice evidence, and final acceptance plan.
 
 ## Read first
 
@@ -32,7 +32,27 @@ engineer must be usable without the planning conversation. Do not copy contracts
 
 ## Implementation slices
 
-All slices are **not started**. Numbers are the default implementation order; prerequisites are
+Slices 01–09 are complete. Slice 10 is implemented with automated checks passing; its real-window
+verification remains blocked by the renderer startup issue recorded in its evidence. Slice 11 is
+complete, including automated and real-window authoring checks.
+Slice 12 is complete, including automated, real-window, and terminal-host evidence recorded in the
+slice. Slice 13 implementation is complete, with automated and real-window evidence recorded in the
+slice; connected-provider journeys and a live terminal capture remain acceptance checks. Slice 14 is
+complete, including typed dashboard publication, real-window composition, and terminal-host boundary
+evidence. Slice 15 implementation and automated checks are complete; its real-window checks through
+a configured API backend and text-only harness remain acceptance work. Slice 16 is complete, including
+controlled-clock, restart, race, continuation, migration, and architecture evidence. Slice 17's
+implementation and automated checks are complete, with real-window evidence for activation, status,
+timezone, retained-history, narrow, and keyboard flows; its live-provider and paired terminal checks
+remain slice-20 acceptance work. Slice 18 implementation and automated checks are complete, with
+real-window rail evidence recorded; its live-created record-table and disconnected-state journeys
+remain acceptance work. Slice 19 is complete: every remaining consumer uses Node-owned typed sources,
+the legacy collection and direct fan-out contracts are removed, and the versioned development-state
+transition is covered against copied fixture roots. Slice 20 remains the final acceptance pass.
+Implementation proceeds sequentially, with one phase agent at a time and a
+final review, documentation pass, and commit after acceptance.
+
+Numbers are the default implementation order; prerequisites are
 explicit so unrelated work is distinguishable from dependent work. Do not delegate unless requested.
 Each slice is one bounded handoff. If repository changes make it too large for one session, split
 the slice into linked children before implementation, preserving its acceptance boundary.

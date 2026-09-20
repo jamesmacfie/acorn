@@ -1,5 +1,7 @@
 import type { ToolRisk } from './api'
 import { z } from 'zod'
+import type { DataValue } from './dataValues'
+import type { DataSchema } from './dataSchemas'
 
 export type { ToolRisk }
 export type ToolCeiling = { allow?: string[]; maxRisk?: ToolRisk }
@@ -73,6 +75,10 @@ export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefi
 // A committed/user workflow definition as loadWorkflowFiles returns it (docs/workflows.md): what the
 // palette launches and the settings inspector lists. `source` is the layer it was found in.
 export type WorkflowDefSummary = {
+  publishedRevision?: number | null
+  maxDescendants?: number
+  maxConcurrency?: number
+  formatVersion?: 2
   id: string
   name: string
   // 'database' is a row the owner typed in the app rather than a file somebody committed
@@ -81,7 +87,7 @@ export type WorkflowDefSummary = {
   source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
   inputs?: WorkflowInput[]
-  steps: { name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+  steps: { id?: string; name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
   // The project this definition belongs to: the one whose checkout holds the file, or the one a row
   // is bound to. Null on a row that any project in the workspace may run.
   projectId?: string | null
@@ -93,6 +99,8 @@ export type WorkflowDefSummary = {
 // `WorkflowDef`; it is `unknown` here because that shape lives in plugins/workflows and protocol may
 // not depend on a plugin. The editor narrows it there.
 export type WorkflowDefRow = {
+  publishedRevision?: number | null
+  basePublishedRevision?: number | null
   id: string
   workspaceId: string
   projectId: string | null
@@ -101,22 +109,27 @@ export type WorkflowDefRow = {
   createdAt: number
   updatedAt: number
   def: unknown
+  /** The immutable revision Run will start. Omitted when this draft has never been published. */
+  publishedDef?: unknown
 }
 
 // A value a run is started with. The palette asks for one before it starts a definition that declares
 // any, and the editor lists them (docs/workflows.md § Execution model).
 export type WorkflowInput = {
+  connection?: { source: import('./dataSources').DataSourceRef }
   name: string
+  label?: string
+  schema?: DataSchema
   description?: string
   required?: boolean
-  default?: string
+  default?: DataValue
 }
 
 export type WorkflowRunRow = {
   id: string
   taskId: string
   name: string
-  status: 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled'
+  status: 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled'
   posture: string
   error: string | null
   createdAt: number
@@ -136,7 +149,7 @@ export type WorkflowStepRow = {
   mode: string
   profileId: string | null
   model: string | null
-  status: 'pending' | 'running' | 'waiting-gate' | 'waiting-children' | 'done' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
+  status: 'pending' | 'running' | 'waiting-gate' | 'waiting-children' | 'done' | 'completed-with-failures' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null
@@ -150,6 +163,6 @@ export type WorkflowStepRow = {
   // The bundle handed to the step: the rendered prompt, and `childTaskId` for a step the runner gave
   // its own task and checkout. The run pane reads the second to link to that task.
   inputsJson?: string | null
-  // Which fan-out step spawned this one, when one did. The run pane draws a child under its parent.
+  // Which dispatch step spawned this one, when one did. The run pane draws a child under its parent.
   parentStepId?: string | null
 }

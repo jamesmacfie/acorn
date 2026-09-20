@@ -1,8 +1,8 @@
 import type {
-  PluginCollectionField,
-  PluginCollectionRow,
-  PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+  DashboardDisplayField,
+  DashboardDisplayRow,
+  DashboardDisplaySchema,
+} from '@acorn/dashboards-core/display.ts'
 import type { PanelTone, PanelView } from '../model'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
@@ -14,18 +14,18 @@ export type PanelViewProps = {
    *  is a series the node stores per panel (dashboards/history.ts). Optional because nothing else
    *  needs it, and a view that draws only what it was handed stays testable. */
   panelId?: string
-  schema: PluginCollectionSchema
-  fields: PluginCollectionField[]
-  rows: PluginCollectionRow[]
+  schema: DashboardDisplaySchema
+  fields: DashboardDisplayField[]
+  rows: DashboardDisplayRow[]
   /** The shaping layer's group-by, which only the board draws with. It lives in shaping rather than
    *  in the view for the same reason the filters do, so it arrives the same way. */
   groupBy?: string
-  /** Draw each row's source. True only where the panel unions more than one collection: a badge that
+  /** Draw each row's source. True only where the panel unions more than one source: a badge that
    *  says "github" on every row of a github panel is furniture. No wire change was needed for it:
    *  rows already carry the host's `pluginId` stamp (views/Provenance.tsx). */
   provenance?: boolean
   /** Runs the row's own declared verb through the host dispatcher. Views never act themselves. */
-  onActivate: (row: PluginCollectionRow) => void
+  onActivate: (row: DashboardDisplayRow) => void
 }
 
 /** A panel tone as StatusDot's. The dashboards vocabulary comes off the wire, where a plugin says

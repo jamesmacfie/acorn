@@ -27,11 +27,12 @@ vi.mock('../tasks/taskBridge', () => ({
 const TASK: Task = { id: 'task-9', title: 'Fix it', branch: 'james/fix-it' } as Task
 
 const DEF: WorkflowDefSummary = {
+  formatVersion: 2,
   id: 'db:1',
   name: 'Investigate an issue',
   source: 'database',
   inputs: [{ name: 'issue', required: true }, { name: 'focus' }],
-  steps: [{ name: 'reproduce' }],
+  steps: [{ id: 'reproduce', name: 'reproduce' }],
 }
 
 let host: HTMLElement

@@ -21,7 +21,7 @@ import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 type NodeView = 'rows' | 'graph'
 const NODE_VIEW_KEY = 'plugin:workflows:runs:nodeView'
-const CHILD_TERMINAL = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
+const CHILD_TERMINAL = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 
 /** The list header: how many runs this task has. */
 export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
@@ -37,7 +37,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   }
 
   const runItems = createMemo(() => model.runs().map((run) => ({ key: run.id, label: run.name })))
-  const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.name })))
+  const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.step?.name ?? node.name })))
   const nodeFor = (key: string) => model.nodes().find((node) => (node.step?.id ?? `pending:${node.name}`) === key)
 
   const selectNode = (key: string): void => {

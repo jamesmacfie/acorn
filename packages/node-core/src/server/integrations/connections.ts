@@ -15,6 +15,9 @@ import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
 import { ProviderOperationError, type ProviderCredentials } from './types'
+import { resolvedConnectionCapabilities } from './connectionCapabilities'
+
+export { connectionHasCapability } from './connectionCapabilities'
 
 export type StoredConnection = typeof schema.integrations.$inferSelect
 
@@ -26,19 +29,6 @@ const json = <T>(raw: string, fallback: T): T => {
   }
 }
 
-const resolvedCapabilities = (
-  row: StoredConnection,
-  providers = connectionProviderRegistry,
-): Integration['capabilities'] => {
-  const declared = providers.get(row.provider)?.capabilities ?? {}
-  const defaults = Object.fromEntries(
-    Object.entries(declared)
-      .filter(([, value]) => value !== false && value !== undefined && value !== 'none')
-      .map(([capability]) => [capability, 'available' as const]),
-  )
-  return { ...defaults, ...json(row.capabilities, {}) }
-}
-
 export const connectionSummary = (row: StoredConnection): Integration => ({
   id: row.id,
   providerId: row.provider,
@@ -47,18 +37,12 @@ export const connectionSummary = (row: StoredConnection): Integration => ({
   authKind: row.authKind as Integration['authKind'],
   account: row.account ? json(row.account, null) : null,
   scopes: json(row.scopes, []),
-  capabilities: resolvedCapabilities(row),
+  capabilities: resolvedConnectionCapabilities(row),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
   lastValidatedAt: row.lastValidatedAt ?? undefined,
   lastError: (row.lastError as ProviderErrorCode | null) ?? undefined,
 })
-
-export const connectionHasCapability = (
-  row: StoredConnection,
-  capability: string,
-  providers = connectionProviderRegistry,
-): boolean => resolvedCapabilities(row, providers)[capability] === 'available'
 
 export async function listConnections(db: AppDatabase, userId: string): Promise<StoredConnection[]> {
   return db

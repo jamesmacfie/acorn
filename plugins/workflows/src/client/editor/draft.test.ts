@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import {
   addNode,
+  addForEach,
   applyJson,
   canConnect,
   connect,
@@ -9,6 +10,7 @@ import {
   effectiveAfter,
   graphOrder,
   missingRequiredFields,
+  moveNode,
   newDraft,
   pushUndo,
   removeNode,
@@ -23,13 +25,14 @@ import {
 // middle of a chain, wiring an edge back into its own past.
 
 const def = (): WorkflowDef => ({
+  formatVersion: 2,
   name: 'Investigate an issue',
-  inputs: [{ name: 'issue', required: true }],
+  inputs: [{ name: 'issue', schema: { type: 'string' }, required: true }],
   steps: [
-    { name: 'reproduce', after: [], prompt: 'Reproduce ${inputs.issue}' },
-    { name: 'recent-changes', after: [], kind: 'terminal:command', with: { command: 'git log' } },
-    { name: 'history', after: ['recent-changes'], prompt: 'Given ${steps.recent-changes.output}, why?' },
-    { name: 'synthesise', after: ['reproduce', 'history'], prompt: 'Both said: ${steps.reproduce.output}' },
+    { id: 'reproduce', name: 'Reproduce', after: [], prompt: 'Reproduce ${inputs.issue}' },
+    { id: 'recent-changes', name: 'Recent changes', after: [], kind: 'terminal:command', with: { command: 'git log' } },
+    { id: 'history', name: 'History', after: ['recent-changes'], prompt: 'Given ${steps.recent-changes.output}, why?' },
+    { id: 'synthesise', name: 'Synthesise', after: ['reproduce', 'history'], prompt: 'Both said: ${steps.reproduce.output}' },
   ],
 })
 
@@ -38,7 +41,7 @@ const draft = (selection?: WorkflowDraft['selection']): WorkflowDraft => ({
   ...(selection ? { selection } : {}),
 })
 
-const step = (current: WorkflowDraft, name: string) => current.def.steps.find((entry) => entry.name === name)
+const step = (current: WorkflowDraft, id: string) => current.def.steps.find((entry) => entry.id === id || (!entry.id && entry.name === id))
 
 describe('the graph a definition describes', () => {
   it('reads a missing `after` as the step declared before it, so an old file keeps its chain', () => {
@@ -71,12 +74,11 @@ describe('the graph a definition describes', () => {
 })
 
 describe('renaming a node', () => {
-  it('rewrites every reference and every `after` entry', () => {
-    const renamed = renameNode(draft(), 'recent-changes', 'git-log')
-    expect(step(renamed, 'history')?.after).toEqual(['git-log'])
-    expect(step(renamed, 'history')?.prompt).toBe('Given ${steps.git-log.output}, why?')
-    expect(renamed.def.steps.map((entry) => entry.name)).toContain('git-log')
-    expect(renamed.def.steps.map((entry) => entry.name)).not.toContain('recent-changes')
+  it('changes only the display name and preserves every stable reference', () => {
+    const renamed = renameNode(draft(), 'recent-changes', 'Git log')
+    expect(step(renamed, 'history')?.after).toEqual(['recent-changes'])
+    expect(step(renamed, 'history')?.prompt).toBe('Given ${steps.recent-changes.output}, why?')
+    expect(step(renamed, 'recent-changes')?.name).toBe('Git log')
   })
 
   it('rewrites a reference inside a `with` value as well as a prompt', () => {
@@ -87,7 +89,7 @@ describe('renaming a node', () => {
         { name: 'two', after: ['one'], kind: 'terminal:command', with: { command: 'echo ${steps.one.output}' } },
       ],
     })
-    expect(step(renameNode(start, 'one', 'first'), 'two')?.with?.command).toBe('echo ${steps.first.output}')
+    expect(step(renameNode(start, 'one', 'First'), 'two')?.with?.command).toBe('echo ${steps.one.output}')
   })
 
   it('rewrites structured binding and map-source references', () => {
@@ -114,20 +116,20 @@ describe('renaming a node', () => {
     })
     const renamed = renameNode(start, 'tickets', 'selected-tickets')
     const review = step(renamed, 'review')
-    expect(review?.items?.step).toBe('selected-tickets')
-    expect(review?.childWorkflow?.inputs?.ticket).toMatchObject({ step: 'selected-tickets' })
-    expect(review?.title?.bindings?.ticket).toMatchObject({ step: 'selected-tickets' })
+    expect(review?.items?.step).toBe('tickets')
+    expect(review?.childWorkflow?.inputs?.ticket).toMatchObject({ step: 'tickets' })
+    expect(review?.title?.bindings?.ticket).toMatchObject({ step: 'tickets' })
   })
 
   it('carries the selection with the node', () => {
     const renamed = renameNode(draft({ kind: 'node', name: 'history' }), 'history', 'why')
-    expect(renamed.selection).toEqual({ kind: 'node', name: 'why' })
+    expect(renamed.selection).toEqual({ kind: 'node', name: 'history' })
   })
 
-  it('refuses a duplicate and a name that is not slug-shaped, leaving the draft alone', () => {
+  it('allows duplicate human labels but refuses an empty one', () => {
     const start = draft()
-    expect(renameNode(start, 'history', 'reproduce')).toBe(start)
-    expect(renameNode(start, 'history', 'not a slug')).toBe(start)
+    expect(step(renameNode(start, 'history', 'Reproduce'), 'history')?.name).toBe('Reproduce')
+    expect(renameNode(start, 'history', '')).toBe(start)
   })
 })
 
@@ -137,7 +139,7 @@ describe('adding and deleting', () => {
     const last = added.def.steps[added.def.steps.length - 1]
     expect(last.after).toEqual(['history'])
     expect(last.kind).toBe('gate-human')
-    expect(added.selection).toEqual({ kind: 'node', name: last.name })
+    expect(added.selection).toEqual({ kind: 'node', name: last.id })
   })
 
   it('adds a root when nothing is selected', () => {
@@ -153,13 +155,27 @@ describe('adding and deleting', () => {
 
   it('detaches every edge and never bridges a predecessor to a successor', () => {
     const without = removeNode(draft(), 'history')
-    expect(without.def.steps.map((entry) => entry.name)).toEqual(['reproduce', 'recent-changes', 'synthesise'])
+    expect(without.def.steps.map((entry) => entry.name)).toEqual(['Reproduce', 'Recent changes', 'Synthesise'])
     // `synthesise` keeps `reproduce` and loses `history`. It does not gain `recent-changes`.
     expect(step(without, 'synthesise')?.after).toEqual(['reproduce'])
   })
 
   it('moves the selection off a node it just deleted', () => {
     expect(removeNode(draft({ kind: 'node', name: 'history' }), 'history').selection).toEqual({ kind: 'definition' })
+  })
+
+  it('adds a configured For each after Find records as one stable graph edit', () => {
+    const start = newDraft({ formatVersion: 2, name: 'records', steps: [{ id: 'find', name: 'Find', kind: 'find-records', after: [] }] })
+    const added = addForEach(start, 'find')
+    expect(added.def.steps.at(-1)).toEqual(expect.objectContaining({ kind: 'workflow-map', after: ['find'], items: { step: 'find', pointer: '/records' } }))
+    expect(added.def.steps.at(-1)?.id).toBeTruthy()
+  })
+
+  it('reorders declaration rows without changing the explicit graph', () => {
+    const moved = moveNode(draft(), 'history', -1)
+    expect(moved.def.steps.map(entry => entry.name)).toEqual(['Reproduce', 'History', 'Recent changes', 'Synthesise'])
+    expect(step(moved, 'history')?.after).toEqual(['recent-changes'])
+    expect(step(moved, 'synthesise')?.after).toEqual(['reproduce', 'history'])
   })
 })
 
@@ -197,10 +213,6 @@ describe('setting a field', () => {
     expect('prompt' in (step(cleared, 'reproduce') ?? {})).toBe(false)
   })
 
-  it('reaches a nested field, such as a fan-out child prompt', () => {
-    const nested = setField(draft(), 'reproduce', 'fan-out', 'childStep.prompt', 'Each one')
-    expect(step(nested, 'reproduce')?.childStep).toEqual({ prompt: 'Each one' })
-  })
 })
 
 describe('the JSON tab', () => {

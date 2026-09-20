@@ -80,7 +80,7 @@ export default function FieldControl(props: {
   value: unknown
   disabled?: boolean
   /** Static choices the editor knows and the description does not: the catalog's policies, the
-   *  harness profiles, the definition's own fan-out steps. */
+   *  harness profiles and workflow targets. */
   options?: readonly { value: string; label: string; description?: string }[]
   onChange: (value: unknown) => void
 }) {

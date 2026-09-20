@@ -1,6 +1,6 @@
 # Slice 12: Shared source/query editor and field picker
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-20. Status: complete.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./ux-authoring.md) and [verification](./verification.md).
@@ -36,8 +36,66 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implementation:
+
+- Client core owns one descriptor-driven `SourceQueryEditor`: source/saved-query selection, visible
+  connection scope, dependent parameters, searchable dynamic options, supported all/any groups,
+  typed operands, and explicit preview. Provider plugins contribute no forms.
+- The preview controller retains prior rows, tags them by query digest, ignores obsolete generations,
+  and keeps failed refreshes distinct from empty and incomplete results. Nested and observed record
+  fields render as bounded text.
+- `TypedBindingPicker` accepts admitted origins and a destination schema. It groups workflow inputs,
+  current record, and predecessor results; ranks exact, explicit-conversion, and incompatible paths;
+  labels missing examples and optional/observed paths; and supports typed fallback values.
+- Saved queries use the phase-05 client and recovery store. Shared edits autosave with revision checks;
+  conflicts retain local and remote versions. Customization creates an inline consumer copy.
+- Workflows consumes the shared query editor for `find-records` and the shared binding picker for
+  record bindings. The dashboard seam is the same exported component and protocol value, without
+  implementing phase 14.
+- One feature-owned kit seam selects DOM or terminal primitives. The controller, editor tree, query
+  rules, and binding compatibility stay single-source and the connected UI facade remains lazy.
+
+Automated checks on September 20, 2026:
+
+- `rtk pnpm --filter @acorn/client-core test src/features/dataSources`: five files, nine tests passed.
+- `rtk pnpm --filter @acorn/plugin-workflows test src/client/editor/NodeInspector.test.tsx`: one file,
+  12 tests passed.
+- `rtk pnpm --filter @acorn/protocol test src/dataSchemas.test.ts src/dataBindings.test.ts`: two files,
+  seven tests passed.
+- `rtk proxy env UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test src/surface.test.ts`: one test
+  passed and the additive facade snapshot was updated.
+- `rtk pnpm --filter @acorn/node-core test src/server/dataSources/runtime.test.ts`: one file,
+  18 tests passed.
+- `rtk pnpm --filter @acorn/plugin-api test src/surface.test.ts src/entrypoints.test.ts`: two files,
+  11 tests passed.
+- `rtk pnpm --filter @acorn/arch-tests test boundaries.test.ts`: one file, 52 tests passed.
+- `rtk pnpm --filter @acorn/tui test src/kit/kit.test.tsx`: one file, 115 tests passed and two skipped.
+- Focused TypeScript lint passed for protocol, node-core, client-core, plugin-api, workflows, TUI,
+  and architecture packages. `rtk pnpm lint` passed all 33 workspace lint tasks.
+
+Real-host evidence on September 20, 2026:
+
+- Installed the repository's `typed-source` conformance fixture into the isolated
+  `workflow-v2-phase12` data root, then launched `pnpm dev:agent -- --session
+  workflow-v2-phase12 --reuse`.
+- In the real Tauri workflow editor, **Find records** listed the unfamiliar **Nested records** source,
+  loaded its searchable Project options, and queried records only after **Refresh preview**. The
+  expanded row showed nested, missing, and observed fields. Changing Project to Closed retained the
+  row and displayed **Preview is out of date**.
+- Screenshots: `.acorn/agent-dev/workflow-v2-phase12/screenshots/source-query-editor.png`,
+  `nested-preview.png`, and `stale-preview.png`.
+- In the actual `acorn` terminal client, the same saved workflow opened in cells. Selecting
+  `find-records` rendered **Nested records**, Project **Closed**, **Add condition**, and the explicit
+  preview control. The first terminal pass exposed a DOM-kit leak (`Unknown component type: <div>`);
+  the feature-owned host-kit seam fixed it, and the repeated pass rendered without a pane failure.
+  The TUI and its standalone Node were stopped after inspection.
+
+The standalone `vite build` for the terminal host succeeds. Its broader `build` script currently
+reports the accumulated branch's eager startup closure at 1,147,549 bytes against a 1,130,000-byte
+budget. The phase-12 editor remains in the lazy workflow chunk, and this budget warning does not
+block the demonstrated slice outcome; it remains visible for the final programme audit.
+
+No phase-12 acceptance gap remains.
 
 ## Verify before building
 

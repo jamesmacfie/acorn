@@ -1,6 +1,6 @@
 # Refused alternatives
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented constraints; retained as the programme decision record.
 Context: [decisions and simplicity check](./context.md).
 
 | Excluded | Reason and revisit condition |

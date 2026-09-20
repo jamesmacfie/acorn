@@ -50,7 +50,7 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 | `capabilities` | Provide or resolve a named plugin API |
 | `events` | Subscribe to granted events and publish notifications |
 | `schedules`, `taskChecks`, `runs` | Register periodic work, archive checks, and run listings |
-| `providers`, `collections` | Register providers and data collections |
+| `providers`, `dataSources` | Register providers and Node-owned typed data sources |
 | `extensionPoints`, `hooks` | Accept contributions and run declared hooks |
 | `audit`, `telemetry`, `log` | Record actions and operational diagnostics |
 
@@ -68,7 +68,7 @@ database and unrestricted Node builtin access are unavailable. For the trust bou
 ## The client API
 
 Compiled clients use `ClientPluginContext` to register panes, rail sources, commands, settings,
-slots, extension points, collections, and other contributions. Loaded clients declare their
+slots, extension points, and other UI contributions. Loaded clients declare their
 contributions in the manifest and use the sandbox bridge at runtime.
 
 A remote tree names components in the shared kit. The host owns rendering, focus, and keyboard
@@ -125,7 +125,7 @@ verb in `emits` and the consumer grants the full channel. Missing producers emit
 
 First-party lifecycle broadcasts cover workflow runs and human gates, managed-agent turns,
 requests and session rosters, GitHub repositories and pull-request mirrors, browser-capture
-collections, local review-note counts, findings scope revisions, memory-library scopes, and resolved preview homes. The
+typed sources, local review-note counts, findings scope revisions, memory-library scopes, and resolved preview homes. The
 provider's `contract/` directory holds the matching read capability whenever a listener needs more
 than the event's safe state payload. Exact payloads and deliberate omissions are in
 [Forward compatibility](./plugins/forward-compatibility.md#shipped-first-party-lifecycle-events).

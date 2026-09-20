@@ -55,6 +55,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [findings.md](./findings.md) | Quiet task evidence, provenance, capture authority, history, and plugin collaboration contracts. |
 | [dashboards.md](./dashboards.md) | User-composed panels over typed record collections. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
+| [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
@@ -101,8 +102,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 ## Documentation ownership
 
-The [workflow v2 programme](./future/workflow_v2/README.md) owns the next workflow, shared data,
-dashboard-authoring, and scheduling implementation plan. It builds on the shipped
+The [workflow v2 programme](./future/workflow_v2/README.md) records the workflow, shared data,
+dashboard-authoring, and scheduling implementation through slice 19 and owns the remaining slice-20
+acceptance plan. It builds on the shipped
 [workflow tasks](./future/workflow_tasks/README.md) and supersedes the separate
 [scheduled workflows proposal](./future/scheduled_workflows/README.md).
 

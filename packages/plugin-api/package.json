@@ -11,6 +11,7 @@
     "./testkit/client": "./src/testkit/client.ts",
     "./client": "./src/client.ts",
     "./ui": "./src/ui/index.ts",
+    "./ui/data-sources": "./src/ui/data-sources.ts",
     "./ui/host": "./src/ui/host.ts",
     "./ui/tokens": "./src/ui/tokens.ts",
     "./ui/diff": "./src/ui/diff.ts",

@@ -1,6 +1,6 @@
 # AI authoring over discovered data
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented; provider-backed acceptance pending.
 Context: [decisions](./context.md). UI behavior is owned by [authoring UX](./ux-authoring.md).
 
 ## One source of facts
@@ -11,16 +11,16 @@ connection IDs, child targets, filter operators, or field types. Provider data i
 not authoring instructions or permission to broaden scope.
 
 Keep provider-backed and CLI text-generation backends working. The baseline generateText interface
-has no tool-call protocol. Implement a bounded feature-owned authoring loop whose model response is
-one of: request metadata operation, ask user clarification, or propose a candidate definition.
+has no tool-call protocol. The implementation uses a bounded feature-owned authoring loop whose model
+response is one of: request metadata operation, ask user clarification, or propose a candidate definition.
 Execute only validated allowlisted metadata requests on the Node, append their structured results,
 and ask the model again. This avoids requiring a different model transport or unrestricted managed
 agent session just to author a workflow.
 
 A direct tool-capable backend can adapt to the same requests later, without changing source APIs.
-Expose read-only source discovery/describe/options through the existing MCP/tool contribution
-projection for external authoring agents. The in-app generator calls the same service directly;
-it does not start a second MCP server. Task-scoped callers remain confined to granted scope.
+Read-only source listing, dynamic discovery, description, and option lookup use the existing MCP/tool
+contribution projection for external authoring agents. The in-app generator calls the same service
+directly. It does not start a second MCP server. Task-scoped callers remain confined to granted scope.
 
 ## Conversation state and operations
 

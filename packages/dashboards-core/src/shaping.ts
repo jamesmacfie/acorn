@@ -1,9 +1,9 @@
 import type {
-  PluginCollectionCell,
-  PluginCollectionField,
-  PluginCollectionRow,
-  PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+  DashboardDisplayCell,
+  DashboardDisplayField,
+  DashboardDisplayRow,
+  DashboardDisplaySchema,
+} from './display'
 import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } from './model'
 
 // The shaping layer: filter, sort, limit, visible-field projection, generic and identical for every
@@ -11,15 +11,15 @@ import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } 
 // an optional optimisation, and § The generated editor for why this logic is pure functions tested
 // outside the component.
 
-const fieldsById = (schema: PluginCollectionSchema): Map<string, PluginCollectionField> =>
+const fieldsById = (schema: DashboardDisplaySchema): Map<string, DashboardDisplayField> =>
   new Map(schema.fields.map((field) => [field.id, field]))
 
-const isBlank = (value: PluginCollectionCell | undefined): boolean => value === null || value === undefined || value === ''
+const isBlank = (value: DashboardDisplayCell | undefined): boolean => value === null || value === undefined || value === ''
 
 /** What a cell equals. `enum` keys off the declared value id, never its label: the label is the part a
  *  workspace gets to rename (plugins/linear/src/shared/collections.ts), so a filter written against it
  *  would break the day someone renamed a column. */
-const matchKey = (field: PluginCollectionField | undefined, value: PluginCollectionCell | undefined): string | number | null => {
+const matchKey = (field: DashboardDisplayField | undefined, value: DashboardDisplayCell | undefined): string | number | null => {
   if (isBlank(value)) return null
   switch (field?.type) {
     case 'number':
@@ -38,7 +38,7 @@ const matchKey = (field: PluginCollectionField | undefined, value: PluginCollect
  *  A plugin declares its values in the order the thing moves (draft, open, ready), so that order is
  *  real information and alphabetising it would throw it away. A value the schema never declared sorts
  *  after every one it did. */
-const sortKey = (field: PluginCollectionField | undefined, value: PluginCollectionCell | undefined): string | number | null => {
+const sortKey = (field: DashboardDisplayField | undefined, value: DashboardDisplayCell | undefined): string | number | null => {
   if (isBlank(value)) return null
   if (field?.type === 'enum' && field.values?.length) {
     const index = field.values.findIndex((declared) => declared.id === String(value))
@@ -63,7 +63,7 @@ const relational = (
   keep: (ordered: number) => boolean,
 ): boolean => cell !== null && wanted !== null && keep(compare(cell, wanted))
 
-const matches = (field: PluginCollectionField | undefined, cell: PluginCollectionCell | undefined, filter: PanelFilter): boolean => {
+const matches = (field: DashboardDisplayField | undefined, cell: DashboardDisplayCell | undefined, filter: PanelFilter): boolean => {
   switch (filter.op) {
     case 'is-empty':
       return isBlank(cell)
@@ -85,10 +85,10 @@ const matches = (field: PluginCollectionField | undefined, cell: PluginCollectio
 /** Filter, then sort, then limit, in that order. A limit applied before a sort is a random sample, and
  *  a filter applied after one is wasted work. */
 export function shapeRows(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   shaping: PanelShaping,
-): PluginCollectionRow[] {
+): DashboardDisplayRow[] {
   const fields = fieldsById(schema)
   const filters = shaping.filters ?? []
   // All-AND: a filter list is a narrowing, and anything that needs alternatives has outgrown the
@@ -126,7 +126,7 @@ export function shapeRows(
 
 /** The projection, in render order. A projected id the schema does not declare is dropped rather than
  *  retained: unknown-id survival is a persistence rule, and there is no column to draw. */
-export function visibleFields(schema: PluginCollectionSchema, shaping: PanelShaping): PluginCollectionField[] {
+export function visibleFields(schema: DashboardDisplaySchema, shaping: PanelShaping): DashboardDisplayField[] {
   if (!shaping.fields?.length) return [...schema.fields]
   const fields = fieldsById(schema)
   return shaping.fields.flatMap((id) => {
@@ -137,16 +137,16 @@ export function visibleFields(schema: PluginCollectionSchema, shaping: PanelShap
 
 /** What a list row leads with: the declared `title` role, then the first text field, then whatever
  *  there is. */
-export function titleField(schema: PluginCollectionSchema): PluginCollectionField | undefined {
+export function titleField(schema: DashboardDisplaySchema): DashboardDisplayField | undefined {
   return schema.fields.find((field) => field.role === 'title')
     ?? schema.fields.find((field) => field.type === 'text')
     ?? schema.fields[0]
 }
 
 export const fieldWithRole = (
-  schema: PluginCollectionSchema,
-  role: NonNullable<PluginCollectionField['role']>,
-): PluginCollectionField | undefined => schema.fields.find((field) => field.role === role)
+  schema: DashboardDisplaySchema,
+  role: NonNullable<DashboardDisplayField['role']>,
+): DashboardDisplayField | undefined => schema.fields.find((field) => field.role === role)
 
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
@@ -159,7 +159,7 @@ export const fieldWithRole = (
  *  eventually want, but it has no declared labels or tones, so it would need a synthesised pair of
  *  values that no other part of this layer has. Upgrade path: synthesise them here, where every
  *  caller already asks this one question. */
-export const groupableFields = (schema: PluginCollectionSchema): PluginCollectionField[] =>
+export const groupableFields = (schema: DashboardDisplaySchema): DashboardDisplayField[] =>
   schema.fields.filter((field) => field.type === 'enum')
 
 /** The field a board groups by: the panel's own choice when it still names a groupable field, then the
@@ -168,7 +168,7 @@ export const groupableFields = (schema: PluginCollectionSchema): PluginCollectio
  *  The fallbacks are for a definition whose grouped field the plugin has since renamed or dropped. A
  *  board that silently became one giant column would look like the data broke rather than the schema.
  *  The editor always writes `groupBy` explicitly, so nothing reaches them by default. */
-export function groupField(schema: PluginCollectionSchema, shaping: PanelShaping): PluginCollectionField | undefined {
+export function groupField(schema: DashboardDisplaySchema, shaping: PanelShaping): DashboardDisplayField | undefined {
   const groupable = groupableFields(schema)
   return groupable.find((field) => field.id === shaping.groupBy)
     ?? groupable.find((field) => field.role === 'status')
@@ -186,7 +186,7 @@ export type PanelBoardColumn = {
   /** False for a value the schema never declared, and for the catch-all. Those two cannot be pre-toned
    *  or pre-ordered, and a view may want to say so. */
   declared: boolean
-  rows: PluginCollectionRow[]
+  rows: DashboardDisplayRow[]
 }
 
 /** The columns of a board, in the order they are drawn. Three destinations, and every row lands in
@@ -197,14 +197,14 @@ export type PanelBoardColumn = {
  *  ones, and a query-shaped collection cannot always know its values ahead of the data
  *  (@acorn/protocol/collections.ts), so that is the ordinary case there and schema drift here. */
 export function boardColumns(
-  rows: readonly PluginCollectionRow[],
-  field: PluginCollectionField,
+  rows: readonly DashboardDisplayRow[],
+  field: DashboardDisplayField,
 ): PanelBoardColumn[] {
   const declared = field.values ?? []
-  const buckets = new Map<string, PluginCollectionRow[]>(declared.map((value) => [value.id, []]))
+  const buckets = new Map<string, DashboardDisplayRow[]>(declared.map((value) => [value.id, []]))
   const order = declared.map((value) => value.id)
   const byId = new Map(declared.map((value) => [value.id, value]))
-  const ungrouped: PluginCollectionRow[] = []
+  const ungrouped: DashboardDisplayRow[] = []
 
   for (const row of rows) {
     const cell = row.values[field.id]
@@ -249,8 +249,8 @@ const AGGREGATORS: Record<Exclude<PanelAggregate, 'count'>, (values: number[]) =
  *  an aggregate over a field that is not there or holds no numbers. The view renders an em dash, the
  *  same "no answer" a fleet card shows, rather than a fabricated 0. */
 export function aggregateRows(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   view: PanelView,
 ): number | null {
   const aggregate = view.aggregate ?? 'count'

@@ -1,176 +1,77 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { and, eq } from 'drizzle-orm'
-import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
+import { describe, expect, it } from 'vitest'
+import type { DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
 import { memoryIdentityStore } from '../activeIdentity'
-import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testEnv } from '../../testkit/db'
 import { schema } from '../db'
-import { CapabilityRegistry } from '../pluginHost/capabilities'
-import { clearRegistrations, initPlugins } from '../pluginHost/host'
-import type { NodePlugin } from '../pluginHost/types'
+import { registerCoreDataSource } from '../dataSources/registry'
+import { dashboardStore } from './store'
 import { readSeries } from './history'
 import { definedPanelIds, panelsToSample, runSamplePass } from './sampler'
 
-// `core:sample-measures`, end to end and with no client anywhere: prefs blob in, samples out.
-//
-// The point of doing it this way rather than against a stubbed reader is that the two seams are the
-// risky part. The pass reads through the real node-side collection registry, over a real in-process
-// plugin route, and computes the measure with the same shared pipeline the stat renders with.
-
-const PLUGIN = 'acme'
 const OWNER = 'owner-1'
-
-const panel = (overrides: Partial<PanelDefinition> = {}): PanelDefinition => ({
-  id: 'p1',
-  title: 'Open issues',
-  queries: [{ pluginId: PLUGIN, collectionId: 'issues' }],
-  shaping: {},
-  view: { kind: 'stat', trend: 'history' },
-  ...overrides,
-})
-
-const blob = (panels: PanelDefinition[], placed = panels.map((p) => p.id)) => ({
-  panels: Object.fromEntries(panels.map((p) => [p.id, p])),
-  placements: { home: placed },
-  layouts: {},
-})
-
-const rows = (points: number[]) => ({
-  schema: { fields: [{ id: 'points', name: 'Points', type: 'number' as const }, { id: 'state', name: 'State', type: 'enum' as const, values: [{ id: 'open', label: 'Open' }, { id: 'done', label: 'Done' }] }] },
-  rows: points.map((value, index) => ({ id: `r${index}`, values: { points: value, state: index % 2 ? 'done' : 'open' } })),
-})
-
-afterEach(() => clearRegistrations(PLUGIN))
-
-async function world(prefs: unknown, answer: () => Response) {
-  const core = makeTestDb()
-  const capabilities = new CapabilityRegistry()
-  const env = testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore(OWNER) })
-  if (prefs !== undefined) {
-    await core.db.insert(schema.prefs).values({ userId: OWNER, key: 'dashboards', value: JSON.stringify(prefs) })
-  }
-  const plugin: NodePlugin = {
-    name: PLUGIN,
-    init: (ctx) => {
-      ctx.routes.fetch(() => answer(), { prefix: '/collections' })
-      ctx.collections.register({ collectionId: 'issues', items: `/v2/p/${PLUGIN}/collections/issues` })
-    },
-  }
-  await initPlugins([plugin], {
-    capabilities,
-    core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(OWNER) }),
-    env,
-    dataDir: '',
-  })
-  return { core, env }
+const scope = { workspaceId: 'workspace-1' }
+const content: DashboardPanelContent = {
+  title: 'Open records',
+  queries: [{
+    id: 'records', label: 'Records', reference: { kind: 'inline', bindings: {}, content: {
+      name: 'Records', parameters: { type: 'object', properties: {}, additionalProperties: false },
+      sourceParameters: {}, query: { source: { pluginId: 'core', sourceId: 'records' }, scope: { ...scope, parameters: {} }, sort: [] },
+    } },
+  }],
+  mapping: { columns: [], fields: {}, values: {}, unmapped: 'catch-all' },
+  display: { view: { kind: 'stat', trend: 'history' }, fields: [] },
 }
 
-describe('which panels a pass looks at', () => {
-  it('takes history-trend panels that are placed, and nothing else', () => {
-    const wanted = panel({ id: 'wanted' })
-    const activity = panel({ id: 'activity', view: { kind: 'stat', trend: 'activity' } })
-    const plain = panel({ id: 'plain', view: { kind: 'stat' } })
-    const unplaced = panel({ id: 'unplaced' })
-    const prefs = blob([wanted, activity, plain, unplaced], ['wanted', 'activity', 'plain'])
-    // `activity` needs no store and `plain` asked for no trend; `unplaced` is defined but nothing
-    // renders it (docs/dashboards.md § Sampling and retention).
-    expect(panelsToSample(prefs).map((p) => p.id)).toEqual(['wanted'])
-    // Compaction's live set differs from the placed set: unplacing must not delete history
-    // (docs/dashboards.md § Sampling and retention).
-    expect([...definedPanelIds(prefs)].sort()).toEqual(['activity', 'plain', 'unplaced', 'wanted'])
-  })
-
-  it('finds nothing in a blob it could not read, rather than throwing', () => {
-    expect(panelsToSample(null)).toEqual([])
-    expect(panelsToSample('not a blob')).toEqual([])
-  })
+const blob = (dashboardId: string) => ({
+  version: 2,
+  panels: { p1: { id: 'p1', title: content.title, sources: [], shaping: {}, view: content.display.view, publication: { dashboardId } } },
+  placements: { home: ['p1'] }, layouts: {},
 })
 
-describe('a sampling pass', () => {
-  it('records the panel’s measure with no client attached', async () => {
-    const { core, env } = await world(blob([panel()]), () => Response.json(rows([3, 4, 5])))
-    try {
-      const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-      expect(result).toMatchObject({ sampled: 1, skipped: [] })
-      // Default aggregate is `count`, which is why a stat over a collection with no number field
-      // still draws, and still samples.
-      expect((await readSeries(core.db, 'p1')).samples.map((s) => s.value)).toEqual([3])
-    } finally {
-      core.cleanup()
-    }
+registerCoreDataSource({
+  sourceId: 'records', name: 'Records', singular: 'Record', plural: 'Records', identityScope: 'fixture',
+}, request => request.operation === 'describe'
+  ? {
+    revision: '1', schema: { type: 'object', properties: { points: { type: 'number' } }, required: ['points'], additionalProperties: false },
+    fields: [{ pointer: '/points', label: 'Points', origin: 'declared', display: { kind: 'number' } }],
+    parameters: { type: 'object', properties: {}, additionalProperties: false }, parameterFields: [],
+    operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] }, consistency: 'fixture',
+  }
+  : request.operation === 'query'
+    ? { records: [1, 2, 3].map(value => ({ recordId: String(value), data: { points: value } })), completeness: { kind: 'complete' }, revision: '1', readTime: request.evaluationTime }
+    : {})
+
+describe('dashboard measure sampler', () => {
+  it('selects only placed published history panels', () => {
+    const prefs = blob('dashboard-1')
+    expect(panelsToSample(prefs).map(panel => panel.id)).toEqual(['p1'])
+    expect([...definedPanelIds(prefs)]).toEqual(['p1'])
+    expect(panelsToSample({ ...prefs, version: 1 })).toEqual([])
   })
 
-  it('computes the SAME number the panel renders — filters, then the aggregate', async () => {
-    const definition = panel({
-      shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] },
-      view: { kind: 'stat', trend: 'history', aggregate: 'sum', field: 'points' },
-    })
-    const { core, env } = await world(blob([definition]), () => Response.json(rows([10, 99, 5])))
+  it('resolves the immutable dashboard and shared Node source with no client attached', async () => {
+    const core = makeTestDb()
+    const env = testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore(OWNER) })
     try {
-      await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-      // Rows 0 and 2 are `open`; row 1 is `done` and is filtered out before the sum.
-      expect((await readSeries(core.db, 'p1')).samples.map((s) => s.value)).toEqual([15])
-    } finally {
-      core.cleanup()
-    }
+      await core.db.insert(schema.workspaces).values({
+        id: scope.workspaceId, name: 'Workspace', isDefault: true, sort: 0,
+        createdAt: 1, updatedAt: 1,
+      })
+      const store = dashboardStore(core.db)
+      const draft = store.create(scope, content)
+      store.publish(scope, draft.id, draft.draftRevision)
+      await core.db.insert(schema.prefs).values({ userId: OWNER, key: 'dashboards', value: JSON.stringify(blob(draft.id)) })
+      expect(await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)).toMatchObject({ sampled: 1, skipped: [] })
+      expect((await readSeries(core.db, 'p1')).samples.map(sample => sample.value)).toEqual([3])
+    } finally { core.cleanup() }
   })
 
-  it('skips a panel whose source could not answer, and says which', async () => {
-    const { core, env } = await world(blob([panel()]), () => new Response('rate limited', { status: 429 }))
+  it('reports an unavailable publication without inventing a zero', async () => {
+    const core = makeTestDb()
+    const env = testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore(OWNER) })
     try {
-      const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-      // A partial union measures availability, not data (docs/dashboards.md § Sampling and
-      // retention).
-      expect(result.sampled).toBe(0)
-      expect(result.skipped).toEqual([{ panelId: 'p1', reason: 'acme unavailable' }])
-      expect((await readSeries(core.db, 'p1')).samples).toEqual([])
-    } finally {
-      core.cleanup()
-    }
-  })
-
-  it('records nothing rather than a zero when there is no measure', async () => {
-    const definition = panel({ view: { kind: 'stat', trend: 'history', aggregate: 'avg', field: 'nonexistent' } })
-    const { core, env } = await world(blob([definition]), () => Response.json(rows([1, 2])))
-    try {
-      const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-      expect(result.skipped).toEqual([{ panelId: 'p1', reason: 'no measure' }])
-      expect((await readSeries(core.db, 'p1')).samples).toEqual([])
-    } finally {
-      core.cleanup()
-    }
-  })
-
-  it('resets the series when the panel’s meaning changed between passes', async () => {
-    const before = panel()
-    const { core, env } = await world(blob([before]), () => Response.json(rows([1, 2, 3])))
-    try {
-      await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-
-      // Same panel id, a filter added (docs/dashboards.md § Sampling and retention: a filter change
-      // resets the series).
-      const after = panel({ shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] } })
-      await core.db
-        .update(schema.prefs)
-        .set({ value: JSON.stringify(blob([after])) })
-        .where(and(eq(schema.prefs.userId, OWNER), eq(schema.prefs.key, 'dashboards')))
-
-      const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000 + 3_600_000)
-      expect(result.reset).toBe(1)
-      const series = await readSeries(core.db, 'p1')
-      // Two rows of three are `open`, and the old bucket is gone rather than sitting beside the new one.
-      expect(series.samples.map((s) => s.value)).toEqual([2])
-    } finally {
-      core.cleanup()
-    }
-  })
-
-  it('does nothing at all when the node has no dashboards blob', async () => {
-    const { core, env } = await world(undefined, () => Response.json(rows([1])))
-    try {
-      expect(await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)).toMatchObject({ sampled: 0, skipped: [] })
-    } finally {
-      core.cleanup()
-    }
+      await core.db.insert(schema.prefs).values({ userId: OWNER, key: 'dashboards', value: JSON.stringify(blob('missing')) })
+      expect(await runSamplePass(core.db, env, AbortSignal.timeout(5_000))).toMatchObject({ sampled: 0, skipped: [{ panelId: 'p1', reason: 'published dashboard unavailable' }] })
+    } finally { core.cleanup() }
   })
 })

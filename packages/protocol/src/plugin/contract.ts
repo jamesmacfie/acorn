@@ -6,7 +6,8 @@
 // the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
-import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from '../collections.ts'
+import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../dataSourceContributions.ts'
+import { dashboardViewKinds } from '../dashboardViews.ts'
 import {
   commandSettingOptionSchema,
   MAX_COMMAND_SEARCH_MIN_QUERY,
@@ -59,6 +60,9 @@ const nodePermissions = z.object({
   exec: z.boolean().default(false),
   // Egress hosts enforced by the worker bootstrap's fetch wrapper and raw-socket deny list.
   net: z.array(z.string().min(1)).max(64).default([]),
+  // Unrestricted socket access for protocols that cannot use the hostname-scoped fetch broker.
+  // This is intentionally separate from `net`: it is a broad, high-risk grant.
+  sockets: z.boolean().default(false),
   // Explicit parent-environment values the worker may inherit. The default worker environment is the
   // process broker's credential-free base allowlist.
   env: z.array(nodeEnvironmentName).max(32).optional(),
@@ -253,7 +257,7 @@ const chromeAction = z.discriminatedUnion('verb', [
   // as a pane intent (client-core/host/registries/commands/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   // Go to the task the click names and stop there, for a row whose thing IS a task. Only a dashboard
-  // row carries one (@acorn/protocol/collections.ts), so elsewhere the host refuses it out loud.
+  // row carries one, so elsewhere the host refuses it out loud.
   z.object({ verb: z.literal('openTask') }),
   // A project-scoped pane the same manifest declares, reached by navigating to the route declared for
   // it. Separate from `openPane` because `openPane` mutates a task's persisted layout and this changes
@@ -285,7 +289,7 @@ const refresh = z.number().int().min(30).max(86_400).optional()
 // has neither in scope.
 const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
-  // Go to a task and stop there. Only a dashboard row carries the task it means (collections.ts), so
+  // Go to a task and stop there. Only a dashboard record carries the task it means, so
   // from a command or a badge this verb has nothing to aim at and the host says so.
   z.object({ verb: z.literal('openTask') }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
@@ -324,22 +328,21 @@ const emptyStateDescriptor = z.object({
 // because a manifest-derived roster row is untrusted wire.
 // See docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension points.
 const panelRegion = z.object({
-  // Which collections a panel here may be composed over. Absent means this plugin's own; present, it's
-  // an explicit list of `<pluginId>:<collectionId>`. Not validated against a registry, so a reference
-  // to a collection that isn't installed matches nothing.
-  collections: z.array(z.string().min(1).max(130)).max(16).optional(),
-  // Or, instead of a list, "any collection carrying a field with this role". `status` admits every
+  // Which sources a panel here may be composed over. Absent means this plugin's own; present, it's
+  // an explicit list of `<pluginId>:<sourceId>`. References remain stable while providers are absent.
+  sources: z.array(z.string().min(1).max(200)).max(16).optional(),
+  // Or, instead of a list, "any source carrying a field with this role". `status` admits every
   // provider that declares a status-role field, including ones installed after this manifest.
-  fieldRole: z.enum(COLLECTION_FIELD_ROLES).optional(),
+  fieldRole: z.enum(['title', 'status', 'assignee', 'url', 'updated']).optional(),
   // Which views may be composed here. Absent means all of them.
-  views: z.array(z.enum(PANEL_VIEW_KINDS)).min(1).max(PANEL_VIEW_KINDS.length).optional(),
+  views: z.array(z.enum(dashboardViewKinds)).min(1).max(dashboardViewKinds.length).optional(),
   // How many panels fit. A region is a corner of somebody else's surface, so the owner sets a ceiling.
   max: z.number().int().min(1).max(12).default(4),
 }).superRefine((region, ctx) => {
   // A list and a role requirement answer the same question two ways, so honouring both would mean
   // inventing an and/or the declaration doesn't state.
-  if (region.collections && region.fieldRole) {
-    ctx.addIssue({ code: 'custom', path: ['fieldRole'], message: 'a panel region names collections or a fieldRole, never both' })
+  if (region.sources && region.fieldRole) {
+    ctx.addIssue({ code: 'custom', path: ['fieldRole'], message: 'a panel region names sources or a fieldRole, never both' })
   }
 })
 
@@ -438,7 +441,7 @@ const extensionPointDescriptor = z.object({
   surface: z.string().min(1).max(64).optional(),
   // `pane.aside` only, checked in node-core/server/plugins/manifest.ts. The aside's contributor is the
   // user rather than another plugin, so it needs composition constraints rather than a route to read.
-  // Absent means the defaults: this plugin's own collections, every view, four panels.
+  // Absent means the defaults: this plugin's own sources, every view, four panels.
   panels: panelRegion.optional(),
   // `annotation` only, and required there: what the owner's items are keyed by. The host mints a
   // lookup string from these fields in this order, so the key set is the owner's and not whatever a
@@ -774,22 +777,6 @@ const refResolverDescriptor = z.object({
   resolve: pluginRoute,
 })
 
-// A typed set of records the host draws with its own components (@acorn/protocol/collections.ts holds
-// the response schema). `(id, plugin id)` is the universal reference, which is what lets a placement
-// outlive the plugin being disabled and reinstalled. See docs/dashboards.md § Collections.
-const collectionDescriptor = z.object({
-  id: z.string().min(1).max(64),
-  name: z.string().min(1).max(80),
-  // GET ?<declared params> → { schema, rows }
-  items: pluginRoute,
-  params: collectionParamsSchema.optional(),
-  // The static promise about what `items` returns, so a panel editor can offer views before any data
-  // exists. Optional because a query-shaped collection, such as a saved SQL statement, can't know its
-  // columns at manifest time. The response self-describes either way.
-  schema: collectionSchema.optional(),
-  refresh,
-})
-
 // Periodic work the node runs for this plugin, with no client open. The pair to
 // `ctx.schedules.register`: two feeders, one registry, indistinguishable downstream. A manifest is also
 // how the owner is told, because a schedule acts while nobody is watching. See docs/schedules.md.
@@ -990,7 +977,8 @@ const contributionsShape = z.looseObject({
   // integration, not four, and the old caps were sized for rows alone.
   extensionPoints: z.array(extensionPointDescriptor).max(16).default([]),
   extensions: z.array(extensionDescriptor).max(16).default([]),
-  collections: z.array(collectionDescriptor).max(8).default([]),
+  dataSources: z.array(dataSourceRegistrationSchema).max(32).optional(),
+  dataSourceDiscoveries: z.array(dataSourceDiscoverySchema).max(8).optional(),
   schedules: z.array(scheduleDescriptor).max(4).default([]),
   taskChecks: z.array(taskCheckDescriptor).max(4).default([]),
   // Audit verbs. The ctx twin is `ctx.audit`, and both feeders land in the same registry.
@@ -1256,7 +1244,6 @@ export type PluginExtensionDescriptor = Omit<z.infer<typeof extensionDescriptor>
   mode?: string
   priority?: number
 }
-export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
@@ -1283,7 +1270,8 @@ export type PluginContributions = {
   contextMenus?: PluginContextMenuDescriptor[]
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
-  collections?: PluginCollectionDescriptor[]
+  dataSources?: import('../dataSources').DataSourceRegistration[]
+  dataSourceDiscoveries?: import('../dataSources').DataSourceDiscovery[]
   schedules?: PluginScheduleDescriptor[]
   taskChecks?: PluginTaskCheckDescriptor[]
   auditActions?: PluginAuditActionDescriptor[]

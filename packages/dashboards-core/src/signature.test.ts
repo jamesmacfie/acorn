@@ -5,7 +5,7 @@ import { measureSignature, stableStringify } from './signature'
 const panel = (overrides: Partial<PanelDefinition> = {}): PanelDefinition => ({
   id: 'p1',
   title: 'Open pull requests',
-  queries: [{ pluginId: 'github', collectionId: 'pulls-mine' }],
+  sources: [{ pluginId: 'github', sourceId: 'pulls-mine' }],
   shaping: {},
   view: { kind: 'stat', trend: 'history' },
   ...overrides,
@@ -36,11 +36,11 @@ describe('what resets a series and what does not', () => {
     expect(measureSignature(panel({ shaping: { sort: [{ field: 'updated', direction: 'desc' }], limit: 5 } }))).toBe(base)
   })
 
-  it('resets on a filter, a query, a param, a mapping or the measure itself', () => {
+  it('resets on a filter, a source projection, a mapping or the measure itself', () => {
     const base = measureSignature(panel())
     expect(measureSignature(panel({ shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] } }))).not.toBe(base)
-    expect(measureSignature(panel({ queries: [{ pluginId: 'linear', collectionId: 'pulls-mine' }] }))).not.toBe(base)
-    expect(measureSignature(panel({ queries: [{ pluginId: 'github', collectionId: 'pulls-mine', params: { repo: 'acorn' } }] }))).not.toBe(base)
+    expect(measureSignature(panel({ sources: [{ pluginId: 'linear', sourceId: 'pulls-mine' }] }))).not.toBe(base)
+    expect(measureSignature(panel({ sources: [{ pluginId: 'github', sourceId: 'pulls-mine@second-query' }] }))).not.toBe(base)
     expect(measureSignature(panel({ mapping: { unmapped: 'hidden' } }))).not.toBe(base)
     expect(measureSignature(panel({ view: { kind: 'stat', aggregate: 'sum', field: 'additions' } }))).not.toBe(base)
   })

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
-import { nextRunAt } from './cadence'
+import { nextRunAt, nextRunAtInTimezone } from './cadence'
 import { type Clock, Scheduler } from './scheduler'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
 import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../telemetry/collector'
@@ -294,21 +294,31 @@ describe('scheduler', () => {
   it('deletes a user schedule and refuses to delete a declared one', async () => {
     const time = fakeClock()
     const scheduler = new Scheduler(test.db, { clock: time.clock })
+    const contexts: unknown[] = []
+    let removed = false
     scheduler.register({ key: 'core:sample', name: 'Sample', cadence: { every: 60 }, run: async () => {} })
     scheduler.registerTarget({
       kind: 'noop',
       risk: () => 'read',
       parse: (target) => target,
-      run: async () => 'did nothing',
+      run: async (_target, _signal, _consent, context) => {
+        contexts.push(context)
+        return 'did nothing'
+      },
+      remove: async () => void (removed = true),
     })
     await scheduler.start()
 
     const created = await scheduler.create({ name: 'Mine', kind: 'noop', target: { a: 1 }, cadence: { every: 3600 } })
     expect(created).toMatchObject({ owner: 'user', registered: true, risk: 'read' })
-    expect(await scheduler.runNow(created.key)).toMatchObject({ status: 'ok', detail: 'did nothing' })
+    await scheduler.patch(created.key, { enabled: false })
+    // Pausing suppresses timer admission. It does not turn Run now into Resume or cancellation.
+    expect(await scheduler.runNow(created.key, 'same-click')).toMatchObject({ status: 'ok', detail: 'did nothing' })
+    expect(contexts).toEqual([{ scheduleKey: created.key, reason: 'manual', requestKey: 'same-click' }])
 
     await expect(scheduler.remove('core:sample')).rejects.toThrow(/cannot be deleted/)
     await scheduler.remove(created.key)
+    expect(removed).toBe(true)
     expect((await scheduler.list()).some((row) => row.key === created.key)).toBe(false)
     await scheduler.stop()
   })
@@ -321,6 +331,22 @@ describe('scheduler', () => {
     for (let i = 0; i < 25; i++) await time.advance(60_000)
     expect(await scheduler.runs('core:sample')).toHaveLength(20)
     await scheduler.stop()
+  })
+})
+
+describe('target calendar timezones', () => {
+  it('skips a nonexistent local time at the daylight-saving gap', () => {
+    const from = Date.parse('2026-09-26T12:00:00Z')
+    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, from, 'Pacific/Auckland')).toISOString())
+      .toBe('2026-09-27T13:30:00.000Z')
+  })
+
+  it('chooses the first repeated local time once at the daylight-saving fold', () => {
+    const from = Date.parse('2026-04-04T12:00:00Z')
+    const first = nextRunAtInTimezone({ daily: '02:30' }, from, 'Pacific/Auckland')
+    expect(new Date(first).toISOString()).toBe('2026-04-04T13:30:00.000Z')
+    expect(new Date(nextRunAtInTimezone({ daily: '02:30' }, first, 'Pacific/Auckland')).toISOString())
+      .toBe('2026-04-05T14:30:00.000Z')
   })
 })
 

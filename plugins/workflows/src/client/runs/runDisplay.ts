@@ -9,9 +9,9 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted'
 
-const STEP_GLYPH: Record<string, string> = { pending: 'circle-dashed', running: 'loader-circle', 'waiting-gate': 'hand', done: 'circle-check', failed: 'circle-x', 'safety-rail': 'octagon-alert', skipped: 'circle-dashed', cancelled: 'ban' }
-const STEP_TONE: Record<string, Tone> = { running: 'ok', 'waiting-gate': 'warn', done: 'ok', failed: 'danger', 'safety-rail': 'danger' }
-const RUN_GLYPH: Record<string, string> = { running: 'loader-circle', gated: 'hand', cancelling: 'ban', done: 'circle-check', failed: 'circle-x', 'safety-rail': 'octagon-alert', cancelled: 'ban' }
+const STEP_GLYPH: Record<string, string> = { pending: 'circle-dashed', running: 'loader-circle', 'waiting-gate': 'hand', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', skipped: 'circle-dashed', cancelled: 'ban' }
+const STEP_TONE: Record<string, Tone> = { running: 'ok', 'waiting-gate': 'warn', done: 'ok', 'completed-with-failures': 'warn', failed: 'danger', 'safety-rail': 'danger' }
+const RUN_GLYPH: Record<string, string> = { running: 'loader-circle', gated: 'hand', cancelling: 'ban', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', cancelled: 'ban' }
 
 export const stepGlyph = (status: string | undefined): string => STEP_GLYPH[status ?? 'pending'] ?? 'circle-dashed'
 export const stepTone = (status: string | undefined): Tone => STEP_TONE[status ?? 'pending'] ?? 'muted'

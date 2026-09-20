@@ -1,15 +1,15 @@
 import type {
-  PluginCollectionCell,
-  PluginCollectionField,
-  PluginCollectionRow,
-  PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+  DashboardDisplayCell,
+  DashboardDisplayField,
+  DashboardDisplayRow,
+  DashboardDisplaySchema,
+} from './display'
 import {
   panelSourceKey,
   type PanelFieldDef,
   type PanelMapping,
   type PanelMappingColumn,
-  type PanelQuery,
+  type PanelProjectionSource,
 } from './model'
 
 // The mapping layer: field mapping, value mapping, derived enum, in that order. See
@@ -19,9 +19,9 @@ import {
 
 /** One source's answer, as the mapping layer sees it. */
 export type PanelSourcePage = {
-  query: PanelQuery
-  schema: PluginCollectionSchema
-  rows: readonly PluginCollectionRow[]
+  source: PanelProjectionSource
+  schema: DashboardDisplaySchema
+  rows: readonly DashboardDisplayRow[]
 }
 
 // ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
@@ -37,9 +37,9 @@ const ROLE_FIELDS = [
   { id: 'assignee', name: 'Assignee', type: 'person', role: 'assignee' },
   { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
   { id: 'url', name: 'Link', type: 'link', role: 'url' },
-] as const satisfies readonly PluginCollectionField[]
+] as const satisfies readonly DashboardDisplayField[]
 
-export const PANEL_FIELDS: readonly PluginCollectionField[] = ROLE_FIELDS
+export const PANEL_FIELDS: readonly DashboardDisplayField[] = ROLE_FIELDS
 
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
 export const PANEL_STATUS_FIELD_ID = 'status'
@@ -53,25 +53,25 @@ export const PANEL_STATUS_FIELD_ID = 'status'
  *  minted (`newColumnId`) rather than typed. */
 export const PANEL_SOURCE_FIELD_ID = 'source'
 
-/** The plugin's id, and the collection alongside it only where one plugin provides two of this panel's
+/** The plugin's id, and the source alongside it only where one plugin provides two of this panel's
  *  sources. The registry's display name would read better but lives in client-core, which this package
  *  can't import; pass one down if it ever matters. */
-const sourceLabel = (query: PanelQuery, queries: readonly PanelQuery[]): string =>
-  queries.filter((other) => other.pluginId === query.pluginId).length > 1
-    ? `${query.pluginId} · ${query.collectionId}`
-    : query.pluginId
+const sourceLabel = (source: PanelProjectionSource, sources: readonly PanelProjectionSource[]): string =>
+  sources.filter((other) => other.pluginId === source.pluginId).length > 1
+    ? `${source.pluginId} · ${source.sourceId}`
+    : source.pluginId
 
-const provenanceField = (queries: readonly PanelQuery[]): PluginCollectionField[] =>
-  queries.length < 2
+const provenanceField = (sources: readonly PanelProjectionSource[]): DashboardDisplayField[] =>
+  sources.length < 2
     ? []
     : [{
       id: PANEL_SOURCE_FIELD_ID,
       name: 'Source',
       type: 'enum',
-      values: queries.map((query) => ({ id: panelSourceKey(query), label: sourceLabel(query, queries) })),
+      values: sources.map((source) => ({ id: panelSourceKey(source), label: sourceLabel(source, sources) })),
     }]
 
-const asField = (definition: PanelFieldDef): PluginCollectionField =>
+const asField = (definition: PanelFieldDef): DashboardDisplayField =>
   ({ id: definition.id, name: definition.label, type: definition.type })
 
 /** The panel-local vocabulary for a given mapping: the five roles, then whatever the user invented in
@@ -83,9 +83,9 @@ const asField = (definition: PanelFieldDef): PluginCollectionField =>
  *  render data pass the queries; the matrix doesn't. */
 export const panelFieldsFor = (
   mapping: PanelMapping | undefined,
-  queries: readonly PanelQuery[] = [],
-): PluginCollectionField[] =>
-  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField), ...provenanceField(queries)]
+  sources: readonly PanelProjectionSource[] = [],
+): DashboardDisplayField[] =>
+  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField), ...provenanceField(sources)]
 
 /** An invented field's id is never a role's, so `undefined` here means "this is one of the five". */
 const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
@@ -93,11 +93,12 @@ const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): Pa
 
 /** Does this panel use the mapping layer at all?
  *
- *  Three explicit triggers: more than one source, declared columns (an enum the user invented even over
- *  one source), or an invented field. A single-collection panel with none of them takes the untouched
- *  pre-mapping path, so its rows and schema pass through verbatim. */
-export const isMapped = (queries: readonly PanelQuery[], mapping: PanelMapping | undefined): boolean =>
-  queries.length > 1 || !!mapping?.columns?.length || !!mapping?.extraFields?.length
+ *  Explicit triggers: more than one source, declared columns (an enum the user invented even over one
+ *  source), an invented field, or an explicit role/value mapping. A single-source panel with none
+ *  of them takes the untouched pre-mapping path, so its rows and schema pass through verbatim. */
+export const isMapped = (sources: readonly PanelProjectionSource[], mapping: PanelMapping | undefined): boolean =>
+  sources.length > 1 || !!mapping?.columns?.length || !!mapping?.extraFields?.length
+    || !!Object.keys(mapping?.fields ?? {}).length || !!Object.keys(mapping?.bySource ?? {}).length
 
 // ── Field mapping ─────────────────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ export function sourceFieldFor(
   panelFieldId: string,
   mapping: PanelMapping | undefined,
 ): string | undefined {
-  const declared = mapping?.fields?.[panelSourceKey(source.query)]?.[panelFieldId]
+  const declared = mapping?.fields?.[panelSourceKey(source.source)]?.[panelFieldId]
   if (declared !== undefined) return declared || undefined
   const role = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.role
   // An invented field has no role, so there's nothing to fall back to and an unanswered one is simply
@@ -119,7 +120,7 @@ export function sourceFieldFor(
   return source.schema.fields.find((field) => field.role === role)?.id
 }
 
-/** The suggestion the host shows its work for. "Both of these collections have a status-role enum,
+/** The suggestion the host shows its work for. "Both of these sources have a status-role enum,
  *  here's a mapping" is the whole argument for the role vocabulary, and this is where it's cashed.
  *
  *  Only fields the user hasn't already answered are filled, so pressing it twice is harmless and a
@@ -131,7 +132,7 @@ export function suggestFieldMapping(
 ): PanelMapping['fields'] {
   const out: Record<string, Record<string, string>> = { ...(mapping?.fields ?? {}) }
   for (const source of sources) {
-    const key = panelSourceKey(source.query)
+    const key = panelSourceKey(source.source)
     const existing = out[key] ?? {}
     const suggested: Record<string, string> = { ...existing }
     for (const field of ROLE_FIELDS) {
@@ -151,7 +152,7 @@ export const candidateFieldsFor = (
   source: PanelSourcePage,
   panelFieldId: string,
   mapping?: PanelMapping | undefined,
-): PluginCollectionField[] => {
+): DashboardDisplayField[] => {
   const type = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.type
     ?? extraField(mapping, panelFieldId)?.type
   return type ? source.schema.fields.filter((field) => field.type === type) : []
@@ -219,7 +220,7 @@ export function suggestValueMapping(
   if (!columns.length) return mapping
   let next = mapping
   for (const source of sources) {
-    const key = panelSourceKey(source.query)
+    const key = panelSourceKey(source.source)
     for (const value of statusValuesOf(source, mapping)) {
       if (mappedColumnId(next, key, value.id)) continue
       const wanted = [value.id, value.label].map((text) => text.toLowerCase())
@@ -232,7 +233,7 @@ export function suggestValueMapping(
 }
 
 /** The values of the source field feeding the panel's status, which is what the value-mapping matrix
- *  has rows for. Empty for a source whose status field declares none, meaning a collection that
+ *  has rows for. Empty for a source whose status field declares none, meaning a source that
  *  describes itself in its answer and hasn't been read yet. */
 export function statusValuesOf(
   source: PanelSourcePage,
@@ -245,7 +246,7 @@ export function statusValuesOf(
 
 // ── The union ─────────────────────────────────────────────────────────────────────────────────
 
-const EMPTY_SCHEMA: PluginCollectionSchema = { fields: [] }
+const EMPTY_SCHEMA: DashboardDisplaySchema = { fields: [] }
 
 /** The schema the shaping layer and the views actually see.
  *
@@ -255,10 +256,10 @@ const EMPTY_SCHEMA: PluginCollectionSchema = { fields: [] }
 export function panelSchema(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
-): PluginCollectionSchema {
-  const queries = sources.map((source) => source.query)
-  if (!isMapped(queries, mapping)) return sources[0]?.schema ?? EMPTY_SCHEMA
-  const fields = panelFieldsFor(mapping, queries).flatMap((field): PluginCollectionField[] => {
+): DashboardDisplaySchema {
+  const projections = sources.map((source) => source.source)
+  if (!isMapped(projections, mapping)) return sources[0]?.schema ?? EMPTY_SCHEMA
+  const fields = panelFieldsFor(mapping, projections).flatMap((field): DashboardDisplayField[] => {
     // The host feeds this one. No source has to be able to fill it, and no mapping row points at it.
     if (field.id === PANEL_SOURCE_FIELD_ID) return [field]
     if (!sources.some((source) => sourceFieldFor(source, field.id, mapping))) return []
@@ -274,34 +275,34 @@ export function panelSchema(
 /** Every source's rows as one list of panel-local rows.
  *
  *  Provenance is the host's stamp (docs/dashboards.md § Provenance, and what a row may not claim):
- *  `pluginId` and `collectionId` are copied off the row the host stamped when it parsed the response
- *  (plugins/chrome/data.ts), never off the response body.
+ *  `pluginId` and the query-instance `sourceId` are copied from the typed record reference, never
+ *  accepted from a plugin-controlled display row.
  *
  *  No value is silently dropped. A value no column claims lands in the catch-all, `null`, which
  *  `boardColumns` draws as one "Uncategorised" column, or is hidden only because the user declared
  *  that destination.
  *
  *  Row ids are qualified by source. A github row and a linear row may both be `42`; the wire promises
- *  uniqueness within a collection and nothing wider (@acorn/protocol/collections.ts). */
+ *  uniqueness within one projected query and nothing wider. */
 export function unionRows(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
-): PluginCollectionRow[] {
-  const queries = sources.map((source) => source.query)
-  if (!isMapped(queries, mapping)) return [...(sources[0]?.rows ?? [])]
+): DashboardDisplayRow[] {
+  const projections = sources.map((source) => source.source)
+  if (!isMapped(projections, mapping)) return [...(sources[0]?.rows ?? [])]
 
   const fields = panelSchema(sources, mapping).fields
   const columns = mapping?.columns ?? []
   const hideUnmapped = mapping?.unmapped === 'hidden'
   // Present exactly when the panel unions more than one source, and written from the same host stamp the
-  // provenance badge reads, so a collection can't file its rows under a stranger's source.
+  // provenance badge reads, so a source can't file its rows under a stranger's identity.
   const stampsSource = fields.some((field) => field.id === PANEL_SOURCE_FIELD_ID)
 
   return sources.flatMap((source) => {
-    const key = panelSourceKey(source.query)
+    const key = panelSourceKey(source.source)
     const sourceFields = fields.map((field) => [field.id, sourceFieldFor(source, field.id, mapping)] as const)
-    return source.rows.flatMap((row): PluginCollectionRow[] => {
-      const values: Record<string, PluginCollectionCell> = {}
+    return source.rows.flatMap((row): DashboardDisplayRow[] => {
+      const values: Record<string, DashboardDisplayCell> = {}
       for (const [panelFieldId, sourceFieldId] of sourceFields) {
         if (!sourceFieldId) continue
         values[panelFieldId] = row.values[sourceFieldId] ?? null
@@ -329,7 +330,7 @@ export function unionRows(
         ...(row.taskId ? { taskId: row.taskId } : {}),
         ...(row.action ? { action: row.action } : {}),
         pluginId: row.pluginId,
-        collectionId: row.collectionId,
+        sourceId: row.sourceId,
       }]
     })
   })
@@ -343,10 +344,10 @@ export function unionRows(
  *  the day a source with the same key was added again. */
 export function pruneMapping(
   mapping: PanelMapping | undefined,
-  queries: readonly PanelQuery[],
+  sources: readonly PanelProjectionSource[],
 ): PanelMapping | undefined {
   if (!mapping) return undefined
-  const keys = new Set(queries.map(panelSourceKey))
+  const keys = new Set(sources.map(panelSourceKey))
   const columns = (mapping.columns ?? []).filter((column) => column.id && column.label)
   const columnIds = new Set(columns.map((column) => column.id))
   const extraFields = (mapping.extraFields ?? []).filter((field) => field.id && field.label)
@@ -380,10 +381,10 @@ export function pruneMapping(
     ...(mapping.unmapped === 'hidden' ? { unmapped: 'hidden' as const } : {}),
   }
   // A panel that isn't mapped has no use for any of it: the field mapping the editor pre-filled on the
-  // way in, and everything a second source left behind, are config the single-collection path never
+  // way in, and everything a second source left behind, are config the single-source path never
   // reads. Kept, they'd come back the day a source was re-added and quietly reshape a panel somebody
   // had since made their own.
-  if (!isMapped(queries, next)) return undefined
+  if (!isMapped(sources, next)) return undefined
   return Object.keys(next).length ? next : undefined
 }
 
