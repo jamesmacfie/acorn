@@ -191,6 +191,15 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   validation, wait and attention states, cancellation, managed-parent navigation, session roster
   nesting, and core task hierarchy. The provider runtime tests remain the contract for both managed
   harness drivers; a real Claude Code or Codex login belongs to the manual checklist;
+- the two web-activity captures under `plugins/agents/src/server/drivers/__fixtures__` are the
+  authority for what each provider sends, in the same way the subagent captures beside them are. They
+  were taken from live runs against the pinned Codex CLI and the pinned Claude ACP adapter, sanitized
+  by truncating long strings and trimming result lists without touching a field name, and each records
+  the version it came from. Both contradicted the plan written before them, so a hand-written input is
+  not enough here. The one action neither run produced, Codex's `findInPage`, has a unit case derived
+  from `codex app-server generate-json-schema` that says so beside the capture tests. The card itself
+  is checked in both hosts: `webToolCard.test.tsx` under jsdom, and `apps/tui/src/agentsWeb.test.tsx`
+  in a real cell buffer, because links are the one card body a desktop render proves nothing about;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using
   package-local fixtures. Every plugin's `vitest.config.ts` is one line re-exporting
   `plugins/vitest.shared.ts`, and the testkit resolves a plugin's migration chain from its id —
@@ -688,6 +697,7 @@ acceptance pass.
     Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
     workflow-owned session and confirm `agent_spawn` is absent.
 
+
 The next five items are the workflow-task release checks. They were not run in this worktree because
 the app requires the main checkout's environment and port. The workflow, integration, and host tests
 cover the corresponding state and rendering contracts.
@@ -710,6 +720,34 @@ cover the corresponding state and rendering contracts.
     the Nodes and confirm navigation and history stay with the active Node. Then run one mapped child
     workflow and one static inline workflow reference to confirm both behave as
     documented.
+70. Run a Codex session and a Claude Code session that each search the web for a distinctive phrase,
+    then open one result. Confirm each call is one card, that the row says `Search web` with the query
+    beside it, and that opening it shows the query, any domain filter, and the sources as links. Run
+    Claude `WebFetch` and confirm it reads as a page fetch with its prompt rather than as a search.
+    Make a provider-native subagent search in each harness and confirm the card stays in the child's
+    transcript. Then search Agent Center for the phrase, a result title, a domain and a URL fragment.
+    Finish in the terminal client at 80 by 24: open and close the fold, focus a result link, and
+    confirm the address is readable. Last, open a Codex session recorded before this shipped and
+    confirm its status-only row still draws as the flat `Web search` row
+    ([managed-agents.md](./managed-agents.md) § Web activity).
+
+71. The reconnect an agent advertises rather than declares, which needs `dsh` installed and the
+    DeepSeek plugin at `../acorn-deepseek` loaded from a folder. Start a DeepSeek session, get an
+    answer, quit the app and start it again, then ask the agent about something only the earlier turn
+    could know. It should remember, and the transcript should carry no "starts fresh" warning: that is
+    `session/resume`, and before it acorn silently began a new agent under the unchanged transcript.
+    Check the pane while you are there, because DeepSeek's surface is narrower than Claude's on
+    purpose: permission cards work, the model picker lists its models and reasoning effort, cancel
+    stops a turn, and there is no plan section, no mode picker and no question card
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+
+72. The two doors a harness declares and the one it does not. With the same plugin loaded, ask DeepSeek
+    something only an acorn tool can answer, such as what the task is about or what the local diff
+    contains: it reaches them over the protocol, because it has no `mcp add` command to register
+    through ([mcp.md](./mcp.md) § Configuration). Then ask Claude Code the same in a task terminal and
+    confirm each acorn tool still appears once, not twice. Last, press the commit-message wand and open
+    **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
+    entry should be absent throughout, because `dsh` alone has no interactive mode.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

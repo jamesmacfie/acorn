@@ -21,6 +21,9 @@
 .copy-btn:hover {
   color: var(--text);
 }
+/* On a markdown code fence, sit top-right, same corner as CodeBlock's own button (primitives.css).
+   The wrapper is already `position: relative`, and it's the CopyButton's only direct-child use. */
+.ui-code-wrap > .copy-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
 .comment-card {
   position: relative;
 }

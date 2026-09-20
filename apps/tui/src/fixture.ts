@@ -178,6 +178,26 @@ const agentFiller = () => (process.env.ACORN_FIXTURE_LONG_TRANSCRIPT
     event(100 + index, { type: 'assistant_message', text: `Filler turn ${index + 1}.` }))
   : [])
 
+// A web call: the one tool card whose body is not a block of text, so the terminal has its own thing
+// to prove about it (./agentsWeb.test.tsx). Behind a flag for the same reason the filler above is —
+// the pane sweep reads a screen it can hold in its head, and one more card pushes the first turn off
+// the top of it, which would make that case about a scroll position instead of about a pane.
+const agentWebActivity = () => (process.env.ACORN_FIXTURE_WEB_ACTIVITY
+  ? [event(3, {
+    type: 'tool' as const,
+    tool: {
+      id: 'tool-2',
+      title: 'Search web',
+      kind: 'search',
+      status: 'completed' as const,
+      web: {
+        action: { type: 'search' as const, queries: ['bcrypt compare timing'] },
+        results: [{ url: 'https://docs.example/bcrypt', title: 'Comparing hashes', domain: 'docs.example' }],
+      },
+    },
+  })]
+  : [])
+
 const agentSnapshot = () => ({
   session: AGENT_SESSIONS[0],
   turns: [AGENT_TURN],
@@ -185,8 +205,9 @@ const agentSnapshot = () => ({
     ...agentFiller(),
     event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
     event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Read src/login.ts', status: 'completed', output: 'export async function signIn(' } }),
-    event(3, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
-    event(4, { type: 'request', requestId: 'request-1', kind: 'permission', title: 'Write src/login.ts', detail: 'Replace the password check', options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] }),
+    ...agentWebActivity(),
+    event(4, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
+    event(5, { type: 'request', requestId: 'request-1', kind: 'permission', title: 'Write src/login.ts', detail: 'Replace the password check', options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] }),
   ],
   requests: [{
     id: 'request-1',

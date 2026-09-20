@@ -3,8 +3,22 @@ import type { Context } from 'hono'
 import { z } from 'zod'
 import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { parseDataSchema } from '@acorn/protocol/dataSchemas.ts'
-import { type AppEnv, type Principal, ownerId, ProviderOperationError, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability } from '@acorn/plugin-api/node'
-import { GENERATE_MAX_DESCRIPTION_CHARS, type WorkflowGenerateRequest, type WorkflowGenerateResult } from '../../shared/api'
+import {
+  type AppEnv,
+  type Principal,
+  isProviderOperationError,
+  ownerId,
+  requireDevice,
+  respondError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+} from '@acorn/plugin-api/node'
+import {
+  GENERATE_MAX_DESCRIPTION_CHARS,
+  type WorkflowGenerateRequest,
+  type WorkflowGenerateResult,
+} from '../../shared/api'
 import { authoringTurnRequestSchema, type AuthoringTurnRequest, type AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { WorkflowPublication, WorkflowPublicationSelection } from '../../shared/workflowPublication'
 import type { WorkflowFileRequest, WorkflowFileResult } from '../../shared/workflowFileAuthoring'
@@ -210,7 +224,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
         if ('error' in answer) return respondError(c, 422, 'model_answer_unusable', [answer.error])
         return c.json(answer)
       } catch (error) {
-        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         return respondError(c, 502, 'provider_unavailable')
       }
     })
@@ -223,7 +237,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
       try {
         return c.json(await bridge.author({ ...parsed, userId: ownerId(c), principal: c.get('principal')!, signal: c.req.raw.signal }))
       } catch (error) {
-        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         if (c.req.raw.signal.aborted) return respondError(c, 408, 'cancelled')
         return respondError(c, 400, 'authoring_failed', [error instanceof Error ? error.message : 'Authoring failed'])
       }

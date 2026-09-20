@@ -1,13 +1,12 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
 import { agentContextContributions, clearLocal, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, Inline, Kbd, MentionTextarea, Picker,
-  Popover, Select, Stack, Text, Toolbar,
-  type MentionSegment, type MentionSource,
+  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Picker,
+  Popover, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
@@ -69,6 +68,10 @@ export default function AgentComposer(props: {
    *  caret by whichever effect ran first. */
   autoFocus?: boolean
   previousAutomaticContext?: AgentContextSnapshot
+  /** Controls for the transcript above, drawn on this row's right so they line up with the config
+   *  selects. Owned by the conversation, which is the only piece that can see both the transcript and
+   *  this box; the composer just gives them a home. */
+  viewControls?: JSX.Element
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
 }) {
@@ -528,7 +531,7 @@ export default function AgentComposer(props: {
 
   return (
     <Stack gap="row">
-      <Show when={configOptions().length}>
+      <Show when={configOptions().length || props.viewControls}>
         <Inline wrap>
           <For each={configOptions()}>
             {(option) => (
@@ -545,6 +548,10 @@ export default function AgentComposer(props: {
               </Field>
             )}
           </For>
+          <Show when={props.viewControls}>
+            <Toolbar.Spacer />
+            {props.viewControls}
+          </Show>
         </Inline>
       </Show>
 
@@ -612,18 +619,14 @@ export default function AgentComposer(props: {
           }
         }}
         overlay={
-          <Button
-            variant="bare"
-            size="sm"
-            iconOnly
+          <IconButton
+            icon={expanded() ? 'minimize-2' : 'maximize-2'}
             label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
             pressed={expanded()}
             tip={expanded() ? 'Collapse' : 'Expand'}
             tipKey="⌘⇧↩"
             onPress={() => setExpanded((current) => !current)}
-          >
-            <Icon name={expanded() ? 'minimize-2' : 'maximize-2'} size={12} />
-          </Button>
+          />
         }
       />
 

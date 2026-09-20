@@ -17,6 +17,8 @@ import {
 import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport, type Viewport } from './scrolling'
+import type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+import type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -52,9 +54,14 @@ export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Elemen
   )
 }
 
-export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Element }) {
+export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="row" flexWrap={props.wrap ? 'wrap' : 'nowrap'} gap={spaceCells(props.gap ?? 'inline')}>
+    <box
+      flexDirection="row"
+      flexWrap={props.wrap ? 'wrap' : 'nowrap'}
+      justifyContent={props.spread ? 'space-between' : undefined}
+      gap={spaceCells(props.gap ?? 'inline')}
+    >
       {props.children}
     </box>
   )
@@ -129,6 +136,9 @@ export function Card(props: {
   selected?: boolean
   stripe?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'>
   pad?: Extract<Size, 'sm' | 'md'>
+  /** Sized by what is inside it rather than by the room it is given. Here that is the frame taking
+   *  its width from its widest line instead of the column's. */
+  fit?: boolean
   disabled?: boolean
   onPress?: () => void
   title?: string
@@ -155,7 +165,7 @@ export function Card(props: {
         <Line tone={lit() ? 'accent' : props.stripe}>{borderCell('stripe').glyph}</Line>
       </Show>
       <box
-        flexGrow={1}
+        flexGrow={props.fit ? 0 : 1}
         flexDirection="column"
         {...boxBorder('surface', { when: !isCompact(), ...(lit() ? { tone: 'accent' as const } : {}) })}
         title={props.title}
@@ -185,14 +195,31 @@ export function Card(props: {
  *  Without `follow` it is a plain column and whatever is around it scrolls, which is what github's
  *  pull request conversation wants.
  *
- *  `viewKey` is dropped. It is the DOM's per-view scroll memory, and this host has one offset per
- *  mounted viewport rather than a map of remembered ones.
+ *  `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`. Putting a reader back on
+ *  a turn needs per-turn geometry, and a viewport here knows its own offset and the height of the box
+ *  inside it and nothing else. So this host keeps one offset per mounted viewport: the foot is held
+ *  while the reader is at the foot, and a list that is drawn again opens there. `NODE_SUPPORT` calls
+ *  the node `reduced` and says so (client-core kit/tokens/support.ts).
  *
  *  `props.follow` is read once rather than through a `Show`, because it is a constant at every call
  *  site and a reactive read would rebuild every turn the moment it flipped. */
-export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?: string; children: JSX.Element }) {
+export function Timeline(props: {
+  ariaLabel?: string
+  follow?: boolean
+  place?: () => ReadingPlace
+  onChange?: (place: ReadingPlace) => void
+  controls?: (api: TimelineControls) => void
+  children: JSX.Element
+}) {
   if (!props.follow) return <box flexDirection="column" flexGrow={1}>{props.children}</box>
   let view: Viewport | undefined
+  // The same jumps the DOM hands out, against this host's viewport. `scrollTo`, not `stickToBottom`,
+  // for the bottom: the reader asked to go there, so it is not the conditional re-stick a turn arriving
+  // does.
+  props.controls?.({
+    toTop: () => view?.scrollTo(0),
+    toBottom: () => { if (view) view.scrollTo(Math.max(0, view.scrollHeight - view.viewport.height)) },
+  })
   return (
     <ScrollViewport onBox={(box) => { view = box }}>
       {/* An inner box sized by the turns. The viewport's content box is free-sized, so this one's
@@ -213,7 +240,7 @@ export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?
  *  with no `Turn` is `undefined` passed to `createComponent`, which is a pane that fails to draw
  *  rather than a pane that draws badly. Found by the pane sweep, on the PR conversation
  *  (docs/tui.md). */
-Timeline.Turn = (props: { children: JSX.Element }) => (
+Timeline.Turn = (props: { key?: string; children: JSX.Element }) => (
   <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
 )
 

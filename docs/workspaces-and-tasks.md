@@ -138,16 +138,27 @@ derives and revalidates the path; clients cannot choose an arbitrary worktree pa
 branch uses the mapped project folder directly.
 
 The directory is keyed by owner, repo, and branch, so revalidation checks the branch as well as the
-path. Before a resolved worktree is handed out, persisted or reused, its on-disk HEAD must still be
-the task's branch. A directory that was pruned, moved, or checked out onto something else is refused
-with a `worktree-stale` 409, and a worktree that cannot be created is refused with
-`worktree-unavailable` rather than falling back to the main checkout. Either fallback hands the task
-another branch's files, which is the tree its agent then reads and edits.
+path. For a worktree the task already owns, the on-disk HEAD is the fact and the row follows it: a
+live worktree checked out onto another branch updates `tasks.branch` to match and carries on, because
+work that needs a second pull request switches branch inside the one worktree. The directory keeps
+the name it was created under, since the path is persisted and only rederived from the branch when
+the task has no worktree yet.
+
+A directory with no branch to adopt is refused with a `worktree-stale` 409: one that was pruned or
+moved, one left on a detached HEAD, and one that holds another branch while the task does not yet own
+it. A worktree that cannot be created is refused with `worktree-unavailable` rather than falling back
+to the main checkout. Either fallback hands the task another branch's files, which is the tree its
+agent then reads and edits.
 
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
 If the task branch already exists, Acorn checks out that branch without changing its history.
+
+The project's setup script runs in the new worktree as an ordinary terminal session titled "Setup",
+so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
+the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
+task's life ([ui-design.md](./ui-design.md) § Rail controls).
 
 A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
@@ -188,11 +199,12 @@ while that claim is held, and archive waits for a worktree creation that was alr
 it reads the path to remove. An archived task also returns no root. This keeps a pane refresh from
 reading a half-removed tree or recreating the directory between removal and the final status write.
 
-Before any of that, the confirmation dialog asks every plugin what it has to say about this task,
-such as running containers, uncommitted files, or live sessions, and offers whatever cleanup each one
-declared. That is a plugin contribution called a task check, and it is the only way anything reaches
-that dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and
-the task is archived anyway.
+Before any of that, archive always opens a confirmation dialog. The dialog asks every plugin what it
+has to say about this task, such as running containers, uncommitted files, or live sessions, and
+offers whatever cleanup each one declared. With no reported concerns it remains as the explicit
+archive barrier. A plugin contribution called a task check is the only way anything else reaches that
+dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and the task
+is archived anyway.
 
 The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
 whichever of the two started the archive. One shared flag in `client-core/features/tasks/archiveLifecycle.ts`
@@ -201,6 +213,11 @@ highest-priority marker and it takes the slot under the task's glyph
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). It no longer blanks the row's
 other markers the way it used to: anything it outranks keeps its place in the hover tooltip, because a
 marker that loses its corner should lose the pixels, never the state.
+
+Where the owner lands afterwards is decided when the archive finishes, not when it starts, and only
+if they are still on the task being archived. The teardown takes long enough to walk away from, and
+moving someone who has since opened another task takes them off a task they chose. Nothing left to
+show falls back to the default browse.
 
 The same flag pauses the Changes pane's Git reads while the archive runs. The pane remains mounted so
 it can show a teardown failure, but it keeps its last stable status instead of observing worktree

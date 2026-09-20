@@ -13,11 +13,24 @@ describe('linear project source', () => {
   const respond = (body: unknown, status = 200) =>
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
 
-  it('projects Linear projects onto the host shape', async () => {
-    respond({ data: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } } })
+  // The source asks twice, once per kind, so the stub answers on what the query names.
+  const respondByQuery = (bodies: { projects: unknown; teams: unknown }) =>
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {
+      const query = String(JSON.parse(String(init.body)).query)
+      return Promise.resolve(new Response(JSON.stringify({ data: query.includes('teams') ? bodies.teams : bodies.projects })))
+    }))
+
+  it('projects Linear projects and teams onto the host shape', async () => {
+    respondByQuery({
+      projects: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } },
+      teams: { teams: { nodes: [{ id: 'team-1', name: 'Engineering' }] } },
+    })
     await expect(list()).resolves.toEqual([
       { id: 'proj-1', label: 'Platform' },
       { id: 'proj-2', label: 'Mobile' },
+      // Prefixed, because core stores this id as-is and the rail's filter reads the prefix back to
+      // decide which Linear field to match on.
+      { id: 'team:team-1', label: 'Engineering (team)' },
     ])
   })
 
@@ -30,6 +43,39 @@ describe('linear project source', () => {
 
   it('is advertised on the public descriptor', () => {
     expect(linearProvider.toPublic().supportsProjects).toBe(true)
+  })
+})
+
+// validate is the trust boundary for Linear's answer, and normalize reads three levels into what it
+// returns. Anything validate lets past unguarded comes back to the owner as "provider unavailable",
+// which names the wrong thing entirely.
+describe('linear connection validate', () => {
+  const validate = (token: string) => linearProvider.connection.validate({ token })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const respond = (body: unknown, status = 200) =>
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
+
+  it('accepts a key that names a workspace', async () => {
+    respond({ data: { viewer: { name: 'Jo', organization: { name: 'Acme' } } } })
+    await expect(validate('lin_api_test')).resolves.toMatchObject({ secret: 'lin_api_test' })
+  })
+
+  // 200, no errors array, and nothing to name the workspace with. An application token looks like
+  // this, and it used to reach normalize and throw a TypeError there.
+  it('refuses a key with no person behind it rather than letting normalize dereference null', async () => {
+    respond({ data: { viewer: null } })
+    await expect(validate('lin_api_test')).rejects.toMatchObject({ code: 'provider_needs_auth' })
+  })
+
+  it('refuses a viewer that has no organization', async () => {
+    respond({ data: { viewer: { name: 'Jo', organization: null } } })
+    await expect(validate('lin_api_test')).rejects.toMatchObject({ code: 'provider_needs_auth' })
+  })
+
+  it('refuses an empty key before it reaches the network', async () => {
+    await expect(validate('  ')).rejects.toMatchObject({ code: 'provider_bad_config' })
   })
 })
 

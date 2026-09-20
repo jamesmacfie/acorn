@@ -4,6 +4,8 @@ import type {
   AgentRequest,
   AgentSubagentUpdate,
   AgentToolCall,
+  AgentUsage,
+  AgentWebActivity,
 } from '@acorn/protocol/managedAgents.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
@@ -18,6 +20,9 @@ export type AgentConversationItem = {
   event: AgentNormalizedEvent
   /** Present on a subagent card: what that subagent did, in its own order. */
   children?: AgentConversationItem[]
+  /** Present on a `turn_completed` card: how much of the model's context window was in use when the
+   *  turn ended. Stamped from the turn's own usage card by `stampTurnContext` below. */
+  context?: { used: number; size?: number }
 }
 
 // Which events are worth a card. `session_state`, `session_metadata` and `request_resolved` are all
@@ -31,7 +36,6 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'subagent',
   'plan',
   'request',
-  'usage',
   'file_change',
   'terminal',
   'artifact',
@@ -39,6 +43,11 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'error',
   'diagnostic',
 ])
+
+// `usage` is deliberately absent above. Its tokens and its provider cost used to be a line of their own
+// at the head of each turn; the cost is a plugin's job now (agents:session-header) and the context
+// figure rides the turn's closing line, so the card had nothing left to say that the transcript did
+// not already say twice. The events still fold, because that fold is what feeds the closing line.
 
 // Anything the agent is blocked on is drawn where it asked, because that is the moment it interrupted
 // and answering it there costs no hunting. What happens afterwards differs by kind. A question stays:
@@ -66,6 +75,19 @@ export const visibleConversationItems = (
 ): AgentConversationItem[] =>
   items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
 
+/** A card that is somebody talking — the reader or the agent — as opposed to a tool call, reasoning,
+ *  or a note. What the "show chats only" toggle above the composer keeps.
+ *
+ *  A request counts. It is the agent asking the reader something and the reader answering, which is
+ *  the same conversation as a message, and during planning it is most of it: hiding it left a chat-only
+ *  transcript where the agent asked nothing and settled a question out of nowhere. `belongsInThread`
+ *  above has already dropped the resolved permissions, so what is left is the questions and whatever
+ *  is still blocking. */
+export const isChatItem = (item: AgentConversationItem): boolean =>
+  item.event.type === 'user_message'
+  || item.event.type === 'assistant_message'
+  || item.event.type === 'request'
+
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
   items: AgentConversationItem[],
@@ -91,6 +113,16 @@ const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): AgentToolC
     : next.output ?? previous.output,
   paths: next.paths ?? previous.paths,
   subagentId: next.subagentId ?? previous.subagentId,
+  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
+})
+
+// Same convention, one level down. A provider reports the request and the sources on different
+// updates — Claude Code sends the query, then the results, then the status, all on the same call id
+// — so a spread would let each of those wipe the last. An explicit empty result list is the
+// provider saying it found nothing and does replace; an absent one means it had nothing to add.
+const mergeWebActivity = (previous: AgentWebActivity, next: AgentWebActivity): AgentWebActivity => ({
+  action: next.action ?? previous.action,
+  results: next.results ?? previous.results,
 })
 
 
@@ -248,5 +280,36 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     }
     stream.items.push(item)
   }
+  stampTurnContext(top.items)
   return top.items
+}
+
+/**
+ * Put each turn's context figure on the line that closes the turn.
+ *
+ * Positional rather than by turn id, because a `turn_completed` often has no turn id to match on: the
+ * Codex driver clears the current turn before it emits the event (server/drivers/codexDriver.ts), so
+ * the completion arrives unattributed. What "the context at that point" means is anyway where the
+ * reader is looking, and the usage card above the closing line is the last one before it.
+ *
+ * A second pass rather than a branch in the loop above, so the trailing usage update needs no special
+ * case. That update lands after the turn is already complete and folds into the card it is updating,
+ * which is the card this pass then reads.
+ *
+ * Only the session's own stream, which is where every usage event lands: `subagentIdOf` does not
+ * attribute one, and a subagent reports its own tokens on its roster card instead.
+ */
+function stampTurnContext(items: AgentConversationItem[]): void {
+  let latest: AgentUsage | undefined
+  for (const [at, item] of items.entries()) {
+    if (item.event.type === 'usage') latest = item.event.usage
+    if (item.event.type !== 'turn_completed' || latest?.contextUsed === undefined) continue
+    items[at] = {
+      ...item,
+      context: {
+        used: latest.contextUsed,
+        ...(latest.contextSize === undefined ? {} : { size: latest.contextSize }),
+      },
+    }
+  }
 }

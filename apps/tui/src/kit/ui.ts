@@ -19,7 +19,7 @@ export {
   Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 export {
-  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
+  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
   MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
@@ -39,6 +39,10 @@ export type { ItemProps } from '../keys/collection'
 export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 export type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
+export type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+// The reading place is the DOM timeline's contract and a plain value, so both hosts hand back the
+// same type even though this one never restores one (./grouping.tsx).
+export type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
 export type {
   MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'

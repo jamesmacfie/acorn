@@ -1,6 +1,7 @@
 import { createAdaptorServer, type Http2Bindings, type HttpBindings, type ServerType } from '@hono/node-server'
 import type { ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { createServer as createHttpsServer } from 'node:https'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createApp } from '../index'
 import { makeBindings, type RuntimeBindings } from '../bindings'
@@ -29,6 +30,32 @@ export { devDataDir }
 // What the listener bound, plus the certificate identity it bound it with. The endpoint is reported after
 // the kernel chooses a port; the fingerprint and certificate let the broker pin that endpoint.
 export type Listener = { server: ServerType; endpoint: ServiceEndpoint; fingerprint: string; certPem: string }
+
+// Who already has the port we wanted. "Taken" on its own sends the reader to `lsof` anyway, and the
+// answer is almost always another node of our own: a second checkout, an agent session, or a previous
+// run that outlived its shell. `node.lock` names the holder of a data root the same way
+// (../storage/dataRoot.ts); this is the same courtesy for the other thing two nodes contend over.
+//
+// Only ever runs on the failure path, so a synchronous spawn costs a healthy boot nothing. Best
+// effort: `lsof` is absent on some machines and refuses to name a process owned by another user, and
+// neither is worth turning a recoverable port clash into a failed start.
+function describePortHolder(port: number): string {
+  // stderr is discarded rather than inherited, which is what execFileSync does by default: `lsof`
+  // warns about every directory it cannot read, and those warnings would land in the log looking like
+  // ours.
+  const capture = (file: string, args: string[]): string =>
+    execFileSync(file, args, { encoding: 'utf8', timeout: 2_000, stdio: ['ignore', 'pipe', 'ignore'] })
+  try {
+    const pid = capture('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN']).split('\n')[0]?.trim()
+    if (!pid) return 'something this node could not identify'
+    // The command line, not just the number, because the number is meaningless by the time anyone
+    // reads the log and the path says whether this is a second checkout or an agent session.
+    const command = capture('ps', ['-o', 'command=', '-p', pid]).trim().slice(0, 200)
+    return command ? `pid ${pid} (${command})` : `pid ${pid}`
+  } catch {
+    return 'something this node could not identify'
+  }
+}
 
 // Start the loopback HTTPS listener over an already-built runtime. The service composition root wires the
 // harness and context bridges before the listener accepts requests. Resolves once listening so callers
@@ -145,7 +172,7 @@ export function startListener(
         // The remembered port belongs to someone else now. An ephemeral port is still a correct endpoint,
         // since the client is told where we bound rather than assuming, so this is a retry.
         retried = true
-        log.warn(`port ${requested} is taken; binding an ephemeral port instead`)
+        log.warn(`port ${requested} is taken by ${describePortHolder(requested)}; binding an ephemeral port instead`)
         server.listen(0, bindHost, onListening)
         return
       }

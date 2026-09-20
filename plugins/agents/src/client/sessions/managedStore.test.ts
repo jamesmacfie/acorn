@@ -25,15 +25,22 @@ vi.mock('./wsChannel', () => ({
 }))
 
 const snapshotCalls: string[] = []
+const pageCalls: number[] = []
 const sessionCalls: { taskId?: string }[] = []
 let failSessions = false
 let served: AgentSessionSnapshot
+// The rest of the ledger, keyed by the cursor the client pages from.
+let servedPages: Record<number, AgentEventRecord[]> = {}
 let servedList: AgentSessionList = { sessions: [], delegations: [], nextCursor: null }
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     snapshot: async (sessionId: string) => {
       snapshotCalls.push(sessionId)
       return served
+    },
+    events: async (_sessionId: string, afterSeq: number) => {
+      pageCalls.push(afterSeq)
+      return { events: servedPages[afterSeq] ?? [], nextCursor: null }
     },
     sessions: async (query: { taskId?: string } = {}) => {
       sessionCalls.push(query)
@@ -88,7 +95,31 @@ const seed = async (snapshot: Partial<AgentSessionSnapshot> = {}) => {
 beforeEach(() => {
   managedAgentStore.clear()
   snapshotCalls.length = 0
+  pageCalls.length = 0
+  servedPages = {}
   servedList = { sessions: [], delegations: [], nextCursor: null }
+})
+
+// The snapshot route caps its event list, so a session past the cap arrives short. Reopening one used
+// to stop at the cap and show a transcript that ended hours before the last message.
+describe('a snapshot the node truncated', () => {
+  it('pages forward until it reaches lastEventSeq', async () => {
+    servedPages = { 2: [prose(3), prose(4)], 4: [prose(5)] }
+    await seed({ session: { ...session, lastEventSeq: 5 }, events: [prose(1), prose(2)] })
+    expect(pageCalls).toEqual([2, 4])
+    expect(events().map((item) => item.seq)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('asks for nothing when the snapshot already holds the whole ledger', async () => {
+    await seed({ session: { ...session, lastEventSeq: 2 }, events: [prose(1), prose(2)] })
+    expect(pageCalls).toEqual([])
+  })
+
+  it('stops on an empty page rather than looping', async () => {
+    await seed({ session: { ...session, lastEventSeq: 9 }, events: [prose(1)] })
+    expect(pageCalls).toEqual([1])
+    expect(events().map((item) => item.seq)).toEqual([1])
+  })
 })
 
 describe('appending a streamed event', () => {

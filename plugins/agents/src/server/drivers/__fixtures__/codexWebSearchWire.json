@@ -1,0 +1,167 @@
+{
+ "capturedWith": {
+  "cli": "codex-cli 0.154.0",
+  "model": "gpt-5.6-luna"
+ },
+ "prompts": [
+  "search the web for the ACP specification, open the top result and find text on it",
+  "open https://agentclientprotocol.com/protocol/overview and find a word on it"
+ ],
+ "notes": [
+  "Only the webSearch thread items, start and completion, from two live runs.",
+  "item/started carries nothing: query is the empty string and both action and results are null.",
+  "Everything a card can show arrives on item/completed, so the fold must not let the start blank it.",
+  "The first pair is a `search` action: the item's own `query` repeats action.query and `queries` is null.",
+  "The second pair is the same model reading a page, which this CLI reports as `other` with a",
+  "`turn1view0` result rather than as openPage.",
+  "The third pair is an explicit openPage, with a thumbnail_url this repo deliberately drops.",
+  "No findInPage action appeared in either run; codexNormalizer.test.ts covers it from the schema.",
+  "Results are trimmed to three per item and snippets to 180 characters; field names and nesting are",
+  "verbatim. The opaque thumbnail token is replaced with the word REDACTED."
+ ],
+ "notifications": [
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-dd8e5b77-be97-49bd-874a-a8d0e63b399f",
+     "query": "",
+     "action": null,
+     "results": null
+    },
+    "threadId": "01a0a337-1df2-7760-88e2-7d4735e5b977",
+    "turnId": "01a0a337-1ecc-7482-8679-914c5bd70892",
+    "startedAtMs": 1789444717111
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-dd8e5b77-be97-49bd-874a-a8d0e63b399f",
+     "query": "Agent Client Protocol acp specification",
+     "action": {
+      "type": "search",
+      "query": "Agent Client Protocol acp specification",
+      "queries": null
+     },
+     "results": [
+      {
+       "type": "text_result",
+       "domain": "github.com",
+       "ref_id": "turn0search0",
+       "snippet": "# Agent Control Protocol (ACP) Specification ... The Agent Control Protocol (ACP) is an open, bidirectional, WebSocket-based protocol that enables AI agents to operate existing",
+       "title": "acp/spec/SPEC.md at main \u00b7 agent-control-protocol/acp \u00b7 GitHub",
+       "url": "https://github.com/agent-control-protocol/acp/blob/main/spec/SPEC.md"
+      },
+      {
+       "type": "text_result",
+       "domain": "github.com",
+       "ref_id": "turn0search1",
+       "snippet": "The Agent Client Protocol allows Agents and Clients to communicate by exposing methods that each side can call and sending notifications to inform each other",
+       "title": "agent-client-protocol/docs/protocol/v2/overview.mdx at main \u00b7 agentclientprotocol/agent-client-protocol \u00b7 GitHub",
+       "url": "https://github.com/agentclientprotocol/agent-client-protocol/blob/main/docs/protocol/v2/overview.mdx"
+      },
+      {
+       "type": "text_result",
+       "domain": "agentclientprotocol.github.io",
+       "ref_id": "turn0search2",
+       "snippet": "The official TypeScript implementation of the Agent Client Protocol (ACP) \u2014 a standardized communication protocol between code editors and AI-powered coding agents. ... Start by",
+       "title": "Agent Client Protocol - v1.4.0",
+       "url": "https://agentclientprotocol.github.io/typescript-sdk/"
+      }
+     ]
+    },
+    "threadId": "01a0a337-1df2-7760-88e2-7d4735e5b977",
+    "turnId": "01a0a337-1ecc-7482-8679-914c5bd70892",
+    "completedAtMs": 1789444719346
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-6e392051-5997-4766-9f07-570a5bbb76ff",
+     "query": "",
+     "action": null,
+     "results": null
+    },
+    "threadId": "01a0a337-1df2-7760-88e2-7d4735e5b977",
+    "turnId": "01a0a337-1ecc-7482-8679-914c5bd70892",
+    "startedAtMs": 1789444722167
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-6e392051-5997-4766-9f07-570a5bbb76ff",
+     "query": "",
+     "action": {
+      "type": "other"
+     },
+     "results": [
+      {
+       "type": "text_result",
+       "domain": "github.com",
+       "ref_id": "turn1view0",
+       "snippet": "Total lines: 1337",
+       "title": "acp/spec/SPEC.md at main \u00b7 agent-control-protocol/acp \u00b7 GitHub",
+       "url": "https://github.com/agent-control-protocol/acp/blob/main/spec/SPEC.md"
+      }
+     ]
+    },
+    "threadId": "01a0a337-1df2-7760-88e2-7d4735e5b977",
+    "turnId": "01a0a337-1ecc-7482-8679-914c5bd70892",
+    "completedAtMs": 1789444724851
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-dcdc3caa-afde-4f31-9eef-6d2bd2a9df38",
+     "query": "",
+     "action": null,
+     "results": null
+    },
+    "threadId": "01a0a337-e43b-7840-a8a3-963fa9d80123",
+    "turnId": "01a0a337-e57d-7630-b767-4c0a83d7d776",
+    "startedAtMs": 1789444750950
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "webSearch",
+     "id": "exec-dcdc3caa-afde-4f31-9eef-6d2bd2a9df38",
+     "query": "https://agentclientprotocol.com/protocol/overview",
+     "action": {
+      "type": "openPage",
+      "url": "https://agentclientprotocol.com/protocol/overview"
+     },
+     "results": [
+      {
+       "type": "text_result",
+       "domain": "agentclientprotocol.com",
+       "ref_id": "turn0view0",
+       "snippet": "Total lines: 287",
+       "thumbnail_url": "https://images.openai.com/static-rsc-1/REDACTED",
+       "title": "Overview - Agent Client Protocol",
+       "url": "https://agentclientprotocol.com/protocol/overview"
+      }
+     ]
+    },
+    "threadId": "01a0a337-e43b-7840-a8a3-963fa9d80123",
+    "turnId": "01a0a337-e57d-7630-b767-4c0a83d7d776",
+    "completedAtMs": 1789444753610
+   }
+  }
+ ]
+}

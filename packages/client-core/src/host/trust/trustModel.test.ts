@@ -29,7 +29,7 @@ const HASH = 'a'.repeat(64)
 const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
   api: [],
   events: [],
-  node: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
   ...over,
 })
 
@@ -163,7 +163,7 @@ describe('trustTiers', () => {
     // `Declared` describes plugin-authored unattended behavior, and `Web pages` reaches the
     // live internet. A reader who cannot tell them apart is being misled about the first one.
     const tiers = trustTiers(request({
-      permissions: permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: true, exec: false, net: [] } }),
+      permissions: permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: true, exec: false, net: [], sockets: false } }),
       contributions: {
         frames: [{
           target: 'webview', id: 'board-web', label: 'Board', glyph: 'puzzle', order: 500,
@@ -195,7 +195,7 @@ describe('trustTiers', () => {
   it('diffs the grant key, so rewording a sentence is not a fleet-wide “asks for more”', () => {
     // The whole reason PermissionLine carries a key at all. A copy edit that read as a new grant would
     // teach every owner in a fleet that the "asks for more" banner means nothing.
-    const same = permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: false, exec: false, net: [] } })
+    const same = permissions({ api: ['core.tasks:read'], node: { core: ['git'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })
     const tiers = trustTiers(request({ permissions: same, previous: { permissions: same } }))
     expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added)).toEqual([])
   })

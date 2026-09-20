@@ -64,7 +64,7 @@ export default function WorkflowDispatchForm(props: {
     <Show when={input.description}><Text emphasis="muted" wrap>{input.description}</Text></Show>
   </Stack>
 
-  return <Show when={targetStateKey()} keyed>{() => <Stack gap="stack">
+  return <Show when={targetStateKey()} keyed>{(_targetStateKey) => <Stack gap="stack">
     <Show when={isMap()}>
       <TypedBindingPicker label="Records to process"
         origins={workflowBindingOrigins(props.def, props.step, props.catalog)}

@@ -43,6 +43,26 @@ provider. Every query it makes carries the provider, and a freshness-marker key 
 provider's own `provider:<id>:` namespace is refused, so a plugin can never read or write another
 provider's rows through it.
 
+### Naming a connection
+
+Every connection carries two strings. `label` is the provider's own answer, written by `normalize`
+at connect and rewritten at every rotate: Linear reports the workspace, Rollbar the project, GitHub
+the login. `name` is what the owner typed in Settings, and is null until they type one.
+
+Show a connection with `connectionName` from `protocol/integrations.ts`, which reads the name and
+falls back to the label. Nothing reads either field on its own to put a connection in front of
+someone. `PATCH /v2/core/integrations/:id` carries the rename, and sending `name: null` clears it back
+to the label.
+
+The two are separate columns rather than one editable field for two reasons. A rotate rewrites
+`label`, so a name kept there would vanish the first time someone replaced a key. And Rollbar's
+project source reports `label` as the name of the project a connection covers, so an owner renaming a
+connection would rename a project in the mapping picker.
+
+A provider that can hold several connections is responsible for telling them apart wherever it merges
+their rows into one list. Linear's rail adds a workspace column when, and only when, more than one
+connection contributed rows to it.
+
 Deleting a connection cascades its cached external items, freshness markers, project links, and task
 links. The provider mirror is disposable and is never treated as the upstream source of truth.
 
@@ -105,6 +125,10 @@ or over-long one is dropped rather than truncated into a different project. The 
 the workspace-mapping write already accepts through Zod: up to 500 projects, ids and labels capped at
 200 bytes each, generous enough that no honest provider notices.
 
+An id is opaque to core: it is stored and handed back to the provider that offered it, and nothing
+between the two reads it. A provider that groups its work in more than one way can therefore offer
+both here and tell them apart itself, which is what Linear does with teams below.
+
 ### The map itself
 
 A link is a row in `workspace_external_projects`: a workspace, a connection, one of that connection's
@@ -152,14 +176,33 @@ because issue keys are not globally unique across connections. That is why a rai
 both carry the connection, and why a bare `ENG-42` from PR text is resolved by asking each connected
 workspace in turn.
 
+Promoting a pull request to a task has to settle that question before it writes, because a task link
+names one connection. One connected Linear answers it. With several, the repo's own project map
+decides: the Linear connections mapped to this project, or to its workspace as a whole, are the
+candidates, and exactly one candidate is an answer. A repo following two Linears, or none, gets a
+task with no Linear link rather than a link into the wrong workspace
+(`plugins/github/src/client/pullTasks.ts`).
+
 Linear ships as a loaded plugin. Its rail source lists issues, promotes one to a task with the
 issue's own suggested branch, links issues, posts comments, recognises `linear.app` issue URLs, and
 renders the reference panel github's PR detail shows, all as manifest descriptors and a sandboxed
 frame rather than compiled contributions. It contributes a project source, so its workspaces appear
 in core's project picker.
 
-The rail lists only the issues of the projects a workspace has linked, and with none linked the shell
-does not draw the source at all (see the source gates in [the frontend doc](./frontend.md)). Its
+A workspace can map a Linear team as well as a Linear project. An issue belongs to exactly one team
+and may belong to no project, so a team that works out of its backlog rather than out of projects has
+nothing to map otherwise, and its issues reach Acorn only by being pasted or referenced from a pull
+request. The project source lists both, and a team's id carries a `team:` prefix so the rail's filter
+knows to match Linear's `team` field instead of its `project` field. Core stores that id and never
+reads it, which is the whole of what makes this work without a schema change. An id with no prefix is
+a project, so rows written before teams were offered keep their meaning.
+
+Mapping a team is a wider net than mapping a project, and a busy team makes a long rail. It is also a
+coarser unit than a repository, so pointing one at a single project fits less often than a Linear
+project does.
+
+The rail lists only the issues of the projects and teams a workspace has linked, and with none linked
+the shell does not draw the source at all (see the source gates in [the frontend doc](./frontend.md)). Its
 `emptyState` therefore speaks to the case that remains: projects are linked and none of them has an
 active issue. See descriptors in [the plugins doc](./plugins.md). An earlier version fell back to the
 viewer's own open issues, cover for a rail that had no way to explain an empty list. That fallback is
@@ -462,4 +505,20 @@ A provider failure that is not a deliberate `ProviderOperationError` is flattene
 `provider_unavailable` before it reaches the client (`integrations/respondProvider.ts`), shared by
 core's own connection routes and by plugin-owned connect flows such as GitHub's device flow. An
 upstream exception message can quote a URL, a token fragment, or a response body, so a second copy of
-that mapping would only be a second place for one of those to leak through.
+that mapping would only be a second place for one of those to leak through. The flattening is not
+silent: the name and a scrubbed message go to the log with the request id the client was shown, which
+is the only record an unplanned throw leaves.
+
+Ask `isProviderOperationError(error)`, never `error instanceof ProviderOperationError`. Two things
+break the identity and they compound. A plugin bundle inlines its whole dependency graph, that class
+included, because a loaded plugin's directory has no `node_modules` to resolve against
+(`apps/node/scripts/build-plugin.mjs`). And a plugin runs in an isolated worker, so what it throws is
+torn down by `errorToWire` and rebuilt on this side as a plain `Error` (`packages/node-core/src/server/plugins/pluginRpc.ts`). The
+class never survives either crossing, so `instanceof` is false in both directions and a typed failure
+such as `provider_needs_auth` lands in the catch-all instead.
+
+The shape does survive, and the guard checks that: an `Error` carrying a numeric `status` and a
+`code` from `PROVIDER_ERROR_CODES`. Both fields have to be on the RPC record for that to hold, which
+is why `errorToWire` names `status` beside `code`. A field a host check depends on has to be added
+there or it is gone by the time the route reads it. The same caution applies to any other class that
+crosses this boundary, Hono's included.

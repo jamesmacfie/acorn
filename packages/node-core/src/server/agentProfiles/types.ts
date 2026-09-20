@@ -45,6 +45,11 @@ export type AgentProfileContribution = {
   mcpRegistration?: (name: string, launcher: Launcher) => Promise<{ ok: boolean; reason?: string }>
   // Extra argv for the interactive launch (docs/notes-and-memory.md § Context integration).
   launchArgs?: string[]
+  // Whether `command` can be opened as a terminal. Omitted means yes, which is every built-in profile:
+  // a shell, and three agent CLIs that all run interactively. `false` is for a profile that exists only
+  // to answer one prompt, where running `command` bare would fail in front of whoever picked it. The
+  // terminal's profile menu leaves those out (../profiles.ts) and the spawn route refuses them.
+  interactive?: boolean
   headlessArgv?: (command: string, opts: HeadlessOpts) => HeadlessArgv
   resumeArgv?: (command: string, sessionRef: string) => HeadlessArgv
   // Declaring this is the opt-in for text generation, not just for a workflow `decide` step: a profile

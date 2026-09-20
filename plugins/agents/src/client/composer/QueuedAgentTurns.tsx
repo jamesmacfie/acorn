@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { AgentRuntimeState, AgentTurn } from '@acorn/protocol/managedAgents.ts'
-import { Button, Card, Icon, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { Button, Card, IconButton, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import { clientEvents } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from '../settings/concurrencyClient'
 import { managedAgentApi } from '../sessions/managedClient'
@@ -100,10 +100,8 @@ export default function QueuedAgentTurns(props: {
                     <Show
                       when={editing() === turn.id}
                       fallback={
-                        <Button
-                          variant="bare"
-                          size="sm"
-                          iconOnly
+                        <IconButton
+                          icon="pencil"
                           title="Edit queued prompt"
                           label="Edit queued prompt"
                           disabled={pending() != null}
@@ -111,76 +109,54 @@ export default function QueuedAgentTurns(props: {
                             setEditing(turn.id)
                             setText(promptText(turn))
                           }}
-                        >
-                          <Icon name="pencil" />
-                        </Button>
+                        />
                       }
                     >
-                      <Button
-                        variant="bare"
+                      <IconButton
                         tone="accent"
-                        size="sm"
-                        iconOnly
+                        icon="check"
                         title="Save queued prompt"
                         label="Save queued prompt"
                         busy={pending() === `${turn.id}:save`}
                         disabled={!text().trim() || pending() != null}
                         onPress={() => void save(turn)}
-                      >
-                        <Icon name="check" />
-                      </Button>
-                      <Button
-                        variant="bare"
-                        size="sm"
-                        iconOnly
+                      />
+                      <IconButton
+                        icon="x"
                         title="Cancel editing"
                         label="Cancel editing"
                         disabled={pending() != null}
                         onPress={() => setEditing(null)}
-                      >
-                        <Icon name="x" />
-                      </Button>
+                      />
                     </Show>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
+                    <IconButton
+                      icon="arrow-up"
                       title="Move queued prompt up"
                       label="Move queued turn up"
                       busy={pending() === `${turn.id}:up`}
                       disabled={index() === 0 || pending() != null}
                       onPress={() => void run(`${turn.id}:up`, () =>
                         managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }))}
-                    >
-                      <Icon name="arrow-up" />
-                    </Button>
-                    <Button
-                      variant="bare"
-                      size="sm"
-                      iconOnly
+                    />
+                    <IconButton
+                      icon="arrow-down"
                       title="Move queued prompt down"
                       label="Move queued turn down"
                       busy={pending() === `${turn.id}:down`}
                       disabled={index() === queued().length - 1 || pending() != null}
                       onPress={() => void run(`${turn.id}:down`, () =>
                         managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }))}
-                    >
-                      <Icon name="arrow-down" />
-                    </Button>
-                    <Button
-                      variant="bare"
+                    />
+                    <IconButton
                       tone="danger"
-                      size="sm"
-                      iconOnly
+                      icon="trash-2"
                       title="Remove queued prompt"
                       label="Remove queued prompt"
                       busy={pending() === `${turn.id}:remove`}
                       disabled={pending() != null}
                       onPress={() => void run(`${turn.id}:remove`, () =>
                         managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))}
-                    >
-                      <Icon name="trash-2" />
-                    </Button>
+                    />
                   </Inline>
                 </Stack>
               </Card>

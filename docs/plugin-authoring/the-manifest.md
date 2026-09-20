@@ -69,6 +69,16 @@ yours:
 | `client` | `'./dist/client.js'` when a client is declared | your own, e.g. `'./client.js'` |
 | `migrations` | always `'./migrations'` in the built package | wherever your chain actually is |
 
+The repository builder emits only the runtimes the config declares. A client-only plugin names
+`client` and omits `entry`/`factory`; a descriptor-only plugin omits both. Removing a node entry also
+removes the old `dist/node.js` rather than carrying executable bytes the next manifest no longer
+names.
+
+A Solid remote-tree client that uses the published SDK sets
+`client.treeModule: 'acorn-plugin-sdk/remote'`. The builder then points the JSX transform at the same
+runtime that the plugin imports. Repository plugins that omit `treeModule` retain the private
+`@acorn/plugin-api/ui/tree` default.
+
 Everything else in the generated manifest — `name`, `icon`, `icons`, `permissions`,
 `contributions` — is copied through from the config untouched, so a `acorn-plugin.config.mjs` in the
 repository is a faithful reference for what those blocks look like. `plugins/http/acorn-plugin.config.mjs`
@@ -227,10 +237,8 @@ This is the whole plugin that adds OpenCode:
         "spawn": { "command": "opencode", "args": ["acp"] },
         "envPassthrough": ["OPENCODE_*"],
         "quirks": { "manualCompaction": true },
-        "terminal": {
-          "command": "opencode",
-          "oneShot": { "args": ["run"], "modelFlag": "--model", "output": "text" }
-        }
+        "terminal": { "command": "opencode" },
+        "oneShot": { "args": ["run"], "modelFlag": "--model", "output": "text" }
       }
     ]
   }
@@ -256,7 +264,7 @@ compatibility break for your users rather than a label edit.
 | `label`, `glyph` | Every surface: Agent Center rows, the pane header, usage sections, notifications |
 | `quirks` | Enables or hides the matching affordance, per harness |
 | `terminal` | Registers the terminal profile: task terminals, handoff, the input-controller lease |
-| `terminal.oneShot` | Lists your agent in every Generate control, and runs one contained turn when it is picked |
+| `oneShot` | Lists your agent in every Generate control, and runs one contained turn when it is picked |
 | `probes` | Fetches them and draws the answers |
 | nothing else | The ACP connection, the normalizer, the durable event ledger, transcript rendering, permission plumbing, attachments, session persistence, reconnect, replay |
 
@@ -286,8 +294,9 @@ record sees it.
 rather than by a list of ids inside acorn:
 
 - `manualCompaction` — the agent implements a compaction command, so the pane offers Compact.
-- `sessionPersistence` — sessions outlive the agent process and can be reloaded, so resume and the
-  terminal handoff exist.
+- `sessionPersistence` — sessions outlive the agent process, so the terminal handoff exists. You do not
+  need it for acorn to pick a session back up after a restart: if your agent advertises `session/load`
+  or `session/resume`, the driver finds that at `initialize` and uses it.
 
 Do not restate anything the agent already says through ACP capability negotiation. The driver reads
 those off the wire, and a manifest repeating them would only drift.
@@ -302,11 +311,19 @@ those off the wire, and a manifest repeating them would only drift.
   provider-health row. `null` means "cannot tell", which is different from `false`; an answer acorn
   cannot read is treated as `null` rather than as signed out.
 
-**One-shot text generation.** `terminal.oneShot` describes how your CLI answers a single prompt and
-exits. Declare it and your agent appears in every Generate control in acorn — the commit message wand,
-the SQL draft, the workflow definition generator — beside whatever API keys the owner has connected.
-Three fields:
+**One-shot text generation.** `oneShot` describes how your CLI answers a single prompt and exits.
+Declare it and your agent appears in every Generate control in acorn — the commit message wand, the
+SQL draft, the workflow definition generator — beside whatever API keys the owner has connected.
 
+It sits beside `terminal` rather than inside it, because holding a conversation and answering one
+question are two different things and some agents do only one. DeepSeek is the second kind:
+`dsh --profile headless "…"` answers and exits, and `dsh` on its own has no interactive mode, so it
+declares `oneShot` and no `terminal`. Then it is in the Generate lists and not in the terminal menu,
+which is the truth about it. Four fields:
+
+- `command` — the executable, for a harness with no `terminal` to borrow one from. Leave it out
+  whenever there is a `terminal`, because a harness runs one binary and acorn decides whether it is
+  installed by looking that one up on `PATH`. Naming a second one is refused rather than resolved.
 - `args` (required) — the subcommand and switches for one prompt in, one answer out. `["run"]` for
   OpenCode.
 - `modelFlag` — the flag a model id goes behind, in your CLI's own spelling. OpenCode wants
@@ -386,7 +403,8 @@ Three groups, enforced at the boundary that owns each one.
 undeclared host facet is absent, so the first call is a `TypeError` the author sees immediately.
 Filesystem, environment, process, and network grants are also absent unless declared.
 
-- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`, plus
+- `core`: `fs`, `git`, `tasks`, `context`, `models`, `identity`, `prefs`, `telemetry`,
+  `data:query`, `data:write`, plus
   `projects:read`, `projects:config`, `projects:write`. The project grants nest — `config` and
   `write` each imply `read` — and they are split because `checkouts()` returns where every codebase
   on the machine lives, and `config()` returns shell commands the node executes. An unknown token is
@@ -437,6 +455,15 @@ the person picking from the dropdown, or by your own fallback to the first avail
 cannot name a CLI the owner does not have, and you cannot make one run with tools or inside a
 worktree, because core owns that process. There is no second token for the CLI half: `models` is the
 host operation being granted, whichever host-owned backend the person later chooses.
+
+**Database access is host-mediated.** `data:query` supplies `ctx.core.data`: connect or disconnect a
+task's configured PostgreSQL source, inspect its catalog or configured schema description, and run a
+bounded read. Core resolves the transient URL, applies the repo-config trust gate, owns `pg` and the
+pool, normalizes cells, caps rows and timeouts, and runs reads in a read-only transaction. Your plugin
+never sees the URL or opens a socket. `data:write` implies that read surface and additionally permits
+`query(..., { readOnly: false })`; it draws as a separate high-risk trust line. Parameters belong in
+`options.parameters`, never interpolated into SQL. Identifiers cannot be parameters, so validate them
+against `catalog()` before quoting them.
 
 `permissions.api` is the **frame's** scope list, and unlike the node block it is genuinely enforced —
 by an allowlist of (path shape, method) pairs at

@@ -5,7 +5,12 @@
 import { verifyInternalToken, type InternalClaims } from '../auth/internalTokens'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { WebSocketServer, type WebSocket } from 'ws'
+// Type-only. The `ws` package is loaded on the first upgrade (attachWsHub), never at module load, so a
+// loaded-plugin bundle that reaches wsBroadcast/onWsBroadcast through notify.ts does not inline it. The
+// plugin builder inlines every non-builtin (apps/node/scripts/build-plugin.mjs), and ws is CommonJS, so
+// inlining it makes the bundler emit `createRequire` from `node:module`, which the plugin sandbox
+// forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
+import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { encodeIdFrame, WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
@@ -406,7 +411,9 @@ function dropDevice(deviceId: string): void {
 }
 
 export function attachWsHub(server: Server, deps: WsAuthDeps): void {
-  const wss = new WebSocketServer({ noServer: true })
+  // Created on the first upgrade, not here, so importing this module does not import the `ws` package.
+  // See the import note at the top for why that matters to loaded-plugin bundles.
+  let wss: WebSocketServer | null = null
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
   // Backstop for long-lived streams (docs/api-reference.md § Pairing, docs/security.md § Transport and
@@ -454,12 +461,14 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     // Synchronously, before the async authorize below: the "nobody answered" sweeper runs as the last
     // upgrade listener and cannot wait for our promise (server/transport/upgradeClaim.ts).
     claimUpgrade(socket)
-    void authorize(req, deps).then((authorized) => {
+    void authorize(req, deps).then(async (authorized) => {
       if (!authorized) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
         socket.destroy()
         return
       }
+      // Lazy, and `??=` so two upgrades racing the first load settle on one server.
+      wss ??= new (await import('ws')).WebSocketServer({ noServer: true })
       wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES))
     })
   }
@@ -469,7 +478,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     clearInterval(sweep)
     offRevoked()
     for (const conn of [...conns]) conn.ws.terminate()
-    wss.close()
+    wss?.close()
   })
 }
 

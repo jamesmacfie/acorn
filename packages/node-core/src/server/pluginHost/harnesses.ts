@@ -27,15 +27,18 @@ export type ManifestHarness = {
   spawn: ManifestHarnessSpawn
   envPassthrough: string[]
   quirks: { manualCompaction: boolean; sessionPersistence: boolean }
-  /** `oneShot` is the one argv a manifest may assemble: the arguments that make the CLI answer one
-   *  prompt and exit, the flag its model goes behind, and how its stdout is read. Present means the
-   *  consumer builds an `aiArgv` from it and the harness becomes a model backend. */
+  /** Present means the harness is offered in a task terminal. Absent means it is not, which is the
+   *  honest answer for an agent with no interactive mode. */
   terminal?: {
     command: string
     backendPreference: 'node-pty' | 'tmux'
     launchArgs: string[]
-    oneShot?: { args: string[]; modelFlag?: string; output: 'text' | 'json-lines' }
   }
+  /** The one argv a manifest may assemble: the arguments that make the CLI answer one prompt and exit,
+   *  the flag its model goes behind, and how its stdout is read. Present means the consumer builds an
+   *  `aiArgv` from it and the harness becomes a model backend. `command` falls back to the one
+   *  `terminal` declares, and the manifest parser has already refused a block with neither. */
+  oneShot?: { command?: string; args: string[]; modelFlag?: string; output: 'text' | 'json-lines' }
   /** Present only when the descriptor declared the matching route. Absent means the surface shows less,
    *  which suits most agent CLIs. */
   probeUsage?: HarnessProbe

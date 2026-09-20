@@ -85,16 +85,24 @@ const usageReading = (harness: ManifestHarness) => async (): Promise<AgentProvid
   }
 }
 
-const terminalProfile = (harness: ManifestHarness): AgentProfileContribution => {
-  const oneShot = harness.terminal!.oneShot
+// One profile row from whichever of the two blocks the harness declared. They are independent: a
+// harness may hold a conversation, answer one prompt, or do both. Without `terminal` the row is not a
+// terminal, and `interactive: false` is what keeps it out of the profile menu (node-core
+// server/profiles.ts) while still reaching every Generate list through `aiArgv` below.
+const harnessProfile = (harness: ManifestHarness): AgentProfileContribution => {
+  const { terminal, oneShot } = harness
+  // One binary per harness. The manifest parser refuses a `oneShot` with no command anywhere and
+  // refuses its own `command` beside a `terminal`, so exactly one of these two is present.
+  const command = terminal?.command ?? oneShot?.command ?? ''
   return {
     id: harness.id,
     label: harness.label,
     kind: 'agent',
-    command: harness.terminal!.command,
-    backendPreference: harness.terminal!.backendPreference,
+    command,
+    backendPreference: terminal?.backendPreference ?? 'tmux',
     transport: 'pty',
-    launchArgs: harness.terminal!.launchArgs,
+    launchArgs: terminal?.launchArgs ?? [],
+    ...(terminal ? {} : { interactive: false }),
     // No `headlessArgv` and no `resumeArgv`, on purpose: those need conditional argv assembly, and
     // putting that in manifest data means inventing a template language. A data-only harness works in
     // the Agent pane and the terminal, but no agentic workflow step can name it.
@@ -144,7 +152,7 @@ export function createHarnessRegistry(deps: {
           collect: usageReading(harness),
         }))
       }
-      if (harness.terminal) undo.push(profiles.register(terminalProfile(harness)))
+      if (harness.terminal || harness.oneShot) undo.push(profiles.register(harnessProfile(harness)))
       let disposed = false
       return {
         dispose: () => {

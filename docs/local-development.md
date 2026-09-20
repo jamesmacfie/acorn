@@ -44,6 +44,12 @@ stages them with the pinned Node runtime and the migration chains, then runs `ta
 Vite renderer on port 4319. `pnpm dev:node` runs the standalone Node and prints one JSON handshake
 line containing endpoint, fingerprint, certificate, Node ID, and device token.
 
+`pnpm dev:no-watch` is the same run with the Rust watcher off. `tauri dev` otherwise rebuilds and
+relaunches the app on every change under `src-tauri`, which takes the window away from whoever is
+using it, so start this way when somebody is working in the app while the shell is being edited.
+Pick the new binary up by stopping it and starting `pnpm dev` again. Renderer hot reload is Vite's
+and works the same either way.
+
 ### Agent-driven desktop development
 
 An agent on a graphical development host can launch and drive a real Acorn window without using the
@@ -67,6 +73,7 @@ Once the launcher prints `ready`, use its small command-line driver from another
 pnpm dev:agent:ui -- --session my-change snapshot
 pnpm dev:agent:ui -- --session my-change click e2
 pnpm dev:agent:ui -- --session my-change fill e4 "new value"
+pnpm dev:agent:ui -- --session my-change scroll -400
 pnpm dev:agent:ui -- --session my-change screenshot after-change.png
 pnpm dev:agent:ui -- --session my-change stop
 ```
@@ -77,8 +84,15 @@ persistent data directories, so a stopped name is not reused accidentally; pass 
 reopen its data. For a disposable end-to-end check of the launcher and first-run UI, run
 `pnpm dev:agent:smoke`.
 
+`scroll` moves the largest scrolling region and reports where that leaves the reader: the offset, and
+the turn the viewport starts in where the content publishes one. With no delta it only looks, which is
+what a check across a navigation wants — note the turn, go somewhere else, come back, ask again.
+Compare the turn and not the offset, because an offset means nothing once the content above it has
+changed height, which is why a transcript's reading place is a turn in the first place
+([ui-design.md](./ui-design.md) § Behaviour a pane keeps redoing).
+
 The driver controls the main Acorn renderer through the Tauri webview. It can inspect rendered text,
-click and fill elements, and capture the window. Native menus and dialogs, terminal keyboard fidelity,
+click and fill elements, scroll, and capture the window. Native menus and dialogs, terminal keyboard fidelity,
 and host-owned child webviews still require native computer-use control or the release smoke checklist.
 The WebDriver dependency and server exist only behind the `agent-automation` Cargo feature used by
 this launcher; normal development and packaged builds do not expose it.

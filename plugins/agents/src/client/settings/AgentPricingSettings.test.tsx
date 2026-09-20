@@ -7,14 +7,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const saveAgentPricing = vi.fn(async (preferences: unknown) => preferences)
 
-vi.mock('./pricingClient', () => ({
+vi.mock('../pricingClient', () => ({
   agentPricingQueryKey: ['agents', 'pricing'],
   agentPricingOptions: () => ({}),
   saveAgentPricing: (preferences: unknown) => saveAgentPricing(preferences),
 }))
 
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ data: { version: 1, claude: { overrides: [], customModels: [] } } }),
+  createQuery: () => ({
+    data: {
+      version: 1,
+      claude: { overrides: [], customModels: [] },
+      codex: { overrides: [], customModels: [] },
+    },
+  }),
   useQueryClient: () => ({ setQueryData: () => {} }),
 }))
 
@@ -52,7 +58,10 @@ describe('the agent pricing settings page', () => {
     const host = draw()
     const heads = host.querySelectorAll('thead th[scope="col"]')
     expect([...heads].map((head) => head.textContent))
-      .toEqual(['Model', 'Input', 'Output', 'Cache write', 'Cache read', ''])
+      .toEqual([
+        'Model', 'Input', 'Output', 'Cache write', 'Cache read', '',
+        'Model', 'Input', 'Output', 'Cache write', 'Cache read', '',
+      ])
     // Every model gets a row header and one number field per price.
     const rows = [...host.querySelectorAll('tr')].filter((row) => !row.closest('thead'))
     expect(rows.length).toBeGreaterThan(0)

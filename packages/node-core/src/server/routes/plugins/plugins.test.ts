@@ -18,7 +18,7 @@ const ROSTER: PluginRosterEntry[] = [
   { name: 'rollbar', required: false, disabled: true, state: 'disabled' },
 ]
 
-const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
+const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
   version: '1.0.0',

@@ -15,6 +15,9 @@ export {
   Textarea, ToggleButton, Toolbar, ToolbarSpacer, TreeRow,
 } from '@acorn/client-core/kit/components/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/kit/components/content/Icon.tsx'
+// The small square affordance: one mark, a required accessible name, and the bar's own size
+// already chosen. Reach for this rather than a `Button` with `iconOnly` spelled out.
+export { IconButton } from '@acorn/client-core/kit/components/inputs/IconButton.tsx'
 export { default as Picker } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 // The row on its own, for a list that opens from typing rather than from Picker's trigger button.
 export { default as PickerRow } from '@acorn/client-core/kit/components/inputs/PickerRow.tsx'
@@ -99,7 +102,8 @@ export { Text } from '@acorn/client-core/kit/components/content/Text.tsx'
 export { Link } from '@acorn/client-core/kit/components/content/Link.tsx'
 export { Heading } from '@acorn/client-core/kit/components/content/Heading.tsx'
 export { Section } from '@acorn/client-core/kit/components/layout/Section.tsx'
-export { Timeline } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+export type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
 export { Facts } from '@acorn/client-core/kit/components/content/Facts.tsx'
 export { ChipRow } from '@acorn/client-core/kit/components/layout/ChipRow.tsx'
 export { Log } from '@acorn/client-core/kit/components/content/Log.tsx'

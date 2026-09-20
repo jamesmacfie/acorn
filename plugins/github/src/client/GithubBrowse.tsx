@@ -23,7 +23,9 @@ import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
 import { createBrowseScope } from './browseScope'
 import { githubCreateRoute } from './clientRoutes'
-import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, SectionHeader } from '@acorn/plugin-api/ui'
+import {
+  Button, DetailColumn, EmptyState, IconButton, ListColumn, ListDetail, SectionHeader,
+} from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
 // form do not compete with the first interactive paint. PullList is the startup path, so it loads
@@ -74,7 +76,7 @@ export function GithubBrowseList() {
               tip="New pull request"
               onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(scope.projectId())))}
             >+ New PR</Button>
-            <Button variant="bare" iconOnly tip="Refresh reviews" label="Refresh reviews" busy={refreshing()} onPress={refreshAllPulls}>↻</Button>
+            <IconButton icon="refresh-cw" tip="Refresh reviews" label="Refresh reviews" busy={refreshing()} onPress={refreshAllPulls} />
           </>
         }
       >

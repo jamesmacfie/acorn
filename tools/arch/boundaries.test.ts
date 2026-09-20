@@ -259,6 +259,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
       'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
+      'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
@@ -271,7 +272,6 @@ describe('architecture boundaries', () => {
       'plugins/agents/src/server/usage/codexUsage.ts',
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
-      'plugins/database/src/server/database.ts',
       'plugins/editor/src/server/search.ts', // ripgrep, streamed
       'plugins/http/src/server/send.ts',
     ])
@@ -544,6 +544,8 @@ describe('architecture boundaries', () => {
     // reopen every path at once and break no build. That is what this checks. It also checks that
     // every declared target exists, because a map entry pointing at a moved file fails only for
     // whoever imports it next.
+    // An empty map is a declaration too: a plugin whose entry is a relative path in its plugin config
+    // resolves no subpath from outside, and `{}` says so where a missing field says nothing at all.
     const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|contract\/\*|testkit|testkit\/client)$/
     const problems: string[] = []
     for (const pkg of PACKAGES.filter((p) => p.kind === 'plugin')) {

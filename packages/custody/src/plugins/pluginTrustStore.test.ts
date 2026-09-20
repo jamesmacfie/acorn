@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { PluginTrustStore, type PluginAck } from './pluginTrustStore'
 
-const NONE: NodePluginPermissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
+const NONE: NodePluginPermissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const HASH_A = 'a'.repeat(64)
 const HASH_B = 'b'.repeat(64)
 

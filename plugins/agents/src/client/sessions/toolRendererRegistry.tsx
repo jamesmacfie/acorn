@@ -1,9 +1,10 @@
-import { createSignal, For, mergeProps, Show, type Component } from 'solid-js'
+import { createEffect, createSignal, For, mergeProps, on, Show, type Component } from 'solid-js'
 import { agentToolTone } from '@acorn/plugin-api/client'
 import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
+import { WebToolBody, webSummary } from './webToolCard'
 
 /** What the built-in card draws with: the point's own props plus the one thing a contributor cannot
  *  have, a callback. It is what lets "carry my last one forward" learn from this card too, and a
@@ -18,19 +19,27 @@ const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 
 
 /** The state half: a dot, and the word beside it while the call is not finished. The dot carries a
  *  finished call's state on its own, and the word beside it used to read as the entire card whenever
- *  a provider sent its updates without a title. */
-const AgentToolState: Component<AgentToolRendererProps> = (props) => (
-  <Inline>
-    <StatusDot
-      tone={agentToolTone(props.tool.status)}
-      pulse={toolStatusLabel(props) === 'running'}
-      label={toolStatusLabel(props)}
-    />
-    <Show when={toolStatusLabel(props) !== 'completed'}>
-      <Text emphasis="muted">{toolStatusLabel(props)}</Text>
-    </Show>
-  </Inline>
-)
+ *  a provider sent its updates without a title.
+ *
+ *  A web call adds its one-line summary here, in the fold's `meta` slot, rather than to the label: the
+ *  label is the row's accessible name and it is what a reader scans a transcript by, so it stays the
+ *  stable `Search web` while the query — which can be a paragraph — sits beside it. */
+const AgentToolState: Component<AgentToolRendererProps> = (props) => {
+  const summary = () => (props.tool.web ? webSummary(props.tool.web) : undefined)
+  return (
+    <Inline>
+      <StatusDot
+        tone={agentToolTone(props.tool.status)}
+        pulse={toolStatusLabel(props) === 'running'}
+        label={toolStatusLabel(props)}
+      />
+      <Show when={toolStatusLabel(props) !== 'completed'}>
+        <Text emphasis="muted">{toolStatusLabel(props)}</Text>
+      </Show>
+      <Show when={summary()}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
+    </Inline>
+  )
+}
 
 /** The flat card: a call with nothing to open onto. The provider's own name for it, which for a
  *  shell command is the command itself. */
@@ -44,6 +53,7 @@ const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
 // onto nothing. Providers report plenty of calls with neither output nor a path, so those render flat.
 const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
+  const fold = useAgentToolFold()
   // Seeded from the reader's setting, then the reader's own. A reactive `open` would shut a card the
   // moment its call finished, which is when somebody is most likely to be reading it, and the card
   // only holds this state for as long as it stays mounted — see the note on Show's children in
@@ -53,6 +63,10 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // started call as `running`, the ACP path reports it as `pending` and never as `running` at all, so
   // one provider's cards opened themselves and the other's never did.
   const [open, setOpen] = createSignal(props.defaultOpen)
+  // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
+  // the seed above already decided how this card opens, and a new card arriving after a collapse
+  // starts collapsed anyway.
+  createEffect(on(() => fold.collapseSignal?.(), () => setOpen(false), { defer: true }))
   return (
     <Fold
       label={props.tool.title || 'Tool'}
@@ -64,18 +78,28 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
         props.onOpenChange(next)
       }}
     >
-      <Stack gap="row">
-        <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
-        <Show when={props.tool.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
-        <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
-      </Stack>
+      {/* Web activity gets its own body, and it is chosen on the payload rather than on `kind`, a
+          harness id or a tool name: any driver that fills in `tool.web` draws this card. The
+          pretty-printed `input` is dropped there, because it is the same query said again as JSON. */}
+      <Show
+        when={props.tool.web}
+        fallback={
+          <Stack gap="row">
+            <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
+            <Show when={props.tool.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
+            <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
+          </Stack>
+        }
+      >
+        {(web) => <WebToolBody web={web()} output={props.tool.output} />}
+      </Show>
     </Fold>
   )
 }
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <Show
-    when={props.tool.input || props.tool.output || props.tool.paths?.length}
+    when={props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web}
     fallback={<AgentToolHead {...props} />}
   >
     <AgentToolFold {...props} />

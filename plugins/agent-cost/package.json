@@ -1,0 +1,25 @@
+{
+  "name": "@acorn/plugin-agent-cost",
+  "version": "0.1.0",
+  "description": "A compact managed-session cost estimate beside the session title.",
+  "private": true,
+  "type": "module",
+  "exports": {},
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "acorn-plugin-sdk": "workspace:*",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}

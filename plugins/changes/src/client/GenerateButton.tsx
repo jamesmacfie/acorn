@@ -1,5 +1,7 @@
 import { Show } from 'solid-js'
-import { Button, ConfirmButton, Icon, Inline, ModelBackendPicker, Popover, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  ConfirmButton, Icon, IconButton, Inline, ModelBackendPicker, Popover, Stack, Text,
+} from '@acorn/plugin-api/ui'
 import type { ChangesModel } from './changesModel'
 
 // "Write it for me", at the left of the commit toolbar where Zed's is.
@@ -45,18 +47,14 @@ function ModelPickerButton(props: { model: ChangesModel }) {
       ariaLabel="Model for the message"
       minWidth={220}
       trigger={({ open, toggle }) => (
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="chevron-down"
           label="Model for the message"
           title={`Which provider writes the message. Now: ${labelFor(model())}`}
           opens="menu"
           expanded={open()}
           onPress={toggle}
-        >
-          <Icon name="chevron-down" />
-        </Button>
+        />
       )}
     >
       <Stack gap="row">

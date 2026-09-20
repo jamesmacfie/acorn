@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
   id: String(seq),
@@ -64,6 +64,39 @@ describe('conversation projection', () => {
       contextSize: 1_000_000,
       cost: { amount: 2.8301, currency: 'USD' },
     })
+  })
+
+  it('closes each turn with the context it had used, and draws no usage line of its own', () => {
+    const items = buildConversationItems([
+      event(1, { type: 'usage', usage: { contextUsed: 94_358, contextSize: 1_000_000 } }, 'turn-1'),
+      event(2, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
+      event(3, { type: 'usage', usage: { contextUsed: 180_004, contextSize: 1_000_000 } }, 'turn-2'),
+      // Codex clears the turn before it emits the completion, so this one arrives unattributed.
+      event(4, { type: 'turn_completed', stopReason: 'end_turn' }, null),
+    ])
+    expect(items.filter((item) => item.event.type === 'turn_completed').map((item) => item.context)).toEqual([
+      { used: 94_358, size: 1_000_000 },
+      { used: 180_004, size: 1_000_000 },
+    ])
+    expect(visibleConversationItems(items).map((item) => item.event.type))
+      .toEqual(['turn_completed', 'turn_completed'])
+  })
+
+  it('picks up a usage update that lands after the turn already closed', () => {
+    const items = buildConversationItems([
+      event(1, { type: 'usage', usage: { contextUsed: 94_358, contextSize: 1_000_000 } }, 'turn-1'),
+      event(2, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
+      // The last usage of a turn arrives unattributed, after the completion. It folds onto the line it
+      // belongs to, which sits above the closing card, so the second pass reads the final figure.
+      event(3, { type: 'usage', usage: { contextUsed: 96_100 } }, null),
+    ])
+    expect(items.find((item) => item.event.type === 'turn_completed')?.context)
+      .toEqual({ used: 96_100, size: 1_000_000 })
+  })
+
+  it('leaves a turn that reported no context without a figure', () => {
+    const items = buildConversationItems([event(1, { type: 'turn_completed', stopReason: 'refusal' })])
+    expect(items[0].context).toBeUndefined()
   })
 
   it('starts a new usage line for a new turn', () => {
@@ -277,5 +310,90 @@ describe('what a request leaves in the thread', () => {
       event(3, { type: 'assistant_message', text: 'After' }),
     ]))
     expect(ordered.map((item) => item.event.type)).toEqual(['assistant_message', 'request', 'assistant_message'])
+  })
+})
+
+describe('what "show chats only" keeps', () => {
+  const chats = (records: AgentEventRecord[], requestFor?: (id: string) => AgentRequest | undefined) =>
+    visibleConversationItems(buildConversationItems(records), requestFor)
+      .filter(isChatItem)
+      .map((item) => item.event.type)
+
+  it('keeps the question the agent asked and the answer on it', () => {
+    expect(chats([
+      event(1, { type: 'assistant_message', text: 'Two ways to do this.' }),
+      event(2, { type: 'request', requestId: 'ask-1', kind: 'question', title: 'Which one?', questions: [] }),
+      event(3, { type: 'request_resolved', requestId: 'ask-1', resolution: { answers: { pick: 'first' } } }),
+      event(4, { type: 'assistant_message', text: 'Doing the first one.' }),
+    ])).toEqual(['assistant_message', 'request', 'assistant_message'])
+  })
+
+  it('still drops the tool calls and the notes', () => {
+    expect(chats([
+      event(1, { type: 'user_message', text: 'Go' }),
+      event(2, { type: 'reasoning', text: 'thinking' }),
+      event(3, { type: 'tool', tool: { id: 'bash-1', title: 'Bash' } }),
+      event(4, { type: 'turn_completed', stopReason: 'end_turn' }),
+    ])).toEqual(['user_message'])
+  })
+
+  // `belongsInThread` has already let it go, so chat-only inherits that rather than deciding again.
+  it('does not bring back a permission that was already answered', () => {
+    const rows = () => ({ providerRequestId: 'allow-1', status: 'resolved' } as AgentRequest)
+    expect(chats([
+      event(1, { type: 'request', requestId: 'allow-1', kind: 'permission', title: 'Allow the tests?', options: [] }),
+    ], rows)).toEqual([])
+  })
+})
+
+// One provider call is several updates, and a web payload is the first thing on a tool card with a
+// shape of its own. Both live captures split the request from the sources, so a merge that replaced
+// the whole `web` object would lose one half or the other depending on which arrived last.
+describe('folding a tool call’s web activity', () => {
+  const webCard = (records: AgentEventRecord[]) => {
+    const [item] = buildConversationItems(records)
+    return item.event.type === 'tool' ? item.event.tool.web : undefined
+  }
+
+  it('adds the sources a completion reports to the action the start reported', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', web: { results: [{ url: 'https://example.com' }] } } }),
+    ])).toEqual({ action: { type: 'search', queries: ['acp'] }, results: [{ url: 'https://example.com' }] })
+  })
+
+  it('keeps the action when a later update repeats nothing of it', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Fetch page', web: { action: { type: 'fetch_page', url: 'https://example.com' } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', status: 'completed', output: 'the page' } }),
+    ])).toEqual({ action: { type: 'fetch_page', url: 'https://example.com' } })
+  })
+
+  it('is unchanged when a completion repeats the action it already had', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { action: { type: 'search', queries: ['acp'] } } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: 'Search web', status: 'completed', web: { action: { type: 'search', queries: ['acp'] } } } }),
+    ])).toEqual({ action: { type: 'search', queries: ['acp'] } })
+  })
+
+  it('lets a provider say it found nothing, and tells that apart from saying nothing', () => {
+    expect(webCard([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', web: { results: [{ url: 'https://example.com' }] } } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [] } } }),
+    ])?.results).toEqual([])
+  })
+
+  it('keeps everything else on the card when only sources arrive', () => {
+    const [item] = buildConversationItems([
+      event(1, { type: 'tool', tool: { id: 'w', title: 'Search web', kind: 'search', status: 'running', input: '{}', subagentId: 'child-1' } }),
+      event(2, { type: 'tool', tool: { id: 'w', title: '', web: { results: [{ url: 'https://example.com' }] } }, ...{} }),
+    ])
+    expect(item.event.type === 'tool' && item.event.tool).toMatchObject({
+      title: 'Search web',
+      kind: 'search',
+      status: 'running',
+      input: '{}',
+      subagentId: 'child-1',
+    })
   })
 })

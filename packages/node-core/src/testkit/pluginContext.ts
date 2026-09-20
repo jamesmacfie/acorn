@@ -24,7 +24,7 @@ import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } f
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
 // this is what `permissions: {}` means in a config, and a test opts into each grant by name.
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
+const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
 
 export type TestNodeContextOptions = {
   // The plugin under test. A NodePlugin satisfies this, so `{ plugin: rollbarPlugin() }` reads well.

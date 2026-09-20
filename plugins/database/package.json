@@ -19,7 +19,6 @@
     "@tanstack/solid-virtual": "^3.13.29",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "pg": "^8.22.0",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },
@@ -27,7 +26,6 @@
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
-    "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

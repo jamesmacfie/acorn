@@ -51,7 +51,8 @@ Checks run on September 14, 2026:
 - `rtk pnpm --filter @acorn/protocol test src/dataQueryResolution.test.ts`: three tests passed.
 - `rtk pnpm --filter @acorn/client-core test src/features/queries/recoveryStore.test.ts`: three tests
   passed, including reopening across a changed base revision and a late acknowledgment after edits.
-- `rtk pnpm db:check`: all 11 migration chains passed, including core migration 0006.
+- `rtk pnpm db:check`: all 11 migration chains passed. After merging main's integration-name
+  migration, the workflow tables are consolidated in core migration 0007.
 - `rtk pnpm --filter @acorn/arch-tests test`: 63 tests passed. The first run found the route's
   `parse` spelling; the route uses `safeParse` and the rerun passed.
 - `rtk proxy env UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test src/surface.test.ts`: one test

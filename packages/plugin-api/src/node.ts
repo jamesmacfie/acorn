@@ -103,7 +103,25 @@ export type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
 // the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
-export type { CompiledCoreServices, CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/server/core/index.ts'
+export type {
+  CompiledCoreServices,
+  CoreFsService,
+  CoreGitService,
+  CoreProcService,
+  CoreServices,
+  DataCell,
+  DataColumn,
+  DataQueryOptions,
+  DataQueryResult,
+  DataSchemaResult,
+  DataSchemaSource,
+  DataSourceService,
+  DataTable,
+  GenerateTextRequest,
+  ModelService,
+  ProjectRef,
+  TaskRef,
+} from '@acorn/node-core/server/core/index.ts'
 export { SecretUnavailableError } from '@acorn/node-core/server/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/server/core/prefs.ts'
@@ -146,6 +164,7 @@ export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node
 export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/server/headless.ts'
 export {
   getProfile,
+  interactiveProfile,
   listProfileDefs,
   listProfiles,
   profileAvailable,
@@ -154,7 +173,7 @@ export {
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
 export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export { acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
@@ -182,7 +201,7 @@ export { serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 export type { Cached, RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 
 // ── Integrations and providers ────────────────────────────────────────────────────────────────
-export { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
+export { isProviderOperationError, ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 export type {
   CachedExternalItem,
   CachedItemCodec,

@@ -6,10 +6,7 @@ import { dataRecordActionSchema } from './dataActions'
 import {
   dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
-  dataSourceRegistrationSchema,
   type DataSourceDescriptor,
-  type DataSourceDiscovery,
-  type DataSourceRegistration,
 } from './dataSourceContributions'
 
 export {

@@ -29,7 +29,7 @@ const row = (name: string, over: Partial<NodePluginRow['installed']> = {}, frame
     // The real constant, not '1': the literal made every fixture here a candidate this shell could not
     // speak the day PLUGIN_API_MAJOR moved, and the failure looked like a bug in resolution.
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     contributions: { frames } as PluginContributions,
     client: null,
     ...over,

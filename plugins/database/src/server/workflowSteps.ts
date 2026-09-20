@@ -78,13 +78,13 @@ export function databaseQuery(bridge: DatabaseBridge): DatabaseQuery {
     query: async (taskId, sql, options) => {
       const refusal = readOnlyRefusal(sql)
       if (refusal) throw new Error(`This query is refused: ${refusal}.`)
-      let result = await bridge.query(taskId, sql)
+      let result = await bridge.query(taskId, sql, { readOnly: true })
       // A step has no pane to have pressed Connect in, so the first "not connected" opens the pool and
       // tries once more. Any other error is the query's own and is handed straight back.
       if ('error' in result && result.error === NOT_CONNECTED) {
         const connected = await bridge.connect(taskId)
         if (!connected.ok) throw new Error(connected.error)
-        result = await bridge.query(taskId, sql)
+        result = await bridge.query(taskId, sql, { readOnly: true })
       }
       if ('error' in result) throw new Error(result.error)
       const max = rowCap(options?.maxRows)

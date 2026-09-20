@@ -13,7 +13,7 @@ import type {
 import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protocol/managedAgents.ts'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
-import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
+import { eventSubagentId, foldSubagentRoster, projectAgentEvent, touchSubagentRoster } from './stateMachine'
 import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
 import { AgentLifecycle } from './lifecycle'
 import { normalizeStoredSessionTitle } from './sessionTitle'
@@ -31,6 +31,10 @@ const parseSubagents = (value: string | null): AgentSubagent[] => {
     return []
   }
 }
+
+// `undefined` in, `undefined` out, because the column is only written when something changed.
+const jsonOrUndefined = (roster: AgentSubagent[] | undefined): string | undefined =>
+  roster ? JSON.stringify(roster) : undefined
 
 type SessionSearchFilter = {
   taskId?: string
@@ -106,6 +110,10 @@ export class AgentSessionRepository {
       // row rather than in a table of its own because runtimeEngine.record() already broadcasts the
       // row after every event, which is what makes the sidebar's sub-rows live for a session nobody
       // has opened (docs/managed-agents.md § Subagents).
+      // An event the harness attributed to a child marks that child heard from, which is what keeps a
+      // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
+      // clock the roster has is one that stopped ticking minutes ago.
+      const touchedId = event.type === 'subagent' ? undefined : eventSubagentId(event)
       const subagentsJson = event.type === 'subagent'
         ? JSON.stringify(foldSubagentRoster(
             parseSubagents(current.subagentsJson),
@@ -113,7 +121,9 @@ export class AgentSessionRepository {
             turnId,
             timestamp,
           ))
-        : undefined
+        : touchedId
+          ? jsonOrUndefined(touchSubagentRoster(parseSubagents(current.subagentsJson), touchedId, timestamp))
+          : undefined
       tx.update(schema.agentSessions)
         .set({
           lastEventSeq: seq,

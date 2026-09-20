@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationMapping, IntegrationProject, Workspace } from '@acorn/protocol/api.ts'
+import { connectionName } from '@acorn/protocol/integrations.ts'
 import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../../infra/queries'
 import { setIntegrationMappings } from '../workspaces/workspaceMutations'
 import { Alert, Button, EmptyState, Select } from '../../kit/components/primitives'
@@ -129,7 +130,7 @@ export default function ConnectionProjectMap(props: { connection: Integration })
         <Select
           value={externalId()}
           disabled={busy() || !offered().length}
-          label={`${props.connection.label} projects`}
+          label={`${connectionName(props.connection)} projects`}
           onChange={(value) => setExternalId(value)} options={[{ value: '', label: projects.isPending ? 'Loading projects…' : 'Choose a project…' }, ...offered().map((project) => ({ value: project.id, label: project.label }))]} />
         <Select
           value={target()}

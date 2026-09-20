@@ -23,8 +23,13 @@ export type MarkdownOptions = {
    * tracker or a note. `placeholder` renders the alt text and never issues the request, for output a
    * model produced: a remote image there is a tracking pixel that carries the reader's IP, and the
    * managed-agent transcript is provider text rather than authored text. Defaults to `inline`.
+   *
+   * `thumb` is `inline` drawn as a short band across whatever holds it, cropped to fill, for a picture
+   * that stands for a file rather than being the content: an attachment above its filename, where full
+   * size would push everything else off the card. The flavour is the whole difference, so it rides the
+   * same `<img>` and the stylesheet does the sizing.
    */
-  images?: 'inline' | 'placeholder'
+  images?: 'inline' | 'placeholder' | 'thumb'
 }
 
 // Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores, so tokens
@@ -46,12 +51,23 @@ function inline(raw: string, opts: MarkdownOptions): string {
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, url: string) =>
     `${S}i${images.push({ alt, url }) - 1}${S}`)
   s = esc(s)
+  // A rendered link parks its href here and leaves a sentinel in its place, so the autolink pass
+  // below cannot see a URL it has already handled. Only the href hides: the link's text stays in the
+  // string, so emphasis written inside it still renders.
+  const hrefs: string[] = []
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
     const href = safeHref(url) // url is already escaped, so don't re-escape it
-    return href ? `<a href="${href}" target="_blank" rel="noreferrer">${text}</a>` : text
+    return href ? `<a href="${S}l${hrefs.push(href) - 1}${S}" target="_blank" rel="noreferrer">${text}</a>` : text
   })
+  // A pasted URL is a link too. Nobody writing in a note or a commit message reaches for the bracket
+  // form, and a model writes one far less often than it writes the bare address, so without this the
+  // most common link in the app is the one you cannot click. Trailing punctuation is left out of the
+  // match because a sentence ends with a full stop more often than a URL does.
+  s = s.replace(/https?:\/\/[^\s<\uE000]*[^\s<\uE000.,:;!?)\]}'"]/g, (url: string) =>
+    `<a href="${url}" target="_blank" rel="noreferrer">${url}</a>`)
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>')
+  s = s.replace(new RegExp(`${S}l(\\d+)${S}`, 'g'), (_m, i: string) => hrefs[Number(i)])
   s = s.replace(new RegExp(`${S}(\\d+)${S}`, 'g'), (_m, i: string) => `<code>${esc(codes[Number(i)])}</code>`)
   s = s.replace(new RegExp(`${S}i(\\d+)${S}`, 'g'), (_m, i: string) => {
     const image = images[Number(i)]

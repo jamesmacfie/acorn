@@ -41,7 +41,7 @@ describe('the two permission groups', () => {
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
     // that is what checkouts() returns (docs/security.md § Rung 1).
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [] } })))).toEqual([
+    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
       'Read projects, including where every codebase lives on disk',
     ])
   })
@@ -54,6 +54,7 @@ describe('the two permission groups', () => {
         secrets: false,
         exec: false,
         net: [],
+        sockets: false,
         env: ['DATABASE_URL'],
         files: [{ env: 'ACORN_NODES_FILE', access: 'read-write' }],
       },
@@ -69,7 +70,7 @@ describe('the two permission groups', () => {
     // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
     // no token, because a plugin measuring its own work reads nobody else's
     // (docs/security.md § Telemetry sinks).
-    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [] } }))
+    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
     expect(texts(lines)).toEqual([
       'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',
     ])
@@ -77,9 +78,20 @@ describe('the two permission groups', () => {
   })
 
   it('names the executable configuration carried by the config grant', () => {
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [] } })))).toEqual([
+    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
       'Read every project’s build, dev and database scripts',
     ])
+  })
+
+  it('draws database writes high and keeps reads ordinary', () => {
+    const lines = nodePermissionLines(permissions({
+      node: { core: ['data:query', 'data:write'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+    }))
+    expect(texts(lines)).toEqual([
+      'Query the databases you’ve connected',
+      'Change data in the databases you’ve connected',
+    ])
+    expect(lines.map((entry) => entry.high)).toEqual([false, true])
   })
 
   it('discloses a plugin\'s own live channel without echoing the verb it named', () => {
@@ -122,10 +134,10 @@ describe('the two permission groups', () => {
 
 describe('the update diff', () => {
   it('marks only what is new, so an unchanged set reads as unchanged', () => {
-    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [] } })
+    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })
     const after = permissions({
       api: ['core.tasks:read', 'core.tasks:write'],
-      node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [] },
+      node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [], sockets: false },
     })
     expect(added(before, after, nodePermissionLines)).toEqual(['Run commands on the node'])
     expect(added(before, after, uiPermissionLines)).toEqual(['Create and update tasks'])
@@ -142,7 +154,7 @@ describe('the update diff', () => {
     // every owner of every installed plugin. Same grants, different sentence, nothing new.
     const same = permissions({
       api: ['core.tasks:read'],
-      node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'] },
+      node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'], sockets: false },
     })
     const reworded = (project: (p: NodePluginPermissions) => PermissionLine[]) => (p: NodePluginPermissions) =>
       project(p).map((line) => ({ ...line, text: `SEE: ${line.text}` }))
@@ -167,7 +179,7 @@ describe('the update diff', () => {
     // sentence missed the table as harmless.
     const risky = permissions({
       api: ['core.projects:read'],
-      node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'] },
+      node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'], sockets: false },
     })
     const high = (lines: readonly PermissionLine[]) => lines.filter((line) => line.high).map((line) => line.key)
     expect(high(nodePermissionLines(risky))).toEqual(['node.secrets', 'node.exec', 'node.core:projects:write'])
@@ -179,7 +191,7 @@ describe('the update diff', () => {
   // A permission the plugin gave up is not marked. The prompt asks whether the new reach is
   // acceptable, and a removal is never the thing to hesitate over.
   it('does not mark a permission that was dropped', () => {
-    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [] } })
+    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [], sockets: false } })
     expect(added(before, permissions(), nodePermissionLines)).toEqual([])
   })
 })
@@ -266,7 +278,8 @@ describe('the harness grant', () => {
       label: 'OpenCode',
       spawn: { command: 'opencode', args: ['acp'] },
       envPassthrough: [],
-      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [], oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) } },
+      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+      oneShot: { args, output: 'text', ...(modelFlag ? { modelFlag } : {}) },
     }])
 
     const lines = harnessPermissionLines(harnessGrants(withOneShot(['run'], '--model')))
@@ -287,6 +300,19 @@ describe('the harness grant', () => {
     expect(harnessPermissionLines(harnessGrants(contributions([
       { id: 'opencode', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
     ])))).toHaveLength(1)
+
+    // A harness with no interactive mode names its own command, and the line reads the same either way,
+    // because what an owner consents to is the program and its arguments.
+    expect(texts(harnessPermissionLines(harnessGrants(contributions([{
+      id: 'deepseek',
+      label: 'DeepSeek',
+      spawn: { command: 'dsh', args: ['--profile', 'acp'] },
+      envPassthrough: [],
+      oneShot: { command: 'dsh', args: ['--profile', 'headless'], output: 'text' },
+    }]))))).toEqual([
+      'Run “dsh --profile acp” as the “DeepSeek” agent',
+      'Runs “dsh --profile headless” to generate text',
+    ])
   })
 
   it('discloses nothing for a spawn the node already refused', () => {

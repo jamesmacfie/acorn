@@ -60,6 +60,18 @@ export function clearManagedSession(taskId: string, expectedSessionId?: string):
   }
 }
 
+/** Consume the pending reveal for a session. It is a one-shot navigation command, like the composer
+ *  focus below: once the transcript has been handed the request to scroll to, leaving it in the store
+ *  would replay the scroll-and-focus on every later remount and pull a typing reader back to it. */
+export function clearFocusedManagedRequest(sessionId: string): void {
+  setFocusedRequestBySession((current) => {
+    if (current[sessionId] === undefined) return current
+    const next = { ...current }
+    delete next[sessionId]
+    return next
+  })
+}
+
 export function openManagedSession(taskId: string, sessionId: string, requestId?: string): void {
   selectManagedSession(taskId, sessionId)
   setFocusedRequestBySession((current) => ({ ...current, [sessionId]: requestId }))

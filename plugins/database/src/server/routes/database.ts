@@ -16,10 +16,10 @@ import { z } from 'zod'
 import {
   type AppEnv,
   type CoreServices,
+  isProviderOperationError,
   type PluginDatabase,
   type PluginFetchHandler,
   portableCarrier,
-  ProviderOperationError,
   respondError,
 } from '@acorn/plugin-api/node'
 import type { CommandInputResult } from '@acorn/protocol/commands.ts'
@@ -336,7 +336,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
           item: { id: SCRATCH_SELECT_ID, title: 'Generated SQL' },
         } satisfies CommandInputResult)
       } catch (error) {
-        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         return respondError(c, 502, 'provider_unavailable')
       }
     })
@@ -377,7 +377,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
         })
         return c.json({ sql: stripSqlFences(result.text), providerId: result.providerId, modelId: result.modelId } satisfies DbGenerateResult)
       } catch (error) {
-        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         return respondError(c, 502, 'provider_unavailable')
       }
     })

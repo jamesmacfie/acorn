@@ -88,6 +88,17 @@
   gap: var(--space-4);
   align-items: center;
 }
+/* The rename box and its two buttons, standing in for the title while a connection is being renamed.
+   The box takes the slack so the buttons keep their size on a narrow card. */
+.integration-rename-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+.integration-rename-row .ui-input {
+  flex: 1;
+  min-width: 0;
+}
 .integration-setting-head {
   display: flex;
   align-items: baseline;
@@ -104,7 +115,7 @@
 
 .integration-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-6);
   padding: var(--space-5) var(--space-6);
   background: var(--bg-subtle);
@@ -128,10 +139,13 @@
 .integration-logo svg { width: 18px; height: 18px; display: block; }
 .integration-logo-mono { font-weight: 700; font-size: var(--fs-md); line-height: 1; font-family: var(--font-glyph); }
 
+/* Everything but the logo: the name and details on one row, the buttons on the next. */
+.integration-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; flex: 1; }
+.integration-head { display: flex; align-items: center; gap: var(--space-4); }
 .integration-meta { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
 .integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
-.integration-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
+.integration-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
 .integration-badge {
   font-size: var(--fs-sm);
   color: var(--text-faint);

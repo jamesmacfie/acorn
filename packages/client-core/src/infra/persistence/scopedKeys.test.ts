@@ -19,9 +19,8 @@ describe('storageKeyFor', () => {
   })
 
   it('leaves the app scope alone', () => {
-    // `last_source` and `left_collapsed` describe the window. Node-qualifying them would reset the
-    // rail's collapse state on every node switch, which is the opposite of what the qualification
-    // is for.
+    // `last_source` describes the window. Node-qualifying it would reset which source was open on
+    // every node switch, which is the opposite of what the qualification is for.
     setActiveNode('node-a')
     expect(storageKeyFor(appSlice, '')).toBe('last_source')
   })

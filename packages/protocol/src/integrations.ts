@@ -11,17 +11,24 @@ export type IntegrationProviderKind =
 // being true when GitHub became an ordinary stored connection (it is 'oauth' now, like any other).
 export type IntegrationAuthKind = 'api-key' | 'oauth' | 'installation' | 'none'
 export type IntegrationConnectionStatus = 'connected' | 'needs-auth' | 'degraded' | 'disabled'
-export type ProviderErrorCode =
-  | 'provider_not_connected'
-  | 'provider_needs_auth'
-  | 'provider_missing_scope'
-  | 'provider_rate_limited'
-  | 'provider_unavailable'
-  | 'provider_resource_not_found'
-  | 'provider_resource_deleted'
-  | 'provider_resource_forbidden'
-  | 'provider_bad_config'
-  | 'provider_secret_unreadable'
+// A list rather than a union, because one consumer has to ask the question at runtime. A provider
+// failure crosses a bundle boundary on its way to the route that answers it, and the class it
+// arrives as is not the class that side holds (integrations/types.ts § isProviderOperationError).
+// The type is derived from the list so the two can never drift.
+export const PROVIDER_ERROR_CODES = [
+  'provider_not_connected',
+  'provider_needs_auth',
+  'provider_missing_scope',
+  'provider_rate_limited',
+  'provider_unavailable',
+  'provider_resource_not_found',
+  'provider_resource_deleted',
+  'provider_resource_forbidden',
+  'provider_bad_config',
+  'provider_secret_unreadable',
+] as const
+
+export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number]
 
 export type CapabilityState = 'available' | 'missing-scope' | 'degraded'
 export type ProviderCapabilities = Record<string, boolean | string | undefined> & {
@@ -56,6 +63,18 @@ export type CredentialField = {
 }
 
 export type ProviderAccountRef = { id: string; label: string; type?: string }
+
+// The longest name that is still a name. A connection name sits in list rows and rail subtitles, so
+// the cap is about what stays readable there rather than about storage.
+export const MAX_CONNECTION_NAME = 60
+
+// What to call a connection in front of someone. Every surface that names one goes through here, so
+// that renaming a connection reaches all of them and none of them has to remember the fallback.
+// Structural on purpose: it takes a stored row (`name: string | null`) and a wire `Integration`
+// (`name?: string`) without either side converting first. A name of whitespace falls back rather
+// than drawing a blank row.
+export const connectionName = (connection: { name?: string | null; label: string }): string =>
+  connection.name?.trim() || connection.label
 
 export type ModelCatalogEntry = { id: string; label: string }
 
