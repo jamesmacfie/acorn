@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [legacy/](./legacy/README.md) | Architecture review, plugin ownership, compatibility removal, and a coordinated version-1 reset. Evidence, target contracts, and 13 implementation tickets. | Reviewed proposal, 2026-09-21. Implementation not started. |
 | [workflow_tasks/](./workflow_tasks/README.md) | The shipped child-task workflow programme and links to its owning documentation. | Shipped, 2026-09-13. |
 | [workflow_v2/](./workflow_v2/README.md) | Shared plugin data, typed workflows, simple authoring, dashboards, AI discovery, and scheduling. Twenty implementation slices with contracts and UX flows. | Implementation complete, 2026-09-20. Connected-provider and model, native desktop keyboard, and full-suite evidence remain. |
 | [scheduled_workflows/](./scheduled_workflows/README.md) | Historical scheduling proposal retained for background. Follow workflow v2 instead. | Superseded, 2026-09-13. |
