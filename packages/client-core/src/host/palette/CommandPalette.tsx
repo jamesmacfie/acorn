@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { activeTaskId } from '../../features/tasks/tasks'
+import { taskById } from '../../features/tasks/taskLookup'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
 import type { CommandExecutionContext } from '../registries/commands/commands'
@@ -25,22 +26,28 @@ export default function CommandPalette() {
   const navigate = useNavigate()
   const fleetWorkspaces = createFleetWorkspaces()
 
-  const context = (): CommandExecutionContext => ({
-    host: 'desktop',
-    nodeId: activeNodeId() ?? null,
-    workspaceId: workspaceForProject(
-      fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace),
-      params.projectId,
-    )?.id ?? null,
-    projectId: params.projectId ?? null,
-    taskId: activeTaskId() ?? null,
-    paneId: null,
-    surfaceId: null,
-    // The shell's own navigator, for the closed chrome verbs that address a URL rather than a task
-    // layout. Taken here because `useNavigate` needs a router context and the command registry has
-    // none (../registries/commands/commands.ts).
-    navigate,
-  })
+  const context = (): CommandExecutionContext => {
+    const taskId = activeTaskId()
+    // A task route carries no project parameter. Commands still run in the task's project, matching
+    // the shell and rail scope rather than silently falling back to an unscoped project action.
+    const projectId = params.projectId ?? (taskId ? taskById(taskId)?.projectId : undefined)
+    return {
+      host: 'desktop',
+      nodeId: activeNodeId() ?? null,
+      workspaceId: workspaceForProject(
+        fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace),
+        projectId,
+      )?.id ?? null,
+      projectId: projectId ?? null,
+      taskId: taskId ?? null,
+      paneId: null,
+      surfaceId: null,
+      // The shell's own navigator, for the closed chrome verbs that address a URL rather than a task
+      // layout. Taken here because `useNavigate` needs a router context and the command registry has
+      // none (../registries/commands/commands.ts).
+      navigate,
+    }
+  }
 
   const { session, view } = createCommandPaletteView({
     id: 'commands',

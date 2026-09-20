@@ -34,6 +34,18 @@ describe('consolidated findings review', () => {
     expect(() => store.edit(edited.candidateId, 1, {}, { payload: {}, payloadHash: '', fingerprint: '', subjectKey: '', warnings: [] }, 'device-1', 'edit-stale')).toThrow(/revision changed/)
   })
 
+  it('aggregates persistent review attention by scope', async () => {
+    await store.prepare({ scope: { kind: 'project', projectId: 'project-1' }, boundaryKey: 'manual:attention-1', targetKind: 'memory:change', target: target(), observations: [observation('o1')] })
+    await store.prepare({ scope: { kind: 'project', projectId: 'project-1' }, boundaryKey: 'manual:attention-2', targetKind: 'memory:change', target: target(), observations: [observation('o2', 'Another durable finding.')] })
+
+    expect(store.attention()).toMatchObject([{
+      id: 'project:project-1',
+      scope: { kind: 'project', projectId: 'project-1' },
+      readyCount: 2,
+      failedCount: 0,
+    }])
+  })
+
   it('suppresses exact dismissals, retains history, and undo restores readiness', async () => {
     const bundle = await store.prepare({ scope: { kind: 'project', projectId: 'project-1' }, boundaryKey: 'manual:1', targetKind: 'memory:change', target: target(), observations: [observation('o1')] })
     const candidate = bundle.candidates[0]!
@@ -43,6 +55,20 @@ describe('consolidated findings review', () => {
     expect(retry.outcomes[0]?.outcome).toBe('suppressed')
     expect(store.decide({ candidateId: candidate.candidateId, expectedRevision: 1, actorId: 'device-1', action: 'undo-dismiss', idempotencyKey: 'undo-1' }).status).toBe('ready')
     expect(new Set(store.history(candidate.candidateId).map((row) => row.action))).toEqual(new Set(['dismiss', 'dismiss-reason', 'undo-dismiss']))
+  })
+
+  it('dismisses a noisy bundle as one review action', async () => {
+    const reviewTarget: FindingReviewTargetContribution = {
+      ...target(),
+      validate: async ({ payload }) => ({ payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: JSON.stringify(payload), warnings: [] }),
+    }
+    const bundle = await store.prepare({
+      scope: { kind: 'project', projectId: 'project-1' }, boundaryKey: 'manual:noisy', targetKind: 'memory:change', target: reviewTarget,
+      observations: [observation('o1'), observation('o2', 'Second distinct observation.')],
+    })
+
+    expect(store.dismissBundle(bundle.id, 'device-1', 'dismiss-bundle', 'bundle-not-useful').candidates.map((candidate) => candidate.status)).toEqual(['dismissed', 'dismissed'])
+    expect(bundle.candidates.map((candidate) => store.candidate(candidate.candidateId)?.status)).toEqual(['dismissed', 'dismissed'])
   })
 
   it('binds target transitions to the owning target, source state, and exact operation', async () => {

@@ -4,10 +4,10 @@ import { memoryAddRoute, memoryApproveFindingRoute, memoryListRoute, memoryPropo
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   findingsBundlesRoute, findingsCancelPreparationRoute, findingsCandidateDecisionRoute, findingsCandidateEditRoute, findingsCandidateHistoryRoute,
-  findingsCandidateRoute, findingsPrepareRoute, findingsRestoreObservationRoute, findingsRetryPreparationRoute, findingsSplitCandidateRoute, type FindingBundle, type FindingCandidateRevision, type FindingReviewHistory,
+  findingsCandidateRoute, findingsDismissBundleRoute, findingsPrepareRoute, findingsRestoreObservationRoute, findingsRetryPreparationRoute, findingsReviewAttentionRoute, findingsSplitCandidateRoute, type FindingBundle, type FindingCandidateRevision, type FindingReviewAttention, type FindingReviewHistory,
 } from '@acorn/plugin-findings/contract/review.ts'
 import type { FindingObservation, FindingScope } from '@acorn/plugin-findings/contract/records.ts'
-import { findingsMigrationReportRoute, type FindingsMigrationReport } from '@acorn/plugin-findings/contract/lifecycle.ts'
+import { findingsMigrationReportRoute, findingsSettingsRoute, type FindingsMigrationReport, type FindingsReviewSettings } from '@acorn/plugin-findings/contract/lifecycle.ts'
 import type { MemoryChangePayload } from '../contract/findingsReview'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
@@ -54,14 +54,17 @@ export type MemoryApi = {
   proposals(taskId?: string, options?: { nodeId?: string; signal?: AbortSignal }): Promise<MemoryProposalRow[]>
   resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
   bundles(scope: FindingScope, history?: boolean): Promise<FindingBundle[]>
+  reviewAttention(options?: { nodeId?: string; signal?: AbortSignal }): Promise<FindingReviewAttention[]>
   findingsMigrationReport(): Promise<FindingsMigrationReport>
+  reviewSettings(): Promise<FindingsReviewSettings>
   finding(id: string): Promise<FindingCandidateRevision & { observations: FindingObservation[] }>
-  prepare(taskId: string, boundaryKey: string, backendId?: string): Promise<FindingBundle>
+  prepare(taskId: string, boundaryKey: string): Promise<FindingBundle>
   editFinding(id: string, expectedRevision: number, payload: MemoryChangePayload, idempotencyKey: string): Promise<FindingCandidateRevision>
   decideFinding(id: string, input: { expectedRevision: number; action: 'dismiss' | 'dismiss-reason' | 'undo-dismiss' | 'snooze'; reason?: string; until?: number; idempotencyKey: string }): Promise<FindingCandidateRevision>
   findingHistory(id: string): Promise<{ items: FindingReviewHistory[] }>
   approveFinding(id: string, revision: number, payloadHash: string, idempotencyKey: string): Promise<{ ok: boolean; state?: string; targetReference?: string; reason?: string }>
   cancelPreparation(bundleId: string): Promise<FindingBundle>
+  dismissBundle(bundleId: string, idempotencyKey: string, reason?: string): Promise<FindingBundle>
   retryPreparation(bundleId: string): Promise<FindingBundle>
   restoreFindingObservation(bundleId: string, observationId: string, candidateId: string, expectedRevision: number, idempotencyKey: string): Promise<FindingBundle>
   splitFinding(candidateId: string, bundleId: string, expectedRevision: number, observationIds: string[], idempotencyKey: string): Promise<FindingBundle>
@@ -77,14 +80,17 @@ const api: MemoryApi = {
   proposals: (taskId, options) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId), options ?? {}),
   resolveProposal: (id, approved, edited) => post<{ ok: boolean; reason?: string }>(memoryResolveProposalRoute(id), { approved, edited }),
   bundles: (scope, history) => readJson<FindingBundle[]>(findingsBundlesRoute(scope, history)),
+  reviewAttention: (options) => readJson<FindingReviewAttention[]>(findingsReviewAttentionRoute, options ?? {}),
   findingsMigrationReport: () => readJson<FindingsMigrationReport>(findingsMigrationReportRoute),
+  reviewSettings: () => readJson<FindingsReviewSettings>(findingsSettingsRoute),
   finding: (id) => readJson<FindingCandidateRevision & { observations: FindingObservation[] }>(findingsCandidateRoute(id)),
-  prepare: (taskId, boundaryKey, backendId) => post<FindingBundle>(findingsPrepareRoute(taskId), { boundaryKey, ...(backendId ? { backendId } : {}) }),
+  prepare: (taskId, boundaryKey) => post<FindingBundle>(findingsPrepareRoute(taskId), { boundaryKey }),
   editFinding: (id, expectedRevision, payload, idempotencyKey) => post<FindingCandidateRevision>(findingsCandidateEditRoute(id), { expectedRevision, payload, idempotencyKey }),
   decideFinding: (id, input) => post<FindingCandidateRevision>(findingsCandidateDecisionRoute(id), input),
   findingHistory: (id) => readJson<{ items: FindingReviewHistory[] }>(findingsCandidateHistoryRoute(id)),
   approveFinding: (id, revision, payloadHash, idempotencyKey) => post<{ ok: boolean; state?: string; targetReference?: string; reason?: string }>(memoryApproveFindingRoute(id), { revision, payloadHash, idempotencyKey }),
   cancelPreparation: (bundleId) => post<FindingBundle>(findingsCancelPreparationRoute(bundleId)),
+  dismissBundle: (bundleId, idempotencyKey, reason) => post<FindingBundle>(findingsDismissBundleRoute(bundleId), { idempotencyKey, ...(reason ? { reason } : {}) }),
   retryPreparation: (bundleId) => post<FindingBundle>(findingsRetryPreparationRoute(bundleId)),
   restoreFindingObservation: (bundleId, observationId, candidateId, expectedRevision, idempotencyKey) => post<FindingBundle>(findingsRestoreObservationRoute(bundleId, observationId), { candidateId, expectedRevision, idempotencyKey }),
   splitFinding: (candidateId, bundleId, expectedRevision, observationIds, idempotencyKey) => post<FindingBundle>(findingsSplitCandidateRoute(candidateId), { bundleId, expectedRevision, observationIds, idempotencyKey }),

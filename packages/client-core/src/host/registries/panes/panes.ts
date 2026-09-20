@@ -22,6 +22,8 @@ type PaneCommon = {
   glyph: string
   description?: string
   order: number
+  /** False for a command-only diagnostic pane. The pane remains addressable by `openPane`. */
+  showInSwitcher?: boolean
   defaultChord?: string
   requires?: HostCapabilityRequirement
   when?: (task: Task) => boolean

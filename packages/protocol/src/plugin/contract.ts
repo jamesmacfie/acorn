@@ -189,6 +189,8 @@ const frameSurface = z.object({
   // A Lucide name, resolved client-side; an unmatched name renders as-is.
   glyph: z.string().min(1).max(64).default('puzzle'),
   order: z.number().int().min(0).max(100_000).default(500),
+  // A diagnostic pane can stay addressable by a command without occupying the everyday switcher.
+  showInSwitcher: z.boolean().optional(),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
   // `refPanel` and task-scoped `pane`. The client adapter checks it against the plugin id: a surface

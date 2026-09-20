@@ -147,6 +147,10 @@ describe('findings runtime', () => {
       })
     const reviewTarget: FindingReviewTargetContribution = {
       version: 1, connect: () => {}, acceptedFingerprints: async () => [],
+      synthesisContext: async () => ({
+        instructions: 'Create durable memory changes.',
+        existing: [{ id: 'memory-1', name: 'existing-memory' }],
+      }),
       validate: async ({ payload }) => ({ payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: 'subject', warnings: [] }),
     }
     const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: { tasks: ctx.core.tasks, identity: ctx.core.identity, models: { ...ctx.core.models, generateText } } })
@@ -155,7 +159,11 @@ describe('findings runtime', () => {
     expect(generateText).toHaveBeenCalledOnce()
     expect(generateText.mock.calls[0]?.[0]).toMatchObject({
       userId: 'owner', backendId: 'connection:model-1', timeoutMs: 60_000,
-      input: { modelId: 'fixture-model' },
+      input: { modelId: 'fixture-model', system: expect.stringContaining('durable knowledge') },
+    })
+    expect(JSON.parse(generateText.mock.calls[0]?.[0].input.prompt)).toMatchObject({
+      target: { instructions: 'Create durable memory changes.', existing: [{ id: 'memory-1', name: 'existing-memory' }] },
+      observations: [{ id: recorded.id }],
     })
     expect(failed).toMatchObject({ backendId: 'connection:model-1', modelId: 'fixture-model' })
     capture.withdrawTask({ taskId: 'task', observationId: recorded.id, actor: { kind: 'device', id: 'device-1' } })

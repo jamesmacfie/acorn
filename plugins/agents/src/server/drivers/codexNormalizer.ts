@@ -308,6 +308,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
     case 'thread/tokenUsage/updated': {
       const usage = asObject(params.tokenUsage)
       const total = asObject(usage?.total)
+      const last = asObject(usage?.last)
       return [{
         type: 'usage',
         usage: {
@@ -315,7 +316,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
           outputTokens: numberValue(total?.outputTokens) ?? undefined,
           cachedInputTokens: numberValue(total?.cachedInputTokens) ?? undefined,
           cacheWriteInputTokens: numberValue(total?.cacheWriteInputTokens) ?? undefined,
-          contextUsed: numberValue(total?.totalTokens) ?? undefined,
+          contextUsed: numberValue(last?.totalTokens) ?? undefined,
           contextSize: numberValue(usage?.modelContextWindow) ?? undefined,
         },
       }]

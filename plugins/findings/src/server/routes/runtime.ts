@@ -134,7 +134,9 @@ export const findingsRuntimeRoutes = (runtime: FindingsRuntime) => new Hono<AppE
     const principal = taskPrincipal(c)!
     try {
       const page = await runtime.listTask(principal.taskId, { state: 'active', limit: 13 })
-      const visible = page.items.slice(0, 12)
+      // Lifecycle summaries are synthesis inputs, not task guidance. Keep explicit findings in the
+      // agent context and leave raw review provenance to the Memory review surface.
+      const visible = page.items.filter((finding) => finding.kind.id !== 'findings:review-input').slice(0, 12)
       const compactText = compact(visible)
       const items: Array<{
         id: string

@@ -108,20 +108,36 @@ describe('Codex app-server normalization', () => {
     })
   })
 
-  it('maps message deltas and usage', () => {
+  it('maps message deltas', () => {
     expect(normalizeCodexNotification({
       method: 'item/agentMessage/delta',
       params: { itemId: 'message-1', delta: 'hello' },
     })).toEqual([{ type: 'assistant_message', text: 'hello', messageId: 'message-1', append: true }])
+  })
+
+  it('keeps cumulative billing tokens separate from the latest context usage', () => {
     expect(normalizeCodexNotification({
       method: 'thread/tokenUsage/updated',
       params: {
         tokenUsage: {
-          total: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, cacheWriteInputTokens: 1, totalTokens: 17 },
+          total: { inputTokens: 40, outputTokens: 8, cachedInputTokens: 12, cacheWriteInputTokens: 1, totalTokens: 48 },
+          last: { inputTokens: 9, outputTokens: 2, cachedInputTokens: 2, cacheWriteInputTokens: 0, totalTokens: 11 },
           modelContextWindow: 100,
         },
       },
-    })).toEqual([{ type: 'usage', usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, cacheWriteInputTokens: 1, contextUsed: 17, contextSize: 100 } }])
+    })).toEqual([{ type: 'usage', usage: { inputTokens: 40, outputTokens: 8, cachedInputTokens: 12, cacheWriteInputTokens: 1, contextUsed: 11, contextSize: 100 } }])
+  })
+
+  it('does not treat cumulative usage as context when the latest snapshot is absent', () => {
+    expect(normalizeCodexNotification({
+      method: 'thread/tokenUsage/updated',
+      params: {
+        tokenUsage: {
+          total: { inputTokens: 40, outputTokens: 8, totalTokens: 48 },
+          modelContextWindow: 100,
+        },
+      },
+    })[0]).toMatchObject({ type: 'usage', usage: { contextUsed: undefined, contextSize: 100 } })
   })
 
   it('maps each Codex plan snapshot with its structured status intact', () => {

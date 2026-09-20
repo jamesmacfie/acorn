@@ -28,6 +28,10 @@ export const findingsPlugin = (): NodePlugin => {
         id: 'observation',
         value: { version: 1, label: 'Observation' },
       })
+      ctx.extensionPoints.handle(FINDINGS_KIND, {
+        id: 'review-input',
+        value: { version: 1, label: 'Review input' },
+      })
 
       const db = ctx.storage.open()
       const capture = new FindingCapture({
@@ -49,6 +53,7 @@ export const findingsPlugin = (): NodePlugin => {
         core: ctx.core,
         agents: () => ctx.capabilities.get(AGENTS_REVIEW_INPUT),
         notice: (notice) => ctx.events.notice(notice),
+        settingsChanged: () => ctx.events.send({ channel: 'plugin:findings:settings-changed' }),
       })
       migration = new FindingsLegacyMigration(
         db,

@@ -3,7 +3,7 @@ import { onPluginFrame } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Alert, Badge, Button, Card, CodeBlock, Field, Heading, Inline, Input, Markdown, Section, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import type { FindingCandidateRevision, FindingBundle } from '@acorn/plugin-findings/contract/review.ts'
-import type { FindingScope } from '@acorn/plugin-findings/contract/records.ts'
+import type { FindingEvidence, FindingObservation, FindingOrigin, FindingScope } from '@acorn/plugin-findings/contract/records.ts'
 import { memoryApi, type MemoryType } from './memoryClient'
 import { type MemoryChangePayload, memoryChangePayloadSchema } from '../contract/findingsReview'
 
@@ -13,6 +13,24 @@ const payloadOf = (candidate: FindingCandidateRevision): MemoryChangePayload | n
   const parsed = memoryChangePayloadSchema.safeParse(candidate.payload); return parsed.success ? parsed.data : null
 }
 const scopeLabel = (payload: MemoryChangePayload): string => payload.scope.kind === 'private' ? 'Applies across projects' : 'Applies to this project'
+const boundaryLabel = (key: string): string => key.startsWith('task:') ? 'Task archive'
+  : key.startsWith('workflow:') ? 'Workflow completion'
+    : key.startsWith('terminal:') ? 'Terminal completion'
+      : key.startsWith('manual:') ? 'Manual review'
+        : key.startsWith('legacy:') ? 'Legacy import' : 'Review'
+const originLabel = (origin: FindingOrigin): string => origin.kind === 'agent' ? 'Managed agent'
+  : origin.kind === 'workflow' ? 'Workflow'
+    : origin.kind === 'schedule' ? 'Schedule'
+      : origin.kind === 'device' ? 'Device'
+        : origin.kind === 'plugin' ? `Plugin · ${origin.pluginId}` : 'Legacy proposal'
+const evidenceLabel = (evidence: FindingEvidence): string => evidence.label ?? (
+  evidence.kind === 'repository' ? evidence.path
+    : evidence.kind === 'url' ? evidence.url
+      : evidence.kind === 'managed-turn' ? `Managed turn ${evidence.turnId}`
+        : evidence.kind === 'workflow-step' ? `Workflow ${evidence.runId}`
+          : evidence.kind === 'observation' ? `Observation ${evidence.observationId}`
+            : `Memory ${evidence.memoryId}`
+)
 const previewLines = (payload: MemoryChangePayload): string[] => [
   `name: ${payload.name}`,
   `type: ${payload.type}`,
@@ -27,7 +45,29 @@ const unifiedDiff = (before: MemoryChangePayload, after: MemoryChangePayload): s
   return ['--- accepted memory', '+++ proposed memory', ...left.map((line) => `- ${line}`), ...right.map((line) => `+ ${line}`)].join('\n')
 }
 
-function Candidate(props: { bundleId: string; candidate: FindingCandidateRevision; focused: boolean; onOpen(): void; onChanged(): void }) {
+function ObservationSource(props: { observation: FindingObservation; canSplit: boolean; onSplit(): void }) {
+  return (
+    <Card>
+      <Stack gap="row">
+        <Inline wrap>
+          <Badge>{props.observation.claimStatus}</Badge>
+          <Text emphasis="strong">{props.observation.title}</Text>
+          <Show when={props.observation.scopeLabels.task}><Badge>{props.observation.scopeLabels.task}</Badge></Show>
+          <Show when={props.canSplit}><Button size="sm" variant="bare" onPress={props.onSplit}>Separate</Button></Show>
+        </Inline>
+        <Text tone="muted">{originLabel(props.observation.origin)} · {new Date(props.observation.createdAt).toLocaleString()}</Text>
+        <Markdown text={props.observation.body} images="placeholder" />
+        <Show when={props.observation.evidence.length}>
+          <Section label="Evidence" count={props.observation.evidence.length}>
+            <Stack gap="row"><For each={props.observation.evidence}>{(evidence) => <Text>{evidenceLabel(evidence)}</Text>}</For></Stack>
+          </Section>
+        </Show>
+      </Stack>
+    </Card>
+  )
+}
+
+function Candidate(props: { bundleId: string; boundary: string; candidate: FindingCandidateRevision; focused: boolean; onOpen(): void; onChanged(): void }) {
   const initial = () => payloadOf(props.candidate)
   const [editing, setEditing] = createSignal(false), [busy, setBusy] = createSignal(false), [error, setError] = createSignal('')
   const [snoozing, setSnoozing] = createSignal(false), [snoozeDate, setSnoozeDate] = createSignal(new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10))
@@ -49,7 +89,7 @@ function Candidate(props: { bundleId: string; candidate: FindingCandidateRevisio
       <Stack gap="row">
         <Show when={initial()} fallback={<Alert tone="danger" title="Invalid memory candidate">This candidate cannot be previewed.</Alert>}>
           {(payload) => <>
-            <Inline wrap><Badge shape="pill">{payload().operation === 'update' ? 'Update' : 'Add'}</Badge><Text emphasis="strong">{payload().name}</Text><Badge>{scopeLabel(payload())}</Badge><Show when={props.candidate.status !== 'ready'}><Badge tone="neutral">{props.candidate.status}</Badge></Show></Inline>
+            <Inline wrap><Badge shape="pill">{payload().operation === 'update' ? 'Update' : 'Add'}</Badge><Text emphasis="strong">{payload().name}</Text><Badge>{scopeLabel(payload())}</Badge><Badge tone="neutral">{boundaryLabel(props.boundary)}</Badge><Show when={props.candidate.status !== 'ready'}><Badge tone="neutral">{props.candidate.status}</Badge></Show></Inline>
             <Text>{payload().description}</Text>
             <Show when={!props.focused}><Button size="sm" onPress={props.onOpen}>View change</Button></Show>
             <Show when={props.focused}>
@@ -75,7 +115,13 @@ function Candidate(props: { bundleId: string; candidate: FindingCandidateRevisio
                   <Show when={props.candidate.status === 'conflict'}><Button size="sm" disabled={busy()} onPress={() => setEditing(true)}>Edit conflicted change</Button></Show>
                   <Show when={props.candidate.status === 'applying'}><Button size="sm" busy={busy()} onPress={approve}>Retry approval</Button></Show>
                 </Show>
-                <Show when={detail()?.observations?.length}><Section label="Source observations" count={detail()!.observations.length}><Stack gap="row"><For each={detail()!.observations}>{(observation) => <Card><Inline wrap><Badge>{observation.claimStatus}</Badge><Text emphasis="strong">{observation.title}</Text><Show when={props.candidate.sourceObservationIds.length > 1}><Button size="sm" variant="bare" onPress={() => split(observation.id)}>Separate</Button></Show></Inline><Markdown text={observation.body} images="placeholder" /></Card>}</For></Stack></Section></Show>
+                <Show when={detail()?.observations?.length}>
+                  <Section label="Source tasks and evidence" count={detail()!.observations.length}>
+                    <Stack gap="row"><For each={detail()!.observations}>{(observation) => (
+                      <ObservationSource observation={observation} canSplit={props.candidate.sourceObservationIds.length > 1} onSplit={() => split(observation.id)} />
+                    )}</For></Stack>
+                  </Section>
+                </Show>
                 <Show when={history()?.items.length}><Section label="Review history"><Stack gap="row"><For each={history()!.items}>{(entry) => <Text tone="muted">{entry.action}{entry.reason ? ` · ${entry.reason}` : ''}</Text>}</For></Stack></Section></Show>
               </Stack>
             </Show>
@@ -103,6 +149,7 @@ export default function FindingsBundleReview(props: { scope: FindingScope; compa
   })
   const changed = () => { void refetch(); props.onChanged?.() }
   const retry = (bundle: FindingBundle) => void memoryApi().retryPreparation(bundle.id).then(changed)
+  const dismissBundle = (bundle: FindingBundle) => void memoryApi().dismissBundle(bundle.id, key(), 'bundle-not-useful').then(changed)
   const restore = (bundle: FindingBundle, observationId: string) => {
     const candidate = bundle.candidates.find((entry) => entry.candidateId === focused())
     if (!candidate) return
@@ -114,13 +161,21 @@ export default function FindingsBundleReview(props: { scope: FindingScope; compa
       <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'failed')}>{(bundle) => <Alert tone="danger" title="Could not prepare suggestions">{bundle.error ?? 'Preparation failed.'}<Button size="sm" onPress={() => retry(bundle)}>Retry</Button></Alert>}</For>
       <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'preparing')}>{(bundle) => <Alert tone="muted" title="Preparing suggestions">{bundle.pendingCount} observations remain.<Button size="sm" onPress={() => void memoryApi().cancelPreparation(bundle.id).then(changed)}>Cancel</Button></Alert>}</For>
       <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'cancelled' && bundle.pendingCount > 0)}>{(bundle) => <Alert tone="muted" title="Preparation cancelled">Completed suggestions were kept. {bundle.pendingCount} observations remain.<Button size="sm" onPress={() => retry(bundle)}>Resume</Button></Alert>}</For>
+      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'ready' && bundle.backendId === null && bundle.candidates.length > 3)}>{(bundle) => (
+        <Alert tone="warn" title="Earlier unfiltered review">
+          This bundle was prepared without a model and may contain one suggestion per observation.
+          <Button size="sm" onPress={() => dismissBundle(bundle)}>Dismiss this bundle</Button>
+        </Alert>
+      )}</For>
       <For each={shown()}>{(candidate) => {
         const bundle = (bundles() ?? []).find((entry) => entry.candidates.some((member) => member.candidateId === candidate.candidateId))!
-        return <Candidate bundleId={bundle.id} candidate={candidate} focused={focused() === candidate.candidateId} onOpen={() => setFocused(candidate.candidateId)} onChanged={changed} />
+        return <Candidate bundleId={bundle.id} boundary={bundle.boundaryKey} candidate={candidate} focused={focused() === candidate.candidateId} onOpen={() => setFocused(candidate.candidateId)} onChanged={changed} />
       }}</For>
       <For each={(bundles() ?? []).filter((bundle) => bundle.outcomes.some((outcome) => outcome.outcome === 'not-selected'))}>{(bundle) => <Section label="Omitted observations"><Stack gap="row"><For each={bundle.outcomes.filter((outcome) => outcome.outcome === 'not-selected')}>{(outcome) => <Card><Text>{outcome.explanation}</Text><Text tone="muted">Observation {outcome.observationId}</Text><Show when={bundle.candidates.some((candidate) => candidate.candidateId === focused())}><Button size="sm" variant="bare" onPress={() => restore(bundle, outcome.observationId)}>Restore to open change</Button></Show></Card>}</For></Stack></Section>}</For>
       <Show when={candidates().length > 3 && !showAll()}><Button size="sm" onPress={() => setShowAll(true)}>Show all {candidates().length} changes</Button></Show>
-      <Show when={!candidates().length}><Text>No suggested changes left in this bundle.</Text></Show>
+      <Show when={!candidates().length && (bundles() ?? []).some((bundle) => bundle.state === 'ready')}>
+        <Text>No memory suggestions are awaiting review. The latest review either found nothing durable or its suggestions have already been resolved.</Text>
+      </Show>
       <Show when={groupingError()}><Alert tone="danger">{groupingError()}</Alert></Show>
     </Stack>
   </Show>

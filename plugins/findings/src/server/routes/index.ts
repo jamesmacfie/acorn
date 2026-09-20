@@ -16,7 +16,7 @@ export const createFindingsFetch = (
 ): PluginFetchHandler => portableFetch(
   new Hono<AppEnv>()
     .route('/', findingsRecordRoutes(runtime))
-    .route('/', findingsReviewRoutes(runtime))
+    .route('/', findingsReviewRoutes(runtime, lifecycle))
     .route('/', findingsLifecycleRoutes(lifecycle, migration))
     .route('/', findingsRuntimeRoutes(runtime)),
 )

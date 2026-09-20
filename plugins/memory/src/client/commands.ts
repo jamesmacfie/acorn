@@ -2,6 +2,7 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   openPane,
+  projectPath,
   setSelectedSource,
   type CommandOutcome,
   type ContributedCommand,
@@ -28,6 +29,10 @@ import { MEMORY_SOURCE_ID } from './proposalTarget'
 
 const CONTEXT_PANE = 'context'
 const MEMORY_SECTION = 'memory'
+const openMemory = (context: { projectId: string | null; navigate?: (path: string) => void }, projectId = context.projectId): void => {
+  setSelectedSource(MEMORY_SOURCE_ID)
+  if (projectId) context.navigate?.(projectPath(projectId))
+}
 
 export const memoryCommands: readonly ContributedCommand[] = [
   {
@@ -41,8 +46,8 @@ export const memoryCommands: readonly ContributedCommand[] = [
     requires: { plugin: 'findings' },
     run: async (context): Promise<CommandOutcome> => {
       if (!context.taskId) return { effect: 'stay', status: 'Choose a task first.' }
-      await memoryApi().prepare(context.taskId, `manual:${context.taskId}:${Date.now()}`)
-      setSelectedSource(MEMORY_SOURCE_ID)
+      const bundle = await memoryApi().prepare(context.taskId, `manual:${context.taskId}:${Date.now()}`)
+      openMemory(context, bundle.scope.kind === 'project' ? bundle.scope.projectId : null)
       return COMMAND_CLOSED
     },
   },
@@ -90,6 +95,6 @@ export const memoryCommands: readonly ContributedCommand[] = [
     // The Memory page, not the Context pane's fold. A pending proposal is not task-scoped, so this
     // row no longer needs a task to be worth offering, and it lands where every pending proposal is
     // rather than the handful this task happens to have raised (./MemoryCenter.tsx).
-    run: () => setSelectedSource(MEMORY_SOURCE_ID),
+    run: (context) => openMemory(context),
   },
 ]

@@ -7,6 +7,12 @@ import MemorySection from './MemorySection'
 
 const MemoryCenter = lazy(() => import('./MemoryCenter'))
 
+const reviewAttentionTitle = (ready: number, failed: number): string => {
+  const readyText = `${ready} memory suggestion${ready === 1 ? '' : 's'} ready`
+  const failedText = `${failed} memory review${failed === 1 ? '' : 's'} failed`
+  return failed && ready ? `${failedText}; ${readyText}` : failed ? failedText : readyText
+}
+
 export const memoryClientPlugin: ClientPlugin = {
   name: 'memory',
   required: true,
@@ -41,8 +47,11 @@ export const memoryClientPlugin: ClientPlugin = {
     ctx.attentionSources.register({
       id: 'memory.proposals', order: 20,
       fetch: async (nodeId, signal) => {
-        const proposals = await memoryApi().proposals(undefined, { nodeId, signal })
-        return proposals.filter((proposal) => proposal.status === 'pending').map((proposal) => ({
+        const [proposals, reviews] = await Promise.all([
+          memoryApi().proposals(undefined, { nodeId, signal }),
+          memoryApi().reviewAttention({ nodeId, signal }),
+        ])
+        const legacy = proposals.filter((proposal) => proposal.status === 'pending').map((proposal) => ({
           id: `memory.proposals:${proposal.id}`,
           title: `Review memory: ${proposal.name}`,
           detail: proposal.description,
@@ -64,6 +73,19 @@ export const memoryClientPlugin: ClientPlugin = {
           ...(proposal.projectId ? { projectId: proposal.projectId } : {}),
           target: { kind: 'memory-proposal', resourceId: proposal.id },
         }))
+        const prepared = reviews.map((review) => ({
+          id: `memory.findings:${review.id}`,
+          title: reviewAttentionTitle(review.readyCount, review.failedCount),
+          detail: review.failedCount
+            ? 'Open Memory to retry the failed review.'
+            : 'Open Memory to review the proposed changes.',
+          severity: review.failedCount ? 'danger' as const : 'info' as const,
+          glyph: 'brain',
+          at: review.updatedAt,
+          ...(review.scope.kind === 'project' ? { projectId: review.scope.projectId } : {}),
+          target: { kind: 'findings-bundle', resourceId: review.id },
+        }))
+        return [...prepared, ...legacy]
       },
     })
   },

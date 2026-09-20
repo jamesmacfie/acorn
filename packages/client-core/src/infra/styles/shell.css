@@ -312,8 +312,8 @@
 .layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
 
 /* `list-detail`. The list column's width is a style token until someone drags the handle, which
-   writes a pixel value onto the container. The divider is the handle's, so the column carries no
-   border of its own. */
+   writes a pixel value onto the container. The divider is the handle's while expanded, so the
+   column carries no border of its own. The surviving edge takes it over when collapsed. */
 .layout-region-list {
   flex: none;
   width: var(--listdetail-w);
@@ -339,13 +339,15 @@
   min-width: 0;
   overflow: visible;
 }
-.layout-list-edge > .ui-btn {
+.layout-list-edge[data-collapsed] { border-right: var(--chrome-divider); }
+.layout-list-edge > .ui-btn[data-variant='bare'] {
   position: absolute;
   top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);
   right: 0;
   transform: translateX(50%);
   z-index: var(--z-resizer);
-  background: var(--pane-bg);
+  background: var(--bg-subtle);
+  border: var(--control-border);
   border-radius: var(--radius-surface);
 }
 

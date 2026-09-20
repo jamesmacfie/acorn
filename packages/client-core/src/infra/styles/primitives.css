@@ -1126,6 +1126,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   min-width: 0;
   overflow: visible;
 }
+.ui-listdetail[data-list='collapsed'] > .ui-listdetail-edge { border-right: var(--chrome-divider); }
 .ui-listdetail-edge > .ui-btn {
   position: absolute;
   top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);

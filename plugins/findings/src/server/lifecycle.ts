@@ -8,6 +8,7 @@ import type {
 } from '../contract/lifecycle'
 import { DEFAULT_FINDINGS_SETTINGS } from '../contract/lifecycle'
 import type { FindingOrigin } from '../contract/records'
+import type { FindingBundle } from '../contract/review'
 import { findingBundleNotices, findingLifecycleCheckpoints } from '../node/schema'
 import type { FindingsRuntime } from './runtime'
 import { FindingCaptureError } from './capture'
@@ -28,7 +29,9 @@ const readSettingsValue = (raw: string | null): FindingsReviewSettings => {
   try {
     const value = JSON.parse(raw) as Record<string, unknown>
     return {
-      automaticPreparation: value.automaticPreparation === true,
+      // A configured model now opts into archive review. Keep the old field canonical so older
+      // clients can still read this preference without preserving the former silent opt-out.
+      automaticPreparation: true,
       notifyWhenReady: value.notifyWhenReady === true,
       backendId: typeof value.backendId === 'string' && value.backendId ? value.backendId : null,
       modelId: typeof value.modelId === 'string' && value.modelId ? value.modelId : null,
@@ -45,6 +48,7 @@ export class FindingsLifecycle {
     core: Pick<CoreServices, 'identity' | 'prefs' | 'tasks'>
     agents(): AgentReviewInputCapability | undefined
     notice(input: { taskId?: string; title: string; detail?: string; kind?: string; target?: { kind: string; resourceId: string } }): void
+    settingsChanged(): void
     now?: () => number
   }) {}
 
@@ -54,12 +58,13 @@ export class FindingsLifecycle {
 
   async setSettings(userId: string, settings: FindingsReviewSettings): Promise<FindingsReviewSettings> {
     const normalized: FindingsReviewSettings = {
-      automaticPreparation: settings.automaticPreparation === true,
+      automaticPreparation: true,
       notifyWhenReady: settings.notifyWhenReady === true,
       backendId: typeof settings.backendId === 'string' && settings.backendId ? settings.backendId : null,
       modelId: typeof settings.modelId === 'string' && settings.modelId ? settings.modelId : null,
     }
     await this.options.core.prefs.write(userId, FINDINGS_SETTINGS_KEY, JSON.stringify(normalized))
+    this.options.settingsChanged()
     return normalized
   }
 
@@ -76,7 +81,7 @@ export class FindingsLifecycle {
         || (existing.unavailableReason ?? undefined) !== input.unavailableReason) {
         throw new FindingCaptureError('conflict', `lifecycle boundary '${input.boundaryKey}' changed after capture`)
       }
-      if (existing.sourceKind !== 'agent' && existing.observationId && !existing.preparedBundleId) await this.schedule(input)
+      if (existing.sourceKind === 'task-archive' && !existing.preparedBundleId) await this.schedule(input)
       return this.toCheckpoint(existing)
     }
     const at = this.options.now?.() ?? Date.now()
@@ -93,7 +98,7 @@ export class FindingsLifecycle {
         producerId: `lifecycle:${input.sourceKind}`,
         input: {
           sourceKey: input.boundaryKey,
-          kind: 'findings:observation',
+          kind: 'findings:review-input',
           kindVersion: 1,
           title: input.title.slice(0, 200),
           body: input.body,
@@ -124,13 +129,13 @@ export class FindingsLifecycle {
       || checkpoint.unavailableReason !== input.unavailableReason) {
       throw new FindingCaptureError('conflict', `lifecycle boundary '${input.boundaryKey}' changed after capture`)
     }
-    if (input.sourceKind !== 'agent' && observationId) await this.schedule(input)
+    if (input.sourceKind === 'task-archive') await this.schedule(input)
     return this.checkpoint(input.boundaryKey)!
   }
 
   async reconcile(): Promise<void> {
     for (const checkpoint of this.options.db.select().from(findingLifecycleCheckpoints).all()) {
-      if (checkpoint.sourceKind === 'agent' || !checkpoint.observationId || checkpoint.preparedBundleId) continue
+      if (checkpoint.sourceKind !== 'task-archive' || checkpoint.preparedBundleId) continue
       await this.schedule(this.toCheckpoint(checkpoint)).catch(() => undefined)
     }
     const agents = this.options.agents()
@@ -162,6 +167,18 @@ export class FindingsLifecycle {
     }
   }
 
+  async prepareTask(taskId: string, boundaryKey: string): Promise<FindingBundle> {
+    const userId = this.options.core.identity.active()
+    if (!userId) throw new FindingCaptureError('forbidden', 'an active owner is required for memory review')
+    const settings = await this.settings(userId)
+    if (!settings.backendId) throw new FindingCaptureError('unavailable', 'Choose a memory review model in Settings before preparing suggestions.')
+    return this.options.runtime.startPrepareTask(taskId, {
+      boundaryKey,
+      backendId: settings.backendId,
+      ...(settings.modelId ? { modelId: settings.modelId } : {}),
+    })
+  }
+
   private async reconcileAgent(ref: AgentReviewInputRef, agents: AgentReviewInputCapability): Promise<void> {
     const boundaryKey = `agent:${ref.sessionId}:${ref.turnId}:${ref.attempt}:${ref.completedSequence}`
     if (this.checkpoint(boundaryKey)) return
@@ -189,10 +206,10 @@ export class FindingsLifecycle {
     const userId = this.options.core.identity.active()
     if (!userId) return
     const settings = await this.settings(userId)
-    if (!settings.automaticPreparation) return
+    if (!settings.backendId) return
     const bundle = await this.options.runtime.startPrepareTask(input.taskId, {
       boundaryKey: input.boundaryKey,
-      ...(settings.backendId ? { backendId: settings.backendId } : {}),
+      backendId: settings.backendId,
       ...(settings.modelId ? { modelId: settings.modelId } : {}),
     })
     this.options.db.update(findingLifecycleCheckpoints)
