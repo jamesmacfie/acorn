@@ -113,7 +113,8 @@ host cannot draw.
 | `routes` | 8 | A renderer URL for a project-scoped pane, confined to `/p/:projectId/x/<id>/`. Eight, matching `sources`, because a route addresses something inside a surface a rail already reached. |
 | `agentContexts` | 4 | An entry in the agent composer's context picker: an `options` GET and a `capture` POST. |
 | `refResolvers` | 4 | A batch enrichment route so another plugin's surface can turn identifiers of your items into a label and a state chip. |
-| `collections` | 8 | A typed set of records a user can compose a dashboard panel over: `{ id, name, items, params?, schema?, refresh? }`. `items` is a GET on your own namespace answering `{ schema, rows }`, in seven field types and five roles. The `schema` here is the *static* promise so an editor can offer views before any data exists; omit it and the response describes itself, at the cost of nothing being configurable until the collection has been read once. See `docs/dashboards.md`. |
+| `dataSources` | 32 | A Node-owned typed record source: `{ sourceId, name, singular, plural, identityScope, handler, icon?, providerId?, titlePointer?, urlPointer? }`. `handler` is a route on your own namespace that serves describe, options, query, and details operations. The host binds plugin identity, validates typed values and provenance, and gives dashboards and workflows the same runtime. See [Typed data sources](../data-sources.md). |
+| `dataSourceDiscoveries` | 8 | A bounded source catalogue for provider resources that are not known at install time: `{ discoveryId, handler, providerId? }`. Discovery returns source descriptors; the host binds their handler, provider, plugin, and exact discovery scope. See [Typed data sources](../data-sources.md). |
 | `themes` | 8 | A **colour** theme: `{ id, label, dark?, tokens }`, where `tokens` is the complete palette. You write no CSS — the host generates the block. See below. |
 | `contextMenus` | 8 | A row on a host-drawn right-click menu: `{ id, location, label, icon?, order?, when?, action }`. `location` is from a closed list (`task.row` today); `when` is a map of literals that must all equal the target's facts; `action` takes the narrow verb set and receives the id of what was right-clicked. |
 | `extensionPoints` | 4 | A place inside one of **your** surfaces that other plugins may fill: `{ id, label, kind, … }`. `kind` picks which of the five a point takes and which other fields it reads: `rows` and `annotation` take a `location` or a `key`, `remote` and `rectangle` take a `mode`, and `hook` takes a `payload` and an `allows` list. The host mints the id as `<yourId>:<pointId>`. You write no code for a `rows` or `annotation` point — the host draws it. |
@@ -413,8 +414,11 @@ Filesystem, environment, process, and network grants are also absent unless decl
   exporting a capability is a contribution, not an access grant.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
-- `net`: exact hostnames the worker's `fetch` may reach. Raw network modules stay unavailable,
-  and redirects are returned rather than followed so fetching the next location rechecks its host.
+- `net`: exact hostnames the worker's `fetch` may reach. Raw network modules stay unavailable unless
+  `sockets` is also granted. Redirects are returned rather than followed so fetching the next
+  location rechecks its host.
+- `sockets`: unrestricted raw socket access for protocols that cannot use the hostname-scoped fetch
+  broker. This broad, high-risk grant has no hostname allowlist.
 - `env`: parent-environment variable names the worker may inherit in addition to the process broker's
   credential-free base. Each is a high-risk trust line.
 - `files`: local path grants resolved from environment variables, as

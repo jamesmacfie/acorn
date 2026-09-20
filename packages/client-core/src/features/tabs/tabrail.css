@@ -47,6 +47,24 @@
   inset-inline-start: calc((var(--task-depth) - 0.5) * 5px);
   border-inline-start: var(--divider);
 }
+.tabrail-task-disclosure {
+  position: absolute;
+  inset-inline-end: 2px;
+  inset-block-end: 2px;
+  z-index: var(--z-base);
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 18px;
+  padding: 1px 2px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  font: 9px/1 var(--font-ui);
+  cursor: pointer;
+}
+.tabrail-task-disclosure:hover,
+.tabrail-task-disclosure:focus-visible { color: var(--text); background: var(--bg-hover); }
 
 .tabrail-tab {
   width: 100%;

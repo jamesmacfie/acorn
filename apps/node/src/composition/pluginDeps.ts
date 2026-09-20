@@ -6,6 +6,7 @@ import { FINDINGS_LIFECYCLE, type FindingsBoundaryInput } from '@acorn/plugin-fi
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import type { NodePluginDeps } from './plugins'
+import { SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 
 // The plugin dependency bag, built once for both composition roots (docs/plugins.md § Adding a
 // plugin contribution). Nothing in it differs between the two hosts.
@@ -100,6 +101,7 @@ export function buildPluginDeps({ capabilities, core, internalEnv, reconciled }:
     workflows: {
       internalEnv,
       reconciled,
+      scheduler: () => capabilities.require(SCHEDULER),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
       reviewBoundary: async ({ taskId, runId, status, transcriptTail }) => captureBoundary({
         taskId,

@@ -67,7 +67,7 @@ halves.
 
 **A capability id belongs to the plugin that publishes it.** A loaded plugin may only provide ids
 starting with `<its own id>.`, the same binding the host already applies to its routes, schedules,
-collections, integration flows and extension points. Providing anything else fails registration and the
+data sources, integration flows and extension points. Providing anything else fails registration and the
 reason lands on the roster row. Without the rule, a package called anything at all could publish
 `github.mirror` or `preview.rules` while the real plugin was disabled, and the composition root would
 resolve the impostor — a capability is a typed function another plugin calls, so squatting one is not a

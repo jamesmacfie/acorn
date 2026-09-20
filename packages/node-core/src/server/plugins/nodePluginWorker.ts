@@ -1,7 +1,7 @@
 // Bootstrap for one loaded plugin's Node half. This is a separate Vite entry in production and a
 // directly executed TypeScript module in tests. Trusted runtime modules load first; the resolver hook
 // is installed before the package's entrypoint is evaluated.
-import { registerHooks } from 'node:module'
+import { builtinModules, createRequire, registerHooks } from 'node:module'
 import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { workerData, type MessagePort } from 'node:worker_threads'
@@ -19,6 +19,7 @@ type WorkerOptions = {
   databasePath: string
   migrationsFolder: string | null
   allowNetwork: boolean
+  allowSockets: boolean
   networkHosts: string[]
   allowExec: boolean
 }
@@ -29,10 +30,33 @@ const openWorkerPluginDb = options.migrationsFolder
   : null
 const denied = new Set([
   'cluster', 'module', 'vm', 'inspector', 'repl', 'sqlite', 'worker_threads',
-  // Raw sockets cannot enforce a manifest host list. Networked plugins use the wrapped fetch below.
-  'net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'quic',
+  // Raw sockets cannot enforce a manifest host list. Networked plugins use the wrapped fetch below;
+  // protocols such as Postgres need the separate, explicitly broad sockets grant.
+  ...(options.allowSockets ? [] : ['net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'quic']),
 ])
 if (!options.allowExec) denied.add('child_process')
+
+// Rolldown uses createRequire when an otherwise self-contained ESM bundle contains a CommonJS
+// dependency. The package builder rewrites only that generated import to this permission-aware
+// require. Exposing the function is safe: direct and generated callers both pass through the same
+// builtin deny list, and non-builtin packages cannot escape the package's bundled dependency graph.
+const safeRequireSymbol = Symbol.for('acorn.plugin.safe-require.v1')
+const nativeRequire = createRequire(import.meta.url)
+const builtins = new Set(builtinModules.map(name => name.replace(/^node:/, '')))
+Object.defineProperty(globalThis, safeRequireSymbol, {
+  configurable: false,
+  writable: false,
+  value: (specifier: string) => {
+    const name = specifier.replace(/^node:/, '')
+    if (!builtins.has(name)) {
+      throw new Error(`acorn: loaded plugin '${options.plugin}' may not require non-builtin '${specifier}'`)
+    }
+    if (denied.has(name)) {
+      throw new Error(`acorn: loaded plugin '${options.plugin}' may not require '${specifier}'`)
+    }
+    return nativeRequire(specifier)
+  },
+})
 
 registerHooks({
   resolve(specifier, context, next) {

@@ -156,4 +156,33 @@ describe('workflow tree safety', () => {
       error: 'Provider usage was unavailable after restart; the admitted turn remains counted.',
     })
   })
+
+  it('charges grandchildren against every ancestor subtree without charging unrelated siblings', async () => {
+    let next = 0
+    const safety = new WorkflowTreeSafety(store.db, () => `turn-${++next}`)
+    await insertRun('root', { budget: { maxCostUsd: 10 } })
+    await insertRun('parent', { rootRunId: 'root', parentRunId: 'root', depth: 1, budget: { maxCostUsd: 1, maxTurns: 2 } })
+    const left = await insertRun('left', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
+    const right = await insertRun('right', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
+    const independent = await insertRun('independent', { rootRunId: 'root', parentRunId: 'root', depth: 1 })
+    const leftStep = await insertStep(left.id, 'left-step')
+    const rightStep = await insertStep(right.id, 'right-step')
+    const otherStep = await insertStep(independent.id, 'other-step')
+    const admission = safety.reserveTurn(left, leftStep, {})
+    expect(await safety.settleTurn(admission, { costUsd: 1 })).toBeNull()
+    expect(() => safety.reserveTurn(right, rightStep, {})).toThrow('cost budget exhausted')
+    expect(safety.reserveTurn(independent, otherStep, {})).toBe('turn-2')
+    await safety.recover()
+    await safety.settleTurn(admission, { costUsd: 99 })
+    expect(await safety.usage('root')).toEqual({ costUsd: 1, inputTokens: 0, outputTokens: 0 })
+  })
+
+  it('detects an ancestor budget overrun when a grandchild reports usage', async () => {
+    const safety = new WorkflowTreeSafety(store.db, () => 'turn')
+    await insertRun('root', { budget: { maxCostUsd: 10 } })
+    await insertRun('parent', { rootRunId: 'root', parentRunId: 'root', depth: 1, budget: { maxCostUsd: 1 } })
+    const leaf = await insertRun('leaf', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
+    const step = await insertStep(leaf.id, 'leaf-step')
+    expect(await safety.settleTurn(safety.reserveTurn(leaf, step, {}), { costUsd: 2 })).toContain('cost budget exceeded')
+  })
 })

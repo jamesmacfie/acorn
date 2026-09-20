@@ -43,7 +43,7 @@ export default function ChartView(props: PanelViewProps) {
       when={plot()}
       fallback={(
         <EmptyState align="start" size="sm" title="Nothing to chart">
-          This collection has no field with a fixed set of values and no date to plot against.
+          This source has no field with a fixed set of values and no date to plot against.
         </EmptyState>
       )}
     >

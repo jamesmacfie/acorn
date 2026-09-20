@@ -5,7 +5,7 @@ import { Button, Field, Inline, Input, Select, Stack, Text } from '@acorn/plugin
 //
 // Not a `StepField`, because a field is one control and this is a list of pairs. The field vocabulary
 // stays closed on purpose and the two shapes it does not cover are drawn by the editor itself, here
-// and in ./JoinField.tsx.
+// and in the graph connection editor.
 
 export default function BranchesField(props: {
   branches: Readonly<Record<string, string>>

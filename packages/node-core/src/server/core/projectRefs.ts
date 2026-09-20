@@ -4,7 +4,7 @@ import { schema } from '../db'
 import { createProjectRef, getProject, projectByGithub, toProjectRef, updateProjectRef, type ProjectCreateRefInput, type ProjectRef, type ProjectUpdateRefInput } from '../projects'
 import type { ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { getProjectConfig } from '../projectConfig'
-import { assertRepoConfigTrusted } from '../repoConfigTrust'
+import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../worktrees/taskWorktree'
 
 // The project seam available to plugins. Identity and write methods accept or return narrow ProjectRef
@@ -37,7 +37,11 @@ export type ProjectService = {
   setup(id: string): Promise<{ script: string | null; trigger: SetupTrigger }>
 }
 
-export function createProjectService(db: AppDatabase): ProjectService {
+export type CompiledProjectService = ProjectService & {
+  assertProjectConfigTrusted(projectId: string): Promise<void>
+}
+
+export function createProjectService(db: AppDatabase): CompiledProjectService {
   return {
     byId: async (id) => {
       const row = await getProject(db, id)
@@ -84,6 +88,7 @@ export function createProjectService(db: AppDatabase): ProjectService {
     update: (id, patch) => updateProjectRef(db, id, patch),
     config: (id) => getProjectConfig(db, id),
     assertConfigTrusted: (taskId) => assertRepoConfigTrusted(db, taskId),
+    assertProjectConfigTrusted: (projectId) => assertProjectRepoConfigTrusted(db, projectId),
     setup: (id) => projectSetup(db, id),
   }
 }

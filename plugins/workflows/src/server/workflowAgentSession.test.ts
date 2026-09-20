@@ -4,6 +4,7 @@ import { makeTestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID, type ExtensionPointId } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './workflowRunner'
+import type { WorkflowDef } from '../shared/workflowContracts'
 
 // When a step's row learns which managed session it is running in.
 //
@@ -20,6 +21,12 @@ const ok = {
   capture: { result: 'done', structuredOutput: null, sessionId: null, costUsd: null, events: [] },
   stderrTail: '',
 }
+
+const v2 = (def: Omit<WorkflowDef, 'formatVersion'>): WorkflowDef => ({
+  ...def,
+  formatVersion: 2,
+  steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
+})
 
 describe('which harness a step runs on', () => {
   it('resolves the workflow default before the step is run', async () => {
@@ -42,7 +49,7 @@ describe('which harness a step runs on', () => {
         notify: () => {},
       }, noExtensions)
       // No harness named, which is what the editor's "The workflow default" leaves behind.
-      await runner.start('task-1', { name: 'W', steps: [{ name: 'look', kind: 'agent', prompt: 'go' }] })
+      await runner.start('task-1', v2({ name: 'W', steps: [{ name: 'look', kind: 'agent', prompt: 'go' }] }))
 
       // Not `undefined`. The managed path reads this to find a driver, and answers "no driver" for a
       // profile it cannot name — which used to send every default-harness step to a bare CLI process
@@ -82,10 +89,10 @@ describe('a step running in a managed session', () => {
 
     try {
       const runner = new WorkflowRunner(testDb.db, deps, noExtensions)
-      const runId = await runner.start('task-1', {
+      const runId = await runner.start('task-1', v2({
         name: 'Investigate',
         steps: [{ name: 'look', kind: 'agent', prompt: 'have a look' }],
-      })
+      }))
 
       await vi.waitFor(async () => {
         const [row] = await testDb.db.select().from(schema.workflowSteps)
@@ -137,14 +144,14 @@ describe('what a step that runs an agent is given', () => {
         failingChecks: async () => '',
         notify: () => {},
       }, noExtensions)
-      await runner.start('task-1', {
+      await runner.start('task-1', v2({
         name: 'W',
         steps: [
           { name: 'analyze', kind: 'agent', prompt: 'analyse it' },
           { name: 'pick', kind: 'decide', after: ['analyze'], prompt: 'changes or none?', branches: { yes: 'apply' } },
           { name: 'apply', kind: 'agent', after: ['pick'], prompt: 'apply it' },
         ],
-      })
+      }))
 
       await vi.waitFor(() => expect(prompts).toHaveLength(3))
       expect(prompts[1]).toContain('changes or none?')

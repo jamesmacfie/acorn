@@ -56,7 +56,7 @@ const TRUST: PluginTrustRequest = {
     installed: {
       version: '1.0.0',
       apiVersion: '9',
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
       contributions: { frames: [] },
       client: null,
     },

@@ -1,13 +1,16 @@
 import { and, eq } from 'drizzle-orm'
 import { parsePanels } from '@acorn/dashboards-core/definition.ts'
 import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
-import type { PanelSourcePage } from '@acorn/dashboards-core/mapping.ts'
 import { panelMeasure } from '@acorn/dashboards-core/measure.ts'
 import { measureSignature } from '@acorn/dashboards-core/signature.ts'
+import { projectDashboardPanel, type DashboardQueryProjection } from '@acorn/dashboards-core/typedProjection.ts'
+import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
-import { readCollection } from '../collections/registry'
 import { type AppDatabase, schema } from '../db'
+import { invokeDataSource } from '../dataSources/runtime'
+import { resolveQuery } from '../queries/runtime'
 import { appendSample, hourBucket } from './history'
+import { dashboardStore } from './store'
 import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('dashboards')
@@ -21,7 +24,7 @@ const log = createLogger('dashboards')
 const DASHBOARDS_PREF_KEY = 'dashboards'
 
 /** The per-panel timeout budget belongs to the schedule, not each read. This bounds how many
- *  collections one pass dispatches, so a board of hundreds of panels cannot turn an hourly job into a
+ *  sources one pass dispatches, so a board of hundreds of panels cannot turn an hourly job into a
  *  permanent one. Panels past the cap are reported in the run detail rather than dropped silently. */
 const MAX_PANELS_PER_PASS = 200
 
@@ -83,17 +86,36 @@ export async function runSamplePass(
 
   for (const panel of panels) {
     if (signal.aborted) break
-    const pages: PanelSourcePage[] = []
+    if (!panel.publication) continue
+    const projections: DashboardQueryProjection[] = []
     let unavailable: string | null = null
-    for (const query of panel.queries) {
+    let published
+    try { published = dashboardStore(db).publishedById(panel.publication.dashboardId) }
+    catch {
+      result.skipped.push({ panelId: panel.id, reason: 'published dashboard unavailable' })
+      continue
+    }
+    const principal = { kind: 'internal' as const, scope: 'service' as const, userId: env.ACTIVE_IDENTITY.get()! }
+    for (const entry of published.content.queries) {
       try {
-        const page = await readCollection(env, query.pluginId, query.collectionId, query.params ?? {}, signal)
-        pages.push({ query, schema: page.schema, rows: page.rows })
+        const invocation = { principal, signal }
+        const resolved = await resolveQuery(env, {
+          workspaceId: published.workspaceId,
+          ...(published.projectId ? { projectId: published.projectId } : {}),
+        }, entry.reference, {}, invocation)
+        const description = await invokeDataSource(env, {
+          operation: 'describe', source: resolved.query.source, scope: resolved.query.scope,
+        }, invocation)
+        const page = await invokeDataSource(env, {
+          operation: 'query', query: resolved.query, mode: 'execution', evaluationTime: now,
+          pageSize: DATA_LIMITS.options,
+        }, invocation)
+        projections.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description, result: page })
       } catch (error) {
-        unavailable = `${query.pluginId} unavailable`
+        unavailable = `${entry.label} unavailable`
         // One line for the author. The run row gets the short form, because it is a settings list,
         // not a log.
-        log.warn(`${panel.id} skipped: ${query.pluginId}:${query.collectionId}: ${describeError(error).message}`)
+        log.warn(`${panel.id} skipped: ${entry.label}: ${describeError(error).message}`)
         break
       }
     }
@@ -102,7 +124,8 @@ export async function runSamplePass(
       continue
     }
 
-    const value = panelMeasure(panel, pages)
+    const projection = projectDashboardPanel(published.content, projections)
+    const value = panelMeasure(projection.definition, projection.sources)
     if (value === null || !Number.isFinite(value)) {
       // An aggregate over a field that is not there, or over rows with no numbers. The stat draws a
       // dash for this, so the series records nothing rather than a 0 that never happened.
@@ -112,7 +135,7 @@ export async function runSamplePass(
 
     const { reset } = await appendSample(db, {
       panelId: panel.id,
-      signature: measureSignature(panel),
+      signature: measureSignature(projection.definition),
       bucket,
       value,
       recordedAt: now,

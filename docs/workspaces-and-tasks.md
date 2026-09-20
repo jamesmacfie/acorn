@@ -124,6 +124,13 @@ their worktrees. The tasks remain in the rail with their final workflow runs and
 the owner through the normal task action. Retrying a dispatch reuses the existing tasks and runs;
 starting a new root workflow creates a new set.
 
+Workflow-created tasks carry origin `workflows:child`. Desktop and terminal navigation collapses
+those descendants under the nearest ordinary root task and shows aggregate running/attention markers
+on that root. Expanding a root shows the same parent/child order; opening a descendant reveals only
+its ancestor path. Manual children and top-level tasks keep their persisted drag order. Collapse does
+not change task identity or lifecycle: each task still has the ordinary individual archive action,
+and there is no workflow group or automatic archive operation.
+
 ## Worktrees and setup
 
 Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
@@ -258,3 +265,6 @@ the corresponding visible task. A task can be archived without deleting its hist
 The desktop and terminal rails group a child after its parent from `Task.parentId`, while retaining
 the original order among roots and siblings. The child remains a normal selectable task with its own
 panes. An orphan or a lineage cycle stays visible as a top-level row instead of being dropped.
+Workflow descendants start collapsed under their ordinary root as described above; manual descendants
+remain visible. A run-history link to an archived or missing child explains that state and retains the
+record and attempt history instead of dropping the link's context.

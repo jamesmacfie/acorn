@@ -4,6 +4,42 @@ Workflows are durable Node orchestration. A definition is either a committed
 `.acorn/workflows/*.toml` file or a `workflow_defs` row the owner typed in the app, and the two are
 read as one list. SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.
 
+## Version 2 values
+
+Definitions use `formatVersion: 2` (`format_version = 2` in TOML). Each step has a stable `id`
+and a separate human-readable `name`. Edges, branches, bindings, prompt references, and device layout
+positions use the ID. Renaming changes the label; the frozen run maps persisted row indices to its
+own frozen definition IDs. An omitted `after` still means the preceding step, and explicit edges
+survive declaration reordering. New editor steps receive an ID once when created.
+
+Inputs declare the shared structural `schema`, optional `label` and `description`, `required`, and a
+typed `default`. Numbers, booleans, nulls, arrays, and objects cross start routes, run snapshots, and
+child dispatch without conversion. Missing optional values are omitted; missing required values
+fail admission. An explicit null is validated as a value and never replaced by a default.
+
+Bindings use the shared data address vocabulary: `{ address: { from: "literal", value } }`,
+`{ address: { from: "input", name, pointer } }`,
+`{ address: { from: "step", stepId, pointer } }`, or an `item` address with a pointer inside a map.
+An empty pointer selects the whole value. Optional `fallback` applies only to missing values.
+Explicit conversions are `scalar-to-text` and `json-to-text`. Only completed transitive predecessors
+enter a handler's `predecessorValues`; a completed sibling cannot supply a binding.
+
+Named definition `outputs` declare `{ name, schema, binding, required? }`. Output bindings select
+completed step values. A child step exposes these as `outputs`, alongside its task/run/status summary;
+consumers do not need to inspect the last transcript message. The Node validates structural step
+outputs before completing a v2 step and validates declared workflow outputs before completing a run.
+Workflow values are bounded by the shared 16 MiB selection limit; provider record/detail limits remain
+separate. Prompt/title rendering serializes objects deterministically without truncation.
+
+TOML stores structural schemas in `schema_json`, typed defaults in `default_json`, typed bindings in
+`binding_json`, and named outputs in `outputs_json`. These JSON strings preserve nested nulls and
+mixed arrays that TOML cannot represent directly. The basic input editor supports typed defaults;
+the JSON tab exposes the complete schema and binding contract.
+
+Unversioned definitions, missing stable IDs, old binding tables, and unknown versions are refused
+with a file-located upgrade diagnostic. There is no read-normalization or execution adapter. The
+development-state transition exports then removes old database definitions before v2 is admitted.
+
 ## Execution model
 
 The workflow loader parses and validates a definition, rejects cycles, expands static branches, and
@@ -17,22 +53,22 @@ recovery/gated state. Cancellation propagates to child sessions and process grou
 
 ### The graph
 
-A step declares `after`, the names of the steps it waits on. A step with no `after` key waits on the
+A step declares `after`, the IDs of the steps it waits on. A step with no `after` key waits on the
 step declared before it, and `after = []` makes it a root. Edges are derived from that and never
 stored, so a file written as a plain list still runs as the chain it always was.
 
-The runner keeps one rule: a step is ready when every step in its `after` is `done`. Every ready step
-starts at once, up to the four-slot headless semaphore fan-out children already queue on. A step that
+The runner starts a step when every predecessor is `done`, `completed-with-failures`, or `skipped`.
+Agent execution uses the Node's four-slot semaphore and the root's optional lower concurrency limit. A step that
 ended `skipped` counts as done for readiness, because a skip is how a branch is not taken and the
-step after the decision still has to run. `idx` is the declaration order and nothing but the row
-insert reads it.
+step after the decision still has to run. `idx` maps a persisted row to the same position in its frozen
+definition; it does not identify a step across definition edits.
 
-A `decide` step's `branches` map a verdict to a step name, and each target must have the deciding
+A `decide` step's `branches` map a verdict to a step ID, and each target must have the deciding
 step among its predecessors. When the verdict picks one target, every other target is marked
 `skipped`, and so is every step whose only path back to a root runs through a skipped step. A step
 that a taken branch also reaches stays pending and runs when its live predecessors finish.
 
-Validation follows the graph rather than the list. `${steps.<name>.output}` must name a transitive
+Validation follows the graph rather than the list. `${steps.<id>.output}` must name a transitive
 predecessor, because two roots are not ordered and a step beside this one may well have run first and
 still be the wrong thing to read. A cycle is refused and the error names it, as `a → b → a`.
 
@@ -42,7 +78,7 @@ A definition declares `[[inputs]]`, each with a `name`, an optional `description
 `default`. A run starts with a value per input. The start route refuses a run that misses a required
 input with no default, and refuses a value for a name the definition does not declare.
 
-`${inputs.<name>}` renders wherever `${steps.<name>.output}` renders: a prompt, a child prompt, and
+`${inputs.<name>}` renders wherever `${steps.<id>.output}` renders: a prompt, a child prompt, and
 every string value inside `[steps.with]`, one level deep. A contributed kind receives its `with`
 already rendered, so a step handler sees the substituted command and never the template. A run
 freezes the values it started with into its own copy of the definition, so the definition a finished
@@ -50,11 +86,11 @@ run shows says what it was given.
 
 ### What an agent step sees
 
-A step that runs an agent — `agent`, `decide`, `ci-loop`, `fan-out` — takes
+A step that runs an agent, such as `agent`, `decide`, or `ci-loop`, takes
 `inputs = "append" | "template" | "none"`, default `append`. With `append`, the runner renders the
 prompt and then adds one `## Output of <name>` block per incoming edge whose step finished `done`, in
 `after` order. With `template`, nothing is added and the prompt places its own
-`${steps.<name>.output}` references. With `none`, the step sees only its prompt. The handoff context
+`${steps.<id>.output}` references. With `none`, the step sees only its prompt. The handoff context
 rides along in every mode, because that is a separate thing from the graph's edges.
 
 All four kinds assemble that prompt through one function, which they did not until 2026-09-09. Only
@@ -78,8 +114,7 @@ So a profile is now what decides which of the two paths a step takes, and nothin
 with a managed driver, meaning `claude-code` or `codex`, runs the step as a managed session with a
 durable transcript ([managed-agents.md](./managed-agents.md)). A profile without one runs it headless:
 a one-shot process, its stream captured into the step's events, and no session for the run pane to
-draw. A fan-out child resolves its own `profile` rather than inheriting the row it was spawned from,
-which is why the runner reads the definition and not the step row.
+draw. Each child workflow resolves its own step profile from the frozen definition.
 
 One narrowing on top of that: a `decide` step needs a profile with a one-shot structured mode, which
 validation tests for on the profile itself rather than against a list of names, so both `claude-code`
@@ -99,11 +134,10 @@ file.
 ### Isolation
 
 An agent step with `isolation = "worktree"` runs on a child task with a checkout of its own, created
-through `CoreServices.tasks.createChild()` with a branch derived from the run name and the step name.
-The child task id lands in the step's `inputs_json`, the same field fan-out children use, so
+through `CoreServices.tasks.createChild()` with a branch derived from the run name and the step ID.
+The child task ID lands in the step's `inputs_json`, so
 cancelling the run reaches it. The default, `shared`, runs the step on the run's own task beside its
-siblings. Two investigators reading the same checkout do not need a worktree each, and paying for one
-is what made fan-out feel heavy.
+siblings. Two investigators reading the same checkout can share a task; child workflows use separate tasks.
 
 ### Retry
 
@@ -138,15 +172,7 @@ part of how long the step took.
 A run still going when the process exits reports no span. Nothing measured how long it took, and a
 span invented on the next boot would say otherwise.
 
-### Fan-out, and where a file comes from
-
-A step that fans out into parallel branches creates each branch as a child task under the workflow's
-own task, through `CoreServices.tasks.createChild()`. `resolveCwd()` creates the child's worktree
-lazily, when its first step runs, the same path every other task-worktree consumer takes. Cancelling
-one branch calls `CoreServices.tasks.cancel()`, a separate verb from the general task lifecycle so a
-plugin cannot use this seam to archive or restore a task outside core's own routes. A child's
-proposed branch name is checked against every task, not only its siblings, because a worktree is
-keyed on the branch and a collision with an unrelated task would hand two tasks one checkout.
+### Where a file comes from
 
 Workflow files load from the repo checkout or worktree and layer over `~/.acorn/workflows` the same
 way `config.toml` layers repo before user, so a repo-defined id wins over a user one. Database rows
@@ -154,7 +180,7 @@ sit under both, as § Database definitions describes. A step can
 reference another workflow by id. The reference expands inline, one level of nesting, and a chain
 that revisits an id is rejected as a cycle rather than followed into a hang. A malformed file
 surfaces as an error row instead of being skipped silently. A sub-workflow's steps are prefixed with
-its id, and so are the `after` and `joins` names inside it, so an expanded block keeps its own shape
+its id, and so are the `after` IDs inside it, so an expanded block keeps its own shape
 inside the outer graph.
 
 ### Child workflow tasks
@@ -168,22 +194,38 @@ to a referenced definition therefore affects a later root run, not one already i
 Each dispatch is recorded before it creates a task or starts a run. The record holds a stable caller
 key and payload fingerprint, reserved task and run IDs, explicit root and parent lineage, and its
 progress from reservation to terminal state. A retry or restart resumes that record. Repeating the
-same request returns the same task and run; reusing its key with different content fails. The initial
-release permits one child-workflow level and at most 12 descendant tasks per root run.
+same request returns the same task and run; reusing its key with different content fails. The graph
+permits four child-workflow levels below the root and rejects recursive references before admission.
+`maxDescendants` defaults to 100 and accepts values from 1 through 500. Every nested child counts
+toward that root limit. An oversized roster reserves and dispatches nothing. A later nested admission
+can reach the same limit; that step stops at a visible safety rail while admitted siblings settle.
 
 A child-workflow step waits without taking an agent execution slot. A mapped step keeps source order,
 uses the configured JSON Pointer as the stable item key, and records each child's task ID, run ID,
 status, bounded result, failure, and provider usage. An empty array succeeds. When results are mixed,
-the parent waits for every admitted child and then fails with the failed-child count. A child gate
-puts the parent in `gated`; approval still happens in the child run.
+the parent waits for every admitted child and persists `completed-with-failures`. That step's typed
+output remains available to downstream summaries and conditions. A successful summary does not hide
+unresolved child failures in the root outcome. A child gate puts the parent in `gated`; approval
+still happens in the child run, and independent siblings continue.
+
+Four agent turns can execute concurrently on the Node. A root can lower its limit with
+`maxConcurrency`, from 1 through 4. Waiting parents, gates, and data reads consume no agent slot.
+The semaphore skips saturated roots without holding Node slots for their queued work.
 
 Cancellation stops new admissions, cancels descendant runs and managed sessions, and settles the
 root only after admitted children settle. A failure in another branch applies the same cleanup
 before the root becomes failed. Child tasks stay active, and their worktrees remain as ordinary task
 history. Retrying a dispatch step reuses the saved child roster and does not create replacement
 tasks. Tool ceilings, provider-turn limits, cost, token limits, and the absolute deadline are
-intersected down the tree. Usage is admitted once against the root and remains charged across
-retries.
+intersected down the tree. Usage is admitted once against the root and every ancestor's subtree
+budget, and remains charged across retries. An explicit failed-child retry reopens its ancestor
+dispatch path and reuses the task, run, roster, and frozen graph. Successful siblings are not rerun.
+The original absolute deadline still applies. A restart keeps unknown-usage turn reservations counted.
+
+The editor's **Plan with AI, then For each** shortcut inserts a structured agent plan and a For each
+step as one undoable draft edit. Select the child workflow and bind its inputs in the inspector. The
+plan declares stable item IDs and accepts an empty array. Removed execution kinds receive an upgrade
+diagnostic; they do not execute. Ordinary graph convergence uses `after` edges.
 
 This replay protection is limited to one root run. Starting a fresh root can process the same
 business item again; cross-run business deduplication is deliberately not part of workflow dispatch.
@@ -208,15 +250,15 @@ snapshot check does not apply. That is the whole reason every route under `/v2/p
 device-only, and the reason a start by id refuses a row to a task-confined caller: an agent inside a
 run may start a file, because the snapshot covers it, and may not start a row.
 
-**Starting by id.** `POST /v2/p/workflows/tasks/:id/workflows` takes either the whole definition or
-`{ defId }`. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+**Starting by id.** `POST /v2/p/workflows/tasks/:id/workflows` takes `{ defId }` and optional typed
+inputs. Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
 
 **A row is a draft.** Neither write validates, because a workflow being built is invalid for most of
 the time somebody is building it: it has no steps the moment it is created, and a step has no prompt
 until one is typed. `POST /v2/p/workflows/defs/validate` reports, the editor draws what it says in
-its footer, and starting a run is what refuses. A file layer is the same: a definition that does not
+its footer. Run resolves an immutable published revision, never the editable row. A file layer is different: a definition that does not
 validate is listed with its problems rather than hidden.
 
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step
@@ -224,13 +266,79 @@ runs, not when the row is saved. The node holding a definition may not have the 
 `POST /v2/p/workflows/defs/validate` answers the loader's own problem list and leaves the
 project-specific names to the step handlers.
 
-**Save to repo.** `POST /v2/p/workflows/defs/:id/save-to-repo` writes the row as
-`.acorn/workflows/<slug>.toml` in the task's checkout, or in the project folder when no task is
-given, and deletes the row unless `keepRow` is set. The file id is a slug of the definition name,
-deduplicated against the folder, so nothing a person types can address a path. The write is confined
-to the checkout by the same symlink-aware check every other checkout write takes, and it lands
-through a temporary file and a rename. From then on the trust snapshot covers the file, and the next
-start from it asks for the acknowledgement any committed configuration asks for.
+### Draft recovery and publication
+
+`workflow_defs` owns editable content, a draft revision, and published/base revision pointers.
+`workflow_revisions` retains immutable content and digests. Saves use compare-and-swap and verify
+the affected-row count. Editing a draft does not change what Run executes.
+
+The editor coalesces autosaves after 750 ms. Device recovery copies retain the Node ID, entity ID,
+base revision, base content, and local content. Only a matching acknowledgment clears a copy.
+Unavailable storage displays **Not saved**; an unacknowledged durable copy displays **Saved on this
+device**. Reopening compares the local copy with the Node version. Stable IDs align step lists;
+conflicting fields, concurrent structural edits, and delete-versus-edit require an explicit choice.
+
+`POST /defs/publications/prepare` freezes a reviewed dependency-first write set. The request selects
+the root draft revision and optional changed child/query draft revisions. Required unpublished
+dependencies are included; unrelated edits to published dependencies are not adopted. Metadata-dependent
+queries accept explicit validation inputs and step values through the `validation` field. Preparation
+uses source descriptions and options, not record queries. A missing validation value blocks publication.
+
+`POST /defs/publications/:operationId/publish` writes that set idempotently. The workflow-owned journal
+records `prepared`, `publishing`, `complete`, or `needs-reconciliation`, intended revisions, landed
+revisions, and the remaining writes. Core query holds prevent partially published query revisions
+from resolving. Workflow admission refuses affected definitions until the operation completes;
+unaffected definitions remain usable. Core and plugin writes are not one transaction.
+
+`GET /defs/publications?workspaceId=` exposes recovery state. Resume retries the exact frozen writes;
+it does not create replacement revisions after a lost response. A review with no landed writes can
+be discarded through `POST /defs/publications/:operationId/discard`. A partial publication must resume.
+Ordinary references resolve published revisions; run admission pins saved-query revisions and freezes
+the child graph. Dependency records support consumer review and refuse referenced workflow deletion.
+
+Draft saved-query references use a separate `draft:<workflowId>` consumer identity. The workflow
+store tracks reference claims before writing core consumers, then acknowledges the draft save.
+Stale claims are removed after successful saves or deletion. Startup reconciles interrupted claims,
+including deletion that reached the workflow store before core cleanup. Draft changes cannot remove
+the consumer protection of the published revision. Query deletion also refuses active publication
+holds, even when the query has no consumers.
+
+### File drafts and portable export
+
+`POST /v2/p/workflows/defs/files` accepts `open`, `save`, `review`, `export`, `publish`, `discard`,
+and `list` operations. Device authentication protects this authoring route. File targets identify a
+project, a repository or user layer, and a confined `.acorn/workflows/<id>.toml` path.
+`workflow_file_drafts` retains the original text/hash, edited definition, and compare-and-swap
+revision. Parse failures name the file to repair in a text editor. Static file composition must be
+converted before visual editing, so saving an expanded graph cannot erase its original references.
+
+Review merges independent external edits by stable step ID. Conflicting values require an explicit
+choice against the reviewed external hash. A deleted file requires restoration. Publication rechecks
+the expected hash, writes a unique adjacent temporary file, and renames it. Known external changes
+are refused. External editors do not share Acorn's journal, so this is not a filesystem transaction.
+
+The outline editor opens repository and user files through this draft route. It autosaves the visual
+draft, shows external changes during review, and requires a conflict choice before publication. It
+does not write the source file during ordinary draft editing.
+
+**Export to repository** captures the published workflow graph into sibling files in the selected
+project. Workspace originals remain intact. Published saved queries and typed parameter declarations
+are embedded inline, database child references become repository references, and repository references
+are reused only within the export scope. Cycles, unresolved references, user-file dependencies, and
+occupied destination paths are refused. The obsolete `save-to-repo` route refuses destructive export.
+
+Connection selections become required string inputs with a `connection.source` constraint. Export
+removes Acorn workspace/project scope IDs, while retaining provider project/state IDs in the review.
+Run admission binds the destination workspace/project and validates connection and provider choices
+through the source runtime before starting. Destination scope parameters must resolve before admission.
+Filter values bound to runtime records are validated by the data step when those records exist.
+Credentials are not read by export.
+
+`workflow_file_operations` retains each intended file, original hash, dependency hash, and landed
+status. Resume verifies completed writes and continues the same plan after interruption, including a
+rename that landed before its journal acknowledgment. A review with no written files can be discarded.
+Affected file definitions cannot run until their publication completes. Publication leaves ordinary
+uncommitted changes; repository run admission still applies configuration trust.
 
 `plugin:workflows:defs-changed { workspaceId }` goes out on every write.
 
@@ -257,19 +365,54 @@ list in its Browse panel and the editor in the main one, and the editor's own no
 are a `list-detail` pair inside that. Every control is a kit node, so none of this is plugin code
 either host had to be given.
 
-The list column holds three kinds of row. **Definition** carries the workflow's name, its posture,
-its tool ceiling and its budget. **Inputs** carries the values a run is started with. Under them is
-the graph in reading order: roots first in declaration order, then each node after the last of the
-steps it waits on, indented one level per rank. A node that waits on more than one step carries a
-`⇐ n` mark and names them on hover. **Add** is a menu over the catalog's kinds, built-in ones first
-and then each plugin's, with the icon and the sentence each kind's `describe` gives.
+The primary view is an outline with three kinds of row. **Definition** carries the workflow's name,
+posture, tool ceiling, and budget. **Inputs** carries the values supplied when a run starts. Step
+rows show a behavior summary, an **After** line with readable dependencies, and visible branch
+labels. Roots appear in declaration order, followed by each step after the last dependency. Move
+controls reorder declarations without changing stable IDs or explicit edges. A referenced-step
+deletion names the affected dependencies and bindings before applying the edit. **Add** lists the
+catalog's kinds, with built-in actions first and each contributed kind's icon and description.
+
+The selected row opens its configuration and a contextual preview. The preview describes the step,
+dependencies, branch, and declared output fields. It does not run an agent or invent sample output.
+**Graph** and **Code** are secondary views over the same definition and stable step IDs. They do not
+maintain a separate graph model. Outline edits, binding changes, code edits, and generated proposals
+share one undo and redo history.
 
 The inspector draws whatever the list has selected. For a node that is its name, the steps it waits
 on as removable chips with a picker beside them, the agent fields when the kind runs an agent, then
 the kind's own fields in declared order. A prompt field carries a chip per declared input and per
 step that is certain to have finished first, and pressing one appends the reference. A `decide` node
-draws its branches as verdict-to-step rows. A `join` node draws a select over the fan-out steps that
-run before it. A kind that ships no `describe` draws its `with` table as raw JSON and says so.
+draws its branches as verdict-to-step rows. For each selects a child workflow and typed item bindings.
+A kind that ships no `describe` draws its `with` table as raw JSON and says so.
+
+**Find records** uses the shared query editor. Adding **For each** from a Find records step creates
+the dependency and preselects that step's records output as one undoable edit. For each bindings and
+direct conditions use the shared typed field picker. Conditions expose field, comparison, and typed
+value controls. Agent output uses a field list with nested object and list fields, types, and
+requiredness. Raw pointers and JSON Schema remain available in **Code**, but the normal setup does
+not require them. Task title templates, ordinary-array identity keys, and execution limits remain
+under **Advanced** until validation requires them.
+
+### Scheduling a published workflow
+
+**Schedule…** appears only for a published database workflow. It opens one shared-kit editor on both
+hosts; cadence, timezone, project, and typed input values are schedule setup, not fields on a normal
+workflow draft. The first review shows three concrete future checks with their timezone offsets,
+effective execution limits, and whether the first check processes current matches or establishes a
+baseline from now.
+
+Record repeat handling appears only for `workflow-map` loops. **Run again when these fields change**
+uses the same typed field picker as authoring. **Since the last completed check** appears only when
+the source declares incremental continuation and the query feeds one unambiguous loop. Saving stores
+a disabled Node draft; activation is a separate device-only action and is never queued while offline.
+
+The workflows list gives schedules their own section and labels Active, Paused, Needs review, or
+Unavailable. A changed published dependency retains the prior approved snapshot and processing
+history, pauses admission, and links back to both activation review and the published workflow.
+**Start fresh** is folded under advanced review and names the consequence that matching records may
+run again. Pause stops future checks, **Run now** still works while paused, an active run opens its run
+surface for cancellation, and deletion retains run and processing history.
 
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
 select per option that harness advertises through `GET /v2/p/agents/providers`, then where the step
@@ -283,6 +426,12 @@ each item in a structured result. The child workflow picker lists database, repo
 definitions that the selected project can resolve. The catalog includes each target's declared
 inputs and terminal output schemas. It omits definition bodies, input defaults, credentials, and
 values from a run.
+
+From a mapped step, **Create a workflow for this record** creates a child draft with one required,
+typed `record` input. It binds the current record, saves the parent reference, and opens the child.
+The parent link returns to the same selected step. Unpublished leaf drafts remain selectable in the
+editor and carry a **draft** label; generation only receives published targets. Parent publication
+reviews a required child draft with the parent rather than making either draft runnable early.
 
 The inspector draws one binding for each declared child input. A binding can use fixed text, a
 declared parent input, or a JSON Pointer into a structured predecessor. A mapped step can also use a
@@ -355,23 +504,32 @@ The editor preserves unavailable targets, unsupported bindings, and malformed po
 draft, then reports each problem beside the field and in validation. Saving the draft does not make
 it runnable. The start path validates and resolves every child before it creates a task.
 
-Renaming a step rewrites map sources and structured step bindings along with graph edges and prompt
-references. The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
+Renaming a v2 step preserves map sources, structured bindings, graph edges, and prompt references.
+The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
 child workflow contract.
 
 ### Generating and editing with AI
 
-**Generate** on the editor toolbar is a menu once there is a saved workflow or an unsaved draft with
-changes. **Overwrite** keeps the original generation behaviour: its description answers with a whole
-new definition that replaces the draft. **Edit** takes an instruction and the current definition,
-and asks the model for the whole definition with only the requested changes. A new empty draft keeps
-the direct **Generate** button, which opens overwrite.
+**AI authoring** opens a bounded conversation beside the workflow draft. Each turn can request
+allowlisted source metadata, dynamic source discovery, option IDs, or compatible child workflows;
+ask an inline clarification; or return a proposal. API-backed model connections and text-only agent
+harnesses use the same JSON response protocol over the existing `generateText` service.
 
-Both dialogs ask which connected model provider writes the answer and which of that provider's
-models it uses. Overwrite sends the draft's current name and declared inputs as hints, with the model
-asked to keep each where it still fits. Edit sends the graph itself and explicitly tells the model to
-preserve every step, prompt, edge, input, policy, budget, and setting the request does not need to
-change. The instruction box takes up to 8,000 characters, which is enough to paste an issue in.
+The conversation stores pending context, clarifications, and proposals in device-local recovery
+state keyed by Node and workflow. Source records stay out of the prompt unless the user enables
+**Use preview records to help AI**. An enabled sample contains at most three selected records and
+16 KiB. Cancellation keeps the draft unchanged, and each result reports model request and token use.
+
+A proposal shows a semantic diff before it can change the draft. Applying it reconciles a stale
+base against the current definition by stable step ID, refuses conflicts, and runs the workflow
+validator again. One accepted proposal creates one undo entry. Rejecting it changes nothing. The
+conversation cannot save, publish, run, activate, change a provider, or read credentials.
+
+#### Legacy one-shot endpoint
+
+The device-only `/defs/generate` route remains for compatibility with callers of the earlier
+one-shot generation contract. The workflow editor uses `/defs/authoring/turn` for interactive AI
+editing.
 
 The edit projection removes provider choices, configured execution targets, tool allowlists,
 triggers, and the `headers` and `auth` fields of contributed step configuration from each step. The
@@ -397,19 +555,17 @@ removes a reference outside that catalog, an input binding the target does not d
 that is not a structured predecessor. If the catalog is empty, the prompt forbids both child
 workflow kinds.
 
-For an AI edit, a configured child target is protected like a provider choice. The current definition
-sent in the user prompt omits that target, and the server restores it only to a step with the same
-name and kind. A renamed, deleted, or retyped step does not inherit the target. The model can propose
-a target only for a new step, and grounding keeps it only when the scoped catalog contains the exact
-reference.
+The server does not silently restore a changed child target. Both the conversation and compatibility
+route keep only references in the scoped child catalog, and the conversation exposes a target change
+in the semantic diff for review.
 
 The reply is read back rather than trusted. Anything named in it that this node does not have is
 taken out before the draft is touched. An invented step kind becomes a plain agent step keeping its
-prompt, rather than a deleted step, because deleting one cascades through every `after`, `joins` and
-`branches` that named it. An invented policy loses its value and stays a policy gate, because
+prompt, rather than a deleted step, because deleting one cascades through every `after` and `branches`
+target that names it. An invented policy loses its value and stays a policy gate, because
 retargeting it to a human gate would silently turn a hard check into a no-op under an autonomous
-posture. An unknown `with` key goes, and a step name that is not slug-shaped is renamed with every
-reference following it. Each of those changes is reported in a dismissible alert above the node list,
+posture. An unknown `with` key goes, while the step's stable ID keeps every reference intact when its
+display name changes. Each grounding change is reported in a dismissible alert above the node list,
 because a list of things that were changed is not something to read in a toast. What the definition
 still gets wrong is not repeated there: the footer already draws it.
 
@@ -423,20 +579,15 @@ through being built, and **Run** is what refuses to start one. The alert above t
 describes the answer that was applied and only that one. When the repair is the one kept, a note
 about the first draft would be about a definition nobody ever sees.
 
-Applying either answer goes through the same door the JSON tab's **Apply** uses, so the whole
-definition is one entry on the undo stack. One **Undo** puts back what was there. Nothing is saved:
-**Save** and **Run** are still yours to press.
-
-The button is not drawn at all in two cases. One is an owner with nothing to generate with, meaning no
+The AI authoring button is not drawn when the owner has nothing to generate with, meaning no
 model provider connected and no agent CLI installed either
 ([integrations.md](./integrations.md) § Model providers), on the rule the commit-message wand
 follows: a control whose only message is "connect one first" is a control in the way of the ones
-beside it, and Settings, under Integrations, is where a connection is made. The other is a definition read from a file rather than a row, which the whole editor is
-read-only for anyway.
+beside it, and Settings, under Integrations, is where a connection is made. Repository file drafts
+use the same conversation and keep their separate review-before-publication flow.
 
-Two model calls, each with a 60-second ceiling of its own, make this the slowest thing in the editor.
-The dialog counts the seconds rather than spinning, and the client asks for a longer
-request timeout than the broker's 30-second default
+One submitted instruction can make at most eight metadata requests and two candidate attempts. The
+client uses an 11-minute broker timeout for the bounded sequence and exposes **Cancel** while it runs
 ([api-reference.md](./api-reference.md) § Transport).
 
 ### The draft rules
@@ -447,9 +598,8 @@ These are why the editor is safe to type in:
   inserted between two nodes, so adding a step changes nothing about what an existing step waits on.
 - Deleting a node removes every edge that touched it and never bridges its predecessor to its
   successor. A chain that loses its middle becomes two roots, which is visible.
-- Renaming rewrites `${steps.<old>.output}` in every prompt and every `with` string, plus every
-  `after` entry, every branch target and every `joins`. In the draft only, until it is saved. The
-  field refuses a duplicate name and anything that is not slug-shaped.
+- Renaming changes only the display name. `${steps.<id>.output}`, every `after` entry, branch target,
+  binding, and graph position continue to use the stable ID. The field accepts 1–200 characters.
 - The picker offers a step as a predecessor only when the edge would be accepted, so a self edge, a
   duplicate and anything that closes a cycle are never on the list.
 - Undo and redo cover the whole draft, with typing folded into one step inside a 600 ms window, 60
@@ -494,18 +644,24 @@ draw one with.
 
 ### Saving
 
-**Save** writes the row at the revision it was read at. A stale revision answers 409 and the draft is
-kept, because throwing away what somebody typed to show them what changed is the wrong half to lose.
-**Save to repo** writes the definition into the task's checkout as
-`.acorn/workflows/<slug>.toml` and keeps the row; § Database definitions holds what that does to
-trust. **Run** opens the start dialog, one box per declared input with a task picker when no task is
+**Save** flushes the draft at the revision it was read at. Autosave uses the same operation.
+A stale revision answers 409 and opens conflict choices without discarding the local draft.
+**Review publication** names the dependency set. **Publish reviewed set** makes the set executable
+only after all writes complete. **Resume publication** continues an interrupted operation.
+For a repository or user file, Save persists the visual draft on the Node; **Review publication**
+checks external edits and file dependencies, and **Publish reviewed files** atomically replaces that
+file while leaving the working tree uncommitted. A database definition uses **Export to repository**
+to review and write its portable published dependency graph. The old direct Save to repo operation is
+refused because it cannot provide that review or preserve every workspace original.
+
+**Run published** opens the start dialog, one box per declared input with a task picker when no task is
 in scope, and starts the run when the required ones are filled. A definition that declares no inputs
 and already has a task starts without a dialog.
 
-A committed file opens in the same editor, read-only, with **Copy to database** in place of Save. So
-a workflow somebody reviewed in a pull request is read the same way as one you typed. An address that
-names no layer at all says that instead, because read-only and unreadable are different things and
-the editor used to give the second one the first one's words.
+A committed or user file opens in the same visual editor with a recoverable Node draft and its file
+destination visible in publication review. Parse failures preserve the file and direct the user to
+repair its raw TOML; they never open an empty visual definition. An address that names no layer at
+all says that instead, because unreadable and an empty draft are different states.
 
 ### Where positions live
 
@@ -524,8 +680,8 @@ as a problem rather than silently selecting another implementation.
 
 ## Contributed step kinds
 
-The nine built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`,
-`decide`, `workflow`, and `workflow-map`. Workflows opens three node extension points
+The built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `decide`, `if`,
+`find-records`, `get-record-details`, `workflow`, and `workflow-map`. Workflows opens three node extension points
 ([plugins.md](./plugins.md) § Node-side extension points) and any plugin may fill them:
 
 | Point | What it adds | Named in a file as |
@@ -675,8 +831,8 @@ is a record.
 The node list is the editor's list. Both call `graphOrder` in
 `plugins/workflows/src/client/editor/draft.ts`, over the definition the run froze when it started, so
 the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
-more than one step carries the same `⇐ n` mark. A fan-out child is a row under the step that spawned
-it.
+more than one step carries the same `⇐ n` mark. A dispatched child is a row under the step that
+spawned it.
 
 The detail depends on the kind and the status:
 
@@ -695,12 +851,14 @@ terminal**, which resumes it: the agents sidebar used to be where that lived. A 
 task links to it. Every control is drawn only when its transition is legal and disabled while one is
 in flight, so a stale button is a race rather than a bug.
 
-A child-workflow node adds its map progress and one card per child. Each card links to the child task
-and run, and shows approval attention, failure detail, the bounded result, and that child's usage.
-Selecting a child run shows explicit parent and root links. Root-run footers report aggregate tree
-usage; child-run footers report only that run, so the same provider turn is not counted twice. The
-cancel confirmation says it cancels the run tree, and a retry explains that it reuses existing child
-tasks and runs.
+A single child-workflow node shows its child summary. A workflow-map node instead shows compact
+progress and a virtual record table, fetched in pages of at most 100 rather than one card per child.
+Filtering and selection survive event refreshes. Selecting a row loads its frozen input, provenance,
+bounded outputs, and paged attempts on demand. Its task and run links retain the root run and record
+return route; a missing or archived task leaves the record history readable. Selecting a child run
+shows explicit parent and root links. Root-run footers report aggregate tree usage; child-run footers
+report only that run, so the same provider turn is not counted twice. The cancel confirmation says it
+cancels the run tree, and retry explains that it reuses the exact existing attempt.
 
 **The conversation is here.** An agent node draws the transcript, the queue and the composer that the
 Agent pane draws, because reading what a step is saying should not mean leaving the run. It is the
@@ -863,7 +1021,8 @@ landed from one that did not.
 An agent cannot start or drive a workflow run: no workflow control tool is registered. The Agents
 plugin's `agent_*` tools drive managed sessions and keep their dynamic delegation tree in the Agents
 plugin. They do not create `workflow_runs`, append workflow steps, or mutate a run's frozen
-definition. Database rows have no trigger and no schedule; committed files keep theirs.
+definition. Published database workflows can have an owner-approved Node schedule; repository and
+user files do not gain an implicit trigger from their file contents.
 
 ## What workflows refuses
 
@@ -882,7 +1041,7 @@ together boxes the model in the moment a node needs two upstreams from different
 first thing a synthesising step asks for. `after` says that with no group at all.
 
 **Always a child task per parallel step.** Refused as the default. Investigate, review and summarise
-do not write, and a worktree per reader is what made fan-out feel heavy. A step asks for one with
+do not write, and a worktree per reader is unnecessarily heavy. A step asks for one with
 `isolation = "worktree"` when it will write (§ Isolation).
 
 **One implicit context string.** Refused. A single free-text context per run, with `${context}` in
@@ -907,7 +1066,7 @@ writing the definition. A workspace row with an optional project is the shape th
 **JSON Schema forms.** Refused. A kind could ship a JSON Schema for its `with` and let the host
 render it, but the host would then need a schema-to-form renderer that works in cells, and model
 lists and run targets are dynamic where JSON Schema has no way to say "fetch these". A closed field
-vocabulary with an options route is what credential fields and collection parameters already are.
+vocabulary with an options route is what credential and data-source parameters already use.
 
 **A plugin-rendered inspector.** Refused. A kind naming a remote tree that the plugin draws into the
 inspector gives every kind a client bundle, leaves the host unable to validate or index the form, and
@@ -951,9 +1110,10 @@ instead, in the draft, until it is saved.
 frozen copy, and none of the three cares where a card was. Device preferences keyed by definition id
 hold them (§ Where positions live).
 
-**Triggers and schedules for database rows.** Deferred. The sweep reads files, and reading rows too
-is small. But a row that fires on its own runs an agent when nobody typed anything, and that wants
-the same trust thinking the file layer had.
+**Implicit triggers from a database draft.** Refused. A database workflow becomes schedulable only
+after publication, and only through an explicit device-approved schedule that freezes the graph,
+typed inputs, limits, timezone, and first-check behavior. Saving or publishing a workflow never arms
+unattended work by itself.
 
 **Agent tools that start or drive a run.** Refused for the managed-session orchestration tools.
 `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, and `agent_cancel` operate on managed
@@ -969,8 +1129,8 @@ the frozen copy and keeps the original in the step's `inputs_json`.
 addressed by task, and `packages/protocol/src/runs.ts` already says when a core runs table would be
 earned.
 
-**Replacing agent-only fan-out.** Refused. `fan-out` keeps its saved definition and result contract.
-Use `workflow-map` when each structured item needs a complete saved workflow in its own task.
+**A separate agent-only batch runtime.** Refused. Structured agent output followed by
+`workflow-map` uses the same reservation, recovery, and safety contracts as source records.
 
 **A second child execution engine.** Refused. Child dispatch starts the ordinary workflow runner
 against a frozen resolved graph. A parallel engine would split recovery, gates, and safety rails.
@@ -979,8 +1139,8 @@ against a frozen resolved graph. A parallel engine would split recovery, gates, 
 JSON Pointer. Provider queries and filtering belong to the step that produces that value.
 
 **Unbounded or remote workflow recursion.** Refused. Child workflows stay in the same project and
-Node, with one child-workflow level and 12 descendant tasks per root. More depth requires usage and
-operability evidence, not only a higher constant.
+Node, with four child-workflow levels and at most 500 descendants per root. References are acyclic
+and frozen before admission; runtime data cannot choose another definition or extend authority.
 
 **Detached child runs.** Refused. A dispatch step waits for every admitted child, carries child gates
 to the parent's attention state, and settles only after the children settle.
@@ -990,8 +1150,121 @@ and start still applies source trust and the root's approved limits. Saving a de
 nothing.
 
 **Exactly-once business processing.** Refused. Invocation identity prevents duplicate task and run
-creation within one root. A fresh root may intentionally process the same ticket again; a business
-deduplication policy needs its own product contract.
+creation within one root. Repeat policies control record admission within an explicit processing
+scope; they do not guarantee exactly-once external effects. A fresh manual root has independent history.
 
 **Automatic child cleanup.** Refused. A child task and worktree are user work and remain after the
 workflow completes, fails, or is cancelled. The owner can archive them through the normal task flow.
+
+## Typed data and conditions
+
+`find-records` takes a `query` inline or saved-query reference. It resolves input and predecessor
+bindings, persists the resolved query and evaluation time before the source call, and reuses them
+on retry. The source runtime validates and exhausts the selection. Only complete or deliberately
+bounded selections produce a successful step. Structured output holds `records`, completeness,
+schema revision, evaluation/read times, and resolved-query `provenance`. Its serialized size is
+bounded to 16 MiB. Incomplete or oversized results cannot start dependent steps.
+
+`get-record-details` takes a typed `record` binding to an exact `ref`, plus optional `projection`
+pointers. Host-produced references retain source scope for dynamic discovery. Output contains the
+reference, typed `data`, validated `schema`, and `fetchedTime`; not-found fails the step. References
+identify records by plugin, source, connection, and record ID. Their carried scope is retrieval
+context, not an additional identity component.
+
+`if` takes a shared typed `condition` predicate and `branches` with `true` and `otherwise` targets.
+Both targets must wait on the condition's stable step ID. The shared comparison rules preserve
+missing versus null and allow explicit presence tests or fallbacks. The runner skips the untaken
+branch and propagates skips through the graph. No model runs. `decide`, labelled **Ask AI to decide**,
+remains a separate agent step.
+
+Data calls use the workflow task's workspace and project, with a Node-created owner invocation.
+Workspace queries retain their authored scope; explicit project restrictions must match the task.
+Every invocation rechecks source and connection authority. Task credentials gain no provider route
+access. Incremental checkpoint advancement uses the processing ledger described below.
+
+The inspector uses client-core's shared source/query editor for `find-records` and its typed binding
+picker for record inputs. Source metadata drives connections, parameters, filters, options, preview,
+and nested inspection; the workflow plugin stores only the resulting protocol values. Conditions
+remain a typed JSON repair surface until the outline-led workflow editor phase. Generation uses the
+same descriptions and validation. Repository TOML uses `query_json`, `record_json`, and
+`condition_json` for these structures.
+
+## Record processing history
+
+The workflow database owns selections, selected rows, record states, attempts, processing scopes,
+and committed source boundaries. `WorkflowProcessingStore` reserves selected snapshots, repeat
+decisions, eligible child dispatches, and a checkpoint in one transaction. Core tasks are created
+only after that transaction commits. Recovery reuses the reserved task and run IDs.
+
+A root can receive `processingScope: { scopeId, epoch }` through the internal start seam. The scope
+is frozen in the same transaction as the root and its steps. Schedule integration uses its schedule
+ID and explicit epoch. A manual root without this option receives independent history. Loop paths
+use stable step IDs and ancestor item identities, so label edits do not reset history and nested
+parents do not share a child-loop state.
+
+Source rows use plugin, source, connection, and record ID as their identity. Retrieval scope and
+display titles are excluded. Ordinary arrays require a stable typed key. `repeat` on `workflow-map`
+supports `every-match`, `unseen`, and `changed`; the latter requires tracked JSON Pointer `fields`
+against the retained item. Source item fields therefore address its envelope, such as `/data/state`.
+Canonical projections distinguish missing from null, sort object keys, and preserve array order.
+Changed-field decisions compare the last admitted or baselined snapshot, so A to B to A admits both
+changes. An unchanged failed attempt is not automatically retried. Active attempts prevent competing
+admission within the same record scope.
+
+Changing tracked fields reprojects the retained snapshot. A field that cannot be reconstructed
+requires an explicit baseline or fresh epoch. A baseline records identity and projection without
+creating children. An explicitly reviewed baseline may replace a changed query's checkpoint
+fingerprint, with a compare-and-swap check against the prior boundary. It retains attempt history.
+A fresh epoch retains prior history under its original scope.
+
+Retry resumes a failed attempt with its retained snapshot and task/run identities. It does not rerun
+the source query. Reprocess prepares an immutable selected row and digest, then sends that digest with
+a request identity to `reserveReprocess`. The method derives the original scope, snapshot, child
+inputs, and definition from server rows; clients cannot substitute them. It reserves a related
+attempt, creates an ordinary workflow child task, and starts the child workflow as an independent root
+run. Nested records retain their original business history even though the new run has independent
+runtime lineage. Replaying the same command reuses the reservation. Reprocess does not reopen a
+settled parent or restart successful siblings.
+
+An incremental `find-records` step feeds exactly one tracked loop through `/records`. Its path to
+that consumer must be unconditional; conditions after the consumer are allowed. `take` is refused.
+Only a complete execution selection can commit a source-provided boundary. Zero matches and all
+skipped matches may advance it. Invalid bindings, limits, or changed active records roll back the
+selection and boundary together. Query semantics and the previous boundary are checked at commit.
+An expired token or changed query requires an explicit baseline or epoch decision. Cancellation
+after commit retains cancelled child intents and the boundary for explicit reprocessing.
+
+Device-only run routes expose filtered, paged selection summaries, chronological attempt history,
+and a separate retained-snapshot read. Pages contain at most 100 rows and do not include record bodies
+or named outputs. Detail and attempt payloads bound every preview. Skipped rows retain links to their
+preceding attempt. The processing ledger does not prune record identity or automatically archive
+tasks.
+
+## Scheduled roots
+
+The workflows plugin registers the `workflow` target with the node's scheduler. Core stores the
+cadence, pause state, run ring, and timer policy. The plugin stores the approved workflow binding and
+the occurrence ledger. No workflow-owned queue or timer runs beside the core scheduler.
+
+Approval resolves a published definition in one project scope and freezes the complete graph, typed
+inputs, limits, IANA timezone, generation, and processing epoch. It also pins published saved-query
+revisions through the resolved graph. A timer or manual request reserves one occurrence with intended
+root task and run IDs. Recovery reuses those IDs across `claimed`, `task-created`, and `run-started`
+transitions.
+
+The occurrence owns overlap until the root and every descendant are terminal. A gated descendant
+therefore blocks a later timer or **Run now** request. Pausing the core schedule prevents timer
+admission without cancelling the tree. Deleting it tombstones the workflow binding and retains all
+task, run, occurrence, and record history.
+
+Dispatch rechecks the published graph, repository trust, source metadata, connection authority, and
+destination scope before it creates the task. A changed dependency or revoked authority moves the
+schedule to `needs-review`. Temporary source failures retain the claimed occurrence for infrastructure
+retry. A failed child is a workflow outcome and receives no automatic infrastructure retry.
+
+For **Process current matches**, the first active occurrence applies ordinary repeat policy. For
+**Track from now**, approval starts an inactive baseline occurrence. The persisted baseline flag makes
+the processing transaction record identities, projections, and source continuation without reserving
+child workflows. The schedule becomes active only after that root tree settles successfully. Zero
+matches and all-skipped matches can still commit a continuation. An expired token or a changed query
+returns the schedule to review for an explicit baseline or fresh epoch.

@@ -1,31 +1,21 @@
-import { randomUUID } from 'node:crypto'
-import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
-import * as schema from '../node/schema'
+import { workflowDataHandlers } from './workflowDataSteps'
+import { workflowIncrementalQuery } from './workflowIncremental'
+import { type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
 import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../shared/workflowContracts'
 import type { RunnerDeps, StepRunRequest } from './workflowRunner'
-import { intersectToolCeilings } from './workflowTools'
-import { renderWorkflowPrompt } from './workflowValidation'
 
 export const MAX_STEP_TURNS = 8
-export const MAX_FAN_OUT_TASKS = 12
 
 // The single source of truth for what ships built in. Registration below is keyed off these, and
 // workflowFiles' default validation catalog reuses them.
-export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'fan-out', 'join', 'decide'] as const
+export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'decide', 'find-records', 'get-record-details', 'if'] as const
 export const BUILTIN_POLICIES = ['checks-green'] as const
 
 export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)[number], StepValidator>> = {
   'gate-policy': (step, { label, policies }) => {
     if (!step.policy) return [`${label} has no policy`]
     return policies.has(step.policy) ? [] : [`${label} names unknown policy '${step.policy}'`]
-  },
-  join: (step, { label, indexes, stepAt, precedes }) => {
-    if (!step.joins) return [`${label} must declare joins`]
-    if (!indexes.has(step.joins)) return [`${label} has dangling join '${step.joins}'`]
-    return !precedes(step.joins, step.name) || (stepAt(step.joins)?.kind ?? 'agent') !== 'fan-out'
-      ? [`${label} joins '${step.joins}', which is not a preceding fan-out`]
-      : []
   },
   decide: (step, { label, indexes, precedes }) => {
     const errors: string[] = []
@@ -36,7 +26,7 @@ export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)
       // matter. "Through the steps between them" is what a plain list of steps has always meant, so a
       // file written before the graph existed still passes.
       if (!indexes.has(target)) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
-      else if (!precedes(step.name, target)) errors.push(`${label} branch '${verdict}' target '${target}' does not wait on ${label}`)
+      else if (!precedes(stepIdentity(step), target)) errors.push(`${label} branch '${verdict}' target '${target}' does not wait on ${label}`)
     }
     return errors
   },
@@ -58,7 +48,6 @@ type BuiltinServices = {
   policy(id: string): PolicyEvaluator | undefined
 }
 
-const now = () => Date.now()
 
 function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
   const data = {
@@ -93,13 +82,13 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     ['checks-green', (taskId: string) => services.deps.evaluatePolicy(taskId, 'checks-green')],
   ])
   const stepKinds: Record<(typeof BUILTIN_STEP_KINDS)[number], StepHandler> = {
+    ...workflowDataHandlers({ access: services.deps.dataAccess, setStep: services.setStep,
+      incremental: (runId, stepId, query) => workflowIncrementalQuery(services.db, runId, stepId, query) }),
     agent: runAgent,
     'gate-human': async (ctx) =>
       ctx.run.posture === 'autonomous' ? { status: 'done', result: { approved: 'autonomous' } } : { status: 'waiting-gate' },
     'gate-policy': runPolicy,
     'ci-loop': runCiLoop,
-    'fan-out': runFanOut,
-    join: runJoin,
     decide: runDecision,
   }
   const kinds = new Map<string, StepKindContribution>(
@@ -221,122 +210,5 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     }
   }
 
-  async function runFanOut(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
-    if (!services.deps.createChildTask) return { status: 'failed', error: 'Fan-out unavailable (no child-task factory).' }
-    const planPrompt = await agentPrompt(ctx, ctx.renderedPrompt)
-    const plan = await services.runHeadless(
-      ctx.run.taskId,
-      ctx.def,
-      { prompt: planPrompt, model: ctx.def.model, schema: ctx.def.schema, signal: ctx.signal, tools: ctx.tools },
-      ctx,
-    )
-    const structured = plan.capture.structuredOutput as { tasks?: { title: string; branch: string; prompt?: string }[] } | { title: string; branch: string; prompt?: string }[] | null
-    const seeds = Array.isArray(structured) ? structured : structured?.tasks
-    if (plan.status !== 'ok') return headlessOutcome(plan)
-    if (!seeds?.length) return { status: 'failed', error: 'Plan emitted no task list.' }
-    if (seeds.length > MAX_FAN_OUT_TASKS) return { status: 'safety-rail', error: `Fan-out exceeded the ${MAX_FAN_OUT_TASKS}-task ceiling.` }
-
-    const childDef: WorkflowStepDef = { name: ctx.def.childStep?.name ?? 'child', ...ctx.def.childStep }
-    const tools = intersectToolCeilings(ctx.tools, ctx.def.childStep?.tools)
-    // Child prompts share the top-level templating contract: `${steps.<name>.output}` resolves
-    // against completed earlier steps, not the literal token.
-    let childPrompt: string
-    try {
-      childPrompt = renderWorkflowPrompt(childDef.prompt, (await services.steps(ctx.run.id)).filter((row) => row.parentStepId == null), ctx.inputs)
-    } catch (error) {
-      return { status: 'failed', error: error instanceof Error ? error.message : `Fan-out '${ctx.def.name}' has an invalid child template reference.` }
-    }
-    const children = await Promise.all(
-      seeds.map(async (seed, index) => {
-        const childTaskId = await services.deps.createChildTask!(ctx.run.taskId, seed)
-        const rowId = randomUUID()
-        await services.db.insert(schema.workflowSteps).values({
-          id: rowId,
-          runId: ctx.run.id,
-          idx: ctx.step.idx,
-          name: `${childDef.name}:${index + 1} ${seed.title}`.slice(0, 120),
-          kind: 'agent',
-          mode: 'headless',
-          profileId: childDef.profileId ?? DEFAULT_PROFILE_ID,
-          model: childDef.model ?? null,
-          status: 'pending',
-          parentStepId: ctx.step.id,
-          inputsJson: JSON.stringify({ childTaskId, seed, tools }),
-          createdAt: now() + index,
-          updatedAt: now() + index,
-        })
-        return { childTaskId, rowId, seed }
-      }),
-    )
-    services.changed()
-    const outcomes = await Promise.all(children.map(runChild))
-    return {
-      status: 'done',
-      result: { children: children.length, failed: outcomes.filter((ok) => !ok).length },
-      structured: seeds,
-      inputs: { prompt: planPrompt, tools: ctx.tools },
-      sessionId: plan.capture.sessionId,
-      agentSessionId: plan.agentSessionId,
-      costUsd: plan.capture.costUsd,
-    }
-
-    async function runChild({ childTaskId, rowId, seed }: (typeof children)[number]): Promise<boolean> {
-      const controller = new AbortController()
-      const parentAbort = () => controller.abort()
-      ctx.signal.addEventListener('abort', parentAbort, { once: true })
-      services.registerActive(ctx.run.id, rowId, controller)
-      try {
-        const prompt = [childPrompt, seed.prompt ?? '', `Task: ${seed.title}`].filter(Boolean).join('\n\n')
-        const result = await services.runHeadless(
-          childTaskId,
-          childDef,
-          {
-            prompt,
-            model: childDef.model,
-            schema: childDef.schema,
-            signal: controller.signal,
-            tools,
-            // Queued children stay 'pending' until they hold a concurrency slot.
-            onStart: () => services.setStep(rowId, { status: 'running' }),
-          },
-          // Rebind the step id and the emit sink so child stream events land on the child row.
-          { ...ctx, step: { ...ctx.step, id: rowId }, emit: ({ event }) => services.deps.emitStepEvent?.(ctx.run.id, rowId, event) },
-        )
-        const outcome = headlessOutcome(result)
-        await services.setStep(rowId, {
-          status: outcome.status === 'done' ? 'done' : outcome.status === 'cancelled' ? 'cancelled' : 'failed',
-          resultJson: JSON.stringify({ status: result.status, result: result.capture.result, events: result.capture.events.slice(-100) }),
-          structuredJson: result.capture.structuredOutput == null ? null : JSON.stringify(result.capture.structuredOutput),
-          sessionId: result.capture.sessionId,
-          agentSessionId: result.agentSessionId,
-          costUsd: result.capture.costUsd,
-          error: outcome.status === 'done' ? null : 'error' in outcome ? outcome.error : 'Child step failed.',
-        })
-        return outcome.status === 'done'
-      } catch (error) {
-        if (controller.signal.aborted) return false
-        await services.setStep(rowId, { status: 'failed', error: error instanceof Error ? error.message : 'Child step failed.' })
-        return false
-      } finally {
-        ctx.signal.removeEventListener('abort', parentAbort)
-        services.unregisterActive(ctx.run.id, rowId)
-      }
-    }
-  }
-
-  async function runJoin(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
-    const rows = (await services.steps(ctx.run.id)).filter((row) => row.parentStepId == null)
-    const fanOut = rows.find((row) => row.name === ctx.def.joins && row.kind === 'fan-out')
-    if (!fanOut) return { status: 'failed', error: `Dangling join '${ctx.def.joins ?? ''}'.` }
-    const children = await services.childSteps(fanOut.id)
-    const results = children.map((child) => ({
-      name: child.name,
-      status: child.status,
-      structured: child.structuredJson ? (JSON.parse(child.structuredJson) as unknown) : null,
-      childTaskId: child.inputsJson ? (JSON.parse(child.inputsJson) as { childTaskId?: string }).childTaskId : undefined,
-    }))
-    const failures = results.filter((result) => result.status !== 'done')
-    if (failures.length) return { status: 'failed', error: `${failures.length}/${results.length} children failed.`, structured: { results, failures: failures.length } }
-    return { status: 'done', structured: { results, failures: 0 }, handoff: JSON.stringify(results, null, 2) }
-  }
 }
+import { stepIdentity } from '../shared/workflowIdentity'

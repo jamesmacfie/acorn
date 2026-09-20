@@ -18,7 +18,7 @@ export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, 
  *  scheduler through this capability at call time rather than being threaded through initPlugins, the
  *  late binding every other cross-plugin need uses (server/pluginHost/host.ts). Not `start`, `stop` or the
  *  constructor: the composition root owns the lifetime and nothing else may. */
-export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'confirm' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register'>
+export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'confirm' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register' | 'registerTarget' | 'targets'>
 export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')
 
 /** Builds the node's scheduler and declares core's own periodic work on it (docs/schedules.md

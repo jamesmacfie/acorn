@@ -3,7 +3,8 @@ import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import type { WorkflowCatalog, WorkflowDef } from '../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
-import { createDef, getDef } from './workflowDefs'
+import { getDef } from './workflowDefs'
+import { createPublishedDef as createDef } from '../testkit/publishedDefinition'
 import { WorkflowDispatcher } from './workflowDispatch'
 import { catalogValidation } from './generateWorkflow'
 import { generateWorkflowRequest } from './generateWorkflowRequest'
@@ -53,9 +54,10 @@ describe('workflow dispatch authoring', () => {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
       def: {
+        formatVersion: 2,
         name: 'Review ticket',
-        inputs: [{ name: 'ticket', required: true }],
-        steps: [{ name: 'review', prompt: 'Review ${inputs.ticket}.' }],
+        inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+        steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.ticket}.' }],
       },
     })
     const catalog: WorkflowCatalog = {
@@ -69,18 +71,20 @@ describe('workflow dispatch authoring', () => {
       workflows: [{
         ref: { source: 'database', id: child.id },
         name: child.name,
-        inputs: [{ name: 'ticket', required: true }],
+        inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       }],
     }
     const generated: WorkflowDef = {
+      formatVersion: 2,
       name: 'Dispatch review',
-      inputs: [{ name: 'ticket', required: true }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{
+        id: 'dispatch',
         name: 'dispatch',
         kind: 'workflow',
         childWorkflow: {
           ref: { source: 'database', id: child.id },
-          inputs: { ticket: { from: 'input', name: 'ticket' } },
+          inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
         },
       }],
     }
@@ -131,7 +135,6 @@ describe('workflow dispatch authoring', () => {
       evaluatePolicy: vi.fn(async () => ({ pass: true })),
       failingChecks: vi.fn(async () => ''),
       notify: vi.fn(),
-      runtimeWorkflowDispatchEnabled: true,
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
     }

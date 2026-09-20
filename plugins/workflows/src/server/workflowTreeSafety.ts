@@ -6,7 +6,41 @@ import type { ToolCeiling, WorkflowBudget, WorkflowRunRow, WorkflowStepRow } fro
 import * as schema from '../node/schema'
 import { intersectToolCeilings } from './workflowTools'
 
-export const MAX_WORKFLOW_DESCENDANTS = 12
+export const MAX_WORKFLOW_DESCENDANTS = 500
+export const DEFAULT_WORKFLOW_DESCENDANTS = 100
+
+export function descendantLimit(def: { maxDescendants?: number }): number {
+  return Math.min(MAX_WORKFLOW_DESCENDANTS, def.maxDescendants ?? DEFAULT_WORKFLOW_DESCENDANTS)
+}
+
+function ancestors(run: WorkflowRunRow, runs: WorkflowRunRow[]): WorkflowRunRow[] {
+  const result: WorkflowRunRow[] = []
+  let current: WorkflowRunRow | undefined = run
+  while (current && !result.some(row => row.id === current!.id)) {
+    result.push(current)
+    current = runs.find(row => row.id === current!.parentRunId)
+  }
+  return result
+}
+
+function subtreeIds(ancestor: WorkflowRunRow, runs: WorkflowRunRow[]): Set<string> {
+  const children = new Map<string, string[]>()
+  for (const run of runs) {
+    if (!run.parentRunId) continue
+    const siblings = children.get(run.parentRunId) ?? []
+    siblings.push(run.id)
+    children.set(run.parentRunId, siblings)
+  }
+  const ids = new Set<string>()
+  const pending = [ancestor.id]
+  while (pending.length) {
+    const id = pending.pop()!
+    if (ids.has(id)) continue
+    ids.add(id)
+    pending.push(...children.get(id) ?? [])
+  }
+  return ids
+}
 
 export type WorkflowUsage = { costUsd: number; inputTokens: number; outputTokens: number }
 
@@ -129,17 +163,21 @@ export class WorkflowTreeSafety {
       }
       const rows = tx.select().from(schema.workflowTurnAdmissions)
         .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id)).all()
-      const rootBudget = parseEffectiveBudget(root)
-      const runBudget = parseEffectiveBudget(currentRun)
-      const rootUsage = usageOf(rows)
-      const runRows = rows.filter((row) => row.runId === currentRun.id)
+      const runs = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id)).all()
+      const chain = ancestors(currentRun, runs)
+      if (chain.at(-1)?.id !== root.id || chain.some(owner => !['running', 'gated'].includes(owner.status))) {
+        throw new WorkflowSafetyRailError('Workflow ancestor no longer admits agent turns.')
+      }
+      const ancestorViolation = chain.map(owner => {
+        const ids = subtreeIds(owner, runs)
+        const subtree = rows.filter(row => ids.has(row.runId))
+        const budget = parseEffectiveBudget(owner)
+        return budgetViolation(budget, usageOf(subtree), true)
+          ?? (budget.maxTurns != null && subtree.length >= budget.maxTurns
+            ? `turn budget exhausted (${subtree.length} of ${budget.maxTurns} admitted)` : null)
+      }).find(Boolean)
       const stepRows = rows.filter((row) => row.stepId === step.id)
-      const violation = budgetViolation(rootBudget, rootUsage, true)
-        ?? (rootBudget.maxTurns != null && rows.length >= rootBudget.maxTurns
-          ? `turn budget exhausted (${rows.length} of ${rootBudget.maxTurns} admitted)` : null)
-        ?? budgetViolation(runBudget, usageOf(runRows), true)
-        ?? (currentRun.id !== root.id && runBudget.maxTurns != null && runRows.length >= runBudget.maxTurns
-          ? `child turn budget exhausted (${runRows.length} of ${runBudget.maxTurns} admitted)` : null)
+      const violation = ancestorViolation
         ?? budgetViolation(stepBudget, usageOf(stepRows), true)
         ?? (stepBudget.maxTurns != null && stepRows.length >= stepBudget.maxTurns
           ? `step turn budget exhausted (${stepRows.length} of ${stepBudget.maxTurns} admitted)` : null)
@@ -186,12 +224,11 @@ export class WorkflowTreeSafety {
     if (!root || !run) return 'workflow accounting owner disappeared before settlement'
     const rows = await this.db.select().from(schema.workflowTurnAdmissions)
       .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id))
-    return budgetViolation(parseEffectiveBudget(root), usageOf(rows), false)
-      ?? (run.id === root.id ? null : budgetViolation(
-        parseEffectiveBudget(run),
-        usageOf(rows.filter((row) => row.runId === run.id)),
-        false,
-      ))
+    const runs = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id))
+    return ancestors(run, runs).map(owner => {
+      const ids = subtreeIds(owner, runs)
+      return budgetViolation(parseEffectiveBudget(owner), usageOf(rows.filter(row => ids.has(row.runId))), false)
+    }).find(Boolean)
       ?? budgetViolation(stepBudget, usageOf(rows.filter((row) => row.stepId === admission.stepId)), false)
   }
 

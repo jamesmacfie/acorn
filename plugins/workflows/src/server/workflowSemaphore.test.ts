@@ -32,4 +32,27 @@ describe('workflow spawn semaphore', () => {
     release()
     await running
   })
+
+  it('shares four slots and skips a saturated root without blocking other roots', async () => {
+    const semaphore = new Semaphore(4)
+    const signal = new AbortController().signal
+    let release!: () => void
+    const blocked = new Promise<void>(resolve => { release = resolve })
+    const started: string[] = []
+    let active = 0
+    let peak = 0
+    const job = (name: string, key: string, limit: number) => semaphore.use(signal, async () => {
+      started.push(name)
+      peak = Math.max(peak, ++active)
+      await blocked
+      active--
+    }, { key, limit })
+    const jobs = [job('a1', 'a', 1), job('a2', 'a', 1), ...[1, 2, 3, 4].map(id => job(`b${id}`, 'b', 4))]
+    await Promise.resolve()
+    expect(started).toEqual(['a1', 'b1', 'b2', 'b3'])
+    release()
+    await Promise.all(jobs)
+    expect(peak).toBe(4)
+    expect(started).toContain('a2')
+  })
 })

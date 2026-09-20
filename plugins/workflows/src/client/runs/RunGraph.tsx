@@ -24,7 +24,7 @@ export function RunGraph(props: { model: RunPaneModel }) {
     // The step's name, not its row id: an edge is `after`, which names steps, and a pending node has
     // no row yet. Selecting maps the name back to the row.
     id: node.name,
-    label: node.name,
+    label: node.step?.name ?? node.name,
     detail: node.step?.status ?? 'pending',
     glyph: stepGlyph(node.step?.status),
     tone: cardTone(node.step?.status),

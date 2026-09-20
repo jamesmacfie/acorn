@@ -12,10 +12,14 @@ import {
 import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
+import type { WorkflowScheduleDisplayState } from '../shared/workflowSchedules'
 import { emptyDefinition } from './editor/draft'
 import { defRefKey, parseDefRef, SOURCE_GLYPH } from './editor/draftStore'
 import StartDialogHost from './editor/StartDialog'
 import WorkflowEditor from './editor/WorkflowEditor'
+import ScheduleDialogHost from './schedules/ScheduleDialog'
+import { requestWorkflowSchedule } from './schedules/scheduleRequest'
+import { scheduleStateLabel } from './schedules/scheduleModel'
 import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
 import { workflowApi } from './workflowsClient'
 
@@ -32,6 +36,12 @@ const RECENT_RUNS = 20
 // line mentions an icon, and a map spread over five lines mentions one on none of them
 // (client-core scripts/icon-census.mjs).
 const STATUS_GLYPH: Record<string, string> = { running: 'loader-circle', waiting: 'hand', done: 'check', failed: 'circle-x', cancelled: 'ban' }
+
+// Same one-line rule as STATUS_GLYPH above, for the same reason.
+const SCHEDULE_GLYPH: Record<WorkflowScheduleDisplayState, string> = { draft: 'pencil', activating: 'loader-circle', active: 'clock', paused: 'circle-dashed', 'needs-review': 'triangle-alert', unavailable: 'circle-x' }
+
+const scheduleTone = (state: WorkflowScheduleDisplayState): 'ok' | 'danger' | 'warn' | undefined =>
+  state === 'active' ? 'ok' : state === 'unavailable' ? 'danger' : state === 'needs-review' ? 'warn' : undefined
 
 /** The routed project, and the workspace it belongs to. Both halves ask, so neither can answer
  *  differently from the other. */
@@ -68,12 +78,22 @@ export function WorkflowsBrowseList() {
     async (workspaceId) => workflowApi.defsList(workspaceId),
   )
   const [runs, { refetch: refetchRuns }] = createResource(async () => workflowApi.allRuns().catch(() => ({ runs: [] })))
+  const schedules = createQuery(() => ({
+    queryKey: ['workflow-schedules'],
+    queryFn: () => workflowApi.schedules(),
+    refetchInterval: 30_000,
+  }))
 
   // The node says when either moved. Both channels are this plugin's own; nothing else reads them yet
   // and the rail list is the first consumer of `defs-changed` (../node/index.ts).
   createEffect(() => {
     const stopDefs = onPluginFrame('workflows', pluginChannel('workflows', 'defs-changed'), () => void refetchDefs())
-    const stopRuns = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => void refetchRuns())
+    const stopRuns = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => {
+      // A baseline run also completes schedule activation. Refresh both read models so the rail does
+      // not keep showing “Activating” until its polling interval after the run has settled.
+      void refetchRuns()
+      void schedules.refetch()
+    })
     onCleanup(() => {
       stopDefs()
       stopRuns()
@@ -92,6 +112,7 @@ export function WorkflowsBrowseList() {
   const recent = createMemo<RunRowInput[]>(() => (runs()?.runs ?? [])
     .filter((run) => !!run.taskId && workspaceTasks().has(run.taskId))
     .slice(0, RECENT_RUNS))
+  const projectSchedules = createMemo(() => (schedules.data ?? []).filter(schedule => schedule.projectId === scope.projectId()))
 
   const items = createMemo(() => [
     ...errors().map((error, at) => ({ key: `problem:${at}`, label: error.source })),
@@ -126,6 +147,19 @@ export function WorkflowsBrowseList() {
     const task = (tasks.data ?? []).find((entry) => entry.id === run?.taskId)
     if (!task) return
     navigate(`${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(runId)}`)
+  }
+
+  const openSchedule = (scheduleId: string): void => {
+    const schedule = projectSchedules().find(candidate => candidate.id === scheduleId)
+    if (!schedule) return
+    const definition = definitions().find(candidate => candidate.id === schedule.workflowId)
+    requestWorkflowSchedule({
+      scheduleId: schedule.id,
+      workflowId: schedule.workflowId,
+      name: definition?.name ?? schedule.workflowName,
+      projectId: schedule.projectId,
+      inputs: definition?.inputs ?? [],
+    })
   }
 
   return (
@@ -209,6 +243,31 @@ export function WorkflowsBrowseList() {
         </Show>
       </Show>
 
+      <Show when={projectSchedules().length}>
+        <SectionHeader count={projectSchedules().length}>Schedules</SectionHeader>
+        <Rows
+          id="workflows.browse.schedules"
+          ariaLabel="Workflow schedules"
+          items={projectSchedules().map(schedule => ({ key: schedule.id, label: schedule.workflowName }))}
+          onSelect={openSchedule}
+          onActivate={openSchedule}
+        >
+          {(item, itemProps, selected) => (
+            <Show when={projectSchedules().find(schedule => schedule.id === item.key)}>{schedule => (
+              <Row item={itemProps} selected={selected()} onPress={() => openSchedule(schedule().id)}
+                title={schedule().workflowName}
+                // Collapsed: the state, because a schedule that has stopped checking is the only
+                // reason to look at this list at a glance. The workflow name is the tooltip.
+                collapsed={collapsed() ? <Icon name={SCHEDULE_GLYPH[schedule().state]} tone={scheduleTone(schedule().state)} /> : undefined}
+                meta={<Text emphasis="muted">{schedule().nextRunAt ? new Date(schedule().nextRunAt!).toLocaleString() : schedule().error ?? 'No next check'}</Text>}
+                trailing={<Badge tone={scheduleTone(schedule().state)} size="xs">{scheduleStateLabel(schedule().state)}</Badge>}>
+                {schedule().workflowName}
+              </Row>
+            )}</Show>
+          )}
+        </Rows>
+      </Show>
+
       <Show when={recent().length}>
         <SectionHeader count={recent().length}>Recent runs</SectionHeader>
         <Rows
@@ -244,6 +303,7 @@ export function WorkflowsBrowseList() {
       {/* The one mount for the start dialog: this region is on screen whenever the source is, and the
           editor's Run button asks for it from the other half of the layout (./editor/StartDialog.tsx). */}
       <StartDialogHost />
+      <ScheduleDialogHost />
     </Stack>
   )
 }

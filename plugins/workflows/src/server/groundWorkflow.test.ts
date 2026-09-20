@@ -144,13 +144,9 @@ describe('identifiers the catalog can refute', () => {
   })
 
   it('drops an invented profile so the step runs on the default', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], profileId: 'gpt-9', prompt: 'Go.' },
-      { name: 'b', after: ['a'], kind: 'fan-out', prompt: 'Plan.', childStep: { profileId: 'gpt-9', prompt: 'Fix one.' } },
-    ]))
+    const result = ground(workflow([{ name: 'a', after: [], profileId: 'gpt-9', prompt: 'Go.' }]))
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.' })
-    expect(result.def.steps[1]?.childStep).toEqual({ prompt: 'Fix one.' })
-    expect(codes(result)).toEqual(['unknown-profile', 'unknown-profile'])
+    expect(codes(result)).toEqual(['unknown-profile'])
   })
 
   it('leaves a real profile alone, even an unstructured one on a decide', () => {
@@ -200,13 +196,9 @@ describe('identifiers the catalog can refute', () => {
   })
 
   it('drops a schema that is not an object', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Go.', schema: 'a JSON schema' },
-      { name: 'b', after: ['a'], kind: 'fan-out', prompt: 'Plan.', childStep: { schema: [] } },
-    ]))
+    const result = ground(workflow([{ name: 'a', after: [], prompt: 'Go.', schema: 'a JSON schema' }]))
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.' })
-    expect(result.def.steps[1]?.childStep).toEqual({})
-    expect(codes(result)).toEqual(['dropped-schema', 'dropped-schema'])
+    expect(codes(result)).toEqual(['dropped-schema'])
   })
 })
 
@@ -282,48 +274,24 @@ describe('child workflow grounding', () => {
     expect(result.def.steps[1]?.title?.bindings).toBeUndefined()
   })
 
-  it('rewrites map and binding references when grounding renames a step', () => {
-    const result = grounded([
-      {
-        name: 'Select tickets',
-        after: [],
-        schema: { type: 'object', properties: { tickets: { type: 'array' } } },
-        prompt: 'Select tickets.',
-      },
-      {
-        name: 'children',
-        kind: 'workflow-map',
-        after: ['Select tickets'],
-        items: { step: 'Select tickets', pointer: '/tickets' },
-        itemKey: '/id',
-        childWorkflow: { ref: target.ref, inputs: { ticket: { from: 'step', step: 'Select tickets', pointer: '/number' } } },
-        title: { template: 'Review ${ticket}', bindings: { ticket: { from: 'step', step: 'Select tickets', pointer: '/number' } } },
-      },
-    ])
-    const child = result.def.steps[1]!
-    expect(child.after).toEqual(['select-tickets'])
-    expect(child.items?.step).toBe('select-tickets')
-    expect(child.childWorkflow?.inputs?.ticket).toMatchObject({ step: 'select-tickets' })
-    expect(child.title?.bindings?.ticket).toMatchObject({ step: 'select-tickets' })
-  })
 })
 
 describe('keys outside the vocabulary', () => {
-  it('drops a key that is not part of a workflow, a step, a child step or an input', () => {
+  it('drops keys that are not part of a workflow, step, or input', () => {
     const result = ground(workflow(
       [{ name: 'a', after: [], prompt: 'Go.', retries: 2, childStep: { prompt: 'Fix.', timeout: 5 } }],
       { schedule: 'daily', inputs: [{ name: 'issue', kind: 'text' }] },
     ))
-    expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.', childStep: { prompt: 'Fix.' } })
+    expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.' })
     expect(result.def.inputs).toEqual([{ name: 'issue' }])
     expect(codes(result)).toEqual(['unknown-key', 'unknown-key', 'unknown-key', 'unknown-key'])
     expect(messages(result)).toContain("The workflow set 'schedule'")
     expect(messages(result)).toContain("Input 'issue' set 'kind'")
     expect(messages(result)).toContain("Step 'a' set 'retries'")
-    expect(messages(result)).toContain("Step 'a' set 'childStep.timeout'")
+    expect(messages(result)).toContain("Step 'a' set 'childStep'")
   })
 
-  it('drops the five keys nothing can ground', () => {
+  it('drops protected execution keys', () => {
     const result = ground(workflow(
       [{
         name: 'a',
@@ -333,16 +301,14 @@ describe('keys outside the vocabulary', () => {
         configOptions: { reasoning: 'high' },
         requiresRun: 'web',
         tools: { allow: ['bash'], maxRisk: 'write' },
-        childStep: { prompt: 'Fix.', model: 'claude-4', tools: { allow: ['bash'] } },
       }],
       { trigger: 'on-push', tools: { allow: ['bash'], maxRisk: 'execute' } },
     ))
     expect(result.def.tools).toEqual({ maxRisk: 'execute' })
-    expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.', tools: { maxRisk: 'write' }, childStep: { prompt: 'Fix.' } })
-    expect(codes(result)).toEqual(Array<string>(8).fill('forbidden-key'))
+    expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.', tools: { maxRisk: 'write' } })
+    expect(codes(result)).toEqual(Array<string>(6).fill('forbidden-key'))
     expect(messages(result)).toContain("The workflow set 'trigger'")
     expect(messages(result)).toContain('The workflow set `tools.allow`')
-    expect(messages(result)).toContain("Step 'a' set 'childStep.model'")
   })
 
   it('drops a value the checker would walk into and trip over', () => {
@@ -350,62 +316,6 @@ describe('keys outside the vocabulary', () => {
     expect(result.def.steps[0]).toEqual({ name: 'a', prompt: 'Go.' })
     expect(result.def.inputs).toBeUndefined()
     expect(codes(result)).toEqual(['unknown-key', 'unknown-key'])
-  })
-})
-
-describe('step names', () => {
-  const messy = workflow([
-    { name: 'Read the issue', after: [], prompt: 'Read it.' },
-    {
-      name: 'Plan the work',
-      kind: 'fan-out',
-      after: ['Read the issue'],
-      prompt: 'Plan from ${steps.Read the issue.output}.',
-      schema: {},
-      childStep: { prompt: 'Fix one, given ${steps.Read the issue.output}.' },
-    },
-    { name: 'collect', kind: 'join', after: ['Plan the work'], joins: 'Plan the work' },
-    { name: 'pick', kind: 'decide', after: ['collect'], prompt: 'Again?', branches: { again: 'Plan the work', default: 'collect' } },
-    { name: 'call', kind: 'http:request', after: ['collect'], with: { method: 'GET', url: 'https://example.com/${steps.Read the issue.output}' } },
-  ])
-
-  it('renames a step the editor could not, and rewrites every place its name is written', () => {
-    // The checker never asks about the shape of a step name, so the repair pass would never be told.
-    const result = ground(messy)
-    const [read, plan, collect, pick, call] = result.def.steps
-    expect(read?.name).toBe('read-the-issue')
-    expect(plan?.name).toBe('plan-the-work')
-    expect(plan?.after).toEqual(['read-the-issue'])
-    expect(plan?.prompt).toBe('Plan from ${steps.read-the-issue.output}.')
-    expect(plan?.childStep?.prompt).toBe('Fix one, given ${steps.read-the-issue.output}.')
-    expect(collect?.joins).toBe('plan-the-work')
-    expect(collect?.after).toEqual(['plan-the-work'])
-    expect(pick?.branches).toEqual({ again: 'plan-the-work', default: 'collect' })
-    expect(call?.with?.url).toBe('https://example.com/${steps.read-the-issue.output}')
-    expect(codes(result)).toEqual(['renamed-step', 'renamed-step'])
-    expect(messages(result)).toContain("Step 'Read the issue' is not a step name acorn can use, so it is now 'read-the-issue'.")
-  })
-
-  it('renames one shared name once, and never reports a rename it did not make', () => {
-    // Two steps called the same thing: the first rename does both, because `renameStep` works by
-    // name. Going round again used to mint 'reproduce-the-bug-2', rename nothing, and leave a note
-    // naming a step no reader could find. The duplicate is left for the checker and the repair pass.
-    const result = ground(workflow([
-      { name: 'Reproduce the bug', after: [], prompt: 'One.' },
-      { name: 'Reproduce the bug', after: [], prompt: 'Two.' },
-    ]))
-    expect(result.def.steps.map((step) => step.name)).toEqual(['reproduce-the-bug', 'reproduce-the-bug'])
-    expect(codes(result)).toEqual(['renamed-step'])
-    const names = new Set(result.def.steps.map((step) => step.name))
-    for (const note of result.notes) if (note.step) expect(names.has(note.step)).toBe(true)
-  })
-
-  it('never takes a name another step already has', () => {
-    const result = ground(workflow([
-      { name: 'read-the-issue', after: [], prompt: 'One.' },
-      { name: 'Read the issue', after: [], prompt: 'Two.' },
-    ]))
-    expect(result.def.steps.map((step) => step.name)).toEqual(['read-the-issue', 'read-the-issue-2'])
   })
 })
 
@@ -463,10 +373,10 @@ describe('references that cannot resolve', () => {
     expect(messages(result)).toContain("Step 'a' referenced the input 'issue'")
   })
 
-  it('reads the three places a reference works', () => {
+  it('reads prompt and contributed-setting references', () => {
     const result = ground(workflow([
       { name: 'a', after: [], prompt: 'Go.' },
-      { name: 'b', after: [], kind: 'fan-out', prompt: 'Plan.', schema: {}, childStep: { prompt: 'Child of ${steps.a.output}.' } },
+      { name: 'b', after: [], prompt: 'Use ${steps.a.output}.' },
       { name: 'c', after: [], kind: 'http:request', with: { method: 'GET', url: 'https://example.com/${steps.a.output}' } },
     ]))
     expect(result.def.steps[1]?.after).toEqual(['a'])

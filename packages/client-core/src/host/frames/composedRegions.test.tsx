@@ -50,7 +50,7 @@ const row = (): NodePluginRow => ({
   installed: {
     version: '1.0.0',
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     client: { hash: HASH, bytes: 12 },
     contributions: {
       frames: [{

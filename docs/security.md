@@ -1156,6 +1156,22 @@ The allowlist runs even when the source SDK already scrubbed common secret keys 
 payload: that scrubbing is the sender's choice and acorn's storage and rendering path cannot rely on
 a filter it does not control.
 
+AI authoring treats source metadata and opted-in preview records as untrusted prompt content. A model
+can request only the closed metadata operations parsed by `@acorn/protocol/authoring.ts`. The Node
+checks the selected workspace and project on each request, uses the source runtime for provider
+authorization, and limits one turn to eight metadata requests and two candidate attempts. Record
+samples require device opt-in and are limited to three records and 16 KiB. The authoring routes accept
+only device principals and expose no publish, run, schedule, provider-write, or credential operation.
+Task-scoped agents receive the separate read-only metadata tools through the normal tool-permission
+and MCP projection.
+
+Workflow schedule authoring and approval routes require a device principal. At approval and before
+each root task creation, the workflows plugin resolves the published graph and rechecks repository
+trust, source availability, connection ownership, and destination scope through core and source
+capabilities. A client cannot provide an internal principal, an intended task ID, or a frozen graph.
+The schedule target contains only the workflow-owned binding ID. Loaded plugins cannot register user
+schedule target kinds or call the intended root-task creation seam.
+
 ## Filesystem and backup
 
 Data roots, credential files, TLS material, databases, WAL files, blobs, and worktrees are created

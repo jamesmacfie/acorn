@@ -142,6 +142,13 @@ consuming render, so a plugin reads signals it already owns and the rail re-rend
 rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
 the rest of the control still draws.
 
+Workflow descendant grouping is a client-core task projection, not plugin-owned rail markup. Tasks
+created through the workflow child seam carry `workflows:child`; desktop and terminal rails use the
+same pure hierarchy projection to collapse them beneath the ordinary root, reveal only an active
+descendant's ancestors, and preserve the full task list for drag-order writes. The workflows plugin
+adds aggregate running and attention state through the rail-marker registry above. Expansion is a
+device-local view preference and never mutates task ancestry.
+
 Several client registries (`slots.ts`, `railMarkers.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
 `exclusiveSlots.ts`) hold no JSX import. The `logic` half of this package's vitest suite runs in a bare
 Node environment with no Solid transform, so a module that imports a `.tsx` file cannot be loaded by a
@@ -257,6 +264,33 @@ TanStack Query is the server-data cache. There is one QueryClient/persister scop
 keys do not need an ad hoc Node prefix because the cache itself is partitioned. Fleet queries fan out
 per Node and must not write aggregate shapes into ordinary per-Node keys.
 
+## Typed data authoring
+
+Typed source authoring lives in `features/dataSources`, not in provider plugins or consumer panes.
+Its pure editor and field-picker models sit beside host-kit Solid components, and its requests use
+the same Node-partitioned TanStack cache as the rest of the renderer. Workflow and dashboard
+consumers receive protocol values from this shared surface; they do not duplicate source forms.
+The picker filter can request bounded metadata options on typing, while query preview remains an
+explicit action. Both the DOM and terminal kit implementations carry that search callback. The lazy
+`@acorn/plugin-api/ui/data-sources` facade exposes the connected controls to compiled consumers; a
+feature-owned kit seam swaps primitives without duplicating the editor tree or its state model.
+
+Workflow schedule setup follows the same rule. The workflows plugin owns a small modal host and pure
+cadence/preview model, composes only shared kit nodes, and reuses the connected typed value and field
+pickers. The workflow rail lists the Node projection, while activation and status mutations go
+straight to device-only routes. They are not optimistic/offline mutations: failure stays visible in
+the open editor and nothing is replayed after reconnect.
+
+Dashboard authoring consumes `SourceQueryEditor` directly. Each query instance reports its described
+fields and retained explicit preview through an observational callback; the dashboard's Display state
+never writes back into the source query. The persistent two-region editor projects typed nested values
+through pure `@acorn/dashboards-core/typedProjection.ts` rules into the existing host-owned panel views.
+At narrow widths those regions stack without losing the draft or preview.
+Published panels cache their revision and bounded source results under the active Node, workspace, and
+dashboard ID. The renderer strips Solid's reactive cache metadata before handing those protocol values
+to the strict typed-data projector, so cached data remains an offline fallback without becoming part of
+the wire value.
+
 ## Startup readiness
 
 The desktop opens its window as soon as the helper is listening, then shows the existing startup
@@ -341,9 +375,9 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 995,000 B, which is the measured
-  closure rounded up by about 3%, and it went up rather than down when the client took over its own
-  painting: what used to be a 6 MB native library outside the bundle is about 98 KB inside it
+  in it is evaluated before the first cell is drawn. The ceiling is 1,130,000 B, which rounds the
+  measured closure up by about 3%. The closure grew when the client took over its own painting: what
+  used to be a 6 MB native library outside the bundle is about 98 KB inside it
   ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —
   every bare import is left to the runtime, so a package that is only ever imported weighs nothing
   here. The walk is a regex over import edges rather than a real module graph, so it is approximate

@@ -247,7 +247,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       }),
     )
 
-    wireAgentTools({ db, secrets: runtime.SECRETS })
+    wireAgentTools({ db, secrets: runtime.SECRETS, env: runtime })
     mark('install')
 
     const listener = await startListener(runtime, dataRoot, mark)

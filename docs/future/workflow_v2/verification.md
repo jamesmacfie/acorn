@@ -1,8 +1,8 @@
 # Verification and transition
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
-Context: [ownership and decisions](./context.md). No tests in this document have been run as evidence
-of workflow_v2 implementation. Record actual results in the implementation slices.
+Date: 2026-09-20. Status: implementation evidence recorded through slice 19; release acceptance remains.
+Context: [ownership and decisions](./context.md). Record actual results in the implementation slices;
+this matrix remains the release-level acceptance checklist rather than duplicating their evidence.
 
 ## Example journeys
 
@@ -67,17 +67,17 @@ The implementation handoff must identify any manually edited examples before tra
 All new state follows normal owning migration chains. This is not permission to reset future
 production installations silently or to rewrite unrelated shipped migrations.
 
-## Complete collection migration
+## Completed source migration
 
-Inventory compiled registrations, loaded manifests, public SDK types, descriptor synthesis,
-client cache keys, core tasks, agent sessions, GitHub, Linear, new Rollbar data sources, panel
-regions, pure mappings/aggregates, and Node measure sampling. Built-in client fetch callbacks must
-not survive as a second authoritative source path. Preserve optional unavailable task status honestly.
+Slice 19 records the inventory of compiled registrations, loaded manifests, public SDK types,
+descriptor synthesis, former client cache keys, core tasks, agent sessions, GitHub, Linear, Rollbar,
+panel regions, pure mappings/aggregates, and Node measure sampling. Node-owned typed sources are now
+the only authoritative fetch path, and unavailable task worktree status remains `null`.
 
-Retire legacy flat collection schemas, opaque query params, cold-cache discovery, direct fan-out,
-and its dedicated join only after replacement consumers pass. Preserve ordinary graph joins and
-existing unrelated step kinds. Remove transition adapters/gates rather than leaving silent fallback
-execution. Keep unsupported old formats visible and actionable.
+Legacy flat collection schemas, opaque query params, cold-cache discovery, direct fan-out, its
+dedicated join, and transition adapters/gates are retired. Ordinary graph joins and unrelated step
+kinds remain. Unsupported old manifests and workflow formats receive actionable diagnostics rather
+than fallback execution.
 
 Update the affected owning docs when behavior ships: architecture, data layer, state ownership,
 workflows, dashboards, schedules, integrations, agent tools, plugin contracts/authoring, frontend,
@@ -111,6 +111,7 @@ window evidence, source conformance, crash recovery, and a 500-descendant bounde
 
 ## Verify before building
 
-Confirm the exact collection inventory and reset targets against the current checkout and data
-schema. Read the repository's testing and archive lifecycle docs. Treat this survey as a baseline,
-not proof that unrelated concurrent work has stayed unchanged.
+For final acceptance, recheck the source inventory and the exact transition targets recorded in
+[slice 19](./phase-19-transition.md) against the current checkout. Read the repository's testing and
+archive lifecycle docs. Treat the original survey as a baseline, not proof that unrelated concurrent
+work has stayed unchanged.

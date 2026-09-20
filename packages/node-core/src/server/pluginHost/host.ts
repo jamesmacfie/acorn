@@ -6,7 +6,7 @@
 // registry at call time, and a plugin that has to read another plugin's contributions does it in
 // `ready`, which runs after every init.
 import type { Env } from '../bindings'
-import type { CoreServices } from '../core'
+import type { CompiledCoreServices } from '../core'
 import { builtinPluginStorage, type PluginDatabase } from '../plugins/storage'
 import { removeAgentTools } from '../agentTools/registry'
 import { removeContextSections } from '../agentTools/contextSections'
@@ -16,7 +16,7 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
-import { clearCollectionReads } from '../collections/registry'
+import { clearDataSources } from '../dataSources/registry'
 import { clearNodeActions } from '../nodeActions'
 import { clearNodeProviders } from '../nodeProviders/registry'
 import { clearRunSources } from '../runs/registry'
@@ -54,7 +54,7 @@ export type { LoadedPluginBinding }
 export type PluginHostOptions = {
   // Owned by the caller. capabilities.ts says why these aren't module singletons.
   capabilities: CapabilityRegistry
-  core: CoreServices
+  core: CompiledCoreServices
   // The node's data root, because the host opens the per-plugin SQLite files under it
   // (server/plugins/storage.ts). Required, because a caller that forgot it boots a graph whose plugins
   // silently find no `ctx.storage`.
@@ -285,17 +285,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     for (const descriptor of binding?.auditActions ?? []) ctx.audit.declare(descriptor)
   }
 
-  // The same for collections (../collections/registry.ts): a manifest declares an `items` route per
-  // collection, and the node-side read registry maps `(pluginId, collectionId)` to it. No env needed,
-  // because registering a pointer costs nothing.
-  const registerManifestCollections = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
-    for (const descriptor of binding?.collections ?? []) {
-      ctx.collections.register({
-        collectionId: descriptor.id,
-        items: descriptor.items,
-        ...(descriptor.params ? { params: descriptor.params } : {}),
-      })
-    }
+  // Source and discovery descriptors share the same owner-bound runtime registry.
+  const registerManifestDataSources = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
+    for (const source of binding?.dataSources ?? []) ctx.dataSources.register(source)
+    for (const discovery of binding?.dataSourceDiscoveries ?? []) ctx.dataSources.discover(discovery)
   }
 
   // What a loaded plugin's manifest declared as managed agent harnesses, handed on to whichever plugin
@@ -430,7 +423,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     registerManifestSchedules(ctx, plugin.name, loaded)
     registerManifestTaskChecks(ctx, plugin.name, loaded)
     registerManifestHooks(ctx, plugin.name, loaded)
-    registerManifestCollections(ctx, loaded)
+    registerManifestDataSources(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
     registerManifestAuditActions(ctx, loaded)
     registerManifestRuntimeContributions(ctx, plugin.name, loaded)
@@ -617,7 +610,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // what the settings page shows anyway.
       registerEmits(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
       registerManifestHarnesses(candidateCtx, name, next.binding)
-      registerManifestCollections(candidateCtx, next.binding)
+      registerManifestDataSources(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
       registerManifestRuntimeContributions(candidateCtx, name, next.binding)
@@ -737,11 +730,9 @@ export function clearRegistrations(name: string): void {
   for (const undo of undoRegistrations.get(name) ?? []) undo()
   undoRegistrations.delete(name)
   removeAgentTools(name)
-  // A collection read is a pointer at a route this call just removed, so it goes with it. A survivor
-  // leaves the sampler dispatching at a namespace nothing serves.
-  clearCollectionReads(name)
+  clearDataSources(name)
   clearNodeActions(name)
-  // A run source is a pointer at a route this call just removed, same as a collection read.
+  // A run source is a pointer at a route this call just removed, same as a data-source read.
   clearRunSources(name)
   // The declarations go; the rows they describe stay. A verb whose plugin is gone renders as its raw
   // qualified string in the settings list, which is the honest answer — the row is still evidence of

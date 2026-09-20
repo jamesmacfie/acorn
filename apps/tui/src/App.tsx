@@ -15,7 +15,6 @@ import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree/table.ts'
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/RemoteTree'
-import { installPluginWorkers } from './plugins/workerFactory'
 import { Shell } from './chrome/Shell'
 
 // The composition root's client half: the four host seams and the shell under the one query client
@@ -36,11 +35,9 @@ import { Shell } from './chrome/Shell'
 // (client-core/host/layouts/table.ts, docs/tui.md).
 setLayouts(LAYOUTS)
 
-// The loaded-plugin path, the same two seams one level up: a plugin's tree is drawn by this host's
-// `RemoteTree` into cells, and the worker it emits from is a `node:worker_threads` thread under
-// `--permission` rather than a Web Worker under a CSP (docs/tui.md).
+// The loaded-plugin tree seam. Its worker factory is installed beside the loaded-plugin watcher
+// after the first frame: no bundle can reach this renderer until that watcher starts.
 setRemoteTree(RemoteTree)
-installPluginWorkers()
 
 // …and the third seam of the same shape. A plugin that contributes a rail source by descriptor rather
 // than by code gets `ChromeSourcePanel` on the desktop, which is `<main class="panes">` and DOM kit

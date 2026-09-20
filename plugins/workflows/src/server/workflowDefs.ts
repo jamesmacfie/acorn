@@ -7,18 +7,15 @@
 // in a pull request beats a local draft with the same name.
 //
 // Cross-database ids are plain ids, as the runs table already does with `task_id`.
-import { mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { WorkflowDefRow, WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
-import { workflowDefs } from '../node/schema'
+import { workflowDefs, workflowDependencies } from '../node/schema'
+import { publicationStore } from './workflowPublicationStore'
 import type { WorkflowDef } from '../shared/workflowContracts'
 import { loadWorkflowFiles, type LoadedWorkflow } from './workflowFiles'
 import type { WorkflowValidationCatalog } from './workflowValidation'
-import { uniqueWorkflowSlug, writeWorkflowToml } from './workflowToml'
-
-const WORKFLOW_FOLDER = '.acorn/workflows'
 
 type Row = typeof workflowDefs.$inferSelect
 
@@ -42,18 +39,21 @@ const toRow = (row: Row): StoredWorkflowDef => ({
   projectId: row.projectId,
   name: row.name,
   revision: row.revision,
+  publishedRevision: row.publishedRevision ?? null,
+  basePublishedRevision: row.basePublishedRevision ?? null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
   def: JSON.parse(row.defJson) as WorkflowDef,
 })
 
 const summariseDef = (id: string, source: WorkflowDefSummary['source'], def: WorkflowDef, extra: Partial<WorkflowDefSummary> = {}): WorkflowDefSummary => ({
+  formatVersion: def.formatVersion,
   id,
   name: def.name,
   source,
   posture: def.posture,
   inputs: def.inputs,
-  steps: def.steps.map((step) => ({ name: step.name, kind: step.kind, after: step.after, isolation: step.isolation, inputs: step.inputs })),
+  steps: def.steps.map((step) => ({ id: step.id, name: step.name, kind: step.kind, after: step.after, isolation: step.isolation, inputs: step.inputs })),
   ...extra,
 })
 
@@ -80,11 +80,11 @@ export async function getDef(db: PluginDatabase, id: string): Promise<StoredWork
 
 export async function createDef(
   db: PluginDatabase,
-  input: { workspaceId: string; projectId?: string | null; def: WorkflowDef },
+  input: { id?: string; workspaceId: string; projectId?: string | null; def: WorkflowDef },
 ): Promise<StoredWorkflowDef> {
   const at = now()
   const row: typeof workflowDefs.$inferInsert = {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     workspaceId: input.workspaceId,
     projectId: input.projectId ?? null,
     name: input.def.name,
@@ -109,14 +109,24 @@ export async function updateDef(
   if (!current) return null
   if (current.revision !== revision) return { conflict: current }
   const at = now()
-  await db
+  const changed = await db
     .update(workflowDefs)
     .set({ name: def.name, defJson: JSON.stringify(cleanDef(def)), revision: revision + 1, updatedAt: at })
     .where(and(eq(workflowDefs.id, id), eq(workflowDefs.revision, revision)))
+    .returning({ id: workflowDefs.id })
+  if (changed.length !== 1) {
+    const winner = await getDef(db, id)
+    return winner ? { conflict: winner } : null
+  }
   return { row: { ...current, name: def.name, def: cleanDef(def), revision: revision + 1, updatedAt: at } }
 }
 
 export async function removeDef(db: PluginDatabase, id: string): Promise<void> {
+  publicationStore(db).assertAvailable('workflow', id)
+  if (db.select().from(workflowDependencies).where(and(eq(workflowDependencies.targetId, id), eq(workflowDependencies.kind, 'workflow'))).get()) throw new Error('This workflow is referenced by another published workflow')
+  for (const row of db.select().from(workflowDefs).all()) {
+    if (row.id !== id && (JSON.parse(row.defJson) as WorkflowDef).steps.some(step => step.childWorkflow?.ref.source === 'database' && step.childWorkflow.ref.id === id)) throw new Error('This workflow is referenced by a draft')
+  }
   await db.delete(workflowDefs).where(eq(workflowDefs.id, id))
 }
 
@@ -138,6 +148,7 @@ export async function mergedList(
     const dangling = row.projectId && !known.has(row.projectId)
     byId.set(row.id, summariseDef(row.id, 'database', row.def, {
       projectId: row.projectId,
+      publishedRevision: row.publishedRevision,
       ...(dangling ? { problems: ['The project this workflow was bound to has been removed.'] } : {}),
     }))
   }
@@ -168,30 +179,13 @@ export async function mergedList(
   return { workflows: [...byId.values()], errors }
 }
 
-/** Save to repo: the row becomes `.acorn/workflows/<slug>.toml` in the given checkout, and the trust
- *  snapshot covers it from then on. The file id is a slug of the name, so nothing a person typed can
- *  address a path; the folder is the only place this writes. */
+/** Compatibility for callers that have not adopted reviewed published-graph export. */
 export async function saveDefToRepo(
   db: PluginDatabase,
   id: string,
-  options: { checkoutDir: string; keepRow: boolean; resolveInRoot: (root: string, relPath: string) => string | null },
+  _options: { checkoutDir: string; keepRow: boolean; resolveInRoot: (root: string, relPath: string) => string | null },
 ): Promise<{ path: string } | { error: string }> {
   const row = await getDef(db, id)
   if (!row) return { error: 'not_found' }
-  // The folder is confined before it is created: a symlinked `.acorn` inside an untrusted worktree
-  // would otherwise have `mkdir -p` following it out of the tree.
-  const dir = options.resolveInRoot(options.checkoutDir, WORKFLOW_FOLDER)
-  if (!dir) return { error: 'outside_checkout' }
-  mkdirSync(dir, { recursive: true })
-  const taken = new Set(readdirSync(dir).filter((entry) => entry.endsWith('.toml')).map((entry) => entry.slice(0, -5)))
-  const relPath = `${WORKFLOW_FOLDER}/${uniqueWorkflowSlug(row.name, taken)}.toml`
-  // And the file itself, because the slug is derived from a name a person typed.
-  const abs = options.resolveInRoot(options.checkoutDir, relPath)
-  if (!abs) return { error: 'outside_checkout' }
-  // Written beside and renamed, so a reader never sees half a definition.
-  const temp = `${abs}.tmp-${process.pid}`
-  writeFileSync(temp, writeWorkflowToml(row.def), 'utf8')
-  renameSync(temp, abs)
-  if (!options.keepRow) await removeDef(db, id)
-  return { path: relPath }
+  return { error: 'review_published_export_required' }
 }

@@ -9,7 +9,7 @@ import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import type { PluginFrameSurface } from '@acorn/protocol/plugin/contract.ts'
 import type { Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
-import { createCoreServices, SecretService, type CoreServices } from '../server/core'
+import { createCoreServices, SecretService, type CompiledCoreServices } from '../server/core'
 import type { NodePermissions } from '../server/plugins/manifest'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
@@ -24,7 +24,7 @@ import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } f
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
 // this is what `permissions: {}` means in a config, and a test opts into each grant by name.
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
+const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
 
 export type TestNodeContextOptions = {
   // The plugin under test. A NodePlugin satisfies this, so `{ plugin: rollbarPlugin() }` reads well.
@@ -83,7 +83,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), `acorn-testkit-${name}-`))
   const permissions = options.permissions ? { ...NO_PERMISSIONS, ...options.permissions } : undefined
   const secrets = new SecretService(TEST_ENCRYPTION_KEY)
-  const services: CoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null) })
+  const services: CompiledCoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null) })
 
   // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/pluginHost/host.ts): one
   // file named for the plugin id under the data root, migrated with the plugin's own chain on first open.

@@ -660,6 +660,10 @@ describe('architecture boundaries', () => {
     //
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
+      ['packages/protocol/src/dataSources.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/plugin-types/src/public.ts', 'preview is a published query mode, not the preview plugin'],
+      ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
@@ -704,7 +708,6 @@ describe('architecture boundaries', () => {
       // The rest, each a plain collision with a word core already had.
       ['packages/client-core/src/features/editor/DocumentSurface.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
-      ['packages/client-core/src/features/tasks/tasksCollection.ts', "'changes' the collection column"],
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
       ['packages/node-core/src/server/agentTools/contextSections.ts', "'notes' and 'memory', the TaskContext compatibility keys"],
@@ -948,6 +951,7 @@ describe('architecture boundaries', () => {
     // instant and names the offending specifier.
     const componentEntrypoints = new Set([
       'packages/plugin-api/src/ui/index.ts',
+      'packages/plugin-api/src/ui/data-sources.ts',
       'packages/plugin-api/src/ui/host.ts',
     ])
     const componentLeak = entrypoints

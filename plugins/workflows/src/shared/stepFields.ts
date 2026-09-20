@@ -17,6 +17,38 @@ const PROMPT_FIELD: StepField = { id: 'prompt', label: 'Prompt', type: 'prompt',
 const OPTIONAL_PROMPT_FIELD: StepField = { ...PROMPT_FIELD, required: false, hint: 'Optional when the step appends its upstream outputs.' }
 
 export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescription>> = {
+  'find-records': {
+    label: 'Find records', description: 'Run an inline or published query and store its complete selection.', icon: 'search',
+    fields: [{ id: 'query', label: 'Query', type: 'textarea', required: true, hint: 'A typed inline or saved query reference.' }],
+    output: { description: 'Complete records with exact references, evaluation/read times and resolved query provenance.', schema: {
+      type: 'object',
+      properties: {
+        records: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ref: { type: 'object', properties: { pluginId: { type: 'string' }, sourceId: { type: 'string' }, recordId: { type: 'string' } }, required: ['pluginId', 'sourceId', 'recordId'] },
+              data: { type: 'object' },
+              display: { type: 'object', properties: { title: { type: 'string' }, url: { type: 'string' } } },
+            },
+            required: ['ref', 'data'],
+          },
+        },
+      },
+      required: ['records'],
+    } },
+  },
+  'get-record-details': {
+    label: 'Get record details', description: 'Fetch typed details for an exact record reference.', icon: 'file-search',
+    fields: [{ id: 'record', label: 'Record reference', type: 'textarea', required: true, hint: 'A typed binding to the record ref.' }],
+    output: { description: 'Record reference, typed data, schema and fetched time.', schema: { type: 'object', properties: { fetchedTime: { type: 'number' } }, required: ['fetchedTime'] } },
+  },
+  if: {
+    label: 'If / otherwise', description: 'Compare typed values and take a branch without calling a model.', icon: 'git-branch',
+    fields: [{ id: 'condition', label: 'Condition', type: 'textarea', required: true, hint: 'A bounded all/any predicate or typed comparison.' }],
+    output: { description: 'Whether the condition matched.', schema: { type: 'object', properties: { matched: { type: 'boolean' }, verdict: { type: 'string' } }, required: ['matched', 'verdict'] } },
+  },
   agent: {
     label: 'Ask an agent',
     description: 'Run one agent turn and hand its answer to the steps that wait on it.',
@@ -30,7 +62,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     output: { description: 'The structured result if the step declared a schema, the final text otherwise.' },
   },
   decide: {
-    label: 'Decide a branch',
+    label: 'Ask AI to decide',
     description: 'Ask an agent for one verdict and take the branch it names.',
     icon: 'git-branch',
     runsAgent: true,
@@ -64,26 +96,6 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     ],
     output: { description: 'Whether the checks went green, and how many iterations it took.' },
   },
-  'fan-out': {
-    label: 'Fan out',
-    description: 'Ask an agent for a list of tasks, then run one child agent per item, each in its own worktree.',
-    icon: 'split',
-    runsAgent: true,
-    fields: [
-      PROMPT_FIELD,
-      { id: 'childStep.prompt', label: 'Child prompt', type: 'prompt' },
-      { id: 'childStep.profileId', label: 'Child profile', type: 'select' },
-      { id: 'childStep.model', label: 'Child model', type: 'select' },
-    ],
-    output: { description: 'The list the planning agent produced, and how many children failed.' },
-  },
-  join: {
-    label: 'Collect the children',
-    description: 'Wait for a fan-out’s children and gather what each one returned.',
-    icon: 'merge',
-    fields: [{ id: 'joins', label: 'Fan-out step', type: 'select', required: true, hint: 'A fan-out step this one waits on.' }],
-    output: { description: 'One row per child: its name, its status, and its structured result.' },
-  },
   workflow: {
     label: 'Run a workflow',
     description: 'Start one saved workflow in a child task and wait for its result.',
@@ -95,10 +107,10 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
       required: true,
       hint: 'Pick a workflow available to this project, then bind its declared inputs.',
     }],
-    output: { description: 'The child task, run status, and bounded result summary.' },
+    output: { description: 'The child task, run status, and declared named outputs.', schema: { type: 'object', properties: { outputs: { type: 'object' } }, required: ['outputs'] } },
   },
   'workflow-map': {
-    label: 'Map to workflows',
+    label: 'For each',
     description: 'Start one saved workflow in a child task for each selected item.',
     icon: 'git-fork',
     fields: [
@@ -113,9 +125,9 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
         id: 'itemKey',
         label: 'Item key pointer',
         type: 'workflow-json-pointer',
-        required: true,
+        required: false,
         placeholder: '/id',
-        hint: 'A safe JSON Pointer to a nonempty string that identifies each item.',
+        hint: 'A safe JSON Pointer to a nonempty string or finite number that identifies each item.',
       },
       {
         id: 'childWorkflow',
@@ -128,11 +140,11 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
         id: 'title',
         label: 'Child task title',
         type: 'workflow-title',
-        required: true,
+        required: false,
         hint: 'Write a title template and bind each placeholder to a string value.',
       },
     ],
-    output: { description: 'One result per source item, in source order, with its task, run, status, and summary.' },
+    output: { description: 'One result per source item, in source order, with its task, run, status, and declared outputs.', schema: { type: 'object', properties: { children: { type: 'array', items: { type: 'object' } } }, required: ['children'] } },
   },
 }
 
@@ -154,8 +166,7 @@ export const BUILTIN_AGENT_STEP_KINDS: ReadonlySet<string> = new Set(
   Object.entries(BUILTIN_STEP_DESCRIPTIONS).filter(([, describe]) => describe.runsAgent).map(([kind]) => kind),
 )
 
-/** A field's value, wherever it lives. A dotted id addresses a nested named field, as `fan-out`'s
- *  child prompt does. */
+/** A field's value, wherever it lives. A dotted id addresses a nested named field. */
 export function readStepField(step: { with?: Record<string, unknown> } & Record<string, unknown>, kind: string, fieldId: string): unknown {
   if (fieldHome(kind, fieldId) === 'with') return step.with?.[fieldId]
   return fieldId.split('.').reduce<unknown>((value, part) => (value as Record<string, unknown> | undefined)?.[part], step)

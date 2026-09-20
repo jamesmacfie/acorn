@@ -1,6 +1,6 @@
 # Authoring UX
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented through slice 19; cross-surface acceptance remains in slice 20.
 Context: [decisions](./context.md). Mechanics live in [data](./data-contract.md),
 [publication](./publication.md), and [AI authoring](./ai-authoring.md).
 

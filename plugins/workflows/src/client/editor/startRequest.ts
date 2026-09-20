@@ -1,3 +1,4 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // What "run this workflow" is, before anything draws it.
 //
 // A module of its own rather than a signal inside ./StartDialog.tsx, because the palette asks for the
@@ -14,7 +15,7 @@ export type StartRequest = {
   name: string
   inputs?: readonly WorkflowInput[]
   /** Values the caller already knows — the item a run was started from, in phase 5. */
-  prefill?: Readonly<Record<string, string>>
+  prefill?: Readonly<Record<string, DataValue>>
   /** The task to run on. Absent means the dialog asks. */
   taskId?: string
   projectId?: string
@@ -39,7 +40,7 @@ export const closeWorkflowStart = (): void => {
  */
 export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
   !next.taskId
-  || (next.inputs ?? []).some((input) => input.required && !input.default && !next.prefill?.[input.name])
+  || (next.inputs ?? []).some((input) => input.required && input.default === undefined && next.prefill?.[input.name] === undefined)
 
 /**
  * Ask for the dialog.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { PluginCollectionField } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayField } from './display'
 import { cellText, formatCell, personInitials } from './format'
 
-const field = (over: Partial<PluginCollectionField> & Pick<PluginCollectionField, 'type'>): PluginCollectionField =>
+const field = (over: Partial<DashboardDisplayField> & Pick<DashboardDisplayField, 'type'>): DashboardDisplayField =>
   ({ id: 'f', name: 'F', ...over })
 
 const NOW = 1_700_000_000_000

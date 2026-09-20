@@ -1,7 +1,10 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeTaskId, tasksOptions } from '@acorn/plugin-api/client'
-import { Button, Field, Input, Modal, ModalActions, ModalBody, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Button, Field, Modal, ModalActions, ModalBody, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import TypedValueField from './TypedValueField'
+import type { WorkflowDef } from '../../shared/workflowContracts'
 import { workflowApi } from '../workflowsClient'
 import { closeWorkflowStart, startRequest, type StartRequest } from './startRequest'
 
@@ -22,22 +25,24 @@ export default function StartDialogHost() {
 }
 
 function StartDialog(props: { request: StartRequest }) {
+  const [definition] = createResource(() => props.request.defId, async id => (await workflowApi.def(id, props.request.projectId)).def as WorkflowDef)
   const inputs = () => props.request.inputs ?? []
-  const [values, setValues] = createSignal<Record<string, string>>({
-    ...Object.fromEntries(inputs().filter((input) => input.default).map((input) => [input.name, input.default!])),
+  const [values, setValues] = createSignal<Record<string, DataValue>>({
+    ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
     ...(props.request.prefill ?? {}),
   })
   const [taskId, setTaskId] = createSignal(props.request.taskId ?? activeTaskId() ?? '')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>()
+  const [invalid, setInvalid] = createSignal<Record<string, boolean>>({})
 
   const tasks = createQuery(() => tasksOptions(true))
   const choices = createMemo(() => (tasks.data ?? [])
     .filter((task) => task.status === 'active' && (!props.request.projectId || task.projectId === props.request.projectId))
     .map((task) => ({ value: task.id, label: task.title })))
 
-  const missing = () => inputs().some((input) => input.required && !values()[input.name]?.trim())
-  const ready = () => !!taskId() && !missing() && !busy()
+  const missing = () => inputs().some((input) => input.required && values()[input.name] === undefined)
+  const ready = () => !!taskId() && !missing() && !Object.values(invalid()).some(Boolean) && !busy()
 
   const start = async (): Promise<void> => {
     if (!ready()) return
@@ -59,6 +64,9 @@ function StartDialog(props: { request: StartRequest }) {
       <ModalBody>
         <Stack gap="row">
           <Show when={error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+          <Show when={definition()}>{(saved) => (
+            <Text emphasis="muted" wrap>Up to {saved().maxDescendants ?? 100} descendant tasks, four child levels, and {saved().maxConcurrency ?? 4} concurrent agents. Nested work shares these limits.</Text>
+          )}</Show>
           <Show when={!props.request.taskId}>
             <Field label="Task" hint="The run happens in this task's checkout." group>
               <Select
@@ -72,19 +80,19 @@ function StartDialog(props: { request: StartRequest }) {
           </Show>
           <For each={inputs()}>
             {(input) => (
-              <Field
-                label={input.required ? `${input.name} *` : input.name}
-                hint={input.description}
-                group
-              >
-                <Input
-                  size="sm"
-                  label={input.name}
-                  value={values()[input.name] ?? ''}
-                  invalid={!!input.required && !values()[input.name]?.trim()}
-                  onInput={(value) => setValues((current) => ({ ...current, [input.name]: value }))}
+                <TypedValueField
+                  label={input.required ? `${input.label ?? input.name} *` : input.label ?? input.name}
+                  schema={input.schema}
+                  value={values()[input.name]}
+                  required={input.required}
+                  onValidity={(valid) => setInvalid(current => ({ ...current, [input.name]: !valid }))}
+                  onChange={(value) => setValues((current) => {
+                    const next = { ...current }
+                    if (value === undefined) delete next[input.name]
+                    else next[input.name] = value
+                    return next
+                  })}
                 />
-              </Field>
             )}
           </For>
           <Show when={!inputs().length}>

@@ -32,6 +32,7 @@ const ENTRYPOINTS = {
   // breaks when it moves, and third-party authors have no other door into the host from a test.
   testkit: 'testkit.ts',
   ui: 'ui/index.ts',
+  'ui/data-sources': 'ui/data-sources.ts',
   'ui/diff': 'ui/diff.ts',
   'ui/editor': 'ui/editor.ts',
   'ui/host': 'ui/host.ts',

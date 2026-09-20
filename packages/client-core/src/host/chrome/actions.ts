@@ -28,7 +28,7 @@ export type ChromeActionContext = {
   item?: PluginRailItem
   promote?: (item: PluginRailItem) => void
   // The task this click is about, when the click site knows one and it is not the task on screen. Only a
-  // dashboard row supplies it today, from `PluginCollectionRow.taskId`: a panel is drawn outside every
+  // dashboard record supplies it today from its task link: a panel is drawn outside every
   // task, so without this `openPane` had only the active task to work with, which is never the task the
   // row is about, and usually there is none at all.
   taskId?: string

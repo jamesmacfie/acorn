@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
 import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
+import { toggleWorkflowRoot } from '@acorn/client-core/features/tasks/taskTreeViewState.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { createMemo, createRoot, createSignal } from 'solid-js'
 import type { Renderable } from '../tree/compat'
@@ -424,6 +425,46 @@ describe('the shell', () => {
     // retrying" about a node that is booting fine (./nodeState.ts).
     expect(frame).toContain('starting the node')
     expect(frame).not.toContain('unreachable')
+  }, 30_000)
+
+  it('keeps a 500-child workflow group bounded and leaves manual siblings visible', async () => {
+    const task = (id: string, title: string, parentId: string | null, sort: number, origin: string): Task => ({
+      id, title, projectId: 'project-1', branch: id, origin, icon: null, status: 'active', links: [],
+      parentId, sort, github: null, worktreePath: null, pullNumber: null,
+    })
+    const cached = [
+      task('phase18-root', 'Phase 18 root', null, 0, 'local'),
+      ...Array.from({ length: 500 }, (_, index) => task(
+        `phase18-child-${index}`,
+        `Workflow child ${index + 1}`,
+        'phase18-root',
+        index + 1,
+        'workflows:child',
+      )),
+      task('phase18-manual', 'Manual sibling', null, 502, 'local'),
+    ]
+    const screen = await renderFixture({
+      width: 120,
+      height: 40,
+      cache: (client) => client.setQueryData(tasksKey, cached),
+    })
+
+    const collapsed = await screen.frame()
+    expect(collapsed).toContain('▸ Phase 18 root · 500')
+    expect(collapsed).toContain('Manual sibling')
+    expect(collapsed).not.toContain('Workflow child 1')
+
+    toggleWorkflowRoot('phase18-root')
+    const expanded = await screen.frame()
+    expect(expanded).toContain('▾ Phase 18 root · 500')
+    expect(expanded).toContain('Workflow child 1')
+
+    toggleWorkflowRoot('phase18-root')
+    const restored = await screen.frame()
+    screen.done()
+    expect(restored).toContain('Manual sibling')
+    expect(restored).not.toContain('Workflow child 1')
+    for (const line of restored.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
   }, 30_000)
 
   it('drops the starting sentence once the handshake lands, and fills the rail from the node', async () => {

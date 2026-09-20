@@ -15,7 +15,8 @@ import type {
   WorkflowStepDef,
 } from '../../shared/workflowContracts'
 import { fieldHome, readStepField } from '../../shared/stepFields'
-import { STEP_NAME_RE, uniqueStepName } from '../../shared/stepNames'
+import { uniqueStepName } from '../../shared/stepNames'
+import { stepIdentity } from '../../shared/workflowIdentity'
 
 /** What the inspector is showing. "Definition" and "Inputs" are rows in the list too, so the
  *  selection is not always a node. */
@@ -36,10 +37,10 @@ export const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
 
 export const newDraft = (def: WorkflowDef): WorkflowDraft => ({ def, selection: { kind: 'definition' } })
 
-export const emptyDefinition = (name = 'Untitled workflow'): WorkflowDef => ({ name, steps: [] })
+export const emptyDefinition = (name = 'Untitled workflow'): WorkflowDef => ({ formatVersion: 2, name, steps: [] })
 
 const stepAt = (def: WorkflowDef, name: string): WorkflowStepDef | undefined =>
-  def.steps.find((step) => step.name === name)
+  def.steps.find((step) => stepIdentity(step) === name)
 
 /** The steps one waits on, with the "absent means the step declared before it" rule applied. The
  *  runner reads `after` the same way (../../server/workflowValidation.ts), so the picture the editor
@@ -49,12 +50,12 @@ export function effectiveAfter(def: WorkflowDef, index: number): readonly string
   if (!step) return []
   if (step.after) return step.after
   const previous = def.steps[index - 1]
-  return previous ? [previous.name] : []
+  return previous ? [stepIdentity(previous)] : []
 }
 
 /** Every step's incoming edges, by name. */
 export function edges(def: WorkflowDef): Map<string, readonly string[]> {
-  return new Map(def.steps.map((step, index) => [step.name, effectiveAfter(def, index)]))
+  return new Map(def.steps.map((step, index) => [stepIdentity(step), effectiveAfter(def, index)]))
 }
 
 /** Is `candidate` on some path back from `step`? The cycle check and the reference check both ask it. */
@@ -84,8 +85,8 @@ const MAX_DEPTH = 4
 
 export function graphOrder(def: WorkflowDef): GraphRow[] {
   const graph = edges(def)
-  const declared = new Map(def.steps.map((step, index) => [step.name, index]))
-  const waiting = new Set(def.steps.map((step) => step.name))
+  const declared = new Map(def.steps.map((step, index) => [stepIdentity(step), index]))
+  const waiting = new Set(def.steps.map((step) => stepIdentity(step)))
   const placedAt = new Map<string, number>()
   const rank = new Map<string, number>()
   const rows: GraphRow[] = []
@@ -125,7 +126,7 @@ const withSteps = (draft: WorkflowDraft, steps: WorkflowStepDef[]): WorkflowDraf
   ({ ...draft, def: { ...draft.def, steps } })
 
 const patchStep = (draft: WorkflowDraft, name: string, patch: (step: WorkflowStepDef) => WorkflowStepDef): WorkflowDraft =>
-  withSteps(draft, draft.def.steps.map((step) => (step.name === name ? patch(step) : step)))
+  withSteps(draft, draft.def.steps.map((step) => (stepIdentity(step) === name ? patch(step) : step)))
 
 export const select = (draft: WorkflowDraft, selection: DraftSelection): WorkflowDraft =>
   ({ ...draft, selection })
@@ -143,8 +144,18 @@ export function addNode(draft: WorkflowDraft, kind: string, base?: string): Work
   // Every step the editor writes carries an explicit `after`, so a node added at the end of a list
   // written by hand does not silently inherit the step above it.
   const explicit = draft.def.steps.map((step, index) => (step.after ? step : { ...step, after: [...effectiveAfter(draft.def, index)] }))
-  const step: WorkflowStepDef = { name, ...(kind === 'agent' ? {} : { kind }), after: parent ? [parent] : [] }
-  return { def: { ...draft.def, steps: [...explicit, step] }, selection: { kind: 'node', name } }
+  const step: WorkflowStepDef = { ...(draft.def.formatVersion === 2 ? { id: crypto.randomUUID() } : {}), name, ...(kind === 'agent' ? {} : { kind }), after: parent ? [parent] : [] }
+  return { def: { ...draft.def, steps: [...explicit, step] }, selection: { kind: 'node', name: stepIdentity(step) } }
+}
+
+/** The guided Find records → For each operation. One draft change means one undo restores the exact
+ *  prior graph, while the map still uses the same stable IDs as the outline and canvas. */
+export function addForEach(draft: WorkflowDraft, sourceId: string): WorkflowDraft {
+  const added = addNode(select(draft, { kind: 'node', name: sourceId }), 'workflow-map', 'For each')
+  const selected = added.selection
+  return selected.kind === 'node'
+    ? setStep(added, selected.name, { items: { step: sourceId, pointer: '/records' } })
+    : added
 }
 
 /** Delete, detaching every edge that touched it. The predecessor is never bridged to the successor:
@@ -154,7 +165,7 @@ export function removeNode(draft: WorkflowDraft, name: string): WorkflowDraft {
   if (!stepAt(draft.def, name)) return draft
   const explicit = draft.def.steps.map((step, index) => ({ ...step, after: [...effectiveAfter(draft.def, index)] }))
   const steps = explicit
-    .filter((step) => step.name !== name)
+    .filter((step) => stepIdentity(step) !== name)
     .map((step) => ({ ...step, after: step.after.filter((parent) => parent !== name) }))
   const selection: DraftSelection = draft.selection.kind === 'node' && draft.selection.name === name
     ? { kind: 'definition' }
@@ -162,63 +173,30 @@ export function removeNode(draft: WorkflowDraft, name: string): WorkflowDraft {
   return { def: { ...draft.def, steps }, selection }
 }
 
+/** Move one declaration without changing the graph it describes. `after` is made explicit first,
+ *  because declaration order is the legacy shorthand for a missing edge list. Stable step IDs keep
+ *  bindings, branches, and graph positions attached to the same step. */
+export function moveNode(draft: WorkflowDraft, name: string, direction: -1 | 1): WorkflowDraft {
+  const from = draft.def.steps.findIndex((step) => stepIdentity(step) === name)
+  const to = from + direction
+  if (from < 0 || to < 0 || to >= draft.def.steps.length) return draft
+  const steps = draft.def.steps.map((step, index) => ({ ...step, after: [...effectiveAfter(draft.def, index)] }))
+  const [moved] = steps.splice(from, 1)
+  steps.splice(to, 0, moved!)
+  return withSteps(draft, steps)
+}
+
 const RENAME_LIMIT = 200
 
-/** Rewrite `${steps.<old>.output}` wherever a reference may appear. One level into `with`, which is
- *  as deep as the runner renders. */
-function rewriteReferences(value: unknown, from: string, to: string, depth = 0): unknown {
-  if (typeof value === 'string') return value.split(`\${steps.${from}.output}`).join(`\${steps.${to}.output}`)
-  if (depth > 1 || !value || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map((entry) => rewriteReferences(entry, from, to, depth + 1))
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, rewriteReferences(entry, from, to, depth + 1)]))
-}
-
-const rewriteBindingStep = <T extends { from: string; step?: string }>(binding: T, from: string, to: string): T =>
-  binding.from === 'step' && binding.step === from ? { ...binding, step: to } : binding
-
-const rewriteBindings = <T extends { from: string; step?: string }>(
-  bindings: Record<string, T> | undefined,
-  from: string,
-  to: string,
-): Record<string, T> | undefined => bindings && Object.fromEntries(
-  Object.entries(bindings).map(([name, binding]) => [name, rewriteBindingStep(binding, from, to)]),
-)
-
 /** Why this rename cannot happen, or nothing. */
-export function renameProblem(def: WorkflowDef, from: string, to: string): string | undefined {
-  if (to === from) return undefined
-  if (!STEP_NAME_RE.test(to)) return 'A step name is letters, numbers, dashes and underscores.'
-  if (to.length > RENAME_LIMIT) return 'That name is too long.'
-  if (def.steps.some((step) => step.name === to)) return `Another step is already called '${to}'.`
-  return undefined
+export function renameProblem(_def: WorkflowDef, _from: string, to: string): string | undefined {
+  return !to.trim() || to.length > RENAME_LIMIT ? 'Choose a name of 1–200 characters.' : undefined
 }
 
-/** The identity stays the name, so a rename is a rewrite: every `after` entry, every branch target,
- *  every `joins`, and every `${steps.old.output}` in a prompt or a `with` value
- *  (docs/workflows.md § Authoring). Draft-only until the draft is saved. */
+/** Stable IDs make a display-name edit local to the selected step. */
 export function renameNode(draft: WorkflowDraft, from: string, to: string): WorkflowDraft {
   if (to === from || renameProblem(draft.def, from, to)) return draft
-  const steps = draft.def.steps.map((step, index) => {
-    const after = [...effectiveAfter(draft.def, index)].map((parent) => (parent === from ? to : parent))
-    const next: WorkflowStepDef = { ...step, after, name: step.name === from ? to : step.name }
-    if (next.prompt) next.prompt = rewriteReferences(next.prompt, from, to) as string
-    if (next.with) next.with = rewriteReferences(next.with, from, to) as Record<string, unknown>
-    if (next.joins === from) next.joins = to
-    if (next.childStep?.prompt) next.childStep = { ...next.childStep, prompt: rewriteReferences(next.childStep.prompt, from, to) as string }
-    if (next.childWorkflow?.inputs) {
-      next.childWorkflow = { ...next.childWorkflow, inputs: rewriteBindings(next.childWorkflow.inputs, from, to) }
-    }
-    if (next.items?.step === from) next.items = { ...next.items, step: to }
-    if (next.title?.bindings) next.title = { ...next.title, bindings: rewriteBindings(next.title.bindings, from, to) }
-    if (next.branches) {
-      next.branches = Object.fromEntries(Object.entries(next.branches).map(([verdict, target]) => [verdict, target === from ? to : target]))
-    }
-    return next
-  })
-  const selection: DraftSelection = draft.selection.kind === 'node' && draft.selection.name === from
-    ? { kind: 'node', name: to }
-    : draft.selection
-  return { def: { ...draft.def, steps }, selection }
+  return patchStep(draft, from, step => ({ ...step, name: to }))
 }
 
 /** Would this edge be accepted? The `Waits on` picker asks it of every node, so a node it cannot
@@ -226,7 +204,7 @@ export function renameNode(draft: WorkflowDraft, from: string, to: string): Work
 export function canConnect(def: WorkflowDef, from: string, to: string): boolean {
   if (from === to) return false
   if (!stepAt(def, from) || !stepAt(def, to)) return false
-  const index = def.steps.findIndex((step) => step.name === to)
+  const index = def.steps.findIndex((step) => stepIdentity(step) === to)
   if (effectiveAfter(def, index).includes(from)) return false
   // A cycle: `to` already runs before `from`, so making `from` a predecessor closes the loop.
   return !precedes(def, to, from)
@@ -235,13 +213,13 @@ export function canConnect(def: WorkflowDef, from: string, to: string): boolean 
 /** `to` waits on `from`. */
 export function connect(draft: WorkflowDraft, from: string, to: string): WorkflowDraft {
   if (!canConnect(draft.def, from, to)) return draft
-  const index = draft.def.steps.findIndex((step) => step.name === to)
+  const index = draft.def.steps.findIndex((step) => stepIdentity(step) === to)
   const after = [...effectiveAfter(draft.def, index), from]
   return patchStep(draft, to, (step) => ({ ...step, after }))
 }
 
 export function disconnect(draft: WorkflowDraft, from: string, to: string): WorkflowDraft {
-  const index = draft.def.steps.findIndex((step) => step.name === to)
+  const index = draft.def.steps.findIndex((step) => stepIdentity(step) === to)
   if (index < 0) return draft
   const after = effectiveAfter(draft.def, index).filter((parent) => parent !== from)
   return patchStep(draft, to, (step) => ({ ...step, after: [...after] }))
@@ -318,7 +296,7 @@ export function applyJson(draft: WorkflowDraft, text: string): { draft: Workflow
   if (def.steps.some((step) => !step || typeof (step as WorkflowStepDef).name !== 'string')) {
     return { error: 'Every step needs a name.' }
   }
-  const names = def.steps.map((step) => (step as WorkflowStepDef).name)
+  const names = def.steps.map((step) => stepIdentity(step as WorkflowStepDef))
   const selection: DraftSelection = draft.selection.kind === 'node' && names.includes(draft.selection.name)
     ? draft.selection
     : { kind: 'definition' }

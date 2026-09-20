@@ -2,8 +2,6 @@ import type { NodePlugin } from '@acorn/plugin-api/node'
 import { pullRequestSection } from '../server/contextSection'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/checks/actions'
-import { PULLS_COLLECTION_ID, pullsCollectionRoute } from '../shared/collections'
-import { collections } from '../server/routes/pulls/collections'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { githubProvider } from '../server/provider'
@@ -26,6 +24,8 @@ import { githubAgentTools } from '../server/agentTools'
 import { taskPulls } from '../server/routes/pulls/taskPulls'
 import { githubEmitter } from '../server/events'
 import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
+import { pullSource } from '../shared/pullSource'
+import { createPullSourceHandler } from '../server/data/pullSourceHandler'
 
 export const githubPlugin = (): NodePlugin => {
   return {
@@ -65,6 +65,8 @@ export const githubPlugin = (): NodePlugin => {
       // The device-flow router registers separately below because github's routes share a namespace
       // with twelve mirror routers whose registration order is load-bearing.
       ctx.providers.integration(githubProvider)
+      ctx.routes.fetch(createPullSourceHandler(), { prefix: '/data/pulls' })
+      ctx.dataSources.register(pullSource)
 
       // /v2/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
       // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono
@@ -92,18 +94,6 @@ export const githubPlugin = (): NodePlugin => {
       // `pinned_repos` moved out of core, so /v2/core/pins became /v2/p/github/pins. The repo
       // selector is the only caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
-      // /v2/p/github/collections/* projects the mirror as typed records a user can compose a panel
-      // over (server/routes/collections.ts). Its own prefix rather than /repos, because a collection
-      // spans every mirrored repository and is not addressed by one.
-      ctx.routes.register(collections(store), { prefix: '/collections' })
-      // The compiled feeder for node-side collection reads (docs/schedules.md § Reading a collection
-      // from the node). The client half ships a `fetch` that reads the same route over HTTP; this
-      // pointer lets the measure sampler read it in-process with no client attached.
-      ctx.collections.register({
-        collectionId: PULLS_COLLECTION_ID,
-        items: pullsCollectionRoute,
-        params: [{ id: 'repo', name: 'Repository', type: 'text' }],
-      })
       // The device-flow connect writes core's own `integrations` row through connectProvider
       // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
       // takes no handle.

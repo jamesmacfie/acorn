@@ -42,6 +42,9 @@ export type PickerProps<T> = {
   items?: readonly PickerItem[]
   /** Picked, by id, in the data form. */
   onPick?: (id: string) => void
+  /** Search text as it changes. Metadata-backed pickers use this to request another bounded option
+   *  page; record previews must never hang off it. Callback props are compiled-client only. */
+  onSearch?: (query: string) => void
   /** A removable row's control was pressed, by id. */
   onRemove?: (id: string) => void
   results?: (query: string) => T[]
@@ -146,7 +149,10 @@ export default function Picker<T>(props: PickerProps<T>) {
                 class="repo-picker-filter"
                 placeholder={props.placeholder}
                 value={filter()}
-                onInput={(e) => setFilter(e.currentTarget.value)}
+                onInput={(e) => {
+                  setFilter(e.currentTarget.value)
+                  props.onSearch?.(e.currentTarget.value)
+                }}
               />
               {props.tools}
             </div>

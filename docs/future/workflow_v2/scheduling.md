@@ -1,6 +1,6 @@
 # Scheduling and record processing
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented through slice 19; cross-surface acceptance remains in slice 20.
 Context: [decisions](./context.md). This replaces the earlier scheduling programme's proposed contract.
 
 ## Schedule target and approval

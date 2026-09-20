@@ -35,7 +35,7 @@ const row = (name: string, declared: Partial<PluginContributions> = {}, over: Pa
   installed: {
     version: '1.0.0',
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     contributions: { frames: [], ...declared },
     client: null,
   },

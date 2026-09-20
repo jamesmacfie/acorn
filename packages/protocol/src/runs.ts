@@ -6,7 +6,7 @@ import { z } from 'zod'
 // `workflow_runs`, agent sessions, `schedule_runs` — in three SQLite files, one per owner, so nothing
 // could list them together. This is the read model that can, and it is deliberately a registry rather
 // than a table: a plugin declares the route that lists its runs and the host merges the answers, the
-// same shape `ctx.collections` already uses for panels.
+// the same owner-bound route registry pattern used by other Node contributions.
 //
 // **When to build the core table instead.** Written down so it is recognized rather than re-argued:
 // when something *outside* the owning plugin must cancel a run, or charge it against a budget shared

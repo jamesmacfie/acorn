@@ -15,6 +15,12 @@ const RETIRED_KEY_PREFIXES = [
   // Unsaved API-panel drafts, headers/auth/body included. Saved requests are server-encrypted now and
   // unsaved credential-bearing drafts stay memory-only (plugins/http/src/frame/draft.ts).
   'http-draft:',
+  // Workflow-v2 development cutover. These drafts refer to reset workflow/query/dashboard revisions
+  // and must not be replayed against the new stores.
+  'workflow-recovery:v1:',
+  'query-recovery:v1:',
+  'acorn:dashboard-recovery:',
+  'acorn:ai-authoring:v1:',
 ] as const
 
 type SweepableStorage = Pick<Storage, 'length' | 'key' | 'removeItem'>

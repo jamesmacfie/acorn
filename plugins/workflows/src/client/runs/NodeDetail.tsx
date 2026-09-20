@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
-import { useNavigate } from '@solidjs/router'
+import { useNavigate, useSearchParams } from '@solidjs/router'
 import {
   clientCapability, openPane, pathForTask, refreshSessions, requestTerminalFocus, setTerminalOpen,
   type Task, tasksOptions,
@@ -17,6 +17,7 @@ import type { WorkflowStepProjection } from '../../shared/api'
 import { formatCost, formatDuration, kindLabel, kindRunsAgent, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 import { ChildRuns, RunLineage } from './RunRelationships'
+import { RunRecords } from './RunRecords'
 
 // The run pane's `detail` region: what one node is doing, and the controls that are legal for the
 // state it is in (docs/workflows.md § Routes and UI).
@@ -64,8 +65,11 @@ const FAILED = new Set(['failed', 'safety-rail'])
 export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
   const navigate = useNavigate()
+  const [search] = useSearchParams()
   const tasks = createQuery(() => tasksOptions(true))
   const [retrying, setRetrying] = createSignal<string | null>(null)
+  const searchValue = (value: string | string[] | undefined): string | undefined =>
+    Array.isArray(value) ? value[0] : value
 
   const step = () => model.selectedStep()
   const shape = createMemo(() => shapeOf(step()?.kind ?? 'agent'))
@@ -100,12 +104,30 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     requestTerminalFocus(props.task.id, sessionId)
   }
 
-  const openTaskTarget = (taskId: string, runId?: string): void => {
+  const openTaskTarget = (taskId: string, runId?: string, record?: { rootRunId: string; recordId: string }): void => {
     const task = (tasks.data ?? []).find((candidate) => candidate.id === taskId)
-    if (!task) return
-    navigate(runId
-      ? `${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(runId)}`
-      : pathForTask(task))
+    const query = runId ? new URLSearchParams({ pane: 'workflows', item: runId }) : null
+    if (query && record) {
+      query.set('workflowReturnTask', props.task.id)
+      query.set('workflowReturnRun', record.rootRunId)
+      query.set('workflowReturnRecord', record.recordId)
+    }
+    const path = task ? pathForTask(task) : `/t/${encodeURIComponent(taskId)}`
+    navigate(query ? `${path}?${query}` : path)
+  }
+
+  const returnToRecord = (): void => {
+    const returnTask = searchValue(search.workflowReturnTask)
+    const returnRun = searchValue(search.workflowReturnRun)
+    const returnRecord = searchValue(search.workflowReturnRecord)
+    const task = (tasks.data ?? []).find(candidate => candidate.id === returnTask)
+    if (!task || !returnRun || !returnRecord) return
+    const query = new URLSearchParams({ pane: 'workflows', item: returnRun, workflowRecord: returnRecord })
+    navigate(`${pathForTask(task)}?${query}`)
+  }
+  const returnTaskAvailable = (): boolean => {
+    const returnTask = searchValue(search.workflowReturnTask)
+    return !!returnTask && (tasks.data ?? []).some(candidate => candidate.id === returnTask)
   }
 
   const resumeInTerminal = async (name: string, profileId: string | null, command: string): Promise<void> => {
@@ -255,9 +277,19 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
               </Toolbar>
 
               <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+              <Show when={search.workflowReturnRun && search.workflowReturnRecord}>
+                <Show
+                  when={returnTaskAvailable()}
+                  fallback={<Text emphasis="muted">The original task is missing or archived. Its selected record history remains retained on the Node.</Text>}
+                >
+                  <Button size="sm" variant="bare" onPress={returnToRecord}>Back to selected record</Button>
+                </Show>
+              </Show>
               {alerts(current)}
               {childTaskLine()}
-              <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+              <Show when={current().kind !== 'workflow-map'}>
+                <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+              </Show>
 
               <Switch>
                 <Match when={shape() === 'gate'}>
@@ -290,7 +322,20 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 </Match>
 
                 <Match when={shape() === 'other'}>
-                  <Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>
+                  <Show
+                    when={current().kind === 'workflow-map' && model.selectedRunId()}
+                    fallback={<Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>}
+                  >
+                    {(runId) => (
+                      <RunRecords
+                        runId={runId()}
+                        stepId={current().id}
+                        tasks={tasks.data ?? []}
+                        initialRecordId={searchValue(search.workflowRecord)}
+                        onOpen={openTaskTarget}
+                      />
+                    )}
+                  </Show>
                 </Match>
               </Switch>
 

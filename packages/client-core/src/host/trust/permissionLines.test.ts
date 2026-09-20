@@ -11,7 +11,7 @@ const texts = (lines: readonly PermissionLine[]): string[] => lines.map((line) =
 const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
   api: [],
   events: [],
-  node: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
   ...over,
 })
 
@@ -25,11 +25,12 @@ describe('the two permission groups', () => {
     const all = permissions({
       api: ['core.tasks:read'],
       events: ['runtime:task-archived'],
-      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'] },
+      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'], sockets: true },
     })
     expect(texts(nodePermissionLines(all))).toEqual([
       'Use your saved credentials to make requests on its behalf',
       'Run commands on the node',
+      'Open unrestricted network connections',
       'Reach ntfy.sh',
       'Use capability docker.compose',
       '1 node permission request this version of acorn does not recognise (ignored)',
@@ -40,7 +41,7 @@ describe('the two permission groups', () => {
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
     // that is what checkouts() returns (docs/security.md § Rung 1).
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [] } })))).toEqual([
+    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
       'Read projects, including where every codebase lives on disk',
     ])
   })
@@ -53,6 +54,7 @@ describe('the two permission groups', () => {
         secrets: false,
         exec: false,
         net: [],
+        sockets: false,
         env: ['DATABASE_URL'],
         files: [{ env: 'ACORN_NODES_FILE', access: 'read-write' }],
       },
@@ -68,7 +70,7 @@ describe('the two permission groups', () => {
     // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
     // no token, because a plugin measuring its own work reads nobody else's
     // (docs/security.md § Telemetry sinks).
-    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [] } }))
+    const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
     expect(texts(lines)).toEqual([
       'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',
     ])
@@ -76,14 +78,14 @@ describe('the two permission groups', () => {
   })
 
   it('names the executable configuration carried by the config grant', () => {
-    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [] } })))).toEqual([
+    expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
       'Read every project’s build, dev and database scripts',
     ])
   })
 
   it('draws database writes high and keeps reads ordinary', () => {
     const lines = nodePermissionLines(permissions({
-      node: { core: ['data:query', 'data:write'], capabilities: [], secrets: false, exec: false, net: [] },
+      node: { core: ['data:query', 'data:write'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
     }))
     expect(texts(lines)).toEqual([
       'Query the databases you’ve connected',
@@ -132,10 +134,10 @@ describe('the two permission groups', () => {
 
 describe('the update diff', () => {
   it('marks only what is new, so an unchanged set reads as unchanged', () => {
-    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [] } })
+    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })
     const after = permissions({
       api: ['core.tasks:read', 'core.tasks:write'],
-      node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [] },
+      node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [], sockets: false },
     })
     expect(added(before, after, nodePermissionLines)).toEqual(['Run commands on the node'])
     expect(added(before, after, uiPermissionLines)).toEqual(['Create and update tasks'])
@@ -152,7 +154,7 @@ describe('the update diff', () => {
     // every owner of every installed plugin. Same grants, different sentence, nothing new.
     const same = permissions({
       api: ['core.tasks:read'],
-      node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'] },
+      node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'], sockets: false },
     })
     const reworded = (project: (p: NodePluginPermissions) => PermissionLine[]) => (p: NodePluginPermissions) =>
       project(p).map((line) => ({ ...line, text: `SEE: ${line.text}` }))
@@ -177,7 +179,7 @@ describe('the update diff', () => {
     // sentence missed the table as harmless.
     const risky = permissions({
       api: ['core.projects:read'],
-      node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'] },
+      node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'], sockets: false },
     })
     const high = (lines: readonly PermissionLine[]) => lines.filter((line) => line.high).map((line) => line.key)
     expect(high(nodePermissionLines(risky))).toEqual(['node.secrets', 'node.exec', 'node.core:projects:write'])
@@ -189,7 +191,7 @@ describe('the update diff', () => {
   // A permission the plugin gave up is not marked. The prompt asks whether the new reach is
   // acceptable, and a removal is never the thing to hesitate over.
   it('does not mark a permission that was dropped', () => {
-    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [] } })
+    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [], sockets: false } })
     expect(added(before, permissions(), nodePermissionLines)).toEqual([])
   })
 })

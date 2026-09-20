@@ -17,12 +17,14 @@ const LINEAR_GRAPHQL = 'https://api.linear.app/graphql'
 type GraphQLResponse<T> = { data?: T; errors?: { message: string }[] }
 
 // Low-level: returns the raw Response so the route can normalize status (e.g. 401 bad key).
-export const linearFetch = (apiKey: string, query: string, variables: Record<string, unknown>) =>
+export const linearFetch = (apiKey: string, query: string, variables: Record<string, unknown>, signal?: AbortSignal) =>
   fetch(LINEAR_GRAPHQL, {
     method: 'POST',
     headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+      : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
 export const linearError = (res: Response): { error: string; status: 401 | 502 } | null =>

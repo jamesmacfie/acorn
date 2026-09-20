@@ -1,3 +1,4 @@
+import { stepIdentity } from '../../shared/workflowIdentity'
 import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
 import { debounce } from '@acorn/plugin-api/client'
 import { Graph, type GraphCard } from '@acorn/plugin-api/ui'
@@ -33,11 +34,11 @@ export default function GraphView(props: {
   const selected = () => (props.draft.selection.kind === 'node' ? props.draft.selection.name : undefined)
 
   const cards = createMemo<GraphCard[]>(() => order().map((row) => {
-    const kind = def().steps.find((step) => step.name === row.name)?.kind ?? 'agent'
+    const kind = def().steps.find((step) => stepIdentity(step) === row.name)?.kind ?? 'agent'
     const described = describeFor(kind, props.catalog)
     return {
       id: row.name,
-      label: row.name,
+      label: def().steps.find(step => stepIdentity(step) === row.name)?.name ?? row.name,
       detail: described?.label ?? kind,
       glyph: described?.icon,
       selected: row.name === selected(),

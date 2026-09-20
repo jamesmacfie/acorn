@@ -1,7 +1,7 @@
 // Calling one of this node's own plugin routes with no client and no request in sight.
 //
 // Two callers need it: a manifest-declared schedule firing (./scheduleRun.ts) and the measure
-// sampler reading a collection (../collections/registry.ts), and they needed the same six steps, so
+// sampler reading a data source, and they needed the same six steps, so
 // the steps live here once. It dispatches in process rather than over loopback HTTP: the listener is
 // TLS with a self-signed certificate and its origin is a property of the composition root, so a
 // self-call would mean teaching this module about certificates and ports to reach a handler sitting
@@ -16,7 +16,7 @@
 import type { Env } from '../bindings'
 import type { Principal } from '../middleware/auth'
 import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routeRegistry'
-import { buildPluginRequestContext } from './requestContext'
+import { buildPluginRequestContext, type PluginConnectionScope } from './requestContext'
 import { runWithTelemetry, startSpan } from '../telemetry/collector'
 
 /** A base only the URL parser sees. Nothing is sent anywhere, so the origin exists purely to turn a
@@ -54,6 +54,7 @@ export async function dispatchPluginRoute(
   init: PluginDispatchInit,
   signal: AbortSignal,
   originPrincipal?: Principal,
+  connectionScope?: PluginConnectionScope,
 ): Promise<Response> {
   const url = confinePluginPath(pluginId, path)
   const match = resolvePluginFetch(pluginId, url.pathname)
@@ -67,7 +68,7 @@ export async function dispatchPluginRoute(
   if (principal.userId !== userId) throw new Error('plugin dispatch principal does not match the active node identity')
 
   // Mount-relative, exactly as servePluginFetch hands it to an HTTP-served handler. The query string
-  // rides along untouched, which is what makes a declared collection param reach the plugin as the
+  // rides along untouched, which is what makes a declared source parameter reach the plugin as the
   // same string a client would have sent.
   const forwarded = new URL(url)
   forwarded.pathname = url.pathname.slice(match.mount.length) || '/'
@@ -86,7 +87,7 @@ export async function dispatchPluginRoute(
           ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
           signal,
         }),
-        buildPluginRequestContext(env, principal, pluginId),
+        buildPluginRequestContext(env, principal, pluginId, connectionScope),
       ),
     )
     span.end(response.ok ? 'ok' : 'error', { status: response.status })

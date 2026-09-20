@@ -201,6 +201,13 @@ Renderer calls require a device principal. MCP calls require an internal princip
 bound to the task. The Node applies the caller scope, task identity, and the owner's per-tool
 permission preference before executing.
 
+Core contributes four read-only typed-source tools: `data_sources_list`,
+`data_sources_discover`, `data_source_describe`, and `data_source_options`. The Node derives their
+workspace and project scope from the addressed task. Inputs can narrow the connection and source
+parameters, but cannot substitute another task scope. The source runtime performs its normal provider
+authorization and returns descriptors, schemas, or bounded option pages. These tools do not query
+records, return credentials, or mutate provider state.
+
 Permissions have two layers, persisted together as one prefs slice under `agentTools.perms`: a
 **tier** default (`read` / `write` / `execute`) and a **per-tool** override. A per-tool toggle wins
 over its tier. Turning a tier off removes every tool at that risk level from `tools/list` and rejects a

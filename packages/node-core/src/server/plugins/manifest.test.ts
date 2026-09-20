@@ -159,6 +159,13 @@ describe('permission identifier shape', () => {
     expect(permissionManifest({ node: { env: ['DATABASE_*'] } }).success).toBe(false)
     expect(permissionManifest({ node: { files: [{ env: 'nodes_file' }] } }).success).toBe(false)
   })
+
+  it('keeps unrestricted sockets an explicit opt-in', () => {
+    const defaults = permissionManifest({ node: {} })
+    const enabled = permissionManifest({ node: { sockets: true } })
+    expect(defaults.success && defaults.data.permissions.node.sockets).toBe(false)
+    expect(enabled.success && enabled.data.permissions.node.sockets).toBe(true)
+  })
 })
 
 describe('overlay surfaces', () => {
@@ -657,49 +664,13 @@ describe('chrome descriptors', () => {
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
-  it('carries a collection, confines its route and takes an optional static schema', () => {
-    const good = manifest({
-      collections: [{
-        id: 'cards-mine',
-        name: 'My cards',
-        items: '/v2/p/board/collections/cards-mine',
-        refresh: 300,
-        params: [{ id: 'lane', name: 'Lane', type: 'enum', values: ['doing', 'done'] }],
-        schema: {
-          fields: [
-            { id: 'title', name: 'Title', type: 'text', role: 'title' },
-            { id: 'state', name: 'State', type: 'enum', role: 'status', values: [{ id: 'doing', label: 'Doing', tone: 'accent' }] },
-          ],
-        },
-      }],
+  it('refuses the removed collection format with a migration path', () => {
+    const result = parsePluginManifest({
+      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1',
+      contributions: { collections: [{ id: 'old', items: '/v2/p/board/old' }] },
     })
-    expect(good.success).toBe(true)
-    expect(good.success && good.data.contributions.collections[0]?.schema?.fields).toHaveLength(2)
-
-    // A collection with no static schema is the query-shaped case: its columns cannot be known at manifest
-    // time, so the response describes itself instead.
-    expect(manifest({ collections: [{ id: 'q', name: 'Query', items: '/v2/p/board/collections/q' }] }).success).toBe(true)
-
-    // The route is the whole reason confinement exists here: the host fetches it and stamps the answer
-    // with this plugin's id, so an unconfined one is how a plugin would put another's rows on a board
-    // under its own badge.
-    expect(messages(manifest({
-      collections: [{ id: 'c', name: 'C', items: '/v2/p/linear/collections/issues-mine' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
-    expect(messages(manifest({
-      collections: [{ id: 'c', name: 'C', items: '/v2/core/tasks' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
-  })
-
-  it('caps collections at eight and refuses an id another contribution kind already took', () => {
-    const nine = Array.from({ length: 9 }, (_, i) => ({ id: `c${i}`, name: 'C', items: '/v2/p/board/collections/c' }))
-    expect(manifest({ collections: nine }).success).toBe(false)
-    expect(manifest({ collections: nine.slice(0, 8) }).success).toBe(true)
-
-    expect(messages(manifest({
-      frames: [PANE],
-      collections: [{ id: 'board', name: 'Board cards', items: '/v2/p/board/collections/cards' }],
-    }))).toEqual([`duplicate contribution id 'board'`])
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.reason).toContain('Register a Node-owned contributions.dataSources entry')
   })
 
   it('carries a schedule, confines its run route and insists there is a node half to serve it', () => {
@@ -1434,11 +1405,11 @@ describe('extension points', () => {
       .toContain("panels is only valid on a 'pane.aside' extension point")
   })
 
-  it('refuses a region that names collections and a field role at once', () => {
+  it('refuses a region that names sources and a field role at once', () => {
     expect(messages(manifest({
       frames: [PANE],
-      extensionPoints: [point({ location: 'pane.aside', panels: { collections: ['a:b'], fieldRole: 'status' } })],
-    }))).toContain('a panel region names collections or a fieldRole, never both')
+      extensionPoints: [point({ location: 'pane.aside', panels: { sources: ['a:b'], fieldRole: 'status' } })],
+    }))).toContain('a panel region names sources or a fieldRole, never both')
   })
 
   it('refuses a view kind this build has no renderer for', () => {

@@ -1,6 +1,6 @@
 # Slice 07: Query, details, and condition steps
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-14. Status: complete.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./workflow-contract.md) and [verification](./verification.md).
@@ -36,8 +36,25 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented `find-records`, `get-record-details`, and deterministic `if`, with explicit AI decision
+kept separate. The source facade owns schema validation, paging, completeness, and authority.
+The workflow runner persists frozen query resolution before reads and retains it on retry.
+Record references carry host-stamped retrieval scope, which is not part of repeat identity.
+Workspace queries remain usable by project runs without rewriting their authored scope.
+
+Verification on September 14, 2026:
+
+- `rtk pnpm lint`: 33 package checks passed. Existing oxlint warnings and sandbox cache-write warnings remain nonfatal.
+- `rtk pnpm --filter @acorn/plugin-workflows test`: 36 files, 360 tests passed.
+- `rtk pnpm --filter @acorn/protocol test`: 25 files, 173 tests passed, including rolling and daylight-saving calendar windows.
+- `rtk pnpm --filter @acorn/node-core exec vitest run src/server/dataSources/runtime.test.ts src/server/queries/runtime.test.ts`: 25 tests passed. Covers installed dynamic discovery through details, source authority, complete selections, and shared query resolution. The query suite was rerun after adding project consumption of a workspace query; eight tests passed.
+- `rtk pnpm --filter @acorn/node exec vitest run test/integration/plugins/workflowRunner.test.ts`: 24 tests passed. True and false conditions exercise persisted runner branch selection and skipping without a model call.
+- `rtk pnpm --filter @acorn/arch-tests test`: four files, 63 tests passed.
+- Real Tauri session `workflow-v2-phase07`: opened catalog, added Find records, edited its typed query to a valid saved reference, captured and visually inspected `.acorn/agent-dev/workflow-v2-phase07/screenshots/find-records.png`, then stopped the session. Launcher and driver required approved sandbox escalation for local IPC. Source picker and condition-builder UX remain owned by phases 12 and 13.
+
+The structured time helper is reusable by scheduling. Incremental windows and checkpoint advancement
+remain gated to processing-history and schedule implementation. Later history must identify records
+by plugin/source/connection/record ID, excluding the carried retrieval scope.
 
 ## Verify before building
 

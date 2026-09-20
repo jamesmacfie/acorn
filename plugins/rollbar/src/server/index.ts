@@ -15,10 +15,12 @@ const REQUEST_TIMEOUT_MS = 4_000
 
 const BASE = 'https://api.rollbar.com/api/1'
 
-export function rollbarFetch(token: string, path: string): Promise<Response> {
+export function rollbarFetch(token: string, path: string, signal?: AbortSignal): Promise<Response> {
   return fetch(`${BASE}${path}`, {
     headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+      : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 }
 

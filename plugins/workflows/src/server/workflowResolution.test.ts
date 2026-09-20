@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import type { WorkflowDef } from '../shared/workflowContracts'
-import { createDef, getDef, updateDef } from './workflowDefs'
+import { getDef, updateDef } from './workflowDefs'
+import { createPublishedDef as createDef, publishFixtureDef } from '../testkit/publishedDefinition'
 import {
-  assertRuntimeWorkflowDispatchUnavailable,
   resolveScopedWorkflowDefinition,
   resolveWorkflowGraph,
   workflowContentFingerprint,
@@ -22,9 +22,10 @@ const catalog: WorkflowValidationCatalog = {
 }
 
 const leaf = (name = 'child', inputs?: WorkflowDef['inputs']): WorkflowDef => ({
+  formatVersion: 2,
   name,
   inputs,
-  steps: [{ name: 'work', prompt: 'Do it.' }],
+  steps: [{ id: 'work', name: 'work', prompt: 'Do it.' }],
 })
 
 describe('scoped workflow resolution', () => {
@@ -59,17 +60,22 @@ describe('scoped workflow resolution', () => {
     const child = await createDef(store.db, {
       workspaceId: scope.workspaceId,
       projectId: scope.projectId,
-      def: leaf('Review', [{ name: 'ticket', required: true }, { name: 'focus', default: 'tests' }]),
+      def: leaf('Review', [
+        { name: 'ticket', schema: { type: 'string' }, required: true },
+        { name: 'focus', schema: { type: 'string' }, default: 'tests' },
+      ]),
     })
     const root: WorkflowDef = {
+      formatVersion: 2,
       name: 'Parent',
-      inputs: [{ name: 'ticket', required: true }],
+      inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{
+        id: 'review',
         name: 'review',
         kind: 'workflow',
         childWorkflow: {
           ref: { source: 'database', id: child.id },
-          inputs: { ticket: { from: 'input', name: 'ticket' } },
+          inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
         },
       }],
     }
@@ -91,8 +97,8 @@ describe('scoped workflow resolution', () => {
   })
 
   it('resolves repository and user sources without accepting traversal', async () => {
-    writeWorkflow(repoDir, 'review', 'name = "Repo review"\n[[steps]]\nname = "work"\nprompt = "Review."\n')
-    writeWorkflow(userDir, 'personal', 'name = "Personal"\n[[steps]]\nname = "work"\nprompt = "Review."\n')
+    writeWorkflow(repoDir, 'review', 'format_version = 2\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeWorkflow(userDir, 'personal', 'format_version = 2\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
 
     await expect(resolveScopedWorkflowDefinition(
       store.db,
@@ -128,15 +134,18 @@ describe('scoped workflow resolution', () => {
     }
   })
 
-  it('refuses child cycles and definitions deeper than one child level', async () => {
+  it('refuses child cycles and definitions deeper than four child levels', async () => {
     const first = await createDef(store.db, { workspaceId: scope.workspaceId, def: leaf('first') })
     const second = await createDef(store.db, { workspaceId: scope.workspaceId, def: leaf('second') })
     const dispatch = (name: string, id: string): WorkflowDef => ({
+      formatVersion: 2,
       name,
-      steps: [{ name: 'next', kind: 'workflow', childWorkflow: { ref: { source: 'database', id } } }],
+      steps: [{ id: 'next', name: 'next', kind: 'workflow', childWorkflow: { ref: { source: 'database', id } } }],
     })
     await updateDef(store.db, first.id, dispatch('first', second.id), 1)
     await updateDef(store.db, second.id, dispatch('second', first.id), 1)
+    await publishFixtureDef(store.db, first.id)
+    await publishFixtureDef(store.db, second.id)
 
     const firstAfterUpdate = await getDef(store.db, first.id)
     await expect(resolveWorkflowGraph(store.db, firstAfterUpdate!.def, {
@@ -147,33 +156,36 @@ describe('scoped workflow resolution', () => {
       .rejects.toThrow('child workflow cycle')
 
     const leafRow = await createDef(store.db, { workspaceId: scope.workspaceId, def: leaf('leaf') })
-    const nested = await createDef(store.db, { workspaceId: scope.workspaceId, def: dispatch('nested', leafRow.id) })
+    let nested = leafRow
+    for (let depth = 1; depth <= 3; depth++) nested = await createDef(store.db, { workspaceId: scope.workspaceId, def: dispatch(`nested-${depth}`, nested.id) })
+    const graph = await resolveWorkflowGraph(store.db, dispatch('root', nested.id), { scope, catalog })
+    expect(graph.nodes.map(node => node.depth)).toEqual([0, 1, 2, 3, 4])
+    nested = await createDef(store.db, { workspaceId: scope.workspaceId, def: dispatch('too-deep', nested.id) })
     await expect(resolveWorkflowGraph(store.db, dispatch('root', nested.id), { scope, catalog }))
-      .rejects.toThrow('depth exceeds the 1-level limit')
+      .rejects.toThrow('depth exceeds the 4-level limit')
   })
 
   it('refuses undeclared and missing required child inputs before dispatch is available', async () => {
     const child = await createDef(store.db, {
       workspaceId: scope.workspaceId,
-      def: leaf('child', [{ name: 'ticket', required: true }]),
+      def: leaf('child', [{ name: 'ticket', schema: { type: 'string' }, required: true }]),
     })
     const root = (inputs: NonNullable<WorkflowDef['steps'][number]['childWorkflow']>['inputs']): WorkflowDef => ({
+      formatVersion: 2,
       name: 'root',
-      steps: [{ name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: child.id }, inputs } }],
+      steps: [{ id: 'child', name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: child.id }, inputs } }],
     })
 
-    await expect(resolveWorkflowGraph(store.db, root({ extra: { from: 'literal', value: 'x' } }), { scope, catalog }))
+    await expect(resolveWorkflowGraph(store.db, root({ extra: { address: { from: 'literal', value: 'x' } } }), { scope, catalog }))
       .rejects.toThrow("binds undeclared child input 'extra'")
     await expect(resolveWorkflowGraph(store.db, root({}), { scope, catalog }))
       .rejects.toThrow("needs a binding for child input 'ticket'")
     await expect(resolveWorkflowGraph(
       store.db,
-      root({ ticket: { from: 'literal', value: 'ACORN-42' } }),
+      root({ ticket: { address: { from: 'literal', value: 'ACORN-42' } } }),
       { scope, catalog, allowDatabaseDefinitions: false },
     )).rejects.toThrow('task-confined caller')
     expect(await getDef(store.db, child.id)).not.toBeNull()
-    expect(() => assertRuntimeWorkflowDispatchUnavailable(root({ ticket: { from: 'literal', value: 'ACORN-42' } })))
-      .toThrow('not available in this build')
   })
 
   it('fingerprints object keys independently of insertion order', () => {

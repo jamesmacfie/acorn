@@ -1,9 +1,9 @@
 import { getProfile, resolveCommand, type PluginDatabase } from '@acorn/plugin-api/node'
-import { desc, inArray, sum } from 'drizzle-orm'
+import { desc, eq, inArray, isNotNull, or, sum } from 'drizzle-orm'
 import type { WorkflowRunner } from './workflowRunner'
 import type { WorkflowStepProjection } from '../shared/api'
 import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../shared/runStatus'
-import { workflowRuns, workflowSteps, workflowTurnAdmissions } from '../node/schema'
+import { workflowDispatches, workflowRuns, workflowSteps, workflowTurnAdmissions } from '../node/schema'
 
 /** Projects workflow rows into the Node-wide run list without double-counting child usage. */
 export async function workflowRunList(db: PluginDatabase) {
@@ -48,13 +48,52 @@ export async function workflowRunList(db: PluginDatabase) {
   }
 }
 
+/** Compact task-rail aggregate. Task visibility still comes from core; this only describes runs. */
+export async function workflowTaskNavigation(db: PluginDatabase) {
+  const children = await db.select().from(workflowRuns)
+    .where(or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.trigger, 'reprocess')))
+    .orderBy(desc(workflowRuns.updatedAt))
+  const latestByTask = new Map<string, typeof children[number]>()
+  for (const run of children) if (!latestByTask.has(run.taskId)) latestByTask.set(run.taskId, run)
+  const reprocessRuns = [...latestByTask.values()].filter(run => run.trigger === 'reprocess' && !run.parentRunId)
+  const reprocessDispatches = reprocessRuns.length
+    ? await db.select().from(workflowDispatches).where(inArray(workflowDispatches.runId, reprocessRuns.map(run => run.id)))
+    : []
+  const sourceRunIds = reprocessDispatches.map(dispatch => dispatch.parentRunId)
+  const sourceRuns = sourceRunIds.length
+    ? await db.select().from(workflowRuns).where(inArray(workflowRuns.id, sourceRunIds))
+    : []
+  const sourceRootByReprocess = new Map(reprocessDispatches.flatMap(dispatch => {
+    const source = sourceRuns.find(run => run.id === dispatch.parentRunId)
+    return source ? [[dispatch.runId, source.rootRunId ?? source.id] as const] : []
+  }))
+  const ownerRunId = (run: typeof children[number]) => sourceRootByReprocess.get(run.id) ?? run.rootRunId
+  const rootIds = [...new Set([...latestByTask.values()].map(ownerRunId).filter((id): id is string => !!id))]
+  const roots = rootIds.length ? await db.select().from(workflowRuns).where(inArray(workflowRuns.id, rootIds)) : []
+  const rootTaskByRun = new Map(roots.map(run => [run.id, run.taskId]))
+  const groups = new Map<string, { rootTaskId: string; descendants: number; running: number; attention: number }>()
+  for (const run of latestByTask.values()) {
+    const root = ownerRunId(run)
+    const rootTaskId = root ? rootTaskByRun.get(root) : undefined
+    if (!rootTaskId) continue
+    const group = groups.get(rootTaskId) ?? { rootTaskId, descendants: 0, running: 0, attention: 0 }
+    group.descendants += 1
+    if (run.status === 'running' || run.status === 'cancelling') group.running += 1
+    if (run.status === 'gated' || run.status === 'failed' || run.status === 'safety-rail' || run.status === 'completed-with-failures') group.attention += 1
+    groups.set(rootTaskId, group)
+  }
+  return { groups: [...groups.values()] }
+}
+
 /** Adds child relationships and a safe resume command to persisted step rows. */
 export async function workflowStepProjections(
   runner: WorkflowRunner,
   runId: string,
 ): Promise<WorkflowStepProjection[]> {
   return Promise.all((await runner.steps(runId)).map(async (step): Promise<WorkflowStepProjection> => {
-    const children = await runner.childRuns(step.id)
+    // Record loops have their own paged projection. Putting up to 500 child summaries on every step
+    // refresh made the supposedly compact run read eagerly load the entire batch.
+    const children = step.kind === 'workflow-map' ? [] : await runner.childRuns(step.id)
     const projected = { ...step, status: step.status as WorkflowStepProjection['status'], children }
     if (!step.sessionId || !step.profileId || /[^A-Za-z0-9_-]/.test(step.sessionId)) return projected
     const profile = getProfile(step.profileId)

@@ -7,7 +7,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 
 // A panel's recorded measure series, read from the node that stores it (docs/dashboards.md § Trends).
 //
-// Not through the panel's own fan-out, unlike its rows. The fan-out gives a collection read a deadline, a
+// Not through the panel's own fan-out, unlike its rows. The fan-out gives a source read a deadline, a
 // cache fallback and the live/stale/offline vocabulary, because those rows are what the panel is. A
 // history series is a decoration on a number that has already rendered, so a node that can't answer for
 // it simply draws no sparkline, and there's nothing here to badge stale.

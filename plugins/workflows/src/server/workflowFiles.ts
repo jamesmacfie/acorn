@@ -4,7 +4,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { z } from 'zod'
-import { agentProfileRegistry } from '@acorn/plugin-api/node'
+import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { agentProfileRegistry, resolveInRoot } from '@acorn/plugin-api/node'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import type {
   ChildWorkflowConfig,
@@ -36,6 +37,10 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
 type RawWorkflow = {
+  maxDescendants?: number
+  maxConcurrency?: number
+  formatVersion: 2
+  outputs?: WorkflowDef['outputs']
   id: string
   name: string
   posture?: 'gated' | 'autonomous'
@@ -90,9 +95,11 @@ function parseInputs(value: unknown): WorkflowInput[] | undefined {
     if (!name) return []
     return [{
       name,
+      ...(typeof raw.connection_json === 'string' ? { connection: JSON.parse(raw.connection_json) } : {}),
+      label: str(raw.label),
+      ...(typeof raw.schema_json === 'string' ? { schema: JSON.parse(raw.schema_json), ...(typeof raw.default_json === 'string' ? { default: JSON.parse(raw.default_json) } : {}) } : { default: str(raw.default) }),
       description: str(raw.description),
       ...(raw.required === true ? { required: true } : {}),
-      default: str(raw.default),
     }]
   })
   return inputs.length ? inputs : undefined
@@ -109,7 +116,8 @@ function parseBinding(value: unknown): WorkflowValueBinding {
   const raw = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
-  return raw as WorkflowValueBinding
+  if (typeof raw.binding_json !== 'string') throw new Error('Workflow bindings require binding_json with a typed address')
+  return dataBindingSchema.parse(JSON.parse(raw.binding_json))
 }
 
 function parseBindings(value: unknown): Record<string, WorkflowValueBinding> | undefined {
@@ -148,6 +156,11 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const workflowRef = str(o.workflow)
   const kind = str(o.kind) ?? 'agent'
   const name = str(o.name) ?? (workflowRef ? `→ ${workflowRef}` : `step-${i + 1}`)
+  const stepId = str(o.id)
+  if (!stepId) {
+    errors.push({ source, message: `${id}: step '${name}' needs an id. Add format_version = 2 and a stable id to every [[steps]] table.` })
+    return null
+  }
   let schema: object | undefined
   const schemaJson = str(o.schema_json)
   if (schemaJson) {
@@ -160,21 +173,23 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
       return null
     }
   }
-  const childRaw = o.child_step
-  const child =
-    childRaw && typeof childRaw === 'object'
-      ? {
-          name: str((childRaw as Record<string, unknown>).name),
-          profileId: str((childRaw as Record<string, unknown>).profile),
-          model: str((childRaw as Record<string, unknown>).model),
-          prompt: str((childRaw as Record<string, unknown>).prompt),
-          tools: parseTools((childRaw as Record<string, unknown>).tools),
-          budget: parseBudget((childRaw as Record<string, unknown>).budget),
-        }
-      : undefined
   const isolation = str(o.isolation)
   const inputsMode = str(o.inputs)
+  const dataFields: Partial<WorkflowStepDef> = {}
+  if (Array.isArray(o.projection) && o.projection.every(value => typeof value === 'string')) dataFields.projection = o.projection
+  if (o.repeat && typeof o.repeat === 'object') dataFields.repeat = o.repeat as WorkflowStepDef['repeat']
+  if (typeof o.incremental === 'boolean') dataFields.incremental = o.incremental
+  try {
+    for (const key of ['query', 'record', 'condition'] as const) {
+      if (typeof o[`${key}_json`] === 'string') Object.assign(dataFields, { [key]: JSON.parse(o[`${key}_json`] as string) })
+    }
+  } catch {
+    errors.push({ source, message: `${id}: step '${name}' has invalid data configuration JSON` })
+    return null
+  }
   return {
+    ...dataFields,
+    id: stepId,
     name,
     kind,
     after: parseAfter(o.after),
@@ -188,12 +203,10 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     policy: str(o.policy),
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
-    childStep: child,
     childWorkflow: parseChildWorkflow(o.child_workflow),
     items: parseMapSource(o.items),
     itemKey: typeof o.item_key === 'string' ? o.item_key : undefined,
     title: parseTitle(o.title),
-    joins: str(o.joins),
     branches: parseBranches(o.branches),
     // Passed through unread: `[steps.with]` belongs to whichever plugin contributed the kind.
     with: o.with && typeof o.with === 'object' && !Array.isArray(o.with) ? (o.with as Record<string, unknown>) : undefined,
@@ -211,7 +224,12 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     errors.push({ source: `${source}:${id}`, message: e instanceof Error ? e.message : 'invalid TOML' })
     return null
   }
+  try {
   const rawSteps = Array.isArray(doc.steps) ? doc.steps : []
+  if (doc.format_version !== 2) {
+    errors.push({ source: `${source}:${id}`, message: 'Unsupported workflow format. Add format_version = 2, a stable id to every [[steps]] table, and typed bindings before loading this workflow.' })
+    return null
+  }
   if (!rawSteps.length) {
     errors.push({ source: `${source}:${id}`, message: `${id}: no [[steps]] declared` })
     return null
@@ -220,6 +238,10 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
   if (steps.length !== rawSteps.length) return null
   const posture = str(doc.posture)
   return {
+    formatVersion: 2,
+    maxDescendants: doc.max_descendants as number | undefined,
+    maxConcurrency: doc.max_concurrency as number | undefined,
+    outputs: typeof doc.outputs_json === 'string' ? JSON.parse(doc.outputs_json) : undefined,
     id,
     name: str(doc.name) ?? id,
     posture: posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
@@ -229,6 +251,10 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     inputs: parseInputs(doc.inputs),
     steps,
     source,
+  }
+  } catch (error) {
+    errors.push({ source: `${source}:${id}`, message: `Invalid typed workflow value: ${error instanceof Error ? error.message : String(error)}` })
+    return null
   }
 }
 
@@ -257,23 +283,27 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
       const inner = expand(target, [...chain, step.workflowRef])
       if (!inner) return null
       const prefix = `${step.workflowRef}:`
-      const prefixBinding = (binding: WorkflowValueBinding): WorkflowValueBinding =>
-        binding.from === 'step' ? { ...binding, step: `${prefix}${binding.step}` } : binding
+      const prefixBinding = (binding: WorkflowValueBinding): WorkflowValueBinding => {
+        const typed = dataBindingSchema.parse(binding)
+        return {
+          ...typed,
+          address: typed.address.from === 'step'
+            ? { ...typed.address, stepId: `${prefix}${typed.address.stepId}` }
+            : typed.address,
+        }
+      }
       const prefixBindings = (bindings: Record<string, WorkflowValueBinding> | undefined) =>
         bindings ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, prefixBinding(binding)])) : undefined
       steps.push(
         ...inner.map((s) => ({
           ...s,
+          id: `${prefix}${s.id}`,
           name: `${prefix}${s.name}`,
           // An absent `after` still means "the step declared before me", which after a linear
           // expansion is the previous inner step, or the step before the reference for the first one.
           after: s.after?.map((name) => `${prefix}${name}`),
-          joins: s.joins ? `${prefix}${s.joins}` : undefined,
           branches: s.branches ? Object.fromEntries(Object.entries(s.branches).map(([verdict, targetName]) => [verdict, `${prefix}${targetName}`])) : undefined,
           prompt: s.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`),
-          childStep: s.childStep
-            ? { ...s.childStep, prompt: s.childStep.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`) }
-            : undefined,
           childWorkflow: s.childWorkflow
             ? { ...s.childWorkflow, inputs: prefixBindings(s.childWorkflow.inputs) }
             : undefined,
@@ -291,6 +321,10 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
     const steps = expand(w, [w.id])
     if (steps) {
       const workflow = {
+        formatVersion: w.formatVersion,
+        maxDescendants: w.maxDescendants,
+        maxConcurrency: w.maxConcurrency,
+        outputs: w.outputs,
         id: w.id,
         name: w.name,
         posture: w.posture,
@@ -326,7 +360,9 @@ export function loadWorkflowFiles(
       if (!entry.endsWith('.toml')) continue
       const id = entry.slice(0, -5)
       try {
-        const parsed = parseWorkflowToml(readFileSync(join(dir, entry), 'utf8'), id, source, errors)
+        const path = resolveInRoot(base, `.acorn/workflows/${entry}`)
+        if (!path) throw new Error('Workflow file is outside the allowed root')
+        const parsed = parseWorkflowToml(readFileSync(path, 'utf8'), id, source, errors)
         // repo layer scans first and wins; the user layer only fills gaps.
         if (parsed && !raw.has(id)) raw.set(id, parsed)
       } catch (e) {

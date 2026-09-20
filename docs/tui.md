@@ -165,12 +165,13 @@ shell read a cache nothing persisted and nothing invalidated: a task created by 
 window moved nothing on screen until a restart. Nothing on any host may add a second client
 ([caching.md](./caching.md) § Renderer query cache).
 
-**The roster loads after the first frame.** `apps/tui/src/roster.ts` holds the twelve client plugins and
-`main.tsx` imports it on the renderer's first `frame` event. Registering late is safe because every
-contribution registry is a Solid signal, so the chrome draws and the rail, the pane strip and the
-palette fill from the same reactivity that already handles a loaded plugin arriving from a node seconds
-later. What must not move behind the frame is the four host seams in `App.tsx` — the layout table above
-all, which a pane needs before it can draw at all.
+**The roster and loaded-plugin worker factory load after the first frame.** `apps/tui/src/roster.ts`
+holds the twelve client plugins. `main.tsx` imports it and the Node worker factory on the renderer's
+first `frame` event, then installs the factory before starting the loaded-plugin watcher. Registering
+late is safe because every contribution registry is a Solid signal. The chrome draws first, then the
+rail, pane strip, and palette fill through the same reactivity that handles a plugin arriving from a
+Node later. The four host seams in `App.tsx`, especially the layout table, must remain eager because a
+pane needs them before it can draw.
 
 | Group | What the TUI installs |
 | --- | --- |

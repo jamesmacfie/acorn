@@ -33,6 +33,10 @@ const task = (id: string, title: string, parentId: string | null = null): Task =
   sort: 0,
   links: [],
 })
+const workflowTask = (id: string, title: string, parentId: string): Task => ({
+  ...task(id, title, parentId),
+  origin: 'workflows:child',
+})
 
 const prefetched: string[] = []
 const pane = (over: Partial<PaneContribution> = {}): PaneContribution => ({
@@ -182,9 +186,46 @@ describe('dragging a task row', () => {
     expect(host.querySelector('[data-drop-position]')).toBeNull()
     expect(taskLabels()).toEqual(['Parent', 'Child', 'Other'])
   })
+
+  it('reorders visible roots without dropping a collapsed workflow descendant from the saved order', async () => {
+    const rows = mount([
+      task('workflow-root', 'Workflow root'),
+      workflowTask('workflow-child', 'Workflow child', 'workflow-root'),
+      task('manual-root', 'Manual root'),
+    ])
+    expect(taskLabels()).toEqual(['Workflow root', 'Manual root'])
+    vi.spyOn(rows[1]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
+    pointAt(rows[1]!)
+
+    dispatchMouse(rows[0]!, 'mousedown', 10)
+    dispatchMouse(rows[0]!, 'mousemove', 40)
+    dispatchMouse(rows[0]!, 'mouseup', 40)
+
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Manual root', 'Workflow root']))
+    host.querySelector<HTMLButtonElement>('.tabrail-task-disclosure')!.click()
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Manual root', 'Workflow root', 'Workflow child']))
+  })
 })
 
 describe('task lineage in the core rail fallback', () => {
+  it('collapses workflow descendants, reveals the selected ancestor path, and expands on demand', async () => {
+    mount([
+      task('root', 'Root'),
+      workflowTask('one', 'One', 'root'),
+      workflowTask('nested', 'Nested', 'one'),
+      workflowTask('two', 'Two', 'root'),
+    ])
+    expect(taskLabels()).toEqual(['Root'])
+    expect(host.querySelector<HTMLButtonElement>('.tabrail-task-disclosure')?.textContent).toContain('3')
+
+    host.querySelector<HTMLButtonElement>('.tabrail-task-disclosure')!.click()
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Root', 'One', 'Nested', 'Two']))
+
+    host.querySelector<HTMLButtonElement>('.tabrail-task-disclosure')!.click()
+    setActiveTaskId('nested')
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Root', 'One', 'Nested']))
+  })
+
   it('indents a child under its parent and keeps the child selectable', () => {
     mount([
       task('child', 'Child', 'parent'),

@@ -41,6 +41,7 @@ const isReactiveRuntime = (id: string) =>
 // and the list there have to say the same thing.
 const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
   || id.startsWith('@acorn/plugin-api/ui')
+  || id === '@acorn/client-core/features/dataSources/kit.ts'
   || id === '@codemirror/theme-one-dark'
   || id.startsWith('@codemirror/lang-') || id.startsWith('@codemirror/legacy-modes')
   || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
@@ -56,6 +57,8 @@ export default defineConfig({
     // `solid-js/dist/solid.js` again, forever.
     alias: [
       { find: /^@acorn\/plugin-api\/ui$/, replacement: resolve(import.meta.dirname, 'src/kit/ui.ts') },
+      { find: /^@acorn\/plugin-api\/ui\/data-sources$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts') },
+      { find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts') },
       // …and the host's own surfaces beside it. `ui/host` is the palette chrome, the drawer, the
       // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
       // portals and `<ul>`s (src/kit/host.tsx).
@@ -136,7 +139,19 @@ export default defineConfig({
         pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
       external: (id: string) => externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
-      output: { format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js' },
+      output: {
+        format: 'es',
+        entryFileNames: '[name].js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        // Plugin manifests are parsed before the first frame, but query execution is lazy. Keep the
+        // tiny manifest carrier from being coalesced into the much larger data-query chunk merely
+        // because both lazy editors also consume it.
+        manualChunks: (id: string) => {
+          if (id.endsWith('/packages/protocol/src/dataSourceContributions.ts')) return 'data-source-contributions'
+          if (id.endsWith('/packages/protocol/src/dashboardViews.ts')) return 'dashboard-views'
+          return undefined
+        },
+      },
     },
   },
 })

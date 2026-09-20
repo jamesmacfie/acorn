@@ -70,7 +70,7 @@ express).
 
 ## The contribution points catalogue
 
-One page per contribution key. Nineteen keys, grouped in the sidebar by what they extend:
+One page per contribution key, grouped in the sidebar by what it extends:
 
 - **Surfaces**: `frames` (32; the surfaces a plugin draws — `pane`, `refPanel`, `settings`,
   `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, `refPanel` or `settings` names a host-owned
@@ -81,9 +81,10 @@ One page per contribution key. Nineteen keys, grouped in the sidebar by what the
   (32), `palette` (32; the legacy verb-union rows), `contextMenus` (8; host-drawn rows gated by
   a closed `when` vocabulary), `contentLinks` (16; host-linkified URL patterns), `themes` (8;
   validated token maps — no plugin CSS reaches the shell).
-- **Data and dashboards**: `collections` (8; typed record sets the host draws), `attention`
-  (4; inbox rows), `nodeStats` (4; one number on a node card), `agentContexts` (4; composer
-  context entries), `refResolvers` (4; batch identifier enrichment).
+- **Data and dashboards**: `dataSources` (32; Node-owned typed record sources),
+  `dataSourceDiscoveries` (8; bounded dynamic source catalogues), `attention` (4; inbox rows),
+  `nodeStats` (4; one number on a node card), `agentContexts` (4; composer context entries), and
+  `refResolvers` (4; batch identifier enrichment).
 - **Node-side work**: `schedules` (4; periodic node work, 300-second floor), `taskChecks` (4;
   pre-archive checks with optional apply).
 - **Cross-plugin**: `extensionPoints` (4; this plugin opening a region of its own surface) and
@@ -101,7 +102,7 @@ panes) rather than re-explaining the feature.
 From `docs/plugin-authoring.md` § the node half, backed by
 `packages/node-core/src/server/pluginHost/types.ts`. The page documents the `NodePlugin` lifecycle
 (`init`, `ready`, `dispose`) and each `NodePluginContext` facet in reference style: `routes`,
-`tools`, `schedules`, `collections`, `taskChecks`, `contextSections`, `providers`, `capabilities`,
+`tools`, `schedules`, `dataSources`, `taskChecks`, `contextSections`, `providers`, `capabilities`,
 `storage`, `core` (the confined filesystem, git, process broker, and secrets services), `events`.
 Node actions and harnesses are manifest-only and have no facet.
 

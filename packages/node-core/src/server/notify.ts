@@ -4,7 +4,7 @@ import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 
-// "Re-read this plugin's chrome descriptors": rail rows, badges, collections, agent context. One
+// "Re-read this plugin's chrome descriptors": rail rows, badges, sources, agent context. One
 // client-side consumer, `client-core/host/chrome/chromeData.ts`, and nothing else hears it.
 //
 // The plugin id is the whole point of the argument. Without it every ping refetched every plugin's

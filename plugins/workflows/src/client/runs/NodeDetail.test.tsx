@@ -19,7 +19,7 @@ vi.mock('@acorn/plugin-terminal/contract/sessionsClient.ts', () => ({
 }))
 // The detail's one router call, for the link to a child task's own task. A `Route` around the
 // component would make every assertion below wait a tick for nothing.
-vi.mock('@solidjs/router', () => ({ useNavigate: () => vi.fn() }))
+vi.mock('@solidjs/router', () => ({ useNavigate: () => vi.fn(), useSearchParams: () => [{}, vi.fn()] }))
 
 const { default: NodeDetail } = await import('./NodeDetail')
 

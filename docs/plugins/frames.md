@@ -215,9 +215,9 @@ and both routes are confined to the plugin's own namespace at parse time and aga
 
 The host owns the document editor and maps text onto its desktop or terminal implementation.
 A document region does not expose editor internals to the plugin. Use remote trees for shared UI,
-collections for host-owned record views, and frames for browser-specific rendering.
-For editor behavior, see [Editor](../editor.md). For collection contracts, see
-[Dashboards](../dashboards.md).
+data sources for host-owned record views, and frames for browser-specific rendering.
+For editor behavior, see [Editor](../editor.md). For source contracts, see
+[Typed data sources](../data-sources.md).
 
 Because a pane with no `frame` region runs no plugin code on the device, it is gated like a **descriptor**
 rather than like a frame: no bytes execute, so there is nothing for a bytes-hash trust prompt to be
