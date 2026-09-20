@@ -85,6 +85,18 @@ export function clearSessions(): void {
 
 export const requestTerminalFocus = (taskId: string, sessionId: string): void => requestTerminalFocusIntent(taskId, sessionId)
 
+// The setup script runs as an ordinary terminal session under this title (the terminal plugin's
+// `maybeRunSetup`). Duplicated as a literal for the same reason the route above is: client-core is a
+// shared library and may not import a plugin.
+const SETUP_SESSION_TITLE = 'Setup'
+
+// "This task's worktree is still being prepared." Core's sentence rather than the terminal plugin's,
+// because the rail draws it as a lifecycle state under the task glyph, opposite archiving
+// (tasks/railStatus.ts).
+export function isSettingUp(taskId: string): boolean {
+  return sessions().some((s) => s.taskId === taskId && s.title === SETUP_SESSION_TITLE && s.status === 'running')
+}
+
 // Target-picker data for sendToAgent: the task's running agent sessions, most-recent first (the
 // default target), each with its idle dot.
 export function agentSessionsFor(taskId: string | null): TerminalSession[] {

@@ -1,4 +1,5 @@
-/* Workspace tab rail: far-left full-height column. Square tabs with no radius, matching panes, and a
+/* Workspace tab rail: far-left column, starting under the top bar so it begins on the same line as
+   the panes and the pane switcher (styles/shell.css). Square tabs with no radius, matching panes, and a
    bottom-pinned "+". The glyph popover anchors to the active tab. */
 .tabrail {
   flex: none;
@@ -67,7 +68,7 @@
 
 .tabrail-tab {
   width: 100%;
-  height: 52px;
+  height: var(--pane-head-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +93,7 @@
 .tabrail-tab[data-tone="danger"]:hover { color: var(--del-marker); }
 .tabrail-tab[data-tone="warn"]:hover { color: var(--warn); }
 
-/* The bottom-pinned action on either rail: the left "+" and the right "close task". Same 52px box
+/* The bottom-pinned action on either rail: the left "+" and the right "close task". Same square box
    as everything above it, with the divider moved to the top edge. */
 .tabrail-tab.tabrail-bottom {
   flex: none;

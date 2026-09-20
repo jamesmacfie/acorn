@@ -114,6 +114,16 @@ declared quirks. Everything downstream is shared, including the normalizer, the 
 the transcript, and permission plumbing. This is the default path for a new agent and the only path a
 loaded plugin can reach.
 
+**Picking a session back up is read off the wire, not declared.** The protocol has two ways back into a
+session the agent still holds, and they are different calls: `session/load` replays the history the
+agent kept, and `session/resume` restores the context and sends nothing back. An agent advertises
+whichever it implements at `initialize`, Claude Code the first and DeepSeek the second, so the driver
+takes it from there and a harness declares nothing. Reading only the older capability is what used to
+put a brand-new agent under an unchanged transcript on every reconnect, silently. Either call can also
+answer that it has never heard of the reference, which is an ordinary outcome for a moved checkout or a
+pruned store: the driver starts a fresh session and says so in the transcript. The
+`sessionPersistence` quirk is now about the terminal handoff alone.
+
 **Tier 2 is a native driver, first-party only, for what ACP cannot say.** Codex is the reason it
 exists. Its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
 `thread/delete`, and Codex-specific per-turn model, effort, permission, and collaboration-mode
@@ -180,6 +190,15 @@ owner's tier and per-tool preferences narrowed by the step's own ceiling, so thi
 gate to match acorn's rather than replacing it. `aiArgv` keeps `dontAsk`, because it passes
 `--tools ''`: with nothing to approve, denying whatever tries anyway is the point.
 
+**A harness may answer one question without holding a conversation.** The manifest's `oneShot` block
+sits beside `terminal` rather than inside it, so an agent with no interactive command-line interface
+still reaches every Generate control. DeepSeek is that case: `dsh --profile headless` answers a prompt
+and exits, and `dsh` alone prints a usage error. Such a harness still gets a profile row, because a
+Generate backend is read off the profile registry, and the row carries `interactive: false` so the
+terminal's profile menu leaves it out and the spawn route refuses it by name. One binary per harness
+either way: `oneShot.command` exists for a harness with no `terminal` to borrow one from, and declaring
+both is refused, because "is this installed" is a single lookup on `PATH`.
+
 **`aiArgv` is the one-shot text mode, and declaring it is the whole opt-in.** A profile that returns
 an argv from it can answer one prompt with its tools off, and that makes it two things at once: a
 profile a workflow `decide` step may name, and a backend every Generate control in acorn lists beside
@@ -224,13 +243,24 @@ declared read ceiling, and the provider's native invocation prevents file writes
 and ceiling escape. A prompt that asks the model to be read-only is not evidence. A provider without
 that conformance is shown as unavailable for the preset instead of being allowed by convention.
 
+**A contributed harness reaches acorn's own tools through the protocol.** ACP carries MCP declarations
+on `session/new` and on the call that picks a session back up, so the driver names acorn's server there
+for any harness that has no `mcp add` command of its own to register through. Claude Code and Codex
+keep the config-file door they already had, and a harness gets one door, never both.
+[mcp.md](./mcp.md) § Configuration owns this, including why the launch environment is spelled out
+rather than inherited.
+
 **What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
-answers no to `fs`, `terminal`, and `mcpServers` at `initialize`. Each is worth adopting on its own
+answers no to `fs` and `terminal` at `initialize`. `mcpServers`, the client capability, stays declined
+too, and it is a different thing from the declarations above: it would have the agent ask acorn to
+proxy an MCP server on its behalf, rather than connect to one acorn named. Each is worth adopting on its own
 merits and none of them blocks, or is blocked by, harness contributions. `fs` would make the agent ask
 acorn to read and write files, which is one audit point and the precondition for the agent and the
 worktree living on different machines. `terminal` would put agent-run commands through acorn's process
-lifecycle and into the task's terminal surfaces. `mcpServers` would replace per-CLI config-file
-registration with per-session MCP carrying the task-scoped internal token.
+lifecycle and into the task's terminal surfaces. The `mcpServers` client capability would let an agent
+hand acorn a server of its own to run and proxy, which is a different consent question from acorn
+naming its own; replacing config-file registration was the other half of that idea, and that half
+shipped through the session declarations above.
 
 **Form elicitation is declared, and it is what lets an agent ask a question at all.** Declining it is
 not neutral: Claude Code's adapter puts its own `AskUserQuestion` tool in `disallowedTools` whenever
@@ -256,7 +286,8 @@ answering each with `cancel` and recording a `request_resolved`, which is what r
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
-are not stored by the model-provider plugin. Plan usage is per harness: the built-in CLI probes and a
+are not stored by the model-provider plugin. The same pricing page holds the built-in Claude and Codex
+catalogues plus exact-model overrides. Plan usage is per harness: the built-in CLI probes and a
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
@@ -300,7 +331,7 @@ rather than a fixed set of columns with gaps in it.
 | Live file changes | yes, the diff on the tool call | yes, the child's own patch updates |
 | Live usage | no | the child's own `thread/tokenUsage/updated` |
 | At completion | `_meta.claudeCode.toolResponse`: agent id, type, model, tokens, tool uses, duration | nothing extra |
-| Terminal state | completed | idle, and still resumable |
+| Terminal state | completed, unless backgrounded (see below) | idle, and still resumable |
 
 Reading Claude's `_meta.claudeCode` namespace in the shared ACP normalizer is deliberate rather than a
 harness quirk: another harness's namespace is simply absent, so the branch costs nothing, and a quirk
@@ -313,6 +344,44 @@ and the adapter forwards the ping as a `tool_call_update` under an id it made up
 normalizer recognises it. Reading a ping as a call mints a new card every 30 seconds, and when the tool
 is `Agent` it mints a subagent row keyed on an id that never appears again, so the completion lands on
 the real call and the row sits at "Working" for good.
+
+A backgrounded Claude subagent needs a second exception, for the same reason the heartbeat does: the
+spawning `Agent` call does not mean what it looks like. When the CLI runs a child with
+`run_in_background: true`, the call returns the instant the child launches, so its `toolResponse`
+arrives at the start with `status: "async_launched"` and the call's own status then goes `completed`,
+all while the child is only getting started. Its inner tool calls stream on for as long as it runs.
+Reading that first summary as a finish, or the spawning call's `completed` as the child's, marks the
+row done before it has done anything. So `async_launched` folds to `running` and sets the roster
+entry's `background` flag, and a background entry is settled only by a real completion summary, the one
+update that carries the harness handle. A terminal status with no agent id on it is the launch receipt
+and leaves the row running. The parent session still reads as ready meanwhile, by the rule above: a
+backgrounded child is precisely a child that outlives its parent's turn.
+
+That last point has a tail, and it is where a background child's status actually comes from. The
+completion summary that would settle the row never arrives: the spawning call files a launch receipt
+and then says nothing about that child again. What does arrive is the child's own work. Its tool calls
+stream on for as long as it runs, each tagged with `parentToolUseId`, so that traffic is the only
+honest report that it is still going.
+
+So the roster reads liveness from traffic. Any event the harness attributed to a child marks that
+child heard from, which is what `touchSubagentRoster` in `stateMachine.ts` does, and `updatedAt`
+becomes the clock. The end is then inferred from silence, because nothing else can infer it: a quiet
+window with no traffic in it settles the row to `idle`, meaning detached and resumable by its
+`providerAgentRef` rather than spinning or falsely "completed". Traffic after that revives the row,
+since quieting was a guess and a child that speaks again has disproved it. A real completion summary,
+if one ever comes, still folds the row on to `completed`.
+
+The sweep is a debounced timer per session in `runtimeEngine.ts`, pushed back by every event that
+touches a roster row, and re-armed on boot for any session the previous process left with an active
+child. The window is `SUBAGENT_QUIET_MS`, a minute. That number is measured, not guessed: in a
+captured Claude Code run on Sonnet the longest pause between two events from a child that was still
+working was 16 seconds.
+
+Do not tie any of this to turn boundaries. The end of a turn says nothing about a child that was
+backgrounded precisely so it could outlive one. An earlier version quieted every active child on
+`turn_completed`, and in a captured run that marked a child `idle` while it had 70 more tool calls to
+stream, then left the next child spinning for good because it was spawned after the last turn had
+already ended and no second `turn_completed` was ever coming.
 
 Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
 `turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's
@@ -366,6 +435,98 @@ rows still being created. The child inherits the intersection of the parent's si
 and any narrower ceiling requested at spawn. General session configuration updates cannot widen or
 remove that persisted ceiling.
 
+## Web activity
+
+A reader should be able to answer, from the transcript alone, what an agent searched for, which pages
+it opened, and which sources came back. Both built-in harnesses report all three. Neither reported any
+of it to a reader, for different reasons: the Codex normalizer mapped a `webSearch` item to an id, a
+title and a status and threw the rest away before the event was recorded, and the ACP path kept
+Claude's request but showed it as pretty-printed JSON under a title the adapter had written.
+
+The fix is one optional field on the tool call rather than an event type of its own. A web search has
+the same identity and the same lifecycle as any other tool call, so a parallel kind would duplicate
+status, output, subagent ownership, folding, the extension point and the search index:
+
+```ts
+type AgentWebAction =
+  | { type: 'search'; queries: string[]; allowedDomains?: string[]; blockedDomains?: string[] }
+  | { type: 'open_page'; url?: string }
+  | { type: 'find_in_page'; url?: string; pattern?: string }
+  | { type: 'fetch_page'; url?: string; prompt?: string }
+  | { type: 'other' }
+
+type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[] }
+type AgentToolCall = { /* … */ web?: AgentWebActivity }
+```
+
+The names are Acorn's, not any provider's. Both fields are optional because a provider reports the
+request and the sources on different updates, so absent has to mean unchanged, the same convention
+`AgentToolCall.status` follows. `input` and `output` stay filled in beside it: the structured payload
+drives the card and the index, and the generic text is what a renderer that has never heard of the
+field still has to draw.
+
+**Each driver owns its own mapping, and nothing downstream knows which executable ran.** The Codex
+normalizer reads `item.type === 'webSearch'`. The ACP normalizer reads `_meta.claudeCode.toolName`,
+never ACP's `kind`, because Claude's `WebSearch` and `WebFetch` both arrive as `fetch` and another
+harness may well call a repository grep `search`. An ACP harness whose tool identity the driver does
+not recognize keeps the generic card. A new harness earns the card by mapping its own confirmed wire
+shape to `AgentWebActivity` and nothing else.
+
+**The row is named after the action, not by the provider.** `Search web`, `Open page`, `Find on page`,
+`Fetch page`, `Web activity` for an action a provider declined to name, and `Web search` for a call
+that has not said yet. The table is in `plugins/agents/src/server/drivers/webActivity.ts`, shared
+between the drivers so that a second one does not import the first. Claude Code's adapter titles a
+search `"the query" (allowed: docs.example)`; that title no longer reaches a transcript, because the
+query can be a paragraph and the title is what a reader scans by. The query goes in the fold's summary
+slot beside the title instead.
+
+What the two providers actually send is checked in, sanitized, under
+`plugins/agents/src/server/drivers/__fixtures__`. Two things in those captures contradicted the plan
+this work was written from, which is why they are the authority:
+
+- Codex sends nothing on `item/started`. The query is the empty string and both the action and the
+  results are null, so the start event carries no payload at all and the fold is what puts the call
+  back together. The same model reading a page reported it once as `openPage` and once as `other`.
+- Claude Code does forward structured results, on `_meta.claudeCode.toolResponse.results`, whose
+  object entries hold `content` arrays of title and URL with the model's prose as a sibling string.
+  So a Claude card shows the same list of sources a Codex card does. The adapter also converts
+  recognized result blocks to `Title (url)` text in other paths; that format belongs to the adapter
+  and is never parsed back.
+
+Claude reports no domain for a result and Codex does. The card reads the host off the URL when the
+field is absent rather than storing a derived one, so the two read the same without the ledger
+carrying a second thing to keep true.
+
+**The payload is bounded twice before it reaches SQLite**, in `boundProviderEvent.ts`: every string
+and collection on its own, and then the whole payload against the 64 KiB the inline tool budget uses.
+Overflow drops trailing sources and only that. The per-field limits are chosen so the action fits
+inside the budget by itself, which is what lets that trim finish and what keeps the one field that
+explains the call. Oversized web data is not promoted to an artifact the way command output and
+patches are: a reader wants those in full, and the fortieth search result is not that.
+
+**Only `http:` and `https:` URLs become links.** The card parses with `URL` and checks the protocol.
+Anything else stays visible as text, so a reader can see what the provider tried, and no result can
+become a `javascript:`, `data:`, `file:` or Acorn deep link. Scheme is a rendering decision, so the
+bounds layer stores a hostile URL whole rather than truncating it into something that no longer looks
+like what it is.
+
+Queries and result metadata join `agentEventSearchText()`, so Agent Center finds a run by what it
+searched for, by a result title, domain, URL fragment or snippet. Bounds run before the index string
+is built. Nothing about a web call reaches telemetry, lifecycle events, session rows or notification
+text: a query is written from task context and can hold anything that context held.
+
+One card is drawn for both hosts by `plugins/agents/src/client/sessions/webToolCard.tsx`, selected by
+the presence of `tool.web` and wrapped by the same `agents:tool-card` slot as the generic one, so a
+contributed renderer still wins. It uses kit nodes only. In a terminal a focused result link prints
+its address on the line below, which is what that host does with every address it cannot open.
+
+No migration and no schema-version bump: the field is additive and optional, readers already tolerate
+an absent optional tool field, and `agent_events.search_text` accepts the longer string for rows
+inserted from here on. Codex rows recorded before this change hold no query, because normalization
+discarded it, and they keep rendering as the flat `Web search` row they always did. Codex rollout
+files may still hold the payload, but they are private provider storage that can be pruned or live on
+another node, so a transcript read never touches `~/.codex` or `~/.claude`.
+
 ## Client surfaces
 
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
@@ -383,6 +544,15 @@ transcript is a `Timeline` with `follow` set, which means the kit owns the scrol
 newest turn until the reader scrolls away from it, picks the bottom up again when they scroll back,
 and gives a reader the place they left when they come back to a session. The bar above it and the
 composer below it are pinned by being that scroller's siblings.
+
+Immediately after the title, the header hosts the `agents:session-header` remote `stack` point. Its
+props are a public projection rather than the ledger itself: task and session ids, provider id,
+per-turn usage and resolved prices, and explicit token/cost accounting modes. The owner stops there.
+The bundled `agent-cost` loaded plugin prices and formats those facts, preferring provider-reported USD
+and otherwise showing an API-equivalent estimate; disabling that plugin removes the badge without
+changing Agents. The point is not cost-specific, so independently installed plugins can fill the same
+seat with a token counter or budget warning. The complete contract lives in
+[cooperative extension points](./plugins/cooperative-extension-points.md#remote-trees).
 
 That is a property of the region, not of this pane, which is why the conversation reaches its region as
 a fragment and never wraps itself in a box: the region is the flex column the scroller sizes against,
@@ -428,6 +598,11 @@ it fails for any reason a selection can break, not only for the one it was writt
   module map keyed by session (`plugins/agents/src/client/composer/composerState.ts`) rather than in
   the component. What stays per mount is view state: how tall the box is, which picker is open, and
   which surface's scroll place the transcript restores.
+- A roster row puts the provider's live reasoning effort beside its live model name. Codex reports
+  those as separate configuration options, and both can change while the session is open, so the
+  display reads `configOptions` rather than the legacy model column. Provider-native subagents inherit
+  the same combined summary when the provider has not named a different child model. Dashboard data
+  keeps model as its own typed field; the combined value is presentation text, not a stored contract.
 - Starting an interactive session acknowledges the durable row before waiting for the provider CLI.
   The pane selects that row immediately, draws a **Connecting…** state above the composer, and keeps
   the draft editable while Send and provider configuration remain disabled. `ready` is published only
@@ -468,6 +643,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   maps a call's `rawInput` into the card as pretty-printed JSON. Output only lands on the completion
   update there, since Acorn declines ACP's terminal capability, so without the parameters a running
   Claude call had nothing to disclose and could not honour the setting until it was over.
+- **Claude's plan-mode handover is the exception to that.** `ExitPlanMode` carries the whole plan as
+  one markdown string in its parameters, so pretty-printed JSON draws it with every line break spelled
+  out as `\n`, and that plan is the one thing in a planning session somebody wants to read. The
+  normalizer posts it as an assistant message instead, which renders through the transcript Markdown
+  policy and survives the chats-only toggle, and the call keeps its title and its outcome with no
+  parameters to disclose. Only the opening `tool_call` is read that way: the parameters arrive with the
+  call, so reading an update as well would post the plan twice.
 - A plan update is a complete snapshot. Every snapshot remains in the durable ledger, while the
   transcript folds snapshots from one turn into the card the first one opened; a new turn starts a new
   card. Each step has one structured status marker and renders its text through the transcript Markdown
@@ -484,6 +666,15 @@ it fails for any reason a selection can break, not only for the one it was writt
   so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
+- **A folded usage line has no card of its own.** It used to draw at the head of each turn as tokens,
+  context and a provider cost on one row. The cost belongs to whichever plugin fills
+  `agents:session-header` and already sits beside the session title, and the token counts said the
+  same thing twice for a reader scrolling the thread. So the fold feeds the line that closes the turn
+  instead: `Turn complete` and its stop reason on the left, the share of the model's context window
+  the turn had used on the right. `stampTurnContext` in `conversationItems.ts` copies the figure onto
+  the `turn_completed` card by position rather than by turn id, because Codex clears the current turn
+  before it emits the completion and the event arrives unattributed. A turn whose harness reported no
+  context window closes with its reason alone.
 - Anything the agent is blocked on is drawn in the transcript at the point it asked, and that one card
   has two states. While it is blocking, it is the control that answers it: a dropdown, a column of
   checkboxes for a question that takes several answers, a free-text box, or a row of buttons for a
@@ -496,6 +687,12 @@ it fails for any reason a selection can break, not only for the one it was writt
   anybody has answered yet and what they said both live on the row and keep changing long after the
   event is written. An answer to a question the harness marked secret reads as "Answer hidden", since
   the thread is durable and searchable in a way a prompt answered and gone was not.
+- **Chats only keeps the requests.** The toggle above the composer drops the tool calls, the reasoning
+  and the notes, and a question the agent asked with the answer sitting on it is the same conversation
+  as a message. During planning it is most of the conversation, so leaving it out gave a reader a
+  transcript where the agent settled a question it had never asked. An answered permission is already
+  gone by then, dropped by the rule in the bullet above rather than by a second one here, so what
+  survives the toggle is the questions and whatever is still blocking.
 - The task sidebar keeps its own "Needs you" list, which is the way to reach a blocked session the
   reader is not looking at. Picking a row opens that session and brings its card into view.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
@@ -614,6 +811,16 @@ events a second per streaming session, because the Node coalesces text deltas at
 A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
 unions the two payloads, socket first, so no reported field is lost either way.
+
+**The snapshot route caps its event list, so loading a session is a walk, not a read.** `GET
+/sessions/:id` returns at most 2,000 events, oldest first, and a session reaches that in about half an
+hour of streaming: text deltas land at 40 ms each and a 7,000-event session on this machine's database
+is 5,500 deltas against 26 messages. `loadSnapshot` compares the session row's `lastEventSeq` against
+the highest event it holds and pages `GET /sessions/:id/events?afterSeq=` until the two agree. Without
+that walk the store stopped at the cap, and because the socket appends past it live, the gap only
+appeared on a reload — a long transcript reopened hours behind its last message, which read as lost
+messages rather than a short read. The events were always in SQLite; the Node commits each one as it
+arrives.
 
 ## New-session defaults
 
@@ -748,6 +955,15 @@ session records. Artifacts are authenticated no-store downloads; provider paths 
 are revalidated against the owning task. Raster image artifacts are fetched as authenticated bytes
 and drawn inline in the transcript with their download action. Other artifact media types keep the
 download row.
+
+A sent attachment is drawn the same way, from the same kind of route
+(`GET /v2/p/agents/attachments/:id/content`, no-store and `nosniff`, guarded by the attachment's own
+task). Each one is a tile that sizes to its own contents: a picture draws as a cropped band above its
+filename and opens full size in a modal on press, and anything else draws an icon above its filename and
+downloads on press. The turn's text names each attachment as `[Attachment: <id>]`, which is what a
+harness receives, and the transcript drops that line once it has a card to draw in its place. Reading these bytes is deliberately wider than the draft-attachment read
+below: a claimed attachment is out of a plugin's reach and is exactly what its own sender wants to see
+again.
 
 ### Draft attachments, and replacing one
 

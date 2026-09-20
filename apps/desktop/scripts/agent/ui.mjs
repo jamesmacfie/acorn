@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { renderSnapshot, WebDriverClient } from './webdriver.mjs'
+import { renderPlace, renderSnapshot, WebDriverClient } from './webdriver.mjs'
 import { readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
 
 function parseArgs(argv) {
@@ -11,7 +11,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|screenshot|status|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|status|stop')
   return { session, command, args }
 }
 
@@ -56,6 +56,18 @@ async function main() {
     if (args.length < 2) throw new Error('Usage: fill REF TEXT')
     await client.fill(await client.resolveElement(await refFor(manifest, args[0])), args.slice(1).join(' '))
     console.log(`Filled ${args[0]}.`)
+    return
+  }
+  // Where the reader is, and how to move them. `scroll` with no delta only looks, which is what a
+  // check across a navigation wants: note the turn, go away, come back, ask again. Compare the turn
+  // rather than the offset, because the offset is meaningless once the content above it has resized.
+  if (command === 'scroll') {
+    if (args.length > 1) throw new Error('Usage: scroll [DELTA]')
+    const delta = args[0] === undefined ? 0 : Number(args[0])
+    if (!Number.isFinite(delta)) throw new Error('Usage: scroll [DELTA]')
+    const place = await client.scroll(delta)
+    if (!place) throw new Error('Nothing on this page scrolls.')
+    process.stdout.write(`${renderPlace(place)}\n`)
     return
   }
   if (command === 'screenshot') {

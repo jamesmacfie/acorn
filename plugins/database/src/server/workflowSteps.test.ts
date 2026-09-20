@@ -71,6 +71,12 @@ describe('the read-only rule', () => {
 describe('the database:query step', () => {
   const validate = queryStep(services()).validate!
 
+  it('executes through the host read-only transaction', async () => {
+    const query = vi.fn(async () => resultSet([['1']]))
+    await databaseQuery(bridge({ query })).query('task-1', 'select 1')
+    expect(query).toHaveBeenCalledWith('task-1', 'select 1', { readOnly: true })
+  })
+
   it('needs exactly one of a saved query and inline SQL', () => {
     expect(validate(step('database:query', {}), validationContext)).toEqual(["step 'rows' needs either a saved query or inline SQL"])
     expect(validate(step('database:query', { sql: 'select 1', savedQueryId: 'q1' }), validationContext))

@@ -1,4 +1,4 @@
-import { ProviderOperationError } from '@acorn/plugin-api/node'
+import { isProviderOperationError, ProviderOperationError } from '@acorn/plugin-api/node'
 
 const statusOf = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object' || !('status' in error)) return undefined
@@ -6,7 +6,7 @@ const statusOf = (error: unknown): number | undefined => {
 }
 
 export const modelProviderError = (error: unknown): ProviderOperationError => {
-  if (error instanceof ProviderOperationError) return error
+  if (isProviderOperationError(error)) return error
   const status = statusOf(error)
   if (status === 401 || status === 403) return new ProviderOperationError('provider_needs_auth', 401)
   if (status === 429) return new ProviderOperationError('provider_rate_limited', 429)

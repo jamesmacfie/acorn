@@ -30,7 +30,7 @@ export const KIT_NODES = [
   'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
   'FileHead', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
   // Asking
-  'Button', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
+  'Button', 'IconButton', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
   'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor', 'FindBar', 'Field', 'ConfirmButton',
   'CopyButton', 'ModelBackendPicker',
   // Pixels. A tree naming this gets the box and the keyboard contract, and nothing else: what fills a

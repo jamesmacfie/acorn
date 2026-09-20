@@ -146,4 +146,4 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
 // The composition hooks apps/node calls around plugin init: the MCP launcher, the boot-time MCP
 // re-registration, and the tmux reconcile pass. Exported from the entrypoint because they are
 // cross-package by definition and the engine that implements them must stay out of contract/.
-export { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '../server/terminal'
+export { reconcileTmux, refreshAcornMcpRegistrations } from '../server/terminal'

@@ -8,6 +8,7 @@ import {
   type Client,
   type ContentBlock,
   type CreateElicitationResponse,
+  type McpServer,
   type RequestPermissionResponse,
   type SessionConfigOption,
 } from '@agentclientprotocol/sdk'
@@ -26,7 +27,7 @@ import {
   normalizeAcpUpdate,
 } from './acpNormalizer'
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
-import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import type { AgentDriver, AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { providerStderrNotice } from './diagnostics'
 
 // Same tag as codexDriver's: both are this plugin talking about a provider child process.
@@ -34,9 +35,12 @@ const log = createLogger('agents:provider', 'agents')
 
 const DRIVER_VERSION = 'acp-1'
 
-// JSON-RPC code the protocol reserves for a resource the agent cannot find. On `session/load` it means
-// the session reference is dead, which is the one load failure worth recovering from.
+// The two JSON-RPC codes that mean "the session this row points at is gone". The protocol reserves the
+// first for a resource the agent cannot find, which is what `session/load` answers; the second is plain
+// invalid params, which is how an agent that only has `session/resume` refuses a reference it never
+// stored. Either one is worth recovering from, and nothing else is.
 const ACP_RESOURCE_NOT_FOUND = -32002
+const ACP_INVALID_PARAMS = -32602
 
 // One parked question, whatever kind it was. Each entry carries its own way back to its own corner of
 // the protocol, so the resolve path below does not have to know a permission from a form.
@@ -159,6 +163,16 @@ export function clientFor(
     },
   }
 }
+
+// ACP names an environment as an ordered list of pairs rather than a map, so that a server declaring
+// the same name twice is a protocol error the agent can report instead of a silent last-wins.
+export const acpMcpServers = (servers: readonly AgentDriverMcpServer[]): McpServer[] =>
+  servers.map((server) => ({
+    name: server.name,
+    command: server.command,
+    args: server.args,
+    env: Object.entries(server.env).map(([name, value]) => ({ name, value })),
+  }))
 
 export class AcpDriver implements AgentDriver {
   constructor(private readonly spec: HarnessLaunchSpec) {}
@@ -294,34 +308,55 @@ export class AcpDriver implements AgentDriver {
         elicitation: { form: {} },
       },
     })
+    // Two ways back into a session the agent still holds, and they are different calls. `session/load`
+    // replays the history the agent kept; `session/resume` restores the context and sends nothing back.
+    // An agent advertises whichever one it implements, Claude Code the first and DeepSeek the second, and
+    // acorn reads that off the wire rather than out of a manifest, because the protocol already says it.
+    const supportsResume = initialized.agentCapabilities?.sessionCapabilities?.resume != null
+      && typeof agent.resumeSession === 'function'
     const supportsLoad = initialized.agentCapabilities?.loadSession === true && typeof agent.loadSession === 'function'
 
     let providerSessionRef = options.session.providerSessionRef
     let configOptions: readonly SessionConfigOption[] = []
+    // acorn's own tool servers, named on every session call. The runtime decides whether there are any:
+    // a harness that registers them through its CLI's own config file gets none here, so nothing is
+    // offered twice (docs/mcp.md § Configuration).
+    const mcpServers = acpMcpServers(options.mcpServers)
     const createSession = async (): Promise<void> => {
       const created = await agent.newSession({
         cwd: options.cwd,
         additionalDirectories: [],
-        mcpServers: [],
+        mcpServers,
       })
       providerSessionRef = created.sessionId
       configOptions = created.configOptions ?? []
     }
-    if (providerSessionRef && supportsLoad) {
+    if (providerSessionRef && (supportsResume || supportsLoad)) {
+      // The same four fields either way: neither call takes a prompt, and acorn names no extra roots and
+      // no MCP servers on any session call it makes.
+      const reference = {
+        sessionId: providerSessionRef,
+        cwd: options.cwd,
+        additionalDirectories: [],
+        // Named again rather than remembered. An agent that keeps a session does not keep the servers
+        // it was told about, because the token in one of them is minted per start and the old one is
+        // already dead.
+        mcpServers,
+      }
       try {
-        const loaded = await agent.loadSession!({
-          sessionId: providerSessionRef,
-          cwd: options.cwd,
-          additionalDirectories: [],
-          mcpServers: [],
-        })
-        configOptions = loaded?.configOptions ?? []
+        const reconnected = supportsResume
+          ? await agent.resumeSession!(reference)
+          : await agent.loadSession!(reference)
+        configOptions = reconnected?.configOptions ?? []
       } catch (error) {
         // The agent no longer holds the session this row points at. Claude Code, for one, keys its
         // store by working directory, so a checkout that moved or a pruned transcript both land here.
         // Without the fallback the row's dead reference is retried on every start, the queued turn
         // never dispatches, and the session is stuck reporting provider_start_failed.
-        if (!(error instanceof RequestError) || error.code !== ACP_RESOURCE_NOT_FOUND) throw error
+        //
+        // A transport failure still throws. The recovery is for an agent that answered and said no.
+        const code = error instanceof RequestError ? error.code : null
+        if (code !== ACP_RESOURCE_NOT_FOUND && code !== ACP_INVALID_PARAMS) throw error
         await createSession()
         // Say it out loud. The transcript on screen stays, but the fresh session has never seen it,
         // so a reader who is not told will read the next answer as if the agent remembered.

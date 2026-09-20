@@ -25,7 +25,7 @@ describe('isDevicePref', () => {
     // list — flat or nested, sorted how, grouped by what — is about the person reading it, not about
     // the worktree it is a list of (plugins/changes/src/client/changesPrefs.ts).
     for (const key of [
-      PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder, PrefKeys.leftCollapsed,
+      PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder,
       PrefKeys.lastSource, PrefKeys.notices, PrefKeys.diffView, PrefKeys.changesView,
       PrefKeys.generatePick,
     ]) {

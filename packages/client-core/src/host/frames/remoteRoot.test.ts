@@ -73,6 +73,45 @@ describe('the remote root', () => {
     expect(press).toHaveBeenCalledWith({ at: 'the card' })
   })
 
+  it('copies JSON props out of proxies before they cross the worker port', async () => {
+    const { root, ops } = collect()
+    const tabs = createNode('Tabs')
+    const proxied = new Proxy([{ id: 'body', label: 'Body' }], {})
+    setProperty(tabs, 'tabs', proxied)
+    insertNode(root.node, tabs, null)
+    await flush()
+
+    const insert = ops().find((op) => op.op === 'insert')
+    if (insert?.op !== 'insert') throw new Error('unreachable')
+    expect(insert.node.props.tabs).toEqual([{ id: 'body', label: 'Body' }])
+    expect(() => structuredClone(insert)).not.toThrow()
+  })
+
+  it('leaves out an undefined field rather than dropping the prop that holds it', async () => {
+    const { root, ops } = collect()
+    const tabs = createNode('Tabs')
+    setProperty(tabs, 'tabs', [{ id: 'body', label: 'Body', count: undefined }])
+    insertNode(root.node, tabs, null)
+    await flush()
+
+    const insert = ops().find((op) => op.op === 'insert')
+    if (insert?.op !== 'insert') throw new Error('unreachable')
+    expect(insert.node.props.tabs).toEqual([{ id: 'body', label: 'Body' }])
+  })
+
+  it('drops a nested function instead of letting it stop the plugin worker', async () => {
+    const { root, ops } = collect()
+    const tabs = createNode('Tabs')
+    setProperty(tabs, 'actions', { type: 'Select', props: { onChange: () => {} } })
+    insertNode(root.node, tabs, null)
+    await flush()
+
+    const insert = ops().find((op) => op.op === 'insert')
+    if (insert?.op !== 'insert') throw new Error('unreachable')
+    expect(insert.node.props).not.toHaveProperty('actions')
+    expect(() => structuredClone(insert)).not.toThrow()
+  })
+
   it('gives one function one id however many times it is set', async () => {
     const { root, ops } = collect()
     const press = () => {}

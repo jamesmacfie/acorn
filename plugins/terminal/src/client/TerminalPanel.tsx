@@ -5,7 +5,9 @@ import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, SplitHandle } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
+} from '@acorn/plugin-api/ui'
 import { Drawer } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
 
@@ -265,18 +267,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
             <Menu
               ariaLabel="New session"
               trigger={({ toggle, open }) => (
-                <Button
-                  variant="bare"
-                  size="sm"
-                  iconOnly
+                <IconButton
+                  icon="plus"
+                  label="New session"
                   disabled={busy() || !ws()}
                   title={ws() ? 'New session' : 'Select a task first'}
                   opens="menu"
                   expanded={open()}
                   onPress={toggle}
-                >
-                  <Icon name="plus" />
-                </Button>
+                />
               )}
             >
               {(menu) => (
@@ -307,9 +306,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 ^C
               </Button>
             </Show>
-            <Button variant="bare" size="sm" iconOnly onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close">
-              <Icon name="x" />
-            </Button>
+            <IconButton icon="x" onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close" />
           </>
         }
       />

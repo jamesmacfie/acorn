@@ -1,11 +1,11 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, Inline, Menu, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
@@ -15,20 +15,25 @@ import { asPlainText } from './copyFormats'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
 import AgentArtifactCard from './AgentArtifactCard'
+import AgentAttachmentCard from './AgentAttachmentCard'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
 
-// Both of these build their whole string in one call, so the card can read the event through a getter
-// rather than freezing a copy of it. See the note on Show's children below.
-const usageLine = (usage: AgentUsage): string => [
-  usage.inputTokens != null ? `${usage.inputTokens.toLocaleString()} in` : '',
-  usage.outputTokens != null ? `${usage.outputTokens.toLocaleString()} out` : '',
-  usage.contextUsed != null && usage.contextSize != null
-    ? `${usage.contextUsed.toLocaleString()} / ${usage.contextSize.toLocaleString()} context`
-    : '',
-  usage.cost ? `${usage.cost.amount.toFixed(4)} ${usage.cost.currency}` : '',
-].filter(Boolean).join(' · ')
+// Builds its whole string in one call, so the card can read the item through a getter rather than
+// freezing a copy of it. See the note on Show's children below.
+const contextLine = (context: { used: number; size?: number }): string =>
+  context.size === undefined
+    ? `${context.used.toLocaleString()} tokens`
+    : `${context.used.toLocaleString()} / ${context.size.toLocaleString()} context`
+
+// The turn's text names each attachment as `[Attachment: <id>]`, which is what the harness is sent
+// (server/sessions/runtimeContext.ts). Once the cards below draw the attachments themselves, the
+// placeholder is the same fact twice, and the uglier of the two. Dropped only when there are cards to
+// draw: a truncated replay can reach a card with no turn behind it, and a reader who loses the line
+// entirely has no idea anything was attached.
+export const withoutAttachmentPlaceholders = (text: string): string =>
+  text.replace(/^\[Attachment: [^\]\n]+\]$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
 
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
@@ -45,17 +50,13 @@ function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalize
   return (
     <Menu ariaLabel="Copy this response" placement="bottom-end"
       trigger={({ toggle, open }) => (
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="ellipsis"
           label="Copy this response"
           opens="menu"
           expanded={open()}
           onPress={toggle}
-        >
-          <Icon name="ellipsis" />
-        </Button>
+        />
       )}
     >
       {(menu) => (
@@ -98,11 +99,26 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
+          const attachments = () =>
+            props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
                 <Text emphasis="eyebrow">You</Text>
-                <AgentMarkdown text={message().text} taskId={props.taskId} />
+                <AgentMarkdown
+                  text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
+                  taskId={props.taskId}
+                />
+                <Show when={attachments().length}>
+                  <Inline wrap>
+                    {/* Index, not For: the projection hands out a fresh input array on every snapshot,
+                        and For keys by item identity, so a streaming session would remount these tiles
+                        25 times a second and shut any open picture. A turn's parts never reorder. */}
+                    <Index each={attachments()}>
+                      {(part) => <AgentAttachmentCard attachmentId={part().attachmentId} />}
+                    </Index>
+                  </Inline>
+                </Show>
                 <Show when={props.turn?.input.some((part) => part.type === 'context')}>
                   <Fold label="Context manifest" level="sub">
                     <Stack gap="row">
@@ -143,7 +159,7 @@ export default function AgentEventCard(props: {
             // else in the stream is a tool call or a note rather than somebody talking.
             <Card pad="sm" stripe="ok">
               <Stack gap="row">
-                <Inline>
+                <Inline spread>
                   <Text emphasis="eyebrow">Agent</Text>
                   <CopyOutputMenu text={() => message().text} event={message} />
                 </Inline>
@@ -349,12 +365,6 @@ export default function AgentEventCard(props: {
           )
         }}
       </Show>
-      <Show when={event().type === 'usage'}>
-        {(_shown) => {
-          const usage = () => (event() as Extract<ReturnType<typeof event>, { type: 'usage' }>).usage
-          return <Text emphasis="muted" wrap>{usageLine(usage())}</Text>
-        }}
-      </Show>
       <Show when={event().type === 'error'}>
         {(_shown) => {
           const error = () => event() as Extract<ReturnType<typeof event>, { type: 'error' }>
@@ -367,12 +377,21 @@ export default function AgentEventCard(props: {
         </Text>
       </Show>
       <Show when={event().type === 'turn_completed'}>
-        <Text emphasis="muted">
-          Turn complete
-          {(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason
-            ? ` · ${(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason}`
-            : ''}
-        </Text>
+        {/* The turn's own footer: what ended it on the left, how much of the model's context window it
+            had used on the right. The figure is stamped onto the item by the fold, because the usage
+            that carries it is a separate event and often arrives after this one
+            (./conversationItems.ts § stampTurnContext). */}
+        <Inline spread>
+          <Text emphasis="muted">
+            Turn complete
+            {(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason
+              ? ` · ${(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason}`
+              : ''}
+          </Text>
+          <Show when={props.item.context}>
+            {(context) => <Text emphasis="muted">{contextLine(context())}</Text>}
+          </Show>
+        </Inline>
       </Show>
     </>
   )

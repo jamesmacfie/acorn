@@ -1,6 +1,5 @@
 import { For, onCleanup, Show, type Accessor, type JSX } from 'solid-js'
-import { Button } from '../../kit/components/primitives'
-import Icon from '../../kit/components/content/Icon'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { createArmedConfirm } from '../../kit/lib/confirm'
 import type { PanelDefinition } from './model'
@@ -51,18 +50,16 @@ export default function PanelGridItem(props: {
       ariaLabel={`${props.definition.title} panel actions`}
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button
+        <IconButton
           size="xs"
           variant="ghost"
-          iconOnly
+          icon="ellipsis"
           label={`${props.definition.title} panel actions`}
           // Header actions fade when the pointer leaves. Keep the trigger present while its portalled
           // menu owns pointer and focus.
           {...(open() ? { 'data-open': '' } : {})}
           onPress={toggle}
-        >
-          <Icon name="ellipsis" />
-        </Button>
+        />
       )}
     >
       {(menu) => (

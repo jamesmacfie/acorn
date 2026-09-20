@@ -160,7 +160,7 @@ describe('findings as a loaded plugin', () => {
     expect(findings.plugin).not.toHaveProperty('migrationsModule')
     expect(findings.manifest.permissions).toMatchObject({
       api: [],
-      node: { capabilities: ['agents.reviewInput.v1'], secrets: false, exec: false, net: [] },
+      node: { capabilities: ['agents.reviewInput.v1'], secrets: false, exec: false, net: [], sockets: false },
     })
     expect(findings.manifest.permissions.node.capabilities).not.toContain('memory.knowledge')
     expect(findings.manifest.contributions.agentTools.map((entry) => entry.id)).toEqual(['record', 'list', 'get', 'withdraw'])

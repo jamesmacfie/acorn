@@ -1,13 +1,13 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, EmptyState, Text } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, IconButton, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
-import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
+import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
@@ -30,6 +30,12 @@ export default function AgentConversation(props: AgentConversationProps & {
   autoFocus?: boolean
 }) {
   const [error, setError] = createSignal('')
+  // The transcript view controls, sitting above the composer because that is where the reader's hands
+  // are. They reach into the transcript, which is a sibling: the scroll jumps come back up from the kit
+  // Timeline through `onControls`, the filter and collapse-all push back down as a signal and a counter.
+  const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
+  const [chatsOnly, setChatsOnly] = createSignal(false)
+  const [collapseTick, setCollapseTick] = createSignal(0)
   // A memo, not an inline getter. `on()` re-runs its callback on every notification without comparing
   // the input, and `loadSnapshot` ends in `upsertSession`, which replaces the row a caller may have
   // derived this id from. That was an infinite reload loop in the pane model this came out of.
@@ -83,6 +89,22 @@ export default function AgentConversation(props: AgentConversationProps & {
   const reload = (): void => void managedAgentStore.loadSnapshot(sessionId())
     .catch(() => undefined)
 
+  // The request to reveal is a one-shot navigation command, like the composer focus. A notice or a
+  // dashboard row that opened this pane named a request to scroll the reader to; read it once, hand it
+  // to the transcript, and clear it from the store. Kept there it would replay the scroll-and-focus
+  // every time this session was reopened, pulling a typing reader back to an old request. The latch is
+  // dropped when the shown session changes so a stale reveal cannot cross into another session.
+  const [focusRequest, setFocusRequest] = createSignal<string>()
+  let focusFor = ''
+  createEffect(() => {
+    const id = sessionId()
+    if (id !== focusFor) { focusFor = id; setFocusRequest(undefined) }
+    const requested = focusedManagedRequest(id)
+    if (!requested) return
+    setFocusRequest(requested)
+    clearFocusedManagedRequest(id)
+  })
+
   return (
     <Show when={sessionId()} fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
@@ -99,9 +121,12 @@ export default function AgentConversation(props: AgentConversationProps & {
             <AgentTranscript
               taskId={narrowed().session.taskId}
               snapshot={narrowed()}
-              focusRequestId={focusedManagedRequest(sessionId())}
+              focusRequestId={focusRequest()}
               focusSubagentId={selectedManagedSubagent(sessionId())}
               viewKeyPrefix={props.viewKeyPrefix}
+              chatsOnly={chatsOnly()}
+              collapseSignal={collapseTick}
+              onControls={setScrollControls}
               onExitSubagent={() => clearManagedSubagent(sessionId())}
               onRequestResolved={reload}
             />
@@ -131,6 +156,37 @@ export default function AgentConversation(props: AgentConversationProps & {
               submitDisabled={agentSessionIsStarting(current())}
               autoFocus={props.autoFocus}
               previousAutomaticContext={previousAutomaticContext()}
+              // The transcript view controls, on the composer's own top row so they line up with the
+              // model and effort selects. They act on the sibling transcript; the composer only hosts them.
+              viewControls={(
+                <>
+                  <IconButton
+                    icon="arrow-up-to-line"
+                    label="Scroll to the top of the transcript"
+                    tip="Go to top"
+                    onPress={() => scrollControls()?.toTop()}
+                  />
+                  <IconButton
+                    icon="arrow-down-to-line"
+                    label="Scroll to the bottom of the transcript"
+                    tip="Go to bottom"
+                    onPress={() => scrollControls()?.toBottom()}
+                  />
+                  <IconButton
+                    icon="messages-square"
+                    label="Show only agent and user messages"
+                    tip="Chats only"
+                    pressed={chatsOnly()}
+                    onPress={() => setChatsOnly((on) => !on)}
+                  />
+                  <IconButton
+                    icon="fold-vertical"
+                    label="Collapse every tool card"
+                    tip="Collapse all"
+                    onPress={() => setCollapseTick((tick) => tick + 1)}
+                  />
+                </>
+              )}
               onSessionUpdated={managedAgentStore.upsertSession}
               onSent={reload}
             />

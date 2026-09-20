@@ -75,11 +75,6 @@
 
 /* Escape hatch, budget 25 selectors (docs/ui-design.md § Style packs). Currently 2. */
 
-/* docs/ui-design.md § Style packs covers the collapsed-pane gap sliver this guards against. */
-:root[data-style='cozy'] .app.left-collapsed .panes {
-  grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
-  gap: 0 var(--pane-gap);
-}
 
 /* docs/ui-design.md § Style packs covers why this reaches past the token block for .markdown. */
 :root[data-style='cozy'] .markdown { line-height: var(--lh); }

@@ -11,7 +11,7 @@ type WireFunction = { __acornRpc: 'function'; id: number; sync: boolean }
 type WireRequest = { __acornRpc: 'call'; callId: number; functionId: number; args: unknown[] }
 type WireResponse = { __acornRpc: 'result'; callId: number; ok: boolean; value: unknown }
 type WireSyncRequest = { __acornRpc: 'sync-call'; functionId: number; args: unknown[]; reply: SharedArrayBuffer }
-type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; permission?: unknown; resource?: unknown }
+type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; status?: unknown; permission?: unknown; resource?: unknown }
 type WireRequestValue = { __acornRpc: 'request'; url: string; method: string; headers: [string, string][]; body: Uint8Array | null }
 type WireResponseValue = { __acornRpc: 'response'; status: number; statusText: string; headers: [string, string][]; body: Uint8Array }
 type WireAbortSignal = { __acornRpc: 'abort-signal'; aborted: boolean; reason?: unknown }
@@ -19,6 +19,11 @@ type WireAbortSignal = { __acornRpc: 'abort-signal'; aborted: boolean; reason?: 
 type FunctionMode = (path: string, fn: (...args: never[]) => unknown) => 'sync' | 'async'
 
 const SYNC_REPLY_BYTES = 4 * 1024 * 1024
+// A synchronous reference is a pure, read-shaped call, so an answer is either immediate or never
+// coming. Without a ceiling, a worker that crashed or wedged freezes the thread that called it, and
+// on the host that thread is the node's event loop: no route answers and the broker's heartbeat
+// stops, so one bad plugin reads as the whole node being unreachable.
+const SYNC_REPLY_TIMEOUT_MS = 5_000
 const HEADER_BYTES = Int32Array.BYTES_PER_ELEMENT * 2
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -36,6 +41,11 @@ const errorToWire = (error: unknown): WireError => {
     message: source.message,
     ...(source.stack ? { stack: source.stack } : {}),
     ...('code' in source ? { code: (source as Error & { code?: unknown }).code } : {}),
+    // `status` travels with `code` because the pair is one answer, not two facts. A provider error
+    // that arrived with its code and no status stopped looking like a provider error to the host
+    // (integrations/types.ts § isProviderOperationError), so a rejected credential was reported as
+    // the provider being unavailable.
+    ...('status' in source ? { status: (source as Error & { status?: unknown }).status } : {}),
     ...('permission' in source ? { permission: (source as Error & { permission?: unknown }).permission } : {}),
     ...('resource' in source ? { resource: (source as Error & { resource?: unknown }).resource } : {}),
   }
@@ -46,6 +56,7 @@ const errorFromWire = (wire: WireError): Error => {
   error.name = wire.name
   if (wire.stack) error.stack = wire.stack
   if (wire.code !== undefined) (error as Error & { code?: unknown }).code = wire.code
+  if (wire.status !== undefined) (error as Error & { status?: unknown }).status = wire.status
   if (wire.permission !== undefined) (error as Error & { permission?: unknown }).permission = wire.permission
   if (wire.resource !== undefined) (error as Error & { resource?: unknown }).resource = wire.resource
   return error
@@ -59,7 +70,6 @@ export class PluginRpcEndpoint {
   readonly #remoteFunctions = new Map<number, (...args: unknown[]) => unknown>()
   #nextFunctionId = 1
   #nextCallId = 1
-  #queue: Promise<void> = Promise.resolve()
   readonly #port: MessagePort
   readonly #mode: FunctionMode
 
@@ -175,7 +185,9 @@ export class PluginRpcEndpoint {
     // intentionally classified async by each side.
     const encoded = this.#encodeSync(args, `${path}.args`) as unknown[]
     this.#port.postMessage({ __acornRpc: 'sync-call', functionId, args: encoded, reply } satisfies WireSyncRequest)
+    const deadline = Date.now() + SYNC_REPLY_TIMEOUT_MS
     while (Atomics.load(control, 0) === 0) {
+      if (Date.now() >= deadline) throw new Error(`A synchronous plugin call (${path}) went unanswered for ${SYNC_REPLY_TIMEOUT_MS}ms.`)
       const nested = receiveMessageOnPort(this.#port)?.message
       if (nested) this.#handleSyncDuringWait(nested)
       else Atomics.wait(control, 0, 0, 10)
@@ -205,7 +217,20 @@ export class PluginRpcEndpoint {
       this.#settle(message as WireResponse)
       return
     }
-    this.#queue = this.#queue.then(() => this.#handle(message)).catch(() => {})
+    // Answered here rather than on the queue, because the peer is sitting in `Atomics.wait` until it
+    // arrives. Queued, the reply waited on every call already in flight, and one of those could be a
+    // route handler awaiting the very peer that is blocked: both threads then wait on each other for
+    // good. `#answerSync` never awaits, so there is nothing to serialise here.
+    if (isRecord(message) && message.__acornRpc === 'sync-call') {
+      this.#answerSync(message as WireSyncRequest)
+      return
+    }
+    // Concurrent, not queued. A chain here made every call to one plugin wait for the call before it
+    // to finish, so a single route waiting on a slow provider stopped that plugin answering anything
+    // until it returned. The fan-out's retry ladder then stacked the retries behind the request that
+    // had already timed out, and the panel never recovered. Each call carries its own `callId` and
+    // decodes its own arguments, so nothing here needs an order.
+    void this.#handle(message).catch(() => {})
   }
 
   async #handle(message: unknown): Promise<void> {
@@ -222,7 +247,6 @@ export class PluginRpcEndpoint {
       }
       return
     }
-    if (message.__acornRpc === 'sync-call') this.#answerSync(message as WireSyncRequest)
   }
 
   #handleSyncDuringWait(message: unknown): void {

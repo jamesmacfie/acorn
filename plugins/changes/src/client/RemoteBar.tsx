@@ -1,5 +1,7 @@
 import { Show } from 'solid-js'
-import { Alert, Button, ConfirmButton, CopyButton, Icon, Menu, Text, Toolbar } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, ConfirmButton, CopyButton, Icon, IconButton, Menu, Text, Toolbar,
+} from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
 import { PUSH_ACTIONS_POINT, type PushActionsProps } from './extensionPoints'
@@ -96,19 +98,15 @@ function RemoteMenu(props: { model: ChangesModel }) {
       ariaLabel="Remote actions"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="chevron-down"
           label="Remote actions"
           title="Fetch, pull, push"
           opens="menu"
           expanded={open()}
           disabled={model().remoteBusy()}
           onPress={toggle}
-        >
-          <Icon name="chevron-down" />
-        </Button>
+        />
       )}
     >
       {(menu) => (

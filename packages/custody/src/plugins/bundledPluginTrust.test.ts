@@ -36,6 +36,9 @@ describe('bundled plugin client trust', () => {
           target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'circle-dot', order: 100,
           layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
         }],
+        extensions: [{
+          id: 'session-header', point: 'agents:session-header', label: 'Session cost', remote: 'pane',
+        }],
       },
     }))
     const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
@@ -47,7 +50,11 @@ describe('bundled plugin client trust', () => {
     expect(cache.has(hash)).toBe(true)
     expect(trust.decisionFor('rollbar', hash)).toMatchObject({
       pluginId: 'rollbar', version: '1.2.3', decision: 'accepted', nodeId: 'bundled:acorn-0.1.0',
+      extensions: [{
+        kind: 'extends', pointKind: 'remote', target: 'agents:session-header', label: 'Session cost',
+      }],
     })
+    expect(trust.decisionFor('rollbar', hash)?.partial).toBeUndefined()
   })
 
   // The whole second launch, which is the shape the performance programme cared about: sweep the cache,

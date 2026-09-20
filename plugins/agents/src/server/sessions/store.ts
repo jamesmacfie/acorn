@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import * as schema from '../../node/schema'
 import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'
+import { isActiveSubagent } from './stateMachine'
 import { DEFAULT_SESSION_TITLE, deterministicSessionTitle } from './sessionTitle'
 
 export type EnqueueTurnOutcome = {
@@ -581,6 +582,17 @@ export class AgentStore extends AgentSessionRepository {
       ))
       .limit(1)
     return row != null
+  }
+
+  // Sessions whose roster still holds a child that claims to be working. Filtered in memory after a
+  // narrow SQL cut because the roster is a JSON column: on a real installation `!= '[]'` took 278 rows
+  // down to 23, and this runs once, at boot.
+  async sessionsWithActiveSubagents(): Promise<AgentSession[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentSessions)
+      .where(and(isNull(schema.agentSessions.archivedAt), ne(schema.agentSessions.subagentsJson, '[]')))
+    return rows.map(mapAgentSession).filter((session) => session.subagents.some(isActiveSubagent))
   }
 
   async unsettledSessions(): Promise<AgentSession[]> {

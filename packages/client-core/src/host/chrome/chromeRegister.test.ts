@@ -47,7 +47,7 @@ const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<
     version: '1.0.0',
     // The real constant: a literal here fails the day PLUGIN_API_MAJOR moves, for no reason this file is about.
     apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     contributions: contributions(declared),
     client: null,
   },

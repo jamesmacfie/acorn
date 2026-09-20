@@ -30,7 +30,8 @@ export const NODE_SUPPORT = {
   Section: { dom: 'full', tui: 'full' },
   Fold: { dom: 'full', tui: 'full' },
   Card: { dom: 'full', tui: 'full' },
-  Timeline: { dom: 'full', tui: 'full' },
+  Timeline: { dom: 'full', tui: 'reduced',
+    loss: 'the reader is not put back on the turn they left; a redrawn list opens at the newest turn' },
   Tabs: { dom: 'full', tui: 'full' },
   Toolbar: { dom: 'full', tui: 'full' },
   Modal: { dom: 'full', tui: 'full' },
@@ -153,6 +154,8 @@ export const NODE_SUPPORT = {
   // Asking
   Button: { dom: 'full', tui: 'full' },
   ConfirmButton: { dom: 'full', tui: 'full' },
+  IconButton: { dom: 'full', tui: 'reduced',
+    loss: 'the mark is one cell from apps/tui/src/kit/glyphs.ts rather than a drawn icon, and a name with no glyph there falls back to the `label`, which is why the kit makes that prop mandatory' },
   Input: { dom: 'full', tui: 'full' },
   Textarea: { dom: 'full', tui: 'full' },
   Select: { dom: 'full', tui: 'full' },

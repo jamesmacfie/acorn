@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { fleetBridge } from '../platform'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { readLocal, writeLocal } from '../../kit/lib/deviceStorage'
-import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
+import { homeNode, nodeIsStarting, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
 // The node this window talked to last, remembered on the device so the next launch has one before the
 // fleet answers.
@@ -53,22 +53,26 @@ export { nodeReadiness }
 
 export const nodeReady = (): boolean => nodeReadiness().kind === 'ready'
 
+/** The selected node is the supervised local process and has not reported a connection state yet. */
+export const activeNodeStarting = (): boolean => {
+  const nodeId = activeNodeId()
+  return nodeId !== null && nodeIsStarting(nodeId)
+}
+
 // Whether the gate holds the screen, or the shell draws behind it.
 //
-// Not `nodeReady()`, which is the fleet's answer and now arrives after the first paint. A warm window
-// knows which node it talked to last before it has asked anything, and that is enough to draw: the
-// persisted cache for that node fills the rail and the panes, and the chip says the node is starting
-// (docs/frontend.md § Painting before the node).
-//
-// Two states still have nothing to draw. A broker that could not answer at all is the diagnostics
-// screen, because nothing in the window will work. And a launch with no node to address is the
-// onboarding path — a first-ever launch has no cache either, so there is nothing behind the gate but
-// an empty shell.
-export const nodeGateHolds = (): boolean =>
-  nodeReadiness().kind === 'failed' || (activeNodeId() === null && !nodeReady())
+// The helper and the remembered cache partition are ready before the local node process is. The shell
+// used to draw that cache immediately, which let pane-owned resources fail before their routes
+// existed. Hold the existing loader through fleet selection and through the local node's first broker
+// status instead. A remote node that is offline, or a node that disconnects after it has reported,
+// still draws the cached shell with its ordinary connection state.
+export const nodeGateHolds = (): boolean => {
+  const readiness = nodeReadiness().kind
+  return readiness === 'starting' || readiness === 'failed' || readiness === 'unpaired' || activeNodeStarting()
+}
 
-// Pick the node this window talks to. Started at boot and not awaited, so the first paint does not
-// wait on the round trip; called again when the fleet gains its first node, and by the recovery
+// Pick the node this window talks to. Started at boot and not awaited, so the startup loader can paint
+// during the round trip; called again when the fleet gains its first node, and by the recovery
 // screen's Retry, which is what makes `starting` a state the user can observe.
 export async function selectActiveNode(): Promise<void> {
   const bridge = fleetBridge()

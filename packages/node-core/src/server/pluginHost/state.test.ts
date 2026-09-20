@@ -6,7 +6,7 @@ import { pluginState, type PluginsBridge } from './state'
 // Objects in, rows out. This logic used to live inside the route, so reaching it meant a Hono app and a
 // nine-member fixture. The judgement calls it makes, what counts as stale, which gaps raise the restart
 // banner, deserve a test that is only about them.
-const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
+const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
   attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],

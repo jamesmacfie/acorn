@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, previewViews } from '@acorn/plugin-api/client'
-import { Button, EmptyState, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -22,9 +22,16 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   const [suppressed, setSuppressed] = createSignal(false)
   let ensureVersion = 0
 
+  // Where the view was last told to sit. The poll below asks the same question five times a second
+  // and the answer is usually the same one, which is not worth a message across the seam.
+  let placed = ''
+
   const syncRect = () => {
     if (!preview || !host) return
     const r = host.getBoundingClientRect()
+    const next = `${r.left},${r.top},${r.width},${r.height}`
+    if (next === placed) return
+    placed = next
     preview.setBounds(props.taskId, { x: r.left, y: r.top, width: r.width, height: r.height })
   }
 
@@ -47,7 +54,16 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     // page is observed too, in place of the `window` resize listener this used to carry.
     ro.observe(host)
     ro.observe(document.documentElement)
-    const poll = setInterval(checkOcclusion, 200)
+    // Size is observed above; nothing reports that the box has *moved*. An ancestor scrolling, a
+    // fixed rail arriving beside the panes, a stylesheet landing a frame late in dev — each leaves
+    // the view sitting where the box used to be, and somebody else's pixels over the tab rails is
+    // what that looks like. So the question is asked again on the tick the occlusion check already
+    // runs on. The ceiling is a fifth of a second of lag behind a fast drag, and the observer above
+    // still covers everything that does change size.
+    const poll = setInterval(() => {
+      syncRect()
+      checkOcclusion()
+    }, 200)
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
       setLoading(s.loading)
@@ -85,6 +101,10 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     }
     void preview.ensure(taskId, url).then((ready) => {
       if (!ready || version !== ensureVersion) return
+      // A view the shell has just created is a 1x1 square in the corner, and the bounds call that
+      // ran before `ensure` found no view to move, so this one placement cannot be the one the
+      // memo above skips.
+      placed = ''
       syncRect()
       if (!suppressed()) preview.show(taskId)
     })
@@ -109,11 +129,15 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
             the address box is an `Input`, so it takes the reader's style pack like every other box
             in the app instead of the three rules this plugin used to ship for it. */}
-        <Toolbar size="sm" ariaLabel="Preview">
-          <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
-          <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
-          <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
-          <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
+        <Toolbar ariaLabel="Preview">
+          <IconButton icon="chevron-left" label="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')} />
+          <IconButton icon="chevron-right" label="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')} />
+          <IconButton
+            icon={loading() ? 'x' : 'rotate-cw'}
+            label={loading() ? 'Stop loading the page' : 'Reload the page'}
+            onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}
+          />
+          <IconButton icon="house" label="Back to the run target's URL" onPress={() => props.url && preview?.load(props.taskId, props.url)} />
           <Input
             size="sm"
             label="Preview address"
@@ -122,7 +146,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
             onInput={(value) => setAddr(value)}
             onKeyDown={(event) => { if (event.key === 'Enter') go() }}
           />
-          <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
+          <IconButton icon="code-xml" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')} />
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>
       </Show>

@@ -17,7 +17,7 @@ import type { NodePlugin, PluginStorage } from './types'
 // both have to survive the lifecycle table, which is the part a fake would never catch.
 
 const PLUGIN = 'acme'
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
+const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
 const storage: PluginStorage = {
   open: () => {
     throw new Error('this suite never opens a plugin database')

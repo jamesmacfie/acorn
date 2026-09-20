@@ -40,14 +40,29 @@ The rail's task list goes through the same `rail.taskList` exclusive slot the de
 plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
 on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
 
+The topbar spans the window. The rails and the panes all begin under its bottom border, so that
+border is one unbroken line across the app: the left TabRail is the first thing in `.shell-body`, the
+right pane switcher is fixed at `top: var(--topbar-h)`, and the two meet the same pixel because the
+bar's height is stated rather than left to its content.
+
 Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
-one component: `tabs/RailTab.tsx`, a square 52px control styled by `.tabrail-tab`. Every control in
+one component: `tabs/RailTab.tsx`, a square control styled by `.tabrail-tab`. Its side is
+`--pane-head-h`, the height of the pane header it runs beside, so a rail button, a pane header and
+the top bar read as one row height and a style pack that moves the header moves the rails with it. Every control in
 both rails goes through it, including the bottom-pinned "+" on the left and "close task" on the
 right, which share the `.tabrail-bottom` modifier and therefore the same box. It is not a Button. A
 rail control hovers by changing its icon and background only, and `.ui-btn:hover` also moves
 `border-color`, which lit the right rail's own dividers on hover and made the two sides look
 unrelated. `.pane-switcher` restates only what genuinely differs on the right: the glyph font and an
 active accent on the right edge instead of the left.
+
+That same `--pane-head-h` is the height of every bar that is a pane's chrome, whichever component
+draws it: a plain `Toolbar`, a pane-level `SectionHeader`, and the hand-written `.diff-toolbar`.
+Chrome means the bar at the top of a pane, the header of a list column, or the header of a detail
+column. `Toolbar`'s `size="sm"` is for a strip *inside* the contents — a filter row, a find bar, a
+status line under a body — and picking it for chrome is what left the browser preview's address bar
+at half the height of the agents header one pane over. Tab strips are the deliberate exception at
+`--tab-h`: a strip under a pane header should read as subordinate to it, not as a second header.
 
 ### Rail controls and status markers
 
@@ -66,7 +81,8 @@ applying native `disabled`, which would swallow the mouseover the tooltip needs.
 A **marker** is a small non-interactive status icon around the outside edge of a control: CI checks,
 an unread agent, a dirty worktree, a plugin's own state. A marker is data, not markup. It carries an
 id, a label in words, exactly one of an icon name or a `StatusDot` tone, an optional semantic tone,
-an optional `busy` spin, and an ordered list of the positions it would like:
+an optional `busy` flag, and an ordered list of the positions it would like. `busy` means "this state
+is live": it spins an icon marker and pulses a dot one.
 
 ```
 top-start   top-end
@@ -79,7 +95,9 @@ stylesheet. It orders markers by priority (then id, so activation order never sh
 the first position on its list that is still free, renders at most one marker per position, and keeps
 everything that missed out in the tooltip legend and the control's accessible description. Compact
 chrome may hide an icon; it must never hide a state. `bottom-center` is reserved for host lifecycle
-and activity, because it sits under the main glyph rather than in a corner.
+and activity, because it sits under the main glyph rather than in a corner. Two states use it, at
+opposite ends of a task's life: a pulsing dot while its setup script prepares the new worktree, and a
+spinner while teardown removes it.
 
 Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
 `features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
@@ -452,6 +470,54 @@ on. `Rows` hands back the same item object for an unchanged key, so a list rebui
 reconciles instead of remounting, which is what used to replace a row several times a second while an
 agent was fanning out.
 
+Both of those props answer to the same rule: **a background change never moves the reader.** For
+`Card focus` it means the reveal is dropped outright when the caret is in a text box: some callers hold
+`focus` as state rather than issuing it as a command, so a list that refetches rebuilds its rows and
+re-issues a reveal nobody gave, and the person who finds out is the one whose sentence lost the caret.
+
+For `Timeline follow` it means **a place is a turn, not a pixel.** "Two thousand pixels down" only
+means something while everything above those two thousand pixels keeps its height, and in a live
+transcript nothing does: a message keeps streaming, a code fence grows, an image loads, highlighting
+lands a frame or two after the paint. So the reader's place is the turn the viewport starts in and how
+far into it, which is `ReadingPlace` in `kit/lib/readingPlace.ts`, and putting them back is a
+correction measured against that turn's current position rather than an offset replayed. Following is
+the same value's other case, not a flag beside it, because the two used to be kept in agreement by
+hand and every defect found in that code was them disagreeing.
+
+The place only changes on the reader's own gesture, and a gesture lasts a second. A list that shrinks
+makes the browser clamp the scroll offset and fire a scroll event that by position is
+indistinguishable from someone scrolling, so a scroll with no gesture behind it changes nothing and
+the next frame puts the reader back: on their turn, or on the foot if they were following. The second
+counts for as much as the gesture does. Most input scrolls nothing at all, a click into a card or a
+drag across a line, so the gesture it armed used to sit there until something else moved the view, and
+that move was then filed as the place the reader chose. Focus counts as a gesture when it lands on a
+turn in this list, because revealing a card scrolls it into view and then focuses it.
+
+A list that the reader has no place in opens at the foot, and so does a list they were following.
+Those two are the same value, `{ at: 'live' }`, which is also why the timeline acts on a place equal
+to the one it already holds: the caller only reads its store again when the view has changed, so two
+live places in a row are the feet of two different lists. Treating that as nothing to do left a reader
+who switched sessions sitting at the old transcript's offset, partway down one they had never seen.
+
+One move has no signal of its own: the page taking the list away and putting it back. A scroller that
+was detached comes back at the top, and the browser reports neither a scroll event nor a resize for
+it, so the timeline watches its parent's children for that and runs the same correction it runs for
+every other move nobody asked for.
+
+What produced it was the `Suspense` around every pane region ([panes.md](./panes.md)). A query in the
+region reading an empty cache suspends that boundary *after* it has drawn, so every child left the
+document for the length of the fetch, and a reader who created a task from a pull request watched the
+diff appear and then go. Solid is patched so a boundary that has drawn never swaps back to its
+fallback (`patches/README.md`), which leaves the boundary covering the module it was put there for and
+nothing else. The timeline keeps its observer, because re-parenting is not only that boundary's to
+do.
+
+The timeline does not keep the places. `place` and `onChange` hand them to the caller, because
+navigation disposes a task's panes on purpose ([panes.md](./panes.md)), so a place kept in the
+component is a place lost on every workspace switch, and a map hidden inside a kit node has no owner to
+scope or clear it. The agents plugin owns them, beside the drafts, in
+`plugins/agents/src/client/sessions/readingPlaceStore.ts`.
+
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
 `items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes
@@ -508,6 +574,14 @@ caller depends on at least one of them.
   highlighter again. Behind that, `infra/highlight/shiki.ts`'s `highlightToHtml` keeps a small
   first-in-first-out cache of fence html keyed by the exact text and language, which catches the same
   fence coming back after a scroll or a remount.
+
+The `images` option decides what an image in the source becomes, and the flavour is part of the block
+key, so two surfaces sharing the cache cannot share a block. `inline` renders an `<img>`, for text a person
+wrote. `placeholder` renders the alt text and never issues the request, for text a model produced,
+where a remote image is a tracking pixel carrying the reader's IP. `thumb` is `inline` drawn as a short
+band across whatever holds it and cropped to fill, for a picture that stands in for a file rather than
+being the content: an attachment above its filename, where full size would push the rest of the card off
+screen.
 
 A fence takes its colour from the theme rather than from Shiki. `highlightToHtml` asks for the
 dual-theme html with `defaultColor: false`, so each token leaves carrying both colours as `--l` and
@@ -571,6 +645,26 @@ through `--brand-legible`, which is how a provider's mark is drawn wherever a su
 provider. `spin` turns the mark, for a state that is in flight. It carries no reduced-motion guard,
 unlike `.spin`: on a state icon the turn is the whole signal that something is running, and a 12px
 rotation is not the motion that setting exists to stop.
+
+### A button whose face is a mark
+
+Reach for `IconButton`, not a `Button` with `iconOnly` written out. It takes an `icon` name, a
+required `label`, and defaults to `variant="bare"` and `size="sm"` — the small square affordance the
+agents pane uses for go-to-top, go-to-bottom and chats-only. A caller that wants a different pair
+still says so, which is how the dashboards keep their `ghost`/`xs` buttons.
+
+The three props behind it were written out at sixty call sites before the node existed, and seven of
+those had lost the `size` along the way and drew a third larger than the rest. A handful more never
+reached `Icon` at all and typed a character in: the browser preview's chrome was `‹ › ↻ ⌂`, which is
+four glyphs that no style pack, tone or spin can touch.
+
+`label` is required rather than optional because a mark has no text in it. A button whose only child
+is a glyph announced itself to a screen reader as "‹", and on a terminal it is the fallback for a
+name that has no glyph yet.
+
+On the terminal the node paints the mark, one cell, which a plain `Button` cannot do: `Button` prints
+`label` for any child it cannot read text off, so the four transcript controls came to about fifty
+cells of an eighty-cell pane and the GitHub browse header clipped "Reviews" to "Revi".
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of the Lucide name list
@@ -680,13 +774,13 @@ region holds a `ListDetail`, because its two columns are one surface over one mo
 regions the host mounts apart.
 
 A pane or a region that puts a list beside a detail uses that node, not a hand-rolled grid. It
-owns the split, the three column widths (`narrow` for an identifier switcher, the default for a browse
-list, `wide` for a column that holds a document rather than a picker), the `--chrome-divider` between
-them, and each column's flex/overflow behaviour. Its consumers are the Rollbar, Linear, API and
-Database panes plus the Editor, Notes, Agents and Changes task panes, and Rollbar's occurrence
-workbench and GitHub's browse each nest one inside another; before it existed those eight had eight
-column widths and two different border roles, which is why they read as variations on a pane rather
-than the same pane.
+owns the split, the drag handle, the three column widths (`narrow` for an identifier switcher, the
+default for a browse list, `wide` for a column that holds a document rather than a picker), the
+`--chrome-divider` between them, and each column's flex/overflow behaviour. GitHub and Workflows
+reach it through `SourceSurface`; Linear, Database, Rollbar, Docker, Editor and the workflow editor
+use it directly, including the nested splits in GitHub and Rollbar. HTTP and the compiled task panes
+whose list and detail are separate host regions use the `list-detail` layout instead. Both paths own
+the same resize behaviour, so a plugin never supplies its own grid or pointer handlers.
 
 A list column is flush and scrolls its own rows. A column holding a document instead says so with
 `scroll`, and then it scrolls as one region and takes the pane's inline padding, the same rule
@@ -710,8 +804,8 @@ one surface split by a divider or two surfaces side by side; `.panes` + `.pane` 
 2 / -1` on the last pane is how the chrome source panel says it. A plugin that writes its own
 `grid-template-columns` for `.panes` gets a column width that only resembles the shell's — Docker's
 was `clamp(320px, 30vw, 460px)` against the shell's `clamp(320px, 28vw, 420px)` — and a rule that has
-to out-specify every style pack's own `.app.left-collapsed .panes`. Spanning has neither problem and
-needs no CSS at all.
+to out-specify every style pack's own `.panes` override. Spanning has neither problem and needs no
+CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for
@@ -1060,7 +1154,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `viewKey` is dropped: this host keeps one offset per mounted viewport rather than a map of remembered ones. `Timeline.Turn` is a node of its own on both hosts |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
@@ -1123,6 +1217,7 @@ and code blocks while preserving child state on subsequent toggles.
 | --- | --- | --- |
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
+| `IconButton` | stop | reduced: one cell, the mark itself, per `apps/tui/src/kit/glyphs.ts`. A name with no glyph yet falls back to the `label`, which is wide on purpose — the width is what says which name to add to the map |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |

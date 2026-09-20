@@ -1,10 +1,16 @@
 import { createResource, For, Show } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
 import { clientCapability, openPane, type Task } from '@acorn/plugin-api/client'
+import {
+  AGENT_SESSION_HEADER_POINT,
+  type AgentSessionHeaderProps,
+} from '@acorn/protocol/extensionPoints.ts'
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import {
-  Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker,
-  Stack, Text, Toolbar,
+  Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, IconButton, Inline, Input, Menu, Modal,
+  Picker, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import { registerSessionActionCommands } from '../commands'
 import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentConversation from './AgentConversation'
@@ -14,6 +20,9 @@ import RuntimeStateIcon from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
 import { canStopAgent } from './agentActivity'
 import { managedAgentApi } from './managedClient'
+import { agentPricingOptions } from '../pricingClient'
+import { emptyAgentPricingPreferences } from '../../shared/pricing'
+import { sessionHeaderContext } from './sessionHeaderContext'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -28,6 +37,7 @@ import { managedAgentApi } from './managedClient'
  *  the claim worth checking here is one chip. */
 export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  const pricing = createQuery(() => agentPricingOptions())
   // A session a workflow started says so, and the chip opens the run that started it. The session row
   // has carried `kind` and `workflowRunId` since the runtime wrote them; nothing read either until
   // the run pane existed to open (docs/managed-agents.md § Sessions).
@@ -49,6 +59,20 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         )}
       </Show>
       <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
+      <Show when={model.selected()}>
+        {(session) => (
+          <Slot
+            point={AGENT_SESSION_HEADER_POINT}
+            taskId={props.task.id}
+            props={() => sessionHeaderContext(
+              props.task.id,
+              session(),
+              model.snapshot(),
+              pricing.data ?? emptyAgentPricingPreferences(),
+            ) satisfies AgentSessionHeaderProps}
+          />
+        )}
+      </Show>
       <Show when={workflow()}>
         {(found) => (
           <Chip
@@ -99,16 +123,14 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               ariaLabel="Session actions"
               placement="bottom-end"
               trigger={({ toggle, open }) => (
-                <Button
-                  size="sm"
-                  iconOnly
+                <IconButton
+                  variant="outline"
+                  icon="ellipsis"
                   label="Session actions"
                   opens="menu"
                   expanded={open()}
                   onPress={toggle}
-                >
-                  <Icon name="ellipsis" />
-                </Button>
+                />
               )}
             >
               {(menu) => (
@@ -147,15 +169,12 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         isDisabled={(item) => !item.installed || model.creating()}
         onSelect={(item) => void model.createSession(item)}
         tools={
-          <Button
-            variant="bare"
-            iconOnly
+          <IconButton
+            icon="refresh-cw"
             title="Refresh provider health"
             label="Refresh provider health"
             onPress={() => void model.refreshProviders()}
-          >
-            <Icon name="refresh-cw" />
-          </Button>
+          />
         }
       />
     </Toolbar>

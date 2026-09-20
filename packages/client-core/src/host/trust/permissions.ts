@@ -35,6 +35,8 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   tasks: { text: 'Read task details', icon: 'list' },
   context: { text: 'Read task launch context', icon: 'info' },
   models: { text: 'Generate text with your model providers and installed agent CLIs', icon: 'sparkles' },
+  'data:query': { text: 'Query the databases you’ve connected', icon: 'database' },
+  'data:write': { text: 'Change data in the databases you’ve connected', icon: 'database', high: true },
   prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },
   identity: { text: 'Read the node owner identity', icon: 'user-round' },
   // High for the same reason the three below are: it reads something the plugin did not produce.

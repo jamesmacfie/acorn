@@ -45,6 +45,13 @@ describe('Linear descriptor rows', () => {
     })
   })
 
+  it('adds a workspace column only when the list spans more than one connection', () => {
+    // Two connected workspaces can both hold an ENG-42, so the caller names the workspace for every
+    // row in a merged list. With one connection the column would repeat a single answer down the list.
+    expect(linearRailItem(ISSUE).fields).toEqual(['ENG-42', 'In Progress'])
+    expect(linearRailItem(ISSUE, 'Work').fields).toEqual(['ENG-42', 'In Progress', 'Work'])
+  })
+
   it('falls back to the lower-cased identifier when Linear suggests no branch', () => {
     const row = linearRailItem({ ...ISSUE, branchName: null, labels: [] })
     expect(row.task?.branch).toBe('eng-42')

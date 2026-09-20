@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
 import { acpElicitationResponse, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
+import { foldSubagentRoster } from '../sessions/stateMachine'
 import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
+import webCapture from './__fixtures__/claudeWebSearchWire.json' with { type: 'json' }
 import { buildConversationItems } from '../../client/sessions/conversationItems'
 import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
 
@@ -137,6 +139,72 @@ describe('Claude subagent attribution, against the captured wire', () => {
       event.type === 'assistant_message')
     expect(prose.length).toBeGreaterThan(0)
     expect(prose.every((event) => event.subagentId === undefined)).toBe(true)
+  })
+})
+
+describe('a backgrounded subagent, as the wire reports it', () => {
+  // The wire of a `run_in_background: true` Agent call, captured on Claude Code 2.1.241: the spawn
+  // carries the flag, then a summary lands at launch with status `async_launched`, then the spawning
+  // call's own status goes `completed` while the child is only getting started.
+  const agentId = 'toolu_bg'
+  const meta = (extra: Record<string, unknown>) => ({ _meta: { claudeCode: extra } })
+
+  const launchInput = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId, title: 'Recon the sessions folder',
+    rawInput: { subagent_type: 'general-purpose', run_in_background: true },
+    ...meta({ toolName: 'Agent' }),
+  } as unknown as SessionUpdate
+  const launchSummary = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId,
+    ...meta({ toolResponse: { agentId: 'a97', agentType: 'general-purpose', status: 'async_launched' } }),
+  } as unknown as SessionUpdate
+  const spawnCompleted = {
+    sessionUpdate: 'tool_call_update', toolCallId: agentId, status: 'completed', ...meta({ toolName: 'Agent' }),
+  } as unknown as SessionUpdate
+
+  const rosterFrom = (updates: SessionUpdate[]) => {
+    let roster: import('@acorn/protocol/managedAgents.ts').AgentSubagent[] = []
+    for (const update of updates) {
+      for (const event of normalizeAcpUpdate(update, 'Claude Code')) {
+        if (event.type === 'subagent') roster = foldSubagentRoster(roster, event.subagent, 'turn-1', 1)
+      }
+    }
+    return roster
+  }
+
+  it('reads the launch receipt as running, not done', () => {
+    const roster = rosterFrom([launchInput, launchSummary])
+    expect(roster).toHaveLength(1)
+    expect(roster[0]).toMatchObject({ status: 'running', background: true })
+  })
+
+  it('does not let the spawning call’s own completion settle a background child', () => {
+    const roster = rosterFrom([launchInput, launchSummary, spawnCompleted])
+    expect(roster[0]?.status).toBe('running')
+    expect(roster[0]?.background).toBe(true)
+  })
+
+  it('still settles when a real completion summary arrives', () => {
+    const done = {
+      sessionUpdate: 'tool_call_update', toolCallId: agentId,
+      ...meta({ toolResponse: { agentId: 'a97', status: 'completed', totalDurationMs: 51000, totalToolUseCount: 22 } }),
+    } as unknown as SessionUpdate
+    const roster = rosterFrom([launchInput, launchSummary, spawnCompleted, done])
+    expect(roster[0]).toMatchObject({ status: 'completed', durationMs: 51000, toolUseCount: 22 })
+  })
+
+  it('leaves a foreground subagent settling on its own completion, as before', () => {
+    // Same shape without the background flag: the spawning call’s completion is the child’s finish.
+    const fgSpawn = {
+      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', title: 'Read one file',
+      rawInput: { subagent_type: 'general-purpose', run_in_background: false }, ...meta({ toolName: 'Agent' }),
+    } as unknown as SessionUpdate
+    const fgDone = {
+      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', status: 'completed', ...meta({ toolName: 'Agent' }),
+    } as unknown as SessionUpdate
+    const roster = rosterFrom([fgSpawn, fgDone])
+    expect(roster[0]).toMatchObject({ status: 'completed' })
+    expect(roster[0]?.background).toBeUndefined()
   })
 })
 
@@ -379,5 +447,186 @@ describe('an answer goes back in the shape the agent asked for', () => {
 
   it('leaves an unanswered question out rather than sending an empty one', () => {
     expect(acpElicitationResponse(askUserQuestion, { answers: {} })).toEqual({ action: 'accept', content: {} })
+  })
+})
+
+describe('Claude’s plan-mode handover', () => {
+  const exitPlanMode = (update: Partial<SessionUpdate> = {}): AgentNormalizedEvent[] => normalizeAcpUpdate({
+    sessionUpdate: 'tool_call',
+    toolCallId: 'plan-1',
+    title: 'Ready to code?',
+    kind: 'other',
+    rawInput: { plan: '# The plan\n\n- step one\n- step two' },
+    _meta: { claudeCode: { toolName: 'ExitPlanMode' } },
+    ...update,
+  } as SessionUpdate, 'Claude Code')
+
+  it('posts the plan as the agent talking, in the markdown it was written in', () => {
+    expect(exitPlanMode()[0]).toEqual({
+      type: 'assistant_message',
+      text: '# The plan\n\n- step one\n- step two',
+      subagentId: undefined,
+    })
+  })
+
+  // The call keeps its title and outcome; without this the plan also sits under it as JSON with every
+  // line break spelled out, which is what sent it here in the first place.
+  it('leaves the call itself with no parameters to disclose', () => {
+    const tool = exitPlanMode().find((event) => event.type === 'tool')
+    expect(tool).toMatchObject({ type: 'tool', tool: { title: 'Ready to code?', input: undefined } })
+  })
+
+  it('posts nothing for an update, so the plan cannot arrive twice', () => {
+    const events = exitPlanMode({ sessionUpdate: 'tool_call_update', status: 'failed' })
+    expect(events.some((event) => event.type === 'assistant_message')).toBe(false)
+  })
+
+  it('leaves every other tool’s parameters alone', () => {
+    expect(toolEvent({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'bash-1',
+      title: 'Bash',
+      rawInput: { plan: 'not a plan' },
+      _meta: { claudeCode: { toolName: 'Bash' } },
+    }).input).toBe('{\n  "plan": "not a plan"\n}')
+  })
+})
+
+// Claude Code's web tools, against the wire the adapter actually sends
+// (./__fixtures__/claudeWebSearchWire.json, Claude Code 2.1.241 with adapter 0.54.1).
+//
+// The capture settled two things this work was planned against and found to be wrong. The adapter
+// does forward structured search results, on `_meta.claudeCode.toolResponse.results`, so a Claude
+// card shows the same sources a Codex one does rather than a wall of prose. And a call arrives in
+// three or four updates, only one of which carries the request, so the mapping has to say nothing
+// on the others rather than say "empty".
+describe('Claude web activity, against the captured wire', () => {
+  const tools = webCapture.updates.map((update) => toolEvent(update as unknown as SessionUpdate))
+  const folded = (id: string) => tools.filter((tool) => tool.id === id)
+    .reduce((card, update) => {
+      const [item] = buildConversationItems([
+        { id: 'a', sessionId: 's', turnId: 't', seq: 1, event: { type: 'tool', tool: card }, searchText: null, createdAt: 0 },
+        { id: 'b', sessionId: 's', turnId: 't', seq: 2, event: { type: 'tool', tool: update }, searchText: null, createdAt: 0 },
+      ] as AgentEventRecord[])
+      if (item.event.type !== 'tool') throw new Error('expected a tool card')
+      return item.event.tool
+    })
+
+  it('names the row after what the call did, not after the adapter’s quoted title', () => {
+    // The adapter titles this one `"Agent Client Protocol specification" (allowed: …)`.
+    expect(tools.map((tool) => tool.title))
+      .toEqual(['Search web', 'Search web', 'Fetch page', 'Fetch page', 'Fetch page', 'Fetch page', 'Search web', 'Search web'])
+  })
+
+  it('keeps the query and the domain filter of a search', () => {
+    expect(tools[1].web).toEqual({
+      action: {
+        type: 'search',
+        queries: ['Agent Client Protocol specification'],
+        allowedDomains: ['agentclientprotocol.com'],
+      },
+    })
+  })
+
+  it('keeps the URL and the page prompt of a fetch', () => {
+    expect(tools[3].web).toEqual({
+      action: { type: 'fetch_page', url: 'https://agentclientprotocol.com/protocol/overview', prompt: 'what is a session' },
+    })
+  })
+
+  it('reads the sources out of the structured tool response rather than out of its prose', () => {
+    expect(tools[6].web?.action).toBeUndefined()
+    expect(tools[6].web?.results?.slice(0, 2)).toEqual([
+      { url: 'https://agentclientprotocol.com/get-started/introduction', title: 'Introduction - Agent Client Protocol' },
+      { url: 'https://agentclientprotocol.com/protocol/v1/overview', title: 'Overview - Agent Client Protocol' },
+    ])
+  })
+
+  it('folds one call’s updates into one card that has both its request and its sources', () => {
+    const search = folded(webCapture.updates[0].toolCallId)
+    expect(search).toMatchObject({
+      title: 'Search web',
+      status: 'completed',
+      web: { action: { type: 'search', queries: ['Agent Client Protocol specification'] } },
+    })
+    expect(search.web?.results).toHaveLength(3)
+    // The provider's own summary survives beside the structured half, because it is the answer and
+    // the sources are only where the answer came from.
+    expect(search.output).toContain('Agent Client Protocol')
+  })
+
+  it('leaves the fetched page’s text as the call’s output', () => {
+    const fetch = folded(webCapture.updates[2].toolCallId)
+    expect(fetch).toMatchObject({
+      status: 'completed',
+      web: { action: { type: 'fetch_page', prompt: 'what is a session' } },
+    })
+    expect(fetch.output).toContain('a session represents a conversation')
+  })
+})
+
+describe('Claude web activity, unit cases', () => {
+  it('leaves an ACP call that is not Claude’s generic, however it spells its kind', () => {
+    // `fetch` is the kind Claude's own web tools use, and `search` is what another harness may well
+    // call a repository grep. Neither is evidence about the web on its own.
+    expect(toolEvent({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'other-1',
+      title: 'Search the repository',
+      kind: 'search',
+      rawInput: { query: 'signIn' },
+    }).web).toBeUndefined()
+    expect(toolEvent({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'other-2',
+      title: 'Fetch',
+      kind: 'fetch',
+      _meta: { someOtherHarness: { toolName: 'WebSearch' } },
+      rawInput: { query: 'signIn' },
+    }).web).toBeUndefined()
+  })
+
+  it('settles a search that never carried a usable query', () => {
+    const tool = toolEvent({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'web-1',
+      status: 'failed',
+      _meta: { claudeCode: { toolName: 'WebSearch' } },
+      rawInput: { query: '' },
+      content: [{ type: 'content', content: { type: 'text', text: 'Search failed: rate limited' } }],
+    })
+    expect(tool).toMatchObject({
+      title: 'Search web',
+      status: 'failed',
+      web: { action: { type: 'search', queries: [] } },
+      output: 'Search failed: rate limited',
+    })
+  })
+
+  it('says nothing about the web on an update that reported neither request nor sources', () => {
+    // Otherwise the completion update, which carries only a status, would blank the query above it.
+    expect(toolEvent({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'web-1',
+      status: 'completed',
+      _meta: { claudeCode: { toolName: 'WebSearch' } },
+    }).web).toBeUndefined()
+  })
+
+  it('reads past result entries that are prose rather than sources', () => {
+    // `toolResponse.results` mixes the source objects with the model's own text.
+    expect(toolEvent({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'web-1',
+      _meta: {
+        claudeCode: {
+          toolName: 'WebSearch',
+          toolResponse: {
+            query: 'q',
+            results: ['prose', { content: [{ title: 'One', url: 'https://example.com/one' }, { title: 'no url' }] }],
+          },
+        },
+      },
+    }).web?.results).toEqual([{ url: 'https://example.com/one', title: 'One' }])
   })
 })

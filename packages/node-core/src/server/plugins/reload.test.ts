@@ -25,7 +25,7 @@ import type { CompiledNodePluginContext, NodePlugin, PluginStorage } from '../pl
 const PLUGIN = 'acme'
 
 // A loaded plugin declares nothing by default, which is what `permissions: {}` means in a manifest.
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
+const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
 // Never opened by anything in this file: these cases are about registrations, and a real chain would drag
 // a temp data root in for nothing. The reload × migration interaction has its own note in
 // server/plugins/storage.ts, and it is a promise deliberately NOT made.

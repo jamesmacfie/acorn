@@ -17,6 +17,7 @@ export const mergeAgentUsage = (previous: AgentUsage, next: AgentUsage): AgentUs
   inputTokens: next.inputTokens ?? previous.inputTokens,
   outputTokens: next.outputTokens ?? previous.outputTokens,
   cachedInputTokens: next.cachedInputTokens ?? previous.cachedInputTokens,
+  cacheWriteInputTokens: next.cacheWriteInputTokens ?? previous.cacheWriteInputTokens,
   contextUsed: next.contextUsed ?? previous.contextUsed,
   contextSize: next.contextSize ?? previous.contextSize,
   cost: next.cost ?? previous.cost,

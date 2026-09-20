@@ -276,6 +276,8 @@ client: tokenizeAnsiLines
 client: tunnelUrl
 client: validateDataValue
 client: watchAppearance
+client: workspaceExternalProjectsKey
+client: workspaceExternalProjectsOptions
 client: workspaceForProject
 client: workspacesKey
 client: workspacesOptions
@@ -314,14 +316,20 @@ node: DATA_VERSION
 node: DEFAULT_PROFILE_ID
 node: DataBinding
 node: DataBindingAddress
+node: DataCell
+node: DataColumn
 node: DataField
 node: DataOperator
 node: DataPredicate
 node: DataPrimitive
+node: DataQueryOptions
+node: DataQueryResult
 node: DataRead
 node: DataRecord
 node: DataRecordRef
 node: DataSchema
+node: DataSchemaResult
+node: DataSchemaSource
 node: DataSourceDescription
 node: DataSourceDescriptor
 node: DataSourceDetails
@@ -337,6 +345,8 @@ node: DataSourceRequest
 node: DataSourceResponse
 node: DataSourceResult
 node: DataSourceScope
+node: DataSourceService
+node: DataTable
 node: DataType
 node: DataValue
 node: Disposable
@@ -433,6 +443,7 @@ node: TelemetrySink
 node: ToolContext
 node: ToolError
 node: VersionedDataValue
+node: acornMcp
 node: agentProfileRegistry
 node: brokerEnv
 node: buildHeadlessArgv
@@ -444,6 +455,7 @@ node: childEnv
 node: chunkRowsByColumnBudget
 node: codexJsonAdapter
 node: compareDataValues
+node: configureAcornMcp
 node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability
@@ -466,8 +478,10 @@ node: getProfile
 node: git
 node: gitOrThrow
 node: gitText
+node: interactiveProfile
 node: invalidateWorktreeStatus
 node: isDir
+node: isProviderOperationError
 node: isRecord
 node: isRepoConfigTrustError
 node: isTaskConfined
@@ -684,6 +698,7 @@ ui/tree: Fold
 ui/tree: Grid
 ui/tree: Heading
 ui/tree: Icon
+ui/tree: IconButton
 ui/tree: Inline
 ui/tree: Input
 ui/tree: KIT_NODE_COMPONENTS
@@ -779,6 +794,7 @@ ui: GraphPoint
 ui: Grid
 ui: Heading
 ui: Icon
+ui: IconButton
 ui: Inline
 ui: Input
 ui: Kbd
@@ -808,6 +824,7 @@ ui: PickerRow
 ui: Popover
 ui: PtyEvent
 ui: PtyIo
+ui: ReadingPlace
 ui: Rectangle
 ui: Row
 ui: RowActions
@@ -833,6 +850,7 @@ ui: Text
 ui: Textarea
 ui: ThreadCollapseController
 ui: Timeline
+ui: TimelineControls
 ui: ToggleButton
 ui: Toolbar
 ui: ToolbarSpacer

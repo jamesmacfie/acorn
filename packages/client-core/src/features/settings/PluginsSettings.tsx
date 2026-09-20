@@ -16,7 +16,7 @@ import { canPickFolder, pickFolder } from '../../infra/platform'
 import { readPluginHostState, setPluginDevGrant } from '../../host/plugins/host'
 import { syncPluginDistribution } from '../../host/plugins/distribution'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
-import Icon from '../../kit/components/content/Icon'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { activeTaskId } from '../tasks/tasks'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
@@ -362,12 +362,8 @@ export default function PluginsSettings() {
                     when={removing() === row.name}
                     fallback={
                       <>
-                        <Button size="sm" variant="ghost" iconOnly label={`Update ${row.name}`} title="Update" disabled={busy()} onPress={() => void update(row.name)}>
-                          <Icon name="refresh-cw" />
-                        </Button>
-                        <Button size="sm" variant="ghost" tone="danger" iconOnly label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onPress={() => setRemoving(row.name)}>
-                          <Icon name="trash-2" />
-                        </Button>
+                        <IconButton variant="ghost" icon="refresh-cw" label={`Update ${row.name}`} title="Update" disabled={busy()} onPress={() => void update(row.name)} />
+                        <IconButton variant="ghost" tone="danger" icon="trash-2" label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onPress={() => setRemoving(row.name)} />
                       </>
                     }
                   >

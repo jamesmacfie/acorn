@@ -1,5 +1,5 @@
-import type { CoreServices, InternalEnvFactory, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { createLogger, describeError } from '@acorn/plugin-api/node'
+import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, createLogger, describeError } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -8,7 +8,7 @@ import type {
   AgentSessionSnapshot,
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
-import type { AgentDriverEvent } from '../drivers/types'
+import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame, AgentTurnChangedEvent } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
@@ -23,9 +23,50 @@ import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
 import { AgentStore } from './store'
-import { decideAgentCommand } from './stateMachine'
+import {
+  decideAgentCommand,
+  eventSubagentId,
+  isActiveSubagent,
+  quietedSubagents,
+  SUBAGENT_QUIET_MS,
+} from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+
+/**
+ * acorn's own tool servers for one session, or none.
+ *
+ * Two doors exist and a harness gets one. Claude Code and Codex register acorn through their own CLI
+ * (`claude mcp add`, `codex mcp add`), which their profile declares as `mcpRegistration`; telling them
+ * again over the protocol would list every acorn tool twice. A contributed harness has no such command
+ * and no manifest field for one, so the protocol is its only door. `mcpRegistration` is therefore the
+ * test, rather than a new declaration: whoever already has a door keeps it.
+ *
+ * An unregistered profile gets nothing either. The session could not have started without one, so this
+ * is a broken state rather than a case, and the conservative answer is not to hand a credential to it.
+ *
+ * The environment is spelled out rather than inherited. The agent process already holds these values,
+ * because the session environment is what acorn spawned it with, but an agent is free to scrub
+ * credential-shaped names out of what it passes its own children, and a stdio MCP server that loses
+ * `ACORN_API_TOKEN` fails every call. `ACORN_SESSION_ID` is provenance for notes and memory writes, the
+ * same value a task terminal passes; the token, not this, is what the node trusts for the session and
+ * the tool ceiling (docs/mcp.md § Launch environment).
+ */
+export function acornMcpServers(
+  mcp: { name: string; launcher: Launcher } | null,
+  session: Pick<AgentSession, 'id' | 'profileId'>,
+  sessionEnv: Record<string, string>,
+): AgentDriverMcpServer[] {
+  if (!mcp) return []
+  const profile = agentProfileRegistry.get(session.profileId)
+  if (!profile || profile.mcpRegistration) return []
+  return [{
+    name: mcp.name,
+    command: mcp.launcher.command,
+    args: mcp.launcher.args,
+    env: { ...mcp.launcher.env, ...sessionEnv, ACORN_SESSION_ID: session.id },
+  }]
+}
 
 type PublishedFrame = AgentWsFrame
   | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
@@ -60,6 +101,10 @@ export type AgentRuntimeOptions = {
   // whether a webhook's task exists.
   core: CoreServices
   internalEnv: InternalEnvFactory
+  // acorn's own MCP server, read per session rather than captured, because the composition root sets it
+  // and a test sets nothing. `null` means a session is offered no acorn tools, which is the honest
+  // answer on a standalone node: it receives no service handshake, so it learns no staging directory.
+  mcp?: () => { name: string; launcher: Launcher } | null
   secrets: SecretService
   currentUserId(): string | null
   registry?: AgentDriverRegistry
@@ -77,6 +122,9 @@ export type AgentRuntimeOptions = {
    *  (docs/managed-agents.md § What a session reports). Optional so a test can build an engine with
    *  no host around it. */
   telemetry?: PluginTelemetry
+  /** How long a background child may go quiet before its roster row is settled to `idle`. Overridable
+   *  only so a test does not have to wait out the real minute. */
+  subagentQuietMs?: number
 }
 
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
@@ -103,6 +151,7 @@ export class ManagedAgentEngine {
   protected readonly db: PluginDatabase
   protected readonly core: CoreServices
   protected readonly internalEnv: InternalEnvFactory
+  protected readonly mcp: () => { name: string; launcher: Launcher } | null
   // Every internal token this engine has handed to a provider child, so a leaked value can still be
   // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
   protected readonly mintedSecrets: string[] = []
@@ -129,6 +178,11 @@ export class ManagedAgentEngine {
   // `apps/node/src/service/runtime.test.ts` starts the runtime several times in one process, so a leaked
   // timer from an earlier boot lands inside a later one.
   protected readonly reconnectTimers = new Set<ReturnType<typeof setTimeout>>()
+  // One pending quiet sweep per session, keyed by session id. A background child's traffic resets it,
+  // so it fires only once that child has actually gone silent. Tracked for the same reason the
+  // reconnect delays are: it must not outlive the engine that armed it.
+  protected readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  protected readonly subagentQuietMs: number
   protected readonly listeners = new Set<RuntimeListener>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
@@ -146,6 +200,7 @@ export class ManagedAgentEngine {
     this.db = options.db
     this.core = options.core
     this.internalEnv = options.internalEnv
+    this.mcp = options.mcp ?? (() => null)
     this.currentUserId = options.currentUserId
     this.registry = options.registry ?? agentDriverRegistry
     this.publish = options.publish
@@ -154,6 +209,7 @@ export class ManagedAgentEngine {
     this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
     this.telemetry = options.telemetry
+    this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
@@ -211,6 +267,14 @@ export class ManagedAgentEngine {
         detail: 'The provider process stopped when Acorn last exited. Send a prompt to resume.',
       })
     }
+    // Nothing is streaming into a roster the previous process left behind, so any child still marked
+    // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
+    // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
+    for (const session of await this.store.sessionsWithActiveSubagents()) {
+      for (const id of quietedSubagents(session.subagents, Date.now())) {
+        await this.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
+      }
+    }
     await this.attachments.collectGarbage()
     await this.webhooks.reconcile()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
@@ -225,6 +289,8 @@ export class ManagedAgentEngine {
     this.stopped = true
     for (const timer of this.reconnectTimers) clearTimeout(timer)
     this.reconnectTimers.clear()
+    for (const timer of this.quietTimers.values()) clearTimeout(timer)
+    this.quietTimers.clear()
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     if (this.pumping) {
       await new Promise<void>((resolve) => this.pumpIdleWaiters.add(resolve))
@@ -308,6 +374,7 @@ export class ManagedAgentEngine {
       session,
       cwd,
       env: sessionEnv,
+      mcpServers: acornMcpServers(this.mcp(), session, sessionEnv),
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),
       onClosed: (error) => this.onProviderClosed(session.id, error),
@@ -366,21 +433,66 @@ export class ManagedAgentEngine {
       if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
     }
     await this.record(sessionId, turnId, event)
+    // The two things that change what the roster knows: a roster update, which is also how a child
+    // first appears, and a child's own traffic. Each pushes the quiet sweep back, so a child that
+    // keeps streaming keeps its row and a child that stops loses it a window later. Turn boundaries
+    // are deliberately not on this list, and a session with no children never holds a timer.
+    if (event.type === 'subagent' || eventSubagentId(event)) this.armSubagentQuiet(sessionId)
     if (settlesTurn) {
-      if (event.type === 'turn_completed' && turnId && this.onCompletedTurn) {
-        const session = await this.store.requireSession(sessionId)
-        const turn = await this.store.turn(turnId)
-        if (turn) void this.onCompletedTurn({
-          taskId: session.taskId,
-          sessionId,
-          turnId,
-          source: turn.source,
-          status: turn.status,
-          attempt: turn.attempt,
-        }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
+      if (event.type === 'turn_completed' && turnId) {
+        if (this.onCompletedTurn) {
+          const session = await this.store.requireSession(sessionId)
+          const turn = await this.store.turn(turnId)
+          if (turn) void this.onCompletedTurn({
+            taskId: session.taskId,
+            sessionId,
+            turnId,
+            source: turn.source,
+            status: turn.status,
+            attempt: turn.attempt,
+          }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
+        }
       }
       void this.pump()
     }
+  }
+
+  // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch
+  // receipt and then says nothing more about it, so the only way its row can ever end is if we infer
+  // the end from silence (docs/managed-agents.md § Subagents). This is that inference, debounced:
+  // every event the child produces pushes the sweep back, so it fires a full quiet window after the
+  // last thing we heard. A real completion summary on a later turn still folds the row on to
+  // `completed`, so nothing is lost by guessing `idle` first.
+  protected armSubagentQuiet(sessionId: string): void {
+    const existing = this.quietTimers.get(sessionId)
+    if (existing) clearTimeout(existing)
+    if (this.stopped) return
+    // Unref'd for the same reason the reconnect delays are: a node draining must not be held open by
+    // a sweep nobody is waiting on.
+    const timer = setTimeout(() => {
+      this.quietTimers.delete(sessionId)
+      void this.quietSubagents(sessionId)
+        .catch((error: unknown) => log.warn(`subagent quiet sweep failed: ${describeError(error).message}`))
+    }, this.subagentQuietMs)
+    timer.unref?.()
+    this.quietTimers.set(sessionId, timer)
+  }
+
+  protected async quietSubagents(sessionId: string): Promise<void> {
+    if (this.stopped) return
+    const session = await this.store.getSession(sessionId)
+    if (!session) return
+    const quieted = quietedSubagents(session.subagents, Date.now() - this.subagentQuietMs)
+    for (const id of quieted) {
+      // No turn id: the quieting is this engine's own inference, not something the turn that spawned
+      // the child did, and that turn is usually long gone by now anyway.
+      await this.record(sessionId, null, { type: 'subagent', subagent: { id, status: 'idle' } })
+    }
+    // A child that fell silent after this timer was armed is not stale yet, and nothing of its own is
+    // coming to arm the next sweep, so do it here. A child still streaming re-arms with its traffic.
+    const waiting = session.subagents.some((entry) =>
+      entry.background && isActiveSubagent(entry) && !quieted.includes(entry.id))
+    if (waiting) this.armSubagentQuiet(sessionId)
   }
 
   protected async onProviderClosed(sessionId: string, error?: Error): Promise<void> {

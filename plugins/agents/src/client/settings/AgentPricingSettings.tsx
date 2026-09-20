@@ -1,17 +1,18 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
-import { claudePriceCatalog } from '../../shared/pricing'
+import { claudePriceCatalog, codexPriceCatalog, type AgentPriceCatalogEntry } from '../../shared/pricing'
 import {
   agentPricingOptions,
   agentPricingQueryKey,
   saveAgentPricing,
-} from './pricingClient'
+} from '../pricingClient'
 import {
   blankAgentPriceDraft,
   preferencesFromPricingDraft,
   pricingDraftFromPreferences,
   type AgentPriceField,
   type AgentPricingDraft,
+  type AgentPricingProvider,
 } from './pricingDraft'
 import { agentUsageStore } from '../usage/usageStore'
 import {
@@ -23,6 +24,16 @@ const PRICE_FIELDS: Array<{ id: AgentPriceField; label: string }> = [
   { id: 'output', label: 'Output' },
   { id: 'cacheWrite', label: 'Cache write' },
   { id: 'cacheRead', label: 'Cache read' },
+]
+
+const PROVIDERS: Array<{
+  id: AgentPricingProvider
+  label: string
+  exactModelPlaceholder: string
+  catalog: readonly AgentPriceCatalogEntry[]
+}> = [
+  { id: 'claude', label: 'Claude', exactModelPlaceholder: 'claude-new-model', catalog: claudePriceCatalog },
+  { id: 'codex', label: 'Codex', exactModelPlaceholder: 'gpt-new-model', catalog: codexPriceCatalog },
 ]
 
 export default function AgentPricingSettings() {
@@ -40,75 +51,100 @@ export default function AgentPricingSettings() {
   })
   onMount(() => void agentUsageStore.ensure())
 
-  const updateCatalogPrice = (catalogId: string, field: AgentPriceField, value: string) => {
+  const updateCatalogPrice = (
+    provider: AgentPricingProvider,
+    catalogId: string,
+    field: AgentPriceField,
+    value: string,
+  ) => {
     setDraft((current) => current ? {
       ...current,
-      catalog: current.catalog.map((entry) => entry.catalogId === catalogId
-        ? { ...entry, overridden: true, price: { ...entry.price, [field]: value } }
-        : entry),
+      [provider]: {
+        ...current[provider],
+        catalog: current[provider].catalog.map((entry) => entry.catalogId === catalogId
+          ? { ...entry, overridden: true, price: { ...entry.price, [field]: value } }
+          : entry),
+      },
     } : current)
     setDirty(true)
     setSaved('')
   }
 
-  const resetCatalogPrice = (catalogId: string) => {
-    const definition = claudePriceCatalog.find((entry) => entry.id === catalogId)
+  const resetCatalogPrice = (provider: AgentPricingProvider, catalogId: string) => {
+    const definition = PROVIDERS.find((entry) => entry.id === provider)?.catalog
+      .find((entry) => entry.id === catalogId)
     if (!definition) return
     const defaults = definition.defaultPrice(Date.now())
     setDraft((current) => current ? {
       ...current,
-      catalog: current.catalog.map((entry) => entry.catalogId === catalogId
-        ? {
-            ...entry,
-            overridden: false,
-            price: {
-              input: String(defaults.input),
-              output: String(defaults.output),
-              cacheWrite: String(defaults.cacheWrite),
-              cacheRead: String(defaults.cacheRead),
-            },
-          }
-        : entry),
+      [provider]: {
+        ...current[provider],
+        catalog: current[provider].catalog.map((entry) => entry.catalogId === catalogId
+          ? {
+              ...entry,
+              overridden: false,
+              price: {
+                input: String(defaults.input),
+                output: String(defaults.output),
+                cacheWrite: String(defaults.cacheWrite),
+                cacheRead: String(defaults.cacheRead),
+              },
+            }
+          : entry),
+      },
     } : current)
     setDirty(true)
     setSaved('')
   }
 
   const updateCustom = (
+    provider: AgentPricingProvider,
     id: string,
     update: { model: string } | { field: AgentPriceField; value: string },
   ) => {
     setDraft((current) => current ? {
       ...current,
-      customModels: current.customModels.map((entry) => {
-        if (entry.id !== id) return entry
-        return 'model' in update
-          ? { ...entry, model: update.model }
-          : { ...entry, price: { ...entry.price, [update.field]: update.value } }
-      }),
+      [provider]: {
+        ...current[provider],
+        customModels: current[provider].customModels.map((entry) => {
+          if (entry.id !== id) return entry
+          return 'model' in update
+            ? { ...entry, model: update.model }
+            : { ...entry, price: { ...entry.price, [update.field]: update.value } }
+        }),
+      },
     } : current)
     setDirty(true)
     setSaved('')
   }
 
-  const addCustom = (model = '') => {
+  const addCustom = (provider: AgentPricingProvider, model = '') => {
     const normalized = model.toLowerCase()
     const current = draft()
-    if (!current || current.customModels.some((entry) => entry.model.toLowerCase() === normalized)) return
+    if (!current || current[provider].customModels.some((entry) => entry.model.toLowerCase() === normalized)) return
     setDraft({
       ...current,
-      customModels: [
-        ...current.customModels,
-        { id: `new:${nextCustomId++}`, model, price: blankAgentPriceDraft() },
-      ],
+      [provider]: {
+        ...current[provider],
+        customModels: [
+          ...current[provider].customModels,
+          { id: `new:${nextCustomId++}`, model, price: blankAgentPriceDraft() },
+        ],
+      },
     })
     setDirty(true)
     setSaved('')
   }
 
-  const removeCustom = (id: string) => {
+  const removeCustom = (provider: AgentPricingProvider, id: string) => {
     setDraft((current) => current
-      ? { ...current, customModels: current.customModels.filter((entry) => entry.id !== id) }
+      ? {
+          ...current,
+          [provider]: {
+            ...current[provider],
+            customModels: current[provider].customModels.filter((entry) => entry.id !== id),
+          },
+        }
       : current)
     setDirty(true)
     setSaved('')
@@ -124,7 +160,7 @@ export default function AgentPricingSettings() {
       ...(claude?.daily?.yesterday?.unpricedModels ?? []),
     ]
     const configured = new Set(
-      (draft()?.customModels ?? []).map((entry) => entry.model.trim().toLowerCase()),
+      (draft()?.claude.customModels ?? []).map((entry) => entry.model.trim().toLowerCase()),
     )
     return [...new Set(observed)].filter((model) => !configured.has(model.toLowerCase())).sort()
   })
@@ -158,9 +194,8 @@ export default function AgentPricingSettings() {
   return (
     <Stack gap="section">
       <Text emphasis="muted" wrap>
-        These are estimated USD prices per million tokens for local Claude usage. They change
-        Acorn’s estimate only; they do not change what a provider bills. Codex does not currently
-        expose the token history needed for a local cost estimate.
+        These are estimated USD API prices per million tokens. They change Acorn’s estimates only;
+        they do not change what a provider bills or how a subscription applies usage.
       </Text>
 
       <Show when={pricing.error}>
@@ -177,7 +212,7 @@ export default function AgentPricingSettings() {
           <Inline wrap>
             <For each={unpricedModels()}>
               {(model) => (
-                <Button variant="bare" onPress={() => addCustom(model)}>
+                <Button variant="bare" onPress={() => addCustom('claude', model)}>
                   Add <Text emphasis="mono">{model}</Text>
                 </Button>
               )}
@@ -188,17 +223,19 @@ export default function AgentPricingSettings() {
 
       <Show when={draft()}>
         {(current) => (
-          <>
-            <Section label="Built-in Claude prices">
+          <For each={PROVIDERS}>
+            {(provider) => (
+            <>
+            <Section label={`Built-in ${provider.label} prices`}>
               <Table size="sm" minWidth={620}>
                 <TableRow head>
                   <TableHead priority="high">Model</TableHead>
                   <For each={PRICE_FIELDS}>{(field) => <TableHead>{field.label}</TableHead>}</For>
                   <TableHead priority="low" />
                 </TableRow>
-                <For each={current().catalog}>
+                <For each={current()[provider.id].catalog}>
                   {(row) => {
-                    const definition = claudePriceCatalog.find((entry) => entry.id === row.catalogId)
+                    const definition = provider.catalog.find((entry) => entry.id === row.catalogId)
                     return (
                       <TableRow>
                         <TableCell header>
@@ -218,7 +255,7 @@ export default function AgentPricingSettings() {
                                 size="sm"
                                 label={`${definition?.label ?? row.catalogId} ${field.label}`}
                                 value={row.price[field.id]}
-                                onInput={(value) => updateCatalogPrice(row.catalogId, field.id, value)}
+                                onInput={(value) => updateCatalogPrice(provider.id, row.catalogId, field.id, value)}
                               />
                             </TableCell>
                           )}
@@ -227,7 +264,7 @@ export default function AgentPricingSettings() {
                           <Button
                             variant="bare"
                             disabled={!row.overridden}
-                            onPress={() => resetCatalogPrice(row.catalogId)}
+                            onPress={() => resetCatalogPrice(provider.id, row.catalogId)}
                           >
                             Reset
                           </Button>
@@ -240,11 +277,11 @@ export default function AgentPricingSettings() {
             </Section>
 
             <Section
-              label="Exact model prices"
+              label={`Exact ${provider.label} model prices`}
               actions={
                 <Button
-                  disabled={current().customModels.some((entry) => !entry.model.trim())}
-                  onPress={() => addCustom()}
+                  disabled={current()[provider.id].customModels.some((entry) => !entry.model.trim())}
+                  onPress={() => addCustom(provider.id)}
                 >
                   Add model
                 </Button>
@@ -252,11 +289,11 @@ export default function AgentPricingSettings() {
             >
               <Stack gap="row">
                 <Text emphasis="muted" wrap>
-                  Add the exact model id from Claude’s usage history when a new model is not in the
-                  built-in list. An exact entry takes priority over a built-in price.
+                  Add an exact model id when it is not in the built-in list. An exact entry takes
+                  priority over a built-in price.
                 </Text>
                 <Show
-                  when={current().customModels.length}
+                  when={current()[provider.id].customModels.length}
                   fallback={<Text emphasis="muted">No exact model prices.</Text>}
                 >
                   <Table size="sm" minWidth={620}>
@@ -265,7 +302,7 @@ export default function AgentPricingSettings() {
                       <For each={PRICE_FIELDS}>{(field) => <TableHead>{field.label}</TableHead>}</For>
                       <TableHead priority="low" />
                     </TableRow>
-                    <For each={current().customModels}>
+                    <For each={current()[provider.id].customModels}>
                       {(row) => (
                         <TableRow>
                           <TableCell header>
@@ -273,10 +310,10 @@ export default function AgentPricingSettings() {
                               required
                               maxLength={200}
                               assist={false}
-                              placeholder="claude-new-model"
-                              label="Exact Claude model id"
+                              placeholder={provider.exactModelPlaceholder}
+                              label={`Exact ${provider.label} model id`}
                               value={row.model}
-                              onInput={(value) => updateCustom(row.id, { model: value })}
+                              onInput={(value) => updateCustom(provider.id, row.id, { model: value })}
                             />
                           </TableCell>
                           <For each={PRICE_FIELDS}>
@@ -292,13 +329,13 @@ export default function AgentPricingSettings() {
                                   size="sm"
                                   label={`${row.model || 'Custom model'} ${field.label}`}
                                   value={row.price[field.id]}
-                                  onInput={(value) => updateCustom(row.id, { field: field.id, value })}
+                                  onInput={(value) => updateCustom(provider.id, row.id, { field: field.id, value })}
                                 />
                               </TableCell>
                             )}
                           </For>
                           <TableCell>
-                            <Button variant="bare" onPress={() => removeCustom(row.id)}>Remove</Button>
+                            <Button variant="bare" onPress={() => removeCustom(provider.id, row.id)}>Remove</Button>
                           </TableCell>
                         </TableRow>
                       )}
@@ -307,7 +344,9 @@ export default function AgentPricingSettings() {
                 </Show>
               </Stack>
             </Section>
-          </>
+            </>
+            )}
+          </For>
         )}
       </Show>
 

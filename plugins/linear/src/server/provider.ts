@@ -12,7 +12,9 @@ import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   COMMENT_CREATE,
   ISSUE_DETAIL_QUERY,
+  linearTeamScopeId,
   PROJECTS_QUERY,
+  TEAMS_QUERY,
   VIEWER_QUERY,
   issuesFilter,
   type LinearNode,
@@ -240,19 +242,37 @@ const linearItemDetail: ProviderItemDetail = async (context, identifier) => {
   throw new Error(result.failure.error)
 }
 
-// The projects a Linear workspace offers, for the host's workspace-mapping picker. It sits on the
-// provider contribution so core can ask without knowing it is asking Linear.
+const linearScopeQuery = async <T>(secret: string, query: string): Promise<T> => {
+  const response = await linearFetch(secret, query, {})
+  const error = linearError(response)
+  if (error) throw new ProviderOperationError(error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', error.status)
+  return linearData<T>(response)
+}
+
+// The projects and teams a Linear workspace offers, for the host's workspace-mapping picker. It sits
+// on the provider contribution so core can ask without knowing it is asking Linear. Core stores an
+// entry's id and never reads it, which is what lets a team ride in on the same list
+// (docs/integrations.md § Linear).
 //
 // No error handling beyond "no projects". The host runs this inside the secret scope and the request
 // budget and turns a throw into a per-connection failure the picker can retry, so swallowing a 401
 // here would hide it. Same division as `linearIssuesResource.refresh` above.
+//
+// Each query asks for 250, and core keeps the first 500 entries, so a workspace with 250 projects
+// would lose its teams off the end. Page both queries if a real workspace gets near either number.
 const linearProjectSource: ProviderProjectSource = {
   async list({ secret }) {
-    const response = await linearFetch(secret, PROJECTS_QUERY, {})
-    const error = linearError(response)
-    if (error) throw new ProviderOperationError(error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', error.status)
-    const { projects } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(response)
-    return projects.nodes.map((node) => ({ id: node.id, label: node.name }))
+    // Both calls sit inside the one budgeted slot the host opened for this list, and run together so
+    // the pair costs the picker one round trip rather than two.
+    const [projects, teams] = await Promise.all([
+      linearScopeQuery<{ projects: { nodes: LinearProjectNode[] } }>(secret, PROJECTS_QUERY),
+      linearScopeQuery<{ teams: { nodes: LinearProjectNode[] } }>(secret, TEAMS_QUERY),
+    ])
+    return [
+      ...projects.projects.nodes.map((node) => ({ id: node.id, label: node.name })),
+      // Labelled, because a team and a project can share a name and the picker draws one flat list.
+      ...teams.teams.nodes.map((node) => ({ id: linearTeamScopeId(node.id), label: `${node.name} (team)` })),
+    ]
   },
 }
 
@@ -280,11 +300,19 @@ export const linearProvider = publicProvider({
       if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
       const response = await linearFetch(secret, VIEWER_QUERY, {})
       if (linearError(response)) throw new ProviderOperationError('provider_needs_auth', 401)
+      let viewer: Viewer
       try {
-        return { viewer: await linearData<Viewer>(response), secret }
+        viewer = await linearData<Viewer>(response)
       } catch {
         throw new ProviderOperationError('provider_needs_auth', 401)
       }
+      // A key with no person behind it, an application token rather than a personal one, gets a 200
+      // and `{"viewer": null}` with nothing in `errors`, so every check above it passes. `normalize`
+      // then reads the workspace name three levels into this, and the TypeError that follows leaves
+      // validate as something nobody threw on purpose: the owner is told the provider is unavailable
+      // when the truth is that this key cannot name a workspace.
+      if (!viewer.viewer?.organization?.name) throw new ProviderOperationError('provider_needs_auth', 401)
+      return { viewer, secret }
     },
     normalize(_credentials, validated: LinearValidated) {
       const workspace = validated.viewer.viewer.organization.name

@@ -9,6 +9,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
 import { RowActions } from '../../kit/components/layout/RowActions'
 import { contextMenuItems, registerContextMenuItems, type ItemRowTarget } from '../registries/panes/contextMenus'
@@ -206,16 +207,13 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           actions={(
             <>
               <Show when={row() && row()!.freshness !== 'live'}><span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span></Show>
-              <Button
-                variant="bare"
-                iconOnly
+              <IconButton
+                icon="refresh-cw"
                 tip={`Refresh ${props.descriptor.label}`}
                 label={`Refresh ${props.descriptor.label}`}
                 busy={refreshing()}
                 onPress={() => void refresh()}
-              >
-                ↻
-              </Button>
+              />
             </>
           )}
         >

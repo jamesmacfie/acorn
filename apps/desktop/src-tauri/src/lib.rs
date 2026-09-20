@@ -129,6 +129,7 @@ pub fn run() {
             commands::quit_approved,
             commands::show_notification,
             commands::set_badge,
+            commands::set_window_background,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
@@ -183,6 +184,17 @@ pub fn run() {
                 if !approved {
                     api.prevent_exit();
                     menu::request_quit(app);
+                }
+            }
+            // The keyboard, on a window nobody has clicked yet. `open_window` runs in `setup`, before
+            // the event loop, so wry makes the webview the window's first responder while macOS has
+            // not activated the app; activation can then settle on the window itself, and a first
+            // responder that is not the webview means no key reaches the page at all. Ready is the
+            // first tick after activation, and the last one before the renderer exists to have a
+            // child webview of its own that the focus would be taken from.
+            RunEvent::Ready => {
+                if let Some(webview) = app.get_webview("main") {
+                    let _ = webview.set_focus();
                 }
             }
             // The click on a system notification, as near as desktop Tauri gets to one
@@ -367,9 +379,19 @@ fn host_suffix() -> &'static str {
 
 fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     let url = format!("{APP_ORIGIN}/").parse().expect("the app origin is a valid url");
-    WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
+    let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url));
+    // A macOS title bar that paints the window background instead of the system chrome, so the strip
+    // above the app is whichever colour the theme is. The web content stays below it, which is the
+    // difference from `Overlay`: no drag region to define and no gap to leave for the traffic
+    // lights. `commands::set_window_background` is the other half, because only the page knows the
+    // colour. See docs/shell.md, "The renderer bridge".
+    #[cfg(target_os = "macos")]
+    let builder = builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+    builder
         .title("acorn")
         .inner_size(1440.0, 900.0)
+        // The colour until the page reports its own, one paint later: the default theme's `--bg`
+        // (client-core styles/tokens-theme.css). Wrong for any other theme, and only for that paint.
         .background_color(tauri::webview::Color(0x12, 0x12, 0x12, 0xff))
         // This is the preload. It runs before any page script, so the host global is installed before
         // the shell mounts and the platform string the seam reads synchronously is already there. A

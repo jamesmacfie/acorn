@@ -304,7 +304,7 @@ describe('plugin host', () => {
           // The binding as the loader builds it, with the chain already resolved from the manifest. That
           // is why this tier never consults the plugin object's own `migrationsModule`.
           loaded: new Map([['ntfy', {
-            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
             storage: { open: () => openPluginDb(dir, 'ntfy', { migrationsFolder: join(dir, 'migrations') }) },
           }]]),
         },
@@ -407,7 +407,7 @@ describe('loaded plugins', () => {
         Object.entries(loaded).map(([name, node]) => [
           name,
           {
-            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], ...node },
+            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false, ...node },
             // The manifest's `permissions.events`, a sibling of the `node` block rather than part of it.
             events: events[name] ?? [],
             storage: { open: () => { throw new Error('test storage is not configured') } },
@@ -667,7 +667,7 @@ describe('delivering a manifest-declared harness', () => {
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
       dataDir: '',
       loaded: new Map([['opencode', {
-        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
         storage: { open: () => { throw new Error('test storage is not configured') } },
         harnesses: harnesses as never,
         dir,
@@ -751,7 +751,7 @@ describe('delivering a manifest-declared harness', () => {
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
       dataDir: '',
       loaded: new Map([['opencode', {
-        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
         storage: { open: () => { throw new Error('test storage is not configured') } },
         harnesses: [{
           id: 'opencode',
@@ -826,7 +826,7 @@ describe('order independence', () => {
         core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
         dataDir: '',
         loaded: new Map([['opencode', {
-          permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+          permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
           storage: { open: () => { throw new Error('test storage is not configured') } },
           harnesses: [harnessDescriptor] as never,
           dir: '',
@@ -863,7 +863,7 @@ describe('order independence', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(noop)
     const ready: string[] = []
     const loaded = (name: string): [string, LoadedPluginBinding] => [name, {
-      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
       storage: { open: () => { throw new Error('test storage is not configured') } },
     }]
     const result = await initPlugins(

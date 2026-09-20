@@ -2,7 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, EmptyState, Icon, Menu, Only, Sections, Stack, Tabs,
+  Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs,
 } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
@@ -76,21 +76,17 @@ function PullStrip(props: { tabs: PrTabsModel }) {
             actions={
               <>
                 <Show when={kind() === 'task' && linked().length === 1}>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  <IconButton
+                    icon="list-checks"
                     label={`Open ${linked()[0].title}`}
                     onPress={() => tabs().openTask(linked()[0])}
-                  ><Icon name="list-checks" size={13} /></Button>
+                  />
                 </Show>
                 <Show when={kind() === 'task' && linked().length > 1}>
                   <Menu
                     ariaLabel={`Tasks linked to #${selected()!.pull.number}`}
                     trigger={({ toggle }) => (
-                      <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
-                        <Icon name="list-checks" size={13} />
-                      </Button>
+                      <IconButton icon="list-checks" label="Choose linked task" onPress={toggle} />
                     )}
                   >
                     {(menu) => (
@@ -105,13 +101,11 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                   </Menu>
                 </Show>
                 <Show when={kind() === 'agent'}>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
+                  <IconButton
+                    icon="bot"
                     label="Open creating agent session"
                     onPress={() => tabs().openAgent(selected()!)}
-                  ><Icon name="bot" size={13} /></Button>
+                  />
                 </Show>
                 <Show when={tabs().offersTaskCreation()}>
                   <Button

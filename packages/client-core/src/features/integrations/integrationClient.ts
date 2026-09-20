@@ -37,4 +37,12 @@ export const setIntegrationDisabled = (id: string, disabled: boolean) =>
     body: JSON.stringify({ disabled }),
   })
 
+// `null` clears the name and puts the connection back to the provider's own label.
+export const renameIntegration = (id: string, name: string | null) =>
+  writeJson<{ integration: Integration }>(integrationRoute(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+
 export const deleteIntegration = (id: string): Promise<void> => sendJson<void>(integrationRoute(id), { method: 'DELETE' })

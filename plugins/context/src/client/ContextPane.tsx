@@ -2,8 +2,8 @@ import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
 import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task } from '@acorn/plugin-api/client'
 import type { ContextItem, TaskContext } from '@acorn/protocol/api.ts'
 import {
-  Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, Inline, Meter, Picker, Row, Rows,
-  Stack, Text, Toolbar,
+  Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, IconButton, Inline, Meter, Picker,
+  Row, Rows, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -72,7 +72,7 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
           }
           trailing={
             <Show when={rowProps.item.jump?.pane === 'notes'}>
-              <Button variant="bare" size="sm" iconOnly title="Edit in Notes" label="Edit in Notes" onPress={() => model().followJump(rowProps.item)}>✎</Button>
+              <IconButton icon="pencil" title="Edit in Notes" label="Edit in Notes" onPress={() => model().followJump(rowProps.item)} />
             </Show>
           }
         >
@@ -189,7 +189,7 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
         </Show>
         <Button onPress={() => void model().syncContext()}>Sync context</Button>
         <Toolbar.Spacer />
-        <Button variant="bare" iconOnly title="Refresh" label="Refresh" onPress={() => void model().refreshContext()}>↻</Button>
+        <IconButton icon="refresh-cw" title="Refresh" label="Refresh" onPress={() => void model().refreshContext()} />
       </Toolbar>
     </Stack>
   )

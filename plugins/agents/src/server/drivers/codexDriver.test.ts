@@ -152,6 +152,7 @@ async function start(mode: string | null = null, resumed = false) {
     session: session(mode, resumed),
     cwd: '/tmp',
     env: {},
+    mcpServers: [],
     noProviderExecutionHistory: false,
     onEvent: (event) => {
       driverEvents.push(event)

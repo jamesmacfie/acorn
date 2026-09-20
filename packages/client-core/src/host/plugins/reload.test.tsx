@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { NodeConnectionState, NodeRecord } from '@acorn/protocol/broker.ts'
 
 // The first plugin pass is owned by the watcher and fired by a node becoming reachable, because every
-// host draws before the node it just spawned is up: fired at boot it asked nobody, found no roster, and
+// host can start before the node it just spawned is up: fired at boot it asked nobody, found no roster, and
 // left a session with no loaded plugins in it.
 //
 // A `.tsx` so it runs in the jsdom project, which is the only one with Solid's browser build; under the

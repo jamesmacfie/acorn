@@ -6,7 +6,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
-import { sessionModelLabel } from '../settings/agentConfigOptions'
+import { sessionModelSummary } from '../settings/agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { attentionMark } from './stateTone'
@@ -207,7 +207,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                               {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
                             </Show>
                             <Text emphasis="muted">
-                              {[current().providerId, sessionModelLabel(current()), current().runtimeState]
+                              {[current().providerId, sessionModelSummary(current()), current().runtimeState]
                                 .filter(Boolean).join(' · ')}
                             </Text>
                           </Inline>
@@ -238,7 +238,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           onPress={() => openRow(item.key)}
                         >
                           <Text emphasis="strong">{child().title}</Text>
-                          <Text emphasis="muted">{subagentSummary(child(), sessionModelLabel(current()))}</Text>
+                          <Text emphasis="muted">{subagentSummary(child(), sessionModelSummary(current()))}</Text>
                         </Row>
                       )}
                     </Show>

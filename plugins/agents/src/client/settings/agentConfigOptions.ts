@@ -45,3 +45,21 @@ export const sessionModelLabel = (session: AgentSession): string | undefined => 
   if (!model?.currentValue) return session.model ?? undefined
   return model.values.find((value) => value.value === model.currentValue)?.label ?? model.currentValue
 }
+
+/**
+ * The compact model summary shown in session views. Reasoning is a separate provider option for
+ * Codex, so the model label alone loses a setting that materially changes the session. Keep the
+ * dashboard's typed model value separate; this is presentation text for places where the two facts
+ * belong beside each other.
+ */
+export const sessionModelSummary = (session: AgentSession): string | undefined => {
+  const model = sessionModelLabel(session)
+  if (!model) return undefined
+  const options = session.config.configOptions
+  if (!Array.isArray(options)) return model
+  const reasoning = (options as AgentConfigOption[]).find((option) => option.category === 'reasoning')
+  if (!reasoning?.currentValue) return model
+  const effort = reasoning.values.find((value) => value.value === reasoning.currentValue)?.label
+    ?? reasoning.currentValue
+  return `${model} · ${effort}`
+}

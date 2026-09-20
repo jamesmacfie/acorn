@@ -1,8 +1,19 @@
 diff --git a/dist/dev.cjs b/dist/dev.cjs
-index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..cc52c2f400e6f61f2068f7c8c90e8c556cd32676 100644
+index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..e1705df7ed523edbe07312d2f2667b07da9feca8 100644
 --- a/dist/dev.cjs
 +++ b/dist/dev.cjs
-@@ -1549,10 +1549,9 @@ function Show(props) {
+@@ -829,7 +829,9 @@ function runTop(node) {
+   const runningTransition = Transition && Transition.running;
+   if ((runningTransition ? node.tState : node.state) === 0) return;
+   if ((runningTransition ? node.tState : node.state) === PENDING) return lookUpstream(node);
+-  if (node.suspense && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
++  // acorn: `!resolved`, so a boundary that has drawn stops holding its effects back too
++  // (patches/README.md).
++  if (node.suspense && !node.suspense.resolved && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
+   const ancestors = [node];
+   while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
+     if (runningTransition && Transition.disposed.has(node)) return;
+@@ -1549,10 +1551,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -16,11 +27,33 @@ index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..cc52c2f400e6f61f2068f7c8c90e8c55
      }
      return props.fallback;
    }, undefined, {
+@@ -1765,7 +1766,9 @@ function Suspense(props) {
+               showContent = true,
+               showFallback = true
+             } = show ? show() : {};
+-          if ((!inFallback || p && p !== "$$f") && showContent) {
++          // acorn: `store.resolved`, so a boundary that has drawn never swaps back to its
++          // fallback (patches/README.md).
++          if ((!inFallback || store.resolved || p && p !== "$$f") && showContent) {
+             store.resolved = true;
+             dispose && dispose();
+             dispose = ctx = p = undefined;
 diff --git a/dist/dev.js b/dist/dev.js
-index 2803ce7f070926657d1b4352741a5fcec67af2f9..24c2a900fbf54b47ab1ea13a130e7334b7fab424 100644
+index 2803ce7f070926657d1b4352741a5fcec67af2f9..bf197ecbdd8c144f3bcacb030d4c0aab714bb338 100644
 --- a/dist/dev.js
 +++ b/dist/dev.js
-@@ -1547,10 +1547,9 @@ function Show(props) {
+@@ -827,7 +827,9 @@ function runTop(node) {
+   const runningTransition = Transition && Transition.running;
+   if ((runningTransition ? node.tState : node.state) === 0) return;
+   if ((runningTransition ? node.tState : node.state) === PENDING) return lookUpstream(node);
+-  if (node.suspense && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
++  // acorn: `!resolved`, so a boundary that has drawn stops holding its effects back too
++  // (patches/README.md).
++  if (node.suspense && !node.suspense.resolved && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
+   const ancestors = [node];
+   while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
+     if (runningTransition && Transition.disposed.has(node)) return;
+@@ -1547,10 +1549,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -34,11 +67,33 @@ index 2803ce7f070926657d1b4352741a5fcec67af2f9..24c2a900fbf54b47ab1ea13a130e7334
      }
      return props.fallback;
    }, undefined, {
+@@ -1763,7 +1764,9 @@ function Suspense(props) {
+               showContent = true,
+               showFallback = true
+             } = show ? show() : {};
+-          if ((!inFallback || p && p !== "$$f") && showContent) {
++          // acorn: `store.resolved`, so a boundary that has drawn never swaps back to its
++          // fallback (patches/README.md).
++          if ((!inFallback || store.resolved || p && p !== "$$f") && showContent) {
+             store.resolved = true;
+             dispose && dispose();
+             dispose = ctx = p = undefined;
 diff --git a/dist/solid.cjs b/dist/solid.cjs
-index 08b339b27b6c149d73a81dd759b483dcde99531b..8887b32d84c0a1672d3cb4bcddf77c02279f280c 100644
+index 08b339b27b6c149d73a81dd759b483dcde99531b..e4b8bf77ba9cfe3f02c0f9d3aa604afe0fcdcfe1 100644
 --- a/dist/solid.cjs
 +++ b/dist/solid.cjs
-@@ -1490,10 +1490,9 @@ function Show(props) {
+@@ -784,7 +784,9 @@ function runTop(node) {
+   const runningTransition = Transition && Transition.running;
+   if ((runningTransition ? node.tState : node.state) === 0) return;
+   if ((runningTransition ? node.tState : node.state) === PENDING) return lookUpstream(node);
+-  if (node.suspense && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
++  // acorn: `!resolved`, so a boundary that has drawn stops holding its effects back too
++  // (patches/README.md).
++  if (node.suspense && !node.suspense.resolved && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
+   const ancestors = [node];
+   while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
+     if (runningTransition && Transition.disposed.has(node)) return;
+@@ -1490,10 +1492,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -52,11 +107,33 @@ index 08b339b27b6c149d73a81dd759b483dcde99531b..8887b32d84c0a1672d3cb4bcddf77c02
      }
      return props.fallback;
    }, undefined, undefined);
+@@ -1694,7 +1695,9 @@ function Suspense(props) {
+               showContent = true,
+               showFallback = true
+             } = show ? show() : {};
+-          if ((!inFallback || p && p !== "$$f") && showContent) {
++          // acorn: `store.resolved`, so a boundary that has drawn never swaps back to its
++          // fallback (patches/README.md).
++          if ((!inFallback || store.resolved || p && p !== "$$f") && showContent) {
+             store.resolved = true;
+             dispose && dispose();
+             dispose = ctx = p = undefined;
 diff --git a/dist/solid.js b/dist/solid.js
-index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..90a3a94944425a849cc2397fc1a43fdec6c56b49 100644
+index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..1011f2f27ab24eb6637d02b89c62ed0527b8a820 100644
 --- a/dist/solid.js
 +++ b/dist/solid.js
-@@ -1488,10 +1488,9 @@ function Show(props) {
+@@ -782,7 +782,9 @@ function runTop(node) {
+   const runningTransition = Transition && Transition.running;
+   if ((runningTransition ? node.tState : node.state) === 0) return;
+   if ((runningTransition ? node.tState : node.state) === PENDING) return lookUpstream(node);
+-  if (node.suspense && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
++  // acorn: `!resolved`, so a boundary that has drawn stops holding its effects back too
++  // (patches/README.md).
++  if (node.suspense && !node.suspense.resolved && untrack(node.suspense.inFallback)) return node.suspense.effects.push(node);
+   const ancestors = [node];
+   while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
+     if (runningTransition && Transition.disposed.has(node)) return;
+@@ -1488,10 +1490,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -70,3 +147,14 @@ index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..90a3a94944425a849cc2397fc1a43fde
      }
      return props.fallback;
    }, undefined, undefined);
+@@ -1692,7 +1693,9 @@ function Suspense(props) {
+               showContent = true,
+               showFallback = true
+             } = show ? show() : {};
+-          if ((!inFallback || p && p !== "$$f") && showContent) {
++          // acorn: `store.resolved`, so a boundary that has drawn never swaps back to its
++          // fallback (patches/README.md).
++          if ((!inFallback || store.resolved || p && p !== "$$f") && showContent) {
+             store.resolved = true;
+             dispose && dispose();
+             dispose = ctx = p = undefined;

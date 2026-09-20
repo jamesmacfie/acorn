@@ -1,13 +1,48 @@
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
+import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({
   default: (props: { text: string }) => { markdownMounts++; return <span>{props.text}</span> },
 }))
 
-const { default: AgentEventCard } = await import('./AgentEventCard')
+// The attachment card behind a sent turn asks the node for the row before it draws anything, so a
+// card under test would otherwise reach the network. A PDF is the case that draws without bytes.
+vi.mock('./managedClient', () => ({
+  managedAgentApi: {
+    attachment: async (id: string) => ({
+      id, taskId: 'task', filename: 'notes.pdf', mediaType: 'application/pdf', byteSize: 2048, createdAt: 0,
+    }),
+    attachmentContent: async () => { throw new Error('bytes are only fetched for a picture') },
+  },
+}))
+
+const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
+
+it('drops the attachment placeholder only when there is an attachment to draw instead', async () => {
+  expect(withoutAttachmentPlaceholders('Have a look\n\n[Attachment: 8f2c]\n\nthanks'))
+    .toBe('Have a look\n\nthanks')
+  // Nothing that merely mentions one: the placeholder is a line of its own, written by the projection.
+  expect(withoutAttachmentPlaceholders('see [Attachment: 8f2c] above')).toBe('see [Attachment: 8f2c] above')
+
+  const item: AgentConversationItem = {
+    key: 'turn', firstSeq: 1, lastSeq: 1, turnId: 'turn-1',
+    event: { type: 'user_message', text: 'Have a look\n\n[Attachment: 8f2c]' },
+  }
+  const turn = { id: 'turn-1', input: [{ type: 'attachment', attachmentId: '8f2c' }] } as AgentTurn
+  const host = document.createElement('div')
+  const dispose = render(() => (
+    <AgentEventCard item={item} taskId="task" sessionId="session" turn={turn} />
+  ), host)
+  try {
+    expect(host.textContent).toContain('Have a look')
+    expect(host.textContent).not.toContain('[Attachment:')
+    // The row is drawn once the node has answered.
+    await vi.waitFor(() => expect(host.textContent).toContain('notes.pdf'))
+  } finally { dispose() }
+})
 
 it('does not render a completed subagent’s history until its disclosure opens', () => {
   markdownMounts = 0
@@ -92,4 +127,31 @@ it('answers a blocking question in the thread, and keeps the answer in the same 
     fold.dispatchEvent(new Event('toggle'))
     expect(settled.textContent).toContain('Coffee')
   } finally { disposeSettled() }
+})
+
+it('closes a turn with the context window on the right of the line', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'end_turn' },
+    context: { used: 94_358, size: 1_000_000 },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    // One row, the reason first and the figure last, which is what `Inline spread` puts at each end.
+    const row = host.querySelector('.ui-inline[data-spread]')
+    expect(row?.textContent).toBe('Turn complete · end_turn94,358 / 1,000,000 context')
+  } finally { dispose() }
+})
+
+it('closes a turn that reported no context with the reason alone', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'refusal' },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    expect(host.textContent).toBe('Turn complete · refusal')
+  } finally { dispose() }
 })

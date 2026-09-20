@@ -396,7 +396,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             is `list-detail`'s own rule rather than anything this pane decides. */}
         <ListDetail split>
           <ListColumn>
-            <Show when={workflowCatalogKey()} keyed>{() => (
+            <Show when={workflowCatalogKey()} keyed>{(_catalogKey) => (
               <NodeList
                 draft={draft()}
                 catalog={store.catalog()}

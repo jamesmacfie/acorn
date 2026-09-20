@@ -1,8 +1,8 @@
 import { createSignal, Show } from 'solid-js'
 import { fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, Inline, Menu,
-  Row, Rows, Stack, Text, Toolbar, TreeRow,
+  Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu, Row, Rows,
+  Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { type ChangesModel } from './changesModel'
@@ -93,18 +93,14 @@ function ViewMenu(props: { model: ChangesModel }) {
       ariaLabel="Changes view"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
+        <IconButton
+          icon="sliders-horizontal"
           label="View options"
           title="How this list is drawn"
           opens="menu"
           expanded={open()}
           onPress={toggle}
-        >
-          <Icon name="sliders-horizontal" />
-        </Button>
+        />
       )}
     >
       {(menu) => (
@@ -134,7 +130,7 @@ export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   const counted = () => model().totals().additions > 0 || model().totals().deletions > 0
   return (
-    <Toolbar size="sm" ariaLabel="Changes">
+    <Toolbar ariaLabel="Changes">
       <Text emphasis="muted">{model().isGit() ? summary(model()) : 'not a git project'}</Text>
       <Show when={counted()}>
         <Text emphasis="muted">+{model().totals().additions} −{model().totals().deletions}</Text>
@@ -384,16 +380,12 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
           {/* At the left of the row, where Zed's is. Draws nothing until a model provider is
               connected (./GenerateButton.tsx). */}
           <GenerateButton model={model()} />
-          <Button
-            variant="bare"
-            size="sm"
-            iconOnly
+          <IconButton
+            icon="square-pen"
             label="Expand the message"
             title="Write the message in a bigger box"
             onPress={() => setExpanded(true)}
-          >
-            <Icon name="square-pen" />
-          </Button>
+          />
           <Toolbar.Spacer />
           <Inline gap="inline">
             <CommitOptionsMenu model={model()} />

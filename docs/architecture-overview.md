@@ -431,6 +431,18 @@ show partial availability with a Node label. A mutation always targets the Node 
 resource. Node IDs are part of cache and persisted-state scope, so identical IDs on different Nodes
 cannot collide.
 
+Two deadlines sit on that path and the order between them is a contract. The client gives each Node a
+fixed window per fan-out request, and every route that waits on something outside the Node has to
+finish inside it. A provider plugin's per-request deadline is therefore always below the fan-out's,
+because a fetch that outlasts the client draws "this machine is unavailable" over a Node that is
+answering everything else, and the plugin's own "this API is unavailable" answer never reaches
+anyone. Changing the client's window means changing those deadlines with it.
+
+A route that passes its deadline is a fact about that route, not about the Node. The broker does not
+read its own request timeout as evidence that a Node is gone; liveness comes from the WebSocket
+heartbeat, and a Node that misses two pings is the one that gets terminated and reconnected. Reading
+a slow route as an unreachable Node took the whole app down over a single slow plugin panel.
+
 The Fleet source and the node switcher appear only once more than one Node is paired
 (`SourceContribution.when`). With a single bundled local Node the rail never mentions Nodes, so
 first-run stays a one-Node product. When a Node stops answering, its card in the Fleet view keeps
@@ -439,6 +451,15 @@ whatever that Node's `QueryClient` last held, so a Node that answered once and t
 as a stale row rather than a failure. The banner that says a Node has never answered is reserved for
 a Node whose cache is empty. Conflating the two would make an offline Node look unreachable and a
 never-reachable Node look stale.
+
+That banner also has to clear itself. A Node that is still booting is listed as `online` the whole
+time, so the fan-out's source never changes and nothing re-runs it, and the surface keeps a banner
+for a Node that is fine seconds later. This is the ordinary shape of a cold launch: the desktop shell
+opens the window as soon as the helper is listening, which is a socket bind rather than a Node boot.
+So a run that reports any Node unavailable schedules another at 2, 5, and 10 seconds, and then stops.
+A ladder rather than a poll, because what it covers has an end: a Node is either up within the boot
+window or it is actually down. A Node that comes back later is picked up by a fleet change, a write,
+or a remount, each of which re-runs the fan-out anyway.
 
 ## The three parties, and what a control plane may hold
 

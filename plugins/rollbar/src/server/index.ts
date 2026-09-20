@@ -3,10 +3,25 @@
 // `counter` (#142) rather than their internal id. Exported fetch is mocked in route tests, never
 // called live there.
 
+// Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
+// (client-core/src/infra/node/fanout.ts) and then draws "unavailable" over the whole node, so a fetch
+// that outlasts it reads to the user as "your machine is down" rather than "this API is slow". Eight
+// seconds did exactly that: the client always gave up first, so the "this provider is unavailable"
+// answer below could never reach anyone. Four, which is what core's own provider routes allow
+// themselves against the same deadline (node-core server/routes/nodeProviders.ts).
+// ponytail: per-request, not per-route. A route that loops over several connections can still add up
+// past the client's 5s; give it a shared budget if anyone hits that with enough workspaces.
+const REQUEST_TIMEOUT_MS = 4_000
+
 const BASE = 'https://api.rollbar.com/api/1'
 
 export function rollbarFetch(token: string, path: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${BASE}${path}`, { headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' }, signal })
+  return fetch(`${BASE}${path}`, {
+    headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' },
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+      : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
 }
 
 // Rollbar wraps every response as { err: 0, result }. A nonzero err or an HTTP failure counts as an

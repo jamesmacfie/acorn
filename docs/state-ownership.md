@@ -73,8 +73,8 @@ The desktop persists:
 
 - paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
 - which Node this window talked to last, so the next launch can pick its cache partition before
-  the fleet answers ([frontend.md](./frontend.md) § Painting before the node);
-- device-scoped appearance, shortcuts, rail order, collapse state, and window geometry;
+  the fleet answers ([frontend.md](./frontend.md) § Startup readiness);
+- device-scoped appearance, shortcuts, rail order, and window geometry;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
@@ -86,7 +86,7 @@ while a Node is offline.
 
 **State follows the resource it describes.** State about a Node's resources goes to that Node's
 per-user prefs, so every client renders it; state about this machine or the person at it — theme,
-style, keybindings, window and collapse state, notices, caches, trust, tokens — stays device-local on
+style, keybindings, window state, notices, caches, trust, tokens — stays device-local on
 purpose. There is no "home node" to store things on: `homeNode()` picks which Node a fresh window
 opens on and nothing else, and the remembered last Node is an id this device draws a cache for,
 not a place preferences live. Drafts stay device-local by a separate recorded decision, because losable
@@ -223,13 +223,24 @@ Neither is persisted. Where you are in a list is a reading posture, not a prefer
 one across a relaunch would need a scope and an eviction rule nobody has asked for. See
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
 
+A scrolled list answers to the same rule, and for a while one list did not. A followed `Timeline` keeps
+the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/readingPlace.ts`,
+and the timeline does not hold it: `plugins/agents/src/client/sessions/readingPlaceStore.ts` does,
+keyed by the view, cleared when the node drops the session and on a node switch. It used to be a pixel
+offset in a module map inside the kit node itself, which broke both halves of the rule above. The unit
+was wrong, because an offset means nothing once the content above it has changed height, which a live
+transcript does continuously. And the owner was wrong: a map inside a kit component cannot be scoped,
+cleared or seen, and its own comment said as much, bounding itself at fifty entries because `kit/` may
+not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
+rather than by position, and clear it where you clear everything else about that entity.
+
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
 2026-08-28. The migration was confirmed complete on the live data root first: none of the four
 aggregate keys was still in `prefs`, and the scoped `core:task-layouts:*`, `editor:open-files:*`,
-`github:pr-filters:*` and `context:section-selection:*` keys were all present. The four `app`-scoped
-shell slices (`core.last-path`, `core.last-task`, `core.last-source`, `core.left-collapsed`) had a
+`github:pr-filters:*` and `context:section-selection:*` keys were all present. The `app`-scoped
+shell slices (`core.last-path`, `core.last-task`, `core.last-source`) had a
 `legacy` reader too, and for those it was always a no-op: `storageKeyFor` returns the declared key
 unchanged for an `app` slice, so the canonical read and the legacy read were the same key.
 
