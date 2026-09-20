@@ -8,7 +8,9 @@ export type FindingsReviewSettings = {
 }
 
 export const DEFAULT_FINDINGS_SETTINGS: FindingsReviewSettings = {
-  automaticPreparation: false,
+  // Retained in the persisted shape for compatibility. Review is automatic at the task-archive
+  // boundary whenever a model backend is configured; choosing no backend is the off switch.
+  automaticPreparation: true,
   notifyWhenReady: false,
   backendId: null,
   modelId: null,

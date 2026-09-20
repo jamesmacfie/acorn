@@ -20,27 +20,38 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
     catch (reason) { setEdited(previous); setError(reason instanceof Error ? reason.message : String(reason)) }
   }
   const chosen = () => backends().find((backend) => backend.id === settings().backendId) ?? backends()[0]
+  const setArchiveReview = (enabled: boolean) => {
+    if (!enabled) return void save({ backendId: null, modelId: null })
+    const backend = chosen()
+    if (!backend) return
+    void save({ backendId: backend.id, modelId: defaultModelIdFor(backend) || null })
+  }
 
   return (
     <Stack gap="section">
       <Heading level={3}>Findings</Heading>
       <Text tone="muted" wrap>Findings quietly records bounded evidence at completion boundaries. Recording does not run a model.</Text>
       <Show when={error()}>{(detail) => <Alert tone="danger">{detail()}</Alert>}</Show>
-      <Checkbox label="Automatically prepare memory suggestions at workflow, terminal, and archive boundaries" checked={settings().automaticPreparation} onChange={(automaticPreparation: boolean) => void save({ automaticPreparation })} />
-      <Show when={settings().automaticPreparation}>
-        <Field label="Prepare suggestions with">
-          <Show when={backends().length} fallback={<Alert tone="warn">No model backend is available. Findings will still be recorded.</Alert>}>
-            <ModelBackendPicker
-              backends={backends()}
-              backendId={settings().backendId ?? ''}
-              modelId={settings().modelId ?? (chosen() ? defaultModelIdFor(chosen()!) : '')}
-              onChange={(pick: { backendId: string; modelId: string }) => void save({ backendId: pick.backendId || null, modelId: pick.modelId || null })}
-            />
-          </Show>
-        </Field>
-      </Show>
+      <Field label="Memory review">
+        <Show when={backends().length} fallback={<Alert tone="warn">No model backend is available. Findings will still be recorded, but memory suggestions cannot be prepared.</Alert>}>
+          <Stack gap="row">
+            <Checkbox label="Prepare memory suggestions when I archive a task" checked={!!settings().backendId} onChange={setArchiveReview} />
+            <Show when={!!settings().backendId}>
+              <Stack gap="row">
+                <Text tone="muted" wrap>Using {chosen()?.label ?? 'the selected backend'}.</Text>
+                <ModelBackendPicker
+                  backends={backends()}
+                  backendId={settings().backendId ?? ''}
+                  modelId={settings().modelId ?? defaultModelIdFor(chosen())}
+                  onChange={(pick: { backendId: string; modelId: string }) => void save({ backendId: pick.backendId || null, modelId: pick.modelId || null })}
+                />
+              </Stack>
+            </Show>
+          </Stack>
+        </Show>
+      </Field>
       <Checkbox label="Notify me when a prepared review bundle is ready" checked={settings().notifyWhenReady} onChange={(notifyWhenReady: boolean) => void save({ notifyWhenReady })} />
-      <Text tone="muted" wrap>Both options are off by default. A preparation failure never changes task or workflow success.</Text>
+      <Text tone="muted" wrap>Closing a task queues the review in the background. A preparation failure never changes task or workflow success.</Text>
     </Stack>
   )
 }

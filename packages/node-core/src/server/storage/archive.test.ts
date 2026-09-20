@@ -123,6 +123,18 @@ describe('archiveTask teardown ordering', () => {
     expect(order).toEqual(['capture:true', 'teardown:true', 'drop:false'])
   })
 
+  it('archives but reports when review input capture fails', async () => {
+    const res = await archiveTask(t.db, 'task1', {}, {
+      ...deps(),
+      captureReviewInput: async () => { throw new Error('findings unavailable') },
+    })
+
+    expect(res).toEqual({ ok: true, reviewCaptureFailed: true })
+    expect(existsSync(worktree)).toBe(false)
+    const [row] = await t.db.select().from(schema.tasks)
+    expect(row.status).toBe('archived')
+  })
+
   it('does not serve or recreate the worktree while archive owns the task', async () => {
     let rootDuringDrop: string | undefined | null
     const res = await archiveTask(t.db, 'task1', {}, {

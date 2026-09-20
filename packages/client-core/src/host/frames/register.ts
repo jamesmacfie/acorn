@@ -228,6 +228,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         label: surface.label,
         glyph: surface.glyph,
         order: surface.order,
+        showInSwitcher: surface.showInSwitcher,
         when: () => pluginEnabledOnNode(frameNode(), pluginId),
         component: (props) => createComponent(PluginWebview, {
           pluginId,
@@ -381,6 +382,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           label: surface.label,
           glyph: surface.glyph,
           order: surface.order,
+          showInSwitcher: surface.showInSwitcher,
           // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so
           // the switcher never offers a pane whose routes aren't there (distribution.ts).
           when: (task) => pluginEnabledOnNode(frameNode(), pluginId)

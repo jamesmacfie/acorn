@@ -143,6 +143,17 @@ describe('TaskPaneHost', () => {
     expect(tabs.some((label) => label?.includes('agent'))).toBe(false)
   })
 
+  it('keeps a command-only pane addressable without putting it in the switcher', () => {
+    pane({ id: 'findings', order: 0, showInSwitcher: false })
+    layout.panes = ['findings']
+
+    mount()
+
+    expect(drawn()).toEqual(['findings'])
+    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) => node.getAttribute('aria-label'))
+    expect(tabs.some((label) => label?.includes('findings'))).toBe(false)
+  })
+
   it('shows only the maximized pane while one is maximized', () => {
     pane({ id: 'pr', order: 0 })
     pane({ id: 'changes', order: 1 })

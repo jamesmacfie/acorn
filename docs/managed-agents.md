@@ -674,7 +674,10 @@ it fails for any reason a selection can break, not only for the one it was writt
   the turn had used on the right. `stampTurnContext` in `conversationItems.ts` copies the figure onto
   the `turn_completed` card by position rather than by turn id, because Codex clears the current turn
   before it emits the completion and the event arrives unattributed. A turn whose harness reported no
-  context window closes with its reason alone.
+  context window closes with its reason alone. Codex's token notification carries cumulative `total`
+  counters and one model call's `last` counters: the cumulative input/output values feed session cost,
+  while `last.totalTokens` alone is compared with `modelContextWindow`. Treating the lifetime total as
+  context makes a long thread appear to exceed its window even though Codex has compacted it normally.
 - Anything the agent is blocked on is drawn in the transcript at the point it asked, and that one card
   has two states. While it is blocking, it is the control that answers it: a dropdown, a column of
   checkboxes for a question that takes several answers, a free-text box, or a row of buttons for a

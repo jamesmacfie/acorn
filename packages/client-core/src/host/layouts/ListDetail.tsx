@@ -80,7 +80,7 @@ export function ListDetail(props: LayoutProps) {
         {/* The divider, and the collapse control riding on it. On the edge rather than in the list's
             header because the header is a region the pane wrote, and because a collapsed column has
             no header left to put a button in. A rail cannot be dragged wider, so the grip goes. */}
-        <div class="layout-list-edge">
+        <div class="layout-list-edge" data-collapsed={collapsed() ? '' : undefined}>
           <Show when={!collapsed()}>
             <div {...drag.handleProps} class="ui-split-handle" data-axis="x" />
           </Show>

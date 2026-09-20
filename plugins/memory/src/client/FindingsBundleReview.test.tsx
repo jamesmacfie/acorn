@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FindingBundle, FindingCandidateRevision } from '@acorn/plugin-findings/contract/review.ts'
 
 Element.prototype.scrollIntoView ??= () => {}
-const mocks = vi.hoisted(() => ({ bundles: vi.fn(), finding: vi.fn(), findingHistory: vi.fn(), prepare: vi.fn(), retryPreparation: vi.fn(), approveFinding: vi.fn(), editFinding: vi.fn(), decideFinding: vi.fn(), cancelPreparation: vi.fn(), restoreFindingObservation: vi.fn(), splitFinding: vi.fn() }))
+const mocks = vi.hoisted(() => ({ bundles: vi.fn(), finding: vi.fn(), findingHistory: vi.fn(), prepare: vi.fn(), retryPreparation: vi.fn(), approveFinding: vi.fn(), editFinding: vi.fn(), decideFinding: vi.fn(), cancelPreparation: vi.fn(), dismissBundle: vi.fn(), restoreFindingObservation: vi.fn(), splitFinding: vi.fn() }))
 vi.mock('./memoryClient', () => ({ memoryApi: () => mocks }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), onPluginFrame: () => () => {} }))
 const { default: FindingsBundleReview } = await import('./FindingsBundleReview')
@@ -12,6 +12,16 @@ const { default: FindingsBundleReview } = await import('./FindingsBundleReview')
 const payload = { operation: 'update' as const, name: 'owner-boundaries', type: 'architecture' as const, description: 'Keep writes with owners.', body: 'New full body.', scope: { kind: 'project' as const, projectId: 'project-1' }, baseMemoryId: 'memory-1', baseHash: 'hash-1' }
 const candidate = (id: string): FindingCandidateRevision => ({ candidateId: id, revision: 1, targetKind: 'memory:change', targetVersion: 1, scope: { kind: 'project', projectId: 'project-1' }, payload, sourceObservationIds: ['observation-1'], payloadHash: 'payload-hash', fingerprint: id, subjectKey: id, groupingExplanation: 'Grouped exact target evidence.', warnings: ['Review the contradiction.'], base: { targetId: 'memory-1', hash: 'hash-1', payload: { ...payload, description: 'Old description.', body: 'Old full body.' } }, status: 'ready', snoozedUntil: null, createdAt: 1, updatedAt: 1 })
 const bundle = (count: number): FindingBundle => ({ id: 'bundle', scope: { kind: 'project', projectId: 'project-1' }, boundaryKey: 'manual', revision: 1, state: 'ready', backendId: null, modelId: null, candidates: Array.from({ length: count }, (_, index) => candidate(`candidate-${index + 1}`)), outcomes: [], inputCount: count, pendingCount: 0, createdAt: 1, updatedAt: 1, error: null })
+const observation = (id: string, title: string, body: string) => ({
+  id,
+  title,
+  body,
+  claimStatus: 'observed' as const,
+  evidence: [],
+  scopeLabels: { task: 'Task title' },
+  origin: { kind: 'agent' as const, sessionId: 'session-1' },
+  createdAt: 1,
+})
 
 let host: HTMLDivElement, dispose: () => void
 afterEach(() => { dispose?.(); host?.remove(); vi.clearAllMocks() })
@@ -20,7 +30,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('findings-backed memory review', () => {
   it('limits summaries to three, then opens the exact full preview with update diff and evidence', async () => {
     mocks.bundles.mockResolvedValue([bundle(4)])
-    mocks.finding.mockResolvedValue({ ...candidate('candidate-1'), observations: [{ id: 'observation-1', title: 'Evidence', body: 'Observed source body.', claimStatus: 'observed', evidence: [] }] })
+    mocks.finding.mockResolvedValue({ ...candidate('candidate-1'), observations: [observation('observation-1', 'Evidence', 'Observed source body.')] })
     mocks.findingHistory.mockResolvedValue({ items: [{ id: 'history-1', candidateId: 'candidate-1', expectedRevision: 1, actorId: 'device-1', action: 'edit', reason: null, createdAt: 1 }] })
     host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
     await settle()
@@ -70,7 +80,7 @@ describe('findings-backed memory review', () => {
     const grouped = { ...candidate('candidate-1'), sourceObservationIds: ['observation-1', 'observation-2'] }
     const withOmission = { ...bundle(1), candidates: [grouped], outcomes: [{ observationId: 'observation-3', outcome: 'not-selected' as const, candidateId: null, explanation: 'Task-specific.' }] }
     mocks.bundles.mockResolvedValue([withOmission])
-    mocks.finding.mockResolvedValue({ ...grouped, observations: [{ id: 'observation-1', title: 'First', body: 'First body.', claimStatus: 'observed', evidence: [] }, { id: 'observation-2', title: 'Second', body: 'Second body.', claimStatus: 'observed', evidence: [] }] })
+    mocks.finding.mockResolvedValue({ ...grouped, observations: [observation('observation-1', 'First', 'First body.'), observation('observation-2', 'Second', 'Second body.')] })
     mocks.restoreFindingObservation.mockResolvedValue(withOmission)
     mocks.splitFinding.mockResolvedValue(withOmission)
     host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
@@ -93,6 +103,17 @@ describe('findings-backed memory review', () => {
     ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Resume') as HTMLButtonElement).click()
     await settle()
     expect(mocks.retryPreparation).toHaveBeenCalledWith('bundle')
+  })
+
+  it('offers one cleanup action for an earlier unfiltered bundle', async () => {
+    const unfiltered = bundle(4)
+    mocks.bundles.mockResolvedValue([unfiltered])
+    mocks.dismissBundle.mockResolvedValue({ ...unfiltered, candidates: [] })
+    host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
+    await settle()
+    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Dismiss this bundle') as HTMLButtonElement).click()
+    await settle()
+    expect(mocks.dismissBundle).toHaveBeenCalledWith('bundle', expect.any(String), 'bundle-not-useful')
   })
 
   it('offers a review-selected snooze date', async () => {

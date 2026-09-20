@@ -43,6 +43,7 @@ export default {
   emits: [
     { verb: 'observations-changed', description: 'A findings scope revision changed; re-read its quiet observation history' },
     { verb: 'review-changed', description: 'A prepared findings review projection changed' },
+    { verb: 'settings-changed', description: 'The owner changed how findings are prepared for memory review' },
   ],
   contributions: {
     frames: [
@@ -52,6 +53,7 @@ export default {
         label: 'Findings',
         glyph: 'list-checks',
         order: 50,
+        showInSwitcher: false,
         layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
         destinations: [
           { id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' },
@@ -68,6 +70,16 @@ export default {
         layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
       },
     ],
+    commands: [{
+      id: 'inspect-evidence',
+      title: 'Findings: inspect task evidence',
+      hint: 'raw observations and review provenance',
+      keywords: ['findings', 'observations', 'evidence', 'diagnostics'],
+      category: 'navigation',
+      palette: true,
+      scope: 'task',
+      action: { verb: 'openPane', pane: 'findings' },
+    }],
     agentTools: [
       { id: 'record', description: 'Record one quiet, task-scoped observation with evidence. This creates no notification or review obligation.', inputSchema: record, risk: 'write', requiresSession: true, handler: '/v2/p/findings/runtime/tools/record', timeoutMs: 5_000, maxOutputBytes: 32_768 },
       { id: 'list', description: 'List this task’s observations with byte-aware cursor pagination, including withdrawn history when requested.', inputSchema: { type: 'object', additionalProperties: false, properties: { cursor: string(400), limit: { type: 'integer', minimum: 1, maximum: 100 }, state: { type: 'string', enum: ['active', 'history'] } } }, risk: 'read', handler: '/v2/p/findings/runtime/tools/list', timeoutMs: 5_000, maxOutputBytes: 262_144 },

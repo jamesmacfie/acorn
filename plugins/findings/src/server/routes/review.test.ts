@@ -25,7 +25,9 @@ describe('findings review device routes', () => {
     runtime = new FindingsRuntime({ capture, emit: () => {}, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: target }], review: new FindingsReviewStore(ctx.storage.open()), core: ctx.core })
   })
   afterEach(() => ctx.cleanup())
-  const request = (principal: Principal, path: string, init?: RequestInit) => portableFetch(findingsReviewRoutes(runtime))(
+  const request = (principal: Principal, path: string, init?: RequestInit) => portableFetch(findingsReviewRoutes(runtime, {
+    prepareTask: (taskId, boundaryKey) => runtime.startPrepareTask(taskId, { boundaryKey }),
+  }))(
     new Request(`http://acorn.test${path}`, init),
     { userId: principal.userId, principal, providers: {} } as PluginRequestContext,
   )
@@ -34,6 +36,10 @@ describe('findings review device routes', () => {
     const body = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ boundaryKey: 'manual:task:1' }) }
     expect((await request({ kind: 'internal', userId: 'owner', scope: 'task', taskId: 'task', sessionId: 'session' }, '/tasks/task/review/prepare', body)).status).toBe(403)
     const device: Principal = { kind: 'device', userId: 'owner', deviceId: 'device' }
+    expect((await request(device, '/tasks/task/review/prepare', {
+      ...body,
+      body: JSON.stringify({ boundaryKey: 'manual:task:1', backendId: 'client-selected' }),
+    })).status).toBe(400)
     const prepared = await request(device, '/tasks/task/review/prepare', body)
     expect(prepared.status).toBe(200)
     expect(await prepared.json()).toMatchObject({ state: 'preparing' })
@@ -46,6 +52,11 @@ describe('findings review device routes', () => {
     }
     expect(bundle).toBeDefined()
     const readyBundle = bundle!
+    expect(await (await request(device, '/review/attention')).json()).toMatchObject([{
+      scope: { kind: 'project', projectId: 'project' },
+      readyCount: 1,
+      failedCount: 0,
+    }])
     expect((await request({ kind: 'internal', userId: 'owner', scope: 'task', taskId: 'task', sessionId: 'session' }, `/review/bundles/${readyBundle.id}/retry`, { method: 'POST' })).status).toBe(403)
     expect((await request(device, `/review/bundles/${readyBundle.id}/retry`, { method: 'POST' })).status).toBe(200)
     const id = readyBundle.candidates[0]!.candidateId
@@ -60,5 +71,13 @@ describe('findings review device routes', () => {
     expect((await request(device, `/review/candidates/${id}/decision`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedRevision: 2, action: 'snooze', until: Date.now() + 60_000, idempotencyKey: 'snooze' }) })).status).toBe(200)
     const history = await request(device, `/review/candidates/${id}/history`)
     expect((await history.json() as { items: unknown[] }).items).toHaveLength(6)
+    const dismissedBundle = await request(device, `/review/bundles/${readyBundle.id}/dismiss`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idempotencyKey: 'dismiss-bundle', reason: 'Not durable.' }),
+    })
+    expect(dismissedBundle.status).toBe(200)
+    const dismissed = await dismissedBundle.json() as { candidates: Array<{ candidateId: string; status: string }> }
+    expect(dismissed.candidates).toContainEqual(expect.objectContaining({ candidateId: id, status: 'dismissed' }))
+    expect(dismissed.candidates.every((candidate) => candidate.status === 'dismissed')).toBe(true)
   })
 })

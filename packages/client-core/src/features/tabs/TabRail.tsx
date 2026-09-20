@@ -335,7 +335,10 @@ export default function TabRail() {
       // danger row.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
-      if (res.cleanupFailed?.length) setArchiveErr(`Archived, but cleanup failed for: ${res.cleanupFailed.join(', ')}`)
+      const warnings: string[] = []
+      if (res.reviewCaptureFailed) warnings.push('memory review could not be queued')
+      if (res.cleanupFailed?.length) warnings.push(`cleanup failed for: ${res.cleanupFailed.join(', ')}`)
+      if (warnings.length) setArchiveErr(`Archived, but ${warnings.join('; ')}.`)
     } else {
       await archiveTask(w.id)
     }

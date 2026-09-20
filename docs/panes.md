@@ -26,6 +26,10 @@ the button, because most tasks never will ([workflows.md](./workflows.md) § The
 the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
 narrow column is unusable.
 
+The loaded Findings pane is deliberately absent from this list. Its manifest sets
+`showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
+**Findings: inspect task evidence**, but raw review inputs do not occupy the everyday task switcher.
+
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
 offered whenever the plugin is running on the node the window is talking to. All four draw **trees**:

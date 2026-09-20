@@ -1,8 +1,10 @@
 # Findings
 
 The findings plugin records evidence discovered during a task without creating a notification or a
-review obligation, then prepares explicit review bundles on request. The task pane shows retained
-evidence; memory owns the preview and approval experience for proposed knowledge changes.
+review obligation. It prepares explicit review bundles when a task is archived or when the owner
+runs **Review learnings**. Memory owns the preview and approval experience for proposed knowledge
+changes. Raw task evidence is a diagnostic surface opened through **Findings: inspect task evidence**
+in the command palette; it does not occupy the task pane switcher.
 
 ## Consolidated review
 
@@ -17,20 +19,29 @@ are checked against accepted memory, every outstanding candidate state, and acti
 Repeated source occurrences remain linked to one candidate; contradictions are never discarded by
 similarity grouping. A preparation that yields no candidate is a valid, inspectable bundle.
 
-The deterministic path needs no model. When a caller explicitly selects an existing model and backend,
-findings makes bounded generation requests and rejects unknown source IDs, duplicate or unaccounted
-inputs, invalid target payloads, and oversized output. The job and bundle projection record the exact
-selected backend and model, supplied token usage, and each omission reason. Findings does not select
-or fall back to another paid backend or model.
+The device routes do not expose the deterministic path. Manual and archive preparation both resolve
+the backend and model from the owner's saved review settings. Without a configured backend, findings
+keeps recording evidence but reports that preparation is unavailable instead of converting every
+observation into a candidate. The lower-level deterministic path remains for migration and isolated
+store tests.
+
+Model preparation receives target-owned instructions and a bounded snapshot of accepted memory. It
+must account for every source once, may combine related sources, and should omit completed-task
+narration, raw logs, and other temporary detail. Findings rejects unknown, duplicate, or unaccounted
+source IDs, invalid target payloads, and oversized output. The job and bundle projection record the
+exact backend and model, token usage, and each omission reason. Findings never selects or falls back
+to another paid backend or model.
 
 Candidate content is immutable per revision. Editing creates a new revision, while dismiss, undo,
 snooze, applying, applied, and conflict are append-only review actions projected into current state.
 An exact dismissal creates a scope-local suppression so regeneration does not resurrect unchanged
 text. A reviewer can restore an omitted observation to an open candidate or separate some of a
 candidate's sources into a new candidate without changing the observations. Bundles publish one
-`plugin:findings:review-changed` invalidation. They remain passive unless the owner enables
-**Notify me when a prepared review bundle is ready**. That option emits one informational notice
-per published bundle.
+`plugin:findings:review-changed` invalidation. Ready suggestions and failed reviews also produce
+project-scoped persistent attention through Memory. The optional **Notify me when a prepared review
+bundle is ready** setting additionally emits one informational notice per published bundle.
+Changing the configured review model emits `plugin:findings:settings-changed`, so an open Memory page
+can refresh its setup state without knowing anything about the settings modal.
 
 `findings:review-target` binds validation and a revocable completion callback to the plugin that owns
 the destination. The public `findings.review.v1` capability is read-only: it lists bundles, reads
@@ -50,20 +61,23 @@ completion sequence, purpose, bounded assistant text, authorized user correction
 availability state. A mismatched task receives unavailable input instead of another task's text.
 
 Findings stores a checkpoint before it considers preparation. Restart reconciliation reads completed
-turns from agents and recreates missed checkpoints. Ordinary managed turns record eligible evidence
-but do not prepare a bundle. Workflow-managed turns record an unavailable checkpoint because the
-top-level workflow completion is the review boundary. Review-purpose turns are excluded.
+turns from agents and recreates missed checkpoints. Lifecycle summaries are stored as internal review
+inputs rather than ordinary findings. They remain available as provenance but are omitted from the
+task context agents receive. Workflow-managed turns record an unavailable checkpoint because the
+top-level workflow owns their handoff. Review-purpose turns are excluded.
 
-The other supported boundaries are an agent terminal exit, top-level workflow completion, and a task
-archive request. Terminal and archive bodies are capped at 16 KiB. Archive capture runs before the
-teardown script, session removal, and worktree removal. If output or a worktree diff cannot be read,
-the checkpoint records why the input is unavailable. Model preparation does not control terminal,
-workflow, or archive success.
+Terminal exit and top-level workflow completion remain evidence boundaries. A task archive is the
+automatic preparation boundary. Terminal and archive bodies are capped at 16 KiB. Archive capture
+runs before the teardown script, session removal, and worktree removal, then queues preparation in
+the background. The task does not wait for model generation. If output or a worktree diff cannot be
+read, the checkpoint records why the input is unavailable; earlier task observations can still be
+prepared. Model preparation does not control terminal, workflow, or archive success. If the archive
+handoff itself fails, core still archives the task and reports that memory review could not be queued.
 
-**Automatically prepare memory suggestions** is off by default. Enabling it applies only to terminal,
-workflow, and archive boundaries. The settings page uses the shared model/backend picker and retains
-both parts of the owner's selection. A missing backend does not stop evidence capture, and
-deterministic preparation remains available.
+Selecting a backend in Findings settings enables automatic review at archive. The shared picker
+retains both the backend and model. Clearing or omitting the backend leaves capture active and review
+disabled. The retained `automaticPreparation` preference field is compatibility data for older
+clients; archive review is now governed by whether a backend is configured.
 
 ## Legacy proposal migration
 

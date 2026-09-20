@@ -11,11 +11,12 @@ import type {
   FindingsChangedFrame,
 } from '../contract/records'
 import { FindingCapture, FindingCaptureError } from './capture'
-import type { FindingBundle, FindingCandidateRevision } from '../contract/review'
+import type { FindingBundle, FindingCandidateRevision, FindingReviewAttention } from '../contract/review'
 import { FINDING_CANDIDATE_PAYLOAD_BYTES } from '../contract/review'
 import { FindingsReviewStore, type FindingSynthesisResult } from './reviewStore'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
+import { FINDINGS_SYNTHESIS_SYSTEM_PROMPT, synthesisPrompt } from './synthesisPrompt'
 
 type Emit = (frame: FindingsChangedFrame) => void
 
@@ -88,6 +89,7 @@ export class FindingsRuntime {
 
   candidate(id: string, revision?: number): FindingCandidateRevision | null { return this.#review?.candidate(id, revision) ?? null }
   bundles(scope: FindingScope, history = false): FindingBundle[] { return this.#review?.bundles(scope, history) ?? [] }
+  reviewAttention(): FindingReviewAttention[] { return this.#review?.attention() ?? [] }
   observations(ids: readonly string[]): FindingObservation[] { return this.#capture.getMany(ids) }
 
   async bundlesForTask(taskId: string, history = false): Promise<FindingBundle[]> {
@@ -182,6 +184,7 @@ export class FindingsRuntime {
     if (frozenIds && input.length !== frozenIds.length) throw new FindingCaptureError('unavailable', 'one or more frozen preparation inputs are unavailable')
     const backendId = persistedSource ? persistedSource.backendId : options.backendId ?? null
     const modelId = persistedSource ? persistedSource.modelId : options.modelId ?? null
+    const targetContext = backendId ? await targetEntry.value.synthesisContext?.(scope) ?? null : null
     let synthesize: ((observations: FindingObservation[]) => Promise<FindingSynthesisResult>) | undefined
     if (backendId) synthesize = async (observations) => {
       const userId = core.identity.active()
@@ -198,8 +201,8 @@ export class FindingsRuntime {
       let inputTokens = 0, outputTokens = 0, hasUsage = false
       for (const chunk of chunks) {
         const result = await core.models.generateText({ userId, backendId, timeoutMs: 60_000, input: {
-          system: 'Return JSON only: {"candidates":[{"payload": memoryChange, "sourceIds":[ids], "explanation":"reason"}], "omitted":[{"sourceId":"id","reason":"reason"}]}. Use only supplied source IDs. Keep contradictions separate. Zero candidates is valid.',
-          prompt: JSON.stringify({ observations: chunk.map(({ id, title, body, claimStatus }) => ({ id, title, body, claimStatus })) }),
+          system: FINDINGS_SYNTHESIS_SYSTEM_PROMPT,
+          prompt: synthesisPrompt(chunk, targetContext),
           ...(modelId ? { modelId } : {}),
           maxOutputTokens: 8_000,
         } })
@@ -282,6 +285,12 @@ export class FindingsRuntime {
   decideCandidate(args: Parameters<FindingsReviewStore['decide']>[0]): FindingCandidateRevision { if (!this.#review) throw new FindingCaptureError('unavailable', 'findings review is unavailable'); const updated = this.#review.decide(args); this.#emit({ channel: 'plugin:findings:review-changed', scope: updated.scope, revision: updated.revision }); return updated }
   history(candidateId: string) { return this.#review?.history(candidateId) ?? [] }
   cancelPreparation(bundleId: string): FindingBundle { if (!this.#review) throw new FindingCaptureError('unavailable', 'findings review is unavailable'); const bundle = this.#review.cancelPreparation(bundleId); this.#emit({ channel: 'plugin:findings:review-changed', scope: bundle.scope, revision: bundle.revision }); return bundle }
+  dismissBundle(bundleId: string, actorId: string, idempotencyKey: string, reason?: string): FindingBundle {
+    if (!this.#review) throw new FindingCaptureError('unavailable', 'findings review is unavailable')
+    const bundle = this.#review.dismissBundle(bundleId, actorId, idempotencyKey, reason)
+    this.#emit({ channel: 'plugin:findings:review-changed', scope: bundle.scope, revision: bundle.revision })
+    return bundle
+  }
   async retryPreparation(bundleId: string): Promise<FindingBundle> {
     if (!this.#review) throw new FindingCaptureError('unavailable', 'findings review is unavailable')
     const source = this.#review.preparationSource(bundleId)

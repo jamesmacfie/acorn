@@ -60,6 +60,14 @@ export type FindingReviewHistory = {
   createdAt: number
 }
 
+export type FindingReviewAttention = {
+  id: string
+  scope: FindingScope
+  readyCount: number
+  failedCount: number
+  updatedAt: number
+}
+
 export type FindingPreparationRequest = {
   scope: FindingScope
   boundaryKey: string
@@ -86,12 +94,14 @@ const scopeQuery = (scope: FindingScope): string => scope.kind === 'private' ? '
     : scope.kind === 'project' ? `scope=project&projectId=${encodeURIComponent(scope.projectId)}`
       : `scope=workspace&workspaceId=${encodeURIComponent(scope.workspaceId)}`
 export const findingsBundlesRoute = (scope: FindingScope, history = false): string => `/v2/p/findings/review/bundles?${scopeQuery(scope)}${history ? '&history=true' : ''}`
+export const findingsReviewAttentionRoute = '/v2/p/findings/review/attention'
 export const findingsPrepareRoute = (taskId: string): string => `/v2/p/findings/tasks/${encodeURIComponent(taskId)}/review/prepare`
 export const findingsCandidateRoute = (id: string): string => `/v2/p/findings/review/candidates/${encodeURIComponent(id)}`
 export const findingsCandidateEditRoute = (id: string): string => `${findingsCandidateRoute(id)}/edit`
 export const findingsCandidateDecisionRoute = (id: string): string => `${findingsCandidateRoute(id)}/decision`
 export const findingsCandidateHistoryRoute = (id: string): string => `${findingsCandidateRoute(id)}/history`
 export const findingsCancelPreparationRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/cancel`
+export const findingsDismissBundleRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/dismiss`
 export const findingsRetryPreparationRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/retry`
 export const findingsRestoreObservationRoute = (bundleId: string, observationId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/outcomes/${encodeURIComponent(observationId)}/restore`
 export const findingsSplitCandidateRoute = (candidateId: string): string => `${findingsCandidateRoute(candidateId)}/split`

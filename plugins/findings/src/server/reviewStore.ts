@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { FindingObservation, FindingScope } from '../contract/records'
-import type { FindingBundle, FindingCandidateRevision, FindingGroupingOutcome, FindingReviewHistory } from '../contract/review'
+import type { FindingBundle, FindingCandidateRevision, FindingGroupingOutcome, FindingReviewAttention, FindingReviewHistory } from '../contract/review'
 import {
   findingBundleCandidates, findingBundles, findingCandidateObservations, findingCandidateRevisions,
   findingCandidates, findingGroupingOutcomes, findingPreparationInputs, findingPreparationJobs, findingReviewActions, findingSuppressions,
@@ -148,6 +148,50 @@ export class FindingsReviewStore {
         candidates: members.flatMap(({ id }) => this.candidate(id) ? [this.candidate(id)!] : []), outcomes: this.outcomeRows(row.id),
         inputCount: row.inputCount, pendingCount: row.pendingCount, createdAt: row.createdAt, updatedAt: row.updatedAt, error: row.error }
     })
+  }
+
+  attention(): FindingReviewAttention[] {
+    const grouped = new Map<string, FindingReviewAttention>()
+    const ensure = (scope: FindingScope, updatedAt: number): FindingReviewAttention => {
+      const key = reviewScopeKey(scope)
+      const existing = grouped.get(key)
+      if (existing) {
+        existing.updatedAt = Math.max(existing.updatedAt, updatedAt)
+        return existing
+      }
+      const created = { id: key, scope, readyCount: 0, failedCount: 0, updatedAt }
+      grouped.set(key, created)
+      return created
+    }
+    for (const row of this.db.select().from(findingCandidates).all()) {
+      const ready = row.status === 'ready' || (row.status === 'snoozed' && row.snoozedUntil !== null && row.snoozedUntil <= this.now())
+      if (ready) ensure(storedScope(row), row.updatedAt).readyCount += 1
+    }
+    for (const row of this.db.select().from(findingBundles).where(eq(findingBundles.state, 'failed')).all()) {
+      ensure(storedScope(row), row.updatedAt).failedCount += 1
+    }
+    return [...grouped.values()].sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id))
+  }
+
+  dismissBundle(bundleId: string, actorId: string, idempotencyKey: string, reason?: string): FindingBundle {
+    const row = this.db.select().from(findingBundles).where(eq(findingBundles.id, bundleId)).get()
+    if (!row) throw new FindingCaptureError('not-found', 'review bundle not found')
+    const scope = storedScope(row)
+    const candidates = this.db.select({ id: findingBundleCandidates.candidateId }).from(findingBundleCandidates)
+      .where(eq(findingBundleCandidates.bundleId, bundleId)).orderBy(asc(findingBundleCandidates.ordinal)).all()
+    for (const { id } of candidates) {
+      const candidate = this.candidate(id)
+      if (!candidate || (candidate.status !== 'ready' && candidate.status !== 'snoozed')) continue
+      this.decide({
+        candidateId: id,
+        expectedRevision: candidate.revision,
+        actorId,
+        action: 'dismiss',
+        reason,
+        idempotencyKey: `${idempotencyKey}:${id}`,
+      })
+    }
+    return this.requireBundle(scope, bundleId)
   }
 
   async prepare(args: { scope: FindingScope; sourceTaskId?: string; boundaryKey: string; backendId?: string; modelId?: string; targetKind: string; target: FindingReviewTargetContribution; synthesize?: (observations: FindingObservation[]) => Promise<FindingSynthesisResult>; observations: FindingObservation[] }): Promise<FindingBundle> {
@@ -427,8 +471,15 @@ export class FindingsReviewStore {
     const current = this.requireCurrent(args.candidateId, args.expectedRevision)
     if (args.action === 'dismiss-reason' && !args.reason?.trim()) throw new FindingCaptureError('invalid-input', 'a dismissal reason cannot be blank')
     const updatesDismissal = args.action === 'undo-dismiss' || args.action === 'dismiss-reason'
-    if (updatesDismissal ? current.status !== 'dismissed' : current.status !== 'ready') {
-      throw new FindingCaptureError('conflict', updatesDismissal ? 'only a dismissed candidate can be updated' : 'only a ready candidate can be dismissed or snoozed')
+    const canAct = updatesDismissal
+      ? current.status === 'dismissed'
+      : args.action === 'dismiss'
+        ? current.status === 'ready' || current.status === 'snoozed'
+        : current.status === 'ready'
+    if (!canAct) {
+      throw new FindingCaptureError('conflict', updatesDismissal
+        ? 'only a dismissed candidate can be updated'
+        : 'only a ready or snoozed candidate can be dismissed, and only a ready candidate can be snoozed')
     }
     const at = this.now()
     const status = args.action === 'dismiss' || args.action === 'dismiss-reason' ? 'dismissed' : args.action === 'snooze' ? 'snoozed' : 'ready'

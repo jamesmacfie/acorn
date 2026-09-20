@@ -87,7 +87,12 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   const projectRoot = project?.path ? resolve(project.path) : null
   const ownsWorktree = !!t.worktreePath && (!projectRoot || resolve(t.worktreePath) !== projectRoot)
 
-  await deps.captureReviewInput?.(id).catch(() => undefined)
+  let reviewCaptureFailed = false
+  try {
+    await deps.captureReviewInput?.(id)
+  } catch {
+    reviewCaptureFailed = true
+  }
 
   // Teardown runs while the worktree and any services still exist, before sessions stop and before
   // removal. A non-zero exit pauses the archive so the caller can abort or re-invoke with
@@ -136,5 +141,9 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   broadcastTasksChanged({ taskId: id })
   // Archived, but say what did not happen. `ok` stays true, because the task is archived, and
   // reporting a failure would have the caller offer a retry for work already done.
-  return checkFailures.length ? { ok: true, cleanupFailed: checkFailures } : { ok: true }
+  return {
+    ok: true,
+    ...(checkFailures.length ? { cleanupFailed: checkFailures } : {}),
+    ...(reviewCaptureFailed ? { reviewCaptureFailed: true } : {}),
+  }
 }

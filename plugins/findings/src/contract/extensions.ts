@@ -39,12 +39,20 @@ export type FindingReviewValidation = {
   base?: { targetId: string; hash: string; payload: unknown }
 }
 
+export type FindingReviewSynthesisContext = {
+  /** Target-owned instructions for producing one valid review payload. */
+  instructions: string
+  /** A bounded snapshot of accepted targets, used to prefer updates and avoid semantic duplicates. */
+  existing: unknown[]
+}
+
 /** A target validates its own payload and receives a revocable, owner-bound completion handle.
  * Findings can prepare review state through this seam, but never receives target write authority. */
 export type FindingReviewTargetContribution = {
   version: number
   validate(input: { scope: FindingScope; payload: unknown }): Promise<FindingReviewValidation>
   acceptedFingerprints(scope: FindingScope): Promise<readonly string[]>
+  synthesisContext?(scope: FindingScope): Promise<FindingReviewSynthesisContext>
   connect(controller: FindingTargetController): void | (() => void)
 }
 

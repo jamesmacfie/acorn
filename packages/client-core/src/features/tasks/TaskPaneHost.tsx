@@ -28,7 +28,7 @@ export default function TaskPaneHost(props: {
 }) {
   const layout = () => layoutForTask(props.task.id) ?? defaultLayout()
   const dispatch = (action: LayoutAction) => dispatchLayout(props.task.id, action)
-  const switcherPanes = () => paneContributions().filter((pane) => paneAvailable(pane, props.task))
+  const switcherPanes = () => paneContributions().filter((pane) => pane.showInSwitcher !== false && paneAvailable(pane, props.task))
   const registeredLayoutPanes = () => {
     const chosen = layout().panes.flatMap((id) => {
       const pane = paneContribution(id)

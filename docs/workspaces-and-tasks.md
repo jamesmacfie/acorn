@@ -190,9 +190,10 @@ window and runs git. A failure is never remembered either: "we could not tell" m
 a file, waits 100 milliseconds, and expects the removal to be refused.
 
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
-failures instead of pretending removal succeeded. Its order is guard, repo teardown script, stop
-sessions, plugin cleanups, remove worktree, mark archived. The two teardown steps sit before removal
-so anything that needs the worktree still has it.
+failures instead of pretending removal succeeded. Its order is guard, review-input capture, repo
+teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Capture and the two
+teardown steps sit before removal so anything that needs the worktree still has it. A failed review
+handoff does not strand the task: archive completes and the rail reports that review was not queued.
 
 Archive claims the task's worktree lifecycle before teardown starts. New root reads return no path
 while that claim is held, and archive waits for a worktree creation that was already in flight before

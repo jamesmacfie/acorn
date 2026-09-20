@@ -13,6 +13,25 @@ const normalize = (text: string): string => text.trim().replace(/\s+/g, ' ')
 const fingerprint = (payload: MemoryChangePayload): string => digest({ scope: payload.scope, name: payload.name.toLowerCase(), type: payload.type, description: normalize(payload.description), body: normalize(payload.body) })
 const rowPayload = (row: MemoryRow): MemoryChangePayload => ({ operation: 'add', name: row.name, type: row.type as MemoryChangePayload['type'], description: row.description, body: row.body, scope: row.scope === 'private' ? { kind: 'private' } : { kind: 'project', projectId: row.projectId! } })
 const rowVersionHash = (row: MemoryRow): string => digest(rowPayload(row))
+const SYNTHESIS_CONTEXT_BYTES = 32 * 1024
+
+const boundedExistingMemories = (rows: readonly MemoryRow[]): unknown[] => {
+  const included: unknown[] = []
+  for (const row of [...rows].sort((left, right) => right.updatedAt - left.updatedAt)) {
+    const entry = {
+      id: row.id,
+      hash: rowVersionHash(row),
+      name: row.name,
+      type: row.type,
+      description: row.description,
+      body: row.body,
+      scope: row.scope === 'private' ? { kind: 'private' } : { kind: 'project', projectId: row.projectId },
+    }
+    if (new TextEncoder().encode(JSON.stringify([...included, entry])).byteLength > SYNTHESIS_CONTEXT_BYTES) break
+    included.push(entry)
+  }
+  return included
+}
 
 export type MemoryFindingsTarget = {
   contribution: FindingReviewTargetContribution
@@ -60,6 +79,22 @@ export const createMemoryFindingsTarget = (args: { db: PluginDatabase; memory: M
     acceptedFingerprints: async (scope) => {
       const resolvedScope = scope.kind === 'project' ? { kind: 'project' as const, projectId: scope.projectId } : { kind: 'private' as const }
       return (await allRows(resolvedScope)).map((row) => fingerprint(rowPayload(row)))
+    },
+    synthesisContext: async (scope) => {
+      const resolvedScope = scope.kind === 'project'
+        ? { kind: 'project' as const, projectId: scope.projectId }
+        : { kind: 'private' as const }
+      return {
+        instructions: [
+          'Produce memory-change payloads with operation, name, type, description, body, and scope.',
+          'Use a short kebab-case name and one clear sentence for description.',
+          'Types are convention, architecture, decision, fix, reference, feedback, task, or user.',
+          'Use project scope unless the source establishes a stable preference that should apply across projects.',
+          'A durable decision should preserve its rationale in the body.',
+          'For an update, copy the existing memory id and hash into baseMemoryId and baseHash. Never rename an update.',
+        ].join(' '),
+        existing: boundedExistingMemories(await allRows(resolvedScope)),
+      }
     },
     connect: (next) => { controller = next; return () => { if (controller === next) controller = null } },
   }

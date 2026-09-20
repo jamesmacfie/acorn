@@ -119,13 +119,17 @@ Memory stays a first-party plugin. The loaded tier contributes a declarative sou
 page; and memory is the human gate on knowledge an agent proposes writing into your repository, which
 is the wrong thing to move behind the sandbox.
 
-Findings-backed suggestions appear above legacy proposals. The Memory page and task Context section
-render the same bundle projection: three stable summaries followed by **Show all**, with an exact
-full-body preview before approval. Updates show their accepted base as a unified before/after diff.
+Findings-backed suggestions appear above legacy proposals. The Memory page shows preparing, failed,
+ready, and empty-review states. Ready suggestions are persistent attention items grouped by project,
+so they remain discoverable after their source task is archived. Three stable summaries appear before
+**Show all**, with an exact full-body preview before approval. An older bundle prepared without a
+model offers one action to dismiss the whole unfiltered bundle. Updates show their accepted base as a
+unified before/after diff.
 Editing covers the name for additions and the type, description, body, and project/private reach for
 all candidates, then creates a new revision before **Approve changes** is available. Update names are
-stable file identities and are not renamed in place. Dismiss, post-action optional reason hints, undo, a selected snooze date,
-source evidence, and history remain attached to the candidate.
+stable file identities and are not renamed in place. Dismiss, post-action optional reason hints, undo,
+a selected snooze date, source task labels, observation origins, capture times, evidence, and review
+history remain attached to the candidate.
 Omitted outcomes retain their preparation reason and can be restored to the open change. A source
 inside an incorrectly grouped change can be separated into its own candidate before editing.
 
@@ -206,8 +210,11 @@ name is what the context section keys its rows by. It is task-scoped even though
 the project: the query carries the captured project, but the surface a hit opens in belongs to a task,
 and a row that cannot be opened is not worth offering. **Review memory proposals** goes to the Memory
 page instead, and so is offered with no task in hand.
-**Review learnings** is task-scoped and explicitly prepares findings from that task, then opens the
-Memory page. It neither enables automatic preparation nor selects a model backend.
+**Review learnings** is task-scoped and explicitly prepares findings from that task, then routes to
+the owning project's Memory page. The Node resolves the same saved backend and model used by archive
+review; without one it asks the owner to configure review instead of creating unfiltered candidates.
+The Findings plugin also contributes **Findings: inspect task evidence**, the command-only route to
+raw observations and provenance.
 
 What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note
 list, where the scope and the current value are both on screen. Accepting or rejecting a proposal
@@ -218,9 +225,9 @@ name, a type, a scope, and a body, which is four fields rather than one line.
 
 When findings is active and its migration report permits cutover, managed-agent completion updates
 findings checkpoints instead of running the legacy per-turn generator. Ordinary turns do not create
-review cards or notices. Terminal exit, top-level workflow completion, and task archive can prepare a
-bundle when the owner enables that setting. Workflow handoff notes remain notes and are read only as
-bounded input for the workflow boundary.
+review cards or notices. Terminal exit and top-level workflow completion contribute evidence. Task
+archive freezes the task's evidence and queues one project-scoped review when a backend is configured.
+Workflow handoff notes remain notes and are read only as bounded input for the workflow boundary.
 
 If findings is disabled or cutover is unsafe, the legacy hook remains available. It runs on the first
 installed agent profile with a headless mode, in a fixed order of Claude Code then Codex. It still

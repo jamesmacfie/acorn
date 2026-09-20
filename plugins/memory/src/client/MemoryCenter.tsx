@@ -1,6 +1,8 @@
 import { useParams } from '@solidjs/router'
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { Badge, Card, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, Card, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Stack, Text } from '@acorn/plugin-api/ui'
+import { clientEvents, onPluginFrame } from '@acorn/plugin-api/client'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { memoryApi, type MemoryProposalRow } from './memoryClient'
 import { highlightedFinding, highlightedProposal, clearHighlightedProposal } from './proposalTarget'
 import ProposalList from './ProposalList'
@@ -37,6 +39,8 @@ export default function MemoryCenter() {
     async () => (await memoryApi().proposals()).filter((proposal) => proposal.status === 'pending'),
     { initialValue: [] },
   )
+  const [reviewSettings, { refetch: refetchReviewSettings }] = createResource(() => memoryApi().reviewSettings())
+  onCleanup(onPluginFrame('findings', pluginChannel('findings', 'settings-changed'), () => void refetchReviewSettings()))
   const proposals = createMemo(() => proposalsForProject(allProposals(), params.projectId))
   const [legacyMapping] = createResource(
     highlightedProposal,
@@ -70,6 +74,16 @@ export default function MemoryCenter() {
     <ListDetail>
       <DetailColumn scroll>
         <Stack gap="section">
+          <Stack gap="row">
+            <Heading level={1}>Memory</Heading>
+            <Text emphasis="muted">Durable knowledge and suggestions distilled from completed tasks.</Text>
+          </Stack>
+          <Show when={reviewSettings() && !reviewSettings()!.backendId}>
+            <Alert tone="warn" title="Choose a model for memory review">
+              Closing a task will keep its evidence, but suggestions cannot be prepared until a review model is selected.
+              <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'findings-settings' })}>Open review settings</Button>
+            </Alert>
+          </Show>
           <FindingsBundleReview focusCandidateId={highlightedFinding() ?? legacyMapping()?.candidateId ?? undefined} scope={params.projectId ? { kind: 'project', projectId: params.projectId } : { kind: 'private' }} onChanged={() => void refetchMemories()} />
           <Show when={proposals().length}>
             <Stack gap="row">

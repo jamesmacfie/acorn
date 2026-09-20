@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 import type { MemoryRow } from './memoryClient'
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), prepare: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn() }))
+const mocks = vi.hoisted(() => ({ search: vi.fn(), prepare: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn(), projectPath: vi.fn((id: string) => `/p/${id}`) }))
 vi.mock('./memoryClient', () => ({ memoryApi: () => ({ search: mocks.search, prepare: mocks.prepare }) }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   openPane: mocks.openPane,
   setSelectedSource: mocks.setSelectedSource,
+  projectPath: mocks.projectPath,
 }))
 
 import { memoryCommands } from './commands'
@@ -78,9 +79,21 @@ describe('the memory plugin catalogue', () => {
     })
   })
 
-  it('sends the proposals row to the Memory page, not into a task', () => {
-    ;(at('memory.proposals.open') as { run: (c: CommandExecutionContext) => void }).run(context())
+  it('sends the proposals row to the routed project’s Memory page, not into a task', () => {
+    const navigate = vi.fn()
+    ;(at('memory.proposals.open') as { run: (c: CommandExecutionContext) => void }).run(context({ navigate }))
     expect(mocks.setSelectedSource).toHaveBeenCalledWith('memory')
+    expect(navigate).toHaveBeenCalledWith('/p/p-1')
     expect(mocks.openPane).not.toHaveBeenCalled()
+  })
+
+  it('prepares with server-owned settings and opens the bundle’s project', async () => {
+    const navigate = vi.fn()
+    mocks.prepare.mockResolvedValue({ scope: { kind: 'project', projectId: 'p-from-bundle' } })
+    const command = at('memory.learnings.review') as { run: (c: CommandExecutionContext) => Promise<unknown> }
+    await command.run(context({ projectId: null, navigate }))
+    expect(mocks.prepare).toHaveBeenCalledWith('task-1', expect.stringMatching(/^manual:task-1:/))
+    expect(mocks.setSelectedSource).toHaveBeenCalledWith('memory')
+    expect(navigate).toHaveBeenCalledWith('/p/p-from-bundle')
   })
 })

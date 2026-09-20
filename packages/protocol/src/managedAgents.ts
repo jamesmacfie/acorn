@@ -138,10 +138,12 @@ export type AgentInputPart =
   | { type: 'image'; attachmentId: string; alt?: string }
 
 export type AgentUsage = {
+  // Token counters follow the provider's declared accounting mode; Codex reports cumulative totals.
   inputTokens?: number
   outputTokens?: number
   cachedInputTokens?: number
   cacheWriteInputTokens?: number
+  // With contextSize, this is the latest model context, not lifetime/session tokens.
   contextUsed?: number
   contextSize?: number
   cost?: { amount: number; currency: string }
