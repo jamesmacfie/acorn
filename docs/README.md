@@ -155,6 +155,30 @@ evidence.
 - [Phase 19: Complete migration and remove superseded paths](./future/workflow_v2/phase-19-transition.md)
 - [Phase 20: Release acceptance and documentation handoff](./future/workflow_v2/phase-20-acceptance.md)
 
+## Architecture and legacy reset programme
+
+Reviewed proposal, 2026-09-21. These files describe future work, not shipped contracts.
+
+- [Programme and implementation order](./future/legacy/README.md)
+- [Context, coverage, and evidence](./future/legacy/context.md)
+- [Architecture and legacy findings](./future/legacy/findings.md)
+- [Target architecture](./future/legacy/target-architecture.md)
+- [Reset and versioning](./future/legacy/reset-and-versioning.md)
+- [Refused alternatives](./future/legacy/refused.md)
+- [Ticket 01: Recoverable reset tooling](./future/legacy/01-reset-tooling.md)
+- [Ticket 02: Remove custody and preference adoption](./future/legacy/02-device-legacy.md)
+- [Ticket 03: Canonical review proposals](./future/legacy/03-canonical-proposals.md)
+- [Ticket 04: Plugin-owned lifecycle collaboration](./future/legacy/04-lifecycle-ownership.md)
+- [Ticket 05: Canonical API representations](./future/legacy/05-canonical-api.md)
+- [Ticket 06: Plugin-owned workflow and agent contracts](./future/legacy/06-contract-ownership.md)
+- [Ticket 07: Terminal-owned client state](./future/legacy/07-terminal-client.md)
+- [Ticket 08: Explicit plugin contracts](./future/legacy/08-plugin-contracts.md)
+- [Ticket 09: Fresh database baselines](./future/legacy/09-database-baselines.md)
+- [Ticket 10: Version-1 cutover](./future/legacy/10-version-one.md)
+- [Ticket 11: Close library exports](./future/legacy/11-library-exports.md)
+- [Ticket 12: Naming and focused simplification](./future/legacy/12-maintainability.md)
+- [Ticket 13: Acceptance and documentation](./future/legacy/13-acceptance.md)
+
 ## Plugin reference topics
 
 ### Plugin contracts
