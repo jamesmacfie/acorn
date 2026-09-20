@@ -9,14 +9,14 @@ import {
   toast,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
-import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import { emptyDefinition } from './editor/draft'
 import { defRefKey, parseDefRef, SOURCE_GLYPH } from './editor/draftStore'
 import StartDialogHost from './editor/StartDialog'
 import WorkflowEditor from './editor/WorkflowEditor'
-import { workflowsSurfacePath } from './surfacePath'
+import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
 import { workflowApi } from './workflowsClient'
 
 // The Workflows rail source, as its two regions (docs/workflows.md § Authoring).
@@ -56,6 +56,9 @@ function useScope() {
 }
 
 export function WorkflowsBrowseList() {
+  // The same signal the source's list column reads, keyed by the source id, so rows and column
+  // narrow together (client-core kit/lib/collapseState.ts).
+  const collapsed = sidebarCollapsed(WORKFLOWS_SOURCE_ID)
   const scope = useScope()
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
@@ -153,7 +156,14 @@ export function WorkflowsBrowseList() {
               <Show
                 when={definitions().find((definition) => defRefKey({ source: definition.source, id: definition.id }) === item.key)}
                 fallback={(
-                  <Row item={itemProps} selected={selected()} variant="stacked" leading={<Icon name="triangle-alert" />}>
+                  <Row
+                    item={itemProps}
+                    selected={selected()}
+                    variant="stacked"
+                    title={item.label}
+                    collapsed={collapsed() ? <Icon name="triangle-alert" tone="warn" /> : undefined}
+                    leading={<Icon name="triangle-alert" />}
+                  >
                     <Text tone="warn" wrap>{item.label}</Text>
                   </Row>
                 )}
@@ -163,7 +173,18 @@ export function WorkflowsBrowseList() {
                     item={itemProps}
                     selected={selected()}
                     onPress={() => open(item.key)}
-                    title={definition().problems?.join(' ')}
+                    title={definition().problems?.join(' ') || definition().name}
+                    // Collapsed: where the definition came from, which is the one thing that tells
+                    // two same-named workflows apart, and the problem badge, which is the reason a
+                    // reader would go looking. The name is the tooltip.
+                    collapsed={collapsed()
+                      ? (
+                        <>
+                          <Icon name={SOURCE_GLYPH[definition().source].icon} title={SOURCE_GLYPH[definition().source].title} />
+                          <Show when={definition().problems?.length}><Badge tone="warn" size="xs">!</Badge></Show>
+                        </>
+                      )
+                      : undefined}
                     meta={(
                       <Text emphasis="muted">
                         {[
@@ -204,6 +225,8 @@ export function WorkflowsBrowseList() {
                   item={itemProps}
                   selected={selected()}
                   onPress={() => openRun(run().id)}
+                  title={run().title}
+                  collapsed={collapsed() ? <Icon name={STATUS_GLYPH[run().status] ?? 'circle'} /> : undefined}
                   leading={<Icon name={STATUS_GLYPH[run().status] ?? 'circle'} />}
                   meta={<Text emphasis="muted">{run().detail ?? run().status}</Text>}
                 >

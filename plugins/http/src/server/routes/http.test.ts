@@ -182,7 +182,7 @@ describe('HTTP credential isolation', () => {
 
     const rows = (await (await call(principal('alice'), '/rail-items?project=project-web')).json()) as PluginRailItems
     // The project tree only: a task's ad-hoc request is not a project row, and another owner's never was.
-    expect(rows.items).toEqual([{ id: expect.any(String), title: 'Filed', badge: 'POST', icon: 'send', subtitle: 'auth' }])
+    expect(rows.items).toEqual([{ id: expect.any(String), title: 'Filed', badge: 'POST', icon: 'send', short: 'POST', subtitle: 'auth' }])
     // No `task` block, which is what tells the host there is nothing here to promote.
     expect(rows.items[0]).not.toHaveProperty('task')
   })

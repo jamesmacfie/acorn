@@ -205,6 +205,12 @@ A source that declares it renders identically on the desktop — `SourceSurface`
 at once, which is what the terminal shell does: the list goes in a panel of its own down the left and
 the detail fills the main panel ([docs/tui.md](./tui.md) § The screen).
 
+Descriptor sources go the same way. `ChromeSourcePanel` used to be one component drawing the whole
+surface on the shell's `.panes` card grid, which left Linear, Rollbar and the HTTP rail as the only
+browse sources not on `ListDetail`. It hands over a list and a detail now, so all five compose
+identically, and the two halves never shared state to begin with: which row is selected is the URL,
+which is what makes a row click, a pasted deep link and the back button one thing.
+
 It exists because a host cannot pull two columns out of one opaque component. Even the kit node cannot:
 the `split` form of `ListDetail` takes both columns as `children`, so it does not know which of its
 children is which. Naming them is the only honest answer, and the name to use is the one panes already

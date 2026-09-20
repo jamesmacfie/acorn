@@ -249,6 +249,9 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
           title: row.name,
           badge: row.method,
           icon: 'send',
+          // The verb identifies a request the way a ticket key identifies an issue, and it is what a
+          // collapsed row shows under the glyph. The badge keeps it for the expanded list.
+          short: row.method,
           ...(row.folder ? { subtitle: row.folder } : {}),
         })),
       } satisfies PluginRailItems)

@@ -99,7 +99,13 @@ function Part(props: { shrink: number; children: JSX.Element }) {
 /** One line: the caret for where the keys are, the leading slot, the title, the meta at the far end.
  *
  *  `reveal` hides the trailing controls until hover on the DOM. There is no hover, so they always
- *  show — the one prop this host answers by ignoring, noted in the node's row in the 80×24 table. */
+ *  show — noted in the node's row in the 80×24 table.
+ *
+ *  `collapsed` is the other prop this host answers by ignoring. It is the row at the width of the
+ *  DOM shell's icon rails, and it is legible there only because the name it drops comes back as a
+ *  tooltip on hover. There is no hover here and no `tip` in this host's facade (./ui.ts), so a rail
+ *  row in cells would be a column of marks with no way left to read them. The terminal narrows by
+ *  showing one region at a time instead (../layouts/ListDetail.tsx), which loses no names. */
 export function Row(props: {
   item?: ItemProps
   metaFields?: number
@@ -118,6 +124,7 @@ export function Row(props: {
   leading?: JSX.Element
   trailing?: JSX.Element
   meta?: JSX.Element
+  collapsed?: JSX.Element
   title?: string
   children: JSX.Element
 }) {
@@ -190,6 +197,7 @@ export function TreeRow(props: {
   trailing?: JSX.Element
   meta?: JSX.Element
   reveal?: boolean
+  collapsed?: JSX.Element
   title?: string
   children: JSX.Element
 }) {

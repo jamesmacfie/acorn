@@ -34,6 +34,9 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   // pane opens on is the only request left. Not the snapshot itself: which session that would be is
   // the reader's choice, and a wrong guess is a few thousand event rows.
   prefetch: (task) => void managedAgentStore.loadTask(task.id).catch(() => {}),
+  // The sidebar gives each row its run-state glyph back as a rail form
+  // (./sessions/AgentTaskSidebar.tsx).
+  collapsible: true,
   regions: {
     'list-header': AgentSidebarHeader,
     list: AgentTaskSidebar,

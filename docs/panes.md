@@ -90,7 +90,7 @@ the answer; a new named layout is.
 | Layout | Regions | Desktop | Narrow | Terminal |
 | --- | --- | --- | --- | --- |
 | `single` | `body` | one region, the pane's padding and focus group | unchanged | one frame, titled with the pane's name |
-| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
+| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token, and `collapsible` adds the control that takes it down to a rail | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
 | `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the body is framed and titled with the pane's name; the two pinned strips are bare, because a frame round one line is three rows of chrome |
 | `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line; the panel is framed and titled with the open tab |
 | `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, each framed; the document is a host text view, read-only for now |
@@ -334,6 +334,15 @@ ctx.panes.register({
   hidden: (task) => (libraryCollapsed(task.id) ? ['list'] : []),
 })
 ```
+
+`hidden` drops a region outright. `collapsible`, on a `list-detail` pane, is the other answer to the
+same question: the column survives and narrows to the width of the icon rails, with each row coming
+back as one mark. Opt in, because that second half is the pane's to arrange — it reads the same
+signal (`kit/lib/collapseState.ts`) and passes each `Row` a `collapsed` slot — and a pane that
+collapses without doing it gets full-width rows clipped mid-word. A pane drawn from a remote tree
+cannot keep the bargain: its rows are built in a plugin worker with no way to read a host signal, so
+it leaves the flag off and keeps a column that resizes and does not collapse. See
+[docs/ui-design.md § Two-column panes](./ui-design.md#two-column-panes).
 
 A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
 a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my

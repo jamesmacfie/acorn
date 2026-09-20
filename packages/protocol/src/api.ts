@@ -509,6 +509,15 @@ export type PluginRailItem = {
   /** Semantic severity for the icon; the host owns its actual colour. */
   severity?: 'info' | 'warn' | 'danger'
   badge?: string
+  /** This row at the width of an icon rail, for a collapsed sidebar: a ticket identifier, an item
+   *  number, an HTTP verb. A few characters, under the icon, and nothing else fits.
+   *
+   *  Its own field rather than the first of `fields`, because the two answer different questions.
+   *  `fields` is what lines up in columns down an expanded list, and the fact a source happens to put
+   *  first is not always the one that identifies a row: rollbar's is `#142` and linear's is the issue
+   *  state. A source that sends neither this nor `icon` still draws a reachable row, marked with a dot
+   *  and named by its tooltip. */
+  short?: string
   task?: PluginRailTask
 }
 export type PluginRailItems = { items: PluginRailItem[] }

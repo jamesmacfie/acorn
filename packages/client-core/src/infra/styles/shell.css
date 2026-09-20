@@ -323,6 +323,31 @@
   overflow: hidden;
 }
 .layout-list-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* Collapsed: the same width the icon rails read, so a pack that moves them moves this
+   (tokens-style.css § --tabrail-w). The dragged pixel value stops being applied while it is, which
+   is why the component drops the inline custom property rather than this rule fighting it. */
+.layout-region-list[data-collapsed] { width: var(--tabrail-w); }
+/* Holds the divider and the collapse control. See host/layouts/ListDetail.tsx for why the control is
+   on the edge and not in the pane's `list-header` region. */
+/* As the kit node does: a label and a count have no room in a rail, and the rail's icon already says
+   which list this is. See primitives.css § ListDetail for why this is a rule and not a prop. */
+.layout-region-list[data-collapsed] .section-header { display: none; }
+.layout-list-edge {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  overflow: visible;
+}
+.layout-list-edge > .ui-btn {
+  position: absolute;
+  top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);
+  right: 0;
+  transform: translateX(50%);
+  z-index: var(--z-resizer);
+  background: var(--pane-bg);
+  border-radius: var(--radius-surface);
+}
 
 /* `wizard`. The host draws the indicator and the two controls; the step is the plugin's. */
 .layout-wizard-steps {

@@ -23,6 +23,26 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // `connection` is the name of the workspace the issue came from, and is passed only when the list
 // holds rows from more than one connected Linear. Two workspaces can both have an ENG-42, so without
 // it those rows read identically; with one connection it would be a column repeating itself.
+// Linear's own state vocabulary, which is a fixed API value rather than the workflow name a team
+// chose, so this map holds for every workspace. The rail source filters completed and canceled out
+// (../server/index.ts), and they are here because the same row shape is reachable from a link.
+//
+// It earns its place twice over: the icon gives the expanded list a leading mark it never had, and it
+// is the only thing a collapsed row has room to show beside the key.
+//
+// Every name here is in the host's eager icon set. The census only scans names spelled in the client
+// tree, so a name reached through this map is not checked for us: picking one the set lacks would
+// render the word `circle-help` in a frame rather than a glyph
+// (client-core/kit/tokens/iconNodes.eager.json, client-core/scripts/icon-census.mjs).
+const STATE_GLYPH: Record<string, string> = {
+  triage: 'circle-question-mark',
+  backlog: 'circle-dashed',
+  unstarted: 'circle',
+  started: 'circle-dot',
+  completed: 'circle-check',
+  canceled: 'circle-x',
+}
+
 export function linearRailItem(issue: LinearProjectIssue, connection?: string): PluginRailItem {
   // Title, key, status, row actions, the shape github's PR list has. Two columns, so the reserved tracks
   // leave room to read the title. Assignee, priority, and labels are a click away in the detail pane.
@@ -35,6 +55,10 @@ export function linearRailItem(issue: LinearProjectIssue, connection?: string): 
     fields: connection
       ? [issue.identifier, issue.state?.name ?? '', connection]
       : [issue.identifier, issue.state?.name ?? ''],
+    ...(issue.state?.type && STATE_GLYPH[issue.state.type] ? { icon: STATE_GLYPH[issue.state.type] } : {}),
+    // The key, not the first of `fields`, even though they are the same string today. `fields` is
+    // what lines up in columns; this is what identifies the row when there is room for nothing else.
+    short: issue.identifier,
     task: {
       origin: 'linear',
       title: `${issue.identifier} ${issue.title}`,

@@ -680,7 +680,11 @@ const NARROW_AT = 80
 const LIST_CELLS = 32
 
 /** reduced: two columns above 80 cells, one at a time below. Which one is drawn below the ceiling is
- *  "the detail if there is one", because a caller that passed a detail has something to show. */
+ *  "the detail if there is one", because a caller that passed a detail has something to show.
+ *
+ *  `collapseKey` is ignored. Collapsing a sidebar to a rail of marks only reads because the names it
+ *  drops come back as tooltips, and this host has neither hover nor `tip` (./ui.ts). Narrowing here
+ *  is the `NARROW_AT` switch below, which shows one column at a time and loses no names. */
 export function ListDetail(props: {
   list?: JSX.Element
   split?: boolean
@@ -688,6 +692,7 @@ export function ListDetail(props: {
   listWidth?: 'narrow' | 'default' | 'wide'
   scrollDetail?: boolean
   detailAs?: 'div' | 'main'
+  collapseKey?: string
   children: JSX.Element
 }) {
   let box: Renderable | undefined

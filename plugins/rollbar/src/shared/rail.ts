@@ -28,6 +28,9 @@ export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
     // One reserved track keeps short and long Rollbar ids aligned; the flexible title gets the rest.
     fields: [`#${item.identifier}`],
     fieldsFirst: true,
+    // The same string the reserved track holds, said again because the two are asked different
+    // questions: one lines up down an expanded list, the other is all a collapsed row has room for.
+    short: `#${item.identifier}`,
     ...rollbarSeverity(item.level),
     badge: String(item.totalOccurrences),
     task: {

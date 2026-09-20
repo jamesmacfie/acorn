@@ -72,6 +72,20 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   tabs?: readonly { id: string; label: string }[]
   /** Regions this pane is not showing right now, asked per render. */
   hidden?: (task: Task) => readonly string[]
+  /**
+   * `list-detail` only: offer the control that narrows the list column to the width of the icon
+   * rails (kit/lib/collapseState.ts).
+   *
+   * Opt in rather than automatic, because collapsing is a bargain the pane has to keep. The column
+   * narrows to 48px and every row in it has to come back as one mark, which the pane arranges by
+   * reading the same signal and passing each `Row` a `collapsed` slot. A pane that collapses without
+   * doing that gets a rail of full-width rows clipped mid-word.
+   *
+   * A pane drawn from a remote tree cannot keep it: its rows are built in a plugin worker that has
+   * no way to read a host signal, so it leaves this off and keeps a column that resizes and does not
+   * collapse (docs/plugins.md § The tree contract).
+   */
+  collapsible?: boolean
 }
 
 // `any` for the reason `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by
@@ -181,6 +195,7 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
         // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
         // pane. Collapsing a library must not remount the note being edited.
         get hidden() { return entry.hidden?.(props.task) },
+      collapsible: entry.collapsible === true,
       }) } })
     },
   }

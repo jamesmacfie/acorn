@@ -25,6 +25,10 @@ export type LayoutProps = {
   /** Regions the pane is not showing right now. A layout drops them and gives their space to the
    *  regions that are left, which is also the mechanism the narrow projections need. */
   hidden?: readonly string[]
+  /** `list-detail` only. Offer the control that collapses the list column to a rail. Opt in, because
+   *  the pane has to give each of its rows a `collapsed` slot for the rail to be readable
+   *  (registries/panes/panes.ts § collapsible). */
+  collapsible?: boolean
   /** `tabs` only. The bar, in order; each entry has a `panel:<id>` region. */
   tabs?: readonly { id: string; label: string }[]
   /** `wizard` only. The host draws the indicator from these and the back and next controls. */

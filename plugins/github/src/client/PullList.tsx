@@ -7,8 +7,8 @@ import {
   runContextMenuItem, workspaceForProject, workspacesOptions, type ItemRowTarget,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, EmptyState, Icon, Input, Menu, Row, RowActions, Rows, StatusDot, Tabs, Text,
-  Toolbar, UserAvatar,
+  Alert, Button, EmptyState, Icon, Inline, Input, Menu, Row, RowActions, Rows, sidebarCollapsed,
+  StatusDot, Tabs, Text, Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
@@ -35,6 +35,9 @@ const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed
 // bindings; none of that is here now (docs/command-palette-and-shortcuts.md § Focus and typing).
 export default function PullList() {
   const params = useParams()
+  // The same signal the source's list column reads, so the rows narrow exactly when the column does
+  // (client-core kit/lib/collapseState.ts). Keyed by the source id this plugin registers.
+  const collapsed = sidebarCollapsed('github')
   const navigate = useNavigate()
   // Tab and filter are kept per workspace (./pullList/filterState.ts). The active workspace is
   // derived from the routed repo, so switching repos within a workspace keeps the filter and
@@ -246,6 +249,27 @@ export default function PullList() {
                       height={place.height}
                       title={pull().title}
                       label={item.label}
+                      // Collapsed: the author's avatar over the number, which is how a pull request is
+                      // named in conversation. The checks dot stays, because "is it green" is the
+                      // other thing worth seeing at a glance, and it costs no width sitting beside
+                      // the avatar. The state glyph and the age go; the title is the tooltip.
+                      //
+                      // Both marks fit the row's existing height, which is not negotiable here: this
+                      // list is the app's only virtualized one and its row height is a number read
+                      // off the document root, so a taller row would tear the scroll range.
+                      collapsed={collapsed()
+                        ? (
+                          <>
+                            <Inline gap="inline">
+                              <UserAvatar login={pull().author} />
+                              <Show when={checks().length}>
+                                <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
+                              </Show>
+                            </Inline>
+                            <Text emphasis="muted">#{item.key}</Text>
+                          </>
+                        )
+                        : undefined}
                       leading={
                         <>
                           <Show when={checks().length}>

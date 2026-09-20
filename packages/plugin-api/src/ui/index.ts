@@ -39,6 +39,11 @@ export { KeyValueEditor } from '@acorn/client-core/kit/components/inputs/KeyValu
 // Drag-resize as a hook, because the three consumers model size differently: two panes against each
 // other, one absolute height, one fraction. Only a delta suits all three.
 export { createSplitDrag } from '@acorn/client-core/kit/lib/split.ts'
+// A collapsed sidebar is two decisions from one signal: the column's width, which `ListDetail` takes
+// as `collapseKey`, and each row's rail form, which the pane passes as `Row`'s `collapsed` slot. Both
+// read the state from here, because a row is created in the pane's own JSX and handed over as an
+// element, so no provider inside the column could ever own it.
+export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from '@acorn/client-core/kit/lib/collapseState.ts'
 // The delegated tooltip protocol, as a typed helper. Attributes are the API; a wrapper component
 // would add an element around every trigger, which is exactly what the protocol avoids.
 export { tip } from '@acorn/client-core/kit/components/overlays/tips.tsx'

@@ -32,6 +32,8 @@ describe('Linear descriptor rows', () => {
       id: 'linear%3Aacme:ENG-42',
       title: 'Ship it',
       fields: ['ENG-42', 'In Progress'],
+      icon: 'circle-dot',
+      short: 'ENG-42',
       task: {
         origin: 'linear',
         title: 'ENG-42 Ship it',
@@ -50,6 +52,17 @@ describe('Linear descriptor rows', () => {
     // row in a merged list. With one connection the column would repeat a single answer down the list.
     expect(linearRailItem(ISSUE).fields).toEqual(['ENG-42', 'In Progress'])
     expect(linearRailItem(ISSUE, 'Work').fields).toEqual(['ENG-42', 'In Progress', 'Work'])
+  })
+
+  it('marks the row from Linear\'s own state vocabulary, not the name a team chose', () => {
+    // `state.type` is a fixed API value; `state.name` is whatever the workspace called that column.
+    // The glyph is the only thing a collapsed row has room for beside the key, so it cannot depend on
+    // a team's spelling. Every name in the map is in the host's eager icon set, which the census
+    // cannot check for us because it only scans names spelled in the client tree.
+    expect(linearRailItem({ ...ISSUE, state: { name: 'Triage', type: 'triage', color: '#000' } }).icon).toBe('circle-question-mark')
+    expect(linearRailItem({ ...ISSUE, state: { name: 'Someday', type: 'backlog', color: '#000' } }).icon).toBe('circle-dashed')
+    expect(linearRailItem({ ...ISSUE, state: { name: 'Anything at all', type: 'started', color: '#000' } }).icon).toBe('circle-dot')
+    expect(linearRailItem({ ...ISSUE, state: null }).icon).toBe(undefined)
   })
 
   it('falls back to the lower-cased identifier when Linear suggests no branch', () => {

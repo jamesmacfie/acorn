@@ -35,6 +35,7 @@ describe('Rollbar descriptor rows', () => {
       title: 'Checkout failed',
       fields: ['#142/7'],
       fieldsFirst: true,
+      short: '#142/7',
       icon: 'circle-x',
       severity: 'danger',
       badge: '12',
