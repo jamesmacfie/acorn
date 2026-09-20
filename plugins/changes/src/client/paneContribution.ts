@@ -16,5 +16,7 @@ export const changesPaneContribution: PaneLayoutContribution<ChangesModel> = {
   // The change list, the selection, the diff source and the armed commit confirm, held once per task
   // by the host (client-core registries/paneModels.ts).
   model: (task) => createChangesModel(task),
+  // Each row comes back as the git status letter it already led with (./ChangesPane.tsx).
+  collapsible: true,
   regions: { 'list-header': ChangesHeader, list: ChangesList, 'list-footer': ChangesFooter, detail: ChangesDiff },
 }

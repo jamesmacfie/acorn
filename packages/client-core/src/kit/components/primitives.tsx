@@ -5,8 +5,10 @@ import {
 import { Dynamic, Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from '../lib/anchor'
 import { createArmedConfirm } from '../lib/confirm'
+import { sidebarCollapse } from '../lib/collapseState'
 import { createSplitDrag, type SplitDrag } from '../lib/split'
 import { createCollection, createDomCollection, type ItemProps } from '../keys/collection'
+import Icon from './content/Icon'
 import type { Size, Tone } from '../tokens/tokens'
 
 // The kit's nodes. Every prop on this page is the node's own: a role token, a string of content, a
@@ -685,17 +687,40 @@ export function Row(props: {
   leading?: JSX.Element
   trailing?: JSX.Element
   meta?: JSX.Element
+  /** This row at the width of an icon rail: a glyph, a number, a short identifier. What is left of
+   *  the row when there is room for one mark and the name has moved into the tooltip.
+   *
+   *  Passing it is what collapses the row, so a caller hands it down from the same signal its column
+   *  reads (../lib/collapseState.ts) and the two cannot disagree. Leading, body, meta and trailing
+   *  all give way to it, along with depth, nesting and revealed controls, which are about a width
+   *  this row no longer has.
+   *
+   *  It has the row's existing height to work in, never more: a virtualized list takes its row height
+   *  from a token read off the document root (../lib/metrics.ts), so a taller collapsed row is a
+   *  height the virtualizer has not accounted for. */
+  collapsed?: JSX.Element
   title?: string
   children: JSX.Element
 }) {
   const activate = () => props.onPress?.()
+  // Given a rail form, draw it. The caller owns both the column's collapse and its rows, so it
+  // passes the slot or leaves it off; there is no second boolean that could disagree with the width
+  // the column is actually at.
+  const collapsed = () => props.collapsed !== undefined
   const body = (
-    <>
-      <Show when={props.leading}><span class="ui-row-leading">{props.leading}</span></Show>
-      <span class="ui-row-body">{props.children}</span>
-      <Show when={props.meta}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{props.meta}</span></Show>
-      <Show when={props.trailing}><span class="ui-row-trailing">{props.trailing}</span></Show>
-    </>
+    <Show
+      when={collapsed()}
+      fallback={(
+        <>
+          <Show when={props.leading}><span class="ui-row-leading">{props.leading}</span></Show>
+          <span class="ui-row-body">{props.children}</span>
+          <Show when={props.meta}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{props.meta}</span></Show>
+          <Show when={props.trailing}><span class="ui-row-trailing">{props.trailing}</span></Show>
+        </>
+      )}
+    >
+      <span class="ui-row-collapsed">{props.collapsed}</span>
+    </Show>
   )
   if (props.href !== undefined) {
     return (
@@ -704,13 +729,15 @@ export function Row(props: {
         href={props.href}
         class="ui-row"
         data-selected={props.selected ? '' : undefined}
-        data-nested={props.nested ? '' : undefined}
-        data-depth={props.depth ? String(props.depth) : undefined}
-        data-reveal={props.reveal ? '' : undefined}
+        data-collapsed={collapsed() ? '' : undefined}
+        data-nested={props.nested && !collapsed() ? '' : undefined}
+        data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
+        data-reveal={props.reveal && !collapsed() ? '' : undefined}
         data-density={props.density ?? 'default'}
         data-variant={props.variant ?? 'default'}
-        data-meta-first={props.metaFirst ? '' : undefined}
+        data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
         title={props.title}
+        data-tip={collapsed() ? (props.title ?? props.label) : undefined}
         aria-label={props.label}
         aria-selected={props.item ? !!props.selected : undefined}
         style={placement(props)}
@@ -740,13 +767,15 @@ export function Row(props: {
       {...(props.item ?? {})}
       class="ui-row"
       data-selected={props.selected ? '' : undefined}
-      data-nested={props.nested ? '' : undefined}
-      data-depth={props.depth ? String(props.depth) : undefined}
-      data-reveal={props.reveal ? '' : undefined}
+      data-collapsed={collapsed() ? '' : undefined}
+      data-nested={props.nested && !collapsed() ? '' : undefined}
+      data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
+      data-reveal={props.reveal && !collapsed() ? '' : undefined}
       data-density={props.density ?? 'default'}
       data-variant={props.variant ?? 'default'}
-      data-meta-first={props.metaFirst ? '' : undefined}
+      data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
       title={props.title}
+      data-tip={collapsed() ? (props.title ?? props.label) : undefined}
       aria-label={props.label}
       aria-selected={props.item ? !!props.selected : undefined}
       style={placement(props)}
@@ -1411,6 +1440,9 @@ export function TreeRow(props: {
   meta?: JSX.Element
   /** Hide `trailing` until hover or focus. */
   reveal?: boolean
+  /** This row at rail width: `Row`'s slot, forwarded. The twist goes with the indentation it belongs
+   *  to, since a tree at 48px has no room to show depth and nothing to reparent by. */
+  collapsed?: JSX.Element
   title?: string
   children: JSX.Element
 }) {
@@ -1420,6 +1452,7 @@ export function TreeRow(props: {
       selected={props.selected}
       depth={props.depth}
       reveal={props.reveal}
+      collapsed={props.collapsed}
       density="compact"
       variant="tree"
       title={props.title}
@@ -1481,6 +1514,17 @@ export function ListDetail(props: {
    *  claims the landmark. A pane inside the shell leaves it a div, because the shell owns the
    *  page's `main`. */
   detailAs?: 'div' | 'main'
+  /** This split's list column is a sidebar: offer the control that narrows it to the width of the
+   *  icon rails, and remember the answer under this key (../lib/collapseState.ts).
+   *
+   *  Opt in, because this node also draws splits that are two halves of one document. A pull
+   *  request's section nav has no rail form and nothing to collapse to. The host's `list-detail`
+   *  *layout* needs no such flag, since a pane that names that layout is a sidebar by definition
+   *  (host/layouts/ListDetail.tsx).
+   *
+   *  The rows collapse separately, from the same signal: read it with `sidebarCollapsed(key)` and
+   *  pass each row a `collapsed` slot. */
+  collapseKey?: string
   children: JSX.Element
 }) {
   // `list` is a prop, so every read of it re-runs the JSX the caller wrote there. This read it three
@@ -1491,6 +1535,8 @@ export function ListDetail(props: {
   const list = children(() => props.list)
   const columns = children(() => props.children)
   const [width, setWidth] = createSignal(0)
+  const collapse = () => props.collapseKey === undefined ? undefined : sidebarCollapse(props.collapseKey)
+  const collapsed = () => collapse()?.[0]() === true
   let root: HTMLDivElement | undefined
   let dragStart: number | null = null
   const currentListWidth = () => {
@@ -1513,20 +1559,48 @@ export function ListDetail(props: {
     },
     onCommit: () => { dragStart = null },
   })
-  const handle = () => <SplitHandle axis="x" drag={drag} />
+  // The divider, and the control that collapses the column, which rides on it.
+  //
+  // On the edge rather than inside the list column's header, because the header belongs to whoever
+  // wrote the column: in the `split` form it is a `ListColumn` the caller built, so there is nothing
+  // for this node to put a button into. The edge is the one place both forms share, and it is also
+  // the only place that still exists once the column is a 48px rail with no header left to sit in.
+  //
+  // A collapsed column loses the drag handle with the width it could have been dragged to.
+  //
+  // A split with no collapse is the bare handle it always was, and the wrapper below appears only
+  // where there is a second thing to hold. Most of this node's callers are two halves of a document
+  // rather than a sidebar, and the grid's middle track is a contract they already keep.
+  const edge = () => (
+    <Show when={props.collapseKey !== undefined} fallback={<SplitHandle axis="x" drag={drag} />}>
+      <div class="ui-listdetail-edge">
+        <Show when={!collapsed()}><SplitHandle axis="x" drag={drag} /></Show>
+        <Button
+          variant="bare"
+          size="xs"
+          iconOnly
+          label={collapsed() ? 'Expand list' : 'Collapse list'}
+          tip={collapsed() ? 'Expand list' : 'Collapse list'}
+          onPress={() => collapse()?.[1](!collapsed())}
+        >
+          <Icon name={collapsed() ? 'chevron-right' : 'chevron-left'} />
+        </Button>
+      </div>
+    </Show>
+  )
   return (
     <div
       ref={root}
       class="ui-listdetail"
-      data-list={list() !== undefined || props.split ? (props.listWidth ?? 'default') : undefined}
-      style={width() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
+      data-list={list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined}
+      style={width() && !collapsed() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
     >
       <Show
         when={list() !== undefined}
         fallback={
           <Show when={props.split} fallback={columns()}>
             {columns.toArray()[0]}
-            {handle()}
+            {edge()}
             {columns.toArray().slice(1)}
           </Show>
         }
@@ -1537,7 +1611,7 @@ export function ListDetail(props: {
           <aside class="ui-listdetail-list" aria-label={props.listLabel}>
             {list()}
           </aside>
-          {handle()}
+          {edge()}
           <Dynamic
             component={props.detailAs ?? 'div'}
             class="ui-listdetail-detail"

@@ -723,6 +723,9 @@ ui: attachPty
 ui: createArmedConfirm
 ui: createSplitDrag
 ui: defaultModelIdFor
+ui: paneCollapseKey
 ui: renderMarkdown
 ui: rowHeightSm
+ui: sidebarCollapse
+ui: sidebarCollapsed
 ui: tip

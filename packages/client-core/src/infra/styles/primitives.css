@@ -271,6 +271,35 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-row[role='button'] { cursor: pointer; }
 .ui-row[role='button']:hover { background: var(--bg-hover); }
 .ui-row[data-selected] { background: var(--bg-selected); border-left-color: var(--accent); }
+/* A row in a collapsed sidebar. The rail is one column wide and the row's mark is centred in it, so
+   the row drops its inline padding and the left accent marker with it: at 48px a 2px marker beside a
+   14px glyph reads as a misaligned icon rather than as selection. The selected row says so with its
+   background alone, the way a rail button does.
+
+   `title` and `aria-label` still carry the name, and `data-tip` (primitives.tsx § Row) turns that
+   into the app's own tooltip on hover and on focus, which is the whole reason a rail row is legible
+   at all. */
+.ui-row[data-collapsed] {
+  justify-content: center;
+  padding: 0;
+  border-left-color: transparent;
+}
+.ui-row[data-collapsed][data-selected] { border-left-color: transparent; }
+.ui-row-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
+  /* The rail's width is the budget, and the row's own height is the other half of it: a virtualizer
+     writes an inline height from a token read off the document root (kit/lib/metrics.ts), so nothing
+     in here may make the row taller than it already is. */
+  max-width: 100%;
+  font-size: var(--fs-xs);
+  line-height: 1.1;
+  overflow: hidden;
+}
 .ui-row[data-density='compact'] { min-height: var(--row-h-sm); }
 .ui-row[data-density='roomy'] { min-height: calc(var(--row-h) + var(--space-4)); }
 .ui-row:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
@@ -1075,6 +1104,37 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-listdetail[data-list] { grid-template-columns: var(--listdetail-w) 1px minmax(0, 1fr); }
 .ui-listdetail[data-list='narrow'] { grid-template-columns: var(--listdetail-w-narrow) 1px minmax(0, 1fr); }
 .ui-listdetail[data-list='wide'] { grid-template-columns: var(--listdetail-w-wide) 1px minmax(0, 1fr); }
+/* Collapsed: the list column is the width of the icon rails, and it is the same token they read, so a
+   style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
+.ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
+/* A collapsed column has no header left to hold the toggle, and in the `split` form it never had one
+   this node could reach, so the control rides the divider instead (primitives.tsx § ListDetail).
+   Centred on the edge and on the header's line, so it reads as belonging to the column it closes. */
+/* A section's label and a pane's list header are both `.section-header`, and neither survives 48px:
+   "Managed sessions · 3" has no room to draw and the rail's own icon already says which list this is.
+   The `<section>` keeps its aria-label, so the grouping is still announced.
+
+   Not a prop, because there is no width at which a plugin would want to keep it. A header with a
+   control in it is a different question, and a plugin answers that one by reading the collapse signal
+   and drawing the control on its own (kit/lib/collapseState.ts).
+
+   `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
+.ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
+.ui-listdetail-edge {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  overflow: visible;
+}
+.ui-listdetail-edge > .ui-btn {
+  position: absolute;
+  top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);
+  right: 0;
+  transform: translateX(50%);
+  z-index: var(--z-resizer);
+  background: var(--pane-bg);
+  border-radius: var(--radius-surface);
+}
 /* A flex column so a caller can stack a header, a scrolling list and a footer link in it, the
    arrangement http's sidebar already had and the other three grew towards. */
 .ui-listdetail-list {

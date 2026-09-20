@@ -27,6 +27,14 @@ const SYNC_REPLY_TIMEOUT_MS = 5_000
 const HEADER_BYTES = Int32Array.BYTES_PER_ELEMENT * 2
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+// An object that already survives a structured clone with its own shape, so neither side walks it key
+// by key. `Object.entries` on a Uint8Array yields `{ '0': 26, '1': 80, … }`, and the receiver gets an
+// object that looks close enough to the real thing to pass every check and then has no `.slice`.
+//
+// That was a live failure. A plugin reading an image through a capability got its bytes back as a
+// numbered object and the route threw, which the host answered as a bare 500.
+const carriesItsOwnShape = (value: unknown): boolean =>
+  value instanceof Date || value instanceof RegExp || ArrayBuffer.isView(value) || value instanceof ArrayBuffer
 const bodyBuffer = (value: Uint8Array): ArrayBuffer => {
   const copy = new Uint8Array(value.byteLength)
   copy.set(value)
@@ -112,7 +120,7 @@ export class PluginRpcEndpoint {
       } satisfies WireAbortSignal
     }
     if (Array.isArray(value)) return Promise.all(value.map((item, index) => this.encode(item, `${path}[${index}]`)))
-    if (!isRecord(value) || value instanceof Date || value instanceof RegExp || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value
+    if (!isRecord(value) || carriesItsOwnShape(value)) return value
 
     const out: Record<string, unknown> = {}
     // Plain objects carry data. Class instances carry their public method surface only: copying own
@@ -132,7 +140,7 @@ export class PluginRpcEndpoint {
 
   decode(value: unknown, path = 'value'): unknown {
     if (Array.isArray(value)) return value.map((item, index) => this.decode(item, `${path}[${index}]`))
-    if (!isRecord(value)) return value
+    if (!isRecord(value) || carriesItsOwnShape(value)) return value
     if (value.__acornRpc === 'function') {
       const wire = value as WireFunction
       const cached = this.#remoteFunctions.get(wire.id)
@@ -206,7 +214,7 @@ export class PluginRpcEndpoint {
       return { __acornRpc: 'function', id, sync: this.#mode(path, value as (...args: never[]) => unknown) === 'sync' } satisfies WireFunction
     }
     if (Array.isArray(value)) return value.map((item, index) => this.#encodeSync(item, `${path}[${index}]`))
-    if (!isRecord(value) || value instanceof Date || value instanceof RegExp || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value
+    if (!isRecord(value) || carriesItsOwnShape(value)) return value
     const out: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value)) out[key] = this.#encodeSync(item, `${path}.${key}`)
     return out

@@ -796,15 +796,57 @@ A list column that can be collapsed passes `list={undefined}` rather than hiding
 still in the grid — `ListDetail` then has one track instead of a zero-width first one. Notes' library
 toggle works this way.
 
+**A sidebar that narrows to a rail says so with `collapseKey`.** The column goes to `--tabrail-w`,
+the width the two icon rails already read, and the drag handle goes with the width nobody can drag
+to. The control rides the divider rather than sitting in the list's header, because in the `split`
+form the header belongs to a `ListColumn` the caller built and this node has nothing to put a button
+into — and because a collapsed column has no header left to sit in.
+
+Collapsing is a bargain, and the other half of it is the rows. A column at 48px has room for one
+mark, so every row in it takes a `collapsed` slot: the run state for an agent, an avatar over a
+number for a pull request, a state icon over a key for a ticket. The slot's presence is what
+collapses the row, and the caller passes it from the same signal the column reads
+(`kit/lib/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
+to it, along with depth, nesting and revealed controls, which are about a width the row no longer
+has. The name comes back as the tooltip, from the `title` the row already carried.
+
+The slot has the row's existing height to work in and never more. A virtualized list takes its row
+height from `--row-h-virt` read off the document root (`kit/lib/metrics.ts`), so a per-column
+override is invisible to the virtualizer and a taller collapsed row tears the scroll range.
+
+Opt in on both tiers, and for the same reason. The kit node is told with `collapseKey` because it
+also draws splits that are two halves of one document, where a pull request's section nav has no rail
+form to collapse to. A pane is told with `collapsible` because a pane that collapses without giving
+its rows a rail form gets full-width rows clipped mid-word. A pane drawn from a remote tree cannot
+keep the bargain at all: its rows are built in a plugin worker with no way to read a host signal, so
+it keeps a column that resizes and does not collapse.
+
+A section label and a pane's list header are both `.section-header`, and neither survives 48px, so
+the stylesheet drops them in a collapsed column. Not a prop, because there is no width at which a
+caller would want to keep them; the `<section>` keeps its aria-label, so the grouping is still
+announced. A header holding a *control* is a different question, and a caller answers that one by
+reading the collapse signal and drawing the control itself, which is what the descriptor source panel
+does with its refresh button.
+
+The terminal ignores all of it. A rail of marks reads only because the names it drops come back on
+hover, and that host has neither hover nor `tip`; it narrows by showing one region at a time instead,
+which loses no names.
+
 It is deliberately not the layout for two separate surfaces. The test is whether the two columns are
 one surface split by a divider or two surfaces side by side; `.panes` + `.pane` from
-`styles/shell.css` is the second case, inset surfaces with a gap between them.
+`styles/shell.css` is the second case, inset surfaces with a gap between them. **Every browse source
+is the first case**, including the ones a descriptor declares. Linear, Rollbar and the HTTP rail used
+to be the exception, drawn by `ChromeSourcePanel` as two inset cards on the `.panes` grid while
+GitHub and Workflows were one surface and a divider; the file's own comment already called that
+surface "master/detail like every other Source browse" and the markup was the thing that disagreed.
+It hands `SourceSurface` two halves now, so all five draw through the same node, and those three
+gained a resize handle and a collapse they never had. `.panes` keeps Home, Fleet, the task view and
+the empty state.
 
-**A Source with fewer than three columns spans the shell grid; it never redefines it.** `grid-column:
-2 / -1` on the last pane is how the chrome source panel says it. A plugin that writes its own
-`grid-template-columns` for `.panes` gets a column width that only resembles the shell's — Docker's
-was `clamp(320px, 30vw, 460px)` against the shell's `clamp(320px, 28vw, 420px)` — and a rule that has
-to out-specify every style pack's own `.panes` override. Spanning has neither problem and needs no
+**A pane that writes its own `grid-template-columns` for `.panes` never redefines the shell grid.**
+It gets a column width that only resembles the shell's — Docker's was `clamp(320px, 30vw, 460px)`
+against the shell's `clamp(320px, 28vw, 420px)` — and a rule that has to out-specify every style
+pack's own `.panes` override. Spanning with `grid-column: 2 / -1` has neither problem and needs no
 CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
@@ -1162,7 +1204,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
 | `Menu` | trap | a vertical list in a box |
 | `Popover` | none | reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
-| `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read |
+| `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
 | `DetailColumn` | none | the right column, or the whole width |
 | `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
@@ -1180,7 +1222,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Link` | stop | the text, underlined, pressable |
 | `Heading` | none | eyebrow in grey uppercase, heading in bold |
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
-| `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
+| `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |

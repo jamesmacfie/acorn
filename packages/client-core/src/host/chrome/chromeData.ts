@@ -195,11 +195,15 @@ const railSeverity = (value: unknown): PluginRailItem['severity'] =>
   typeof value === 'string' && RAIL_SEVERITIES.has(value) ? value as PluginRailItem['severity'] : undefined
 
 /** Parse plugin row data field by field. A malformed optional task claim loses that claim; it does
- * not get to erase an otherwise useful row from the host-owned source list. */
+ * not get to erase an otherwise useful row from the host-owned source list.
+ *
+ * Every field is named twice, once per branch, and a row is rebuilt from those names rather than
+ * spread. A field added to `PluginRailItem` and not to both lists is dropped here in silence: no
+ * error, no warning, and a list that still renders. Check both when adding one. */
 export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem | null => {
   const item = row as PluginRailItem
   if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
-    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge)) return null
+    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge) || !opt(item.short)) return null
   const fields = fieldList(item.fields)
   if (!item.task || typeof item.task !== 'object') {
     return { id: item.id, title: item.title, ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
@@ -207,7 +211,8 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
       ...(item.fieldsFirst === true ? { fieldsFirst: true } : {}),
       ...(str(item.icon) ? { icon: item.icon } : {}),
       ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
-      ...(str(item.badge) ? { badge: item.badge } : {}) }
+      ...(str(item.badge) ? { badge: item.badge } : {}),
+      ...(str(item.short) ? { short: item.short } : {}) }
   }
   const task = item.task
   const link = railLink(task.link)
@@ -220,6 +225,7 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
     ...(str(item.icon) ? { icon: item.icon } : {}),
     ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
     ...(str(item.badge) ? { badge: item.badge } : {}),
+    ...(str(item.short) ? { short: item.short } : {}),
     task: {
       ...(str(task.origin) && ownsTaskOrigin(pluginId, task.origin) ? { origin: task.origin } : {}),
       ...(str(task.title) ? { title: task.title } : {}),

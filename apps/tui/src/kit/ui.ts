@@ -59,6 +59,13 @@ export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-
 export type { MarkdownOptions } from '@acorn/client-core/kit/lib/markdown.ts'
 export { defaultModelIdFor } from '@acorn/client-core/features/settings/models/defaultModel.ts'
 
+// The collapsed-sidebar signal, re-exported as it stands rather than stubbed. It reads device
+// storage, which this host does not have (client-core/kit/lib/deviceStorage.ts), so it answers
+// `false` for every sidebar and every pane that shares its code draws the full column. Nothing here
+// can set it either: `ListDetail` ignores `collapseKey` and never draws the toggle. A stub returning
+// `false` would be the same answer with a second implementation to keep in step.
+export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from '@acorn/client-core/kit/lib/collapseState.ts'
+
 /**
  * Drag-to-resize, with nothing to drag.
  *

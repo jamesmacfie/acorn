@@ -109,3 +109,27 @@ describe('plugin RPC concurrency', () => {
     }
   })
 })
+
+// A plugin that reads an image through a capability gets a `Uint8Array` back. `encode` hands one over
+// untouched, and `decode` used to rebuild every object it saw key by key, so the bytes arrived as
+// `{ '0': 26, '1': 80, … }`: truthy, the right length, and with no `.slice`. The image editor threw on
+// its first line and the host answered a bare 500.
+describe('plugin RPC value shapes', () => {
+  const roundTrip = async (value: unknown): Promise<unknown> => {
+    const endpoint = new PluginRpcEndpoint(new MessageChannel().port1, () => 'async')
+    // Through a real structured clone, because that is what the port does and it is the step that
+    // strips nothing. What `decode` does to what survives is the thing under test.
+    return endpoint.decode(structuredClone(await endpoint.encode(value, 'value')))
+  }
+
+  it('keeps bytes usable as bytes', async () => {
+    const decoded = await roundTrip({ bytes: new Uint8Array([26, 80, 78, 71]) }) as { bytes: Uint8Array }
+    expect(decoded.bytes).toBeInstanceOf(Uint8Array)
+    expect([...decoded.bytes.slice(1)]).toEqual([80, 78, 71])
+  })
+
+  it('keeps a date a date', async () => {
+    const decoded = await roundTrip({ at: new Date('2026-09-19T00:00:00.000Z') }) as { at: Date }
+    expect(decoded.at).toBeInstanceOf(Date)
+  })
+})

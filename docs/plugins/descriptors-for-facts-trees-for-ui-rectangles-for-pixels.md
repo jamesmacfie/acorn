@@ -18,6 +18,17 @@ A source row may attach a semantic `severity` to its icon and may request `field
 identifier must precede the flexible title. The host still owns the severity colour, fixed field
 tracks, ellipsis, and layout; the descriptor names meaning and ordering, never pixels.
 
+`short` is that row at the width of an icon rail, for a reader who has collapsed the list: a ticket
+key, an item number, an HTTP verb. A few characters under the icon, and nothing else fits. It is its
+own field rather than the first of `fields`, because the two answer different questions. `fields` is
+what lines up in columns down an expanded list, and the fact a source puts first is not always the
+one that identifies a row: Rollbar's is `#142` and Linear's is the issue state. A source that sends
+neither `short` nor `icon` still gets a reachable row, marked with a dot and named by its tooltip.
+
+Two places rebuild a rail row field by field from an allowlist, once per branch, in
+`client-core/host/chrome/chromeData.ts`. A field added to `PluginRailItem` and not to both is dropped
+there in silence: no error, no warning, and a list that still renders.
+
 A pane, a reference panel body, a settings page, a card in somebody else's list: those are UI, and
 they are trees. The plugin's bundle names the host's own components and the host draws them, so the
 result has the shell's keyboard handling, focus, ARIA and the reader's chosen style pack, and the

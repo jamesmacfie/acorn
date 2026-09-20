@@ -9,6 +9,8 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
+import { Inline } from '../../kit/components/layout/Inline'
+import { sidebarCollapsed } from '../../kit/lib/collapseState'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
 import { RowActions } from '../../kit/components/layout/RowActions'
@@ -28,6 +30,19 @@ const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'da
 // The one rail list every descriptor source renders through. `Row`, `Badge` and `Icon` are the shell's
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
 // (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
+//
+// Two components rather than one, registered as the `regions` half of `SourceContribution`
+// (../registries/sources/sources.ts). This used to be a single component drawing `<main class="panes">`
+// with a `.pane pane-left` and a `.pane pane-right`, which meant Linear, Rollbar and HTTP were the
+// only browse sources not on `ListDetail`: two inset cards with a gap where GitHub and Workflows had
+// one surface and a divider, no resize handle, and no collapse. The comment on the detail half below
+// already called this "master/detail like every other Source browse" — the markup was the thing that
+// disagreed.
+//
+// Splitting it costs nothing, because the two halves never shared state. Which row is selected is the
+// URL (`decodeProjectSurfaceItem` below), which is why a row click, a pasted link and the back button
+// are one thing here. The terminal host already supplied two halves for these sources
+// (apps/tui/src/plugins/SourcePanel.tsx); this is the desktop catching up.
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
@@ -57,7 +72,8 @@ function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSo
   )
 }
 
-export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
+/** The list half: the source's rows, its filter, and its refresh. */
+export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const navigate = useNavigate()
   const params = useParams()
   const queryClient = useQueryClient()
@@ -175,20 +191,12 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
     })
   }
 
-  // The detail half, for a source whose row click addresses a project-scoped surface rather than opening
-  // a task pane. Master/detail like every other Source browse (plugins/github GithubBrowse.tsx).
-  //
-  // The binding comes from `onSelect`, with no second manifest field: `navigate` names the surface, and
-  // the manifest refuses a project-scoped surface that no source navigates to.
-  const detail = () => {
-    const onSelect = props.descriptor.onSelect
-    return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
-  }
-  // The selection, read back out of the URL. A project-scoped surface has no task layout to hold a
-  // selection, so the address is the state, which makes a row click, a pasted deep link and the back
-  // button the same thing.
+  // The selection, read back out of the URL rather than held here. A project-scoped surface has no
+  // task layout to keep a selection in, so the address is the state, which makes a row click, a pasted
+  // deep link and the back button the same thing. The detail half reads the same two lines.
   const detailItem = () => {
-    const surface = detail()
+    const onSelect = props.descriptor.onSelect
+    const surface = onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
     return surface ? decodeProjectSurfaceItem(params[surface.item]) : undefined
   }
 
@@ -199,9 +207,35 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
     navigate(pathForTask(task))
   }
 
+  // Collapsed, the row is its severity glyph over its identifier, and the header narrows to the one
+  // control that still has something to do. A source that sends neither an icon nor a `short` gets a
+  // dot, so the rail is still a column of reachable stops rather than a column of blanks.
+  const collapsed = sidebarCollapsed(props.descriptor.id)
+  const railMark = (item: PluginRailItem) => (
+    <>
+      <Show when={item.icon} fallback={<Icon name="circle" tone={iconTone(item.severity)} />}>
+        {(name) => <Icon name={name()} tone={iconTone(item.severity)} />}
+      </Show>
+      <Show when={item.short}>{(short) => <span class="ui-row-field">{short()}</span>}</Show>
+    </>
+  )
+
   return (
-    <main class="panes">
-      <section class="pane pane-left">
+    <>
+      <Show
+        when={!collapsed()}
+        fallback={(
+          <Toolbar size="sm" ariaLabel={`${props.descriptor.label} actions`}>
+            <IconButton
+              icon="refresh-cw"
+              tip={`Refresh ${props.descriptor.label}`}
+              label={`Refresh ${props.descriptor.label}`}
+              busy={refreshing()}
+              onPress={() => void refresh()}
+            />
+          </Toolbar>
+        )}
+      >
         <SectionHeader
           count={items().length}
           actions={(
@@ -230,29 +264,56 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
             onInput={(value) => setFilter(value)}
           />
         </Toolbar>
+      </Show>
 
-        {/* A node that did not answer and had nothing cached is a banner, never a failed pane. */}
-        <Show when={unavailable()}>
-          {(entry) => <Alert>{entry().label} unavailable — {entry().reason}</Alert>}
-        </Show>
+      {/* A node that did not answer and had nothing cached is a banner, never a failed pane. Collapsed,
+          the banner becomes the one mark it has room for: a sentence in a 48px column wraps to a
+          letter a line and says nothing. The reason stays reachable as the mark's tooltip, and
+          expanding gives it back in full. */}
+      <Show when={unavailable()}>
+        {(entry) => (
+          <Show
+            when={!collapsed()}
+            fallback={(
+              <Inline>
+                <Icon name="triangle-alert" tone="warn" title={`${entry().label} unavailable — ${entry().reason}`} />
+              </Inline>
+            )}
+          >
+            <Alert>{entry().label} unavailable — {entry().reason}</Alert>
+          </Show>
+        )}
+      </Show>
 
-        {/* `.pane-left` is an overflow:hidden flex column, so the list needs its own scroller or it is
-            clipped at the pane edge. Same shape as the kit's `.ui-rows-scroll` and docker's
-            `.docker-list`. */}
-        <div class="scroll">
+      {/* `ListColumn` is an overflow:hidden flex column, so the list needs its own scroller or it is
+          clipped at the column edge. Same shape as the kit's `.ui-rows-scroll` and docker's
+          `.docker-list`. */}
+      <div class="scroll">
           <Show
             when={row()}
-            fallback={<EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>}
+            fallback={(
+              <Show when={!collapsed()}>
+                <EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>
+              </Show>
+            )}
           >
             {/* The authored empty state, or the fixed string for a source that declares none. Renders
                 only under `row()`, meaning the plugin's route answered with nothing. An unreachable node
                 is the banner above, because "nothing is assigned to you" is a claim the host cannot make
                 on a failed fetch. */}
-            <For each={items()} fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
+            <For
+              each={items()}
+              fallback={(
+                <Show when={!collapsed()}>
+                  <SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />
+                </Show>
+              )}
+            >
               {(item) => (
                 <Row
                   onPress={props.descriptor.onSelect ? () => select(item) : undefined}
                   selected={item.id === detailItem()}
+                  collapsed={collapsed() ? railMark(item) : undefined}
                   leading={<Show when={item.icon}>{(name) => <Icon name={name()} tone={iconTone(item.severity)} />}</Show>}
                   meta={(
                     <Show
@@ -286,40 +347,6 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
             </For>
           </Show>
         </div>
-      </section>
-      {/* The user's own dashboard, beside this source's list (docs/dashboards.md § Placements). This
-          section is the host's own markup, so there is nothing here but a scope and a container.
-
-          It takes the same two grid columns as the detail half below, and only one can be present: the
-          manifest refuses a source that both reserves a region and navigates to a project surface.
-
-          Scoped by plugin and source, never by project, because definitions are per-user-per-node and
-          surface-free. Too narrow for twelve cells collapses, and the stored geometry returns when it
-          is widened. */}
-      <Show when={props.descriptor.panels}>
-        {(declared) => (
-          <section class="pane pane-right" style={{ 'grid-column': '2 / -1' }}>
-            <PanelGrid
-              scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id))}
-              region={panelRegion(props.pluginId, declared())}
-            />
-          </section>
-        )}
-      </Show>
-      {/* Spans the remaining two grid columns, because the frame draws its own header and layout and
-          cannot lay out across two boxes. `pane-right` drops the trailing border and makes the section a
-          flex column, so the iframe's `height: 100%` resolves against the grid row. */}
-      <Show when={detail()}>
-        {(surface) => (
-          <section class="pane pane-right" style={{ 'grid-column': '2 / -1' }}>
-            <Dynamic
-              component={surface().component}
-              projectId={params.projectId ?? ''}
-              item={detailItem()}
-            />
-          </section>
-        )}
-      </Show>
       <Show when={promoteItem()}>
         {(item) => (
           <PromoteToTaskModal
@@ -335,6 +362,48 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           />
         )}
       </Show>
-    </main>
+    </>
+  )
+}
+
+/** The detail half: the surface a row click navigates to, or the dashboard this source reserved.
+ *
+ *  It shares no state with the list. Which row is selected is the URL, which is what makes a row
+ *  click, a pasted deep link and the back button the same thing, so both halves read it rather than
+ *  one telling the other. */
+export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
+  const params = useParams()
+  const surface = () => {
+    const onSelect = props.descriptor.onSelect
+    return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
+  }
+
+  return (
+    <Show when={props.descriptor.panels} fallback={(
+      <Show when={surface()}>
+        {(found) => (
+          <Dynamic
+            component={found().component}
+            projectId={params.projectId ?? ''}
+            item={decodeProjectSurfaceItem(params[found().item])}
+          />
+        )}
+      </Show>
+    )}
+    >
+      {/* The user's own dashboard, beside this source's list (docs/dashboards.md § Placements). Only
+          one of the two can be present: the manifest refuses a source that both reserves a region and
+          navigates to a project surface.
+
+          Scoped by plugin and source, never by project, because definitions are per-user-per-node and
+          surface-free. Too narrow for twelve cells collapses, and the stored geometry returns when it
+          is widened. */}
+      {(declared) => (
+        <PanelGrid
+          scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id))}
+          region={panelRegion(props.pluginId, declared())}
+        />
+      )}
+    </Show>
   )
 }

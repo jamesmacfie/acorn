@@ -2,10 +2,12 @@ import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import {
-  EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
+  EmptyState, Icon, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
+  sidebarCollapsed, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
+import { AGENT_PANE_ID } from '../paneContribution'
 import { sessionModelSummary } from '../settings/agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
@@ -40,6 +42,11 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  // Collapsed, a row is its run state and nothing else. That glyph is already the row's leading mark
+  // and already carries the queued count, so the rail says the same thing the full row's first inch
+  // said: which of these is working, which is waiting on you, which is done. The title comes back as
+  // the tooltip, from `title` below (client-core kit/lib/collapseState.ts).
+  const collapsed = sidebarCollapsed(paneCollapseKey(AGENT_PANE_ID))
   const view = startAgentView('agents.sidebar.open')
   onCleanup(view.dispose)
   void model.sessionsLoaded.then(view.ready, view.fail)
@@ -112,6 +119,17 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                   item={itemProps}
                   variant="stacked"
                   density="compact"
+                  title={item.label}
+                  collapsed={collapsed()
+                    ? (
+                      <>
+                        <RuntimeStateIcon state="waiting" />
+                        <Show when={entry()?.request.kind}>
+                          {(kind) => <Icon {...attentionMark(kind())} />}
+                        </Show>
+                      </>
+                    )
+                    : undefined}
                   leading={<RuntimeStateIcon state="waiting" />}
                   trailing={
                     <Show when={entry()?.request.kind}>
@@ -169,6 +187,10 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           depth={found()?.depth}
                           nested={(found()?.depth ?? 0) > 0}
                           selected={selected()}
+                          title={current().title}
+                          collapsed={collapsed()
+                            ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
+                            : undefined}
                           leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
                           trailing={
                             <>
@@ -234,6 +256,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           depth={found()?.depth ?? 1}
                           nested
                           selected={selected()}
+                          title={child().title}
+                          collapsed={collapsed() ? <SubagentStateIcon status={child().status} /> : undefined}
                           leading={<SubagentStateIcon status={child().status} />}
                           onPress={() => openRow(item.key)}
                         >

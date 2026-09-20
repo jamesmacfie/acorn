@@ -61,7 +61,8 @@ const log = createLogger('plugin-chrome')
 // `.tsx` behind `lazy`, so this module stays importable from a bare-Node test suite: the repo's vitest
 // configs have no Solid transform, and a module that reaches a JSX file can't be imported at all.
 // `lazy` never resolves the import until something renders.
-const ChromeSourcePanel = lazy(() => import('./ChromeSourcePanel'))
+const ChromeSourceList = lazy(async () => ({ default: (await import('./ChromeSourcePanel')).ChromeSourceList }))
+const ChromeSourceDetail = lazy(async () => ({ default: (await import('./ChromeSourcePanel')).ChromeSourceDetail }))
 const ChromeBadge = lazy(() => import('./ChromeBadge'))
 
 const registered = new Map<string, Disposable[]>()
@@ -259,11 +260,18 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       ...(descriptor.projectScoped ? { projectScoped: true } : {}),
       ...(defaultPane ? { defaultPane } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
-      // The rail list, from whichever host is drawing. `ChromeSourcePanel` is the DOM's and stays the
-      // fallback, so nothing on the desktop moved; a cell host supplies its own and gets a list
-      // instead of a reconciler refusing a `<main>` (./sourcePanel.ts).
+      // The rail list, from whichever host is drawing. The DOM's is the fallback, and it now hands over
+      // two halves rather than one opaque surface, so `SourceSurface` composes the same `ListDetail`
+      // split every other browse source already had (../registries/sources/SourceSurface.tsx). A cell
+      // host supplies its own and gets a list instead of a reconciler refusing a `<main>`
+      // (./sourcePanel.ts), which is the shape this follows.
       ...(suppliedSourcePanel()?.({ pluginId, descriptor })
-        ?? { component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }) }),
+        ?? {
+          regions: {
+            list: () => createComponent(ChromeSourceList, { pluginId, descriptor }),
+            detail: () => createComponent(ChromeSourceDetail, { pluginId, descriptor }),
+          },
+        }),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so
       // an integration can use the row click for detail navigation and a separate host-drawn "+Task"
       // affordance for promotion.

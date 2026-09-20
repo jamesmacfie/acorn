@@ -1,8 +1,8 @@
 import { createSignal, Show } from 'solid-js'
 import { fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu, Row, Rows,
-  Stack, Text, Toolbar, TreeRow,
+  Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
+  paneCollapseKey, Row, Rows, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { type ChangesModel } from './changesModel'
@@ -172,6 +172,10 @@ type RowItem = Parameters<Parameters<typeof Rows>[0]['children']>[1]
 type Section = ReturnType<ChangesModel['sections']>[number]
 
 export function ChangesList(props: { task: Task; model: ChangesModel }) {
+  // Collapsed, the row is the git status letter it already leads with. That badge was always the
+  // fastest read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and
+  // the path in the tooltip (client-core kit/lib/collapseState.ts).
+  const collapsed = sidebarCollapsed(paneCollapseKey('changes'))
   const model = () => props.model
 
   // One call for a group's checkbox and a folder's, which want the same two things: stage what is not
@@ -212,6 +216,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
           ? `${row().path} — unmerged; staging it marks the conflict resolved`
           : row().oldPath ? `${row().oldPath} → ${row().path}` : row().path}
         label={row().path}
+        collapsed={collapsed() ? <Badge size="xs" tone={meta().tone}>{meta().letter}</Badge> : undefined}
         leading={<Badge size="xs" tone={meta().tone}>{meta().letter}</Badge>}
         meta={
           <Show when={row().additions != null}>
@@ -266,6 +271,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
         onToggle={toggle}
         onPress={toggle}
         title={rowProps.node.path}
+        collapsed={collapsed() ? <Icon name="folder" /> : undefined}
         leading={<Icon name="folder" />}
         trailing={
           <Show when={rowProps.staging}>

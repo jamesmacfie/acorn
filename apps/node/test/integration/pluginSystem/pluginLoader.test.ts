@@ -143,6 +143,7 @@ describe('loading rollbar from disk', () => {
           title: 'Checkout failed',
           fields: ['#142'],
           fieldsFirst: true,
+          short: '#142',
           icon: 'circle-x',
           severity: 'danger',
           badge: '12',
