@@ -1,10 +1,8 @@
 # docs/future: the design record for work not yet built
 
-This folder holds designs, analyses, and sequenced plans for work that has not shipped, plus the
-refusals that keep it from being re-argued. Behaviour that has shipped is never described here; it
-moves to an owning doc under `docs/` and the future file either shrinks to a pointer or is deleted,
-with `git log --follow` as the record. Where a file here disagrees with an owning doc, the owning doc
-wins.
+This folder holds designs, analyses, sequenced plans, and delivery records whose final acceptance is
+still open. Shipped behaviour belongs in an owning doc under `docs/`; retained programme files record
+decisions and evidence. Where a file here disagrees with an owning doc, the owning doc wins.
 
 Every file states its date and status near the top, keeps its paths as hints rather than promises,
 and ends with a verify-before-building list where it names code. Nothing here is scheduled.
@@ -14,10 +12,10 @@ and ends with a verify-before-building list where it names code. Nothing here is
 Multi-file designs with an order of work. Every one of them carries a `refused.md` holding what it
 decided not to do and why, so a later session argues with the reasoning rather than with silence.
 
-| Folder | What it is | Status, 2026-08-30 |
+| Folder | What it is | Status |
 | --- | --- | --- |
 | [workflow_tasks/](./workflow_tasks/README.md) | The shipped child-task workflow programme and links to its owning documentation. | Shipped, 2026-09-13. |
-| [workflow_v2/](./workflow_v2/README.md) | Shared plugin data, typed workflows, simple authoring, dashboards, AI discovery, and scheduling. Twenty implementation slices with contracts and UX flows. | Slices 01–19 implemented, 2026-09-20; slice 20 acceptance remains. |
+| [workflow_v2/](./workflow_v2/README.md) | Shared plugin data, typed workflows, simple authoring, dashboards, AI discovery, and scheduling. Twenty implementation slices with contracts and UX flows. | Implementation complete, 2026-09-20. Connected-provider and model, native desktop keyboard, and full-suite evidence remain. |
 | [scheduled_workflows/](./scheduled_workflows/README.md) | Historical scheduling proposal retained for background. Follow workflow v2 instead. | Superseded, 2026-09-13. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
@@ -27,7 +25,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 ## The single files
 
-| File | What it is | Status, 2026-08-30 |
+| File | What it is | Status |
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |

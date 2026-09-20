@@ -76,7 +76,7 @@ Two exceptions stay: agents keeps one wrapper per feature folder, and editor kee
 ## Contributions
 
 **A file that registers one kind of contribution is `<kind>Contribution.ts`.** This holds for panes,
-slots, sources, drawers, rail markers, references, collections, and agent context. `extensionPoints.ts`
+slots, sources, drawers, rail markers, references, data sources, and agent context. `extensionPoints.ts`
 means a plugin's cooperative extension-point table and nothing else; do not use it for a contribution.
 
 ## Routes and wire types

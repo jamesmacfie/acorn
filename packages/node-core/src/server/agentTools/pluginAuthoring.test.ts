@@ -157,6 +157,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
       'secrets',
       'exec',
       'net',
+      'sockets',
       'env',
       'files',
     ])

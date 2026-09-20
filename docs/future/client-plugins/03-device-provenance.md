@@ -74,10 +74,11 @@ refuses a package whose manifest has a `node` entry, `routes`, `schedules`, `too
 partial install. The same check runs on the client when it reads the manifest back, so a helper that
 skipped it is caught. The argument is in [refused.md](./refused.md) § A node half on a device.
 
-Two contributions look client-side but are refused too. `contributions.collections` needs a node to
-sample; `contributions.schedules` runs node code. Both are listed by name in the refusal so a later
-reader does not have to re-derive it. Client-side schedules (`ctx.schedules` on the client, the
-device-local scheduler) are compiled-only today and stay that way.
+Three contributions look client-side but are refused too. `contributions.dataSources` and
+`contributions.dataSourceDiscoveries` require a Node-owned handler, and `contributions.schedules`
+runs Node code. Each is listed by name in the refusal so a later reader does not have to re-derive
+it. Client-side schedules (`ctx.schedules` on the client, the device-local scheduler) are
+compiled-only today and stay that way.
 
 ### Resolution against the fleet
 

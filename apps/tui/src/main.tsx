@@ -174,7 +174,13 @@ renderer.once('frame', () => {
 // The agents plugin's `activate` fires an HTTP request to prime its session store as it goes, which is
 // the one thing in the pass that touches the node at all.
 async function fillIn(): Promise<void> {
-  const { installRoster } = await import('./roster')
+  const [{ installRoster }, { installPluginWorkers }] = await Promise.all([
+    import('./roster'),
+    import('./plugins/workerFactory'),
+  ])
+  // Loaded bundles are first discovered by `watchPluginChanges` below. Install their Node worker
+  // factory here, before that first pass, rather than in the graph needed to draw empty chrome.
+  installPluginWorkers()
   installRoster()
   bootMark('roster registered')
 

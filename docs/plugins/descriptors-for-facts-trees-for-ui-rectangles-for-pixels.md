@@ -100,7 +100,7 @@ at the lowest value anyone declared, so a plugin that asked for two seconds woul
 other plugin's budget as well as its own. Declare it for data that changes with nothing to trigger on.
 
 **`ctx.events.status()`** means "re-read my chrome descriptors". The host binds it to the calling
-plugin's id, so it refetches that plugin's rail rows, badges, collections and agent context on every
+plugin's id, so it refetches that plugin's rail rows, badges, and agent context on every
 connected client, and nobody else's. It is right for "something happened" and wrong for "here is
 another number". Use it after an action, not on a timer.
 

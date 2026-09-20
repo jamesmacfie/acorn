@@ -99,8 +99,8 @@ point per surface per location — so one pane may have several.
 **The footer and the aside take two different contributors.** A footer is filled by other plugins'
 `extensions`, below. An **aside is filled by the user**: the host draws a dashboard region there, and
 what the owner declares is not a route to read but the constraints a person's own composition must
-satisfy — `panels: { collections | fieldRole, views, max }`, defaulting to this plugin's own
-collections, every view and four panels ([dashboards.md](../dashboards.md) § Placements owns that
+satisfy — `panels: { sources | fieldRole, views, max }`, defaulting to this plugin's own
+data sources, every view and four panels ([dashboards.md](../dashboards.md) § Placements owns that
 vocabulary; a rail source declares the same block to get a panel area beside its list). An
 `extensions` entry aimed at an aside delivers nothing, which is the same silent nothing every
 unmatched contribution already gets.

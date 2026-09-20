@@ -59,7 +59,7 @@
   padding: 1px 2px;
   color: var(--text-muted);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   font: 9px/1 var(--font-ui);
   cursor: pointer;
 }

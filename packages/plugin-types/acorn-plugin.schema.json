@@ -204,6 +204,10 @@
                 "minLength": 1
               }
             },
+            "sockets": {
+              "default": false,
+              "type": "boolean"
+            },
             "env": {
               "maxItems": 32,
               "type": "array",

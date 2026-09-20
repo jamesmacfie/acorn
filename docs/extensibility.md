@@ -292,8 +292,8 @@ Promise-shaped calls run concurrently. One route waiting on a slow third party d
 plugin answering anything else, which matches how a compiled plugin already behaves.
 
 Which of a plugin's functions cross synchronously is decided by
-`plugins/functionMode.ts`, by the path the function sits on. Everything unnamed there crosses as a
-promise. A missing rule is silent at the seam: the host reads the returned promise as the value it
+`packages/node-core/src/server/plugins/functionMode.ts`, by the path the function sits on.
+Everything unnamed there crosses as a promise. A missing rule is silent at the seam: the host reads the returned promise as the value it
 asked for, every field comes back `undefined`, and the failure surfaces in whatever the caller does
 next. Adding a synchronous contract to the plugin API means adding it there, naming the methods
 rather than the object that holds them.

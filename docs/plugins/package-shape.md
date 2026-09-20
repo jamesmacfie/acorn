@@ -193,7 +193,7 @@ word, on both contexts:
 
 | Shape | Verb | Where |
 | --- | --- | --- |
-| Many entries, host collects | `register` | routes, tools, schedules, collections, task checks, context sections, runs, node actions, harnesses, and every client contribution point |
+| Many entries, host collects | `register` | routes, tools, schedules, data sources, task checks, context sections, runs, node actions, harnesses, and every client contribution point |
 | One owner declares a place, anyone fills it, the owner reads it | `declare`, `handle`, `handlers` | `ctx.extensionPoints`, `ctx.hooks` |
 | One provider, resolved late | `provide`, `get`, `require` | `ctx.capabilities`, and its client twin |
 | A registry with one action call beside its registration | keep the action's own verb | `audit.record`, `hooks.run`, `events.send` |
