@@ -39,6 +39,19 @@ describe('retired localStorage keys', () => {
     expect(values.size).toBe(0)
   })
 
+  it('removes only retired workflow-v2 device namespaces', () => {
+    const { values, storage } = fakeStorage([
+      ['workflow-recovery:v1:draft', '1'],
+      ['query-recovery:v1:draft', '2'],
+      ['acorn:dashboard-recovery:panel', '3'],
+      ['acorn:ai-authoring:v1:conversation', '4'],
+      ['agent-session:session-1', 'keep'],
+      ['theme', 'dark'],
+    ])
+    expect(purgeRetiredLocalStorage(storage)).toHaveLength(4)
+    expect([...values.entries()]).toEqual([['agent-session:session-1', 'keep'], ['theme', 'dark']])
+  })
+
   it('leaves a device with nothing to clean alone', () => {
     const { values, storage } = fakeStorage([['theme', 'dark']])
     expect(purgeRetiredLocalStorage(storage)).toEqual([])

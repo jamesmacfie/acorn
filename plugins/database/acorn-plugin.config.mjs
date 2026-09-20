@@ -38,9 +38,9 @@
 //     plugin has: the connection URL is resolved per connect and NEVER PERSISTED, so there is no
 //     credential at rest for the host secret service to hold. Postgres credentials live in the reader's
 //     own `.env` or come out of their own script.
-//   net: [] — the plugin opens a TCP connection to whatever Postgres the reader pointed it at, which is
-//     not an HTTP destination and not something a host allowlist can describe. Listing nothing says
-//     "this plugin has no destination of its own", which is true.
+//   sockets: true — the plugin opens a TCP connection to whatever Postgres the reader configured.
+//     That cannot be expressed as the hostname-scoped HTTP `net` permission, so it is disclosed as
+//     the separate broad socket grant. `net: []` remains accurate: the plugin makes no HTTP request.
 //   api: ['core.tasks:read'] — one scope, and it is nearly nothing: the host hands the frame its
 //     `taskId` in `context`, and everything the panel does goes through this plugin's own routes. The
 //     scope is there for the task label the panel header shows. `core.projects:read` is NOT declared —
@@ -64,6 +64,7 @@ export default {
       secrets: false,
       exec: true,
       net: [],
+      sockets: true,
       env: ['DATABASE_URL'],
     },
   },

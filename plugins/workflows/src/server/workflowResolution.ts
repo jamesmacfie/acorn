@@ -1,3 +1,8 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import { stepIdentity } from '../shared/workflowIdentity'
+import { eq } from 'drizzle-orm'
+import { workflowFileOperations } from '../node/schema'
+import type { WorkflowFileOperation } from '../shared/workflowFileAuthoring'
 import { createHash } from 'node:crypto'
 import { isDir, type CoreServices, type PluginDatabase, type ProjectRef, type TaskRef } from '@acorn/plugin-api/node'
 import type {
@@ -9,7 +14,7 @@ import type {
   WorkflowStepDef,
   WorkflowValueBinding,
 } from '../shared/workflowContracts'
-import { getDef } from './workflowDefs'
+import { publishedWorkflow, publicationStore } from './workflowPublicationStore'
 import { loadWorkflowFiles } from './workflowFiles'
 import {
   resolveWorkflowInputs,
@@ -18,7 +23,7 @@ import {
   type WorkflowValidationCatalog,
 } from './workflowValidation'
 
-export const MAX_CHILD_WORKFLOW_DEPTH = 1
+export const MAX_CHILD_WORKFLOW_DEPTH = 4
 
 export type WorkflowResolutionScope = {
   workspaceId: string
@@ -99,7 +104,7 @@ export async function resolveScopedWorkflowDefinition(
   catalog: WorkflowValidationCatalog,
 ): Promise<ResolvedDefinition> {
   if (ref.source === 'database') {
-    const row = await getDef(db, ref.id)
+    const row = await publishedWorkflow(db, ref.id)
     if (!row || row.workspaceId !== scope.workspaceId || (row.projectId && row.projectId !== scope.projectId)) {
       throw fileResolutionError(ref, [])
     }
@@ -110,6 +115,13 @@ export async function resolveScopedWorkflowDefinition(
 
   const id = ref.source === 'repo' ? fileId(ref.path) : /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(ref.id) ? ref.id : null
   if (!id) throw fileResolutionError(ref, [])
+  const operationRows = ref.source === 'user'
+    ? db.select().from(workflowFileOperations).all()
+    : db.select().from(workflowFileOperations).where(eq(workflowFileOperations.projectId, scope.projectId)).all()
+  for (const row of operationRows) {
+    const operation = JSON.parse(row.contentJson) as WorkflowFileOperation
+    if (operation.state !== 'complete' && operation.source === ref.source && operation.writes.some(write => write.path === `.acorn/workflows/${id}.toml`)) throw fileResolutionError(ref, [`Resume file publication ${operation.id} before running`])
+  }
   const loaded = ref.source === 'repo'
     ? loadWorkflowFiles(scope.repoDir, scope.userDir, catalog)
     : loadWorkflowFiles(null, scope.userDir, catalog)
@@ -136,16 +148,16 @@ function childInputProblems(step: WorkflowStepDef, child: WorkflowDef): string[]
     if (!declared.has(name)) problems.push(`${label} binds undeclared child input '${name}'`)
   }
   for (const input of declared.values()) {
-    if (input.required && !bindings[input.name] && (input.default == null || !input.default.trim())) {
+    if (input.required && !bindings[input.name] && (input.default === undefined || (!input.schema && input.default === ''))) {
       problems.push(`${label} needs a binding for child input '${input.name}'`)
     }
   }
   return problems
 }
 
-const resolvedDefaults = (def: WorkflowDef, bindings: Readonly<Record<string, WorkflowValueBinding>>): Record<string, string> =>
+const resolvedDefaults = (def: WorkflowDef, bindings: Readonly<Record<string, WorkflowValueBinding>>): Record<string, DataValue> =>
   Object.fromEntries((def.inputs ?? []).flatMap((input) =>
-    bindings[input.name] || input.default == null ? [] : [[input.name, input.default]]))
+    bindings[input.name] || input.default === undefined ? [] : [[input.name, input.default]]))
 
 /** Resolves every runtime child before a run starts. The returned graph is immutable snapshot data
  *  that the durable dispatch layer can persist without consulting live definitions again. */
@@ -155,16 +167,17 @@ export async function resolveWorkflowGraph(
   options: {
     scope: WorkflowResolutionScope
     catalog: WorkflowValidationCatalog
-    inputs?: Record<string, string>
+    inputs?: Record<string, DataValue>
     provenance?: WorkflowDefinitionProvenance
     allowDatabaseDefinitions?: boolean
+    queryRevision?: (queryId: string) => Promise<number>
   },
 ): Promise<ResolvedWorkflowGraph> {
   const rootProblems = validateWorkflow(root, options.catalog)
   if (rootProblems.length) throw new WorkflowValidationError(rootProblems)
   const rootInputs = resolveWorkflowInputs(root, options.inputs)
   const frozenRoot = root.inputs?.length
-    ? { ...structuredClone(root), inputs: root.inputs.map((input) => ({ ...input, default: rootInputs[input.name] ?? '' })) }
+    ? { ...structuredClone(root), inputs: root.inputs.map((input) => ({ ...input, default: rootInputs[input.name] })) }
     : structuredClone(root)
   const nodes: ResolvedWorkflowNode[] = []
 
@@ -174,7 +187,7 @@ export async function resolveWorkflowGraph(
     path: string[],
     depth: number,
     chain: string[],
-    defaults: Record<string, string>,
+    defaults: Record<string, DataValue>,
   ): Promise<void> => {
     const key = provenanceKey(provenance)
     if (chain.includes(key)) throw new WorkflowValidationError([`child workflow cycle: ${[...chain, key].join(' → ')}`])
@@ -182,6 +195,10 @@ export async function resolveWorkflowGraph(
       throw new WorkflowValidationError([`child workflow depth exceeds the ${MAX_CHILD_WORKFLOW_DEPTH}-level limit at ${path.join('.')}`])
     }
     const frozen = structuredClone(definition)
+    for (const step of frozen.steps) if (step.query?.kind === 'saved') {
+      publicationStore(db).assertAvailable('query', step.query.queryId)
+      if (!step.query.revision && options.queryRevision) step.query.revision = await options.queryRevision(step.query.queryId)
+    }
     nodes.push({
       path,
       depth,
@@ -200,7 +217,7 @@ export async function resolveWorkflowGraph(
       await walk(
         child.definition,
         child.provenance,
-        [...path, step.name],
+        [...path, stepIdentity(step)],
         depth + 1,
         [...chain, key],
         resolvedDefaults(child.definition, step.childWorkflow?.inputs ?? {}),
@@ -210,14 +227,18 @@ export async function resolveWorkflowGraph(
 
   await walk(frozenRoot, options.provenance ?? { source: 'inline' }, ['$'], 0, [], rootInputs)
   return {
-    root: frozenRoot,
+    root: nodes[0]!.definition,
     nodes,
     fingerprint: workflowContentFingerprint(nodes.map(({ path, definition, provenance, defaultInputs }) => ({ path, definition, provenance, defaultInputs }))),
     requiresRepoTrust: nodes.some((node) => node.provenance.source === 'repo'),
   }
 }
 
-export function assertRuntimeWorkflowDispatchUnavailable(def: WorkflowDef): void {
-  const step = def.steps.find(runtimeKind)
-  if (step) throw new WorkflowValidationError([`step '${step.name}' uses runtime workflow dispatch, which is not available in this build`])
+/** Rebase a frozen child subtree without reading a mutable definition store. */
+export function childWorkflowGraph(graph: ResolvedWorkflowGraph, stepId: string): ResolvedWorkflowGraph | undefined {
+  const nodes = graph.nodes.filter(node => node.path[0] === '$' && node.path[1] === stepId)
+    .map(node => ({ ...node, path: ['$', ...node.path.slice(2)], depth: node.depth - 1 }))
+  const root = nodes.find(node => node.path.length === 1)?.definition
+  if (!root) return undefined
+  return { root, nodes, fingerprint: workflowContentFingerprint(nodes), requiresRepoTrust: graph.requiresRepoTrust }
 }

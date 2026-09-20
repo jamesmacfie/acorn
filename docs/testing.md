@@ -22,14 +22,44 @@ machine badly enough that they time out while passing in isolation.
 The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
 unit tests, so the boot test always exercises fresh artifacts.
 
+The workflow-v2 transition test creates a fixture, copies it, and runs only against the copy. It
+asserts both the targeted reset and survival of unrelated tasks, links, credentials/connections,
+devices, schedules, and files. A second copied fixture holds an active run and proves the quiescent
+preflight refuses before creating an export or changing rows. Never point this test or an ad-hoc
+transition check at the active development data root.
+
 Suites that do that kind of real work carry a 20-second test and hook timeout instead of Vitest's
 5-second default, set in `packages/node-core/vitest.config.ts`,
 `packages/custody/vitest.config.ts`, `apps/node/vitest.config.ts`, and
 `plugins/vitest.shared.ts`. A genuine hang still fails; it takes longer to say so.
 
+Scheduler tests use an injected clock. Workflow schedule tests pair that clock contract with real
+temporary core and plugin SQLite databases. The focused cases cover catch-up once, stable due and
+manual identities, restart transitions, cross-connection overlap races, gated descendants, baseline
+activation and failure, continuation expiry, authority revocation, pause and deletion, and daylight-
+saving gaps and folds without sleeping.
+
+The workflow schedule editor adds a jsdom host test over the real shared-kit tree and pure tests for
+occurrence previews, loop capability gating, limits, and device projections. Server cases assert that
+published dependency changes retain the approved snapshot, history is retained unless fresh start is
+explicit, drafts keep core cadence paused, paused **Run now** is admitted, and technical recovery
+identities never cross the route. Real-window checks use an isolated `dev:agent` session; provider-
+dependent baseline/checkpoint journeys still require an installed provider fixture.
+
 ## Test layers
 
 - protocol tests validate Zod contracts, route builders, query keys, errors, and service messages;
+- shared typed-source authoring has pure tests for dependent invalidation, preview generations,
+  compatibility ordering, conversions, and missing examples, plus jsdom component tests proving that
+  typing changes metadata without querying records and that provider text renders without becoming
+  markup. Workflow's inspector suite verifies the consumer receives the same binding picker rather
+  than a plugin-local form;
+- AI authoring tests run the same bounded response loop under an API connection ID and a text-only
+  harness ID. Fake model sequences cover source and option lookup, clarification, malformed replies,
+  invalid candidate repair, dropped filters, metadata and repair limits, cancellation, sample opt-in,
+  untrusted record content, stale merges, apply, reject, undo, and device-local recovery. Route tests
+  cover device-only admission and the read-only source-tool projection. Real provider runs remain a
+  release acceptance check because they are not deterministic;
 - the client-core suite is two vitest projects, split by file extension so a host test sits beside the
   host it renders. `logic` is `.test.ts` in bare Node with no Solid transform, which is what the whole
   suite used to be, and a green run there still says nothing about the UI. `hosts` is `.test.tsx`
@@ -536,7 +566,7 @@ Run them on the desktop and in `acorn` in a terminal.
     node's output tails as it runs and folds away with its exit code when it stops.
     Then press **Show in Agent pane** and put the two panes side by side on that session: both
     transcripts move together, a file attached in one appears in the other, and the "Workflow: …" chip
-    in the Agent pane's header comes back to this pane at that node. Last, run one with a fan-out or a
+    in the Agent pane's header comes back to this pane at that node. Last, run one with child dispatch or a
     worktree-isolated agent step and check the conversation you get is the child task's.
 52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
     and Reject in front of you; the inbox has the same row and it stays there until you answer.
@@ -677,8 +707,8 @@ cover the corresponding state and rendering contracts.
     Confirm the run list, selected steps, child progress, gates, failures, and usage reconcile without
     relying on the missed frames.
 69. On two Nodes, create fixtures with the same task and run IDs and different titles. Switch between
-    the Nodes and confirm navigation and history stay with the active Node. Then run one legacy
-    `fan-out` definition and one static inline workflow reference to confirm both still behave as
+    the Nodes and confirm navigation and history stay with the active Node. Then run one mapped child
+    workflow and one static inline workflow reference to confirm both behave as
     documented.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
@@ -691,6 +721,14 @@ in its own change with its own note.
 The dashboards backlog keeps its own once-only verification pass in
 [docs/future/dashboards/README.md](./future/dashboards/README.md) § 0, because its items gate that
 folder's remaining work rather than a release.
+
+Workflow-v2 dashboard checks are split by owner:
+`packages/dashboards-core/src/typedProjection.test.ts` covers nested projection and independent exact-status mappings;
+`packages/node-core/src/server/dashboards/*.test.ts`
+uses migrated temporary SQLite stores for revision and publication behavior; and
+`packages/client-core/src/features/dashboards/dashboardEditorModel.test.ts` plus `dashboardRecovery.test.ts`
+cover local display semantics and device recovery. Real-window checks still exercise the composed
+editor and placement because those interactions are not proved by pure tests.
 
 A worktree cannot run the app without the main checkout's `.env`. An existing development instance
 also owns the desktop renderer's fixed port, 4319. Run the whole checklist from the main checkout.

@@ -1,6 +1,6 @@
 # Slice 15: Contextual AI discovery and proposal review
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-20. Status: implementation complete; real-backend acceptance pending.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./ai-authoring.md) and [verification](./verification.md).
@@ -36,8 +36,49 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented on 2026-09-20. The implementation adds one bounded conversation protocol shared by API
+connections and text-only harnesses. Query, workflow, and dashboard editors keep their own apply and
+validation paths. The Node source runtime remains the authority for source listing, dynamic
+discovery, descriptions, options, and opted-in previews. The existing agent-tool registry projects
+the read-only source tools to MCP.
+
+Automated checks:
+
+- `pnpm --filter @acorn/protocol test src/authoring.test.ts`: 14 tests passed. Each backend adapter
+  case covers real option lookup, inline clarification, invalid field and operator repair, malformed
+  reply limits, dropped-filter refusal, metadata limits, untrusted record content, cancellation,
+  context bounds, and stable-ID diffs.
+- `pnpm --filter @acorn/plugin-workflows test src/server/workflowAuthoringConversation.test.ts
+  src/client/editor/WorkflowEditor.test.tsx src/server/generateWorkflowRequest.test.ts`: 33 tests
+  passed. The suite covers both backend IDs, dynamic source discovery, child workflow metadata,
+  sample opt-in and omission, review, apply, reject, undo, cancellation, and navigation recovery.
+- `pnpm --filter @acorn/node-core test src/server/routes/authoring.test.ts
+  src/server/dataSources/runtime.test.ts src/server/routes/plugins/agentTools.test.ts`: 36 tests
+  passed. The suite covers the device-only route, source authority, and agent-tool projection.
+- `pnpm --filter @acorn/node-core test src/server/modelProviders/runtime.test.ts
+  src/server/modelProviders/harnessRuntime.test.ts`: 17 tests passed across the API connection and
+  text-only harness adapters used by the shared authoring loop.
+- `pnpm --filter @acorn/node test test/integration/coreTools.test.ts`: four tests passed, including
+  the task-scoped, read-only source metadata tool set assembled when host bindings are present.
+- `pnpm --filter @acorn/client-core test src/features/dataSources/authoringMerge.test.ts
+  src/features/dataSources/SourceQueryEditor.test.tsx
+  src/features/dashboards/dashboardEditorModel.test.ts`: 11 tests passed.
+- `pnpm --filter @acorn/plugin-api test src/surface.test.ts src/entrypoints.test.ts
+  src/dataContracts.test.ts`: 12 tests passed after updating the additive public-surface snapshot.
+- `pnpm --filter @acorn/arch-tests test boundaries.test.ts`: 52 tests passed.
+- Targeted TypeScript lint passed for protocol, Node core, client core, plugin API, workflows, the
+  Node composition root, and architecture tests. Targeted `oxlint` found no phase-15 errors.
+
+The real-window provider-backed matrix remains pending. `pnpm dev:agent -- --session
+workflow-v2-phase15 --reuse` built and launched the debug app, and the service reached `ready` at
+`https://127.0.0.1:55064`. Both `snapshot` attempts returned no text or elements, and
+`phase15.png` was a blank white renderer. The session log also reported that the isolated database
+and Linear plugin bundles could not import `node:module`. The session was stopped with
+`pnpm dev:agent:ui -- --session workflow-v2-phase15 stop`; no UI or provider result is claimed.
+
+Repeat the matrix on a working renderer with a configured API backend and signed-in text-only
+harness. Cover workflow, query, and dashboard proposals, clarification, sample opt-in, apply, reject,
+undo, navigation recovery, and stale-proposal handling through both backends.
 
 ## Verify before building
 

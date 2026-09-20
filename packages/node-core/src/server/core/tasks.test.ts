@@ -109,7 +109,7 @@ describe('createChild project inheritance', () => {
       },
     ])
     const tasks = createTaskService(t.db)
-    const seed = { title: 'Inspect tests', branch: 'inspect-tests' }
+    const seed = { title: 'Inspect tests', branch: 'inspect-tests', origin: 'workflows:child' }
 
     expect(await tasks.createChild('git-parent', seed, 'stable-child')).toBe('stable-child')
     expect(await tasks.createChild('git-parent', seed, 'stable-child')).toBe('stable-child')
@@ -120,6 +120,7 @@ describe('createChild project inheritance', () => {
       parentId: 'git-parent',
       projectId: 'project-git',
       branch: 'inspect-tests-2',
+      origin: 'workflows:child',
       worktreePath: null,
     })
     expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
@@ -146,6 +147,38 @@ describe('createChild project inheritance', () => {
       .rejects.toThrow(/different parent or seed/)
     await expect(tasks.createChild('parent-a', { title: 'Different', branch: 'different' }, 'claimed-child'))
       .rejects.toThrow(/different parent or seed/)
+    await expect(tasks.createChild('parent-a', { title: 'Child', branch: 'child', origin: 'workflows:child' }, 'claimed-child'))
+      .rejects.toThrow(/different parent or seed/)
+  })
+})
+
+describe('createRoot replay identity', () => {
+  let t: TestDb
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    broadcasts.length = 0
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-root', name: 'Root', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-root', name: 'app', path: '/tmp/root-app', workspaceId: 'workspace-root', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+  })
+
+  afterEach(() => t.cleanup())
+
+  it('replays the intended root once and rejects conflicting reuse', async () => {
+    const tasks = createTaskService(t.db)
+    const seed = { title: 'Scheduled review', branch: 'scheduled-review', origin: 'workflows:schedule' }
+    expect(await tasks.createRoot('project-root', seed, 'intended-root')).toBe('intended-root')
+    expect(await tasks.createRoot('project-root', seed, 'intended-root')).toBe('intended-root')
+    expect(await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'intended-root'))).toHaveLength(1)
+    await expect(tasks.createRoot('project-root', { ...seed, title: 'Other' }, 'intended-root'))
+      .rejects.toThrow('different seed')
+    expect(broadcasts.filter(frame => frame.channel === 'tasks:changed')).toEqual([
+      { channel: 'tasks:changed', taskId: 'intended-root' },
+    ])
   })
 })
 

@@ -1,9 +1,9 @@
-import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayCell, DashboardDisplayField } from './display'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { formatRelativeTime } from './relativeTime'
 import type { PanelTone } from './model'
 
-// Renders a cell by its semantic type (@acorn/protocol/collections.ts): datetime gets an age, enum
+// Renders a cell by its semantic type: datetime gets an age, enum
 // gets a toned chip, number gets its field's unit. Hints come off the field, never the panel, the
 // same choice model.ts makes for PanelDefinition. Pure and returns a description rather than JSX for
 // the reason docs/dashboards.md § The generated editor gives: the component that draws this can't be
@@ -48,8 +48,8 @@ const withUnit = (text: string, unit: string | undefined): string =>
   unit === undefined ? text : unit === '%' ? `${text}%` : `${text} ${unit}`
 
 export function formatCell(
-  field: PluginCollectionField,
-  value: PluginCollectionCell | undefined,
+  field: DashboardDisplayField,
+  value: DashboardDisplayCell | undefined,
   now = Date.now(),
 ): FormattedCell {
   // `null` means this row has no value here, which the wire distinguishes from an empty string.
@@ -78,7 +78,7 @@ export function formatCell(
     case 'enum': {
       const id = String(value)
       const declared = field.values?.find((candidate) => candidate.id === id)
-      // A value the schema never declared still renders. A query-shaped collection can't always know
+      // A value the schema never declared still renders. A query-shaped source can't always know
       // its values ahead of the data; it just can't be pre-toned or pre-ordered.
       return { kind: 'enum', label: declared?.label ?? id, tone: declared?.tone ?? 'muted', icon: declared?.icon }
     }

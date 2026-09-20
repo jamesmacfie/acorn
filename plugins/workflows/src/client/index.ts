@@ -1,7 +1,6 @@
 import { createComponent, lazy } from 'solid-js'
 import {
-  contextMenuRegistry, openPane, projectSurfaceRegistry, registerNoticeTargetHandler,
-  type ClientPlugin,
+  contextMenuRegistry, openPane, projectSurfaceRegistry, registerNoticeTargetHandler, type ClientPlugin,
 } from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
 import { workflowApi } from './workflowsClient'
@@ -10,7 +9,7 @@ import { workflowsSourceContribution, workflowsSurfaceContribution } from './sou
 import { workflowsAttentionSource } from './runs/attentionSource'
 import { workflowsPaneContribution } from './runs/paneContribution'
 import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
-import { workflowRunCountsSchedule } from './runs/runStore'
+import { workflowRunCountsSchedule, workflowTaskGroups } from './runs/runStore'
 import { openStartFromItem, startFromItemTarget } from './startFromItem'
 
 const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
@@ -41,6 +40,27 @@ export const workflowsClientPlugin: ClientPlugin = {
     ctx.panes.register(workflowsPaneContribution)
     // Which tasks have a run at all, which is what the pane's `when` asks and cannot wait for.
     ctx.schedules.register(workflowRunCountsSchedule)
+    ctx.railMarkers.register({
+      id: 'workflows.task-groups',
+      order: 30,
+      markers: (target) => {
+        if (target.kind !== 'task') return []
+        const group = workflowTaskGroups()[target.id]
+        if (!group) return []
+        return [
+          ...(group.running ? [{
+            id: 'running', label: `${group.running} workflow ${group.running === 1 ? 'task' : 'tasks'} running`,
+            icon: 'loader-circle', tone: 'accent' as const, busy: true,
+            placements: ['bottom-end', 'top-end', 'bottom-start', 'top-start'] as const, priority: 80,
+          }] : []),
+          ...(group.attention ? [{
+            id: 'attention', label: `${group.attention} workflow ${group.attention === 1 ? 'task needs' : 'tasks need'} attention`,
+            icon: 'circle-alert', tone: 'warn' as const,
+            placements: ['top-end', 'bottom-end', 'top-start', 'bottom-start'] as const, priority: 90,
+          }] : []),
+        ]
+      },
+    })
     // A waiting gate, in the inbox, until somebody answers it (./runs/attentionSource.ts).
     ctx.attentionSources.register(workflowsAttentionSource)
     // Where a bell row or an inbox row about a run goes. Both carry the same target shape, and the

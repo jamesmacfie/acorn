@@ -57,6 +57,7 @@ export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // `ctx.routes.fetch` (docs/plugins.md § Loaded plugins).
 export { portableCarrier } from '@acorn/node-core/server/pluginHost/portable.ts'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
+export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // `Env`, core's runtime bindings, is not here. A loaded plugin may inherit only environment names
 // declared in its manifest; host bindings never enter its RPC context. Where it needs a store, it
@@ -102,11 +103,11 @@ export type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
 // the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
-export type { CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/server/core/index.ts'
+export type { CompiledCoreServices, CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/server/core/index.ts'
 export { SecretUnavailableError } from '@acorn/node-core/server/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/server/core/prefs.ts'
-export { confineExistingFile } from '@acorn/node-core/server/core/fs.ts'
+export { confineExistingFile, resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core/git.ts'
 // The coalesced `git status` for a worktree: one process per path per two seconds however many callers
 // ask, so a plugin reading local changes and core reading the rail's dirty markers share one spawn
@@ -194,7 +195,8 @@ export type {
   ProviderResourceRefreshContext,
 } from '@acorn/node-core/server/integrations/types.ts'
 export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
-export { connectionHasCapability, connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
+export { connectionHasCapability } from '@acorn/node-core/server/integrations/connectionCapabilities.ts'
+export { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 export type { StoredConnection } from '@acorn/node-core/server/integrations/connections.ts'
 export { providerCredential } from '@acorn/node-core/server/integrations/credential.ts'
 export { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
@@ -206,3 +208,14 @@ export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProvider
 // the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
 // enum live in @acorn/protocol, which a plugin already depends on.
 export type { NodeProviderContribution, NodeSpec, ProvidedNodeRecord } from '@acorn/node-core/server/nodeProviders/registry.ts'
+export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
+export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
+export { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+export type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
+export { DATA_OPERATORS, dataPointerSchema, dataBindingSchema, dataFieldSchema, dataFieldsSchema, parseDataPredicate, compareDataValues } from '@acorn/protocol/dataBindings.ts'
+export type { DataBinding, DataBindingAddress, DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
+export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataSourceDiscovery, DataSourceScope, DataSourceDescription, DataSourceQuery, DataSourceRequest, DataRecordRef, DataRecord, DataSourcePage, DataSourceResult, DataSourceOptions, DataSourceDetails, DataSourceResponse, DataSourceDiscoveryRequest, DataSourceDiscoveryPage } from '@acorn/protocol/dataSources.ts'
+export { createDataSelectionPager, dataComparisons, selectDataRecords } from '@acorn/node-core/server/dataSources/selection.ts'
+export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery } from '@acorn/protocol/dataQueries.ts'
+export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
+export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'

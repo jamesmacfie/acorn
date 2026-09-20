@@ -13,7 +13,7 @@ import {
 import { schema as coreSchema } from '@acorn/node-core/server/db/index.ts'
 import {
   catalogValidation,
-  createDef,
+  createPublishedDef,
   generateWorkflowRequest,
   loadWorkflowFiles,
   resolveWorkflowGraph,
@@ -43,19 +43,20 @@ const succeeded = (result: string, structuredOutput: unknown) => ({
 })
 
 const ticketMap = (childId: string): WorkflowDef => ({
+  formatVersion: 2,
   name: 'Review selected tickets',
   steps: [
-    { name: 'select', after: [], prompt: 'Select tickets.', schema: { type: 'object' } },
+    { id: 'select', name: 'select', after: [], prompt: 'Select tickets.', schema: { type: 'object' } },
     {
-      name: 'review', kind: 'workflow-map', after: ['select'],
+      id: 'review', name: 'review', kind: 'workflow-map', after: ['select'],
       items: { step: 'select', pointer: '/tickets' }, itemKey: '/id',
       childWorkflow: {
         ref: { source: 'database', id: childId },
-        inputs: { ticket: { from: 'item', pointer: '/number' } },
+        inputs: { ticket: { address: { from: 'item', pointer: '/number' } } },
       },
       title: {
         template: 'Review ${ticket}',
-        bindings: { ticket: { from: 'item', pointer: '/number' } },
+        bindings: { ticket: { address: { from: 'item', pointer: '/number' } } },
       },
     },
   ],
@@ -96,13 +97,14 @@ describe('workflow task acceptance', () => {
   })
 
   it('runs the ticket map from generated and hand-authored definitions without duplicate work after restart', async () => {
-    const child = await createDef(workflows.db, {
+    const child = await createPublishedDef(workflows.db, {
       workspaceId: 'workspace-one', projectId: 'project-one',
       def: {
-        name: 'Review ticket', inputs: [{ name: 'ticket', required: true }],
+        formatVersion: 2,
+        name: 'Review ticket', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
         steps: [
-          { name: 'approve', kind: 'gate-human' },
-          { name: 'review-ticket', prompt: 'Review ${inputs.ticket}.' },
+          { id: 'approve', name: 'approve', kind: 'gate-human' },
+          { id: 'review-ticket', name: 'review-ticket', prompt: 'Review ${inputs.ticket}.' },
         ],
       },
     })
@@ -115,7 +117,7 @@ describe('workflow task acceptance', () => {
       ],
       policies: [],
       profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
-      workflows: [{ ref: { source: 'database', id: child.id }, name: child.name, inputs: [{ name: 'ticket', required: true }] }],
+      workflows: [{ ref: { source: 'database', id: child.id }, name: child.name, inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }] }],
     }
     const generated = await generateWorkflowRequest({
       request: {
@@ -130,13 +132,16 @@ describe('workflow task acceptance', () => {
 
     mkdirSync(join(dir, '.acorn', 'workflows'), { recursive: true })
     writeFileSync(join(dir, '.acorn', 'workflows', 'ticket-map.toml'), `
+format_version = 2
 name = "Review selected tickets"
 [[steps]]
+id = "select"
 name = "select"
 after = []
 prompt = "Select tickets."
 schema_json = '{"type":"object"}'
 [[steps]]
+id = "review"
 name = "review"
 kind = "workflow-map"
 after = ["select"]
@@ -148,13 +153,11 @@ pointer = "/tickets"
 source = "database"
 id = "${child.id}"
 [steps.child_workflow.inputs.ticket]
-from = "item"
-pointer = "/number"
+binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 [steps.title]
 template = "Review \${ticket}"
 [steps.title.bindings.ticket]
-from = "item"
-pointer = "/number"
+binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 `)
     const handAuthored = loadWorkflowFiles(dir, null, catalogValidation(catalog)).workflows[0]
     if (!handAuthored) throw new Error('The hand-authored ticket workflow did not load.')
@@ -181,7 +184,6 @@ pointer = "/number"
           evaluatePolicy: async () => ({ pass: true }),
           failingChecks: async () => '',
           notify: vi.fn(),
-          runtimeWorkflowDispatchEnabled: true,
           dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
           dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),
         }

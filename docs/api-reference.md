@@ -1,5 +1,11 @@
 # API reference
 
+The [workspace query library](./data-sources.md#workspace-query-library) exposes scoped draft,
+publication, resolution, and consumer operations under `/v2/core/queries/:operation`.
+Typed dashboard panels use the matching device-only `/v2/core/dashboards/:operation` surface for
+`list`, `get`, `create`, compare-and-swap `save`, `publish`, immutable `published`, and `delete`.
+`GET /v2/core/dashboards/history` remains the separate measure-series read.
+
 The Node exposes one Hono application under `/v2`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
@@ -176,10 +182,11 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
 | `GET` | `/v2/core/schedules` | List every schedule on this node, plus the global pause flag |
 | `PATCH` | `/v2/core/schedules` | Pause or resume the whole loop |
+| `GET` | `/v2/core/schedules/targets` | List the target options available to the generic creation picker |
 | `POST` | `/v2/core/schedules` | Create a user schedule against a registered target kind |
 | `PATCH` | `/v2/core/schedules/:key` | Pause/resume, retune the cadence, rename (user rows only) |
 | `DELETE` | `/v2/core/schedules/:key` | Delete a user schedule. Declared ones are paused, not deleted |
-| `POST` | `/v2/core/schedules/:key/run` | Run one now |
+| `POST` | `/v2/core/schedules/:key/run` | Run one now; an `Idempotency-Key` identifies a replayed manual occurrence |
 | `GET` | `/v2/core/schedules/:key/runs` | The recent-run ring, newest first |
 
 These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
@@ -369,18 +376,42 @@ file effect.
 /v2/p/workflows/catalog
 /v2/p/workflows/defs[/*]
 /v2/p/workflows/tasks/:id/workflows*
-/v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry}
+/v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry,records}
 ```
 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Workflows own durable definitions, runs, steps, gates, and reconciliation.
 
-`POST /v2/p/workflows/tasks/:id/workflows` takes `{ def, inputs? }` or `{ defId, inputs? }`, one or
-the other. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+Workflow schedule bindings use these device-only routes:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/v2/p/workflows/workflows/schedules` | Lists workflow-owned schedule bindings and activation state |
+| `POST` | `/v2/p/workflows/workflows/schedules` | Saves a draft project, published workflow, typed input, timezone, and limit binding |
+| `GET` | `/v2/p/workflows/workflows/schedules/:id` | Reads one binding |
+| `POST` | `/v2/p/workflows/workflows/schedules/:id/approve` | Freezes approval and chooses `process-current` or `track-now`; `freshEpoch` resets processing scope |
+
+Create the core cadence row separately with target `{ "scheduleId": "..." }` and kind `workflow`.
+The workflows plugin owns approval and occurrences. Core owns cadence, pause, deletion, **Run now**,
+and the recent-run ring.
+
+Processing history is device-only. `GET /workflows/runs/:runId/records` accepts optional `stepId`,
+`selectionId`, numeric position `after`, `filter`, and `limit` up to 100. It returns ordered summaries,
+status counts, distinct zero-match/all-skipped state, and bounded query provenance without record
+bodies or named outputs. `GET /workflows/runs/:runId/records/:recordId` returns the retained snapshot,
+bounded named outputs, and query provenance. Its `/attempts` subroute accepts the returned opaque
+`after` cursor and a limit up to 100. `POST .../prepare-reprocess` requires an empty object and returns
+the retained attempt's digest and title for review. `POST .../reprocess` takes that `digest` and a
+`requestId`; it creates or replays the related attempt and independent root child run without rerunning
+the source query. `GET /workflows/task-navigation` returns aggregate running and attention counts for
+ordinary root tasks. All paths in this paragraph are under `/v2/p/workflows`.
+
+`POST /v2/p/workflows/tasks/:id/workflows` takes `{ defId, inputs? }`. Inline definitions are refused;
+drafts must be published before execution. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a `workflow_defs` row, and a task-confined caller is refused that with a 403
-because a row skips the repository trust snapshot. `inputs` is a table of strings, one per input the
-definition declares; the runner refuses a required input with no value and a name the definition does
-not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
+because a row skips the repository trust snapshot. `inputs` is a table of named bounded JSON values
+allowed by the definition's structural schemas.
+The runner refuses a required input with no value and a name the definition does not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
 device caller. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
 failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
@@ -421,7 +452,12 @@ Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole fami
 | `PUT /defs/:id` | `{ def, revision }` | The row with `revision + 1`. A stale `revision` is a 409 whose `details` carry the row that won. |
 | `DELETE /defs/:id` | | `{ ok }`. Runs that froze this definition are untouched. |
 | `POST /defs/validate` | `{ def, projectId? }` | `{ problems }`, the loader's own list. `projectId` is accepted and ignored: what a step names inside a project is checked when the step runs. |
-| `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | `{ path }` after writing `.acorn/workflows/<slug>.toml`, deleting the row unless `keepRow`. |
+| `POST /defs/files` | A discriminated `open`, `save`, `review`, `export`, `publish`, `discard`, or `list` request. | A recoverable file draft, semantic conflicts, or a resumable per-file operation. Targets are confined `.acorn/workflows/<id>.toml` paths. |
+| `POST /defs/publications/prepare` | A reviewed workflow revision and selected dependency revisions. | The frozen dependency-first publication plan. |
+| `GET /defs/publications?workspaceId=` | | Incomplete and completed workflow publication operations for recovery. |
+| `POST /defs/publications/:operationId/publish` | `{}` | The publication state and exact landed revisions. |
+| `POST /defs/publications/:operationId/discard` | `{}` | `{ ok }` only while no write has landed. |
+| `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | Refused with guidance to use reviewed **Export to repository**. Retained temporarily for older clients. |
 | `POST /defs/generate` | `{ backendId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }`: a whole definition written by whichever backend `backendId` names, what was taken out of the reply, and what the checker still says about it. |
 | `GET /defs/model-connections` | | The backends this owner can generate with, ids and labels only, connections before installed agent CLIs. The path keeps the older name because only this plugin's own code calls it. An empty list is why the editor draws no **Generate** button. |
 

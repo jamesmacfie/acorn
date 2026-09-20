@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 12)",
+  "title": "acorn plugin manifest (plugin API major 13)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -836,13 +836,13 @@
               "panels": {
                 "type": "object",
                 "properties": {
-                  "collections": {
+                  "sources": {
                     "maxItems": 16,
                     "type": "array",
                     "items": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 130
+                      "maxLength": 200
                     }
                   },
                   "fieldRole": {
@@ -2631,13 +2631,13 @@
               "panels": {
                 "type": "object",
                 "properties": {
-                  "collections": {
+                  "sources": {
                     "maxItems": 16,
                     "type": "array",
                     "items": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 130
+                      "maxLength": 200
                     }
                   },
                   "fieldRole": {
@@ -2986,179 +2986,96 @@
             ]
           }
         },
-        "collections": {
-          "default": [],
-          "maxItems": 8,
+        "dataSources": {
+          "maxItems": 32,
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "id": {
+              "sourceId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 200
               },
               "name": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 80
               },
-              "items": {
+              "singular": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 80
               },
-              "params": {
-                "maxItems": 8,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
-                    },
-                    "name": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 80
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "text",
-                        "enum"
-                      ]
-                    },
-                    "values": {
-                      "maxItems": 32,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "multiple": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "type"
-                  ]
-                }
+              "plural": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
               },
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fields": {
-                    "maxItems": 24,
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 64
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 80
-                        },
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "text",
-                            "number",
-                            "boolean",
-                            "datetime",
-                            "enum",
-                            "person",
-                            "link"
-                          ]
-                        },
-                        "role": {
-                          "type": "string",
-                          "enum": [
-                            "title",
-                            "status",
-                            "assignee",
-                            "url",
-                            "updated"
-                          ]
-                        },
-                        "unit": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 16
-                        },
-                        "values": {
-                          "maxItems": 32,
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 80
-                              },
-                              "tone": {
-                                "type": "string",
-                                "enum": [
-                                  "ok",
-                                  "warn",
-                                  "bad",
-                                  "muted",
-                                  "accent"
-                                ]
-                              },
-                              "icon": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "label"
-                            ]
-                          }
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name",
-                        "type"
-                      ]
-                    }
-                  }
-                },
-                "required": [
-                  "fields"
-                ]
+              "identityScope": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
               },
-              "refresh": {
-                "type": "integer",
-                "minimum": 30,
-                "maximum": 86400
+              "icon": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "titlePointer": {
+                "type": "string"
+              },
+              "urlPointer": {
+                "type": "string"
+              },
+              "handler": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
               }
             },
             "required": [
-              "id",
+              "sourceId",
               "name",
-              "items"
-            ]
+              "singular",
+              "plural",
+              "identityScope",
+              "handler"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "dataSourceDiscoveries": {
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "discoveryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "handler": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "discoveryId",
+              "handler"
+            ],
+            "additionalProperties": false
           }
         },
         "schedules": {

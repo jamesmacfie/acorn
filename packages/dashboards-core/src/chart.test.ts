@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PluginCollectionRow, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import {
   buildChart,
   CHART_FRAME,
@@ -20,7 +20,7 @@ import { viewsForSchema } from './model'
 
 const DAY = 86_400_000
 
-const schema = (...fields: PluginCollectionSchema['fields']): PluginCollectionSchema => ({ fields })
+const schema = (...fields: DashboardDisplaySchema['fields']): DashboardDisplaySchema => ({ fields })
 
 const status = {
   id: 'state',
@@ -36,8 +36,8 @@ const updated = { id: 'updated', name: 'Updated', type: 'datetime' as const, rol
 const size = { id: 'size', name: 'Size', type: 'number' as const, unit: 'MB' }
 const title = { id: 'title', name: 'Title', type: 'text' as const, role: 'title' as const }
 
-const row = (id: string, values: PluginCollectionRow['values']): PluginCollectionRow =>
-  ({ id, values, pluginId: 'github', collectionId: 'pulls-mine' })
+const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow =>
+  ({ id, values, pluginId: 'github', sourceId: 'pulls-mine' })
 
 describe('what a schema can chart', () => {
   it('offers bar for an enum, line for a datetime, both for both', () => {

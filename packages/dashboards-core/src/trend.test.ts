@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PluginCollectionRow, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { activityPoints, baselineValue, historyPoints, sparkline, TREND_DAYS, trendDelta } from './trend'
 
 // A fake clock, always. Every function here takes `now` for exactly this reason: a trend is
@@ -9,14 +9,14 @@ const DAY = 86_400_000
 const NOW = Date.UTC(2026, 7, 17, 10, 30)
 const day = (back: number) => Date.UTC(2026, 7, 17) - back * DAY
 
-const schema: PluginCollectionSchema = {
+const schema: DashboardDisplaySchema = {
   fields: [
     { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
     { id: 'size', name: 'Size', type: 'number' },
   ],
 }
-const row = (at: number, size = 1): PluginCollectionRow =>
-  ({ id: `r${at}${size}`, pluginId: 'p', collectionId: 'c', values: { updated: at, size } })
+const row = (at: number, size = 1): DashboardDisplayRow =>
+  ({ id: `r${at}${size}`, pluginId: 'p', sourceId: 'c', values: { updated: at, size } })
 
 describe('historyPoints', () => {
   it('draws the fortnight whatever the series covers, keeping the day’s last value', () => {

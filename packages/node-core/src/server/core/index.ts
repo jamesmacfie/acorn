@@ -8,8 +8,8 @@ import { createModelService, type ModelService } from './models'
 import { createPrefService, type PrefService } from './prefs'
 import * as proc from './proc'
 import { SecretService } from './secrets'
-import { createTaskService, type TaskService } from './tasks'
-import { createProjectService, type ProjectService } from './projectRefs'
+import { createTaskService, type CompiledTaskService, type TaskService } from './tasks'
+import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
 import { createTelemetryService, type TelemetryService } from './telemetry'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
@@ -76,13 +76,19 @@ export type CoreServices = {
   telemetry: TelemetryService
 }
 
+/** First-party orchestration seams that never cross the loaded-plugin boundary. */
+export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects'> & {
+  tasks: CompiledTaskService
+  projects: CompiledProjectService
+}
+
 export function createCoreServices(options: {
   secrets: SecretService
   db: AppDatabase
   // The persisted binding. Required rather than defaulted, so a composition root cannot end up with
   // a process-local identity by omission. Tests pass memoryIdentityStore() from server/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
-}): CoreServices {
+}): CompiledCoreServices {
   return {
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
@@ -101,9 +107,9 @@ export function createCoreServices(options: {
 }
 
 export { SecretService }
-export type { AttachTaskPullInput, ChildTaskSeed, TaskLinkRef, TaskPullRelation, TaskRunConfig, TaskService } from './tasks'
+export type { AttachTaskPullInput, ChildTaskSeed, CompiledTaskService, RootTaskSeed, TaskLinkRef, TaskPullRelation, TaskRunConfig, TaskService } from './tasks'
 export type { IdentityService } from './identity'
-export type { ProjectService } from './projectRefs'
+export type { CompiledProjectService, ProjectService } from './projectRefs'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
 // and they carry no core config columns and no database handle.
 export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'

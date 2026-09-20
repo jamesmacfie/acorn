@@ -5,7 +5,11 @@
 // catalog and provider reads the inspector draws from, the debounced validate, the dirty flag, and the
 // saves with their revision handling.
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { debounce } from '@acorn/plugin-api/client'
+import { activeNodeId, debounce, deviceStorage } from '@acorn/plugin-api/client'
+import { mergeWorkflow, type WorkflowMergeConflict } from '../../shared/workflowMerge'
+import type { WorkflowPublication } from '../../shared/workflowPublication'
+import type { WorkflowFileOperation, WorkflowFileTarget } from '../../shared/workflowFileAuthoring'
+import { workflowRecoveryStore, WORKFLOW_AUTOSAVE_MS, type WorkflowRecovery } from './recoveryStore'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { workflowApi } from '../workflowsClient'
 import { forgetLayout, renameInLayout } from '../layoutPrefs'
@@ -63,7 +67,9 @@ export type WorkflowDraftStore = ReturnType<typeof createDraftStore>
 
 export function createDraftStore(input: { projectId: () => string; item: () => string | undefined }) {
   const ref = createMemo<DefRef | null>(() => parseDefRef(input.item()))
-  const readOnly = () => ref()?.source !== 'database'
+  const readOnly = () => !ref() || !!loaded.error
+  const fileTarget = (): WorkflowFileTarget => ({ projectId: input.projectId(), source: ref()!.source as 'repo' | 'user', path: `.acorn/workflows/${ref()!.id}.toml` })
+  const entityId = () => ref()?.source === 'database' ? ref()!.id : `${input.projectId()}:${routeId(ref()!)}`
   // Told apart from `readOnly`, because "this is committed, copy it" and "this address names nothing"
   // are different things to say and the second one used to wear the first one's words.
   const unreadable = () => !!input.item() && !ref()
@@ -75,6 +81,19 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const [revision, setRevision] = createSignal(0)
   const [busy, setBusy] = createSignal(false)
   const [message, setMessage] = createSignal<string | undefined>()
+  const recovery = workflowRecoveryStore(deviceStorage())
+  const [saveState, setSaveState] = createSignal('Draft saved')
+  const [publishedRevision, setPublishedRevision] = createSignal<number | null>(null)
+  const [publishedDef, setPublishedDef] = createSignal<WorkflowDef | undefined>()
+  const [publication, setPublication] = createSignal<WorkflowPublication | undefined>()
+  const [fileOperation, setFileOperation] = createSignal<WorkflowFileOperation>()
+  const [fileConflicts, setFileConflicts] = createSignal<WorkflowMergeConflict[]>([])
+  let fileChoices: Record<string, 'local' | 'external'> = {}
+  let externalHash: string | undefined
+  const [conflicts, setConflicts] = createSignal<WorkflowMergeConflict[]>([])
+  let mergeBase: { base: WorkflowDef; local: WorkflowDef; external: WorkflowDef; choices: Record<string, 'local' | 'external'> } | undefined
+  let baseDef = emptyDefinition()
+  let pendingCopy: WorkflowRecovery | undefined
 
   // Loaded through a resource keyed on the addressed definition, so navigating between two of them in
   // the list is a refetch rather than a remount of the whole surface.
@@ -83,7 +102,11 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
       const current = ref()
       return current ? { key: defRefKey(current), route: routeId(current), projectId: input.projectId() } : null
     },
-    async (query) => workflowApi.def(query.route, query.projectId || undefined),
+    async (query) => {
+      if (ref()?.source === 'database') return workflowApi.def(query.route, query.projectId || undefined)
+      const value = (await workflowApi.files({ action: 'open', target: fileTarget() })).draft!
+      return { id: entityId(), workspaceId: '', projectId: query.projectId, name: value.def.name, revision: value.revision, createdAt: 0, updatedAt: 0, def: value.def }
+    },
   )
 
   createEffect(on(loaded, (row) => {
@@ -93,8 +116,30 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     setPast([])
     setFuture([])
     setRevision(row.revision)
+    setPublishedRevision(row.publishedRevision ?? null)
+    setPublishedDef(row.publishedDef as WorkflowDef | undefined)
+    baseDef = def
     setSaved(toJson(def))
     setMessage(undefined)
+    setConflicts([])
+    setFileConflicts([])
+    setFileOperation(undefined)
+    fileChoices = {}
+    if (input.projectId()) void workflowApi.files({ action: 'list', projectId: input.projectId() }).then(result => {
+      setFileOperation(result.operations?.find(operation => operation.state !== 'complete' && (ref()?.source === 'database' ? operation.rootId === ref()?.id : operation.source === ref()?.source && operation.rootPath === fileTarget().path)))
+    }).catch(() => undefined)
+    const copy = recovery.latest(activeNodeId() ?? '', row.id)
+    if (copy) {
+      pendingCopy = copy
+      mergeBase = { base: copy.base, local: copy.local, external: def, choices: {} }
+      const merged = mergeWorkflow(copy.base, copy.local, def)
+      setConflicts(merged.conflicts)
+      setDraftRaw(newDraft(merged.value))
+      setSaveState(merged.conflicts.length ? 'Resolve save conflict' : 'Saved on this device')
+    }
+    if (row.workspaceId && workflowApi.publications) void workflowApi.publications(row.workspaceId).then(operations => {
+      setPublication(operations.find(operation => operation.rootId === row.id && operation.state !== 'complete'))
+    }).catch(() => undefined)
   }))
 
   const dirty = () => toJson(draft().def) !== saved()
@@ -144,7 +189,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const rename = (from: string, to: string): void => {
     apply((current) => renameNode(current, from, to))
     const current = ref()
-    if (current) renameInLayout(defRefKey(current), from, to)
+    if (current && draft().def.formatVersion !== 2) renameInLayout(defRefKey(current), from, to)
   }
 
   const [problems, setProblems] = createSignal<string[]>([])
@@ -161,7 +206,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   createEffect(on(defJson, () => validate(draft().def, input.projectId())))
   onCleanup(() => validate.cancel())
 
-  const [catalog] = createResource(() => input.projectId() || 'none', async (projectId) =>
+  const [catalog, { refetch: refetchCatalog }] = createResource(() => input.projectId() || 'none', async (projectId) =>
     workflowApi.catalog(projectId === 'none' ? undefined : projectId))
   const [providers] = createResource(async () => workflowApi.providers().catch(() => []))
 
@@ -183,16 +228,117 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
    *  changed is the wrong half to lose. */
   const save = async (): Promise<boolean> => {
     const current = ref()
-    if (!current || current.source !== 'database') return false
+    if (!current || busy() || conflicts().length || fileConflicts().length) return false
     const def = draft().def
-    const row = await guard(() => workflowApi.updateDef(current.id, def, revision()))
+    const nodeId = activeNodeId() ?? ''
+    const copy: WorkflowRecovery = { nodeId, entityId: entityId(), baseRevision: revision(), base: baseDef, local: def, savedAt: Date.now() }
+    pendingCopy = copy
+    const durable = recovery.save(copy)
+    setSaveState('Saving')
+    const readCurrent = async () => current.source === 'database' ? workflowApi.def(current.id) : (await workflowApi.files({ action: 'open', target: fileTarget() })).draft!
+    const row = await guard(async () => current.source === 'database' ? workflowApi.updateDef(current.id, def, revision()) : (await workflowApi.files({ action: 'save', target: fileTarget(), def, revision: revision() })).draft!)
     if (!row) {
+      setSaveState(durable ? 'Saved on this device' : 'Could not save')
       setMessage((text) => text ?? 'That save did not land.')
+      const remote = await readCurrent().catch(() => null)
+      if (remote && remote.revision !== copy.baseRevision) {
+        mergeBase = { base: copy.base, local: draft().def, external: remote.def as WorkflowDef, choices: {} }
+        const merged = mergeWorkflow(mergeBase.base, mergeBase.local, mergeBase.external)
+        setConflicts(merged.conflicts)
+        setDraftRaw(newDraft(merged.value))
+        setRevision(remote.revision)
+        baseDef = remote.def as WorkflowDef
+        setSaved(toJson(baseDef))
+        setSaveState(merged.conflicts.length ? 'Resolve save conflict' : 'Saved on this device')
+      }
       return false
     }
+    recovery.acknowledge(copy, row.revision, row.def as WorkflowDef)
+    if (pendingCopy === copy) pendingCopy = undefined
     setRevision(row.revision)
+    baseDef = row.def as WorkflowDef
     setSaved(toJson(def))
+    setSaveState('Draft saved')
     return true
+  }
+
+  const autosave = debounce(() => { if (dirty() && !busy() && !conflicts().length) void save() }, WORKFLOW_AUTOSAVE_MS)
+  createEffect(on(defJson, () => {
+    const current = ref()
+    if (!current || readOnly() || !dirty() || !revision() || conflicts().length) return
+    const copy: WorkflowRecovery = { nodeId: activeNodeId() ?? '', entityId: entityId(), baseRevision: revision(), base: baseDef, local: draft().def, savedAt: Date.now() }
+    pendingCopy = copy
+    setSaveState(recovery.save(copy) ? 'Saved on this device' : 'Not saved')
+    autosave()
+  }))
+  onCleanup(() => { autosave.cancel(); if (dirty() && !conflicts().length) void save() })
+  const resolveConflict = (path: string, choice: 'local' | 'external') => {
+    if (!mergeBase) return
+    mergeBase.choices[path] = choice
+    const merged = mergeWorkflow(mergeBase.base, mergeBase.local, mergeBase.external, mergeBase.choices)
+    apply(() => newDraft(merged.value))
+    setConflicts(merged.conflicts)
+    if (!merged.conflicts.length) autosave()
+  }
+  const preparePublication = async () => {
+    if (dirty() && !(await save())) return
+    const current = ref()
+    if (!current) return
+    if (current.source !== 'database') {
+      const result = await guard(() => workflowApi.files({ action: 'review', target: fileTarget(), revision: revision(), choices: fileChoices, externalHash }))
+      externalHash = result?.externalHash
+      if (!result) fileChoices = {}
+      if (result?.draft) { setRevision(result.draft.revision); setDraftRaw(newDraft(result.draft.def)); baseDef = result.draft.def; setSaved(toJson(baseDef)) }
+      setFileConflicts(result?.conflicts ?? [])
+      if (result?.operation) { setFileOperation(result.operation); fileChoices = {} }
+      return
+    }
+    const result = await guard(() => workflowApi.preparePublication({ id: current.id, revision: revision() }))
+    if (result) setPublication(result)
+  }
+  const resolveFileConflict = (path: string, choice: 'local' | 'external') => {
+    fileChoices[path] = choice
+    void preparePublication()
+  }
+  const publishFiles = async () => {
+    const current = fileOperation()
+    if (!current) return
+    const result = await guard(() => workflowApi.files({ action: 'publish', id: current.id }))
+    if (result?.operation) setFileOperation(result.operation)
+    if (result?.operation?.state === 'complete' && ref()?.source !== 'database') {
+      const value = (await workflowApi.files({ action: 'open', target: fileTarget() })).draft!
+      setRevision(value.revision)
+      setMessage('Published to file. Working-tree changes remain uncommitted.')
+    }
+  }
+  const prepareExport = async () => {
+    if (ref()?.source !== 'database') return
+    const result = await guard(() => workflowApi.files({ action: 'export', projectId: input.projectId(), id: ref()!.id }))
+    if (result?.operation) setFileOperation(result.operation)
+  }
+  const discardFiles = async () => {
+    const current = fileOperation()
+    if (current && await guard(() => workflowApi.files({ action: 'discard', id: current.id }))) setFileOperation(undefined)
+  }
+  const publish = async () => {
+    const current = publication()
+    if (!current) return
+    const result = await guard(() => workflowApi.publish(current.id))
+    if (!result) return
+    setPublication(result)
+    if (result.state === 'complete') {
+      const landed = result.landed.find(write => write.kind === 'workflow' && write.id === ref()?.id)
+      setPublishedRevision(landed?.revision ?? null)
+      const write = result.writes.find(write => write.kind === 'workflow' && write.id === ref()?.id)
+      if (write?.kind === 'workflow') setPublishedDef(write.def)
+      // This editor instance survives navigation to a newly created child and back to its parent.
+      // Refresh the shared target list now so the parent sees that child as published immediately.
+      await refetchCatalog()
+    }
+  }
+  const discardPublication = async () => {
+    const current = publication()
+    if (current && await guard(() => workflowApi.discardPublication(current.id))) setPublication(undefined)
   }
 
   const saveToRepo = async (options: { taskId?: string; keepRow: boolean }): Promise<string | undefined> => {
@@ -231,6 +377,8 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   }
 
   return {
+    fileOperation, fileConflicts, resolveFileConflict, publishFiles, prepareExport, discardFiles,
+    saveState, publishedRevision, publishedDef, publication, conflicts, resolveConflict, preparePublication, publish, discardPublication,
     ref,
     readOnly,
     unreadable,
@@ -245,6 +393,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     dirty,
     problems,
     catalog,
+    refetchCatalog,
     providers,
     busy,
     message,

@@ -13,6 +13,9 @@ import { wsOnPluginsChanged } from '../../infra/node/wsClient'
 import { syncPluginDistribution } from './distribution'
 import { syncPluginContributions } from './syncContributions'
 import { createLogger } from '../../infra/telemetry/logger'
+import { invalidateDataSources } from '../../features/dataSources/queries'
+import { activeCacheId } from '../../infra/node/activeNode'
+import { clientFor } from '../../infra/node/fleet'
 
 const log = createLogger('plugins')
 
@@ -54,6 +57,7 @@ export function watchPluginChanges(): () => void {
     })
   })
   return wsOnPluginsChanged(() => {
+    void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId())
     void reconcilePluginChange().catch((error) => log.warn('could not reconcile a plugin change', error))
   })
 }

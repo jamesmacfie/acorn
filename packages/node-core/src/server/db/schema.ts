@@ -1,5 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+export { queryDrafts, queryRevisions, queryConsumers, queryPublicationHolds } from '../queries/schema'
+export { dashboardDrafts, dashboardRevisions } from '../dashboards/schema'
 
 export const syncState = sqliteTable(
   'sync_state',
@@ -161,7 +163,7 @@ export const tasks = sqliteTable('tasks', {
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
-  parentId: text('parent_id'), // task tree (docs/workflows.md): set on fan-out children; null = root
+  parentId: text('parent_id'), // task tree (docs/workflows.md): set on dispatched children; null = root
   sort: integer('sort').notNull().default(0), // rail ordering
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

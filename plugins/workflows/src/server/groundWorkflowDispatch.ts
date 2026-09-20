@@ -7,6 +7,8 @@ import type {
 } from '../shared/workflowContracts'
 import { sameWorkflowRef } from '../shared/workflowRefs'
 import { parseWorkflowJsonPointer, workflowEdges } from './workflowValidation'
+import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { stepIdentity } from '../shared/workflowIdentity'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -27,6 +29,15 @@ const bindingShape = (
   structured: (step: string) => boolean,
   owner: string,
 ): string | undefined => {
+  if (isRecord(binding) && 'address' in binding) {
+    const parsed = dataBindingSchema.safeParse(binding)
+    if (!parsed.success) return 'is not a typed binding'
+    const address = parsed.data.address
+    if (address.from === 'input' && !parentInputs.has(address.name)) return 'references an undeclared input'
+    if (address.from === 'item' && !allowItem) return 'uses an item outside a map'
+    if (address.from === 'step' && (!names.has(address.stepId) || !precedes(address.stepId, owner) || !structured(address.stepId))) return 'does not name a structured predecessor binding'
+    return undefined
+  }
   if (!isRecord(binding) || typeof binding.from !== 'string') return 'is not a binding object'
   if (binding.from === 'literal') {
     return Object.keys(binding).every((key) => key === 'from' || key === 'value') && typeof binding.value === 'string'
@@ -62,7 +73,7 @@ export function groundWorkflowDispatch(
 ): WorkflowDef {
   const targets = catalog.workflows ?? []
   const parentInputs = new Set((def.inputs ?? []).map((input) => input.name))
-  const names = new Set(def.steps.map((step) => step.name))
+  const names = new Set(def.steps.map((step) => stepIdentity(step)))
   const graph = workflowEdges(def.steps)
   const precedes = (candidate: string, owner: string): boolean => {
     const seen = new Set<string>()
@@ -77,7 +88,7 @@ export function groundWorkflowDispatch(
     return false
   }
   const structured = (name: string): boolean => {
-    const source = def.steps.find((step) => step.name === name)
+    const source = def.steps.find((step) => stepIdentity(step) === name)
     if (!source) return false
     if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
     return !!catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema
@@ -98,7 +109,7 @@ export function groundWorkflowDispatch(
       const kept = Object.entries(isRecord(next.childWorkflow.inputs) ? next.childWorkflow.inputs : {}).filter(([name, binding]) => {
         const problem = !declared.has(name)
           ? `binds the undeclared child input '${name}'`
-          : bindingShape(binding, step.kind === 'workflow-map', parentInputs, names, precedes, structured, step.name)
+          : bindingShape(binding, step.kind === 'workflow-map', parentInputs, names, precedes, structured, stepIdentity(step))
         if (!problem) return true
         add(notes, 'unsupported-binding', `Step '${step.name}' ${problem}, so that binding was dropped.`, step.name)
         return false
@@ -114,7 +125,7 @@ export function groundWorkflowDispatch(
 
     if (step.kind === 'workflow-map' && next.items) {
       const valid = typeof next.items.step === 'string' && names.has(next.items.step)
-        && precedes(next.items.step, step.name) && structured(next.items.step)
+        && precedes(next.items.step, stepIdentity(step)) && structured(next.items.step)
         && parseWorkflowJsonPointer(next.items.pointer) !== null
       if (!valid) {
         add(notes, 'unknown-step-reference', `Step '${step.name}' has an invalid map source, so the source was dropped.`, step.name)
@@ -123,7 +134,7 @@ export function groundWorkflowDispatch(
     }
     if (step.kind === 'workflow-map' && next.title?.bindings) {
       const kept = Object.entries(next.title.bindings).filter(([name, binding]) => {
-        const problem = bindingShape(binding, true, parentInputs, names, precedes, structured, step.name)
+        const problem = bindingShape(binding, true, parentInputs, names, precedes, structured, stepIdentity(step))
         if (!problem) return true
         add(notes, 'unsupported-binding', `Step '${step.name}' title binding '${name}' ${problem}, so that binding was dropped.`, step.name)
         return false

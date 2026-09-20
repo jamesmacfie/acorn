@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -18,7 +18,7 @@ const catalog: WorkflowValidationCatalog = {
   structuredProfiles: new Set(['claude-code']),
 }
 
-const def = (name: string): WorkflowDef => ({ name, steps: [{ name: 'only', prompt: 'Do it.' }] })
+const def = (name: string): WorkflowDef => ({ formatVersion: 2, name, steps: [{ id: 'only', name: 'only', prompt: 'Do it.' }] })
 
 // Stands in for `ctx.core.fs.resolveInRoot`, the symlink-aware confinement the node wires in. What
 // the store owes is honouring the answer, which is what the last case here checks.
@@ -87,9 +87,9 @@ describe('workflow definitions stored as rows', () => {
     const user = join(dir, 'home')
     mkdirSync(repo)
     mkdirSync(user)
-    writeFile(repo, 'shared', 'name = "the committed one"\n[[steps]]\nname = "a"\nprompt = "x"\n')
-    writeFile(user, 'shared', 'name = "the user one"\n[[steps]]\nname = "a"\nprompt = "x"\n')
-    writeFile(user, 'mine-only', 'name = "user only"\n[[steps]]\nname = "a"\nprompt = "x"\n')
+    writeFile(repo, 'shared', 'format_version = 2\nname = "the committed one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
+    writeFile(user, 'shared', 'format_version = 2\nname = "the user one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
+    writeFile(user, 'mine-only', 'format_version = 2\nname = "user only"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
     await createDef(store.db, { workspaceId: 'w1', projectId: 'p1', def: def('a row') })
 
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: repo }], { userDir: user, catalog })
@@ -105,8 +105,8 @@ describe('workflow definitions stored as rows', () => {
     const user = join(dir, 'home')
     mkdirSync(repo)
     mkdirSync(user)
-    writeFile(user, 'review-block', 'name = "review"\n[[steps]]\nname = "look"\nprompt = "Review."\n')
-    writeFile(repo, 'main-flow', 'name = "main"\n[[steps]]\nname = "build"\nprompt = "Build."\n[[steps]]\nworkflow = "review-block"\n')
+    writeFile(user, 'review-block', 'format_version = 2\nname = "review"\n[[steps]]\nid = "look"\nname = "look"\nprompt = "Review."\n')
+    writeFile(repo, 'main-flow', 'format_version = 2\nname = "main"\n[[steps]]\nid = "build"\nname = "build"\nprompt = "Build."\n[[steps]]\nid = "review"\nworkflow = "review-block"\n')
 
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: repo }], { userDir: user, catalog })
     expect(merged.errors).toEqual([])
@@ -120,19 +120,17 @@ describe('workflow definitions stored as rows', () => {
     expect(merged.workflows[0].problems).toEqual(['The project this workflow was bound to has been removed.'])
   })
 
-  it('saves to the repository as a slug of the name and deletes the row', async () => {
+  it('refuses the obsolete destructive export and preserves the draft', async () => {
     const row = await createDef(store.db, { workspaceId: 'w1', def: def('Investigate an issue') })
     const saved = await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: false, resolveInRoot })
-    expect(saved).toEqual({ path: '.acorn/workflows/investigate-an-issue.toml' })
-    expect(readFileSync(join(dir, '.acorn', 'workflows', 'investigate-an-issue.toml'), 'utf8')).toContain('name = "Investigate an issue"')
-    expect(await getDef(store.db, row.id)).toBeNull()
+    expect(saved).toEqual({ error: 'review_published_export_required' })
+    expect(await getDef(store.db, row.id)).not.toBeNull()
   })
 
   it('keeps the row when asked, and never writes outside the folder', async () => {
     const row = await createDef(store.db, { workspaceId: 'w1', def: def('../../etc/passwd') })
     const saved = await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot })
-    expect(saved).toEqual({ path: '.acorn/workflows/etc-passwd.toml' })
-    expect(readdirSync(join(dir, '.acorn', 'workflows'))).toEqual(['etc-passwd.toml'])
+    expect(saved).toEqual({ error: 'review_published_export_required' })
     expect(await getDef(store.db, row.id)).not.toBeNull()
   })
 
@@ -140,13 +138,13 @@ describe('workflow definitions stored as rows', () => {
     writeFile(dir, 'ship-it', 'name = "the committed one"\n[[steps]]\nname = "a"\nprompt = "x"\n')
     const row = await createDef(store.db, { workspaceId: 'w1', def: def('Ship it') })
     expect(await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot })).toEqual({
-      path: '.acorn/workflows/ship-it-2.toml',
+      error: 'review_published_export_required',
     })
   })
 
   it('writes nothing when the confinement check refuses the path', async () => {
     const row = await createDef(store.db, { workspaceId: 'w1', def: def('Ship it') })
-    expect(await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot: () => null })).toEqual({ error: 'outside_checkout' })
+    expect(await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot: () => null })).toEqual({ error: 'review_published_export_required' })
     // Not even the folder: the check runs before `mkdir -p`, so a symlinked `.acorn` is not followed.
     expect(existsSync(join(dir, '.acorn'))).toBe(false)
   })

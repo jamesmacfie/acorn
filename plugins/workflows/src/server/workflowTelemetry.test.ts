@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID, type ExtensionPointId, type PluginTelemetry, type TelemetryRecord } from '@acorn/plugin-api/node'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './workflowRunner'
+import type { WorkflowDef } from '../shared/workflowContracts'
 
 // A run and its steps as spans, raised by this plugin through `ctx.telemetry` and owned by it
 // (docs/workflows.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
@@ -48,6 +49,12 @@ const withProfile = async (body: () => Promise<void>): Promise<void> => {
   }
 }
 
+const v2 = (def: Omit<WorkflowDef, 'formatVersion'>): WorkflowDef => ({
+  ...def,
+  formatVersion: 2,
+  steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
+})
+
 describe('what a run reports', () => {
   let ctx: TestNodeContext
   beforeEach(() => {
@@ -60,10 +67,10 @@ describe('what a run reports', () => {
   it('raises one span for the run and one per step, and hangs the steps under the run', async () => {
     await withProfile(async () => {
       const runner = new WorkflowRunner(ctx.storage.open(), baseDeps(ctx.telemetry), noExtensions)
-      const runId = await runner.start('task-1', {
+      const runId = await runner.start('task-1', v2({
         name: 'W',
         steps: [{ name: 'one', kind: 'agent', prompt: 'go' }, { name: 'two', kind: 'agent', prompt: 'go', after: ['one'] }],
-      })
+      }))
       await vi.waitFor(() => expect(spans(ctx)).toHaveLength(3))
 
       const run = spans(ctx).find((span) => span.name === 'workflow.run')!
@@ -89,7 +96,7 @@ describe('what a run reports', () => {
         baseDeps(ctx.telemetry, { runStep: async () => ({ ...ok, status: 'error' as const, stderrTail: 'no' }) }),
         noExtensions,
       )
-      await runner.start('task-1', { name: 'W', steps: [{ name: 'one', kind: 'agent', prompt: 'go' }] })
+      await runner.start('task-1', v2({ name: 'W', steps: [{ name: 'one', kind: 'agent', prompt: 'go' }] }))
       await vi.waitFor(() => expect(spans(ctx)).toHaveLength(2))
       expect(spans(ctx).find((span) => span.name === 'workflow.step')).toMatchObject({ status: 'error', attrs: { status: 'failed' } })
       expect(spans(ctx).find((span) => span.name === 'workflow.run')).toMatchObject({ status: 'error', attrs: { status: 'failed' } })
@@ -99,7 +106,7 @@ describe('what a run reports', () => {
   it('runs with no telemetry at all, because a test builds a runner with no host around it', async () => {
     await withProfile(async () => {
       const runner = new WorkflowRunner(ctx.storage.open(), { ...baseDeps({} as PluginTelemetry), telemetry: undefined }, noExtensions)
-      const runId = await runner.start('task-1', { name: 'W', steps: [{ name: 'one', kind: 'agent', prompt: 'go' }] })
+      const runId = await runner.start('task-1', v2({ name: 'W', steps: [{ name: 'one', kind: 'agent', prompt: 'go' }] }))
       await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('done'))
       expect(spans(ctx)).toEqual([])
     })
@@ -119,10 +126,10 @@ describe('what a run reports', () => {
         },
       }), noExtensions)
 
-      const runId = await runner.start('task-1', {
+      const runId = await runner.start('task-1', v2({
         name: 'Approval',
         steps: [{ name: 'approve', kind: 'gate-human' }],
-      })
+      }))
       await vi.waitFor(() => expect(runEvents.map((event) => event.status)).toEqual(['running', 'gated']))
       expect(runEvents[0]).toMatchObject({ taskId: 'task-1', runId, steps: 1 })
       expect(gateEvents).toHaveLength(1)

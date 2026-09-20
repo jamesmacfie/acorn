@@ -1,3 +1,4 @@
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { randomUUID } from 'node:crypto'
 import { DEFAULT_PROFILE_ID, type PluginDatabase } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
@@ -10,6 +11,7 @@ import type {
   WorkflowRunRow,
 } from '../shared/workflowContracts'
 import { resolveWorkflowInputs } from './workflowValidation'
+import { MAX_CHILD_WORKFLOW_DEPTH } from './workflowResolution'
 
 export type WorkflowInvocationIdentity = {
   callerKey: string
@@ -21,8 +23,10 @@ export type WorkflowInvocationIdentity = {
 }
 
 export type WorkflowStartOptions = {
+  processingScope?: import('../shared/workflowProcessing').WorkflowProcessingScope
+  processingBaseline?: boolean
   trigger?: string
-  inputs?: Record<string, string>
+  inputs?: Record<string, DataValue>
   intendedRunId?: string
   invocation?: WorkflowInvocationIdentity
   resolvedGraph?: ResolvedWorkflowGraph
@@ -71,8 +75,8 @@ export async function persistWorkflowStart(
   if (options?.invocation?.parentRunId != null) {
     const [parent] = await db.select().from(schema.workflowRuns)
       .where(eq(schema.workflowRuns.id, options.invocation.parentRunId))
-    if (!parent || options.invocation.depth !== parent.depth + 1 || options.invocation.depth > 1) {
-      throw new Error('A child workflow run must be a direct depth-one descendant of its parent.')
+    if (!parent || options.invocation.depth !== parent.depth + 1 || options.invocation.depth > MAX_CHILD_WORKFLOW_DEPTH) {
+      throw new Error(`A child workflow run must retain parent lineage within ${MAX_CHILD_WORKFLOW_DEPTH} child levels.`)
     }
     if ((parent.rootRunId ?? parent.id) !== options.invocation.rootRunId) {
       throw new Error('A child workflow run must keep its parent tree accounting owner.')
@@ -82,7 +86,7 @@ export async function persistWorkflowStart(
 
   const inputs = resolveWorkflowInputs(def, options?.inputs)
   const frozen: WorkflowDef = def.inputs?.length
-    ? { ...def, inputs: def.inputs.map((input) => ({ ...input, default: inputs[input.name] ?? '' })) }
+    ? { ...def, inputs: def.inputs.map((input) => ({ ...input, default: inputs[input.name] })) }
     : def
   const runId = options?.intendedRunId ?? randomUUID()
   const at = Date.now()
@@ -99,12 +103,16 @@ export async function persistWorkflowStart(
     ?? (effectiveBudget.maxWallTimeMs == null ? null : at + effectiveBudget.maxWallTimeMs)
   const requiresRepoTrust = options?.requiresRepoTrust ?? options?.resolvedGraph?.requiresRepoTrust ?? false
   const created = db.transaction((tx) => {
+    if (options?.processingScope && (options.invocation?.parentRunId || !options.processingScope.scopeId.trim() || !options.processingScope.epoch.trim())) throw new Error('Processing scope must identify a root and explicit epoch')
     const byId = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, runId)).get()
     const byInvocation = options?.invocation
       ? tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.invocationKey, options.invocation.callerKey)).get()
       : undefined
     const existing = byId ?? byInvocation
     if (existing) {
+      const scope = tx.select().from(schema.workflowProcessingScopes).where(eq(schema.workflowProcessingScopes.runId, existing.id)).get()
+      if ((scope?.scopeId ?? null) !== (options?.processingScope?.scopeId ?? null) || (scope?.epoch ?? null) !== (options?.processingScope?.epoch ?? null)
+        || (scope?.baseline ?? false) !== (options?.processingBaseline ?? false)) throw new Error('Workflow invocation conflicts with its frozen processing scope')
       const matches = existing.id === runId
         && existing.taskId === taskId
         && existing.defJson === defJson
@@ -146,6 +154,7 @@ export async function persistWorkflowStart(
       createdAt: at,
       updatedAt: at,
     }).run()
+    if (options?.processingScope) tx.insert(schema.workflowProcessingScopes).values({ runId, ...options.processingScope, baseline: options.processingBaseline ?? false }).run()
     for (const [idx, step] of def.steps.entries()) {
       tx.insert(schema.workflowSteps).values({
         id: randomUUID(),

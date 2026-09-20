@@ -18,6 +18,7 @@ export type WorkflowUsageSummary = {
 
 /** One admitted child workflow, projected from the dispatch ledger and child run row. */
 export type WorkflowChildRunSummary = {
+  outputs?: Record<string, import('@acorn/protocol/dataValues.ts').DataValue>
   parentTaskId: string
   parentRunId: string
   parentStepId: string
@@ -26,7 +27,7 @@ export type WorkflowChildRunSummary = {
   runId: string
   name: string | null
   dispatchState: 'reserved' | 'task-created' | 'run-started' | 'cancelling' | 'terminal'
-  runStatus: 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled' | null
+  runStatus: 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled' | null
   resultSummary: string | null
   error: string | null
   usage: WorkflowUsageSummary | null
@@ -48,6 +49,13 @@ export type WorkflowRunProjection = WireWorkflowRunRow & {
 
 export type WorkflowStepProjection = WireWorkflowStepRow & {
   children: WorkflowChildRunSummary[]
+}
+
+export type WorkflowTaskGroup = {
+  rootTaskId: string
+  descendants: number
+  running: number
+  attention: number
 }
 
 /** How much description or edit instruction the modal takes and the route accepts.

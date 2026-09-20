@@ -54,7 +54,7 @@ export const workflowRuns = sqliteTable(
 )
 
 // One step of a run. Steps carry their own working context (worktreePath) as a first-class field,
-// not a derived value; structured output is the edge currency for branch and join steps.
+// not a derived value; structured output is the edge currency for branch and converging steps.
 export const workflowSteps = sqliteTable(
   'workflow_steps',
   {
@@ -62,7 +62,7 @@ export const workflowSteps = sqliteTable(
     runId: text('run_id').notNull(), // → workflow_runs.id (same file, so this one really is local)
     idx: integer('idx').notNull(), // sequence position
     name: text('name').notNull(),
-    // Registry ID. Built-ins include agents, gates, control flow, fan-out, and child workflows.
+    // Registry ID. Built-ins include agents, gates, control flow, data steps, and child workflows.
     kind: text('kind').notNull().default('agent'),
     mode: text('mode').notNull().default('headless'), // headless | ai | interactive
     profileId: text('profile_id'),
@@ -76,7 +76,7 @@ export const workflowSteps = sqliteTable(
     agentSessionId: text('agent_session_id'), // → plugins/agents' session id (plain ID across databases)
     costUsd: real('cost_usd'),
     iteration: integer('iteration').notNull().default(0), // loop bound bookkeeping (14 §loop)
-    parentStepId: text('parent_step_id'), // fan-out lineage (14 P4)
+    parentStepId: text('parent_step_id'), // child-dispatch lineage
     error: text('error'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -104,11 +104,56 @@ export const workflowDefs = sqliteTable(
     name: text('name').notNull(),
     defJson: text('def_json').notNull(), // the WorkflowDef, without node positions
     revision: integer('revision').notNull().default(1), // bumped per save; a stale one is a 409
+    publishedRevision: integer('published_revision'),
+    basePublishedRevision: integer('base_published_revision'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [index('workflow_defs_workspace_idx').on(table.workspaceId, table.updatedAt)],
 )
+
+export const workflowRevisions = sqliteTable('workflow_revisions', {
+  id: text('id').primaryKey(),
+  definitionId: text('definition_id').notNull(),
+  revision: integer('revision').notNull(),
+  workspaceId: text('workspace_id').notNull(),
+  projectId: text('project_id'),
+  defJson: text('def_json').notNull(),
+  digest: text('digest').notNull(),
+  operationId: text('operation_id').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, table => [uniqueIndex('workflow_revisions_definition_revision_uq').on(table.definitionId, table.revision)])
+
+export const workflowPublications = sqliteTable('workflow_publications', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  rootId: text('root_id').notNull(),
+  state: text('state').notNull(),
+  planJson: text('plan_json').notNull(),
+  landedJson: text('landed_json').notNull().default('[]'),
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const workflowDependencies = sqliteTable('workflow_dependencies', {
+  id: text('id').primaryKey(),
+  consumerId: text('consumer_id').notNull(),
+  kind: text('kind').notNull(),
+  targetId: text('target_id').notNull(),
+}, table => [index('workflow_dependencies_target_idx').on(table.kind, table.targetId)])
+
+export const workflowFileDrafts = sqliteTable('workflow_file_drafts', {
+  id: text('id').primaryKey(),
+  revision: integer('revision').notNull(),
+  contentJson: text('content_json').notNull(),
+})
+
+export const workflowFileOperations = sqliteTable('workflow_file_operations', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  contentJson: text('content_json').notNull(),
+})
 
 // One replay-safe intent for creating a child task and starting its workflow run. The payload is
 // frozen before either effect, so reconciliation never consults an edited definition after restart.
@@ -166,3 +211,102 @@ export const workflowTurnAdmissions = sqliteTable(
     index('workflow_turn_admissions_state_idx').on(table.state),
   ],
 )
+
+// Processing history is workflow-owned so a selection and its child intents commit together.
+export const workflowProcessingScopes = sqliteTable('workflow_processing_scopes', {
+  runId: text('run_id').primaryKey(),
+  scopeId: text('scope_id').notNull(),
+  epoch: text('epoch').notNull(),
+  baseline: integer('baseline', { mode: 'boolean' }).notNull().default(false),
+})
+export const workflowSelections = sqliteTable('workflow_selections', {
+  id: text('id').primaryKey(),
+  invocationKey: text('invocation_key').notNull().unique(),
+  fingerprint: text('fingerprint').notNull(),
+  runId: text('run_id').notNull(),
+  stepId: text('step_id').notNull(),
+  scopeKey: text('scope_key').notNull(),
+  snapshotJson: text('snapshot_json').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, table => [index('workflow_selections_run_idx').on(table.runId, table.createdAt)])
+export const workflowSelectedRecords = sqliteTable('workflow_selected_records', {
+  id: text('id').primaryKey(),
+  selectionId: text('selection_id').notNull(),
+  position: integer('position').notNull(),
+  recordKey: text('record_key').notNull(),
+  snapshotJson: text('snapshot_json').notNull(),
+  decision: text('decision').notNull(),
+  attemptId: text('attempt_id'),
+}, table => [uniqueIndex('workflow_selected_records_selection_key_uq').on(table.selectionId, table.recordKey),
+  index('workflow_selected_records_page_idx').on(table.selectionId, table.position)])
+export const workflowRecordStates = sqliteTable('workflow_record_states', {
+  id: text('id').primaryKey(),
+  scopeKey: text('scope_key').notNull(),
+  recordKey: text('record_key').notNull(),
+  snapshotJson: text('snapshot_json').notNull(),
+  fieldsJson: text('fields_json').notNull(),
+  projection: text('projection').notNull(),
+  attemptId: text('attempt_id'),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [uniqueIndex('workflow_record_states_scope_key_uq').on(table.scopeKey, table.recordKey)])
+export const workflowRecordAttempts = sqliteTable('workflow_record_attempts', {
+  id: text('id').primaryKey(),
+  stateId: text('state_id').notNull(),
+  selectionId: text('selection_id').notNull(),
+  dispatchId: text('dispatch_id').notNull().unique(),
+  previousAttemptId: text('previous_attempt_id'),
+  createdAt: integer('created_at').notNull(),
+}, table => [index('workflow_record_attempts_history_idx').on(table.stateId, table.createdAt)])
+export const workflowProcessingBoundaries = sqliteTable('workflow_processing_boundaries', {
+  scopeKey: text('scope_key').primaryKey(),
+  queryFingerprint: text('query_fingerprint').notNull(),
+  boundaryJson: text('boundary_json').notNull(),
+  selectionId: text('selection_id').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+// Approved schedule bindings and their replay ledger are workflow-owned. Core owns cadence and
+// invokes the target by id; this database owns everything specific to workflow approval/recovery.
+export const workflowSchedules = sqliteTable('workflow_schedules', {
+  id: text('id').primaryKey(),
+  schedulerKey: text('scheduler_key').unique(),
+  workspaceId: text('workspace_id').notNull(),
+  projectId: text('project_id').notNull(),
+  workflowId: text('workflow_id').notNull(),
+  inputsJson: text('inputs_json').notNull(),
+  timezone: text('timezone').notNull(),
+  limitsJson: text('limits_json').notNull(),
+  loopsJson: text('loops_json').notNull().default('[]'),
+  approvedGraphJson: text('approved_graph_json'),
+  approvedGraphDigest: text('approved_graph_digest'),
+  generation: integer('generation').notNull().default(0),
+  epoch: text('epoch').notNull(),
+  state: text('state').notNull(), // draft | baselining | active | needs-review | baseline-failed | deleted
+  firstCheck: text('first_check').notNull().default('process-current'),
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [index('workflow_schedules_project_idx').on(table.projectId, table.updatedAt)])
+
+export const workflowScheduleOccurrences = sqliteTable('workflow_schedule_occurrences', {
+  id: text('id').primaryKey(),
+  scheduleId: text('schedule_id').notNull(),
+  generation: integer('generation').notNull(),
+  kind: text('kind').notNull(), // due | catch-up | manual | baseline
+  dueAt: integer('due_at'),
+  requestKey: text('request_key').notNull(),
+  payloadFingerprint: text('payload_fingerprint').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  taskId: text('task_id').notNull(),
+  runId: text('run_id').notNull(),
+  state: text('state').notNull(), // claimed | task-created | run-started | terminal | skipped | blocked
+  detail: text('detail'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [
+  uniqueIndex('workflow_schedule_occurrences_request_uq').on(table.scheduleId, table.requestKey),
+  uniqueIndex('workflow_schedule_occurrences_due_uq').on(table.scheduleId, table.generation, table.dueAt),
+  uniqueIndex('workflow_schedule_occurrences_task_uq').on(table.taskId),
+  uniqueIndex('workflow_schedule_occurrences_run_uq').on(table.runId),
+  index('workflow_schedule_occurrences_state_idx').on(table.scheduleId, table.state, table.updatedAt),
+])

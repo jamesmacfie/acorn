@@ -1,8 +1,8 @@
 import type {
-  PluginCollectionField,
-  PluginCollectionRow,
-  PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+  DashboardDisplayField,
+  DashboardDisplayRow,
+  DashboardDisplaySchema,
+} from './display'
 import { cellText, formatCell } from './format'
 import type { PanelShaping, PanelTone, PanelView } from './model'
 import { aggregateRows, boardColumns, groupField } from './shaping'
@@ -177,22 +177,22 @@ export type ChartPlot =
 // The shipped gating pattern, one level down: the editor offers only shapes the schema supports, so
 // a misconfigured chart is unrepresentable rather than validated.
 
-const enumFields = (schema: PluginCollectionSchema) => schema.fields.filter((field) => field.type === 'enum')
-const datetimeFields = (schema: PluginCollectionSchema) => schema.fields.filter((field) => field.type === 'datetime')
+const enumFields = (schema: DashboardDisplaySchema) => schema.fields.filter((field) => field.type === 'enum')
+const datetimeFields = (schema: DashboardDisplaySchema) => schema.fields.filter((field) => field.type === 'datetime')
 
 /** A bar needs a category axis; a line needs a time axis. A schema with neither has nothing to draw
  *  against, however many numbers it carries. */
-export function chartShapesFor(schema: PluginCollectionSchema): ChartShape[] {
+export function chartShapesFor(schema: DashboardDisplaySchema): ChartShape[] {
   return [
     ...(enumFields(schema).length ? (['bar'] as const) : []),
     ...(datetimeFields(schema).length ? (['line'] as const) : []),
   ]
 }
 
-export const chartSupportedBy = (schema: PluginCollectionSchema): boolean => chartShapesFor(schema).length > 0
+export const chartSupportedBy = (schema: DashboardDisplaySchema): boolean => chartShapesFor(schema).length > 0
 
 /** The axis fields a shape may be pointed at. */
-export const chartAxisFields = (schema: PluginCollectionSchema, shape: ChartShape): PluginCollectionField[] =>
+export const chartAxisFields = (schema: DashboardDisplaySchema, shape: ChartShape): DashboardDisplayField[] =>
   shape === 'bar' ? enumFields(schema) : datetimeFields(schema)
 
 /** The enums a shape may be split into series by: one line per value, or one bar per value inside each
@@ -203,11 +203,11 @@ export const chartAxisFields = (schema: PluginCollectionSchema, shape: ChartShap
  *  cluster, which is the ungrouped chart with extra arithmetic. A single-enum schema is therefore
  *  never offered a grouped bar. */
 export const chartSeriesFields = (
-  schema: PluginCollectionSchema,
+  schema: DashboardDisplaySchema,
   shape: ChartShape,
   view: PanelView,
   shaping: PanelShaping,
-): PluginCollectionField[] => {
+): DashboardDisplayField[] => {
   if (shape === 'line') return enumFields(schema)
   const category = barCategoryField(schema, view, shaping)
   return enumFields(schema).filter((field) => field.id !== category?.id)
@@ -216,7 +216,7 @@ export const chartSeriesFields = (
 /** The axis to pre-pick for a shape: the `updated`-role datetime for a line, the field the panel
  *  already groups by, then the `status`-role enum, for a bar. */
 export function defaultChartAxis(
-  schema: PluginCollectionSchema,
+  schema: DashboardDisplaySchema,
   shape: ChartShape,
   shaping: PanelShaping,
 ): string | undefined {
@@ -232,7 +232,7 @@ export function defaultChartAxis(
  *
  *  Nothing here overwrites an answer the person already gave. The editor calls it when the view
  *  becomes a chart, and the selects then show what it decided. */
-export function defaultChartView(schema: PluginCollectionSchema, shaping: PanelShaping): Partial<PanelView> {
+export function defaultChartView(schema: DashboardDisplaySchema, shaping: PanelShaping): Partial<PanelView> {
   // Time first where there is a time axis: a chart of a datetime collection is almost always "over
   // time", and a bar of categories is the fallback rather than the headline.
   const shape: ChartShape = chartShapesFor(schema).includes('line') ? 'line' : 'bar'
@@ -295,11 +295,11 @@ export const dayBucket = (at: number): number => Math.floor(at / 86_400_000) * 8
 
 // ── Building the plot ─────────────────────────────────────────────────────────────────────────
 
-const fieldById = (schema: PluginCollectionSchema, id: string | undefined) =>
+const fieldById = (schema: DashboardDisplaySchema, id: string | undefined) =>
   id ? schema.fields.find((field) => field.id === id) : undefined
 
 /** The measure's own name, so the axis says what it is counting rather than just carrying numbers. */
-function measureLabel(schema: PluginCollectionSchema, view: PanelView): string {
+function measureLabel(schema: DashboardDisplaySchema, view: PanelView): string {
   const aggregate = view.aggregate ?? 'count'
   if (aggregate === 'count') return 'Rows'
   const field = fieldById(schema, view.field)
@@ -308,7 +308,7 @@ function measureLabel(schema: PluginCollectionSchema, view: PanelView): string {
 
 /** A number on an axis, in the units the field declared. The same `format.ts` a cell goes through, so
  *  an "MB" column's axis says MB without the chart knowing what MB is. */
-function axisNumber(schema: PluginCollectionSchema, view: PanelView, value: number): string {
+function axisNumber(schema: DashboardDisplaySchema, view: PanelView, value: number): string {
   const field = (view.aggregate ?? 'count') === 'count' ? undefined : fieldById(schema, view.field)
   return field ? cellText(formatCell(field, value)) : String(value)
 }
@@ -320,7 +320,7 @@ const dayLabel = (at: number): string =>
  *  to be, and the gutter decides where everything else is drawn. Both come out of one function so a
  *  caller cannot lay marks out against a gutter the labels then outgrow. */
 const yAxisFor = (
-  schema: PluginCollectionSchema,
+  schema: DashboardDisplaySchema,
   view: PanelView,
   max: number,
 ): { ticks: ChartTick[]; frame: ChartFrame; top: number } => {
@@ -341,10 +341,10 @@ const yAxisFor = (
 /** The category axis a bar is keyed by: the panel's own choice, then the shaping group-by. The same
  *  fallback chain a board walks, so flipping board and chart keeps the categories. */
 function barCategoryField(
-  schema: PluginCollectionSchema,
+  schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
-): PluginCollectionField | undefined {
+): DashboardDisplayField | undefined {
   const chosen = fieldById(schema, view.x)
   return chosen?.type === 'enum' ? chosen : groupField(schema, shaping)
 }
@@ -355,7 +355,7 @@ function barCategoryField(
  *  `boardColumns` cannot answer it and must not be asked: it defaults every column to `muted`, so a
  *  value declared without a tone comes back looking like one declared muted. Colouring by that would
  *  draw every series of an untoned enum, which is most of them, in the same faint ink. */
-const declaredTone = (field: PluginCollectionField | undefined, valueId: string): PanelTone | undefined =>
+const declaredTone = (field: DashboardDisplayField | undefined, valueId: string): PanelTone | undefined =>
   field?.values?.find((value) => value.id === valueId)?.tone
 
 /** The one place a mark's colour attribute is chosen: the declared tone where there is one, an ordinal
@@ -379,8 +379,8 @@ function legendFor(entries: readonly ChartLegendKey[]): ChartLegendKey[] | undef
 }
 
 function buildBar(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
 ): ChartPlot | undefined {
@@ -475,8 +475,8 @@ function buildBar(
 }
 
 function buildLine(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
 ): ChartPlot | undefined {
@@ -495,7 +495,7 @@ function buildLine(
     : [{ id: '', label: measureLabel(schema, view), tone: 'accent' as PanelTone, declared: true, rows: [...rows] }]
 
   const byGroup = groups.map((group) => {
-    const byDay = new Map<number, PluginCollectionRow[]>()
+    const byDay = new Map<number, DashboardDisplayRow[]>()
     for (const row of group.rows) {
       const cell = row.values[time.id]
       // `Number(null)` is 0, a perfectly finite January 1970, so blankness has to be checked before
@@ -623,8 +623,8 @@ function buildLine(
  *  happens to a definition written against a collection whose fields have since changed. The view
  *  renders the same inert notice it does for a view kind it cannot draw. */
 export function buildChart(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
 ): ChartPlot | undefined {

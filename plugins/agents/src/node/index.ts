@@ -28,6 +28,8 @@ import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profile
 import { AgentDelegationStore } from '../server/delegation/store'
 import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
+import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
+import { sessionSource } from '../shared/sessionSource'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -163,6 +165,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
         onCompletedTurn: deps.onCompletedTurn,
       })
+      ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
+      ctx.dataSources.register(sessionSource)
 
       const delegation = new AgentDelegationService(
         runtime,

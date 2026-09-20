@@ -5,8 +5,8 @@
 
 const BASE = 'https://api.rollbar.com/api/1'
 
-export function rollbarFetch(token: string, path: string): Promise<Response> {
-  return fetch(`${BASE}${path}`, { headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' } })
+export function rollbarFetch(token: string, path: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${BASE}${path}`, { headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' }, signal })
 }
 
 // Rollbar wraps every response as { err: 0, result }. A nonzero err or an HTTP failure counts as an

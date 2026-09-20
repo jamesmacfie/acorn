@@ -1,4 +1,4 @@
-import type { PluginCollectionField, PluginCollectionRow, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { dayBucket } from './chart'
 import type { PanelView } from './model'
 import { aggregateRows } from './shaping'
@@ -43,22 +43,22 @@ export function historyPoints(samples: readonly MeasureSample[], now: number): T
 /** The datetime the activity tier buckets by: the declared `updated` role, then whatever datetime
  *  there is. Exported because it is also the editor's gate, so a schema with no datetime is never
  *  offered the activity trend and a trend that cannot draw is unrepresentable rather than validated. */
-export const activityField = (schema: PluginCollectionSchema): PluginCollectionField | undefined =>
+export const activityField = (schema: DashboardDisplaySchema): DashboardDisplayField | undefined =>
   schema.fields.find((field) => field.role === 'updated' && field.type === 'datetime')
     ?? schema.fields.find((field) => field.type === 'datetime')
 
 /** The activity tier: the panel's own measure over the rows that changed each day, from the rows
  *  already on screen. Zero store involvement, and the same `dayBucket` the line chart uses. */
 export function activityPoints(
-  rows: readonly PluginCollectionRow[],
-  schema: PluginCollectionSchema,
+  rows: readonly DashboardDisplayRow[],
+  schema: DashboardDisplaySchema,
   view: PanelView,
   now: number,
 ): TrendPoint[] {
   const time = activityField(schema)
   if (!time) return []
 
-  const byDay = new Map<number, PluginCollectionRow[]>()
+  const byDay = new Map<number, DashboardDisplayRow[]>()
   for (const row of rows) {
     const cell = row.values[time.id]
     // `Number(null)` is 0, a perfectly finite January 1970, so blankness has to be checked before the

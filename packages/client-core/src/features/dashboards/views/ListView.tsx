@@ -8,7 +8,7 @@ import type { PanelViewProps } from './props'
 
 // The list view: the title-role field leads, everything else projected trails as meta.
 //
-// Built on `Row`, which is what makes a panel over a third-party plugin's collection pixel-identical
+// Built on `Row`, which is what makes a panel over a third-party plugin's source pixel-identical
 // to one over github's under every appearance pack, the same argument the descriptor rail makes.
 
 export default function ListView(props: PanelViewProps) {

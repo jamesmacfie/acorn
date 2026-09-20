@@ -19,8 +19,9 @@ import { WorkflowRunner, type RunnerDeps } from './workflowRunner'
 
 const at = Date.now()
 const CHILD: WorkflowDef = {
+  formatVersion: 2,
   name: 'Child review',
-  steps: [{ name: 'approval', kind: 'gate-human' }],
+  steps: [{ id: 'approval', name: 'approval', kind: 'gate-human' }],
 }
 
 const deps = (): RunnerDeps => ({
@@ -208,6 +209,7 @@ describe('durable workflow dispatch', () => {
           { name: 'dispatch', kind: 'workflow' },
           { name: 'dispatch-two', kind: 'workflow', after: [] },
         ],
+        maxDescendants: 12,
       }),
     }).where(eq(schema.workflowRuns.id, 'parent-run'))
     await workflows.db.insert(schema.workflowSteps).values({
@@ -263,16 +265,16 @@ describe('durable workflow dispatch', () => {
     })
   })
 
-  it('rejects a child attempt to dispatch a grandchild', async () => {
+  it('rejects dispatch below the fourth child level', async () => {
     await workflows.db.update(schema.workflowRuns).set({
       rootRunId: 'root-run',
       parentRunId: 'root-run',
       parentStepId: 'root-step',
-      depth: 1,
+      depth: 4,
     }).where(eq(schema.workflowRuns.id, 'parent-run'))
     const dispatcher = new WorkflowDispatcher(workflows.db, runner, tasks)
 
-    await expect(dispatcher.dispatch(request())).rejects.toThrow('cannot dispatch another workflow')
+    await expect(dispatcher.dispatch(request())).rejects.toThrow('exceeds 4 child levels')
     expect(await workflows.db.select().from(schema.workflowDispatches)).toEqual([])
   })
 })

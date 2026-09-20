@@ -1,10 +1,12 @@
-import { PANEL_VIEW_KINDS, type PanelViewKind } from '@acorn/protocol/collections.ts'
+import { dashboardViewKinds as PANEL_VIEW_KINDS, type DashboardView } from '@acorn/protocol/dashboardViews.ts'
 import type {
-  PluginCollectionCell,
-  PluginCollectionEnumValue,
-  PluginCollectionFieldType,
-  PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+  DashboardDisplayCell,
+  DashboardDisplayChoice,
+  DashboardDisplayFieldType,
+  DashboardDisplaySchema,
+} from './display'
+
+export type PanelViewKind = DashboardView['kind']
 
 // The panel definition: what a user composed, independent of where it is placed. The four layers and
 // what each one owns are in docs/dashboards.md § Panels.
@@ -12,34 +14,27 @@ import type {
 // Two shapes here were fixed before the mapping layer existed, because getting either wrong would
 // have been a migration rather than an addition. Both survived it unchanged:
 //
-//   `queries` is an array, and genuinely plural. A panel unions the rows of several collections, and a
-//   single `query` key would have made that a persisted-model version bump.
+//   `sources` is genuinely plural. A projected panel may union several typed query instances.
 //
 //   `mapping` is a per-(source, column) record, never a value-to-column lookup. See
 //   PanelMappingColumn.
 //
 // Display hints are not here. A unit, a tone or an enum's label hangs off the field
-// (@acorn/protocol/collections.ts), which is what makes switching a panel from a table to a list
+// (display.ts), which is what makes switching a panel from a table to a list
 // lossless. Grafana's `FieldConfig` lesson.
 
 export type PanelId = string
 
-/** One collection reference plus the params the plugin declared. Opaque to the host past the schema:
- *  the plugin owns what a param means. Grafana's opaque-target lesson. */
-export type PanelQuery = {
+/** Internal identity for one projected typed-query instance. */
+export type PanelProjectionSource = {
   pluginId: string
-  collectionId: string
-  params?: Record<string, string>
+  sourceId: string
 }
 
-/** How `mapping` addresses one entry of `queries`: the `(pluginId, collectionId)` pair, the way the
- *  whole app addresses a collection, rather than the array index. An index shifts when a source is
- *  removed, and a mapping that silently rebinds onto a different provider's values is worse than one
- *  that goes missing. Spelled here rather than imported from registries/collections.ts so the model
- *  keeps no dependency on the registry; the two strings are the same by construction. */
-export const panelSourceKey = (query: PanelQuery): string => `${query.pluginId}:${query.collectionId}`
+/** Mapping identity uses the provider and query-instance source id, never an array index. */
+export const panelSourceKey = (source: PanelProjectionSource): string => `${source.pluginId}:${source.sourceId}`
 
-// Shaping is generic and identical for every collection. See docs/dashboards.md § Panels.
+// Shaping is generic and identical for every projected source. See docs/dashboards.md § Panels.
 
 /** Small and all-AND. An OR or nested predicate tree is a query language, and a panel that needs one
  *  has outgrown the generic shaping layer. */
@@ -49,7 +44,7 @@ export type PanelFilter = {
   field: string
   op: PanelFilterOp
   /** Absent for the two emptiness ops, which are about the cell rather than about a value. */
-  value?: PluginCollectionCell
+  value?: DashboardDisplayCell
 }
 
 export type PanelSort = {
@@ -81,7 +76,7 @@ export type PanelView = {
   /** One of PANEL_VIEW_KINDS. Anything else renders inert. */
   kind: string
   /** The measure, shared by `stat` and `chart`. Defaults to `count`, which is why a chart over a
-   *  collection with no number field still draws. Shared rather than duplicated so flipping between
+   *  source with no number field still draws. Shared rather than duplicated so flipping between
    *  stat and chart keeps what the panel is counting. */
   aggregate?: PanelAggregate
   /** The measure's field. Required by every aggregate but `count`. */
@@ -130,7 +125,7 @@ export type PanelMappingColumnDef = { id: string; label: string; tone?: PanelTon
 
 /** A panel-local field the user invented, beyond the five roles.
  *
- *  The five roles are the only thing two independently written collections agree about without being
+ *  The five roles are the only thing two independently written sources agree about without being
  *  asked, which is why the mapped vocabulary starts there. It is also a real ceiling, and this is the
  *  release valve. github's `repo` and linear's `identifier` are both text and both useful on a mixed
  *  board, and neither has a role. The user names the field and says, per source, which of its fields
@@ -139,7 +134,7 @@ export type PanelMappingColumnDef = { id: string; label: string; tone?: PanelTon
  *  The `type` comes from the wire's own field vocabulary, so an invented field renders, sorts, filters
  *  and groups exactly like a declared one and there is no second rendering path. Nothing new crosses
  *  the wire: this is a client-side composition, invisible to every plugin. */
-export type PanelFieldDef = { id: string; label: string; type: PluginCollectionFieldType }
+export type PanelFieldDef = { id: string; label: string; type: DashboardDisplayFieldType }
 
 export type PanelMapping = {
   /** The derived enum's values: the columns a board is keyed by, in the order they are drawn. Absent
@@ -162,18 +157,21 @@ export type PanelMapping = {
 
 /** The host's own status vocabulary (ui/primitives.tsx, `StatusDot`), which is also the wire's. A
  *  user-invented column tones itself from the same five a plugin's declared value can. */
-export type PanelTone = NonNullable<PluginCollectionEnumValue['tone']>
+export type PanelTone = NonNullable<DashboardDisplayChoice['tone']>
 
 export type PanelDefinition = {
   id: PanelId
   title: string
-  /** One or more. Several unions their rows client-side; see mapping.ts. */
-  queries: PanelQuery[]
+  /** Ephemeral typed-query projections. Persisted placements carry only `publication`. */
+  sources?: PanelProjectionSource[]
   mapping?: PanelMapping
   shaping: PanelShaping
   view: PanelView
-  /** Seconds. Absent means "whatever the collection declared", which may itself be nothing. */
+  /** Seconds. Absent means no panel-specific polling interval. */
   refresh?: number
+  /** Workflow-v2 dashboard drafts and immutable revisions are core-owned. Placements contain only
+   * this marker; the renderer resolves the published definition from the Node. */
+  publication?: { dashboardId: string; sources?: string[]; fieldRoles?: string[] }
 }
 
 // ── Views ─────────────────────────────────────────────────────────────────────────────────────
@@ -184,12 +182,11 @@ export type PanelDefinition = {
 // menu.
 
 /** The views this build draws. The list moved to the wire when a manifest gained the ability to narrow
- *  it (@acorn/protocol/collections.ts, `PANEL_VIEW_KINDS`); re-exported here because forty call sites
+ *  it (@acorn/protocol/dashboards.ts); re-exported here because forty call sites
  *  say `./model` and one vocabulary cannot live in two places. */
 export { PANEL_VIEW_KINDS }
-export type { PanelViewKind }
 
-const VIEW_REQUIRES: Record<PanelViewKind, (schema: PluginCollectionSchema) => boolean> = {
+const VIEW_REQUIRES: Record<PanelViewKind, (schema: DashboardDisplaySchema) => boolean> = {
   // A count over nothing is still a number, so these three ask nothing of the schema.
   stat: () => true,
   list: () => true,
@@ -203,13 +200,13 @@ const VIEW_REQUIRES: Record<PanelViewKind, (schema: PluginCollectionSchema) => b
   chart: (schema) => schema.fields.some((field) => field.type === 'enum' || field.type === 'datetime'),
 }
 
-export const viewSupportedBy = (kind: PanelViewKind, schema: PluginCollectionSchema): boolean =>
+export const viewSupportedBy = (kind: PanelViewKind, schema: DashboardDisplaySchema): boolean =>
   VIEW_REQUIRES[kind](schema)
 
-/** What a panel editor may offer for this schema, and nothing else. A collection with no enum field is
+/** What a panel editor may offer for this schema, and nothing else. A source with no enum field is
  *  never offered a board, so a panel that cannot draw is unrepresentable rather than validated. See
  *  docs/dashboards.md § The generated editor. */
-export const viewsForSchema = (schema: PluginCollectionSchema): PanelViewKind[] =>
+export const viewsForSchema = (schema: DashboardDisplaySchema): PanelViewKind[] =>
   PANEL_VIEW_KINDS.filter((kind) => viewSupportedBy(kind, schema))
 
 export const isDrawnViewKind = (kind: string): kind is PanelViewKind =>
@@ -223,8 +220,8 @@ export const isDrawnViewKind = (kind: string): kind is PanelViewKind =>
 export const MIN_PANEL_REFRESH_SECONDS = 30
 export const MAX_PANEL_REFRESH_SECONDS = 86_400
 
-/** The panel's own refresh if it set one, else the collection's declared hint, else no polling at all.
- *  Chrome keeps its single shared revision (plugins/chrome/data.ts); a panel is the first contribution
+/** The panel's own refresh if it set one, else the source's declared hint, else no polling at all.
+ *  A panel is the first contribution
  *  whose refetch cost is worth a signal of its own. */
 export function panelRefreshSeconds(panel: number | undefined, declared: number | undefined): number | undefined {
   const wanted = panel ?? declared
@@ -235,14 +232,3 @@ export function panelRefreshSeconds(panel: number | undefined, declared: number 
 // ── Construction ──────────────────────────────────────────────────────────────────────────────
 
 export const newPanelId = (): PanelId => crypto.randomUUID()
-
-/** A panel over one collection, with nothing shaped and the safest view. `list` rather than `table`
- *  because a list needs no column choice to be readable, and a collection that declares no static
- *  schema has none to choose from before its first answer. */
-export const panelForCollection = (query: PanelQuery, title: string): PanelDefinition => ({
-  id: newPanelId(),
-  title,
-  queries: [query],
-  shaping: {},
-  view: { kind: 'list' },
-})

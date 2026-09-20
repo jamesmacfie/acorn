@@ -11,6 +11,10 @@ import type { ExternalItemStore } from '@acorn/node-core/server/integrations/ite
 import type { CapabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 import type * as Published from './public.ts'
+import type { DataValue, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
+import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
+import type { DataBinding, DataField, DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import type { DataSourceRequest, DataSourceResult, DataSourceDescription } from '@acorn/protocol/dataSources.ts'
 
 // The drift lock for the hand-written published declarations, copying the pattern
 // packages/plugin-sdk/src/contract.test.ts established. See docs/plugins.md § What is published, and
@@ -22,6 +26,20 @@ import type * as Published from './public.ts'
 
 /** Both directions means structurally identical. A type error here is the point of the file. */
 type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]
+const _dataValue: Mutual<DataValue, Published.DataValue> = [true, true]
+const _versionedData: Mutual<VersionedDataValue, Published.VersionedDataValue> = [true, true]
+const _dataSchema: Mutual<DataSchema, Published.DataSchema> = [true, true]
+const _dataBinding: Mutual<DataBinding, Published.DataBinding> = [true, true]
+const _dataField: Mutual<DataField, Published.DataField> = [true, true]
+const _dataPredicate: Mutual<DataPredicate, Published.DataPredicate> = [true, true]
+void [_dataValue, _versionedData, _dataSchema, _dataBinding, _dataField, _dataPredicate]
+const _sourceRequest: Mutual<DataSourceRequest, Published.DataSourceRequest> = [true, true]
+const _sourceResult: Mutual<DataSourceResult, Published.DataSourceResult> = [true, true]
+const _sourceDescription: Mutual<DataSourceDescription, Published.DataSourceDescription> = [true, true]
+void [_sourceRequest, _sourceResult, _sourceDescription]
+const _sourceRegistry: NodePluginContext['dataSources'] = {} as Published.NodePluginContext['dataSources']
+const _publishedSourceRegistry: Published.NodePluginContext['dataSources'] = {} as NodePluginContext['dataSources']
+void [_sourceRegistry, _publishedSourceRegistry]
 
 // ── The holes, named one at a time ────────────────────────────────────────────────────────────────
 //
@@ -119,7 +137,7 @@ it('leaves most of the surface compared, not substituted', () => {
   // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
-    'name', 'routes', 'schedules', 'collections', 'taskChecks',
+    'name', 'routes', 'schedules', 'dataSources', 'taskChecks',
     'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
     'telemetry', 'log',
   ]

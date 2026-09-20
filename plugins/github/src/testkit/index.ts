@@ -14,3 +14,6 @@ export { mirroredPullRequest } from '../server/mirrorQueries'
 export { prFiles, pullRequests, repos } from '../node/schema'
 export { seedGithubIntegration } from './githubToken'
 export { pullRequestSection } from '../server/contextSection'
+// Node source composition test in apps/node/test/integration/githubDataSource.test.ts.
+export { createPullSourceHandler } from '../server/data/pullSourceHandler'
+export { pullSource } from '../shared/pullSource'

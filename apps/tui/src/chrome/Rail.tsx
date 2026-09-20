@@ -14,7 +14,8 @@ import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
-import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
+import { workflowTaskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
+import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/features/tasks/taskTreeViewState.ts'
 
 // The left column: three framed panels, read down the screen.
 //
@@ -87,7 +88,7 @@ function TaskList(props: { model: ShellModel }) {
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
   // them (../kit/showing.tsx § keyedRows).
-  const hierarchy = createMemo(() => taskHierarchy(props.model.tasks()))
+  const hierarchy = createMemo(() => workflowTaskHierarchy(props.model.tasks(), expandedWorkflowRoots(), activeTaskId()))
   const depthByTask = createMemo(() => new Map(
     hierarchy().map((entry) => [entry.task.id, entry.depth]),
   ))
@@ -100,6 +101,7 @@ function TaskList(props: { model: ShellModel }) {
       key: task.id,
       task,
       get depth() { return depthByTask().get(task.id) ?? 0 },
+      get group() { return hierarchy().find(entry => entry.task.id === task.id) },
     }),
   )
 
@@ -111,7 +113,9 @@ function TaskList(props: { model: ShellModel }) {
       items={rows()}
       onActivate={(id) => {
         const task = props.model.tasks().find((row) => row.id === id)
-        if (task) activateTaskSignals(task)
+        const group = hierarchy().find(entry => entry.task.id === id)
+        if (task && id === activeTaskId() && group?.workflowDescendants) toggleWorkflowRoot(id)
+        else if (task) activateTaskSignals(task)
       }}
     >
       {/* No leading icon. A task's glyph is a Lucide name and this host draws a name it has no
@@ -123,7 +127,11 @@ function TaskList(props: { model: ShellModel }) {
           selected={!selectedSource() && row.task.id === activeTaskId()}
           trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} />}
         >
-          {row.depth ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}` : row.task.title}
+          {row.depth
+            ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}`
+            : row.group?.workflowDescendants
+              ? `${row.group.expanded ? '▾' : '▸'} ${row.task.title} · ${row.group.workflowDescendants}`
+              : row.task.title}
         </Row>
       )}
     </Rows>

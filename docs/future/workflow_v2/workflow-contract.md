@@ -1,6 +1,6 @@
 # Workflow data and execution
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented through slice 19; cross-surface acceptance remains in slice 20.
 Context: [decisions and precedents](./context.md). Read [typed data](./data-contract.md) first.
 
 ## Definition and value contracts

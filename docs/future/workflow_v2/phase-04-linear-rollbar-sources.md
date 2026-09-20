@@ -1,6 +1,6 @@
 # Slice 04: Linear and Rollbar source adapters
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-13. Status: implemented and verified with controlled provider fixtures.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./data-contract.md) and [verification](./verification.md).
@@ -36,8 +36,24 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented provider-owned `linear/issues` and `rollbar/error-groups` through portable Node handlers.
+The shared selection pager retains bounded selections; it contains no provider query translation.
+The owning behavior and upstream reference links are in [typed data sources](../../data-sources.md).
+
+Verification on September 13, 2026:
+
+- `rtk pnpm lint`: passed, 33 package tasks. Existing oxlint warnings and sandbox cache-write warnings remain.
+- `rtk pnpm --filter @acorn/plugin-linear --filter @acorn/plugin-rollbar --filter @acorn/plugin-api test`: passed 46 Linear tests, 59 Rollbar tests, and 12 plugin API tests. This final run includes cancellation and the updated additive export snapshot.
+- `rtk pnpm --filter @acorn/node-core test src/server/dataSources/selection.test.ts src/server/integrations/providerRoutes.test.ts`: passed five tests. The added memory-ceiling test subsequently passed with the pager suite, three tests.
+- `rtk pnpm --filter @acorn/arch-tests test`: passed 63 tests.
+- `rtk pnpm --filter @acorn/plugin-api --filter acorn-plugin-types test`: public types passed four tests. The plugin API snapshot required the three additive helper exports; the corrected snapshot passed in the final run above.
+- `rtk pnpm --filter @acorn/plugin-github test src/server/data/pullSourceHandler.test.ts`: passed 16 tests.
+
+Fixtures cover same-category states, project-scoped state invalidation, exact connection credentials,
+project and issue pagination, date translation, empty versus failed reads, first-seen exclusion,
+stable take, candidate caps, foreign or expired continuations, direct task denial, strict refresh
+failure with cached data, safe details, and oversize or truncated data. No UI changes belong to this
+slice. Connected-account UI journeys remain programme acceptance work; no live credential was used.
 
 ## Verify before building
 

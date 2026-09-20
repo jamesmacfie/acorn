@@ -1,6 +1,6 @@
 # Context and decisions
 
-Date: 2026-09-13. Status: accepted design, implementation not started.
+Date: 2026-09-20. Status: implemented through slice 19; retained as the programme decision record.
 Survey baseline: `8e006e6b`.
 
 ## Goal
@@ -20,13 +20,13 @@ Line numbers below are baseline anchors, not stable API addresses. Read the surr
 
 | Evidence | Consequence |
 | --- | --- |
-| `packages/protocol/src/collections.ts`, lines 69–117, defines flat fields and text/enum parameters. | Display cells cannot represent nested workflow data or a general typed query. |
-| `plugins/linear/src/shared/collections.ts`, lines 34–92, projects state categories and chooses one label per category. | Exact provider states can be lost before filtering or automation. |
-| `plugins/github/src/shared/collections.ts`, lines 16–83, derives one display status from several PR facts. | PR state, draft status, and merge readiness need separate record properties. |
-| `plugins/github/src/server/routes/pulls/collections.ts`, lines 32–145, reads one search page or a bounded mirror selection. | Page exhaustion and freshness are not exposed as query completeness. |
+| Removed baseline file _packages/protocol/src/collections.ts_, lines 69–117, defined flat fields and text/enum parameters. | Display cells cannot represent nested workflow data or a general typed query. |
+| Removed baseline file _plugins/linear/src/shared/collections.ts_, lines 34–92, projected state categories and chose one label per category. | Exact provider states can be lost before filtering or automation. |
+| Removed baseline file _plugins/github/src/shared/collections.ts_, lines 16–83, derived one display status from several PR facts. | PR state, draft status, and merge readiness need separate record properties. |
+| Removed baseline file _plugins/github/src/server/routes/pulls/collections.ts_, lines 32–145, read one search page or a bounded mirror selection. | Page exhaustion and freshness are not exposed as query completeness. |
 | `plugins/linear/src/server/routes/linear.ts`, collection handler near line 278, suppresses connection errors. | Empty and incomplete results can be indistinguishable. |
-| `packages/client-core/src/host/registries/sources/collections.ts`, lines 18–54, contains client-only option callbacks. | Loaded plugins and unattended readers do not have equivalent discovery capabilities. |
-| `packages/node-core/src/server/collections/registry.ts`, lines 21–115, already provides a Node-side route registry and parsing. | Extend this ownership pattern instead of inventing another provider transport. |
+| Removed baseline file _packages/client-core/src/host/registries/sources/collections.ts_, lines 18–54, contained client-only option callbacks. | Loaded plugins and unattended readers do not have equivalent discovery capabilities. |
+| Removed baseline file _packages/node-core/src/server/collections/registry.ts_, lines 21–115, provided the earlier Node-side route registry and parsing. | Extend this ownership pattern instead of inventing another provider transport. |
 | `plugins/workflows/src/shared/workflowContracts.ts`, lines 32–58, models inputs and literal bindings as strings. | Whole records, numeric values, and booleans cannot flow through child inputs. |
 | `plugins/workflows/src/client/editor/WorkflowDispatchForm.tsx`, near line 242, uses `/tickets` as a placeholder. | The form suggests provider-specific behavior although the loop is generic. |
 | `plugins/workflows/src/server/workflowBindings.ts`, lines 27–129, validates and freezes a map roster. | Preserve whole-roster validation and snapshot semantics while replacing pointer entry UI. |

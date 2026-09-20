@@ -5,12 +5,16 @@
 // This function knows nothing about lifecycle. Ordering, containment, the ready pass, the roster and
 // the rollback of everything registered here all stay in host.ts, because they are decisions about a
 // set of plugins and this is one plugin's surface.
-import type { CoreServices } from '../core'
+import type { CompiledCoreServices, CoreServices } from '../core'
 import type { Env } from '../bindings'
-import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
+import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
-import { registerCollectionRead } from '../collections/registry'
+import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
+import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime'
+import { authorizeQueryScope, resolveQuery } from '../queries/runtime'
+import { queryPublication } from '../queries/publication'
+import { queryStore } from '../queries/store'
 import { registerNodeAction } from '../nodeActions'
 import { registerNodeProvider } from '../nodeProviders/registry'
 import { registerRunSource } from '../runs/registry'
@@ -59,10 +63,9 @@ export type LoadedPluginBinding = {
   // for the same reason `permissions` is: the host binds a manifest's claims to a plugin id, and the
   // loader is the one place that reads the file.
   schedules?: readonly PluginScheduleDescriptor[]
-  // And its collections, by the same route: the node-side read registry is synthesised from these
-  // `items` paths (../collections/registry.ts), so a loaded plugin's panels can be sampled without a
-  // client and without the plugin shipping node code.
-  collections?: readonly PluginCollectionDescriptor[]
+  // Node-owned sources are registered here so dashboards and schedules do not depend on a client.
+  dataSources?: readonly import('@acorn/protocol/dataSources.ts').DataSourceRegistration[]
+  dataSourceDiscoveries?: readonly import('@acorn/protocol/dataSources.ts').DataSourceDiscovery[]
   // And its commands, of which the host reads one thing: which are `runNodeAction`, so a person can put
   // one on a schedule (../nodeActions/registry.ts). A command's palette entry, keybinding and category
   // are the client's business and never reach here.
@@ -96,7 +99,7 @@ export type PluginContextOptions = {
   // passes, so a plugin cannot contribute under another plugin's name.
   plugin: string
   capabilities: CapabilityRegistry
-  core: CoreServices
+  core: CompiledCoreServices
   // Host bindings let non-route contributions use the same provider runtime as an authenticated
   // request. Optional for context-shape unit tests that never exercise credential access.
   env?: Env
@@ -145,7 +148,7 @@ export function revokePluginContext(ctx: NodePluginContext): void {
  * stream. Absent for a plugin whose manifest never asked for the token, and absent means absent:
  * the whole point of gating by omission is that an ungranted facet is not there to call.
  */
-const withOwnedTelemetry = (core: CoreServices, plugin: string): CoreServices =>
+const withOwnedTelemetry = <T extends CoreServices>(core: T, plugin: string): T =>
   core.telemetry ? { ...core, telemetry: telemetryServiceFor(plugin) } : core
 
 export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
@@ -192,12 +195,47 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         // waiting when it comes back.
         recordUndo(() => handle.dispose())
       },
+      registerTarget: (target) => {
+        if (permissions) throw new Error('User schedule targets require a compiled plugin')
+        const scheduler = options.capabilities.get(SCHEDULER)
+        if (!scheduler) throw new Error(`Plugin '${plugin}' registered a schedule target, but this node has no scheduler.`)
+        const handle = scheduler.registerTarget(target)
+        recordUndo(() => handle.dispose())
+      },
     },
-    // Owner-bound like routes and tools. The measure sampler dispatches through this pointer, so a
-    // collection filed under a stranger's name has the node reading one plugin's route under another's
-    // badge. The route itself is re-confined on every call (../collections/registry.ts).
-    collections: {
-      register: (collection) => registerCollectionRead({ ...collection, pluginId: plugin }),
+    // Owner-bound like routes and tools. The measure sampler dispatches through this pointer.
+    dataSources: {
+      list: (scope, invocation) => {
+        if (!options.env) throw new Error('Source discovery requires host bindings')
+        return listDataSources(options.env, scope, invocation)
+      },
+      discoverAvailable: (request, invocation) => {
+        if (!options.env) throw new Error('Source discovery requires host bindings')
+        return discoverDataSources(options.env, request, invocation)
+      },
+      queryPublication: (request, invocation) => {
+        if (!options.env || permissions) throw new Error('Query publication coordination requires a compiled host consumer')
+        return queryPublication(options.env, request, invocation)
+      },
+      resolveQuery: async (scope, reference, context, invocation) => {
+        if (!options.env) throw new Error('Query resolution requires host bindings')
+        return resolveQuery(options.env, scope, reference, context, invocation, permissions ? plugin : undefined)
+      },
+      setQueryConsumer: async (scope, queryId, consumer, invocation, remove) => {
+        if (!options.env) throw new Error('Query references require host bindings')
+        await authorizeQueryScope(options.env, scope, invocation)
+        queryStore(options.env.DB).setConsumer(scope, queryId, { ...consumer, pluginId: plugin }, remove)
+      },
+      register: (source) => registerDataSource(plugin, source),
+      discover: (discovery) => registerDataSourceDiscovery(plugin, discovery),
+      invoke: (request, invocation) => {
+        if (!options.env) throw new Error('Source invocation requires host bindings')
+        // Loaded code may only invoke its own sources. Cross-plugin workflow execution is a
+        // compiled host consumer; raw task principals remain refused by source admission.
+        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' ? request.ref : request.source
+        if (permissions && source.pluginId !== plugin) throw new Error('Source belongs to another plugin')
+        return invokeDataSource(options.env, request, invocation)
+      },
     },
     // Owner-bound. This is the list anything unattended picks an action from — a person arming a
     // schedule today, and whatever asks next — and the tier beside each entry drives the confirmation
@@ -351,7 +389,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // The read facet is bound to this plugin too, wherever it is present: a sink registered through
     // it is filed under the plugin's id, so Settings can say who is reading the stream and a
     // rollback can drop this plugin's subscriptions (../core/telemetry.ts).
-    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin),
+    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin) as CompiledCoreServices,
     // Owner-bound like every registration above, and here the binding is the whole feature: a record
     // this plugin emits says `owner: <plugin>` because the host closed over the id, not because the
     // plugin passed one. An `owner` attribute set by the emitter is dropped by the collector for the
@@ -475,7 +513,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
   // it never fails the thing it describes (docs/telemetry.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
-  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined
@@ -488,7 +526,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // `hooks.run` awaits a chain and answers the caller: all are guarded against a revoked context like
       // the rest and none is ever deferred, because a buffered call would return undefined to a caller
       // about to act on it.
-      const reads = key === 'handlers' || key === 'entries' || key === 'record' || key === 'run'
+      const reads = key === 'handlers' || key === 'entries' || key === 'record' || key === 'run' || key === 'invoke'
       if (typeof value === 'function') {
         members[key] = guard(value as (...args: unknown[]) => unknown, buffer && !reads)
       }

@@ -11,7 +11,7 @@ const texts = (lines: readonly PermissionLine[]): string[] => lines.map((line) =
 const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
   api: [],
   events: [],
-  node: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
   ...over,
 })
 
@@ -25,11 +25,12 @@ describe('the two permission groups', () => {
     const all = permissions({
       api: ['core.tasks:read'],
       events: ['runtime:task-archived'],
-      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'] },
+      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'], sockets: true },
     })
     expect(texts(nodePermissionLines(all))).toEqual([
       'Use your saved credentials to make requests on its behalf',
       'Run commands on the node',
+      'Open unrestricted network connections',
       'Reach ntfy.sh',
       'Use capability docker.compose',
       '1 node permission request this version of acorn does not recognise (ignored)',

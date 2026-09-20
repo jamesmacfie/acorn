@@ -14,7 +14,6 @@ const current: WorkflowDef = {
       configOptions: { reasoning: 'high' },
       requiresRun: 'release',
       tools: { maxRisk: 'write', allow: ['pnpm build'] },
-      childStep: { prompt: 'Child.', model: 'child-model', tools: { maxRisk: 'read', allow: ['rg'] } },
     },
     {
       name: 'send',
@@ -29,7 +28,7 @@ describe('the model-visible definition', () => {
     const visible = definitionForPrompt(current)
     expect(visible.trigger).toBeUndefined()
     expect(visible.tools).toEqual({ maxRisk: 'execute' })
-    expect(visible.steps[0]).toMatchObject({ name: 'prepare', prompt: 'Prepare.', tools: { maxRisk: 'write' }, childStep: { prompt: 'Child.', tools: { maxRisk: 'read' } } })
+    expect(visible.steps[0]).toMatchObject({ name: 'prepare', prompt: 'Prepare.', tools: { maxRisk: 'write' } })
     expect(visible.steps[0]?.model).toBeUndefined()
     expect(visible.steps[0]?.configOptions).toBeUndefined()
     expect(visible.steps[1]?.with).toEqual({ method: 'POST', url: 'https://old.example' })
@@ -42,7 +41,7 @@ describe('protected configuration restoration', () => {
       name: 'Safer deploy',
       tools: { maxRisk: 'read' },
       steps: [
-        { name: 'prepare', prompt: 'Prepare carefully.', childStep: { prompt: 'Changed child.' } },
+        { name: 'prepare', prompt: 'Prepare carefully.' },
         { name: 'send', kind: 'http:request', with: { method: 'PUT', url: 'https://new.example' } },
       ],
     }
@@ -54,7 +53,6 @@ describe('protected configuration restoration', () => {
       configOptions: { reasoning: 'high' },
       requiresRun: 'release',
       tools: { allow: ['pnpm build'] },
-      childStep: { prompt: 'Changed child.', model: 'child-model', tools: { allow: ['rg'] } },
     })
     expect(restored.steps[1]?.with).toEqual({
       method: 'PUT',
@@ -67,7 +65,7 @@ describe('protected configuration restoration', () => {
     expect(changedKind.steps[0]?.with).toBeUndefined()
   })
 
-  it('keeps a configured child target only for the same-name, same-kind step', () => {
+  it('does not restore a changed child target after grounding', () => {
     const configured: WorkflowDef = {
       name: 'Dispatch',
       steps: [{
@@ -91,7 +89,7 @@ describe('protected configuration restoration', () => {
         childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
       }],
     })
-    expect(attemptedChange.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'approved-target' })
+    expect(attemptedChange.steps[0]?.childWorkflow?.ref).toEqual({ source: 'database', id: 'invented-target' })
 
     const renamed = restoreProtectedDefinition(configured, {
       name: 'Dispatch',

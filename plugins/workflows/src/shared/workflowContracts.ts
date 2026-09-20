@@ -3,6 +3,9 @@
 // one migration chain.
 import type * as schema from '../node/schema'
 import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
+import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
 export type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
@@ -15,37 +18,21 @@ export type WorkflowBudget = {
   maxTurns?: number
 }
 
-export type WorkflowChildStepDef = {
-  name?: string
-  profileId?: string
-  model?: string
-  prompt?: string
-  schema?: object
-  tools?: ToolCeiling
-  budget?: WorkflowBudget
-}
-
 // A value the person starting the run supplies. `${inputs.<name>}` reaches it from a prompt, a child
 // prompt, and any string inside `with` (docs/workflows.md § Execution model). A run freezes the
 // values it started with into its own copy of the definition, so `default` on a frozen run reads as
 // "what this run was given".
-export type WorkflowInput = {
-  name: string
-  description?: string
-  required?: boolean
-  default?: string
-}
+export type WorkflowInput = import('@acorn/protocol/workflow.ts').WorkflowInput
 
 export type WorkflowDefinitionRef =
   | { source: 'database'; id: string }
   | { source: 'repo'; path: string }
   | { source: 'user'; id: string }
 
-export type WorkflowValueBinding =
-  | { from: 'literal'; value: string }
-  | { from: 'input'; name: string }
-  | { from: 'step'; step: string; pointer: string }
-  | { from: 'item'; pointer: string }
+/** Untrusted drafts remain wide enough to produce a field-located diagnostic. Runtime readers parse
+ * the DataBinding branch and never translate another object shape. */
+export type WorkflowValueBinding = DataBinding | Record<string, unknown>
+export type WorkflowOutput = { name: string; label?: string; schema: DataSchema; required?: boolean; binding: DataBinding }
 
 export type WorkflowBoundTemplate = {
   template: string
@@ -63,6 +50,13 @@ export type WorkflowMapSource = {
 }
 
 export type WorkflowStepDef = {
+  repeat?: import('./workflowProcessing').WorkflowRepeatPolicy
+  incremental?: boolean
+  query?: import('@acorn/protocol/dataQueries.ts').QueryReference
+  record?: import('@acorn/protocol/dataBindings.ts').DataBinding
+  condition?: import('@acorn/protocol/dataBindings.ts').DataPredicate
+  projection?: string[]
+  id?: string
   name: string
   kind?: string
   // The steps this one waits on, by name. Absent means the step declared before it; an empty list
@@ -85,7 +79,6 @@ export type WorkflowStepDef = {
   policy?: string
   maxIterations?: number
   requiresRun?: string
-  childStep?: WorkflowChildStepDef
   // Runtime child workflows use a separate key from static `workflow` file composition. Resolution
   // freezes the referenced definition before any child task exists.
   childWorkflow?: ChildWorkflowConfig
@@ -94,7 +87,6 @@ export type WorkflowStepDef = {
   items?: WorkflowMapSource
   itemKey?: string
   title?: WorkflowBoundTemplate
-  joins?: string
   branches?: Record<string, string>
   // A contributed kind's own configuration, straight off the workflow file's `[steps.with]` table
   // (../contract/extensions.ts). The runner never looks inside it: the plugin that contributed the
@@ -106,12 +98,16 @@ export type WorkflowStepDef = {
 }
 
 export type WorkflowDef = {
+  maxDescendants?: number
+  maxConcurrency?: number
+  formatVersion?: 2
   name: string
   posture?: WorkflowPosture
   trigger?: string
   tools?: ToolCeiling
   budget?: WorkflowBudget
   inputs?: WorkflowInput[]
+  outputs?: WorkflowOutput[]
   steps: WorkflowStepDef[]
 }
 
@@ -129,7 +125,7 @@ export type ResolvedWorkflowNode = {
   depth: number
   definition: WorkflowDef
   provenance: WorkflowDefinitionProvenance
-  defaultInputs: Record<string, string>
+  defaultInputs: Record<string, DataValue>
   fingerprint: string
 }
 
@@ -155,9 +151,9 @@ export type StepHandlerContext = {
   budget: WorkflowBudget
   signal: AbortSignal
   // The values this run started with, by declared input name. `${inputs.<name>}` in the prompt is
-  // already substituted; a handler needs these only to render something of its own, as fan-out does
-  // for its child prompt.
-  inputs: Readonly<Record<string, string>>
+  // already substituted; a handler needs these only to render something of its own.
+  inputs: Readonly<Record<string, DataValue>>
+  predecessorValues?: Readonly<Record<string, DataValue>>
   // The outputs of this step's incoming edges, in `after` order, already rendered the way
   // `${steps.<name>.output}` would render them. Only steps that finished `done` appear.
   upstream: readonly { name: string; output: string }[]
@@ -178,8 +174,9 @@ type StepHandlerData = {
 
 export type StepHandlerOutcome =
   | ({ status: 'done' } & StepHandlerData)
+  | ({ status: 'completed-with-failures'; error: string } & StepHandlerData)
   | ({ status: 'failed'; error: string } & StepHandlerData)
-  | ({ status: 'safety-rail'; error: string } & StepHandlerData)
+  | ({ status: 'safety-rail'; error: string; scope?: 'admission' } & StepHandlerData)
   | { status: 'waiting-gate' }
   | { status: 'waiting-children' }
   | { status: 'cancelled'; error?: string }
@@ -267,8 +264,10 @@ export type WorkflowCatalog = {
 export type WorkflowCatalogTarget = {
   ref: WorkflowDefinitionRef
   name: string
+  /** False for an editable database draft that publication will include before it can run. */
+  published?: boolean
   inputs: Array<Omit<WorkflowInput, 'default'> & { hasDefault?: boolean }>
-  outputs?: { step: string; schema: object }[]
+  outputs?: { step?: string; name?: string; schema: object }[]
 }
 export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
 

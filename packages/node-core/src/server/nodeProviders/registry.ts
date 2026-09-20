@@ -53,7 +53,7 @@ export type RegisteredNodeProvider = NodeProviderContribution & {
 const verbsOf = (provider: NodeProviderContribution): NodeLifecycleVerb[] =>
   NODE_LIFECYCLE_VERBS.filter((verb) => typeof provider[verb] === 'function')
 
-// A module singleton, like the route, collection, node-action and audit registries beside it, with the
+// A module singleton, like the route, source, node-action and audit registries beside it, with the
 // same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
 // (server/pluginHost/host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredNodeProvider>()

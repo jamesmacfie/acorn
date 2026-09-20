@@ -8,7 +8,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
 import { loadTask, projectForTask, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
-import { normalizeGithubPart } from '../projects'
+import { getProject, normalizeGithubPart } from '../projects'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
@@ -21,10 +21,11 @@ export type TaskRunConfig =
 // through the integration provider registry, which is core's job.
 export type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
 
-// What a fan-out child needs to exist. `branch` is a suggestion: it is slugged and de-duped against
+// What a dispatched child needs to exist. `branch` is a suggestion: it is slugged and de-duped against
 // every existing task before it is written, because two children of one plan often propose the same
 // name.
-export type ChildTaskSeed = { title: string; branch: string }
+export type ChildTaskSeed = { title: string; branch: string; origin?: string }
+export type RootTaskSeed = { title: string; branch?: string; origin: string }
 
 export type TaskPullRelation = {
   taskId: string
@@ -98,20 +99,59 @@ export type TaskService = {
   // related. The durable row retains provenance for both outcomes.
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
-  // Materialise a fan-out child task under a parent (docs/workflows.md) and return its id. The
+  // Materialise a dispatched child task under a parent (docs/workflows.md) and return its id. The
   // worktree is not created here. `resolveCwd` does that when the child's first step runs, the same
   // path every other surface takes.
   //
   // A write on CoreServices: plugins ask core to create a task rather than writing core-owned rows.
   // Throws when the parent does not resolve.
   createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>
-  // Cancel a task, the child-task half of cancelling a fan-out run. A distinct verb rather than a
+  // Cancel a task, the child-task half of cancelling a dispatched run. A distinct verb rather than a
   // general `setStatus`, so a plugin cannot archive or restore a task outside core's own routes.
   cancel(taskId: string): Promise<void>
 }
 
-export function createTaskService(db: AppDatabase): TaskService {
+export type CompiledTaskService = TaskService & {
+  /** Replay-safe root creation for internal orchestrators such as approved workflow schedules. */
+  createRoot(projectId: string, seed: RootTaskSeed, intendedTaskId: string): Promise<string>
+}
+
+export function createTaskService(db: AppDatabase): CompiledTaskService {
   return {
+    createRoot: async (projectId, seed, intendedTaskId) => {
+      const project = await getProject(db, projectId)
+      if (!project) throw new Error('Project not found.')
+      const title = seed.title.trim()
+      if (!title || !seed.origin.trim() || !intendedTaskId.trim()) throw new Error('Root task identity, title, and origin are required.')
+      const created = db.transaction((tx) => {
+        const existing = tx.select().from(schema.tasks).where(eq(schema.tasks.id, intendedTaskId)).get()
+        const branches = tx.select({ id: schema.tasks.id, branch: schema.tasks.branch }).from(schema.tasks).all()
+          .flatMap(row => row.id !== intendedTaskId && row.branch ? [row.branch] : [])
+        const branch = project.vcs === 'git'
+          ? dedupeBranch(slugifyBranch(seed.branch || title) || `workflow-${intendedTaskId.slice(0, 8)}`, branches)
+          : null
+        if (existing) {
+          if (existing.parentId !== null || existing.projectId !== project.id || existing.title !== title
+            || existing.origin !== seed.origin || existing.branch !== branch) {
+            throw new Error(`Root task id '${intendedTaskId}' is already used by a different seed.`)
+          }
+          return false
+        }
+        const value = tx.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
+        const at = Date.now()
+        tx.insert(schema.tasks).values({
+          id: intendedTaskId, title, icon: null, origin: seed.origin, projectId: project.id,
+          branch, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
+          sort: (value ?? -1) + 1, createdAt: at, updatedAt: at, archivedAt: null,
+        }).run()
+        return true
+      })
+      if (created) {
+        broadcastWorktreeStatusChanged({ taskId: intendedTaskId })
+        broadcastTasksChanged({ taskId: intendedTaskId })
+      }
+      return intendedTaskId
+    },
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0
       const candidates = await db
@@ -288,6 +328,7 @@ export function createTaskService(db: AppDatabase): TaskService {
             || existingTask.projectId !== project.id
             || existingTask.title !== seed.title
             || existingTask.branch !== branch
+            || existingTask.origin !== (seed.origin ?? 'local')
           ) {
             throw new Error(`Child task id '${id}' is already used by a different parent or seed.`)
           }
@@ -298,7 +339,7 @@ export function createTaskService(db: AppDatabase): TaskService {
         tx.insert(schema.tasks).values({
           id,
           title: seed.title,
-          origin: 'local',
+          origin: seed.origin ?? 'local',
           // A child works in the parent's repo by definition, so it inherits the project id too.
           projectId: project.id,
           branch,

@@ -61,7 +61,7 @@ export type HookHandlerRegistration = {
   call: (payload: HookPayload, signal: AbortSignal) => Promise<unknown>
 }
 
-// Module singletons, like the route, collection and extension-point registries beside them, with the
+// Module singletons, like the route, source and extension-point registries beside them, with the
 // same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
 // (./host.ts § clearRegistrations).
 const points = new Map<string, HookPointRegistration>()

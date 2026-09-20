@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Env } from '../bindings'
 import { getDb } from '../db'
-import { forEachConnection, listProviderConnections } from '../integrations/connections'
+import { forEachConnection, getConnection, listProviderConnections } from '../integrations/connections'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { createExternalItemStore } from '../integrations/itemStore'
@@ -39,11 +39,18 @@ const assertOwnedCredential = (pluginId: string, providerId: string): void => {
 // route (server/pluginHost/scheduleRun.ts). The two arguments are exactly what the Hono form read off `c`,
 // so the scheduled path gets the same runtime and the same ownership checks as an HTTP one, including
 // the provider-credential gate, which a background run passes as the node's own 'service' principal.
-export function buildPluginRequestContext(env: Env, principal: Principal, pluginId: string): PluginRequestContext {
+export type PluginConnectionScope = { providerId?: string; connectionId?: string }
+export function buildPluginRequestContext(env: Env, principal: Principal, pluginId: string, connectionScope?: PluginConnectionScope): PluginRequestContext {
+  const assertConnectionScope = (providerId: string, connectionId?: string) => {
+    if (connectionScope && (connectionScope.providerId !== providerId || (connectionId !== undefined && connectionScope.connectionId !== connectionId))) {
+      throw new Error('Provider request is outside the selected source connection')
+    }
+  }
   const providers: PluginProviderRuntime = {
     resource: async (args) => {
       assertProviderAccess(principal)
       assertOwnedProvider(pluginId, args.providerId)
+      assertConnectionScope(args.providerId, args.connectionId)
       return runProviderResource({
         db: getDb(env),
         userId: principal.userId,
@@ -54,11 +61,23 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
     connections: async (providerId) => {
       assertProviderAccess(principal)
       assertOwnedCredential(pluginId, providerId)
+      assertConnectionScope(providerId)
+      if (connectionScope) {
+        const connection = await getConnection(getDb(env), principal.userId, connectionScope.connectionId!)
+        return connection && connection.provider === providerId ? [connection] : []
+      }
       return listProviderConnections(getDb(env), principal.userId, providerId)
     },
     withConnections: async (providerId, visit) => {
       assertProviderAccess(principal)
       assertOwnedCredential(pluginId, providerId)
+      assertConnectionScope(providerId)
+      if (connectionScope) {
+        const connection = await getConnection(getDb(env), principal.userId, connectionScope.connectionId!)
+        if (!connection || connection.provider !== providerId || ['disabled', 'needs-auth'].includes(connection.status)) return []
+        const value = await env.SECRETS.use(connection.authRef, `${providerId}: source connection`, secret => visit(connection, secret))
+        return value === undefined ? [] : [value]
+      }
       return forEachConnection(getDb(env), principal.userId, providerId, env.SECRETS, visit)
     },
     items: (providerId) => {
@@ -68,6 +87,7 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
       // row the store can reach, not just about the argument.
       assertProviderAccess(principal)
       assertOwnedProvider(pluginId, providerId)
+      if (connectionScope) throw new Error('Source callbacks use connection-scoped resources instead of the cross-connection item store')
       return createExternalItemStore(getDb(env), principal.userId, providerId)
     },
   }

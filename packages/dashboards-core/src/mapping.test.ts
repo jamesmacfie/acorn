@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  pluginCollectionResponseSchema,
-  type PluginCollectionRow,
-  type PluginCollectionSchema,
-} from '@acorn/protocol/collections.ts'
+import type { DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import {
   candidateFieldsFor,
   isMapped,
@@ -19,7 +15,7 @@ import {
   withMappedValue,
   type PanelSourcePage,
 } from './mapping'
-import type { PanelMapping, PanelQuery } from './model'
+import type { PanelMapping, PanelProjectionSource } from './model'
 import { boardColumns, shapeRows, UNGROUPED_COLUMN_ID } from './shaping'
 
 // The mapping layer, which is the whole cross-source phase. The editor that drives it cannot be
@@ -31,7 +27,7 @@ import { boardColumns, shapeRows, UNGROUPED_COLUMN_ID } from './shaping'
 // its response (plugins/linear/src/shared/collections.ts). That difference is why the scenario is hard
 // and why it is worth testing against.
 
-const githubSchema: PluginCollectionSchema = {
+const githubSchema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'repo', name: 'Repository', type: 'text' },
@@ -46,7 +42,7 @@ const githubSchema: PluginCollectionSchema = {
   ],
 }
 
-const linearSchema: PluginCollectionSchema = {
+const linearSchema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'identifier', name: 'Issue', type: 'text' },
@@ -61,17 +57,17 @@ const linearSchema: PluginCollectionSchema = {
   ],
 }
 
-const githubQuery: PanelQuery = { pluginId: 'github', collectionId: 'pulls-mine' }
-const linearQuery: PanelQuery = { pluginId: 'linear', collectionId: 'issues-mine' }
+const githubQuery: PanelProjectionSource = { pluginId: 'github', sourceId: 'pulls-mine' }
+const linearQuery: PanelProjectionSource = { pluginId: 'linear', sourceId: 'issues-mine' }
 
 const row = (
-  query: PanelQuery,
+  query: PanelProjectionSource,
   id: string,
-  values: PluginCollectionRow['values'],
-): PluginCollectionRow => ({ id, values, pluginId: query.pluginId, collectionId: query.collectionId })
+  values: DashboardDisplayRow['values'],
+): DashboardDisplayRow => ({ id, values, pluginId: query.pluginId, sourceId: query.sourceId })
 
 const github: PanelSourcePage = {
-  query: githubQuery,
+  source: githubQuery,
   schema: githubSchema,
   rows: [
     row(githubQuery, '1', { title: 'Fix the parser', repo: 'acme/app', status: 'open', author: 'ada', updated: 300 }),
@@ -80,7 +76,7 @@ const github: PanelSourcePage = {
 }
 
 const linear: PanelSourcePage = {
-  query: linearQuery,
+  source: linearQuery,
   schema: linearSchema,
   rows: [
     row(linearQuery, 'ENG-7', { title: 'Ship the board', identifier: 'ENG-7', state: 'started', assignee: 'grace', updated: 200 }),
@@ -106,7 +102,7 @@ const todoBoard: PanelMapping = {
   },
 }
 
-const ids = (result: readonly PluginCollectionRow[]) => result.map((entry) => entry.id)
+const ids = (result: readonly DashboardDisplayRow[]) => result.map((entry) => entry.id)
 
 describe('when the mapping layer applies at all', () => {
   it('leaves a single collection with no columns completely alone', () => {
@@ -192,8 +188,8 @@ describe('`source` as a panel-local field', () => {
   })
 
   it('names the collection too where one plugin provides two of the panel’s sources', () => {
-    const second: PanelQuery = { pluginId: 'github', collectionId: 'reviews' }
-    const field = panelSchema([github, { ...github, query: second }], todoBoard)
+    const second: PanelProjectionSource = { pluginId: 'github', sourceId: 'reviews' }
+    const field = panelSchema([github, { ...github, source: second }], todoBoard)
       .fields.find((entry) => entry.id === 'source')!
     expect(field.values?.map((value) => value.label)).toEqual(['github · pulls-mine', 'github · reviews'])
   })
@@ -279,24 +275,15 @@ describe('the union', () => {
 
 describe('provenance is the HOST’s stamp and survives the whole pipeline', () => {
   it('cannot be overridden by the response body claiming a different plugin', () => {
-    // The wire schema does not carry `pluginId` or `collectionId` at all, so a body that states them
-    // has them stripped before the host stamps its own (@acorn/protocol/collections.ts).
-    const parsed = pluginCollectionResponseSchema.parse({
-      schema: linearSchema,
-      rows: [{ id: 'ENG-1', values: { title: 'Impostor', state: 'started' }, pluginId: 'github', collectionId: 'pulls-mine' }],
-    })
-    expect(parsed.rows[0]).not.toHaveProperty('pluginId')
-
-    // The host then stamps from the contribution whose route answered, and the mapping layer carries
-    // that stamp through untouched, so badge and click both resolve to linear.
+    // The typed projection stamps provider identity before the dashboard mapping layer.
     const stamped: PanelSourcePage = {
       ...linear,
-      rows: parsed.rows.map((entry) => ({ ...entry, pluginId: 'linear', collectionId: 'issues-mine' })),
+      rows: [{ id: 'ENG-1', values: { title: 'Impostor', state: 'started' }, pluginId: 'linear', sourceId: 'issues-mine' }],
     }
     const united = unionRows([github, stamped], todoBoard)
     const impostor = united.find((entry) => entry.id.endsWith('ENG-1'))!
     expect(impostor.pluginId).toBe('linear')
-    expect(impostor.collectionId).toBe('issues-mine')
+    expect(impostor.sourceId).toBe('issues-mine')
   })
 
   it('survives mapping, sorting, limiting and grouping', () => {
@@ -305,7 +292,7 @@ describe('provenance is the HOST’s stamp and survives the whole pipeline', () 
       sort: [{ field: 'updated', direction: 'desc' }],
       limit: 3,
     })
-    expect(shaped.every((entry) => entry.pluginId && entry.collectionId)).toBe(true)
+    expect(shaped.every((entry) => entry.pluginId && entry.sourceId)).toBe(true)
     const statusField = schema.fields.find((field) => field.id === 'status')!
     const inColumns = boardColumns(shaped, statusField).flatMap((column) => column.rows)
     expect(inColumns.map((entry) => entry.pluginId).sort()).toEqual(['github', 'linear', 'linear'])
@@ -400,7 +387,7 @@ describe('the value-mapping suggestion', () => {
   it('has nothing to offer for a source whose values are not known yet', () => {
     // A collection that describes itself in its answer and has not been read: no declared values, so no
     // matrix rows. The editor says so rather than showing an empty one.
-    const cold: PanelSourcePage = { query: linearQuery, schema: { fields: [] }, rows: [] }
+    const cold: PanelSourcePage = { source: linearQuery, schema: { fields: [] }, rows: [] }
     expect(statusValuesOf(cold, undefined)).toEqual([])
     expect(statusValuesOf(linear, undefined).map((value) => value.label)).toEqual(['Todo', 'In progress', 'Done'])
   })
@@ -524,7 +511,7 @@ describe('partial availability', () => {
   })
 
   it('keeps a source’s own field mapping usable when it answered with no schema at all', () => {
-    const cold: PanelSourcePage = { query: linearQuery, schema: { fields: [] }, rows: [] }
+    const cold: PanelSourcePage = { source: linearQuery, schema: { fields: [] }, rows: [] }
     // `source` survives a source that answered with nothing: it is the host's stamp rather than
     // anything the source has to be able to fill, so it names both either way.
     expect(panelSchema([github, cold], todoBoard).fields.map((field) => field.id))

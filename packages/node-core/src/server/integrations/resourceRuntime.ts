@@ -30,6 +30,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
   resourceId: string
   input: TInput
   force?: boolean
+  requireFresh?: boolean
 }): Promise<RouteResult<TOutput>> {
   const provider = integrationProviderRegistry.require(args.providerId)
   const resource = provider.resources.find((candidate) => candidate.id === args.resourceId) as
@@ -57,20 +58,20 @@ export async function runProviderResource<TInput, TOutput>(args: {
 
   // Reauth/disable keeps provider-owned cache readable but must not trigger outbound work.
   if (connection.status === 'needs-auth' || connection.status === 'disabled') {
-    const cached = await read()
+    const cached = args.requireFresh ? null : await read()
     if (cached) return { ok: true, value: cached.data }
     return connection.status === 'needs-auth'
       ? failure('provider_needs_auth', 401)
       : failure('provider_not_connected', 403)
   }
 
-  const fallback = args.force ? await read() : null
+  const fallback = args.force && !args.requireFresh ? await read() : null
   const result = await serveThenRevalidate({
     resource: resource.key(connection.id, args.input),
     userId: args.userId,
     ttlMs: resource.ttlMs,
     backoffMs: provider.budgets.backoffFloorMs,
-    force: args.force,
+    force: args.force || args.requireFresh,
     read,
     refresh: async () => {
       try {

@@ -67,7 +67,7 @@ const key = (pluginId: string, checkId: string): string => `${pluginId}:${checkI
 export const qualifiedConcernId = (pluginId: string, checkId: string, concernId: string): string =>
   `${pluginId}:${checkId}:${concernId}`
 
-// A module singleton, like the route, collection and node-action registries beside it, with the same
+// A module singleton, like the route, source and node-action registries beside it, with the same
 // lifecycle answer: the plugin host clears a plugin's entries before re-registering them
 // (./host.ts § clearRegistrations).
 const checks = new Map<string, RegisteredTaskCheck>()

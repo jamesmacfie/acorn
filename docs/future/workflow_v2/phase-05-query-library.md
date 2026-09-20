@@ -1,6 +1,6 @@
 # Slice 05: Workspace query drafts and published revisions
 
-Date: 2026-09-13. Status: not started.
+Date: 2026-09-14. Status: complete.
 
 Read [context and decisions](./context.md) first, then the owning
 [contract or UX reference](./publication.md) and [verification](./verification.md).
@@ -36,8 +36,31 @@ for UI changes. Record actual evidence rather than copying expected results into
 
 ## Evidence
 
-Not run. Fill in commands, results, UI artifacts where applicable, and any remaining failures during
-implementation. Mark complete only when the outcome and all required checks are demonstrated.
+Implemented core query drafts, immutable revisions, scoped routes, typed inline and saved references,
+consumer tracking, metadata publication validation, and client recovery services. The shipped contract
+is [workspace query library](../../data-sources.md#workspace-query-library).
+
+Checks run on September 14, 2026:
+
+- `rtk pnpm lint`: passed all 33 package tasks. Pre-existing lint warnings and cache-write permission
+  warnings remain; no type errors.
+- `rtk pnpm --filter @acorn/node-core test src/server/queries/runtime.test.ts`: eight tests passed.
+  Real temporary SQLite connections cover stale saves, a save during publication metadata I/O,
+  immutable revisions, two consumers, deletion refusal, retained history, unavailable sources,
+  removed dynamic choices, typed arguments, and workspace/project authorization.
+- `rtk pnpm --filter @acorn/protocol test src/dataQueryResolution.test.ts`: three tests passed.
+- `rtk pnpm --filter @acorn/client-core test src/features/queries/recoveryStore.test.ts`: three tests
+  passed, including reopening across a changed base revision and a late acknowledgment after edits.
+- `rtk pnpm db:check`: all 11 migration chains passed, including core migration 0006.
+- `rtk pnpm --filter @acorn/arch-tests test`: 63 tests passed. The first run found the route's
+  `parse` spelling; the route uses `safeParse` and the rerun passed.
+- `rtk proxy env UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test src/surface.test.ts`: one test
+  passed and the additive public API snapshot was updated.
+- `rtk pnpm --filter acorn-plugin-types test src/contract.test.ts`: three tests passed.
+
+No renderer UI changed. Editor autosave integration and visible conflict review belong to phase 12.
+Consumer publication returns impact links; workflow publication coordination and schedule review
+notifications remain owned by their planned phases. No branch or commit was created.
 
 ## Verify before building
 

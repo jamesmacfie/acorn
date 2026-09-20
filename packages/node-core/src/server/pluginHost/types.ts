@@ -3,12 +3,11 @@
 // provider registries and contracts, and clients are told about change through broadcasts.
 import type { Hono } from 'hono'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
-import type { CoreServices } from '../core'
+import type { CompiledCoreServices, CoreServices } from '../core'
 import type { PluginDatabase } from '../plugins/storage'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
-import type { CollectionReadRegistration } from '../collections/registry'
 import type { NodeActionRegistration } from '../nodeActions'
 import type { NodeProviderContribution } from '../nodeProviders/registry'
 import type { RunSourceRegistration } from '../runs/registry'
@@ -61,6 +60,8 @@ export type PluginProviderResourceRequest<TInput> = {
   resourceId: string
   input: TInput
   force?: boolean
+  /** Block on refresh and return its failure instead of falling back to cached data. */
+  requireFresh?: boolean
 }
 
 export type PluginProviderConnectionVisitor<T> = (
@@ -118,6 +119,11 @@ export type PluginToolRegistry = {
 // state row across a disable and re-enable. Any `setInterval` in plugin node code is a review flag.
 export type PluginScheduleRegistry = {
   register(schedule: PluginSchedule): void
+}
+
+export type CompiledPluginScheduleRegistry = PluginScheduleRegistry & {
+  /** User-owned target kinds are live host callbacks and therefore compiled-only. */
+  registerTarget(target: import('../schedules/scheduler').ScheduleTarget): void
 }
 
 export type PluginSchedule = {
@@ -195,13 +201,10 @@ export type PluginHookHandler = {
   run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 
-// Where this plugin's collections can be read from the node, with no client attached
-// (docs/future/cron/targets.md § seam 1). Not a second way to declare a collection: the client-side
+// Where this plugin's data sources can be read from the node, with no client attached.
+// (docs/future/cron/targets.md § seam 1). Not a second way to declare a data source: the client-side
 // registration is what makes one appear in a panel editor, and this is the pointer that lets the
 // measure sampler ask the same route the same question. A loaded plugin registers nothing here.
-export type PluginCollectionRegistry = {
-  register(collection: CollectionReadRegistration): void
-}
 
 // Where this plugin's runs can be read from the node (../runs/registry.ts). Not a second way to
 // declare a run: the plugin keeps its own table, its own lifecycle and its own surfaces, and this is
@@ -310,7 +313,7 @@ export type CompiledPluginProviderRegistry = PluginProviderRegistry & {
 export type PluginBroadcast = {
   // Push a frame to every connected client. The hub skips task-confined sockets.
   send(frame: WsServerFrame): void
-  // "Re-read my chrome descriptors": this plugin's rail rows, badges, collections and agent context.
+  // "Re-read my chrome descriptors": this plugin's rail rows, badges, sources and agent context.
   // Scoped to the calling plugin by the host, so one plugin saying its rows moved no longer costs every
   // other plugin a descriptor round trip on every connected client
   // (docs/plugins.md § Hearing a core event).
@@ -395,7 +398,16 @@ export type NodePluginContext = {
   schedules: PluginScheduleRegistry
   // Both tiers, same as schedules: a loaded plugin's entries are synthesised from its manifest, and
   // nothing downstream can tell which feeder answered.
-  collections: PluginCollectionRegistry
+  dataSources: {
+    register(source: import('@acorn/protocol/dataSources.ts').DataSourceRegistration): void
+    discover(discovery: import('@acorn/protocol/dataSources.ts').DataSourceDiscovery): void
+    list(scope: import('@acorn/protocol/dataSources.ts').DataSourceScope, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceCatalog>
+    discoverAvailable(request: import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryPage>
+    invoke<R extends import('@acorn/protocol/dataSources.ts').DataSourceRequest>(request: R, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceResponse<R>>
+    resolveQuery(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, reference: import('@acorn/protocol/dataQueries.ts').QueryReference, context: import('@acorn/protocol/dataQueries.ts').QueryBindingContext, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataQueries.ts').ResolvedQuery>
+    setQueryConsumer(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, queryId: string, consumer: Omit<import('@acorn/protocol/dataQueries.ts').QueryConsumer, 'pluginId'>, invocation: import('../dataSources/authority').DataSourceInvocation, remove?: boolean): Promise<void>
+    queryPublication(request: import('@acorn/protocol/queryPublication.ts').QueryPublicationRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/queryPublication.ts').QueryPublicationResult>
+  }
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.
   taskChecks: PluginTaskCheckRegistry
@@ -435,6 +447,8 @@ export type NodePluginContext = {
 // An intersection rather than a second literal, so a member added to the loaded shape reaches this one
 // for free and the two can never disagree about the part they share.
 export type CompiledNodePluginContext = NodePluginContext & {
+  core: CompiledCoreServices
+  schedules: CompiledPluginScheduleRegistry
   routes: CompiledPluginRouteRegistry
   tools: PluginToolRegistry
   contextSections: PluginContextSectionRegistry

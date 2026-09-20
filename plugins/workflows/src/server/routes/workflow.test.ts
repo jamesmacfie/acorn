@@ -51,6 +51,36 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
 describe('workflow routes', () => {
   afterEach(() => setWorkflowBridge(null))
 
+  it('keeps processing history and reprocess preparation device-only', async () => {
+    const records = vi.fn(async () => ({ records: [] }))
+    const prepareReprocess = vi.fn(async () => ({ digest: 'retained' }))
+    const reprocess = vi.fn(async () => ({ runId: 'new-run', taskId: 'new-task' }))
+    setWorkflowBridge(fake({ records, prepareReprocess, reprocess }))
+    const path = '/api/workflows/runs/run1/records'
+    expect((await asTask1().fetch(req(path), {} as Env)).status).toBe(403)
+    expect((await asTask1().fetch(req(`${path}/row/prepare-reprocess`, 'POST', {}), {} as Env)).status).toBe(403)
+    expect((await asTask1().fetch(req(`${path}/row/reprocess`, 'POST', { digest: 'retained', requestId: 'request' }), {} as Env)).status).toBe(403)
+    expect(records).not.toHaveBeenCalled()
+    expect(prepareReprocess).not.toHaveBeenCalled()
+    expect((await authed().fetch(req(path), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req(`${path}/row/prepare-reprocess`, 'POST', { scopeKey: 'forged' }), {} as Env)).status).toBe(400)
+    expect((await authed().fetch(req(`${path}/row/prepare-reprocess`, 'POST', {}), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req(`${path}/row/reprocess`, 'POST', { digest: 'retained' }), {} as Env)).status).toBe(400)
+    expect((await authed().fetch(req(`${path}/row/reprocess`, 'POST', { digest: 'retained', requestId: 'request' }), {} as Env)).status).toBe(200)
+    expect(reprocess).toHaveBeenCalledWith('run1', 'row', 'retained', 'request')
+  })
+
+  it('rejects malformed history cursors and oversized pages before the bridge', async () => {
+    const recordAttempts = vi.fn(async () => ({ attempts: [] }))
+    setWorkflowBridge(fake({ recordAttempts }))
+    const path = '/api/workflows/runs/run1/records/row/attempts'
+    for (const after of ['null', '{', '{}', '{"at":"1","id":"x"}']) {
+      expect((await authed().fetch(req(`${path}?after=${encodeURIComponent(after)}`), {} as Env)).status).toBe(400)
+    }
+    expect((await authed().fetch(req(`${path}?limit=101`), {} as Env)).status).toBe(400)
+    expect(recordAttempts).not.toHaveBeenCalled()
+  })
+
   it('scopes the authoring catalog to a project and keeps it behind the device gate', async () => {
     const projects: Array<string | undefined> = []
     setWorkflowBridge(fake({ catalog: async (projectId) => {
@@ -63,13 +93,12 @@ describe('workflow routes', () => {
     expect(projects).toEqual(['project-one'])
   })
 
-  it('starts a run with a valid def and returns the runId', async () => {
+  it('refuses inline definitions instead of executing an unpublished draft', async () => {
     let seen: unknown = null
     setWorkflowBridge(fake({ start: async (_t, def) => ((seen = def), { runId: 'run1' }) }))
     const res = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { def: { name: 'W', steps: [{ name: 's1' }] } }), {} as Env)
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ runId: 'run1' })
-    expect(seen).toMatchObject({ name: 'W' })
+    expect(res.status).toBe(400)
+    expect(seen).toBeNull()
   })
 
   it('resolves a gate and reads steps by runId', async () => {
@@ -105,17 +134,19 @@ describe('workflow routes', () => {
     expect((await app.fetch(req('/api/workflows/runs/run1/kill', 'POST', {}), {} as Env)).status).toBe(400)
   })
 
-  it('carries the start body\'s inputs to the runner and refuses a value that is not a string', async () => {
+  it('carries typed start inputs to the runner without coercion', async () => {
     let seen: unknown = 'unset'
-    setWorkflowBridge(fake({ start: async (_t, _def, inputs) => ((seen = inputs), { runId: 'run1' }) }))
+    setWorkflowBridge(fake({ startById: async (_t, _def, inputs) => ((seen = inputs), { runId: 'run1' }) }))
     const app = authed()
-    const def = { name: 'W', steps: [{ name: 's1' }] }
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, inputs: { issue: 'It crashes' } }), {} as Env)).status).toBe(200)
+    const defId = 'published-workflow'
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId, inputs: { issue: 'It crashes' } }), {} as Env)).status).toBe(200)
     expect(seen).toEqual({ issue: 'It crashes' })
     // Absent is not the same as empty: which names are allowed is the runner's answer, not the route's.
-    await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def }), {} as Env)
+    await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId }), {} as Env)
     expect(seen).toBeUndefined()
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, inputs: { issue: 12 } }), {} as Env)).status).toBe(400)
+    const typed = { issue: 12, enabled: false, record: { nested: [null, { value: true }] } }
+    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId, inputs: typed }), {} as Env)).status).toBe(200)
+    expect(seen).toEqual(typed)
   })
 
   it('retries a failed step, and 400s a retry with no stepId', async () => {
@@ -298,6 +329,7 @@ describe('workflow definition routes', () => {
       req('/api/defs/def1', 'DELETE'),
       req('/api/defs/validate', 'POST', { def }),
       req('/api/defs/generate', 'POST', { backendId: 'c1', description: 'two agents', workspaceId: 'w1' }),
+      req('/api/defs/authoring/turn', 'POST', { target: 'workflow', scope: { workspaceId: 'w1' }, targetId: 'def1', baseRevision: 1, base: def, backendId: 'c1', instruction: 'Improve it.' }),
       req('/api/defs/def1/save-to-repo', 'POST', {}),
     ]) {
       expect((await app.fetch(call, {} as Env)).status).toBe(403)
@@ -331,6 +363,33 @@ describe('workflow definition routes', () => {
     expect((await app.fetch(req('/api/defs/def1', 'PUT', { def: { name: 'x', steps: [] } }), {} as Env)).status).toBe(400)
     setWorkflowDefsBridge(null)
     expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(503)
+  })
+
+  describe('AI authoring conversation', () => {
+    const body = {
+      target: 'workflow', scope: { workspaceId: 'w1', projectId: 'p1' }, targetId: 'def1', baseRevision: 1,
+      base: row.def, backendId: 'harness:codex', instruction: 'Improve it.', context: [], samplesEnabled: false,
+    }
+
+    it('passes only a validated workflow turn and the interactive principal to the bridge', async () => {
+      let seen: unknown
+      setWorkflowDefsBridge(fakeDefs({
+        author: async input => (seen = input, {
+          state: 'clarification', question: 'Which outcome?', choices: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+          context: [], usage: { requests: 1, inputTokens: 2, outputTokens: 1 }, providerId: 'fake', modelId: 'm',
+        }),
+      }))
+      const response = await asDevice().fetch(req('/api/defs/authoring/turn', 'POST', body), {} as Env)
+      expect(response.status).toBe(200)
+      expect(seen).toMatchObject({ ...body, userId: 'james', principal: { kind: 'device', userId: 'james' } })
+    })
+
+    it('rejects another target before reaching the bridge', async () => {
+      const author = vi.fn()
+      setWorkflowDefsBridge(fakeDefs({ author }))
+      expect((await asDevice().fetch(req('/api/defs/authoring/turn', 'POST', { ...body, target: 'query' }), {} as Env)).status).toBe(400)
+      expect(author).not.toHaveBeenCalled()
+    })
   })
 
   // Generate spends the owner's provider key. The device gate above is what stands in front of it,

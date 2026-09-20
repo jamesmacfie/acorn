@@ -3,6 +3,8 @@ import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { projectsOptions } from '../../infra/queries'
 import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
@@ -23,9 +25,9 @@ export type PromoteWorkflowStep = {
   /** The definition selected when the modal opens. */
   initial?: string
   /** Values the item already supplies, by input name. Editable. */
-  prefill?: Readonly<Record<string, string>>
+  prefill?: Readonly<Record<string, DataValue>>
   /** Runs after the task exists. A rejection keeps the modal open with the message. */
-  onStart: (taskId: string, defId: string, inputs: Record<string, string>) => Promise<void>
+  onStart: (taskId: string, defId: string, inputs: Record<string, DataValue>) => Promise<void>
 }
 
 // Shared "+ Task" flow for the integration browses. Promoting an external item (a Rollbar error, a
@@ -83,18 +85,29 @@ export function PromoteToTaskModal(props: {
   // What was typed, over what the item and the definition supply. Held by input name, so switching
   // definitions keeps an answer the next one also asks for and re-seeds everything else.
   const seeded = createMemo(() => ({
-    ...Object.fromEntries(workflowInputs().filter((input) => input.default).map((input) => [input.name, input.default!])),
+    ...Object.fromEntries(workflowInputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
     ...Object.fromEntries(workflowInputs()
-      .filter((input) => props.workflow?.prefill?.[input.name])
+      .filter((input) => props.workflow?.prefill?.[input.name] !== undefined)
       .map((input) => [input.name, props.workflow!.prefill![input.name]])),
   }))
-  const valueOf = (name: string): string => values()[name] ?? seeded()[name] ?? ''
+  const valueOf = (name: string): string => {
+    if (values()[name] !== undefined) return values()[name]
+    const value = seeded()[name]
+    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
+  }
   const setValue = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }))
-  const filled = (): Record<string, string> => Object.fromEntries(workflowInputs()
-    .map((input) => [input.name, valueOf(input.name)])
-    .filter(([, value]) => value !== ''))
-  const workflowReady = () => !props.workflow
-    || (!!defId() && !workflowInputs().some((input) => input.required && !valueOf(input.name).trim()))
+  const filled = (): Record<string, DataValue> => Object.fromEntries(workflowInputs().flatMap(input => {
+    const raw = valueOf(input.name)
+    if (raw === '') return []
+    const value = !input.schema || input.schema.type === 'string' ? raw : JSON.parse(raw)
+    if (input.schema) validateDataValue(value, input.schema)
+    return [[input.name, value]]
+  }))
+  const workflowReady = () => {
+    if (!props.workflow) return true
+    if (!defId() || workflowInputs().some(input => input.required && !valueOf(input.name).trim())) return false
+    try { filled(); return true } catch { return false }
+  }
 
   // The task a failed start left behind. A refusal keeps the modal open, and without this the next
   // press would make a second task for the same item rather than retrying the run on the first.

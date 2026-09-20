@@ -18,50 +18,9 @@ const roundTrip = (text: string) => {
 }
 
 describe('writing a definition back as TOML', () => {
-  it('round trips the shape the loader tests use: gates, fan-out, joins, a child step', () => {
+  it('round trips the v2 graph, typed inputs, branches, ceilings and budgets', () => {
     const { parsed, again } = roundTrip(`
-name = "super flow"
-posture = "gated"
-
-[[steps]]
-name = "plan"
-kind = "fan-out"
-model = "opus"
-prompt = "Split the ticket."
-schema_json = '{"type":"object"}'
-[steps.child_step]
-name = "build"
-prompt = "Build this slice."
-
-[[steps]]
-name = "aggregate"
-kind = "join"
-joins = "plan"
-
-[[steps]]
-name = "e2e"
-prompt = "Verify in the browser."
-requires_run = "dev"
-
-[[steps]]
-name = "ship?"
-kind = "gate-human"
-
-[[steps]]
-name = "verify"
-kind = "gate-policy"
-policy = "checks-green"
-
-[[steps]]
-name = "ci-fix"
-kind = "ci-loop"
-max_iterations = 3
-`)
-    expect(again).toEqual(parsed)
-  })
-
-  it('round trips every field the model declares, including branches, ceilings and budgets', () => {
-    const { parsed, again } = roundTrip(`
+format_version = 2
 name = "everything"
 posture = "autonomous"
 trigger = "checks-red"
@@ -77,14 +36,17 @@ max_turns = 4
 
 [[inputs]]
 name = "issue"
+schema_json = '{"type":"string"}'
 description = "The bug report"
 required = true
 
 [[inputs]]
 name = "focus"
-default = "the parser"
+schema_json = '{"type":"string"}'
+default_json = '"the parser"'
 
 [[steps]]
+id = "reproduce"
 name = "reproduce"
 after = []
 isolation = "worktree"
@@ -99,6 +61,7 @@ allow = ["read_tool"]
 max_turns = 2
 
 [[steps]]
+id = "recent-changes"
 name = "recent-changes"
 after = []
 kind = "http:request"
@@ -108,6 +71,7 @@ retries = 2
 follow = true
 
 [[steps]]
+id = "route"
 name = "route"
 kind = "decide"
 after = ["reproduce", "recent-changes"]
@@ -117,11 +81,13 @@ yes = "ship"
 no = "stop"
 
 [[steps]]
+id = "ship"
 name = "ship"
 after = ["route"]
 prompt = "Ship it."
 
 [[steps]]
+id = "stop"
 name = "stop"
 after = ["route"]
 kind = "gate-human"
@@ -133,25 +99,30 @@ kind = "gate-human"
 
   it('round trips single and mapped runtime workflow references without changing static composition', () => {
     const { parsed, written, again } = roundTrip(`
+format_version = 2
 name = "dispatch"
 [[inputs]]
 name = "ticket"
+schema_json = '{"type":"string"}'
 
 [[steps]]
+id = "select"
 name = "select"
 after = []
+schema_json = '{"type":"object"}'
 
 [[steps]]
+id = "one"
 name = "one"
 kind = "workflow"
 [steps.child_workflow.ref]
 source = "database"
 id = "review-row"
 [steps.child_workflow.inputs.ticket]
-from = "input"
-name = "ticket"
+binding_json = '{"address":{"from":"input","name":"ticket","pointer":""}}'
 
 [[steps]]
+id = "many"
 name = "many"
 kind = "workflow-map"
 after = ["select"]
@@ -163,20 +134,18 @@ pointer = "/tickets"
 source = "repo"
 path = ".acorn/workflows/review.toml"
 [steps.child_workflow.inputs.ticket]
-from = "item"
-pointer = "/number"
+binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 [steps.title]
 template = "Review \${ticket}"
 [steps.title.bindings.ticket]
-from = "item"
-pointer = "/number"
+binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 `)
     expect(again).toEqual(parsed)
     expect(written).toContain('[steps.child_workflow.ref]')
     expect(written).not.toContain('\nworkflow = "review-row"')
 
     const staticErrors: { source: string; message: string }[] = []
-    const staticStep = parseWorkflowToml('[[steps]]\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
+    const staticStep = parseWorkflowToml('format_version = 2\n[[steps]]\nid = "review"\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
     expect(staticErrors).toEqual([])
     expect(staticStep?.steps[0]).toMatchObject({ workflowRef: 'review-block' })
     expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
@@ -184,11 +153,14 @@ pointer = "/number"
 
   it('writes a multi-line prompt as a literal block, so `${…}` survives unescaped', () => {
     const { written, parsed, again } = roundTrip(`
+format_version = 2
 name = "templated"
 [[inputs]]
 name = "issue"
+schema_json = '{"type":"string"}'
 
 [[steps]]
+id = "look"
 name = "look"
 prompt = """
 Reproduce the issue below.
@@ -205,8 +177,10 @@ Then say what you saw.
   // `$'` is a special sequence in a JavaScript replacement string, and the marker swap is a replace.
   it('survives a prompt holding replacement-pattern characters', () => {
     const { parsed, again } = roundTrip(`
+format_version = 2
 name = "awkward"
 [[steps]]
+id = "quote"
 name = "quote"
 prompt = """
 echo $' and $& and $\` here
@@ -218,7 +192,7 @@ second line
   })
 
   it('falls back to a quoted string when a literal block cannot hold the text', () => {
-    const def = { name: 'edge', steps: [{ name: 'a', prompt: "one\ntwo '''" }] }
+    const def = { formatVersion: 2 as const, name: 'edge', steps: [{ id: 'a', name: 'a', prompt: "one\ntwo '''" }] }
     const text = writeWorkflowToml(def)
     expect(text).toContain('prompt = "one\\ntwo')
     const errors: { source: string; message: string }[] = []

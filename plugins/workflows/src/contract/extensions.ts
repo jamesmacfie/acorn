@@ -11,6 +11,10 @@ import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution
 // entry `request` and neither shadows the other, and the workflow file says which one it meant.
 
 export type { PolicyEvaluator, StepField, StepFieldOption, StepFieldType, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepKindDescription, StepValidationContext, StepValidator, WorkflowCatalog, WorkflowDef, WorkflowStepDef, WorkflowTriggerContribution, WorkflowTriggerMatch } from '../shared/workflowContracts'
+export type { WorkflowInput, WorkflowOutput, WorkflowValueBinding } from '../shared/workflowContracts'
+export type { DataValue } from '@acorn/protocol/dataValues.ts'
+export type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
+export type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 
 // A kind may also carry a `describe`: its label, its icon, and its fields as data
 // (docs/workflows.md § Contributed step kinds). The host draws that form on both hosts and applies

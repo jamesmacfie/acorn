@@ -141,19 +141,14 @@ descriptor. [docs/plugins.md](./plugins.md) § Descriptors for facts, trees for 
 pixels carries the argument, including why a component tree is not the static widget schema this
 project has refused twice.
 
-The furthest that tier goes today is a **collection**: a plugin declares a typed set of records —
-seven semantic field types, five roles — and the host composes user-owned panels over it
-([dashboards.md](./dashboards.md)). It is worth knowing why that is not the failure mode above.
-Widening the verb set trades a bounded vocabulary for one plugin's convenience; a collection widens
-nothing for one plugin, because the host draws its own generic surface and the uniformity across
-providers is what the feature *is* — two plugins' rows can share one board only because neither of
-them draws anything. The same budget discipline applies with the same words: a field type added is a
-rendering rule every provider inherits forever, and the overflow path is a frame pane. Both feeders —
-`contributions.collections` in a manifest and `ctx.collections` from a compiled plugin — land in one
-client registry (`client-core/src/host/registries/sources/collections.ts`), and nothing downstream can tell which
-supplied a collection. That is the strongest form of the descriptor argument: a stranger's plugin gets
-panels that ship no client bundle, raise no trust prompt, and are pixel-identical to a first-party
-one's under every appearance pack.
+The furthest that tier goes today is a **typed data source**. A plugin declares structured records,
+query capabilities, and display metadata, while the host owns querying, authoring controls, and
+dashboard rendering. A source does not widen the verb set for one plugin. Providers share a generic
+surface precisely because none of them draws it. Compiled plugins use `ctx.dataSources`; loaded
+plugins declare `contributions.dataSources` or `contributions.dataSourceDiscoveries`. Both carriers
+land in the Node-owned registry, so dashboards, workflows, and unattended sampling read the same
+contract. For the bounded schema, query, identity, and lifecycle rules, see
+[Typed data sources](./data-sources.md) and [Contribution kinds](./contribution-kinds.md).
 
 ## Plugins may extend each other, and only by invitation
 

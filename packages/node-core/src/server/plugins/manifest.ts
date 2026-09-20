@@ -44,7 +44,6 @@ export type {
   PluginAuditActionDescriptor,
   PluginChromeAction,
   PluginClientRouteDescriptor,
-  PluginCollectionDescriptor,
   PluginCommandDescriptor,
   PluginDocumentRegion,
   PluginExtensionDescriptor,
@@ -81,7 +80,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     }
     required.add(dependency.id)
   }
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -137,6 +136,12 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
   if (!manifest.node) {
+    for (const kind of ['dataSources', 'dataSourceDiscoveries'] as const) {
+      manifest.contributions[kind]?.forEach((_entry, i) => ctx.addIssue({
+        code: 'custom', path: ['contributions', kind, i],
+        message: 'a data source calls a node route; declare `node` in the manifest',
+      }))
+    }
     agentTools.forEach((_entry, i) => ctx.addIssue({
       code: 'custom', path: ['contributions', 'agentTools', i],
       message: 'an agent tool calls a node route; declare `node` in the manifest',
@@ -418,7 +423,8 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
-  collections.forEach((entry, i) => route(entry.items, ['contributions', 'collections', i, 'items']))
+  manifest.contributions.dataSources?.forEach((entry, i) => route(entry.handler, ['contributions', 'dataSources', i, 'handler']))
+  manifest.contributions.dataSourceDiscoveries?.forEach((entry, i) => route(entry.handler, ['contributions', 'dataSourceDiscoveries', i, 'handler']))
   schedules.forEach((entry, i) => {
     const at = ['contributions', 'schedules', i] as (string | number)[]
     route(entry.run, [...at, 'run'])
@@ -674,7 +680,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }
@@ -741,6 +747,13 @@ function unknownIn(json: unknown, manifest: PluginManifest): string[] {
  *
  * `source` only names the file in the message; the rules are the same wherever the bytes came from. */
 export function parsePluginManifest(json: unknown, source: string = MANIFEST_FILE): PluginManifestResult {
+  const rawContributions = isRecord(json) && isRecord(json.contributions) ? json.contributions : undefined
+  if (rawContributions && 'collections' in rawContributions) {
+    return {
+      ok: false,
+      reason: `${source} uses removed contributions.collections. Register a Node-owned contributions.dataSources entry and migrate dashboards to typed queries.`,
+    }
+  }
   const parsed = pluginManifestSchema.safeParse(json)
   if (parsed.success) return { ok: true, manifest: parsed.data, unknown: unknownIn(json, parsed.data) }
   // `path + message`, which is the whole point: `contributions.commands[2].run: ...` tells an author which
