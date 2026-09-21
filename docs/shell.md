@@ -578,13 +578,17 @@ two products is a policy function and a key prefix. Keys are `preview:<taskId>` 
 `plugin:<pluginId>:<nodeId>[:<surface>]`, and the prefix is validated rather than assumed, because it
 is what selects the policy.
 
-A child webview under `Window::add_child` composites over the main one, takes logical bounds the
-renderer's pane geometry drives, and hides while overlays cover the pane. `incognito(true)` gives it
+A child webview under `Window::add_child` composites over the main one and takes logical bounds from
+the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
+the host element with the viewport and every clipping ancestor before it sends those bounds. The
+child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
 its own ephemeral data store. Preview is one kept-alive webview per task, restricted to HTTP and
-HTTPS URLs with no credentials, with an external chrome layer the renderer draws. A loaded plugin's
-webview surface is checked against its manifest hosts by the renderer broker and again here, and two
-independent checks is the point: widening the grant in one layer must not silently widen the other.
-A ceiling of 32 webviews caps what a renderer bug that ensures in a loop can cost.
+HTTPS URLs with no credentials, with an external chrome layer the renderer draws. In development,
+the preview's DevTools button addresses that child handle rather than the main renderer and reapplies
+the child's bounds after WebKit opens its inspector. A loaded plugin's webview surface is checked
+against its manifest hosts by the renderer broker and again here, and two independent checks is the
+point: widening the grant in one layer must not silently widen the other. A ceiling of 32 webviews
+caps what a renderer bug that ensures in a loop can cost.
 
 wry exposes no navigation history, so the shell keeps its own. `on_navigation` reports every
 navigation, including the ones page script drives, and the module marks the traversals it asked for

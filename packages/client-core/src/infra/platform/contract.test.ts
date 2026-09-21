@@ -12,6 +12,7 @@ const fullHost = () => ({
   desktop: true,
   platform: 'darwin',
   onClosePane: vi.fn(() => () => {}),
+  onCommandPalette: vi.fn(() => () => {}),
   onWillQuit: vi.fn(() => () => {}),
   nodeFetch: vi.fn(async () => ({ status: 200, headers: {}, body: new Uint8Array() })),
   nodeAbort: vi.fn(),

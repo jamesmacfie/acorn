@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from 'solid-js'
-import { commandRegistry } from '../registries/commands/commands'
+import { commandRegistry, executeCommand } from '../registries/commands/commands'
 import { keybindingRegistry } from '../registries/commands/keybindings'
+import { desktopExtras } from '../../infra/platform'
 import {
   createCommandSession,
   type CommandSession,
@@ -55,21 +56,26 @@ export function createCommandPaletteView(options: CommandSessionOptions & {
   })
 
   onMount(() => {
+    const commandId = `overlay.${options.id}.toggle`
     const command = commandRegistry.register({
-      id: `overlay.${options.id}.toggle`,
+      id: commandId,
       title: options.title,
       category: 'navigation',
       run: () => (session.open() ? session.close() : session.openRoot()),
     })
     const binding = keybindingRegistry.register({
-      id: `overlay.${options.id}.toggle`,
-      command: `overlay.${options.id}.toggle`,
+      id: commandId,
+      command: commandId,
       description: options.title,
       category: 'Global',
       defaultChord: options.toggleChord,
       when: 'global',
     })
-    onCleanup(() => { binding.dispose(); command.dispose() })
+    // A child webview owns a separate document, so its focused keydown cannot bubble into the
+    // renderer keymap. The native menu catches Cmd/Ctrl+K and arrives here, at the same registered
+    // command the renderer shortcut executes.
+    const offNative = desktopExtras()?.onCommandPalette(() => { void executeCommand(commandId) })
+    onCleanup(() => { offNative?.(); binding.dispose(); command.dispose() })
   })
 
   const view: PaletteView = {

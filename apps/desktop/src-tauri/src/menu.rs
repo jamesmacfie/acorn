@@ -5,23 +5,25 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::commands::Shell;
 
-// The application menu, and the two accelerators that are product behaviour rather than decoration.
+// The application menu, and the accelerators that are product behaviour rather than decoration.
 //
 // Quit is a custom item, never `PredefinedMenuItem::quit`, which routes through `[NSApp terminate:]`
 // and bypasses the event loop, so the quit negotiation would never run.
 //
-// Cmd/Ctrl+W closes the focused pane, never the window. Tauri has no key interception hook, so it is
-// a menu item whose accelerator wins over the page and whose click becomes the event the seam
-// listens for.
+// Cmd/Ctrl+W closes the focused pane, never the window. Cmd/Ctrl+K opens the command palette even
+// while a child preview webview owns focus. Tauri has no key interception hook, so both are menu
+// items whose accelerators win over the page and whose clicks become events the seam listens for.
 //
 // The rest is the standard macOS set, spelled out rather than inherited. A window with no Edit menu
 // has no working Cmd+C, and the default menu is gone once a custom one is set.
 
 pub const CLOSE_PANE: &str = "acorn:close-pane";
+pub const COMMAND_PALETTE: &str = "acorn:command-palette";
 pub const QUIT: &str = "acorn:quit";
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let close_pane = MenuItem::with_id(app, CLOSE_PANE, "Close Pane", true, Some("CmdOrCtrl+W"))?;
+    let command_palette = MenuItem::with_id(app, COMMAND_PALETTE, "Command Palette", true, Some("CmdOrCtrl+K"))?;
     let quit = MenuItem::with_id(app, QUIT, "Quit acorn", true, Some("CmdOrCtrl+Q"))?;
 
     let application = Submenu::with_items(
@@ -56,6 +58,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ],
     )?;
 
+    let view = Submenu::with_items(app, "View", true, &[&command_palette])?;
+
     let window = Submenu::with_items(
         app,
         "Window",
@@ -63,7 +67,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[&PredefinedMenuItem::minimize(app, None)?, &PredefinedMenuItem::fullscreen(app, None)?],
     )?;
 
-    Menu::with_items(app, &[&application, &file, &edit, &window])
+    Menu::with_items(app, &[&application, &file, &edit, &view, &window])
 }
 
 /// Menu clicks that are product behaviour. Everything else is a predefined item the platform handles.
@@ -73,6 +77,9 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
         // single-window app, and Cmd-Q is what quits it.
         CLOSE_PANE => {
             let _ = app.emit("acorn:close-pane", ());
+        }
+        COMMAND_PALETTE => {
+            let _ = app.emit("acorn:command-palette", ());
         }
         QUIT => request_quit(app),
         _ => {}

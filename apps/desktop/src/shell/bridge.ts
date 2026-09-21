@@ -257,6 +257,9 @@ const acorn = {
   // equivalent, so the accelerator is a menu item and the shell emits this
   // (docs/shell.md § Startup: data directory, environment, and the singleton lock).
   onClosePane: (cb: () => void) => onEvent('acorn:close-pane', cb),
+  // The same native crossing for Cmd/Ctrl+K. A child preview webview has its own document, so the
+  // renderer's keymap cannot see the chord while that page owns focus.
+  onCommandPalette: (cb: () => void) => onEvent('acorn:command-palette', cb),
   onWillQuit: (cb: () => boolean | Promise<boolean>) =>
     onEvent('acorn:will-quit', () => {
       void Promise.resolve(cb())

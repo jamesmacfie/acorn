@@ -161,6 +161,10 @@ this roster without subscribing to the registry signal it writes and recursively
 
 The exact platform modifier is handled by the keyboard layer. Inputs, editors, terminals, and
 contenteditable elements stop global commands unless a command explicitly opts into text handling.
+The desktop also owns a fixed Cmd/Ctrl+K application-menu accelerator. A preview is a separate native
+webview whose key events cannot bubble into the renderer, so the menu forwards that accelerator to
+the palette's registered toggle command. Other global shortcuts remain renderer-owned, and changing
+the palette binding in shortcut settings does not change this native fallback.
 
 ## Palette data
 

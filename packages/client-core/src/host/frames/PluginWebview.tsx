@@ -5,6 +5,7 @@ import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'
 import { Alert, Button, EmptyState, Spinner } from '../../kit/components/primitives'
+import { elementRectKey, visibleElementRect } from '../../infra/platform/webviewGeometry'
 
 export type PluginWebviewProps = {
   pluginId: string
@@ -28,17 +29,21 @@ export default function PluginWebview(props: PluginWebviewProps) {
   const [blocked, setBlocked] = createSignal('')
   const [suppressed, setSuppressed] = createSignal(false)
   let ensureVersion = 0
+  let placed = ''
 
   const syncRect = () => {
     if (!native || !host) return
-    const rect = host.getBoundingClientRect()
-    native.setBounds(key(), { x: rect.left, y: rect.top, width: rect.width, height: rect.height })
+    const rect = visibleElementRect(host)
+    const next = elementRectKey(rect)
+    if (next === placed) return
+    placed = next
+    native.setBounds(key(), rect)
   }
   const checkOcclusion = () => {
     if (!host) return
-    const rect = host.getBoundingClientRect()
-    if (rect.width === 0 || rect.height === 0) return
-    const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    const rect = visibleElementRect(host)
+    if (rect.width === 0 || rect.height === 0) return setSuppressed(true)
+    const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
     setSuppressed(!(top === host || host.contains(top)))
   }
   const acceptState = (state: { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => {
@@ -58,12 +63,11 @@ export default function PluginWebview(props: PluginWebviewProps) {
       checkOcclusion()
     })
     resize.observe(host)
-    const onResize = () => {
+    resize.observe(document.documentElement)
+    const poll = setInterval(() => {
       syncRect()
       checkOcclusion()
-    }
-    window.addEventListener('resize', onResize)
-    const poll = setInterval(checkOcclusion, 200)
+    }, 200)
     const offEvent = native.onEvent(acceptState)
     const offBlocked = native.onBlocked((state) => {
       if (state.key === key()) setBlocked(state.host || state.url)
@@ -71,7 +75,6 @@ export default function PluginWebview(props: PluginWebviewProps) {
     onCleanup(() => {
       ensureVersion += 1
       resize.disconnect()
-      window.removeEventListener('resize', onResize)
       clearInterval(poll)
       offEvent()
       offBlocked()
@@ -92,6 +95,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
     else syncRect()
     void native.ensure(key(), homeUrl, props.surface.hosts ?? []).then((ready) => {
       if (!ready || version !== ensureVersion) return
+      placed = ''
       syncRect()
       if (!suppressed()) native.show(key())
     })

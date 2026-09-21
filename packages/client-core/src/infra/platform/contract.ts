@@ -61,7 +61,7 @@ const GROUPS = {
   },
   desktopExtras: {
     resolve: desktopExtras,
-    members: members<DesktopExtras>()(['onClosePane', 'onWillQuit']),
+    members: members<DesktopExtras>()(['onClosePane', 'onCommandPalette', 'onWillQuit']),
   },
   // Checked by its probe alone: calling `pickFolder` would open a dialog on a real host.
   folderPicker: { resolve: () => (canPickFolder() ? {} : null), members: [] },
