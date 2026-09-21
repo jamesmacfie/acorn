@@ -190,6 +190,53 @@ describe('what reaches a tree', () => {
     expect(failures).toEqual([])
   })
 
+  // The deadline on a host request, and the one operation it deliberately does not cover.
+  //
+  // `owner.invoke` is answered by code in this process, so a handler that never settles would leave the
+  // tree waiting forever and the deadline is what stops it. `overlay.open` is answered by a person
+  // closing a modal. Holding that to ten seconds meant the agent composer's image editor rejected the
+  // sandbox's promise while the editor was still open, and the edit the reader applied came back to a
+  // caller that had already given up.
+  const ask = (op: 'owner.invoke' | 'overlay.open', hold: Promise<unknown>) => {
+    start()
+    const handle = acquire()
+    handle.onHostRequest('s1', async () => {
+      await hold
+      return { ok: true, body: 'done' }
+    })
+    handle.mount('s1', 'toolCard', {})
+    sandbox!.port.postMessage({ kind: 'tree:host-request', slot: 's1', id: 1, op, name: 'x' })
+    return () => sandbox!.seen.filter((message) => (message as { kind?: string }).kind === 'tree:host-reply')
+  }
+
+  it('gives up on an owner action that never answers', async () => {
+    // The fake clock goes in before the request does: the deadline is a timer the host starts when the
+    // request lands, and one started on the real clock is not one this test can advance.
+    vi.useFakeTimers()
+    const replies = ask('owner.invoke', new Promise(() => {}))
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(replies()).toEqual([
+      { kind: 'tree:host-reply', slot: 's1', id: 1, ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } },
+    ])
+  })
+
+  it('holds an open overlay past the deadline rather than failing it', async () => {
+    vi.useFakeTimers()
+    const replies = ask('overlay.open', new Promise(() => {}))
+    await vi.advanceTimersByTimeAsync(30_000)
+    // Half a minute in, with nothing said to the tree: the reader is still editing.
+    expect(replies()).toEqual([])
+  })
+
+  it('delivers an overlay result to the tree that asked for it', async () => {
+    let close = (_: unknown) => {}
+    const replies = ask('overlay.open', new Promise((resolve) => { close = resolve }))
+    await settle()
+    close(null)
+    await settle()
+    expect(replies()).toEqual([{ kind: 'tree:host-reply', slot: 's1', id: 1, ok: true, body: 'done' }])
+  })
+
   it('keeps a worker alive while it answers the heartbeat', async () => {
     start()
     vi.useFakeTimers()
