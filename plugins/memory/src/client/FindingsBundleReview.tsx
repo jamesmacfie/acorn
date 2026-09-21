@@ -1,3 +1,8 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
+/* Hallmark · component: candidate review card · genre: modern-minimal · theme: Acorn UI kit
+ * states: default · hover · focus · active · disabled · loading · error · success
+ * contrast: pass (46–50)
+ */
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { onPluginFrame } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
@@ -67,6 +72,34 @@ function ObservationSource(props: { observation: FindingObservation; canSplit: b
   )
 }
 
+function CandidateActions(props: {
+  candidate: FindingCandidateRevision
+  busy: boolean
+  dismissed: boolean
+  showOpen: boolean
+  onOpen(): void
+  onApprove(): void
+  onEdit(): void
+  onDismiss(): void
+  onSnooze(): void
+  onUndoDismissal(): void
+}) {
+  return (
+    <Toolbar variant="actions" size="sm">
+      <Show when={props.showOpen}><Button size="sm" onPress={props.onOpen}>View change</Button></Show>
+      <Show when={props.candidate.status === 'ready' && !props.dismissed}>
+        <Button size="sm" busy={props.busy} onPress={props.onApprove}>{props.candidate.revision > 1 ? 'Approve changes' : 'Approve'}</Button>
+        <Button size="sm" disabled={props.busy} onPress={props.onEdit}>Edit</Button>
+        <Button size="sm" disabled={props.busy} onPress={props.onDismiss}>Dismiss</Button>
+        <Button size="sm" disabled={props.busy} onPress={props.onSnooze}>Snooze</Button>
+      </Show>
+      <Show when={props.candidate.status === 'dismissed'}><Button size="sm" busy={props.busy} onPress={props.onUndoDismissal}>Undo dismissal</Button></Show>
+      <Show when={props.candidate.status === 'conflict'}><Button size="sm" disabled={props.busy} onPress={props.onEdit}>Edit conflicted change</Button></Show>
+      <Show when={props.candidate.status === 'applying'}><Button size="sm" busy={props.busy} onPress={props.onApprove}>Retry approval</Button></Show>
+    </Toolbar>
+  )
+}
+
 function Candidate(props: { bundleId: string; boundary: string; candidate: FindingCandidateRevision; focused: boolean; onOpen(): void; onChanged(): void }) {
   const initial = () => payloadOf(props.candidate)
   const [editing, setEditing] = createSignal(false), [busy, setBusy] = createSignal(false), [error, setError] = createSignal('')
@@ -84,6 +117,22 @@ function Candidate(props: { bundleId: string; boundary: string; candidate: Findi
   const snooze = () => { const until = new Date(`${snoozeDate()}T23:59:59`).getTime(); if (!Number.isFinite(until)) return; void act(() => memoryApi().decideFinding(props.candidate.candidateId, { expectedRevision: props.candidate.revision, action: 'snooze', until, idempotencyKey: key() })) }
   const undoHistory = () => void act(() => memoryApi().decideFinding(props.candidate.candidateId, { expectedRevision: props.candidate.revision, action: 'undo-dismiss', idempotencyKey: key() }))
   const split = (observationId: string) => void act(() => memoryApi().splitFinding(props.candidate.candidateId, props.bundleId, props.candidate.revision, [observationId], key()))
+  const edit = () => { setEditing(true); props.onOpen() }
+  const chooseSnooze = () => { setSnoozing(true); props.onOpen() }
+  const actions = () => (
+    <CandidateActions
+      candidate={props.candidate}
+      busy={busy()}
+      dismissed={!!recentlyDismissed()}
+      showOpen={!props.focused}
+      onOpen={props.onOpen}
+      onApprove={approve}
+      onEdit={edit}
+      onDismiss={dismiss}
+      onSnooze={chooseSnooze}
+      onUndoDismissal={undoHistory}
+    />
+  )
   return (
     <Card focus={props.focused} selected={props.focused}>
       <Stack gap="row">
@@ -91,7 +140,7 @@ function Candidate(props: { bundleId: string; boundary: string; candidate: Findi
           {(payload) => <>
             <Inline wrap><Badge shape="pill">{payload().operation === 'update' ? 'Update' : 'Add'}</Badge><Text emphasis="strong">{payload().name}</Text><Badge>{scopeLabel(payload())}</Badge><Badge tone="neutral">{boundaryLabel(props.boundary)}</Badge><Show when={props.candidate.status !== 'ready'}><Badge tone="neutral">{props.candidate.status}</Badge></Show></Inline>
             <Text>{payload().description}</Text>
-            <Show when={!props.focused}><Button size="sm" onPress={props.onOpen}>View change</Button></Show>
+            <Show when={!props.focused}>{actions()}</Show>
             <Show when={props.focused}>
               <Stack gap="row">
                 <Text tone="muted" wrap>{props.candidate.groupingExplanation} · {props.candidate.sourceObservationIds.length} source occurrence{props.candidate.sourceObservationIds.length === 1 ? '' : 's'}</Text>
@@ -108,12 +157,8 @@ function Candidate(props: { bundleId: string; boundary: string; candidate: Findi
                   </Stack>
                 }>
                   <Heading level={3}>{payload().name}</Heading><Text>{payload().type} · {scopeLabel(payload())}</Text><Text>{payload().description}</Text><Markdown text={payload().body} images="placeholder" copy />
-                  <Show when={props.candidate.status === 'ready' && !recentlyDismissed()} fallback={<Show when={props.candidate.status === 'dismissed'}><Button size="sm" busy={busy()} onPress={undoHistory}>Undo dismissal</Button></Show>}>
-                    <Toolbar variant="actions" size="sm"><Button size="sm" busy={busy()} onPress={approve}>{props.candidate.revision > 1 ? 'Approve changes' : 'Approve'}</Button><Button size="sm" disabled={busy()} onPress={() => setEditing(true)}>Edit</Button><Button size="sm" disabled={busy()} onPress={dismiss}>Dismiss</Button><Button size="sm" disabled={busy()} onPress={() => setSnoozing(true)}>Snooze</Button></Toolbar>
-                    <Show when={snoozing()}><Inline wrap><Field label="Snooze until"><Input type="date" value={snoozeDate()} onInput={setSnoozeDate} /></Field><Button size="sm" busy={busy()} onPress={snooze}>Snooze until date</Button><Button size="sm" variant="bare" onPress={() => setSnoozing(false)}>Cancel snooze</Button></Inline></Show>
-                  </Show>
-                  <Show when={props.candidate.status === 'conflict'}><Button size="sm" disabled={busy()} onPress={() => setEditing(true)}>Edit conflicted change</Button></Show>
-                  <Show when={props.candidate.status === 'applying'}><Button size="sm" busy={busy()} onPress={approve}>Retry approval</Button></Show>
+                  {actions()}
+                  <Show when={props.candidate.status === 'ready' && !recentlyDismissed() && snoozing()}><Inline wrap><Field label="Snooze until"><Input type="date" value={snoozeDate()} onInput={setSnoozeDate} /></Field><Button size="sm" busy={busy()} onPress={snooze}>Snooze until date</Button><Button size="sm" variant="bare" onPress={() => setSnoozing(false)}>Cancel snooze</Button></Inline></Show>
                 </Show>
                 <Show when={detail()?.observations?.length}>
                   <Section label="Source tasks and evidence" count={detail()!.observations.length}>

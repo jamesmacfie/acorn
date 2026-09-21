@@ -15,14 +15,17 @@ Rules:
 - Prefer an update when an existing target already covers the same subject.
 - Use only facts present in the supplied sources and target context. Do not invent details.
 - Zero candidates is a valid and often correct result.
+- When correction is present, return a complete replacement response that fixes the reported error.
 - Follow the target-owned payload instructions exactly.`
 
 export const synthesisPrompt = (
   observations: readonly FindingObservation[],
   target: FindingReviewSynthesisContext | null,
+  correction?: string,
 ): string => JSON.stringify({
   target: target ?? { instructions: 'Produce a payload accepted by the review target.', existing: [] },
   observations: observations.map(({ id, title, body, claimStatus, origin, evidence, scopeLabels, createdAt }) => ({
     id, title, body, claimStatus, origin, evidence, scopeLabels, createdAt,
   })),
+  ...(correction ? { correction: { error: correction, instruction: 'The previous response was rejected. Return a complete replacement response that fixes this error.' } } : {}),
 })

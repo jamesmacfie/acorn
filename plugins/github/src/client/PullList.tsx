@@ -80,7 +80,7 @@ export default function PullList() {
   ))
 
   // Client-side text filter over the loaded tab (title / author / #number).
-  const shown = createMemo(() => filterPulls(list(), filter()))
+  const shown = createMemo(() => filterPulls(list(), collapsed() ? '' : filter()))
   const items = createMemo(() => shown().map((pull) => ({
     key: String(pull.number),
     label: `#${pull.number} ${pull.title}`,
@@ -176,19 +176,21 @@ export default function PullList() {
 
   return (
     <>
-      <Tabs
-        tabs={LIST_TABS}
-        active={tab()}
-        onChange={setTab}
-        idPrefix="github-pulls"
-        ariaLabel="Pull request state"
-      />
-      {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
-          is about the list that choice produced, and squeezed into the tab row it had no room and no
-          inset of its own. */}
-      <Toolbar size="sm" ariaLabel="Filter pull requests">
-        <Input kind="filter" placeholder="Filter…" value={filter()} onInput={setFilter} />
-      </Toolbar>
+      <Show when={!collapsed()}>
+        <Tabs
+          tabs={LIST_TABS}
+          active={tab()}
+          onChange={setTab}
+          idPrefix="github-pulls"
+          ariaLabel="Pull request state"
+        />
+        {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
+            is about the list that choice produced, and squeezed into the tab row it had no room and no
+            inset of its own. */}
+        <Toolbar size="sm" ariaLabel="Filter pull requests">
+          <Input kind="filter" placeholder="Filter…" value={filter()} onInput={setFilter} />
+        </Toolbar>
+      </Show>
       <Show when={taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
       <Show
         when={ready()}
@@ -214,6 +216,7 @@ export default function PullList() {
         <Show when={items().length} fallback={<EmptyState align="start">No matching PRs.</EmptyState>}>
           <Rows
             virtual
+            rowHeight={collapsed() ? 'rail' : 'default'}
             id={`github-pulls:${owner()}/${repo()}:${tab()}`}
             ariaLabel="Pull requests"
             items={items()}

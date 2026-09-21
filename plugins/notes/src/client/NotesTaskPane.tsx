@@ -1,5 +1,4 @@
 import { lazy } from 'solid-js'
-import { libraryCollapsed } from './notesPaneState'
 import { createNotesModel, type NotesModel } from './notesModel'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
@@ -17,7 +16,6 @@ export const notesPaneContribution: PaneLayoutContribution<NotesModel> = {
   // collapsing the library cannot take them with it (client-core registries/paneModels.ts).
   model: (task) => createNotesModel(task.id, task.projectId),
   regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
-  // Collapsing the library drops the column rather than narrowing it, which is what the ◀ in the note
-  // toolbar has always meant.
-  hidden: (task) => (libraryCollapsed(task.id) ? ['list'] : []),
+  collapsible: true,
+  collapseContent: 'empty',
 }

@@ -323,10 +323,25 @@
   overflow: hidden;
 }
 .layout-list-scroll { flex: 1; min-height: 0; overflow: auto; }
+.layout-list-footer {
+  flex: none;
+  padding: 0 var(--pane-pad) var(--pane-pad);
+}
+/* Footer chrome still reaches the column edges; fields and action rows keep the footer inset. */
+.layout-list-footer .ui-toolbar:not([data-variant='actions']) {
+  width: auto;
+  margin-inline: calc(-1 * var(--pane-pad));
+  padding-inline: var(--pane-pad);
+}
 /* Collapsed: the same width the icon rails read, so a pack that moves them moves this
    (tokens-style.css § --tabrail-w). The dragged pixel value stops being applied while it is, which
    is why the component drops the inline custom property rather than this rule fighting it. */
 .layout-region-list[data-collapsed] { width: var(--tabrail-w); }
+.layout-collapsed-header {
+  flex: none;
+  height: var(--pane-head-h);
+  border-bottom: var(--chrome-divider);
+}
 /* As the kit node does: a label and a count have no room in a rail, and the rail's icon already says
    which list this is. See primitives.css § ListDetail for why this is a rule and not a prop. */
 .layout-region-list[data-collapsed] .section-header { display: none; }

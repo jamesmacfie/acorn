@@ -363,6 +363,14 @@ describe('pane layouts', () => {
     expect(parsed.success && parsed.data.contributions.frames[0].regions?.body).toEqual({ kind: 'remote', entry: 'pane' })
   })
 
+  it('allows only a list-detail pane to declare the host-owned collapse control', () => {
+    expect(manifest({
+      frames: [{ ...PANE, collapsible: true, layout: 'list-detail', regions: { list: 'frame', detail: 'frame' } }],
+    }).success).toBe(true)
+    expect(messages(manifest({ frames: [{ ...PANE, collapsible: true }] })))
+      .toContain('collapsible is only valid on a list-detail pane')
+  })
+
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
     expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v2/p/board/doc' }) } }] }).success).toBe(false)
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))

@@ -50,6 +50,8 @@ export type FindingReviewSynthesisContext = {
  * Findings can prepare review state through this seam, but never receives target write authority. */
 export type FindingReviewTargetContribution = {
   version: number
+  /** Must be side-effect free. Findings may call validation while correcting generated payloads and
+   * calls it again before persisting a candidate. */
   validate(input: { scope: FindingScope; payload: unknown }): Promise<FindingReviewValidation>
   acceptedFingerprints(scope: FindingScope): Promise<readonly string[]>
   synthesisContext?(scope: FindingScope): Promise<FindingReviewSynthesisContext>

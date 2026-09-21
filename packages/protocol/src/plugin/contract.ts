@@ -212,6 +212,9 @@ const frameSurface = z.object({
   // `pane` only, and only alongside `layout`. Keys are region names the layout has; the cross-check
   // is in the refinement below, where both fields are visible.
   regions: z.record(z.string().min(1).max(64), paneRegionSource).optional(),
+  // `list-detail` panes only. A loaded tree cannot read host collapse state to author rail rows, so
+  // this always collapses to an empty rail, leaving only the host-owned expand control.
+  collapsible: z.boolean().optional(),
   // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this list,
   // never widen it; declaring the upper bound makes the capture visible before code runs.
   claimsKeys: z.array(z.string().min(1).max(64).superRefine((value, ctx) => {
@@ -238,6 +241,9 @@ const frameSurface = z.object({
   if (surface.regions && !surface.layout) {
     ctx.addIssue({ code: 'custom', path: ['regions'], message: 'regions need a layout to name them' })
     return
+  }
+  if (surface.collapsible && (surface.target !== 'pane' || surface.layout !== 'list-detail')) {
+    ctx.addIssue({ code: 'custom', path: ['collapsible'], message: 'collapsible is only valid on a list-detail pane' })
   }
   if (!surface.layout) return
   const problem = regionProblem(surface.layout, Object.keys(surface.regions ?? {}))

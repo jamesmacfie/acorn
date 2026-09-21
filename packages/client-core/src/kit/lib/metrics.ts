@@ -25,6 +25,9 @@ export const cssPx = (name: string, fallback: number): number => {
  */
 export const rowHeight = (): number => cssPx('--row-h-virt', 36)
 
+/** A collapsed sidebar row is square with the icon rail. */
+export const railRowHeight = (): number => cssPx('--tabrail-w', 48)
+
 /** Compact row height: the SQL result grid. */
 export const rowHeightSm = (): number => cssPx('--row-h-sm', 30)
 

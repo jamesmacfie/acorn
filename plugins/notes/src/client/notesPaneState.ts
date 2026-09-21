@@ -1,8 +1,6 @@
-// Notes pane view state (docs/notes-and-memory.md § Notes): which note you were on and whether
-// the library column is collapsed, per task. Session-only, matching the house session-first
-// guidance; only the Manifest's section selection has a stated durability requirement. Evicted on
-// task archive.
-import { createSignal } from 'solid-js'
+// Notes pane view state (docs/notes-and-memory.md § Notes): which note you were on per task. The
+// shared list-detail layout owns sidebar collapse, including its device-local persistence. Selection
+// is session-only and is evicted on task archive.
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import { onScopeEvicted } from '@acorn/plugin-api/client'
 
@@ -14,21 +12,8 @@ export const rememberNotesSelection = (taskId: string, selection: NotesSelection
   selectedByTask.set(taskId, selection)
 }
 
-// Reactive so the ◀ toggle re-lays out immediately; the map is the session-persistence backing.
-const [collapsed, setCollapsed] = createSignal<Record<string, boolean>>({})
-export const libraryCollapsed = (taskId: string): boolean => collapsed()[taskId] ?? false
-export const setLibraryCollapsed = (taskId: string, value: boolean): void => {
-  setCollapsed((current) => ({ ...current, [taskId]: value }))
-}
-
 export function evictNotesPaneState(taskId: string): void {
   selectedByTask.delete(taskId)
-  setCollapsed((current) => {
-    if (!(taskId in current)) return current
-    const next = { ...current }
-    delete next[taskId]
-    return next
-  })
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that

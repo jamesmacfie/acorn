@@ -21,6 +21,19 @@ describe('memory-owned findings promotion receipts', () => {
   beforeEach(() => { store = makeTestPluginDb('memory'); home = mkdtempSync(join(tmpdir(), 'acorn-findings-memory-')); mkdirSync(home, { recursive: true }) })
   afterEach(() => { store.cleanup(); rmSync(home, { recursive: true, force: true }) })
 
+  it('describes the exact add and update operations to synthesis models', async () => {
+    const memory = { reconciled: async () => {}, list: async () => [] } as unknown as MemoryKnowledge
+    const target = createMemoryFindingsTarget({ db: store.db, memory, capabilities: { get: () => undefined }, homeDir: home, announce: () => {} })
+
+    const context = await target.contribution.synthesisContext!({ kind: 'project', projectId: 'project-1' })
+
+    expect(context.instructions).toContain('exactly "add"')
+    expect(context.instructions).toContain('exactly "update"')
+    expect(context.instructions).toContain('No other operation value is valid.')
+    expect(context.instructions).toContain('"operation":"add"')
+    expect(context.instructions).toContain('"operation":"update"')
+  })
+
   it('writes once, records the durable receipt, and retries only target linkage', async () => {
     const payload = { operation: 'add' as const, name: 'repository-boundaries', type: 'architecture' as const, description: 'Keep repository access behind owners.', body: 'Use the repository owner boundary.', scope: { kind: 'project' as const, projectId: 'project-1' } }
     const row = candidate(payload, memoryChangeHash(payload)); let state: FindingCandidateRevision['status'] = 'ready'

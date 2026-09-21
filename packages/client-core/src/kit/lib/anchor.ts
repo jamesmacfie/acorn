@@ -11,6 +11,56 @@ export type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-sta
 export type AnchorTarget = HTMLElement | { readonly x: number; readonly y: number }
 
 type Rect = { top: number; bottom: number; left: number; right: number; width: number; height: number }
+type Size = { width: number; height: number }
+type Viewport = { width: number; height: number }
+
+const GAP = 4
+
+// Every open surface, in the order it opened. A Select drawn inside a Popover draws its list in a
+// portal of its own, so that list is not inside the popover holding it. Without this, a press on one
+// of its rows reads as a press outside the popover: the popover closes, the row goes with it, and the
+// click never lands on anything. Whatever opened after me is drawn on top of me, so a press in it is
+// not a press outside.
+const openSurfaces: Array<() => HTMLElement | undefined> = []
+
+/** Pure collision pass for every anchored surface. Element anchors may flip to the opposite side;
+ * point anchors keep the pointer as their origin and clamp, because there is no trigger edge to
+ * flip around. The final clamp also covers a surface wider or taller than the available side. */
+export function anchoredPosition(
+  rect: Rect,
+  surface: Size,
+  viewport: Viewport,
+  placement: Placement,
+  canFlip: boolean,
+): { top: number; left: number } {
+  const below = viewport.height - rect.bottom
+  const above = rect.top
+  const right = viewport.width - rect.right
+  const leftRoom = rect.left
+  let top = placement === 'top-start' ? rect.top - surface.height - GAP
+    : placement === 'right-start' ? rect.top
+    : rect.bottom + GAP
+  let left = placement === 'bottom-end' ? rect.right - Math.max(surface.width, rect.width)
+    : placement === 'right-start' ? rect.right + GAP
+    : rect.left
+
+  if (canFlip && (placement === 'bottom-start' || placement === 'bottom-end')
+    && top + surface.height + GAP > viewport.height && above > below) {
+    top = rect.top - surface.height - GAP
+  } else if (canFlip && placement === 'top-start' && top < GAP && below > above) {
+    top = rect.bottom + GAP
+  } else if (canFlip && placement === 'right-start'
+    && left + surface.width + GAP > viewport.width && leftRoom > right) {
+    left = rect.left - surface.width - GAP
+  }
+
+  const fit = (value: number, size: number, limit: number): number =>
+    Math.max(GAP, size && value + size + GAP > limit ? limit - size - GAP : value)
+  return {
+    top: fit(top, surface.height, viewport.height),
+    left: fit(left, surface.width, viewport.width),
+  }
+}
 
 const rectOf = (target: AnchorTarget): Rect =>
   'getBoundingClientRect' in target
@@ -40,9 +90,8 @@ export function createAnchoredPopover(opts: {
    *  them. A number is a fixed `max(trigger, n)`, which is what Picker was tuned against, where a
    *  list that changed width on every keystroke of the filter would be worse. */
   minWidth?: number | 'anchor'
-  /** Keep the surface inside the viewport. Off by default so the four element-anchored consumers
-   *  keep the geometry they were tuned against. See docs/ui-design.md § Menus and right-click for
-   *  why a point anchor turns it on. */
+  /** Keep the surface inside the viewport. On by default. Point anchors clamp without flipping;
+   *  element anchors flip first and clamp only what still does not fit. */
   clamp?: boolean
   onDismiss?: () => void
   disabled?: () => boolean
@@ -61,8 +110,6 @@ export function createAnchoredPopover(opts: {
   const [pos, setPos] = createSignal<{ top: number; left: number; width?: number; minWidth?: number }>({ top: 0, left: 0 })
   let surface: HTMLElement | undefined
 
-  const gap = 4
-
   const reposition = () => {
     const target = opts.anchor()
     if (!target) return
@@ -71,20 +118,25 @@ export function createAnchoredPopover(opts: {
     const height = surface?.getBoundingClientRect().height ?? 0
     const width = surface?.getBoundingClientRect().width ?? 0
     const minWidth = opts.minWidth
-    const top = placement === 'top-start' ? rect.top - height - gap
-      : placement === 'right-start' ? rect.top
-      : rect.bottom + gap
-    const left = placement === 'bottom-end' ? rect.right - Math.max(width, rect.width)
-      : placement === 'right-start' ? rect.right + gap
-      : rect.left
-    // Pull back inside the viewport rather than flipping. A flip needs to know which edge it came
-    // from and re-measure; a clamp needs only the box measured above, and for a menu opened at the
-    // pointer it gives the same answer.
-    const fit = (value: number, size: number, limit: number): number =>
-      Math.max(gap, size && value + size + gap > limit ? limit - size - gap : value)
+    const keepVisible = opts.clamp !== false
+    const placed = keepVisible
+      ? anchoredPosition(
+          rect,
+          { width, height },
+          { width: window.innerWidth, height: window.innerHeight },
+          placement,
+          elementOf(target) !== undefined,
+        )
+      : {
+          top: placement === 'top-start' ? rect.top - height - GAP
+            : placement === 'right-start' ? rect.top
+            : rect.bottom + GAP,
+          left: placement === 'bottom-end' ? rect.right - Math.max(width, rect.width)
+            : placement === 'right-start' ? rect.right + GAP
+            : rect.left,
+        }
     setPos({
-      top: opts.clamp ? fit(top, height, window.innerHeight) : top,
-      left: opts.clamp ? fit(left, width, window.innerWidth) : left,
+      ...placed,
       ...(minWidth === 'anchor' ? { minWidth: rect.width }
         : typeof minWidth === 'number' ? { width: Math.max(rect.width, minWidth) }
         : {}),
@@ -108,11 +160,19 @@ export function createAnchoredPopover(opts: {
 
   const toggle = () => (open() ? close() : show())
 
+  // This surface's place in the open order, for as long as it is open.
+  const entry = () => surface
   // A controlled owner can flip `open` without calling show() (the task rail opens its row menu
   // from onRowClick), and only show() measures. Measure on every open, whichever door it came
   // through. Runs after render, so the mounted surface is already registered.
   createEffect(() => {
-    if (open()) reposition()
+    if (!open()) return
+    reposition()
+    openSurfaces.push(entry)
+    onCleanup(() => {
+      const at = openSurfaces.indexOf(entry)
+      if (at >= 0) openSurfaces.splice(at, 1)
+    })
   })
 
   const onDocPointer = (event: PointerEvent) => {
@@ -120,7 +180,10 @@ export function createAnchoredPopover(opts: {
     const target = event.target as Node
     // A point anchor has no element, so nothing but the surface itself counts as "inside". That is
     // the right answer for a context menu: the row it was opened over is not part of the menu.
-    if (!elementOf(opts.anchor())?.contains(target) && !surface?.contains(target)) close()
+    if (elementOf(opts.anchor())?.contains(target) || surface?.contains(target)) return
+    const at = openSurfaces.indexOf(entry)
+    if (at >= 0 && openSurfaces.slice(at + 1).some((later) => later()?.contains(target))) return
+    close()
   }
   const onKey = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && open()) {

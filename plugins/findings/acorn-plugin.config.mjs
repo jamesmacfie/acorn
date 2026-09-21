@@ -58,6 +58,8 @@ export default {
         destinations: [
           { id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' },
           { id: 'memory-bundles', label: 'Open Memory review', targetKind: 'findings-bundle', noticeKind: 'memory-proposal' },
+          { id: 'agent-run', label: 'Open source agent run', targetKind: 'managed-agent' },
+          { id: 'workflow-run', label: 'Open source workflow run', targetKind: 'workflow-run' },
         ],
       },
       {

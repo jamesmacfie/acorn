@@ -306,7 +306,13 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 onHandle: (next: DocumentHandle | null) => { setDocument(() => next) },
               })
             }
-            return createComponent(Draw, { stateKey: surface.id, label: surface.label, regions })
+            return createComponent(Draw, {
+              stateKey: surface.id,
+              label: surface.label,
+              regions,
+              collapsible: surface.collapsible === true,
+              collapseContent: 'empty',
+            })
           }
         })()
 

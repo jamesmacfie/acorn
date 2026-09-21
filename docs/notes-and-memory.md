@@ -213,6 +213,9 @@ page instead, and so is offered with no task in hand.
 **Review learnings** is task-scoped and explicitly prepares findings from that task, then routes to
 the owning project's Memory page. The Node resolves the same saved backend and model used by archive
 review; without one it asks the owner to configure review instead of creating unfiltered candidates.
+Findings validates generated payloads against Memory's target-owned contract before publication. If
+the model returns an invalid payload, Findings sends the validation error through one bounded
+correction pass; a second invalid response leaves the bundle failed and retryable.
 The Findings plugin also contributes **Findings: inspect task evidence**, the command-only route to
 raw observations and provenance.
 

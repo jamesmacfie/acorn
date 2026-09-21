@@ -137,6 +137,14 @@ export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
       </Show>
       <Show when={model().isGit()}>
         <ViewMenu model={model()} />
+        <IconButton
+          icon="refresh-cw"
+          label="Refresh changes"
+          title="Refresh changes"
+          spin={model().status.loading}
+          disabled={model().status.loading}
+          onPress={() => void model().refresh()}
+        />
       </Show>
       <Toolbar.Spacer />
       {/* One button, not two: there is nothing to stage once everything is staged, and nothing to do

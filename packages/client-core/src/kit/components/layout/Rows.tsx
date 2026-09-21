@@ -3,7 +3,7 @@ import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type 
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
 import { watchAppearance } from '../../tokens/appearance'
-import { rowHeight } from '../../lib/metrics'
+import { railRowHeight, rowHeight } from '../../lib/metrics'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
@@ -40,6 +40,8 @@ export function Rows<T extends CollectionItem>(props: {
    * to reach a row before it is focused (../keys/collection.ts § scrollToKey).
    */
   virtual?: boolean
+  /** Virtual rows in a collapsed sidebar are square with the surrounding icon rails. */
+  rowHeight?: 'default' | 'rail'
   /** Controlled selection, and all of it: supplying this hands `selected` to the caller. */
   selected?: string | null
   onSelect?: (key: string) => void
@@ -113,17 +115,23 @@ export function Rows<T extends CollectionItem>(props: {
   // Row height comes from --row-h-virt so a style pack's density reaches the list. The virtualizer
   // writes its answer back as an inline height, which beats any stylesheet rule, so a number read from
   // the token is the only way density is real here (./metrics.ts).
-  const [rowH, setRowH] = createSignal(rowHeight())
+  const measuredRowHeight = () => props.rowHeight === 'rail' ? railRowHeight() : rowHeight()
+  const [rowH, setRowH] = createSignal(measuredRowHeight())
   virt = createVirtualizer({
     get count() { return items().length },
     getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => rowH(),
     overscan: 12,
   })
-  onCleanup(watchAppearance(() => {
-    setRowH(rowHeight())
-    virt?.measure()
-  }))
+  const updateRowHeight = () => {
+    const next = measuredRowHeight()
+    setRowH(next)
+    // These rows have a fixed height, so update every cached measurement explicitly. `measure()`
+    // alone clears the estimate but leaves the already-rendered slot objects at their old sizes.
+    for (let index = 0; index < items().length; index++) virt?.resizeItem(index, next)
+  }
+  onCleanup(watchAppearance(updateRowHeight))
+  createEffect(on(() => props.rowHeight, updateRowHeight, { defer: true }))
 
   let frame = 0
   onCleanup(() => cancelAnimationFrame(frame))
@@ -153,6 +161,10 @@ export function Rows<T extends CollectionItem>(props: {
         <For each={virt.getVirtualItems()}>
           {(slot) => {
             const item = () => items()[slot.index] as T | undefined
+            const rendered = createMemo(() => {
+              const row = item()
+              return row ? { row, offset: slot.start, rowHeight: rowH() } : undefined
+            })
             // `keyed`, because the slot is not the row. The virtualizer hands the same slot object
             // back for a given index — its list is a store reconciled by `index` — so `For` keeps the
             // body it already ran, and a plain `Show` only re-runs its child when the condition
@@ -162,12 +174,12 @@ export function Rows<T extends CollectionItem>(props: {
             // draws as nothing at all. `children` takes the item by value, so the only way to hand it
             // a new one is to run it again.
             return (
-              <Show when={item()} keyed>
-                {(row) => measureWork('rows.item.mount', () => props.children(
-                  row,
-                  collection.itemProps(row.key),
-                  () => collection.selected() === row.key,
-                  { offset: slot.start, height: slot.size },
+              <Show when={rendered()} keyed>
+                {(placed) => measureWork('rows.item.mount', () => props.children(
+                  placed.row,
+                  collection.itemProps(placed.row.key),
+                  () => collection.selected() === placed.row.key,
+                  { offset: placed.offset, height: placed.rowHeight },
                 ))}
               </Show>
             )

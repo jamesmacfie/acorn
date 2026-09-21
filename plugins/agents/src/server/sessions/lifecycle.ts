@@ -13,6 +13,7 @@ import type {
   AgentTurnState,
 } from '../../contract/lifecycle'
 import { mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
+import { assistantReviewSummary } from './reviewInput'
 
 const eventType = (json: string): string | null => {
   try {
@@ -181,10 +182,16 @@ export class AgentLifecycle {
       .orderBy(asc(schema.agentEvents.seq))
     const completedSequence = events.findLast((event) => eventType(event.eventJson) === 'turn_completed')?.seq ?? 0
     const parsed = events.filter((event) => event.seq <= completedSequence).flatMap((event) => {
-      try { return [JSON.parse(event.eventJson) as { type?: string; text?: string }] } catch { return [] }
+      try {
+        return [JSON.parse(event.eventJson) as {
+          type?: string
+          text?: string
+          append?: boolean
+          messageId?: string
+        }]
+      } catch { return [] }
     })
-    const assistantSummary = parsed.filter((event) => event.type === 'assistant_message' && typeof event.text === 'string')
-      .map((event) => event.text!.trim()).filter(Boolean).join('\n\n').slice(-12_000) || null
+    const assistantSummary = assistantReviewSummary(parsed)
     const userMessages = parsed.filter((event) => event.type === 'user_message' && typeof event.text === 'string')
       .map((event) => event.text!.trim()).filter(Boolean).slice(-4).map((text) => text.slice(-2_000))
     const available = !!assistantSummary || userMessages.length > 0

@@ -80,6 +80,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
   // sits under, which remounts it. Same reasoning as plugins/frames/register.ts.
   const nodeId = activeNodeId() ?? ''
+  const collapsed = sidebarCollapsed(props.descriptor.id)
 
   // The fan-out rather than a bare resource, pinned to one node: it is the only reader with a per-node
   // deadline, a cache fallback and the live/stale/offline vocabulary. An offline node shows the list it
@@ -118,7 +119,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   // plugin to search, so no descriptor field and no plugin route is involved.
   const [filter, setFilter] = createSignal('')
   const items = createMemo(() => {
-    const query = filter().trim().toLowerCase()
+    const query = collapsed() ? '' : filter().trim().toLowerCase()
     if (!query) return allItems()
     return allItems().filter((item) => item.title.toLowerCase().includes(query))
   })
@@ -207,10 +208,9 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
     navigate(pathForTask(task))
   }
 
-  // Collapsed, the row is its severity glyph over its identifier, and the header narrows to the one
-  // control that still has something to do. A source that sends neither an icon nor a `short` gets a
-  // dot, so the rail is still a column of reachable stops rather than a column of blanks.
-  const collapsed = sidebarCollapsed(props.descriptor.id)
+  // Collapsed, the row is its severity glyph over its identifier. A source that sends neither an
+  // icon nor a `short` gets a dot, so the rail is still a column of reachable stops rather than a
+  // column of blanks.
   const railMark = (item: PluginRailItem) => (
     <>
       <Show when={item.icon} fallback={<Icon name="circle" tone={iconTone(item.severity)} />}>
@@ -222,20 +222,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
 
   return (
     <>
-      <Show
-        when={!collapsed()}
-        fallback={(
-          <Toolbar size="sm" ariaLabel={`${props.descriptor.label} actions`}>
-            <IconButton
-              icon="refresh-cw"
-              tip={`Refresh ${props.descriptor.label}`}
-              label={`Refresh ${props.descriptor.label}`}
-              busy={refreshing()}
-              onPress={() => void refresh()}
-            />
-          </Toolbar>
-        )}
-      >
+      <Show when={!collapsed()}>
         <SectionHeader
           count={items().length}
           actions={(

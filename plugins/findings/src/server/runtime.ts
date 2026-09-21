@@ -12,11 +12,10 @@ import type {
 } from '../contract/records'
 import { FindingCapture, FindingCaptureError } from './capture'
 import type { FindingBundle, FindingCandidateRevision, FindingReviewAttention } from '../contract/review'
-import { FINDING_CANDIDATE_PAYLOAD_BYTES } from '../contract/review'
 import { FindingsReviewStore, type FindingSynthesisResult } from './reviewStore'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import { FINDINGS_SYNTHESIS_SYSTEM_PROMPT, synthesisPrompt } from './synthesisPrompt'
+import { synthesizeFindingsWithModel } from './modelSynthesis'
 
 type Emit = (frame: FindingsChangedFrame) => void
 
@@ -189,46 +188,10 @@ export class FindingsRuntime {
     if (backendId) synthesize = async (observations) => {
       const userId = core.identity.active()
       if (!userId) throw new FindingCaptureError('forbidden', 'an active owner is required for model preparation')
-      const chunks: FindingObservation[][] = []
-      for (const observation of observations) {
-        const current = chunks.at(-1), size = new TextEncoder().encode(JSON.stringify(observation)).byteLength
-        const currentSize = current ? new TextEncoder().encode(JSON.stringify(current)).byteLength : 0
-        if (!current || current.length >= 50 || currentSize + size > 32 * 1024) chunks.push([observation])
-        else current.push(observation)
-      }
-      const allGroups: Array<{ payload: unknown; sourceIds: string[]; explanation: string }> = []
-      const allOmissions: Array<{ sourceId: string; reason: string }> = []
-      let inputTokens = 0, outputTokens = 0, hasUsage = false
-      for (const chunk of chunks) {
-        const result = await core.models.generateText({ userId, backendId, timeoutMs: 60_000, input: {
-          system: FINDINGS_SYNTHESIS_SYSTEM_PROMPT,
-          prompt: synthesisPrompt(chunk, targetContext),
-          ...(modelId ? { modelId } : {}),
-          maxOutputTokens: 8_000,
-        } })
-        const text = result.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-        if (result.usage) { hasUsage = true; inputTokens += result.usage.inputTokens ?? 0; outputTokens += result.usage.outputTokens ?? 0 }
-        if (new TextEncoder().encode(text).byteLength > FINDING_CANDIDATE_PAYLOAD_BYTES) throw new FindingCaptureError('invalid-input', 'synthesis result exceeds the candidate payload limit')
-        const parsed = JSON.parse(text) as { candidates?: unknown; omitted?: unknown }
-        if (!Array.isArray(parsed.candidates)) throw new FindingCaptureError('invalid-input', 'synthesis result has no candidates array')
-        const groups = parsed.candidates.map((item) => {
-          if (!item || typeof item !== 'object') throw new FindingCaptureError('invalid-input', 'synthesis candidate is invalid')
-          const row = item as Record<string, unknown>
-          if (!Array.isArray(row.sourceIds) || row.sourceIds.some((id) => typeof id !== 'string') || typeof row.explanation !== 'string') throw new FindingCaptureError('invalid-input', 'synthesis candidate source IDs are invalid')
-          return { payload: row.payload, sourceIds: row.sourceIds as string[], explanation: row.explanation }
-        })
-        const accounted = new Map<string, number>()
-        for (const sourceId of groups.flatMap((group) => group.sourceIds)) accounted.set(sourceId, (accounted.get(sourceId) ?? 0) + 1)
-        if (Array.isArray(parsed.omitted)) for (const omitted of parsed.omitted) {
-          if (!omitted || typeof omitted !== 'object' || typeof (omitted as Record<string, unknown>).sourceId !== 'string' || typeof (omitted as Record<string, unknown>).reason !== 'string') throw new FindingCaptureError('invalid-input', 'synthesis omission is invalid')
-          const row = omitted as { sourceId: string; reason: string }
-          accounted.set(row.sourceId, (accounted.get(row.sourceId) ?? 0) + 1)
-          allOmissions.push(row)
-        }
-        if (accounted.size !== chunk.length || chunk.some((observation) => accounted.get(observation.id) !== 1)) throw new FindingCaptureError('invalid-input', 'synthesis must account for every source ID exactly once as included or omitted')
-        allGroups.push(...groups)
-      }
-      return { groups: allGroups, omissions: allOmissions, ...(hasUsage ? { usage: { inputTokens, outputTokens } } : {}) }
+      return synthesizeFindingsWithModel({
+        observations, scope, target: targetEntry.value, targetContext,
+        generateText: core.models.generateText, userId, backendId, ...(modelId ? { modelId } : {}),
+      })
     }
     const preparation = review.prepare({ scope, sourceTaskId: taskId, boundaryKey: options.boundaryKey, ...(backendId ? { backendId } : {}), ...(modelId ? { modelId } : {}), targetKind: targetEntry.id, target: targetEntry.value, observations: input, ...(synthesize ? { synthesize } : {}) })
     const finish = async (): Promise<FindingBundle> => {

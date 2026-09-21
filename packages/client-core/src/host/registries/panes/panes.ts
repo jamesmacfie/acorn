@@ -83,11 +83,13 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
    * reading the same signal and passing each `Row` a `collapsed` slot. A pane that collapses without
    * doing that gets a rail of full-width rows clipped mid-word.
    *
-   * A pane drawn from a remote tree cannot keep it: its rows are built in a plugin worker that has
-   * no way to read a host signal, so it leaves this off and keeps a column that resizes and does not
-   * collapse (docs/plugins.md § The tree contract).
+   * A pane drawn from a remote tree cannot author one-mark rows because its worker cannot read a host
+   * signal. Loaded `list-detail` panes therefore use the empty form, leaving only the host-owned
+   * expand control (docs/plugins.md § The tree contract).
    */
   collapsible?: boolean
+  /** Use an empty rail when the list has no useful one-mark representation. */
+  collapseContent?: 'rows' | 'empty'
 }
 
 // `any` for the reason `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by
@@ -198,6 +200,7 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
         // pane. Collapsing a library must not remount the note being edited.
         get hidden() { return entry.hidden?.(props.task) },
       collapsible: entry.collapsible === true,
+      collapseContent: entry.collapseContent ?? 'rows',
       }) } })
     },
   }

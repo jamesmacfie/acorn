@@ -8,6 +8,13 @@ import { latestOnly } from '../../kit/lib/latestOnly'
 const [statuses, setStatuses] = createSignal<Record<string, TaskStatus>>({})
 export { statuses }
 
+// The snapshot above deliberately keeps its identity when the rail-visible summary did not move,
+// so every task row is not redrawn on a ten-second poll. A consumer that reads more than that
+// summary still needs to hear the poll itself: the Changes pane's file names and line counts can
+// change while dirty/count/branch/HEAD all stay the same.
+const [statusRevision, setStatusRevision] = createSignal(0)
+export const taskStatusRevision = statusRevision
+
 export const taskStatus = (id: string): TaskStatus | undefined => statuses()[id]
 
 const sameTaskStatus = (left: TaskStatus, right: TaskStatus): boolean =>
@@ -30,10 +37,17 @@ export function taskStatusesChanged(
   })
 }
 
+/** Publish one completed poll. The rail snapshot moves only when its fields changed; the revision
+ * always moves so consumers of the full working tree can refresh on the same clock. */
+export function publishTaskStatuses(list: readonly TaskStatus[]): void {
+  setStatuses((current) =>
+    taskStatusesChanged(current, list) ? Object.fromEntries(list.map((status) => [status.taskId, status])) : current)
+  setStatusRevision((revision) => revision + 1)
+}
+
 export const refreshTaskStatuses = latestOnly(
   async () => taskBridge().task.statuses(),
-  (list) => setStatuses((current) =>
-    taskStatusesChanged(current, list) ? Object.fromEntries(list.map((status) => [status.taskId, status])) : current),
+  publishTaskStatuses,
 )
 
 // Start polling; returns an unsubscribe.

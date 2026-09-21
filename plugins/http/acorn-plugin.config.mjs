@@ -88,6 +88,7 @@ export default {
         glyph: 'send',
         order: 76,
         layout: 'list-detail',
+        collapsible: true,
         regions: {
           list: { kind: 'remote', entry: 'list' },
           detail: { kind: 'remote', entry: 'detail' },
@@ -100,6 +101,7 @@ export default {
         glyph: 'send',
         scope: 'project',
         layout: 'list-detail',
+        collapsible: true,
         regions: {
           list: { kind: 'remote', entry: 'list' },
           detail: { kind: 'remote', entry: 'detail' },

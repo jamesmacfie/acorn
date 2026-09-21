@@ -182,7 +182,7 @@ export {
 } from '@acorn/client-core/features/tasks/agentSessions.ts'
 export { runApi } from '@acorn/client-core/features/tasks/runClient.ts'
 export { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
-export { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
+export { taskStatus, taskStatusRevision } from '@acorn/client-core/features/tasks/taskStatus.ts'
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
 export { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
