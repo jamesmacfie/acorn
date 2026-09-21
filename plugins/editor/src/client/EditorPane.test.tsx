@@ -43,7 +43,9 @@ vi.mock('./editorClient', async (importOriginal) => ({
   }),
 }))
 // The sidebar's two panels fetch a tree and run ripgrep. Neither is this file's subject.
-vi.mock('./FileTree', () => ({ default: () => null }))
+vi.mock('./FileTree', () => ({
+  default: (props: { openPath: string | null }) => <div data-testid="file-tree-selection">{props.openPath}</div>,
+}))
 vi.mock('./search/SearchPanel', () => ({ default: () => null }))
 // Terminal mode's half. The real one is xterm over a websocket, which jsdom cannot give it; what this
 // file is about is which box the pane mounts and what it does when the process ends, so the stand-in
@@ -80,6 +82,7 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
   read.mockClear()
+  read.mockImplementation(async (_taskId, path) => disk.get(path) ?? '')
   quitEditor = undefined
   localStorage.clear()
 })
@@ -118,6 +121,31 @@ const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
 describe('the editor pane', () => {
+  it('selects a tab and its file-tree row before the document read finishes', async () => {
+    editorOpen(taskId, 'a.ts', false)
+    editorOpen(taskId, 'b.ts', false)
+    let releaseRead!: (content: string) => void
+    read.mockImplementation(async (_taskId, path) => {
+      if (path !== 'a.ts') return disk.get(path) ?? ''
+      return new Promise<string>((resolve) => { releaseRead = resolve })
+    })
+
+    const { host } = mount()
+    const view = await editor(host)
+    await showing(() => view, 'const b = 2')
+
+    const tab = document.getElementById('editor-tab-a.ts') as HTMLButtonElement
+    tab.click()
+
+    expect(openFiles(taskId).find((file) => file.path === 'a.ts')).toBeTruthy()
+    expect(host.querySelector('[data-testid="file-tree-selection"]')?.textContent).toBe('a.ts')
+    await vi.waitFor(() => expect(document.getElementById('editor-tab-a.ts')?.getAttribute('aria-selected')).toBe('true'))
+
+    releaseRead('const a = 1\n')
+    await showing(() => view, 'const a = 1')
+    read.mockImplementation(async (_taskId, path) => disk.get(path) ?? '')
+  })
+
   it('keeps a document, its edits and its cursor per file across tab swaps', async () => {
     const { host } = mount()
     const view = await editor(host)

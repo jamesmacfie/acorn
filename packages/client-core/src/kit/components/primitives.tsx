@@ -665,6 +665,8 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
+  /** A mouse double-click, for rows where the second press has a distinct conventional meaning. */
+  onDoublePress?: () => void
   /** Renders an <a class="ui-row">.
    *
    *  With `onPress` it behaves as the router's <A> does: a plain left-click is intercepted and
@@ -755,6 +757,9 @@ export function Row(props: {
           event.preventDefault()
           activate()
         }}
+        onDblClick={(event) => {
+          if (!fromNestedControl(event)) props.onDoublePress?.()
+        }}
       >
         {body}
       </a>
@@ -782,6 +787,7 @@ export function Row(props: {
       role={props.item?.role ?? (props.onPress ? 'button' : undefined)}
       tabindex={props.item ? props.item.tabindex : props.onPress ? 0 : undefined}
       onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
+      onDblClick={props.onDoublePress ? (event) => { if (!fromNestedControl(event)) props.onDoublePress?.() } : undefined}
       onKeyDown={props.onPress && !props.item
         ? (event) => {
           // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
@@ -1434,6 +1440,7 @@ export function TreeRow(props: {
   depth?: number
   selected?: boolean
   onPress?: () => void
+  onDoublePress?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
   /** Trailing metadata: Row's slot, forwarded. */
@@ -1458,6 +1465,7 @@ export function TreeRow(props: {
       title={props.title}
       meta={props.meta}
       onPress={props.onPress}
+      onDoublePress={props.onDoublePress}
       leading={
         <>
           <Show
