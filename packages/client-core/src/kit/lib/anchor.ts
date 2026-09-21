@@ -85,10 +85,10 @@ export type AnchoredPopover = {
 export function createAnchoredPopover(opts: {
   anchor: () => AnchorTarget | undefined
   placement?: () => Placement
-  /** Surface width. `'anchor'` is a floor of the trigger's width that the surface grows past to fit
-   *  its content: a Select's option labels are longer than the closed control that names one of
-   *  them. A number is a fixed `max(trigger, n)`, which is what Picker was tuned against, where a
-   *  list that changed width on every keystroke of the filter would be worse. */
+  /** Surface width. `'anchor'` pins the surface to the trigger's width, so a long option label wraps
+   *  inside the list instead of a list wider than the control it hangs off. A number is a fixed
+   *  `max(trigger, n)`, which is what Picker was tuned against, where a list that changed width on
+   *  every keystroke of the filter would be worse. */
   minWidth?: number | 'anchor'
   /** Keep the surface inside the viewport. On by default. Point anchors clamp without flipping;
    *  element anchors flip first and clamp only what still does not fit. */
@@ -107,7 +107,7 @@ export function createAnchoredPopover(opts: {
     setUncontrolled(next)
     opts.onOpenChange?.(next)
   }
-  const [pos, setPos] = createSignal<{ top: number; left: number; width?: number; minWidth?: number }>({ top: 0, left: 0 })
+  const [pos, setPos] = createSignal<{ top: number; left: number; width?: number }>({ top: 0, left: 0 })
   let surface: HTMLElement | undefined
 
   const reposition = () => {
@@ -137,7 +137,7 @@ export function createAnchoredPopover(opts: {
         }
     setPos({
       ...placed,
-      ...(minWidth === 'anchor' ? { minWidth: rect.width }
+      ...(minWidth === 'anchor' ? { width: rect.width }
         : typeof minWidth === 'number' ? { width: Math.max(rect.width, minWidth) }
         : {}),
     })
@@ -222,7 +222,6 @@ export function createAnchoredPopover(opts: {
         top: `${p.top}px`,
         left: `${p.left}px`,
         ...(p.width === undefined ? {} : { width: `${p.width}px` }),
-        ...(p.minWidth === undefined ? {} : { 'min-width': `${p.minWidth}px` }),
       }
     },
   }
