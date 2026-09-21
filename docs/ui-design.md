@@ -800,7 +800,12 @@ toggle works this way.
 the width the two icon rails already read, and the drag handle goes with the width nobody can drag
 to. The control rides the divider rather than sitting in the list's header, because in the `split`
 form the header belongs to a `ListColumn` the caller built and this node has nothing to put a button
-into — and because a collapsed column has no header left to sit in.
+into, and because a collapsed column has no header left to sit in.
+
+The divider and the control on it are one node, `CollapseEdge`, and both tiers draw it: the kit's
+`ListDetail` and the host's `list-detail` layout. They each wrote their own at first, and the two
+buttons drifted apart, one with a border and one without. A split that does not collapse still gets
+the bare `SplitHandle`, which is what it always had.
 
 Collapsing is a bargain, and the other half of it is the rows. A column at 48px has room for one
 mark, so every row in it takes a `collapsed` slot: the run state for an agent, an avatar over a
