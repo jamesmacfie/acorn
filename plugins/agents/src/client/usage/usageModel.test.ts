@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentProviderUsage, AgentUsageSnapshot } from '../../shared/usage'
+import type { AgentProviderUsage, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
-import { formatReset, formatTokens, providerMetaLine, providerUsageRows, usageSummaryEntries } from './usageModel'
+import { formatReset, formatTokens, providerMetaLine, providerUsageRows, quotaPace, usageSummaryEntries } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -17,6 +17,7 @@ const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage =
       percentRemaining: percent,
       resetsAt: null,
       resetText: null,
+      windowSeconds: null,
       health: usageHealth(percent),
     },
   ],
@@ -127,6 +128,40 @@ describe('agent usage detail formatting', () => {
     }
     expect(providerMetaLine(claude, 1_000)).toBe('Claude Max · james@runn.io · James · updated just now')
     expect(providerMetaLine(claude, 1_000)).not.toContain('Claude Code')
+  })
+
+  describe('the pace mark under a quota bar', () => {
+    const quota = (over: Partial<AgentUsageQuota>): AgentUsageQuota => ({
+      id: 'session', label: 'Session', percentRemaining: 50, resetsAt: null, resetText: null,
+      windowSeconds: 5 * 60 * 60, health: 'healthy', ...over,
+    })
+    const now = 1_700_000_000_000
+    const hour = 3_600_000
+
+    it('is the share of the window still to run', () => {
+      // Four of the five hours left, so a steady spend would still have 80% of the plan.
+      expect(quotaPace(quota({ resetsAt: now + 4 * hour }), now)).toBeCloseTo(0.8)
+      expect(quotaPace(quota({ resetsAt: now + hour }), now)).toBeCloseTo(0.2)
+    })
+
+    it('has nothing to say without both a reset time and a window', () => {
+      expect(quotaPace(quota({ resetsAt: null }), now)).toBeNull()
+      expect(quotaPace(quota({ resetsAt: now + hour, windowSeconds: null }), now)).toBeNull()
+    })
+
+    it('sits at the end of a window that has run out', () => {
+      expect(quotaPace(quota({ resetsAt: now - hour }), now)).toBe(0)
+    })
+
+    it('gives up when the reset is further out than the whole window', () => {
+      expect(quotaPace(quota({ resetsAt: now + 9 * hour }), now)).toBeNull()
+    })
+
+    it('rides along on every quota row', () => {
+      const claude = provider('claude', 30)
+      claude.quotas[0] = quota({ percentRemaining: 30, resetsAt: now + hour, health: 'warning' })
+      expect(providerUsageRows(claude, now)[0].meter).toEqual({ fill: 0.3, pace: 0.2, health: 'warning' })
+    })
   })
 
   it('names models that prevent a daily estimate', () => {

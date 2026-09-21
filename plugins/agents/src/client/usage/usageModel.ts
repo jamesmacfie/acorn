@@ -1,11 +1,15 @@
 import type {
   AgentProviderUsage,
   AgentUsageHealth,
+  AgentUsageQuota,
   AgentUsageSnapshot,
 } from '../../shared/usage'
-import { sessionQuota } from '../../shared/usage'
+import { clampRemaining, sessionQuota } from '../../shared/usage'
 
-export type UsageDetailRow = { label: string; value: string }
+/** The bar under a quota row: how much is left, and where a steady spend would have left it by now.
+ *  Both are 0-1 on the same scale, so the mark reads against the fill. */
+export type UsageMeter = { fill: number; pace: number | null; health: AgentUsageHealth }
+export type UsageDetailRow = { label: string; value: string; meter?: UsageMeter }
 export type UsageSummaryEntry = { health: AgentUsageHealth; label: string; value: string }
 
 export function formatPercent(percent: number): string {
@@ -82,10 +86,31 @@ export function usageSummaryEntries(snapshot: AgentUsageSnapshot | null): UsageS
   })
 }
 
+// Where the bar would sit if the window were being spent evenly: the share of it still to run. On a
+// bar that shows what is left, that is the time left over the window, no arithmetic in between. The
+// fill above the mark means there is room to spare, below it means the plan runs out early.
+//
+// A reset further out than the whole window says the window is not the one acorn assumed — Codex
+// labels a row "Session (5h)" and then reports it resetting in four days — and a mark pinned to the
+// right end would read as "miles ahead" when the truth is that we do not know. No mark instead.
+export function quotaPace(quota: AgentUsageQuota, now = Date.now()): number | null {
+  if (quota.resetsAt == null || quota.windowSeconds == null || quota.windowSeconds <= 0) return null
+  const share = (quota.resetsAt - now) / (quota.windowSeconds * 1_000)
+  return share > 1 ? null : Math.max(0, share)
+}
+
 export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()): UsageDetailRow[] {
   const rows: UsageDetailRow[] = provider.quotas.map((quota) => {
     const reset = formatReset(quota.resetsAt, quota.resetText, now)
-    return { label: quota.label, value: `${formatPercent(quota.percentRemaining)} remaining${reset ? ` · ${reset}` : ''}` }
+    return {
+      label: quota.label,
+      value: `${formatPercent(quota.percentRemaining)} remaining${reset ? ` · ${reset}` : ''}`,
+      meter: {
+        fill: clampRemaining(quota.percentRemaining) / 100,
+        pace: quotaPace(quota, now),
+        health: quota.health,
+      },
+    }
   })
   if (provider.cost) {
     if (provider.cost.source === 'extra_usage') {

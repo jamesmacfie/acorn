@@ -63,6 +63,9 @@ const usageReading = (harness: ManifestHarness) => async (): Promise<AgentProvid
     percentRemaining: quota.percentRemaining,
     resetsAt: quota.resetsAt ?? null,
     resetText: quota.resetText ?? null,
+    // A contributed harness does not say how long its window is, so its rows get a bar without the
+    // pace mark. Worth a probe field the day one asks for it.
+    windowSeconds: null,
     // Derived, not declared, so one harness cannot call 5% healthy while another calls it critical.
     health: usageHealth(quota.percentRemaining),
   }))
