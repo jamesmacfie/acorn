@@ -10,7 +10,7 @@ const TREE = 'editor.file-tree'
 
 export default function FileTree(props: {
   taskId: string
-  onOpen: (path: string) => void
+  onOpen: (path: string, ephemeral: boolean) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
@@ -20,11 +20,17 @@ export default function FileTree(props: {
   // closes: reopening a folder is instant and the tree's shape is stable across a collapse. `''` is
   // the worktree root, which is the one listing fetched without being asked for.
   const [listings, setListings] = createSignal<ReadonlyMap<string, EditorEntry[]>>(new Map())
+  const loading = new Set<string>()
 
   const load = async (dir: string): Promise<void> => {
-    if (!api || listings().has(dir)) return
-    const entries = await api.list(props.taskId, dir)
-    setListings((current) => new Map(current).set(dir, entries))
+    if (!api || listings().has(dir) || loading.has(dir)) return
+    loading.add(dir)
+    try {
+      const entries = await api.list(props.taskId, dir)
+      setListings((current) => new Map(current).set(dir, entries))
+    } finally {
+      loading.delete(dir)
+    }
   }
   onMount(() => void load(''))
 
@@ -49,6 +55,19 @@ export default function FileTree(props: {
     }
     walk('', 0)
     return rows
+  })
+
+  // Expansion outlives this component, while its lazy listings do not. Rebuild every retained open
+  // branch as its parent listing arrives, so returning to the pane cannot show an open twist beside
+  // an empty folder. This also restores nested branches in order without fetching collapsed ones.
+  createEffect(() => {
+    for (const [dir, entries] of listings()) {
+      for (const entry of entries) {
+        if (!entry.dir) continue
+        const path = dir ? `${dir}/${entry.name}` : entry.name
+        if (isOpen(path) && !listings().has(path)) void load(path)
+      }
+    }
   })
 
   // Reveal: open every directory above the file, waiting for each listing before asking for the next,
@@ -79,7 +98,7 @@ export default function FileTree(props: {
       selected={props.openPath}
       onActivate={(key) => {
         const item = items().find((candidate) => candidate.key === key)
-        if (item && !item.dir) props.onOpen(key)
+        if (item && !item.dir) props.onOpen(key, true)
       }}
       // The left and right arrows, from the host's tree collection. Clicking the twist goes through
       // `onToggle` below; both land in the same place.
@@ -102,7 +121,8 @@ export default function FileTree(props: {
           expandable={item.dir}
           expanded={item.dir ? isOpen(item.key) : undefined}
           onToggle={() => setOpen(item.key, !isOpen(item.key))}
-          onPress={() => (item.dir ? setOpen(item.key, !isOpen(item.key)) : props.onOpen(item.key))}
+          onPress={() => (item.dir ? setOpen(item.key, !isOpen(item.key)) : props.onOpen(item.key, true))}
+          onDoublePress={!item.dir ? () => props.onOpen(item.key, false) : undefined}
           title={item.key}
         >
           {item.label}

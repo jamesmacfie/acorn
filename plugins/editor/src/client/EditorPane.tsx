@@ -83,8 +83,18 @@ export default function EditorPane(props: { task: Task }) {
   // history (both live in state fields that survive a reconfigure) and replaces the closures.
   const mountToken = {}
 
-  const files = () => openFiles(taskId)
+  const files = createMemo(() => openFiles(taskId))
   const active = () => activeFile(taskId)
+  // Keep tab definitions stable when only the active path changes. DocumentTabs reconciles by tab
+  // object identity, so rebuilding every definition here would replace the focused tab on each
+  // keyboard move even though the open files themselves had not changed.
+  const documentTabs = createMemo(() => files().map((file) => ({
+    id: file.path,
+    label: file.path.split('/').pop() ?? file.path,
+    title: file.path,
+    dirty: file.dirty,
+    ephemeral: file.ephemeral,
+  })))
   let disposed = false
 
   /** Put a file's live state back in the pool. Only for a file still open: `close()` deletes its
@@ -344,7 +354,9 @@ export default function EditorPane(props: { task: Task }) {
     // new one, so the old instance is what has to go back in the cache.
     if (currentPath) remember(currentPath, view.state)
     const state = await stateFor(relPath)
-    if (disposed || !view || !state) return
+    // A read may finish after the reader chose another tab. Active state changes synchronously at
+    // the interaction boundary; a stale read must not put its document on screen afterward.
+    if (disposed || !view || !state || active() !== relPath) return
     currentPath = relPath
     view.setState(state)
     // A cached state carries the theme it was built with, so a file opened before a theme change
@@ -352,7 +364,6 @@ export default function EditorPane(props: { task: Task }) {
     refreshEditorTheme(view)
     const remembered = editorViewState(taskId, relPath)
     if (remembered) applyViewState(view, remembered)
-    editorActivate(taskId, relPath)
     maybeReveal(relPath)
   }
 
@@ -478,7 +489,7 @@ export default function EditorPane(props: { task: Task }) {
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
-                  onOpen={(p) => openPath(p, true)}
+                  onOpen={openPath}
                   openPath={active()}
                   reveal={treeReveal()}
                   onRevealed={(revision) => {
@@ -496,16 +507,10 @@ export default function EditorPane(props: { task: Task }) {
             idPrefix="editor"
             ariaLabel="Open files"
             active={active() ?? ''}
-            onActivate={(path) => void show(path)}
+            onActivate={(path) => editorActivate(taskId, path)}
             onClose={(path) => void close(path)}
             onPromote={(path) => editorPromote(taskId, path)}
-            tabs={files().map((file) => ({
-              id: file.path,
-              label: file.path.split('/').pop() ?? file.path,
-              title: file.path,
-              dirty: file.dirty,
-              ephemeral: file.ephemeral,
-            }))}
+            tabs={documentTabs()}
             actions={
               <>
                 <ToggleButton

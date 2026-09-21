@@ -115,6 +115,8 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
+  /** Accepted for kit parity. A terminal has no double-click activation gesture. */
+  onDoublePress?: () => void
   href?: string
   offset?: number
   height?: number
@@ -193,6 +195,8 @@ export function TreeRow(props: {
   depth?: number
   selected?: boolean
   onPress?: () => void
+  /** Accepted for kit parity. A terminal has no double-click activation gesture. */
+  onDoublePress?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
   meta?: JSX.Element
