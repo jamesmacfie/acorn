@@ -75,6 +75,9 @@ export type DesktopExtras = {
   // Cmd/Ctrl+W → close the focused pane, never the window. The host suppresses the native accelerator
   // and pings here.
   onClosePane(cb: () => void): () => void
+  // Cmd/Ctrl+K must cross the native menu while a child webview owns focus. The palette still runs
+  // its registered toggle command after this event arrives.
+  onCommandPalette(cb: () => void): () => void
   onWillQuit(cb: () => boolean | Promise<boolean>): () => void
 }
 
@@ -203,6 +206,7 @@ type AcornPreload = {
   desktop?: boolean
   platform?: string
   onClosePane?: DesktopExtras['onClosePane']
+  onCommandPalette?: DesktopExtras['onCommandPalette']
   onWillQuit?: DesktopExtras['onWillQuit']
   reportResponsiveness?: (pulse: ResponsivenessPulse) => void
   nodeFetch?: NodeTransport['fetch']
@@ -320,9 +324,9 @@ export const fleetBridge = (): FleetBridge | null => {
 export const pluginCustody = (): PluginCustody | null => acornGlobal()?.plugins ?? null
 export const desktopExtras = (): DesktopExtras | null => {
   const acorn = acornGlobal()
-  if (!acorn?.onClosePane || !acorn.onWillQuit) return null
-  const { onClosePane, onWillQuit } = acorn
-  return { onClosePane, onWillQuit }
+  if (!acorn?.onClosePane || !acorn.onCommandPalette || !acorn.onWillQuit) return null
+  const { onClosePane, onCommandPalette, onWillQuit } = acorn
+  return { onClosePane, onCommandPalette, onWillQuit }
 }
 export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.recovery ?? null
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null

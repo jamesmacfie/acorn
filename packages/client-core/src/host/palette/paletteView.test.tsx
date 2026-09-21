@@ -84,6 +84,7 @@ afterEach(() => {
   dispose?.()
   dispose = undefined
   host.remove()
+  Reflect.deleteProperty(window, 'acorn')
   for (const disposable of held.splice(0).reverse()) disposable.dispose()
 })
 
@@ -137,6 +138,28 @@ describe('the dialog', () => {
 })
 
 describe('the keyboard', () => {
+  it('toggles through the native menu event while a child webview owns the keyboard', () => {
+    let emit = () => {}
+    Object.defineProperty(window, 'acorn', {
+      configurable: true,
+      value: {
+        onClosePane: () => () => {},
+        onCommandPalette: (callback: () => void) => {
+          emit = callback
+          return () => { emit = () => {} }
+        },
+        onWillQuit: () => () => {},
+      },
+    })
+    register(leaf('cmd.one', { title: 'One' }))
+    mount()
+
+    emit()
+    expect(dialog()).not.toBeNull()
+    emit()
+    expect(dialog()).toBeNull()
+  })
+
   it('runs the same Enter/Escape sequence the terminal does, and draws the breadcrumb', () => {
     register(group('a', { title: 'A' }))
     register(group('a.b', { title: 'B', parentId: 'a' }))

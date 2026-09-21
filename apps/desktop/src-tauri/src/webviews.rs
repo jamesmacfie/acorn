@@ -357,8 +357,10 @@ pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect) {
         return;
     }
     with_record::<R, _>(&app, &key, |record| {
-        let _ = record.webview.set_position(LogicalPosition::new(rect.x, rect.y));
-        let _ = record.webview.set_size(LogicalSize::new(rect.width.max(0.0), rect.height.max(0.0)));
+        let _ = record.webview.set_bounds(tauri::Rect {
+            position: LogicalPosition::new(rect.x, rect.y).into(),
+            size: LogicalSize::new(rect.width.max(0.0), rect.height.max(0.0)).into(),
+        });
     });
 }
 
@@ -443,7 +445,15 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
             if webview.is_devtools_open() {
                 webview.close_devtools();
             } else {
+                // The inspector belongs to this exact child handle. On macOS its first show may
+                // resize the inspected WKWebView as the inspector docks. Queueing the same bounds
+                // behind `open_devtools` restores the renderer-owned rectangle after that native
+                // transition, even though the DOM rectangle did not change and will be memoized.
+                let bounds = webview.bounds().ok();
                 webview.open_devtools();
+                if let Some(bounds) = bounds {
+                    let _ = webview.set_bounds(bounds);
+                }
             }
             true
         }

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents, previewViews } from '@acorn/plugin-api/client'
+import { clientEvents, elementRectKey, previewViews, visibleElementRect } from '@acorn/plugin-api/client'
 import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
@@ -28,18 +28,18 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
 
   const syncRect = () => {
     if (!preview || !host) return
-    const r = host.getBoundingClientRect()
-    const next = `${r.left},${r.top},${r.width},${r.height}`
+    const r = visibleElementRect(host)
+    const next = elementRectKey(r)
     if (next === placed) return
     placed = next
-    preview.setBounds(props.taskId, { x: r.left, y: r.top, width: r.width, height: r.height })
+    preview.setBounds(props.taskId, r)
   }
 
   const checkOcclusion = () => {
     if (!host) return
-    const r = host.getBoundingClientRect()
-    if (r.width === 0 || r.height === 0) return
-    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    const r = visibleElementRect(host)
+    if (r.width === 0 || r.height === 0) return setSuppressed(true)
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
     setSuppressed(!(top === host || host.contains(top)))
   }
 

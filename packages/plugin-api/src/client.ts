@@ -204,6 +204,10 @@ export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHand
 // legitimate use for: the native folder dialog, the file dialogs, and the host-owned preview view.
 // Transport, fleet and plugin custody stay core's business.
 export { canPickFolder, pickFiles, pickFolder, previewViews, saveFile } from '@acorn/client-core/infra/platform/index.ts'
+// Native child webviews do not inherit DOM overflow clipping. Compiled surfaces that position one
+// use the host's shared visible box rather than duplicating the clipping walk.
+export { elementRectKey, visibleElementRect } from '@acorn/client-core/infra/platform/webviewGeometry.ts'
+export type { VisibleElementRect } from '@acorn/client-core/infra/platform/webviewGeometry.ts'
 export type { PickedFile, PreviewState, PreviewViews, SaveRequest } from '@acorn/client-core/infra/platform/index.ts'
 
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
