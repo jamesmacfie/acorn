@@ -132,6 +132,23 @@ describe('Claude subagent attribution, against the captured wire', () => {
     expect(subagents.map((subagent) => subagent.title)).not.toContain('Agent')
   })
 
+  // The brief was only ever readable by opening the spawning call and reading JSON with every line
+  // break spelled out. It is the child's own turn, so it is posted as one.
+  it('posts each subagent\u2019s brief into that subagent\u2019s stream', () => {
+    const ids = new Set(subagents.map((subagent) => subagent.id))
+    const briefs = normalizedCapture.filter((event) => event.type === 'user_message' && event.subagentId)
+    expect(briefs.length).toBe(2)
+    for (const brief of briefs) {
+      expect(ids.has((brief as Extract<AgentNormalizedEvent, { type: 'user_message' }>).subagentId!)).toBe(true)
+      expect((brief as Extract<AgentNormalizedEvent, { type: 'user_message' }>).text)
+        .toContain('Working directory')
+    }
+    // And the call it came out of has nothing left to disclose.
+    for (const id of ids) {
+      expect(tools.filter((tool) => tool.id === id).every((tool) => tool.input === undefined)).toBe(true)
+    }
+  })
+
   it('leaves the parent\u2019s own prose unattributed', () => {
     // This CLI never forwards a subagent's own text, so anything tagged here would be a bug in the
     // reader rather than a feature of the wire.
@@ -304,8 +321,12 @@ describe('the captured fan-out as a transcript', () => {
     const items = projected()
     const cards = items.filter((item) => item.event.type === 'subagent')
     expect(cards).toHaveLength(2)
-    // Every tool the two subagents ran, nested: three for one, four for the other, plus each spawn call.
-    expect(cards.map((card) => card.children?.length)).toEqual([4, 5])
+    // Every tool the two subagents ran, nested: three for one, four for the other, plus each spawn
+    // call and the brief lifted out of it.
+    expect(cards.map((card) => card.children?.length)).toEqual([5, 6])
+    // The brief sits under the spawn call rather than above it, because the call arrives with an empty
+    // parameter bag and the brief only turns up on the update after it.
+    expect(cards.map((card) => card.children?.[1]?.event.type)).toEqual(['user_message', 'user_message'])
     expect(items.some((item) => item.event.type === 'tool')).toBe(false)
   })
 })
@@ -476,9 +497,28 @@ describe('Claude’s plan-mode handover', () => {
     expect(tool).toMatchObject({ type: 'tool', tool: { title: 'Ready to code?', input: undefined } })
   })
 
-  it('posts nothing for an update, so the plan cannot arrive twice', () => {
-    const events = exitPlanMode({ sessionUpdate: 'tool_call_update', status: 'failed' })
-    expect(events.some((event) => event.type === 'assistant_message')).toBe(false)
+  // Claude sends a call's parameters on exactly one of its updates, and not always on the call itself
+  // (see the subagent capture above), so the plan is read from whichever update carries it. An update
+  // with no parameters has nothing to post.
+  it('posts the plan from the update that carries it, and nothing from the rest', () => {
+    const later = exitPlanMode({ sessionUpdate: 'tool_call_update', status: 'failed', rawInput: undefined })
+    expect(later.some((event) => event.type === 'assistant_message')).toBe(false)
+    const carrying = exitPlanMode({ sessionUpdate: 'tool_call_update', status: 'completed' })
+    expect(carrying[0]).toMatchObject({ type: 'assistant_message', text: '# The plan\n\n- step one\n- step two' })
+  })
+
+  // The other end of a subagent's run, and it arrived the same way: the whole report riding in a call's
+  // parameters. `SubagentHandback` is the child's call, so the report lands in the child's stream.
+  it('posts a subagent’s report back as that subagent talking', () => {
+    const events = normalizeAcpUpdate({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'handback-1',
+      title: 'SubagentHandback',
+      rawInput: { message: '# Report\n\nfindings' },
+      _meta: { claudeCode: { toolName: 'SubagentHandback', parentToolUseId: 'agent-1' } },
+    } as SessionUpdate, 'Claude Code')
+    expect(events[0]).toEqual({ type: 'assistant_message', text: '# Report\n\nfindings', subagentId: 'agent-1' })
+    expect(events.find((event) => event.type === 'tool')).toMatchObject({ tool: { input: undefined } })
   })
 
   it('leaves every other tool’s parameters alone', () => {

@@ -278,7 +278,9 @@ export type AgentPlanEntry = {
 export type AgentNormalizedEvent =
   | { type: 'session_state'; state: AgentRuntimeState; detail?: string }
   | { type: 'session_metadata'; providerSessionRef?: string; configOptions?: AgentConfigOption[]; commands?: AgentCommandDescriptor[]; skills?: AgentSkillDescriptor[] }
-  | { type: 'user_message'; text: string }
+  /** `subagentId` means somebody other than the reader wrote this turn: it is the brief a subagent was
+   *  handed, so it belongs in that subagent's stream rather than in the session's. */
+  | { type: 'user_message'; text: string; subagentId?: string }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'reasoning'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'tool'; tool: AgentToolCall }

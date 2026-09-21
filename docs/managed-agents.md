@@ -333,6 +333,24 @@ rather than a fixed set of columns with gaps in it.
 | At completion | `_meta.claudeCode.toolResponse`: agent id, type, model, tokens, tool uses, duration | nothing extra |
 | Terminal state | completed, unless backgrounded (see below) | idle, and still resumable |
 
+A subagent's run reads as a conversation of its own, and both ends of it used to be locked inside a
+tool call's parameters. The brief Claude hands a child rides in the spawning `Agent` call as one
+markdown string; the report the child hands back rides the same way in its `SubagentHandback` call. As
+parameters they render as pretty-printed JSON with every line break spelled out as `\n`, so reading
+either meant expanding a tool card and picking prose out of an escaped blob. `PROSE_TOOLS` in
+`acpNormalizer.ts` lifts each one out and posts it as somebody talking instead: a brief as a
+`user_message`, since the parent plays the reader's part for its child, and a report as an
+`assistant_message`. Both carry the subagent's id, so they land in that subagent's stream, and the call
+they came out of keeps its title and its outcome and loses its parameters. `ExitPlanMode`'s plan was
+the first of these and is now one entry in the same table. Codex needs no lifting: a child thread is a
+thread, so its brief already arrives as a `user_message`, which `codexChildRouting` tags with the
+subagent's id rather than dropping.
+
+Claude sends a call's parameters on exactly one of its updates, and not always on the call itself: a
+spawning `Agent` call arrives with an empty bag and a placeholder title, and the update after it
+carries the real title and the whole brief. So the lift reads whichever update is carrying the
+document, and a brief renders just under the spawn card rather than above it.
+
 Reading Claude's `_meta.claudeCode` namespace in the shared ACP normalizer is deliberate rather than a
 harness quirk: another harness's namespace is simply absent, so the branch costs nothing, and a quirk
 joins `HarnessQuirks` when a *second* harness needs one.
