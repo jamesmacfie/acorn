@@ -7,7 +7,6 @@ import {
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
 import type { NoteScope, NoteSummary } from './notesClient'
-import { libraryCollapsed, setLibraryCollapsed } from './notesPaneState'
 
 // The three regions of the Notes pane (docs/notes-and-memory.md § Notes). The host draws the split,
 // the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
@@ -23,20 +22,6 @@ export function NotesHeader(props: { task: Task; model: NotesModel }) {
       <Text emphasis="muted">{model().workspace()?.name ?? 'workspace'}</Text>
       <Input kind="filter" size="sm" label="Filter notes" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
     </Toolbar>
-  )
-}
-
-// Collapsing the library hides the whole list column, header and all, so the toggle cannot live in it.
-// It sits at the left of the note's own toolbar, which is where the boundary is.
-function LibraryToggle(props: { task: Task }) {
-  const collapsed = () => libraryCollapsed(props.task.id)
-  return (
-    <IconButton
-      icon={collapsed() ? 'chevron-right' : 'chevron-left'}
-      title={collapsed() ? 'Show library' : 'Hide library'}
-      label={collapsed() ? 'Show library' : 'Hide library'}
-      onPress={() => setLibraryCollapsed(props.task.id, !collapsed())}
-    />
   )
 }
 
@@ -152,17 +137,11 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
       <Show when={model().api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
         <Show
           when={model().selected()}
-          fallback={
-            <>
-              <Toolbar ariaLabel="Note actions"><LibraryToggle task={props.task} /></Toolbar>
-              <EmptyState>Select or create a note.</EmptyState>
-            </>
-          }
+          fallback={<EmptyState>Select or create a note.</EmptyState>}
         >
           {(sel) => (
             <>
               <Toolbar ariaLabel="Note actions">
-                <LibraryToggle task={props.task} />
                 <Input
                   kind="bare"
                   size="sm"

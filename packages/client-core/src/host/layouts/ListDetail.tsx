@@ -72,9 +72,14 @@ export function ListDetail(props: LayoutProps) {
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}
         <aside ref={list} class="layout-region-list" data-collapsed={collapsed() ? '' : undefined} aria-label={`${props.label} list`} use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}>
-          {props.regions['list-header']?.()}
-          <div class="layout-list-scroll">{props.regions.list?.()}</div>
-          {props.regions['list-footer']?.()}
+          <Show when={collapsed()}><div class="layout-collapsed-header" aria-hidden="true" /></Show>
+          <Show when={!collapsed() || props.collapseContent !== 'empty'}>
+            {props.regions['list-header']?.()}
+            <div class="layout-list-scroll">{props.regions.list?.()}</div>
+            <Show when={props.regions['list-footer']}>
+              <div class="layout-list-footer">{props.regions['list-footer']?.()}</div>
+            </Show>
+          </Show>
         </aside>
         {/* The same edge the kit's split draws, from the same node, so the two collapse controls
             cannot drift apart again (kit/components/primitives.tsx § CollapseEdge). A pane that

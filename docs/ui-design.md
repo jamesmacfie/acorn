@@ -998,8 +998,15 @@ right-click menu with its own markup would be a second place for the accessibili
 nothing is mouse-only. It is also keyboard-reachable directly: `contextmenu` is what the platform
 dispatches for Shift+F10 and the menu key as well as for the right button, and the surface focuses its
 first item on mount, so the menu is operable the moment it appears rather than something to Tab into.
-Point-anchored menus clamp to the viewport rather than flipping — the pointer really can be a pixel
-from the bottom edge, and there is no trigger rect to fall back to.
+Every anchored surface stays in the viewport. An element-anchored surface flips above, below or to
+the other side when its requested side has less room, then clamps any remaining overflow. A
+point-anchored menu only clamps — the pointer really can be a pixel from the bottom edge, and there
+is no trigger rect to flip around.
+
+Surfaces nest. A `Select` drawn inside a `Popover` puts its list in a portal of its own, so that
+list is not inside the popover holding it, and a press on one of its rows would otherwise read as a
+press outside. `anchor.ts` keeps the open surfaces in the order they opened, and a surface closes
+only on a press that lands outside itself and outside everything opened after it.
 
 A contribution is a label, an optional icon, an order, a predicate over the host-defined target, and
 one action. Core's own rows fit that shape — the tab rail's Pin/Unpin/Rename/Archive are registrations,
@@ -1026,9 +1033,9 @@ Both `Menu.tsx` and its anchoring hook (`kit/lib/anchor.ts`) replaced hand-rolle
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor
 roles, terminal's profile menu had no portal at all so an overflow ancestor clipped it, and
 AccountMenu and NotificationBell each hand-rolled their own outside-click listener. `anchor.ts` owns
-dismissal and geometry only; list semantics come from `focus.ts`, markup from the call site. It
-takes no flip/collision middleware beyond a `placement` flag and a re-measure on reflow, extended
-only when a real collision case turns up.
+dismissal and geometry only; list semantics come from `focus.ts`, markup from the call site. It keeps
+the collision pass in one pure helper beside the `placement` flag and re-measures on reflow, so menus,
+selects, pickers and popovers cannot drift into separate viewport rules.
 
 The portal is why an overflow-clipped pane no longer cuts a menu off at its edge: an absolutely
 positioned child cannot escape an ancestor that sets `overflow`, so it renders through a portal

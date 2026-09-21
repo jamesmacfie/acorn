@@ -142,6 +142,10 @@ describe('findings runtime', () => {
         providerId: 'fixture', backendId: 'connection:model-1', modelId: 'fixture-model',
       })
       .mockResolvedValueOnce({
+        text: JSON.stringify({ candidates: [{ payload: { body: 'Still wrong' }, sourceIds: ['wrong-id'], explanation: 'Wrong again.' }], omitted: [] }),
+        providerId: 'fixture', backendId: 'connection:model-1', modelId: 'fixture-model',
+      })
+      .mockResolvedValueOnce({
         text: JSON.stringify({ candidates: [{ payload: { body: 'Synthesized' }, sourceIds: [recorded.id], explanation: 'Valid.' }], omitted: [] }),
         providerId: 'fixture', backendId: 'connection:model-1', modelId: 'fixture-model',
       })
@@ -156,7 +160,7 @@ describe('findings runtime', () => {
     const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: { tasks: ctx.core.tasks, identity: ctx.core.identity, models: { ...ctx.core.models, generateText } } })
     const failed = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:model', backendId: 'connection:model-1', modelId: 'fixture-model' })
     expect(failed).toMatchObject({ state: 'failed', error: expect.stringContaining('exactly once') })
-    expect(generateText).toHaveBeenCalledOnce()
+    expect(generateText).toHaveBeenCalledTimes(2)
     expect(generateText.mock.calls[0]?.[0]).toMatchObject({
       userId: 'owner', backendId: 'connection:model-1', timeoutMs: 60_000,
       input: { modelId: 'fixture-model', system: expect.stringContaining('durable knowledge') },
@@ -165,12 +169,15 @@ describe('findings runtime', () => {
       target: { instructions: 'Create durable memory changes.', existing: [{ id: 'memory-1', name: 'existing-memory' }] },
       observations: [{ id: recorded.id }],
     })
+    expect(JSON.parse(generateText.mock.calls[1]?.[0].input.prompt)).toMatchObject({
+      correction: { error: expect.stringContaining('exactly once') },
+    })
     expect(failed).toMatchObject({ backendId: 'connection:model-1', modelId: 'fixture-model' })
     capture.withdrawTask({ taskId: 'task', observationId: recorded.id, actor: { kind: 'device', id: 'device-1' } })
     const restarted = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: { tasks: ctx.core.tasks, identity: ctx.core.identity, models: { ...ctx.core.models, generateText } } })
     expect(await restarted.retryPreparation(failed.id)).toMatchObject({ id: failed.id, state: 'preparing', backendId: 'connection:model-1', modelId: 'fixture-model' })
-    for (let attempt = 0; attempt < 20 && generateText.mock.calls.length < 2; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(generateText.mock.calls[1]?.[0]).toMatchObject({
+    for (let attempt = 0; attempt < 20 && generateText.mock.calls.length < 3; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(generateText.mock.calls[2]?.[0]).toMatchObject({
       userId: 'owner', backendId: 'connection:model-1', timeoutMs: 60_000,
       input: { modelId: 'fixture-model' },
     })

@@ -94,7 +94,7 @@ the answer; a new named layout is.
 | Layout | Regions | Desktop | Narrow | Terminal |
 | --- | --- | --- | --- | --- |
 | `single` | `body` | one region, the pane's padding and focus group | unchanged | one frame, titled with the pane's name |
-| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token, and `collapsible` adds the control that takes it down to a rail | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
+| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token, and `collapsible` adds the control that takes it down to a rail. Sources keep square one-mark rows; panes without a useful row mark keep only the empty header and expand control | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
 | `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the body is framed and titled with the pane's name; the two pinned strips are bare, because a frame round one line is three rows of chrome |
 | `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line; the panel is framed and titled with the open tab |
 | `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, each framed; the document is a host text view, read-only for now |
@@ -138,7 +138,8 @@ and a frame region is not one. Both halves are drawn.
 `class`, so a chip row or a composer sitting flush against the pane's border is the one thing a plugin
 cannot fix from inside. Every region that holds content takes the pane's inline padding: the scrolling
 bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`,
-`list-detail`'s detail column, and a `ListDetail`'s own detail column when it says `scroll`.
+`list-detail`'s detail column and footer, and a `ListDetail`'s own detail column when it says `scroll`.
+Chrome in a list footer remains full-bleed; its fields and action rows keep the inset.
 
 Two kinds of child drop the region's padding altogether, because the whole region is theirs: a
 `ListDetail`, whose divider is its columns' shared edge and whose columns pad themselves, and a diff,

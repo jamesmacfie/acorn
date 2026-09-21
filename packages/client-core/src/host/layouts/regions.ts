@@ -29,6 +29,9 @@ export type LayoutProps = {
    *  the pane has to give each of its rows a `collapsed` slot for the rail to be readable
    *  (registries/panes/panes.ts § collapsible). */
   collapsible?: boolean
+  /** `list-detail` only. An empty collapse keeps only the header-height expand control instead of
+   *  asking the list region to provide one-mark row variants. */
+  collapseContent?: 'rows' | 'empty'
   /** `tabs` only. The bar, in order; each entry has a `panel:<id>` region. */
   tabs?: readonly { id: string; label: string }[]
   /** `wizard` only. The host draws the indicator from these and the back and next controls. */

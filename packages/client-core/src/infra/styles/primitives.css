@@ -281,6 +281,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    at all. */
 .ui-row[data-collapsed] {
   justify-content: center;
+  min-height: var(--tabrail-w);
+  height: var(--tabrail-w);
   padding: 0;
   border-left-color: transparent;
 }
@@ -1120,6 +1122,13 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
+.ui-listdetail[data-list='collapsed'] > .ui-listdetail-list::before {
+  content: '';
+  display: block;
+  flex: none;
+  height: var(--pane-head-h);
+  border-bottom: var(--chrome-divider);
+}
 /* The edge is a grid track here and a flex item in the host's `list-detail` layout, so it declares
    both. Expanded, the handle's hairline is the divider; collapsed, the handle is gone and the edge
    carries it. */

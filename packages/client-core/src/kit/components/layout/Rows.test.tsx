@@ -24,7 +24,7 @@ afterEach(() => {
   _resetCollectionState()
 })
 
-const rows = () => [...host.querySelectorAll('.ui-row')]
+const rows = () => [...host.querySelectorAll<HTMLElement>('.ui-row')]
 
 // The virtual path publishes its scroll element in a frame, so a virtual list is only drawn after one.
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
@@ -102,5 +102,31 @@ describe('Rows redraws a virtual row whose item changed', () => {
     await frame()
     expect(rows()).toHaveLength(1)
     expect(rows()[0]?.textContent).toContain('gamma')
+  })
+
+  it('remeasures square rail rows when a sidebar collapses', async () => {
+    const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
+    onTestFinished(() => { if (own) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', own) })
+    const root = document.documentElement
+    root.style.setProperty('--row-h-virt', '36px')
+    root.style.setProperty('--tabrail-w', '48px')
+    onTestFinished(() => {
+      root.style.removeProperty('--row-h-virt')
+      root.style.removeProperty('--tabrail-w')
+    })
+    const [collapsed, setCollapsed] = createSignal(false)
+    mount(() => (
+      <Rows virtual rowHeight={collapsed() ? 'rail' : 'default'} id="rows-test-rail-height" items={[{ key: 'a', label: 'alpha' }]}>
+        {(item, itemProps, _selected, place) => (
+          <Row item={itemProps} offset={place.offset} height={place.height}>{item.label}</Row>
+        )}
+      </Rows>
+    ))
+    await frame()
+    expect(rows()[0]?.style.height).toBe('36px')
+    setCollapsed(true)
+    await frame()
+    expect(rows()[0]?.style.height).toBe('48px')
   })
 })

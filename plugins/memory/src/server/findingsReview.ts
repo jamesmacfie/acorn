@@ -87,11 +87,15 @@ export const createMemoryFindingsTarget = (args: { db: PluginDatabase; memory: M
       return {
         instructions: [
           'Produce memory-change payloads with operation, name, type, description, body, and scope.',
+          'Set operation to exactly "add" for a new memory or exactly "update" when replacing an existing memory. No other operation value is valid.',
           'Use a short kebab-case name and one clear sentence for description.',
           'Types are convention, architecture, decision, fix, reference, feedback, task, or user.',
           'Use project scope unless the source establishes a stable preference that should apply across projects.',
           'A durable decision should preserve its rationale in the body.',
-          'For an update, copy the existing memory id and hash into baseMemoryId and baseHash. Never rename an update.',
+          'For add, omit baseMemoryId and baseHash.',
+          'For update, copy the existing memory id and hash into baseMemoryId and baseHash. Never rename an update.',
+          'Add example: {"operation":"add","name":"owner-boundaries","type":"architecture","description":"Keep writes behind their owning service.","body":"Use the owning service for writes.","scope":{"kind":"project"}}.',
+          'Update example: {"operation":"update","name":"owner-boundaries","type":"architecture","description":"Keep writes behind their owning service.","body":"Use the owning service for writes.","scope":{"kind":"project"},"baseMemoryId":"memory-id","baseHash":"memory-hash"}.',
         ].join(' '),
         existing: boundedExistingMemories(await allRows(resolvedScope)),
       }

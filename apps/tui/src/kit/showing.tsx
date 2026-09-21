@@ -288,6 +288,8 @@ export function Rows<T extends CollectionItem>(props: {
   items: readonly T[]
   tree?: boolean
   virtual?: boolean
+  /** DOM-only density hint. Terminal rows are always one cell high. */
+  rowHeight?: 'default' | 'rail'
   selected?: string | null
   onSelect?: (key: string) => void
   onActivate?: (key: string) => void

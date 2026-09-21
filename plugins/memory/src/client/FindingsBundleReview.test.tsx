@@ -28,6 +28,23 @@ afterEach(() => { dispose?.(); host?.remove(); vi.clearAllMocks() })
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('findings-backed memory review', () => {
+  it('keeps summary review actions compact, right-aligned, and usable without opening the change', async () => {
+    mocks.bundles.mockResolvedValue([bundle(1)])
+    mocks.approveFinding.mockResolvedValue({ ok: true })
+    host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
+    await settle()
+
+    const toolbar = host.querySelector('.ui-toolbar[data-variant="actions"]')!
+    expect(toolbar).not.toBeNull()
+    expect([...toolbar.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['View change', 'Approve', 'Edit', 'Dismiss', 'Snooze'])
+    expect([...toolbar.querySelectorAll('button')].every((button) => button.dataset.size === 'sm')).toBe(true)
+
+    ;([...toolbar.querySelectorAll('button')].find((button) => button.textContent === 'Approve') as HTMLButtonElement).click()
+    await settle()
+    expect(mocks.approveFinding).toHaveBeenCalledWith('candidate-1', 1, 'payload-hash', expect.any(String))
+    expect(mocks.finding).not.toHaveBeenCalled()
+  })
+
   it('limits summaries to three, then opens the exact full preview with update diff and evidence', async () => {
     mocks.bundles.mockResolvedValue([bundle(4)])
     mocks.finding.mockResolvedValue({ ...candidate('candidate-1'), observations: [observation('observation-1', 'Evidence', 'Observed source body.')] })

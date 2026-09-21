@@ -86,6 +86,7 @@ const model = (changes: LocalChange[], chosen: Partial<ChangeView> = {}, commit:
     // and gets out of the way of what this file is about; ./RemoteBar.test.tsx is where the bar's own
     // states are.
     status: () => emptyLocalStatus(),
+    refresh: vi.fn(),
     remoteBusy: () => false,
     remote: () => {},
     // No model provider connected, so the footer draws no wand. ./GenerateButton.test.tsx is where
@@ -306,6 +307,11 @@ const openViewMenu = () => {
 }
 
 describe('the view menu', () => {
+  it('keeps a manual refresh beside the view options', () => {
+    drawHeader([change('src/a.ts', false)])
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="Refresh changes"]')).not.toBeNull()
+  })
+
   it('offers the sort in list view', () => {
     drawHeader([change('src/a.ts', false)])
     expect(openViewMenu().map((item) => item.label)).toEqual([

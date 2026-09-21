@@ -139,6 +139,19 @@ The plugin stores one monotonic revision per scope. A write or withdrawal publis
 history after a matching frame. Observation capture does not register attention or send notices;
 only an explicitly enabled ready-bundle notification can do so.
 
+The task evidence pane is a list/detail workbench. It defaults to active observations, retains an
+explicit all-history view, and keeps prepared Memory suggestions visible beside their source
+observations. Agent and workflow provenance opens the owning run through a manifest-declared
+cooperative destination; managed-turn and workflow-step evidence uses the same path. Findings passes
+only the stored run or session identifier, while the owning plugin resolves and renders the target.
+
+Managed-agent completion text is reconstructed from append-only provider deltas before Findings
+captures it. Earlier rows used the general observation kind for lifecycle checkpoints. The Findings
+migration reclassifies those lifecycle-produced rows as review input while preserving their IDs,
+bodies, evidence, and review links, so they remain available for synthesis but stay out of task
+context. Rows written with one paragraph break per streamed delta are compacted only for display;
+their stored bodies remain unchanged.
+
 ## Evidence and limits
 
 Evidence references are structured values. They can refer to repository paths, managed-agent turns,

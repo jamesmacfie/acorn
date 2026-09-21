@@ -2,6 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LAYOUTS } from '.'
 import { _resetLayoutState } from './state'
+import { _resetSidebarCollapse } from '../../kit/lib/collapseState'
 import type { LayoutProps, Region } from './regions'
 
 // The seven layouts, rendered with placeholder regions (docs/panes.md § Layout model).
@@ -25,11 +26,15 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.append(host)
   _resetLayoutState()
+  localStorage.clear()
+  _resetSidebarCollapse()
 })
 afterEach(() => {
   dispose?.()
   dispose = undefined
   host.remove()
+  localStorage.clear()
+  _resetSidebarCollapse()
 })
 
 describe('every layout draws the regions it is given, in order', () => {
@@ -55,6 +60,18 @@ describe('every layout draws the regions it is given, in order', () => {
     })
     expect(regionOrder()).toEqual(['detail'])
     expect(host.querySelector('[role="separator"]')).toBe(null)
+  })
+
+  it('list-detail can collapse to an empty rail while keeping its header and expand control', () => {
+    mount('list-detail', {
+      regions: { list: text('list'), detail: text('detail'), 'list-header': text('list-header'), 'list-footer': text('list-footer') },
+      collapsible: true,
+      collapseContent: 'empty',
+    })
+    host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!.click()
+    expect(regionOrder()).toEqual(['detail'])
+    expect(host.querySelector('.layout-collapsed-header')).not.toBe(null)
+    expect(host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')?.getAttribute('aria-label')).toBe('Expand Pane list')
   })
 
   it('header-body-footer, with all three optional', () => {

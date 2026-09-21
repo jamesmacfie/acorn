@@ -1,9 +1,9 @@
-import { For, createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
+import { For, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
-  sendReferenceToAgent, taskBridge, taskStatus, type Task,
+  sendReferenceToAgent, taskBridge, taskStatusRevision, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
@@ -42,6 +42,7 @@ export function createChangesModel(task: Task) {
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
+  const [statusRevision, setStatusRevision] = createSignal(0)
 
   // One read behind the whole panel: the changes, the branch, its upstream, how far each way, and
   // whether a merge or rebase is mid-flight (docs/diff-rendering.md § Data flow). The list draws the
@@ -51,18 +52,20 @@ export function createChangesModel(task: Task) {
     // during that interval: the node is removing this worktree, and a status read has no stable tree
     // to describe. Returning to active after a refusal changes this source back and refetches.
     () => isArchiving(task.id) ? undefined : task.id,
-    async (id) => await localGitApi.status(id),
+    async (id) => {
+      const next = await localGitApi.status(id)
+      setStatusRevision((revision) => revision + 1)
+      return next
+    },
     { initialValue: emptyLocalStatus() },
   )
-  // The rail's dirty poll is the refresh signal: when the worktree's change count moves, this
-  // re-lists.
-  createEffect(() => {
+  // The rail's status poll is the refresh signal. Its summary keeps the same object when the dirty
+  // count, branch and HEAD are unchanged, but this list has more information than that summary: one
+  // file can replace another, or its line counts can move, without changing any rail marker.
+  createEffect(on(taskStatusRevision, () => {
     if (isArchiving(task.id)) return
-    const st = taskStatus(task.id)
-    void st?.dirtyCount
-    void st?.dirty
     void refetch()
-  })
+  }, { defer: true }))
   // A commit is not a file change, so the dirty poll above does not see one: an agent committing in
   // its terminal leaves a clean tree and a branch one commit further ahead. `head:changed` is the
   // node noticing HEAD moved, and it is what makes the ahead count move within a poll rather than
@@ -134,7 +137,7 @@ export function createChangesModel(task: Task) {
     // and the viewer keeps the reader's scroll position for that; a file appearing or going moves the
     // first, which does reset it.
     signature: () => stack().map(changeKey).join('\0'),
-    contentSignature: () => `${stack().map((c) => `${changeKey(c)}:${c.additions}:${c.deletions}`).join('\0')}:${taskStatus(task.id)?.dirtyCount ?? 0}`,
+    contentSignature: () => `${statusRevision()}:${stack().map((c) => `${changeKey(c)}:${c.additions}:${c.deletions}`).join('\0')}`,
     // Only after a click. pickSelected falls back to the first row so something renders on open, and
     // treating that as a scroll target would mean the remembered offset never won.
     selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
@@ -308,6 +311,7 @@ export function createChangesModel(task: Task) {
     project,
     isGit: () => project()?.vcs === 'git',
     status,
+    refresh: () => refetch(),
     groups,
     /** The sections the list draws, each with its rows already ordered and its nodes already shaped
      *  for the view. Rebuilt when the status or the preference moves, not when a folder is closed. */
