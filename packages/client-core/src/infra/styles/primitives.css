@@ -130,9 +130,11 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-select-list > .ui-input { flex: none; margin-bottom: var(--space-3); }
 .ui-select-options { overflow-y: auto; }
 .ui-select-nomatch { margin: 0; padding: var(--space-2) var(--space-4); font-size: var(--fs-sm); }
-/* Without this the labels wrap instead of widening the list, and the list was sized to fit the
-   trigger it opened under. */
-.ui-select-list .ui-menu-item { white-space: nowrap; }
+/* The list is exactly as wide as the trigger, so a label longer than that wraps onto a second line
+   rather than the list growing past the control it opened under. Rows get vertical padding because
+   a wrapped one is taller than the single-line row height. */
+.ui-select-list .ui-menu-item { padding: var(--space-2) var(--space-4); }
+.ui-select-list .ui-menu-label { overflow-wrap: anywhere; }
 .ui-select-list .ui-menu-item[aria-selected='true'] { background: var(--bg-selected); }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
