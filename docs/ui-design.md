@@ -285,8 +285,9 @@ style axis it keeps.
 A handful of custom properties are set from JavaScript rather than declared in any stylesheet, and
 `cssHygiene.test.ts`'s `no phantom tokens` check has to know each one by name or it reads as an
 undeclared reference. The rule for what is allowed onto this list: a component may hand CSS a
-measurement or a count, never a design decision. `--meter-value` and `--kv-extra-cols` are a fill
-ratio and a column count; `--diff-cols` is a diff canvas's width in columns, from `maxLineCols()`;
+measurement or a count, never a design decision. `--meter-value`, `--meter-mark` and
+`--kv-extra-cols` are a fill ratio, a second ratio on the same scale, and a column count;
+`--diff-cols` is a diff canvas's width in columns, from `maxLineCols()`;
 `--dash-cell` and `--dash-pitch` are a dashboard grid's measured cell size and pitch, from
 `PanelGrid`'s `ResizeObserver`. In every case the number crosses the JS/CSS boundary, but the
 stylesheet that reads it still owns the shape: the arithmetic that turns a column count into a width,
@@ -1249,7 +1250,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
 | `Graph` | collection | reduced: the indented list, one line per card — glyph, label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
-| `Meter` | none | `████░░░░ 62%` |
+| `Meter` | none | `████░░░░ 62%`; `mark` takes over the cell it falls in, as `███▲░░░░`, rather than a row of its own |
 | `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
 | `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in grey |

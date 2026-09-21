@@ -90,6 +90,17 @@ export const usageTone = (health: string): Tone => {
   return 'muted'
 }
 
+/** The same reading, for the bar under a usage row rather than the dot beside it. `Meter` has no
+ *  muted fill, and a reading acorn could not take should not be drawn in the colour of a healthy
+ *  one, so it takes the neutral accent instead. A depleted plan is red here: the dot can afford grey
+ *  for "nothing to say", an empty bar cannot. */
+export const usageMeterTone = (health: string): 'accent' | 'ok' | 'warn' | 'danger' => {
+  if (health === 'healthy') return 'ok'
+  if (health === 'warning') return 'warn'
+  if (health === 'critical' || health === 'depleted') return 'danger'
+  return 'accent'
+}
+
 /** What a session is waiting on, as a mark rather than a word. The sidebar used to print the reason
  *  in a pill, which put a second block of text on a row that already carries a title, a provider, a
  *  model and a state, and the pill was the widest thing on it.
