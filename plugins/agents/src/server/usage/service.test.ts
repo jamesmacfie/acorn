@@ -21,7 +21,7 @@ const provider = (id: AgentUsageProviderId, percent = 80): AgentProviderUsage =>
   health: 'healthy',
   plan: null,
   account: null,
-  quotas: [{ id: 'session', label: 'Session', percentRemaining: percent, resetsAt: null, resetText: null, health: 'healthy' }],
+  quotas: [{ id: 'session', label: 'Session', percentRemaining: percent, resetsAt: null, resetText: null, windowSeconds: null, health: 'healthy' }],
   cost: null,
   daily: null,
   capturedAt: 1,

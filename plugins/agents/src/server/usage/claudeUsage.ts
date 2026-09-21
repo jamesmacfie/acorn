@@ -7,7 +7,9 @@ import type {
   AgentUsageCost,
   AgentUsageQuota,
 } from '../../shared/usage'
-import { clampRemaining, usageHealth, worstUsageHealth } from '../../shared/usage'
+import {
+  clampRemaining, SESSION_WINDOW_SECONDS, usageHealth, WEEKLY_WINDOW_SECONDS, worstUsageHealth,
+} from '../../shared/usage'
 import type { AgentPricingPreferences } from '../../shared/pricing'
 import { analyzeClaudeDailyUsage } from './claudeDailyUsage'
 import {
@@ -136,6 +138,29 @@ function resetTextFrom(lines: readonly string[]): string | null {
   return null
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+// The absolute form the CLI prints: a wall-clock time on its own for the session ("Resets 2:50pm")
+// and a day in front of it for the week ("Resets Sep 24 at 11:59pm"), both in the reader's own zone.
+// `Date.parse` reads neither — it wants a space before the meridiem and dates a yearless string to
+// 2001 — and the timestamp is worth having, because it is what turns the row into a live countdown
+// and what says how far through the window the plan is.
+function parseClockReset(resetText: string, now: number): number | null {
+  const clock = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(resetText)
+  if (!clock) return null
+  const hour = (Number(clock[1]) % 12) + (clock[3].toLowerCase() === 'pm' ? 12 : 0)
+  const day = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(resetText)
+  const at = new Date(now)
+  // Month and day together, or setting the month alone would overflow out of a short one on the 31st.
+  if (day) at.setMonth(MONTHS.indexOf(day[1].toLowerCase().slice(0, 3)), Number(day[2]))
+  at.setHours(hour, Number(clock[2] ?? 0), 0, 0)
+  // A reset is always ahead, and no year is printed. A bare time that has already passed is
+  // tomorrow's; a date long past is last December's reading of a January reset.
+  if (!day && at.getTime() <= now) at.setDate(at.getDate() + 1)
+  if (day && at.getTime() <= now - 86_400_000) at.setFullYear(at.getFullYear() + 1)
+  return at.getTime()
+}
+
 export function parseClaudeReset(resetText: string | null, now = Date.now()): number | null {
   if (!resetText) return null
   const days = Number(resetText.match(/(\d+)\s*d(?:ays?)?/i)?.[1] ?? 0)
@@ -143,6 +168,8 @@ export function parseClaudeReset(resetText: string | null, now = Date.now()): nu
   const minutes = Number(resetText.match(/(\d+)\s*m(?:in(?:utes?)?)?/i)?.[1] ?? 0)
   const relativeMs = ((days * 24 + hours) * 60 + minutes) * 60_000
   if (relativeMs > 0) return now + relativeMs
+  const clock = parseClockReset(resetText, now)
+  if (clock != null) return clock
   const cleaned = resetText
     .replace(/^resets?\s*/i, '')
     .replace(/\s*\([^)]+\)\s*$/, '')
@@ -161,6 +188,7 @@ function quotaFromSection(
   label: string,
   lines: readonly string[],
   now: number,
+  windowSeconds: number,
   fallbackReset: { text: string | null; at: number | null } | null = null,
 ): AgentUsageQuota | null {
   const percent = lines.map(percentFrom).find((value): value is number => value !== null)
@@ -168,7 +196,7 @@ function quotaFromSection(
   const ownResetText = resetTextFrom(lines)
   const resetText = ownResetText ?? fallbackReset?.text ?? null
   const resetsAt = ownResetText ? parseClaudeReset(ownResetText, now) : fallbackReset?.at ?? null
-  return { id, label, percentRemaining: percent, resetsAt, resetText, health: usageHealth(percent) }
+  return { id, label, percentRemaining: percent, resetsAt, resetText, windowSeconds, health: usageHealth(percent) }
 }
 
 function modelName(label: string): string | null {
@@ -247,17 +275,23 @@ export function parseClaudeUsageOutput(
   const lines = text.split(/\r?\n/)
   const sessionIndex = lines.findIndex((line) => /current session/i.test(line))
   if (sessionIndex < 0) throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a current session.')
-  const session = quotaFromSection('session', 'Session', section(lines, sessionIndex), capturedAt)
+  const session = quotaFromSection('session', 'Session', section(lines, sessionIndex), capturedAt, SESSION_WINDOW_SECONDS)
   if (!session) throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a session percentage.')
 
   const weeklyIndex = lines.findIndex((line) => /current week\s*\(all models\)/i.test(line))
-  const weekly = weeklyIndex >= 0 ? quotaFromSection('weekly', 'Weekly', section(lines, weeklyIndex), capturedAt) : null
+  const weekly = weeklyIndex >= 0
+    ? quotaFromSection('weekly', 'Weekly', section(lines, weeklyIndex), capturedAt, WEEKLY_WINDOW_SECONDS)
+    : null
   const weeklyReset = weekly ? { text: weekly.resetText, at: weekly.resetsAt } : null
   const models: AgentUsageQuota[] = []
   for (const [index, line] of lines.entries()) {
     const name = modelName(line)
     if (!name) continue
-    const quota = quotaFromSection(`model:${name}`, name[0].toUpperCase() + name.slice(1), section(lines, index), capturedAt, weeklyReset)
+    // A per-model cap rides the weekly reset, which is why it takes the weekly window too.
+    const quota = quotaFromSection(
+      `model:${name}`, name[0].toUpperCase() + name.slice(1), section(lines, index), capturedAt,
+      WEEKLY_WINDOW_SECONDS, weeklyReset,
+    )
     if (quota && !models.some((existing) => existing.id === quota.id)) models.push(quota)
   }
   const quotas = [session, ...(weekly ? [weekly] : []), ...models]
