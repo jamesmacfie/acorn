@@ -913,6 +913,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    See docs/ui-design.md § How the kit is built (Meter) for why this is a div rather than
    a native <meter>. */
 .ui-meter {
+  position: relative;
   flex: none;
   display: block;
   width: 100%;
@@ -928,11 +929,30 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   height: 100%;
   width: calc(var(--meter-value, 0) * 100%);
   background: var(--accent);
+  border-radius: var(--radius-pill);
   transition: width var(--dur-short) var(--ease-out);
 }
+.ui-meter[data-tone='ok'] .ui-meter-fill { background: var(--state-ok); }
 .ui-meter[data-tone='warn'] .ui-meter-fill { background: var(--state-warn); }
 .ui-meter[data-tone='danger'] .ui-meter-fill { background: var(--state-bad); }
 @media (prefers-reduced-motion: reduce) { .ui-meter-fill { transition: none; } }
+/* The pace triangle sits under the track, so a marked meter stops clipping its own children and
+   reserves the row the mark hangs in. The fill carries the same pill radius as the track, which is
+   what keeps its ends rounded once the track has stopped clipping them. */
+.ui-meter[data-marked] { overflow: visible; margin-bottom: var(--space-3); }
+.ui-meter-mark {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: calc(var(--meter-mark, 0) * 100%);
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: var(--space-2) solid transparent;
+  border-right: var(--space-2) solid transparent;
+  border-bottom: var(--space-2) solid var(--text-muted);
+  transition: left var(--dur-short) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) { .ui-meter-mark { transition: none; } }
 
 /* ── CodeBlock ──────────────────────────────────────────────────────────────────────────────
    Nine mono-block rules. `.copyable` on the wrapper is the existing shared convention from

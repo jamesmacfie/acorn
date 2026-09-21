@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
 import type { AgentProviderUsageReading, AgentUsageQuota } from '../../shared/usage'
-import { clampRemaining, usageHealth, worstUsageHealth } from '../../shared/usage'
+import {
+  clampRemaining, SESSION_WINDOW_SECONDS, usageHealth, WEEKLY_WINDOW_SECONDS, worstUsageHealth,
+} from '../../shared/usage'
 import {
   capturePty,
   resolveUsageCommand,
@@ -163,17 +165,23 @@ function quota(
   id: string,
   label: string,
   window: Record<string, unknown>,
+  fallbackWindowSeconds: number,
 ): AgentUsageQuota | null {
   if (typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent)) return null
   const percentRemaining = clampRemaining(100 - window.usedPercent)
   const resetSeconds =
     typeof window.resetsAt === 'number' && Number.isFinite(window.resetsAt) ? window.resetsAt : null
+  // Codex sends the window length with some payloads and not others, so its own number wins and the
+  // usual five hours or week stands in when it is absent.
+  const windowMinutes =
+    typeof window.windowMinutes === 'number' && window.windowMinutes > 0 ? window.windowMinutes : null
   return {
     id,
     label,
     percentRemaining,
     resetsAt: resetSeconds == null ? null : resetSeconds * 1_000,
     resetText: null,
+    windowSeconds: windowMinutes == null ? fallbackWindowSeconds : windowMinutes * 60,
     health: usageHealth(percentRemaining),
   }
 }
@@ -187,8 +195,8 @@ export function parseCodexRpcResponse(message: unknown, capturedAt = Date.now())
   const primary = asObject(rateLimits.primary)
   const secondary = asObject(rateLimits.secondary)
   const quotas = [
-    ...(primary ? [quota('session', 'Session (5h)', primary)] : []),
-    ...(secondary ? [quota('weekly', 'Weekly', secondary)] : []),
+    ...(primary ? [quota('session', 'Session (5h)', primary, SESSION_WINDOW_SECONDS)] : []),
+    ...(secondary ? [quota('weekly', 'Weekly', secondary, WEEKLY_WINDOW_SECONDS)] : []),
   ].filter((value): value is AgentUsageQuota => value !== null)
   if (quotas.length === 0 && plan?.toLowerCase() === 'free') {
     quotas.push({
@@ -197,6 +205,7 @@ export function parseCodexRpcResponse(message: unknown, capturedAt = Date.now())
       percentRemaining: 100,
       resetsAt: null,
       resetText: 'Free plan',
+      windowSeconds: null,
       health: 'healthy',
     })
   }
@@ -253,10 +262,10 @@ export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): Agen
   const quotas: AgentUsageQuota[] = [
     ...(session == null
       ? []
-      : [{ id: 'session', label: 'Session (5h)', percentRemaining: session, resetsAt: null, resetText: null, health: usageHealth(session) }]),
+      : [{ id: 'session', label: 'Session (5h)', percentRemaining: session, resetsAt: null, resetText: null, windowSeconds: SESSION_WINDOW_SECONDS, health: usageHealth(session) }]),
     ...(weekly == null
       ? []
-      : [{ id: 'weekly', label: 'Weekly', percentRemaining: weekly, resetsAt: null, resetText: null, health: usageHealth(weekly) }]),
+      : [{ id: 'weekly', label: 'Weekly', percentRemaining: weekly, resetsAt: null, resetText: null, windowSeconds: WEEKLY_WINDOW_SECONDS, health: usageHealth(weekly) }]),
   ]
   if (quotas.length === 0) throw new UsageProcessError('parse_failure', 'Codex `/status` output did not contain usage limits.')
   return {
