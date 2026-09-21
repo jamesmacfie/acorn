@@ -1494,6 +1494,43 @@ export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
   return <div {...props.drag.handleProps} class="ui-split-handle" data-axis={props.axis} />
 }
 
+/* CollapseEdge: the divider between a sidebar and its detail, with the control that collapses the
+   sidebar to a rail riding on it.
+
+   The control sits on the edge rather than in the list column's header, because the header belongs
+   to whoever wrote the column, and because a collapsed column is a rail with no header left to put
+   a button in. A collapsed column also loses the drag handle, along with the width it could have
+   been dragged to.
+
+   One node for both sidebars. The kit's `ListDetail` below and the host's `list-detail` layout
+   (host/layouts/ListDetail.tsx) draw the same edge, and while they each wrote their own the two
+   buttons drifted: one grew a border and the other never had one. */
+export function CollapseEdge(props: {
+  collapsed: boolean
+  onToggle: () => void
+  drag: SplitDrag
+  /** Which list, for the accessible name: "Collapse Pull requests list". The tooltip stays plain,
+   *  since whoever can see it can also see which column it is on. */
+  listLabel?: string
+}) {
+  const verb = () => props.collapsed ? 'Expand' : 'Collapse'
+  return (
+    <div class="ui-listdetail-edge" data-collapsed={props.collapsed ? '' : undefined}>
+      <Show when={!props.collapsed}><SplitHandle axis="x" drag={props.drag} /></Show>
+      <Button
+        variant="bare"
+        size="xs"
+        iconOnly
+        label={`${verb()} ${props.listLabel ? `${props.listLabel} ` : ''}list`}
+        tip={`${verb()} list`}
+        onPress={() => props.onToggle()}
+      >
+        <Icon name={props.collapsed ? 'chevron-right' : 'chevron-left'} />
+      </Button>
+    </div>
+  )
+}
+
 /* ListDetail: list beside detail. See docs/ui-design.md § Two-column panes for what it replaces,
    the layout rules, and when not to use it. */
 const MIN_LIST_DETAIL_WIDTH = 120
@@ -1559,33 +1596,12 @@ export function ListDetail(props: {
     },
     onCommit: () => { dragStart = null },
   })
-  // The divider, and the control that collapses the column, which rides on it.
-  //
-  // On the edge rather than inside the list column's header, because the header belongs to whoever
-  // wrote the column: in the `split` form it is a `ListColumn` the caller built, so there is nothing
-  // for this node to put a button into. The edge is the one place both forms share, and it is also
-  // the only place that still exists once the column is a 48px rail with no header left to sit in.
-  //
-  // A collapsed column loses the drag handle with the width it could have been dragged to.
-  //
-  // A split with no collapse is the bare handle it always was, and the wrapper below appears only
-  // where there is a second thing to hold. Most of this node's callers are two halves of a document
-  // rather than a sidebar, and the grid's middle track is a contract they already keep.
+  // A split with no collapse is the bare handle it always was, and the edge above appears only where
+  // there is a second thing to hold. Most of this node's callers are two halves of a document rather
+  // than a sidebar, and the grid's middle track is a contract they already keep.
   const edge = () => (
     <Show when={props.collapseKey !== undefined} fallback={<SplitHandle axis="x" drag={drag} />}>
-      <div class="ui-listdetail-edge">
-        <Show when={!collapsed()}><SplitHandle axis="x" drag={drag} /></Show>
-        <Button
-          variant="bare"
-          size="xs"
-          iconOnly
-          label={collapsed() ? 'Expand list' : 'Collapse list'}
-          tip={collapsed() ? 'Expand list' : 'Collapse list'}
-          onPress={() => collapse()?.[1](!collapsed())}
-        >
-          <Icon name={collapsed() ? 'chevron-right' : 'chevron-left'} />
-        </Button>
-      </div>
+      <CollapseEdge collapsed={collapsed()} onToggle={() => collapse()?.[1](!collapsed())} drag={drag} listLabel={props.listLabel} />
     </Show>
   )
   return (

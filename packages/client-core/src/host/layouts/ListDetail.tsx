@@ -1,7 +1,6 @@
 import { Show } from 'solid-js'
 import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/collapseState'
-import { Button } from '../../kit/components/primitives'
-import Icon from '../../kit/components/content/Icon'
+import { CollapseEdge, SplitHandle } from '../../kit/components/primitives'
 import { createSplitDrag } from '../../kit/lib/split'
 import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
@@ -77,26 +76,17 @@ export function ListDetail(props: LayoutProps) {
           <div class="layout-list-scroll">{props.regions.list?.()}</div>
           {props.regions['list-footer']?.()}
         </aside>
-        {/* The divider, and the collapse control riding on it. On the edge rather than in the list's
-            header because the header is a region the pane wrote, and because a collapsed column has
-            no header left to put a button in. A rail cannot be dragged wider, so the grip goes. */}
-        <div class="layout-list-edge" data-collapsed={collapsed() ? '' : undefined}>
-          <Show when={!collapsed()}>
-            <div {...drag.handleProps} class="ui-split-handle" data-axis="x" />
-          </Show>
-          <Show when={props.collapsible}>
-            <Button
-              variant="bare"
-              size="xs"
-              iconOnly
-              label={collapsed() ? `Expand ${props.label} list` : `Collapse ${props.label} list`}
-              tip={collapsed() ? 'Expand list' : 'Collapse list'}
-              onPress={() => setCollapsed(!collapsed())}
-            >
-              <Icon name={collapsed() ? 'chevron-right' : 'chevron-left'} />
-            </Button>
-          </Show>
-        </div>
+        {/* The same edge the kit's split draws, from the same node, so the two collapse controls
+            cannot drift apart again (kit/components/primitives.tsx § CollapseEdge). A pane that
+            cannot collapse gets the bare grip and no wrapper. */}
+        <Show when={props.collapsible} fallback={<SplitHandle axis="x" drag={drag} />}>
+          <CollapseEdge
+            collapsed={collapsed()}
+            onToggle={() => setCollapsed(!collapsed())}
+            drag={drag}
+            listLabel={props.label}
+          />
+        </Show>
       </Show>
       <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>{props.regions.detail?.()}</div>
     </div>

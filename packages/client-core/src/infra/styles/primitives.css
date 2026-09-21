@@ -1120,20 +1120,27 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
+/* The edge is a grid track here and a flex item in the host's `list-detail` layout, so it declares
+   both. Expanded, the handle's hairline is the divider; collapsed, the handle is gone and the edge
+   carries it. */
 .ui-listdetail-edge {
   position: relative;
   display: flex;
+  flex: none;
   min-width: 0;
   overflow: visible;
 }
-.ui-listdetail[data-list='collapsed'] > .ui-listdetail-edge { border-right: var(--chrome-divider); }
+.ui-listdetail-edge[data-collapsed] { border-right: var(--chrome-divider); }
+/* The control straddles the edge, half over each column, so it needs a background and a border of
+   its own to read against either one. */
 .ui-listdetail-edge > .ui-btn {
   position: absolute;
   top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);
   right: 0;
   transform: translateX(50%);
   z-index: var(--z-resizer);
-  background: var(--pane-bg);
+  background: var(--bg-subtle);
+  border: var(--control-border);
   border-radius: var(--radius-surface);
 }
 /* A flex column so a caller can stack a header, a scrolling list and a footer link in it, the
