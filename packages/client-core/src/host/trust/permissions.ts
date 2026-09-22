@@ -74,7 +74,11 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
       : []),
     ...(permissions.node.exec ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })] : []),
     ...(permissions.node.sockets ? [line('node.sockets', { text: 'Open unrestricted network connections', icon: 'globe', high: true })] : []),
-    ...permissions.node.net.map((host) => line(`node.net:${host}`, { text: `Reach ${host}`, icon: 'globe' })),
+    ...permissions.node.net.map((host) => line(`node.net:${host}`, {
+      text: host === '*' ? 'Send requests to any network host' : `Reach ${host}`,
+      icon: 'globe',
+      high: host === '*',
+    })),
     ...(permissions.node.env ?? []).map((name) =>
       line(`node.env:${name}`, { text: `Read the node environment value ${name}`, icon: 'key-round', high: true })),
     ...(permissions.node.files ?? []).map(({ env, access }) =>
