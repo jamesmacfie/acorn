@@ -9,14 +9,16 @@ const BACKGROUND_BATCH_DELAY_MS = 80
 
 type HydratorOptions = {
   /**
-  /**
    * Turn a file's patch into rows. Async because tokenizing happens in a worker now
    * (highlight/worker.ts). This used to be a synchronous call plus a separate `tokenizerForFile`
    * hook, and the two collapsed into one when picking the tokenizer stopped being the hydrator's
    * business.
    */
   parseFile: (file: DiffFile) => ParsedFile | Promise<ParsedFile>
+  /** Publish a parsed file. Kept as the stable consumer contract. */
   onParsed: (parsed: ParsedFile) => void
+  /** Publish one completed fetch batch together when the consumer can apply it atomically. */
+  onParsedBatch?: (parsed: ParsedFile[]) => void
   // Patch-body source, injected so the hydrator stays agnostic of where diffs come from (the PR
   // diff wires the query cache + batch endpoint; the compare preview has every body inline):
   /** Resolve a body for a file whose reset() snapshot entry has no patch (e.g. binary → null patch,
@@ -58,10 +60,19 @@ export function createDiffHydrator(options: HydratorOptions) {
   const [published, setPublished] = createStore<Record<string, DiffHydrationStatus>>({})
   let fileByPath = new Map<string, DiffFile>()
   let queue: string[] = []
+  let firstPath: string | undefined
   let generation = 0
   let running = false
   let disposed = false
   let controller: AbortController | null = null
+
+  const publishParsed = (parsed: ParsedFile[]) => {
+    if (options.onParsedBatch) {
+      options.onParsedBatch(parsed)
+      return
+    }
+    for (const file of parsed) options.onParsed(file)
+  }
 
   const setStatus = (path: string, status: DiffHydrationStatus) => {
     statuses.set(path, status)
@@ -112,6 +123,7 @@ export function createDiffHydrator(options: HydratorOptions) {
     }
 
     const byPath = new Map([...cached, ...fetched].map((file) => [file.path, file]))
+    const parsedBatch: ParsedFile[] = []
     for (const path of paths) {
       if (run !== generation || disposed) return
       const file = byPath.get(path)
@@ -121,10 +133,15 @@ export function createDiffHydrator(options: HydratorOptions) {
       }
       const parsed = await options.parseFile(file)
       if (run !== generation || disposed) return
-      options.onParsed(parsed)
+      parsedBatch.push(parsed)
       setStatus(path, 'loaded')
+      if (path === firstPath) {
+        firstPath = undefined
+        publishParsed(parsedBatch.splice(0))
+      }
       await yieldToBrowser()
     }
+    if (parsedBatch.length && run === generation && !disposed) publishParsed(parsedBatch)
   }
 
   const pump = async (run: number) => {
@@ -166,13 +183,16 @@ export function createDiffHydrator(options: HydratorOptions) {
     running = false
     fileByPath = new Map(files.map((file) => [file.path, file]))
     statuses.clear()
+    firstPath = undefined
     queue = files.map((file) => file.path)
     for (const file of files) statuses.set(file.path, 'queued')
     // One write for the new file set, rather than one per file: `reconcile` drops the paths that are
     // gone, adds the ones that are new, and leaves a file whose status has not changed alone.
     setPublished(reconcile(Object.fromEntries(statuses)))
-    const first = priorityPath && fileByPath.has(priorityPath) ? priorityPath : files[0]?.path
-    if (first) enqueueFront([first])
+    firstPath = priorityPath && fileByPath.has(priorityPath) ? priorityPath : files[0]?.path
+    if (firstPath) {
+      enqueueFront([firstPath])
+    }
     schedule()
   }
 

@@ -159,12 +159,20 @@ export function DiffLine(props: {
 }) {
   return (
     <>
-      <span class="diff-gutter">{props.r.oldNo ?? ''}</span>
-      <span class="diff-gutter">{props.r.newNo ?? ''}</span>
-      <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
-      <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
-        <CodeContent r={props.r} highlight={props.highlight} />
-      </LineComposer>
+      <span class="diff-line-chrome">
+        <span class="diff-gutter">{props.r.oldNo ?? ''}</span>
+        <span class="diff-gutter">{props.r.newNo ?? ''}</span>
+        <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
+      </span>
+      <Show when={props.canAdd && props.composer}>
+        <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
+          +
+        </button>
+      </Show>
+      <CodeContent r={props.r} highlight={props.highlight} />
+      <Show when={props.composer?.isOpen()}>
+        <LineComposer addComment={props.addComment} onMutated={props.onMutated} composer={props.composer!} mentions={props.mentions ?? []} />
+      </Show>
     </>
   )
 }
@@ -193,9 +201,15 @@ export function SplitCell(props: {
           <>
             <span class="diff-gutter">{props.gutter ?? ''}</span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
-            <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
-              <CodeContent r={r()} highlight={props.highlight} />
-            </LineComposer>
+            <Show when={props.canAdd && props.composer}>
+              <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
+                +
+              </button>
+            </Show>
+            <CodeContent r={r()} highlight={props.highlight} />
+            <Show when={props.composer?.isOpen()}>
+              <LineComposer addComment={props.addComment} onMutated={props.onMutated} composer={props.composer!} mentions={props.mentions ?? []} />
+            </Show>
           </>
         )}
       </Show>
@@ -258,25 +272,23 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
 }
 
 function LineComposer(props: {
-  canAdd: boolean
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
-  composer?: LineComposerController
+  composer: LineComposerController
   mentions: string[]
-  children: unknown
 }) {
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal<string | null>(null)
 
   const submit = async () => {
-    const text = props.composer?.body().trim() ?? ''
+    const text = props.composer.body().trim()
     if (!text) return
     setBusy(true)
     setErr(null)
     try {
       await props.addComment(text)
-      props.composer?.setBody('')
-      props.composer?.setOpen(false)
+      props.composer.setBody('')
+      props.composer.setOpen(false)
       props.onMutated()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'failed')
@@ -286,33 +298,23 @@ function LineComposer(props: {
   }
 
   return (
-    <>
-      <Show when={props.canAdd && props.composer}>
-        <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
-          +
-        </button>
+    <div class="diff-composer" onClick={(e) => e.stopPropagation()}>
+      <MentionTextarea
+        placeholder={'Comment on this line\u2026'}
+        value={props.composer.body()}
+        onInput={props.composer.setBody}
+        mentions={props.mentions}
+      />
+      <div class="diff-composer-actions">
+        <Button disabled={busy() || !props.composer.body().trim()} onPress={submit}>
+          {busy() ? 'Adding\u2026' : 'Comment'}
+        </Button>
+        <Button onPress={() => props.composer.setOpen(false)}>Cancel</Button>
+      </div>
+      <Show when={err()}>
+        <span class="diff-thread-err">{err()}</span>
       </Show>
-      {props.children as never}
-      <Show when={props.composer?.isOpen()}>
-        <div class="diff-composer" onClick={(e) => e.stopPropagation()}>
-          <MentionTextarea
-            placeholder={'Comment on this line\u2026'}
-            value={props.composer?.body() ?? ''}
-            onInput={(v) => props.composer?.setBody(v)}
-            mentions={props.mentions}
-          />
-          <div class="diff-composer-actions">
-            <Button disabled={busy() || !(props.composer?.body().trim() ?? '')} onPress={submit}>
-              {busy() ? 'Adding\u2026' : 'Comment'}
-            </Button>
-            <Button onPress={() => props.composer?.setOpen(false)}>Cancel</Button>
-          </div>
-          <Show when={err()}>
-            <span class="diff-thread-err">{err()}</span>
-          </Show>
-        </div>
-      </Show>
-    </>
+    </div>
   )
 }
 

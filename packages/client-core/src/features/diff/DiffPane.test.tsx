@@ -11,8 +11,8 @@ import type { DiffSource } from './source'
 //
 // Before phase 8 that was two or three times per file: the hydrator published one version counter, and
 // `DiffPane` read every file's status through it inside one memo over all files. Now a status is a
-// store key the row itself reads, so the only thing that rebuilds the row model is a file actually
-// arriving.
+// store key the row itself reads. Parsed files now publish by fetch batch, and off-screen batches may
+// coalesce further in an idle turn.
 const spy = vi.hoisted(() => ({ rowBuilds: 0, tokenizes: 0 }))
 
 vi.mock('../../kit/diff/diffModel', async (importOriginal) => {
@@ -81,7 +81,7 @@ const mount = (files: DiffFile[]) => {
 }
 
 describe('hydrating a large diff', () => {
-  it(`rebuilds the row model once per file that arrives, not once per status change`, async () => {
+  it(`rebuilds the row model at most once per hydration batch`, async () => {
     const files = Array.from({ length: FILES }, (_, index) => file(index))
     mount(files)
 
@@ -92,10 +92,9 @@ describe('hydrating a large diff', () => {
     // The last file's parse still has to reach the memo.
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    // One rebuild per file, plus the handful the mount itself does (the first empty render, the file
-    // set arriving, the initial statuses). The old shape was two to three per file, so the ceiling
-    // here is what fails if a shared counter comes back.
-    expect(spy.rowBuilds).toBeLessThanOrEqual(FILES + 10)
-    expect(spy.rowBuilds).toBeGreaterThan(FILES / 2)
+    // Four parsed files publish together, plus the handful of mount-time builds. The previous shape
+    // was one rebuild per file, and status transitions before that made it two or three per file.
+    expect(spy.rowBuilds).toBeLessThanOrEqual(FILES / 4 + 12)
+    expect(spy.rowBuilds).toBeGreaterThan(1)
   }, 40_000)
 })

@@ -85,6 +85,28 @@ describe('diff hydrator', () => {
     }
   })
 
+  it('publishes the first priority file immediately and groups the rest by fetch batch', async () => {
+    const publications: string[][] = []
+    const files = ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'].map((path) => pullFile(path, `@@ ${path}`))
+    const { hydrator, disposeRoot } = makeHydrator([], {
+      onParsedBatch: (batch) => publications.push(batch.map((file) => file.file.path)),
+    })
+
+    try {
+      hydrator.reset(files, 'b.ts')
+      await waitFor(() => expect(publications).toHaveLength(3))
+
+      expect(publications).toEqual([
+        ['b.ts'],
+        ['a.ts', 'c.ts', 'd.ts'],
+        ['e.ts'],
+      ])
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
+
   it('resolves patch-less files through cachedFile without needing fetchPatches', async () => {
     // The compare-preview wiring: every body is inline, so cachedFile serves even null-patch
     // (binary) files and no fetchPatches is provided.
