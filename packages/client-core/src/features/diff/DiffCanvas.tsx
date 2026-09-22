@@ -26,6 +26,7 @@ export function DiffCanvas(props: {
   scheduleElementMeasure: (target: 'unified' | 'split', element: HTMLElement) => void
   shouldMeasureRow: (row: Row) => boolean
   shouldMeasureBand: (band: SplitBand) => boolean
+  hasLineExtra: (row: CodeRow) => boolean
   onMutated: () => void
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   replyReview: (databaseId: number, body: string) => Promise<unknown>
@@ -131,7 +132,9 @@ export function DiffCanvas(props: {
                               beside `DiffLine` needs a full basis or it shares the line with the code
                               and squeezes it. The wrapper is the host's, so neither a plugin's own
                               annotation nor another plugin's marks has to know that. */}
-                          <div class="diff-line-extra">{props.lineExtra?.(code())}</div>
+                          <Show when={props.hasLineExtra(code())}>
+                            <div class="diff-line-extra">{props.lineExtra?.(code())}</div>
+                          </Show>
                         </>
                       )
                     }}
@@ -226,13 +229,15 @@ export function DiffCanvas(props: {
                         </div>
                         {/* Below the pair rather than inside a cell: an annotation is about the line,
                             and both columns can be showing the same one. */}
-                        <Show when={props.lineExtra}>
-                          {(extra) => (
-                            <div class="diff-line-extra">
-                              <Show when={pair().left}>{(left) => extra()(left())}</Show>
-                              <Show when={pair().right}>{(right) => extra()(right())}</Show>
-                            </div>
-                          )}
+                        <Show when={(pair().left && props.hasLineExtra(pair().left!)) || (pair().right && props.hasLineExtra(pair().right!))}>
+                          <div class="diff-line-extra">
+                            <Show when={pair().left && props.hasLineExtra(pair().left!) ? pair().left : null}>
+                              {(left) => props.lineExtra?.(left())}
+                            </Show>
+                            <Show when={pair().right && props.hasLineExtra(pair().right!) ? pair().right : null}>
+                              {(right) => props.lineExtra?.(right())}
+                            </Show>
+                          </div>
                         </Show>
                       </>
                     )}

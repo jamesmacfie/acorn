@@ -66,16 +66,21 @@
    needed here: a sticky box paints in the positioned layer, above the unpositioned code span. They
    need an opaque background of their own (a normal code row's is transparent) or the code shows
    through; the add/del tints below re-state theirs for the same reason. */
-.diff-gutter, .diff-marker { position: sticky; background: var(--bg); }
-.diff-row > .diff-gutter:first-child { left: 0; }
-.diff-row > .diff-gutter:nth-child(2) { left: var(--diff-gutter-w); }
-.diff-row > .diff-marker { left: calc(2 * var(--diff-gutter-w)); }
+.diff-line-chrome {
+  position: sticky;
+  left: 0;
+  display: flex;
+  flex: none;
+  width: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
+  background: var(--bg);
+}
+.diff-split-cell > .diff-gutter, .diff-split-cell > .diff-marker { background: var(--bg); }
 /* Split mode needs no sticky columns: there the scroller is the code box itself (see below), so the
    gutters sit outside it and never have anything scroll under them. */
 
-.diff-add, .diff-add .diff-gutter, .diff-add .diff-marker { background: var(--add-bg); }
+.diff-add, .diff-add .diff-line-chrome, .diff-add .diff-gutter, .diff-add .diff-marker { background: var(--add-bg); }
 .diff-add .diff-marker { color: var(--add-marker); }
-.diff-del, .diff-del .diff-gutter, .diff-del .diff-marker { background: var(--del-bg); }
+.diff-del, .diff-del .diff-line-chrome, .diff-del .diff-gutter, .diff-del .diff-marker { background: var(--del-bg); }
 .diff-del .diff-marker { color: var(--del-marker); }
 .diff-split-empty > .diff-gutter { background: var(--bg-subtle); }
 .diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: var(--pane-pad); font-weight: 500; }
