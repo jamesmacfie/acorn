@@ -291,6 +291,12 @@
 :is(.ui-card, .ui-listdetail-list) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row),
 .ui-toolbar[data-variant='actions'] { margin-inline: 0; }
 
+/* Two bars in a row are one piece of chrome, so the column's stack gap does not go between them. That
+   gap is for content, and between a pane's header and the bar under it — the agents pane over its
+   subagent bar — it drew a strip of pane background through a divider that is meant to be the two
+   bars' shared edge. */
+.layout-region-detail > .ui-toolbar + .ui-toolbar { margin-block-start: calc(-1 * var(--gap-stack)); }
+
 /* The reading column stops at `--pane-measure` and sits in the middle of whatever is left. A pane
    is as wide as the display someone gave it, and on a 3700px one a transcript line runs to about
    480 characters, which is a line nobody reads. Chrome is exempt, because a bar's background has to

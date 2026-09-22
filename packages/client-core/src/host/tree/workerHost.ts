@@ -258,14 +258,24 @@ function start(input: AcquireInput): Live {
           if (live.dead || !live.slots.has(message.slot)) return
           live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ...result })
         }
-        const timer = setTimeout(
-          () => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }),
-          TREE_LIMITS.hostRequestMs,
-        )
+        // `owner.invoke` only. An overlay is settled by a person closing a modal, and ten seconds is
+        // not how long somebody takes to crop an image: the deadline was rejecting the sandbox's
+        // promise while the editor was still open, so the edit the reader then applied came back to a
+        // caller that had already given up and showed them a timeout instead.
+        //
+        // Nothing hangs without it. Every dismissal path goes through one `clear()`, and the tree
+        // unmounting dismisses what it opened (../frames/overlays.ts), so the invocation always
+        // settles; the sandbox rejects its own copy on unmount too (../frames/sdk.ts § drop).
+        const timer = message.op === 'owner.invoke'
+          ? setTimeout(
+              () => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }),
+              TREE_LIMITS.hostRequestMs,
+            )
+          : null
         void handler({ op: message.op, name: message.name, payload: message.payload })
           .then((result) => reply(result))
           .catch((error: unknown) => reply({ ok: false, error: { code: 'internal', message: error instanceof Error ? error.message : String(error) } }))
-          .finally(() => clearTimeout(timer))
+          .finally(() => { if (timer !== null) clearTimeout(timer) })
         return
       }
       case 'tree:batch': {

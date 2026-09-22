@@ -291,7 +291,9 @@ was told to expect is still in the slot before it swaps anything — which is wh
 receives a handle to the owner's state.
 
 The bounds: payload and result each under 64 KiB, eight outstanding per slot, ten seconds for the
-owner to answer. An action is scoped by the host-held slot id, so plugin code supplies no plugin,
+owner to answer. The deadline is this operation's alone, because the owner is code in the shell's own
+process and a handler that never settles is a stuck promise; the other thing a tree may ask for, a
+companion overlay, waits on a person and is not held to it. An action is scoped by the host-held slot id, so plugin code supplies no plugin,
 point, owner or target id and there is nothing to forge.
 
 **Binding on the mount, not the bridge.** One worker serves every tree its bundle draws and holds one
@@ -340,6 +342,12 @@ keys the iframe, the opener's input, and the waiter. `openOverlay` resolves with
 passed to `bridge.ui.close(result)`, and with `null` for every dismissal — Escape, the backdrop, the
 close button, another overlay opening over it, the source tree unmounting, navigating away. An opener
 never has to tell "cancelled" from "went away", and nobody is ever left waiting.
+
+No deadline, and that is the difference from `invoke`. What settles an overlay is a person closing a
+modal, and nobody crops an image in ten seconds. Holding it to the owner-action deadline rejected the
+tree's promise while the editor was still open, so the edit the reader went on to apply came back to a
+caller that had already given up. The single `clear()` above is what makes the wait safe: every
+dismissal path goes through it, and the tree unmounting dismisses what it opened.
 
 Reopening the same overlay builds a fresh iframe keyed by the new invocation id. An editor must never
 inherit the previous canvas or the previous input, or the reader has no way to tell which image they

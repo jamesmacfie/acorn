@@ -281,21 +281,52 @@ const CLAUDE_WEB_TOOLS = new Map<string, AgentWebAction['type']>([
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /**
- * The plan Claude Code hands over when it leaves plan mode, if this call is that handover.
+ * Four calls whose parameters are a document rather than arguments, and which field of each holds it.
  *
- * The whole plan rides in the call's parameters as one markdown string, which `toolInput` below turns
- * into pretty-printed JSON with every line break spelled out as `\n`. Unreadable, and it is the one
- * thing in a planning session somebody wants to read. So it comes back out as the agent talking,
- * which renders as markdown and stays in view when the reader has asked for chat only. The call keeps
- * its title and its outcome and loses its parameters, because the plan is now above it.
+ * `toolInput` below argues against reading parameters per tool, and it is right about the general
+ * case. These are not it. Each carries one markdown document as its whole payload — the plan
+ * Claude hands over when it leaves plan mode, the brief a subagent is spawned with, the report that
+ * subagent hands back — and `toolInput` renders each as pretty-printed JSON with every line break
+ * spelled out as `\n`. Unreadable, and in each of them the document is the one thing anybody opened the
+ * call to read.
  *
- * Only from `tool_call`: the parameters arrive with the call, and reading an update as well would
- * post the plan twice.
+ * So it comes back out as somebody talking, which renders as markdown, stays in view when the reader
+ * has asked for chat only, and is searchable as prose. The call keeps its title and its outcome and
+ * loses its parameters, because the document is now above it.
+ *
+ * A brief is posted as a `user_message` because that is the role the parent plays for its child: the
+ * child's stream then reads as a conversation, brief in and report out, the same shape as the
+ * session's own. Both of the subagent ones carry the subagent's id, so they land in its stream.
  */
-const exitPlanModePlan = (update: SessionUpdate, meta: ClaudeToolMeta): string | undefined =>
-  update.sessionUpdate === 'tool_call' && meta.toolName === 'ExitPlanMode'
-    ? str(asRecord('rawInput' in update ? update.rawInput : undefined)?.plan)
-    : undefined
+const PROSE_TOOLS = new Map<string, { field: string; as: 'user_message' | 'assistant_message' }>([
+  ['ExitPlanMode', { field: 'plan', as: 'assistant_message' }],
+  ['Agent', { field: 'prompt', as: 'user_message' }],
+  ['Task', { field: 'prompt', as: 'user_message' }],
+  ['SubagentHandback', { field: 'message', as: 'assistant_message' }],
+])
+
+/**
+ * The document this call is carrying, if it is one of the four.
+ *
+ * From whichever update carries the parameters rather than from the `tool_call` alone, which is what
+ * this used to read. The capture in `__fixtures__/claudeSubagentWire.json` settles it: an `Agent`
+ * call arrives with an empty parameter bag and a placeholder title, and the first update after it
+ * carries both the real title and the whole brief. Reading only the call found nothing.
+ *
+ * The CLI sends a call's parameters once, so nothing posts twice. If one ever repeated them
+ * the reader would see the same document again; dedupe in the driver, which is the only layer that
+ * sees more than one update, rather than here, which is pure.
+ */
+const toolProse = (
+  update: SessionUpdate,
+  meta: ClaudeToolMeta,
+): { text: string; as: 'user_message' | 'assistant_message' } | undefined => {
+  if (meta.toolName == null) return undefined
+  const prose = PROSE_TOOLS.get(meta.toolName)
+  if (!prose) return undefined
+  const text = str(asRecord('rawInput' in update ? update.rawInput : undefined)?.[prose.field])
+  return text ? { text, as: prose.as } : undefined
+}
 
 /**
  * A call's own parameters, so a card has something to show before its output arrives. Without this the
@@ -406,11 +437,12 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           : [])
       const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
       const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
-      const plan = exitPlanModePlan(update, meta)
-      const planned: AgentNormalizedEvent[] = plan
-        ? [{ type: 'assistant_message', text: plan, subagentId }]
+      const prose = toolProse(update, meta)
+      // After the roster, so a brief lands in the stream the subagent card has just opened.
+      const said: AgentNormalizedEvent[] = prose
+        ? [{ type: prose.as, text: prose.text, subagentId }]
         : []
-      return [...roster, ...planned, {
+      return [...roster, ...said, {
         type: 'tool',
         tool: {
           id: update.toolCallId,
@@ -421,7 +453,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           title: webAction ? webToolTitle(webAction) : update.title ?? '',
           kind: update.kind ?? undefined,
           status,
-          input: plan ? undefined : toolInput(update.rawInput),
+          input: prose ? undefined : toolInput(update.rawInput),
           output: text || undefined,
           subagentId,
           ...(web ? { web } : {}),

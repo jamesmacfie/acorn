@@ -170,6 +170,10 @@ Workflows pane inherits that the moment an agent node draws a composer of its ow
 region rule reaching a second pane rather than a second arrangement. A `ListDetail` or a diff drops
 both along with the inline padding.
 
+That gap is for content, so two bars in a row do not get one: the agents pane draws a subagent bar
+under its own header, and the gap between them drew a strip of pane background through what is meant
+to be the two bars' shared edge.
+
 **The reading column stops at `--pane-measure`** and sits in the middle of whatever the pane has
 left. A pane is as wide as the display someone gave it, and at 3700px an agent transcript ran to
 about 480 characters a line. Two children are exempt. Chrome is, because a bar's background has to

@@ -42,7 +42,6 @@ const isReactiveRuntime = (id: string) =>
 const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
   || id.startsWith('@acorn/plugin-api/ui')
   || id === '@acorn/client-core/features/dataSources/kit.ts'
-  || id === '@codemirror/theme-one-dark'
   || id.startsWith('@codemirror/lang-') || id.startsWith('@codemirror/legacy-modes')
   || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
   || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
@@ -110,7 +109,7 @@ export default defineConfig({
       // where `ssr.noExternal` inlines node_modules too, `basicSetup` then threw and the editor pane
       // drew nothing. A stub may only stand in front of a specifier no working surface reaches.
       {
-        find: /^@codemirror\/(?:theme-one-dark|lang-[^/]+|legacy-modes(?:\/.*)?)$/,
+        find: /^@codemirror\/(?:lang-[^/]+|legacy-modes(?:\/.*)?)$/,
         replacement: resolve(import.meta.dirname, 'src/kit/codemirrorGrammars.ts'),
       },
       { find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/, replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts') },

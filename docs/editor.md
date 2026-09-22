@@ -77,6 +77,14 @@ What changed, and why:
   quietly fixes the last-writer-wins hazard that table below describes, because a compartment is per
   view rather than per process. `language.ts` is the same total map over the same published
   vocabulary, resolving to Lezer grammars instead of Monaco language ids.
+- **Syntax colours are the app's own, in the palette shiki already uses.** `theme.ts` defines one
+  `HighlightStyle` per appearance from the GitHub light and dark colours
+  (`client-core/src/infra/highlight/shiki.ts`), so a file reads the same way in an editor pane, in a
+  diff and in an agent's markdown fence. It borrowed CodeMirror's bundled styles before, and none of
+  them applied: both were registered with `fallback: true`, that facet keeps only its first value,
+  and `basicSetup` gets in first — so every file in every theme was painted by a style built for a
+  white page, with a heading and a link label underlined and almost nothing coloured.
+  `theme.test.tsx` fails if that ordering comes back.
 - **`languageForPath` is async, and downloads one grammar.** It was seventeen static imports, so a
   pane that opened one file downloaded every language the app knows: the editor's lazy chunk was
   954,915 bytes of which the grammars were nearly all. The map's entries now import their grammar and

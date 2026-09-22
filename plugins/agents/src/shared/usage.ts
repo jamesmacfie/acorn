@@ -14,6 +14,11 @@ export type AgentUsageQuota = {
   percentRemaining: number
   resetsAt: number | null
   resetText: string | null
+  // How long the window is, when the collector knows. With `resetsAt` this is what says how far
+  // through the window we are, which is the only way to tell "20% left" that is fine from "20% left"
+  // that runs out in an hour. A collector that cannot say leaves it null and the pane draws no pace
+  // mark; nothing else reads it.
+  windowSeconds: number | null
   health: AgentUsageHealth
 }
 
@@ -91,6 +96,11 @@ export type AgentUsageSnapshot = {
   providers: AgentProviderUsage[]
   refreshedAt: number
 }
+
+// The two windows both built-in CLIs bill against: a rolling five-hour session and a week. Neither
+// CLI prints its window length, so the numbers live here rather than being parsed out of one.
+export const SESSION_WINDOW_SECONDS = 5 * 60 * 60
+export const WEEKLY_WINDOW_SECONDS = 7 * 24 * 60 * 60
 
 const HEALTH_ORDER: Record<AgentUsageHealth, number> = {
   unknown: 0,

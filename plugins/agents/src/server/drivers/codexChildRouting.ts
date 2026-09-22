@@ -216,6 +216,9 @@ export class CodexChildRouter {
               message: `Subagent ${titleFromAgentPath(child.agentPath) ?? subagentId} failed: ${event.message}`,
             },
           ]
+        // A child thread's user turn is the brief Codex handed it, not something the reader typed, so
+        // it goes in the child's stream under the subagent's name.
+        case 'user_message':
         case 'assistant_message':
         case 'reasoning':
           return [{ ...event, subagentId }]
@@ -233,7 +236,6 @@ export class CodexChildRouter {
           return [event]
         // A child's plan is not the session's plan, and there is nowhere to say whose it is.
         case 'plan':
-        case 'user_message':
         case 'session_metadata':
         case 'request':
         case 'request_resolved':
