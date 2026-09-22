@@ -33,6 +33,12 @@ findings below. It is not a claim to have read every implementation or exercised
 | Workflow execution | Definition/draft → published frozen graph → run/step/dispatch records → admission ledger → agent/tools/child tasks → run projections. | Retain durable admission and recovery. Remove cost fallback and move workflow-owned forms/types; F04/F06. |
 | External items | Provider connection → provider-specific codec/resource → core item projection → tasks, sources, and context. | Keep the shared item index and credential custody; do not move provider parsing into core. |
 
+Findings and Memory changed after the baseline. The rows above still hold: composition still owns the
+callbacks and the legacy proposal store still has a live producer. Two things narrowed. The task
+archive is the only boundary that schedules preparation, and core now awaits that capture before
+teardown. Memory supplies its own generation instructions to Findings. See F01 and F02 for what is
+left.
+
 Useful source anchors are `apps/node/src/composition/runtime.ts`,
 `packages/custody/src/broker/nodeBroker.ts`, `packages/client-core/src/infra/node/apiClient.ts`,
 `packages/node-core/src/server/pluginHost/context.ts`, and

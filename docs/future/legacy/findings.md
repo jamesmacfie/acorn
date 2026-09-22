@@ -4,6 +4,9 @@ Date: 2026-09-21. Status: source-backed analysis; recommendations not implemente
 Read [context](./context.md) and [target architecture](./target-architecture.md).
 Source locations refer to `9727fd85`; line numbers are navigation hints.
 
+Re-checked on 2026-09-22 against `4bdbf29b`. Findings and Memory changed in that window and the
+paragraphs below marked "After the baseline" say what moved. No finding was withdrawn.
+
 ## F01: Findings and Memory have two live proposal models
 
 Priority: first. Confidence: confirmed producer-to-consumer trace.
@@ -25,9 +28,15 @@ Two deletion traps are material. Canonical export is implemented inside
 that protection across filesystem writes and database updates. It is not historical compatibility.
 
 The review-target contract also promises more extensibility than preparation delivers:
-`plugins/findings/src/server/runtime.ts:123` and line 183 select `memory:change` directly. Require a
-registered target ID and target-provided instructions/schema, with Memory selecting its own target.
-Use the existing controller rather than adding another registry.
+`plugins/findings/src/server/runtime.ts:120` and line 176 still look the target up by the literal
+`memory:change`. Require a registered target ID and target-provided instructions/schema, with Memory
+selecting its own target. Use the existing controller rather than adding another registry.
+
+After the baseline, the target-owned half of this arrived. `FindingReviewTargetContribution` gained
+`synthesisContext`, so Memory supplies the generation instructions and a bounded snapshot of accepted
+memory, and `plugins/findings/src/server/modelSynthesis.ts` validates a generated payload against the
+target before publishing it. Only the selection is still hard-coded, which narrows the work without
+removing it.
 
 ## F02: Composition contains feature policy and a package-cycle workaround
 

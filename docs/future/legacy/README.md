@@ -2,6 +2,9 @@
 
 Date: 2026-09-21. Status: reviewed proposal; implementation not started.
 Evidence baseline: commit `9727fd85`. No application code or user state changed during this review.
+Re-checked on 2026-09-22 against `4bdbf29b`. Findings and Memory work landed in that window and
+narrowed parts of tickets 03 and 04 without starting either. Paragraphs marked "After the baseline"
+in [findings](./findings.md) and [target architecture](./target-architecture.md) say what moved.
 
 Acorn's runtime topology is worth keeping. Its main maintainability problem is uneven ownership:
 some features use the plugin contracts, while others reach through shared client code or application
