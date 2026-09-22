@@ -49,6 +49,7 @@ export function DiffCanvas(props: {
   lineExtra?: (row: CodeRow) => JSX.Element
   /** The source's own click affordance on a code row. See DiffSource.lineAction. */
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
+  openLine?: (row: CodeRow) => void
 }) {
   const virtualRows = () => props.virt.getVirtualItems().flatMap((vi) => {
     const row = props.rows()[vi.index]
@@ -127,6 +128,7 @@ export function DiffCanvas(props: {
                             composer={comment.canAdd ? props.composerFor(comment.key) : undefined}
                             mentions={props.mentions()}
                             highlight={props.findHighlight(code())}
+                            openLine={props.openLine}
                           />
                           {/* Its own line under the code. `.diff-row` wraps, so anything drawn
                               beside `DiffLine` needs a full basis or it shares the line with the code
@@ -215,6 +217,7 @@ export function DiffCanvas(props: {
                             composer={props.splitComposer(pair().left, 'LEFT')}
                             mentions={props.mentions()}
                             highlight={pair().left ? props.findHighlight(pair().left!) : undefined}
+                            openLine={props.openLine}
                           />
                           <SplitCell
                             r={pair().right}
@@ -225,6 +228,7 @@ export function DiffCanvas(props: {
                             composer={props.splitComposer(pair().right, 'RIGHT')}
                             mentions={props.mentions()}
                             highlight={pair().right ? props.findHighlight(pair().right!) : undefined}
+                            openLine={props.openLine}
                           />
                         </div>
                         {/* Below the pair rather than inside a cell: an annotation is about the line,
