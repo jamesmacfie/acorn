@@ -10,11 +10,76 @@
 // editor state stores its own contents under it.
 import { Compartment, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { tags as t } from '@lezer/highlight'
 import { isAppDark, token, watchAppearance } from '../../kit/tokens/appearance'
 
 const appearance = new Compartment()
+
+// Syntax colours, one role per line, in the GitHub palette shiki already paints diffs and markdown
+// fences with (infra/highlight/shiki.ts). Sharing the palette is the point: the same file used to
+// come out one colour in a diff and another in the editor, because nothing connected the two.
+//
+// These are a fixed light/dark pair rather than app tokens, for the same reason the shiki side is:
+// the twelve themes declare 21 chrome colours between them and none of them says what a string
+// literal looks like.
+type Palette = {
+  comment: string
+  keyword: string
+  string: string
+  literal: string
+  name: string
+  tag: string
+  invalid: string
+}
+
+const LIGHT: Palette = {
+  comment: '#6a737d',
+  keyword: '#d73a49',
+  string: '#032f62',
+  literal: '#005cc5',
+  name: '#6f42c1',
+  tag: '#22863a',
+  invalid: '#b31d28',
+}
+
+const DARK: Palette = {
+  comment: '#6a737d',
+  keyword: '#f97583',
+  string: '#9ecbff',
+  literal: '#79b8ff',
+  name: '#b392f0',
+  tag: '#85e89d',
+  invalid: '#fdaeb7',
+}
+
+// Plain identifiers and operators are deliberately absent, so they keep the theme's own --text and
+// code does not turn into a rainbow. That is what GitHub does too.
+//
+// The markdown rules earn their place: a document is the file this app opens most, and CodeMirror's
+// bundled styles underline every heading and every link label, which is what the reader sees before
+// they see any colour. Here the marks around a link go grey, the label takes the link colour, and
+// only the URL keeps an underline.
+const highlightStyle = (c: Palette): HighlightStyle => HighlightStyle.define([
+  { tag: t.comment, color: c.comment },
+  { tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword, t.modifier], color: c.keyword },
+  { tag: [t.string, t.special(t.string), t.regexp, t.character, t.escape], color: c.string },
+  { tag: [t.number, t.bool, t.null, t.atom, t.unit, t.self, t.constant(t.name), t.standard(t.name)], color: c.literal },
+  { tag: [t.propertyName, t.attributeName, t.labelName], color: c.literal },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.className, t.typeName, t.namespace, t.macroName, t.annotation], color: c.name },
+  { tag: [t.tagName, t.angleBracket, t.quote, t.inserted], color: c.tag },
+  { tag: [t.deleted, t.invalid], color: c.invalid },
+  { tag: [t.processingInstruction, t.contentSeparator], color: c.comment },
+  { tag: t.heading, color: c.literal, fontWeight: 'bold' },
+  { tag: [t.monospace, t.link], color: c.literal },
+  { tag: t.url, color: c.literal, textDecoration: 'underline' },
+  { tag: t.strong, fontWeight: 'bold' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+])
+
+const LIGHT_SYNTAX = highlightStyle(LIGHT)
+const DARK_SYNTAX = highlightStyle(DARK)
 
 function currentTheme(): Extension {
   const dark = isAppDark()
@@ -32,9 +97,11 @@ function currentTheme(): Extension {
       '.cm-tooltip': { backgroundColor: token('--bg-subtle'), color: token('--text'), border: `1px solid ${token('--border-strong')}` },
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: token('--bg-selected'), color: token('--text') },
     }, { dark }),
-    // `fallback: true` so the light default only paints tags the dark style did not, and vice versa;
-    // basicSetup registers the light default too and this keeps the two from fighting.
-    syntaxHighlighting(dark ? oneDarkHighlightStyle : defaultHighlightStyle, { fallback: true }),
+    // Not `fallback: true`, and that is the whole fix for an editor that drew no colour. The fallback
+    // facet keeps one value, the first, and `basicSetup` registers CodeMirror's own light default
+    // ahead of this extension — so for as long as both were fallbacks, every file in every theme was
+    // painted by a style built for a white page, underlines and all.
+    syntaxHighlighting(dark ? DARK_SYNTAX : LIGHT_SYNTAX),
   ]
 }
 
