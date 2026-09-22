@@ -866,9 +866,9 @@ The launch grant is intentionally narrow:
   the host database or storage service;
 - direct `node:sqlite` access is refused, including the `process.getBuiltinModule` path that would
   otherwise bypass Node's filesystem permission checks;
-- raw socket modules are refused. `fetch` exists only when `permissions.node.net` is non-empty,
-  checks the destination hostname against that exact set before connecting, and returns redirects
-  unfollowed so the next request re-enters the same check;
+- raw socket modules are refused. `fetch` exists only when `permissions.node.net` is non-empty.
+  Exact hostname grants return redirects unfollowed so the next request re-enters the check. An
+  explicit `'*'` grant permits any hostname and follows the caller's redirect policy;
 - child processes exist only with the explicit `exec` grant. Nested workers and native addons are
   never granted.
 
