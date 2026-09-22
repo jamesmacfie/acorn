@@ -46,6 +46,9 @@ Two members exist for what a caller draws that the viewer has no concept of: `li
 under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
 affordance on a code line. The changes pane uses the first for review notes and the second for
 Alt-click to send a line reference to the agent.
+The Changes source also supplies `openLine`: an added line shows a hover button in its first gutter
+that opens the file at that new-side line in the editor. The viewer hides the button for deleted lines,
+which have no corresponding line in the current file, and for sources without the callback.
 
 Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
 sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not
