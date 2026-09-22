@@ -1,8 +1,8 @@
 // The shared diff viewer's row model (see docs/diff-rendering.md for how GitHub and Changes each
 // reach it and for the row types' structural contract).
-import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
+import { wordDiff, type DiffWordsDocument, type WordDiffInput, type WordDiffOutput, type WordTok } from './wordDiff'
 import type { getHighlighter } from '../../infra/highlight/shiki'
 // From `langs.ts` rather than from `shiki.ts`, which re-exports it: the re-export is a value import
 // and pulls the main-thread highlighter and its regex engine into every graph this module is in.
@@ -48,7 +48,8 @@ export type DiffThread = {
 
 
 export type Tok = { content: string; light: string; dark: string }
-export type WordTok = { content: string; kind: 'eq' | 'add' | 'del' }
+export type { WordTok } from './wordDiff'
+export { wordDiff } from './wordDiff'
 export type CodeRow = {
   kind: 'normal' | 'insert' | 'delete'
   path: string
@@ -190,21 +191,6 @@ export function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter
   }
 }
 
-export function wordDiff(oldText: string, newText: string): { del: WordTok[]; add: WordTok[] } {
-  const parts = diffWordsWithSpace(oldText, newText)
-  const del: WordTok[] = []
-  const add: WordTok[] = []
-  for (const p of parts) {
-    if (p.added) add.push({ content: p.value, kind: 'add' })
-    else if (p.removed) del.push({ content: p.value, kind: 'del' })
-    else {
-      del.push({ content: p.value, kind: 'eq' })
-      add.push({ content: p.value, kind: 'eq' })
-    }
-  }
-  return { del, add }
-}
-
 function rawPatchRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
   const rows: DiffRow[] = []
   for (const line of (file.patch ?? '').split('\n')) {
@@ -314,7 +300,11 @@ export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[]
  * Never rejects. tokenizeDocument degrades to plain text rather than throwing, and a patch that
  * will not parse falls back to the untokenized raw rows as the sync path does.
  */
-export async function buildDiffRowsAsync(file: DiffFile, tokenizeDoc: TokenizeDocument): Promise<DiffRow[]> {
+export async function buildDiffRowsAsync(
+  file: DiffFile,
+  tokenizeDoc: TokenizeDocument,
+  diffWords?: DiffWordsDocument,
+): Promise<DiffRow[]> {
   if (!file.patch) return []
   const built = buildRowSkeleton(file)
     // A patch this parser cannot read is a display problem, not a highlighting one. Show the raw
@@ -329,7 +319,8 @@ export async function buildDiffRowsAsync(file: DiffFile, tokenizeDoc: TokenizeDo
       batch.targets[i]!.toks = toks?.length ? toks : [{ content: batch.targets[i]!.raw, light: '', dark: '' }]
     }
   }
-  attachWordDiffs(built.rows)
+  if (diffWords) await attachWordDiffsAsync(built.rows, diffWords)
+  else attachWordDiffs(built.rows)
   return built.rows
 }
 
@@ -416,6 +407,14 @@ function pushCodeRow(out: Row[], row: CodeRow, fileThreads: DiffThread[]) {
 }
 
 export function attachWordDiffs(rows: DiffRow[]) {
+  const targets = wordDiffTargets(rows)
+  for (const target of targets) applyWordDiff(target, wordDiff(target.input.oldText, target.input.newText))
+}
+
+type WordDiffTarget = { input: WordDiffInput; deleted: CodeRow; inserted: CodeRow }
+
+function wordDiffTargets(rows: DiffRow[]): WordDiffTarget[] {
+  const targets: WordDiffTarget[] = []
   let i = 0
   while (i < rows.length) {
     if (rows[i]!.kind !== 'delete') {
@@ -430,11 +429,28 @@ export function attachWordDiffs(rows: DiffRow[]) {
     const inss = rows.slice(d, n) as CodeRow[]
     const pairs = Math.min(dels.length, inss.length)
     for (let k = 0; k < pairs; k++) {
-      const { del, add } = wordDiff(dels[k]!.raw, inss[k]!.raw)
-      dels[k]!.words = del
-      inss[k]!.words = add
+      targets.push({
+        input: { oldText: dels[k]!.raw, newText: inss[k]!.raw },
+        deleted: dels[k]!,
+        inserted: inss[k]!,
+      })
     }
     i = n > i ? n : i + 1
+  }
+  return targets
+}
+
+function applyWordDiff(target: WordDiffTarget, result: WordDiffOutput) {
+  target.deleted.words = result.del
+  target.inserted.words = result.add
+}
+
+async function attachWordDiffsAsync(rows: DiffRow[], diffWords: DiffWordsDocument) {
+  const targets = wordDiffTargets(rows)
+  const results = await diffWords(targets.map((target) => target.input))
+  for (let i = 0; i < targets.length; i++) {
+    const result = results[i]
+    if (result) applyWordDiff(targets[i]!, result)
   }
 }
 

@@ -1,8 +1,10 @@
 import { createVirtualizer } from '@tanstack/solid-virtual'
 
+const DIFF_OVERSCAN_ROWS = 80
+
 // Virtualizer plumbing shared by DiffView's unified/split lists. The two createVirtualizer setups
 // are identical apart from their item/key/estimate sources, and both feed the same batched-rAF
-// measure scheduling. Mechanical extraction from DiffView; no behaviour change.
+// measure scheduling.
 
 export function createDiffVirtualizer<T>(opts: {
   items: () => readonly T[]
@@ -19,7 +21,9 @@ export function createDiffVirtualizer<T>(opts: {
     getScrollElement: () => opts.scrollEl() ?? null,
     getItemKey: (index) => opts.keys()[index] ?? `${opts.keyPrefix}:${index}`,
     estimateSize: (index) => opts.estimateSize(opts.items()[index]),
-    overscan: 20,
+    // About two screens of normal 20px lines in a typical pane. Diff rows are more expensive than plain
+    // list items, but this runway prevents a momentum scroll from outrunning the mounted window.
+    overscan: DIFF_OVERSCAN_ROWS,
   })
 }
 

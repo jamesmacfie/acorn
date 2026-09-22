@@ -148,27 +148,36 @@ see.
 
 Grammars load lazily. They total about 1.7 MB across the set, and a given diff touches two or three,
 so a TypeScript-only pull request does not pay for the C++ grammar (419 KB, the largest single one).
-`protocol.ts` defines the wire format the worker and the main thread share, and imports nothing from
+`messages.ts` defines the wire format the worker and the main thread share, and imports nothing from
 either side. The worker must not pull in `kit/diff/diffModel.ts`, which would drag `diff` and
 `gitdiff-parser` into the worker bundle, and the client must not pull in the worker's Shiki imports,
 which would put the WASM engine back on the main thread.
+
+Paired delete/insert lines use a second worker for word-level diffs. Patch parsing and row assembly
+remain on the main thread, but the `diffWordsWithSpace` work for one file is sent as one batch so it
+cannot block scrolling. The worker has the same cold/live/dead shape and a main-thread fallback as
+highlighting, without sharing Shiki's wider worker policy or lifecycle.
 
 **Hydration state is per file, and read per row.** The hydrator keeps each file's status —
 `idle`, `queued`, `loading`, `loaded`, `error` — in a Solid store keyed by path, and a load row reads
 its own key. It used to keep them in a `Map` behind one version counter, which made every publish look
 like a change to every file: `DiffPane` reads a status per file, so each of the two or three publishes
 per file rebuilt the row model for the whole diff. On a 200-file pull request that was 226 rebuilds of
-every file's rows during load, against 102 now — one per file that actually arrives, which is the floor
-for a row model built over all files ([performance.md](./performance.md) § 2026-09-03 — phase 8).
+every file's rows during load, then 102 after status became per-file state
+([performance.md](./performance.md) § 2026-09-03 — phase 8).
 
 The hydrator keeps a plain `Map` beside the store for its own queue, and that is deliberate: its pump
 reads statuses synchronously from whatever reactive scope called `reset()`, and reading the store there
 would subscribe that scope to every path in the diff.
 
 Parsed files are keyed the same way, one store key per path, because the map used to be copied whole on
-every parse — one full copy per file in the diff. The one full copy left is the expanded-gap map, which
-is written once per gap a reader clicks open and is handed to `buildRenderableRows`, a published
-function that takes a `Map`.
+every parse — one full copy per file in the diff. The priority file publishes as soon as it is
+ready; later files publish in the hydrator's four-file fetch batches. `parsedPublisher.ts` holds
+off-screen batches while a scroll is active, flushes a file immediately if it enters the viewport,
+and applies the remaining files together in an idle turn after scrolling stops. This keeps progressive
+hydration from repeatedly rebuilding the combined row model on the scroll path. The one full copy left
+is the expanded-gap map, which is written once per gap a reader clicks open and is handed to
+`buildRenderableRows`, a published function that takes a `Map`.
 
 ## Row geometry
 
@@ -180,6 +189,13 @@ always right and no code row is measured. Only threads are, because only they va
 wrapped, a row's height was a layout question: each one painted at its 20px estimate and was
 corrected a frame later, and a first correction above the scroll offset makes the virtualizer write
 `scrollTop` to compensate. Scrolling flashed and stuttered.
+
+The list keeps 80 rows beyond the calculated range, about two viewport heights in a normal desktop
+pane. The Solid adapter uses a release that preserves measured item sizes when reactive
+options such as the row count change. Hydration therefore relies on the adapter's count update rather
+than calling `measure()` for the whole list. Full measurement is reserved for attaching a newly laid
+out scroller and restoring its position; a composer or annotation changing height remeasures only the
+mounted elements.
 
 Because nothing wraps, something has to be wide enough to hold the widest line, and unified and split
 answer that differently.
@@ -198,6 +214,9 @@ a sticky element can only travel within its containing block, and the scroller's
 only one scrollport wide. Hunk headers and expand bands scroll away with the code, as they do on
 GitHub.
 
+The two line numbers and change marker share one sticky gutter box. A normal code line owns no local
+signals: the comment composer, including its busy and error state, mounts only for the one open line.
+
 In split the pair always fits the pane, so half the pane stays half the pane however long a line
 gets, and each column scrolls horizontally inside itself. The scroller is each row's own code box, so
 there is one per row and `splitScrollSync.ts` keeps a column's rows in step. Their scrollbars are
@@ -208,7 +227,8 @@ shift+wheel.
 
 - Unified mode renders old/new lines in one stream and is the default.
 - Split mode renders old and new columns with its own row virtualization.
-- Word-level spans are attached only to paired delete/insert runs, preserving unchanged text.
+- Word-level spans are attached only to paired delete/insert runs, preserving unchanged text, and
+  their comparison runs in `wordDiff.worker.ts`.
 - Gap rows request additional context by file SHA/path and keep the current anchor stable.
 
 ## Review threads and state
@@ -239,6 +259,9 @@ the source's annotation is the one the person using the pane wrote. They ride th
 review threads do — drawn inside the virtualized row, counted by `hasLineExtra`, and invalidated
 through `lineExtraSignature` — so a mark arriving for a row already on screen grows it instead of
 overlapping the rows below.
+
+Rows with no source annotation and no contributed mark do not mount an annotation component or an
+empty wrapper.
 
 Every code row in the diff is asked about at once, in one request per contributor: a coverage plugin on
 a two-thousand-line diff answers once. The host compares the key set before asking, so the effect
