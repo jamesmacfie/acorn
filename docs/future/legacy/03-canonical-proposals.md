@@ -15,10 +15,12 @@ proposal, import mapping, or legacy status mirror is produced.
   Memory validates its target payload; Findings records the observation, candidate, and bundle.
   Bind the target in the controller; use the host-only authenticated adapter for Memory tool provenance
   and host-stamped plugin provenance for other contributors. Return canonical identifiers to the tool.
-- Require target ID during preparation and use that target's schema/instructions. Remove Findings'
-  literal Memory target selection. Add the automatic target setting and freeze it for preparation/retry;
-  keep automatic preparation off by default. Use generic Findings bundle notices. Keep review recursion
-  exclusion and frozen source/revision semantics.
+- Require target ID during preparation and use that target's schema/instructions, which the target
+  already supplies through `synthesisContext`. Remove Findings' literal Memory target selection. Add
+  the automatic target setting beside the saved backend and model, and freeze it for preparation and
+  retry. Archive review is already governed by whether a backend is configured, so do not re-introduce
+  a separate off switch. Use generic Findings bundle notices. Keep review recursion exclusion and
+  frozen source/revision semantics.
 - Change Memory's agent tool to this operation. Findings absence yields a structured unavailable result;
   it must neither directly write the library nor fall back to JSON proposals.
 - Move canonical export out of the migration class. Remove legacy source contribution, importer,

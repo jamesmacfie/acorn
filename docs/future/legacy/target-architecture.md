@@ -3,6 +3,9 @@
 Date: 2026-09-21. Status: accepted review direction; implementation proposal.
 Read [context](./context.md), [findings](./findings.md), and [refused alternatives](./refused.md).
 
+Re-checked on 2026-09-22 against `4bdbf29b`. Parts of the Findings and Memory decisions below landed
+in that window and the paragraphs marked "After the baseline" say which. The direction is unchanged.
+
 ## Retain the runtime topology
 
 Keep the Node authoritative for execution and persisted product state. Keep custody authoritative for
@@ -52,13 +55,20 @@ cannot claim an agent identity. Revoke the controller on unload and revalidate s
 
 Preparation receives an explicit target ID. The target contributes its schema and generation
 instructions; Findings owns bounded source selection, orchestration, and candidate revisions. Memory
-chooses `memory:change` in its own command/UI. Findings settings add a selected automatic target ID;
-fresh automatic preparation remains off, with no selected target. Enabling it requires a registered
-target. Freeze that target in preparation/retry input and report target unavailability explicitly.
+chooses `memory:change` in its own command/UI. Findings settings add a selected automatic target ID.
+Freeze that target in preparation/retry input and report target unavailability explicitly.
 Bundle notices use generic Findings review wording/kind and the existing findings-bundle destination,
 not Memory-specific labels. Keep the exact payload/revision checks, device-only
 approval, and durable application receipt. On absent Findings, proposal tools return unavailable;
 manual owner-authored library edits remain available.
+
+After the baseline, the target contributes its instructions and a bounded accepted-memory snapshot
+through `synthesisContext`, and Findings validates a generated payload against the target with one
+bounded correction pass before publishing. Automatic preparation also stopped being its own switch.
+It runs at the task-archive boundary whenever the owner has configured a review model, and the
+retained `automaticPreparation` preference is compatibility data for older clients. Keep that shape.
+The off switch is having no model, so the target ID joins the backend and model rather than
+re-introducing a separate toggle.
 
 Completion capture follows the Agents event/read precedent: producers emit a stable completion
 identifier, and Findings reads bounded data through the producer's capability. Resolve capabilities
@@ -77,6 +87,12 @@ producer also reads the bounded Git diff before teardown; the loaded Findings wo
 snapshot, not extra Git/process authority. Findings handles the hook and owns observation construction.
 Use best-effort capture with a recorded failure; it must not turn
 an optional Findings plugin into a requirement for archiving. Keep existing archive safety checks.
+
+After the baseline, the ordering and the recorded failure arrived. `archiveTask` awaits
+`captureReviewInput` before teardown and returns `reviewCaptureFailed` instead of failing the
+archive, and Terminal fills it through `TaskSessionsBridge.captureArchiveReviewInput`. The evidence
+formatting and the Git diff read still sit in `apps/node/src/composition/pluginDeps.ts`, which is the
+part this decision moves.
 
 Terminal also owns a launch-context contribution point. Memory supplies launch text through that
 point, removing the mutual dependency mediated by composition. Apply existing ordering and byte
