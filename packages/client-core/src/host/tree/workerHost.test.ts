@@ -8,7 +8,7 @@ import { _setWorkerFactory, _stopAllTreeWorkers, acquireTreeWorker, pluginWorker
 //
 // The worker is a stub that behaves the way a bundle would: it takes the two ports out of the hello
 // and answers on the tree one. What is being tested is the host's half — the sharing, the routing by
-// slot, and what a reader sees when it dies.
+// slot, and how failure reaches every tree when it dies.
 
 const HASH = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
@@ -123,7 +123,7 @@ describe('what reaches a tree', () => {
     expect(refused[0]).toContain('could not read')
   })
 
-  it('gives the tree a placeholder when the bundle cannot draw it', async () => {
+  it('fails the tree when the bundle cannot draw it', async () => {
     start()
     const refused: string[] = []
     const handle = acquire(refused)
@@ -163,7 +163,7 @@ describe('what reaches a tree', () => {
     first.mount('s1', 'toolCard', {})
     second.mount('s2', 'toolCard', {})
 
-    // The bundle stops answering, so the host stops it and both cards say so.
+    // The bundle stops answering, so the host stops it and fails both cards.
     await vi.advanceTimersByTimeAsync(25_000)
     const dead = sandbox!
     expect(dead.terminated).toBe(true)

@@ -249,8 +249,9 @@ what lets a terminal renderer apply the same mutations to a cell buffer.
 ([tui.md](../tui.md)), applies these five mutations to cells (`apps/tui/src/plugins/TreeHost.tsx`). The rules are not written twice: the store,
 the whole-batch pre-flight check, the prop sanitiser and the one place a handler id becomes a closure
 are `packages/client-core/src/host/tree/treeState.ts`, which both hosts import, and each host owns only
-its shell — a table of components per node name, a placeholder, and when a batch flushes. What differs
-in the sandbox behind it is the realm and nothing else: a Web Worker under a CSP on the desktop, a
+its shell — a table of components per node name, its quiet failure boundary, and when a batch flushes.
+What differs in the sandbox behind it is the realm and nothing else: a Web Worker under a CSP on the
+desktop, a
 `node:worker_threads` thread under `--permission` in a terminal, the same two ports and the same
 handshake either way (`docs/security.md § Rung 0 — The client sandbox`).
 
@@ -317,8 +318,8 @@ supplies no identifier at all.
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
 
-- `type` has to be a node this build knows and can draw on this host. Anything else renders the
-  labelled placeholder and records a roster row — the forward-compatibility rule applied to nodes.
+- `type` has to be a node this build knows and can draw on this host. Anything else is omitted, so an
+  optional contribution cannot replace its owner's UI with an error.
 - A prop value is a handler id or plain JSON, depth-bounded. `class`, `className`, `style` and
   `classList` are refused outright, a role prop carrying a raw colour is refused, and a function can
   never cross because a function is not JSON. A failing prop is dropped, the node still renders, and
@@ -333,9 +334,10 @@ shell's DOM:
 - **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
   trusted.
 
-The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch is a placeholder rather
-than a crash. `packages/protocol/src/tree/nodes.ts` carries the node names, the eleven events and the
-role enums as plain constants with no Zod on them, because that file is bundled into a stranger's
+The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
+empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the
+eleven events and the role enums as plain constants with no Zod on them, because that file is bundled
+into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.
 

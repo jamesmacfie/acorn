@@ -722,9 +722,8 @@ The tree path is the stricter of the two, and worth stating as a security proper
 one: the sandbox never produces markup. It produces names of the host's own components and props that
 are checked against the kit's role enums, so `class`, `style`, `innerHTML`, a raw URL and a function
 have nowhere to be. A prop that fails validation is dropped and the node still renders; a batch that
-fails is dropped whole and recorded; a node name this build does not know draws a labelled
-placeholder. What a worker that misbehaves can do to the surface around it is nothing — it is
-terminated and its trees show placeholders.
+fails is dropped whole and recorded; a node name this build does not know is omitted. What a worker
+that misbehaves can do to the UI around it is nothing. The host terminates it and removes its trees.
 
 **Two messages cross the tree channel in the other direction**, and both are bounded requests rather
 than an RPC door (`docs/plugins.md § Asking the owner`). `owner.invoke` calls one action the owning

@@ -9,8 +9,8 @@ import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/o
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { qualifiedContributionId } from '../plugins/contributionIds'
-import { recordSurfaceFailure } from '../plugins/surfaceFailures'
 import { activeNodeId } from '../../infra/node/activeNode'
+import { createLogger } from '../../infra/telemetry/logger'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './treeRegistry'
@@ -93,9 +93,13 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const markGesture = (): void => { lastGestureAt = Date.now() }
 
   const contribution = componentProps.contribution
+  const log = createLogger('plugins', contribution.pluginId)
   const scope = (): TreeScope => componentProps.scope?.() ?? {}
   const refuse = (reason: string): void => {
-    recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
+    log.warn(`${contribution.id}: ${reason}`, undefined, {
+      'plugin.id': contribution.pluginId,
+      'plugin.surface': contribution.id,
+    })
   }
 
   const binding = (): FrameBinding => {

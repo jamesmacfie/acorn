@@ -14,6 +14,7 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS, batchBytes, sandboxMessage, type TreeHostOp } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import type { FrameBridge } from '../frames/broker'
+import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
 /**
@@ -191,6 +192,7 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
 }
 
 function start(input: AcquireInput): Live {
+  const log = createLogger('plugins', input.pluginId)
   const worker = spawn(pluginWorkerUrl(input.hash))
   const bridgeChannel = new MessageChannel()
   const treeChannel = new MessageChannel()
@@ -307,7 +309,11 @@ function start(input: AcquireInput): Live {
   }
 
   live.beat = setInterval(() => {
-    if (live.awaitingPong) return stop(input.hash, 'this plugin stopped responding')
+    if (live.awaitingPong) {
+      const reason = 'this plugin stopped responding'
+      log.warn(reason, undefined, { 'plugin.id': input.pluginId })
+      return stop(input.hash, reason)
+    }
     live.awaitingPong = true
     live.port.postMessage({ kind: 'tree:ping' })
   }, HEARTBEAT_MS)

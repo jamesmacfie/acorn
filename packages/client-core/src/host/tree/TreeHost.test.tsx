@@ -145,13 +145,16 @@ describe('a tree becomes the host’s own components', () => {
     expect(h.sent).toEqual([{ handler: 7, event: 'onPress', payload: undefined }])
   })
 
-  it('draws a named placeholder for a node this build has never heard of', async () => {
+  it('omits a node this build has never heard of without hiding its siblings', async () => {
     const h = harness()
     h.mount()
-    h.apply([{ op: 'insert', parent: null, index: 0, node: node('n1', 'HoloDeck') }])
+    h.apply([
+      { op: 'insert', parent: null, index: 0, node: node('n1', 'HoloDeck') },
+      { op: 'insert', parent: null, index: 1, node: node('n2', 'Badge', {}, [node('n3', '#text', { value: 'known' })]) },
+    ])
     await frame()
-    expect(host.textContent).toContain('Part of stranger this version of acorn cannot draw')
-    expect(host.textContent).toContain('HoloDeck')
+    expect(host.textContent).toBe('known')
+    expect(host.querySelector('.ui-badge')).not.toBeNull()
   })
 
   it('drops a class or a style before it reaches an element', async () => {
@@ -243,8 +246,8 @@ describe('a batch is all or nothing', () => {
   })
 })
 
-describe('a failed tree says so', () => {
-  it('replaces itself with the placeholder when the worker gives up', async () => {
+describe('a failed tree stays out of the owner’s UI', () => {
+  it('draws nothing when the worker gives up', async () => {
     const h = harness()
     h.mount()
     h.apply([{ op: 'insert', parent: null, index: 0, node: node('n1', 'Card') }])
@@ -252,6 +255,6 @@ describe('a failed tree says so', () => {
     h.fail('the plugin worker threw')
     await frame()
     expect(host.querySelector('.ui-card')).toBeNull()
-    expect(host.textContent).toContain('the plugin worker threw')
+    expect(host.textContent).toBe('')
   })
 })
