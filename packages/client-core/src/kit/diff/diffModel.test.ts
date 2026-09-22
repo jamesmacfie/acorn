@@ -331,6 +331,24 @@ describe('buildDiffRowsAsync', () => {
     ])
   })
 
+  it('delegates paired word diffs to the supplied asynchronous implementation', async () => {
+    const seen: { oldText: string; newText: string }[][] = []
+    const rows = await buildDiffRowsAsync(
+      mixedHunk,
+      async (_path, code) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]),
+      async (pairs) => {
+        seen.push(pairs)
+        return pairs.map(() => ({
+          del: [{ content: 'old', kind: 'del' as const }],
+          add: [{ content: 'new', kind: 'add' as const }],
+        }))
+      },
+    )
+
+    expect(seen).toEqual([[{ oldText: '*/ deleted', newText: '`inserted' }]])
+    expect(rows.filter(isCodeRow).map((row) => row.words?.[0]?.content ?? null)).toEqual([null, 'old', 'new', null])
+  })
+
   it('produces the same rows as the synchronous builder, tokens aside', async () => {
     const sync = buildDiffRows(mixedHunk, plainTokenize)
     const async_ = await buildDiffRowsAsync(mixedHunk, async (_p, code) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]))

@@ -3,6 +3,7 @@ import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, 
 import { createStore, reconcile, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tokenizeDocument } from '../../infra/highlight/worker'
+import { diffWordsDocument } from '../../infra/highlight/wordDiffWorker'
 import { readDraft, writeDraft } from '../../kit/lib/draftState'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { prefsOptions } from '../../infra/queries'
@@ -20,7 +21,6 @@ import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
 import { createDiffHydrator } from '../../kit/diff/hydration'
 import {
-  buildDiffRows,
   buildDiffRowsAsync,
   buildRenderableRows,
   DIFF_LOAD_ROW_HEIGHT,
@@ -30,7 +30,6 @@ import {
   gapId,
   isCodeRow,
   maxLineCols,
-  plainTokenize,
   rowIdentityKeys,
   splitBandIdentityKeys,
   toBands,
@@ -44,6 +43,7 @@ import {
   type ViewMode,
 } from '../../kit/diff/diffModel'
 import { createDiffScrollRestoration } from './scrollRestoration'
+import { createParsedFilePublisher } from './parsedPublisher'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
@@ -62,6 +62,9 @@ const log = createLogger('diff')
 // interleave at render time (matched by path), so a thread mutation rerenders without re-tokenizing.
 const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
 const HIGHLIGHT_MAX_PATCH_LINES = 2_000
+
+const plainTokenizeDocument = async (_path: string, code: string) =>
+  code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
 
 const rejectUnsupported = async () => {
   throw new Error('Not supported here.')
@@ -120,6 +123,14 @@ export function DiffPane(props: {
   // every parse, which is one full copy per file in the diff (docs/diff-rendering.md § Parsing and
   // highlighting).
   const [parsedByPath, setParsedByPath] = createStore<Record<string, ParsedFile>>({})
+  let visibleHydrationPaths = new Set<string>()
+  const parsedPublisher = createParsedFilePublisher({
+    publish: (parsedFiles) => batch(() => {
+      for (const parsedFile of parsedFiles) setParsedByPath(parsedFile.file.path, parsedFile)
+    }),
+    isPriority: (path) => path === selectedPath() || visibleHydrationPaths.has(path),
+  })
+  onCleanup(parsedPublisher.dispose)
   // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the
   // file set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
@@ -149,9 +160,14 @@ export function DiffPane(props: {
   const hydrator = createDiffHydrator({
     parseFile: (file) => measure('core', 'diff.parse', async () => ({
       file,
-      diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
+      diff: await buildDiffRowsAsync(
+        file,
+        shouldUsePlainTokenizer(file) ? plainTokenizeDocument : tokenizeDocument,
+        diffWordsDocument,
+      ),
     })),
-    onParsed: (parsedFile) => setParsedByPath(parsedFile.file.path, parsedFile),
+    onParsed: (parsed) => parsedPublisher.enqueue([parsed]),
+    onParsedBatch: parsedPublisher.enqueue,
     cachedFile: (path) => source().cachedFile(path),
     fetchPatches: (paths, signal) => source().fetchPatches?.(paths, signal) ?? Promise.resolve([]),
   })
@@ -174,6 +190,7 @@ export function DiffPane(props: {
   // A different set of files: nothing about the old view survives.
   createEffect(on(filesSignature, (signature, previous) => {
     lastTarget = ''
+    parsedPublisher.reset()
     setParsedByPath(reconcile({}))
     setExpanded(new Map())
     // Restore the scope's collapsed files if they were saved against this same file set; a changed
@@ -194,6 +211,7 @@ export function DiffPane(props: {
   // ponytail: re-reads every file in the set, not the ones that moved. The hydrator has retry(path)
   // if the spawn count ever matters; it would need a per-file content key on the port to know which.
   createEffect(on(contentSignature, () => {
+    parsedPublisher.reset()
     recordSample('core', 'diff.hydrator.reset', 1)
     recordSample('core', 'diff.files', files().length)
     hydrator.reset(files(), selectedPath() || undefined)
@@ -274,7 +292,7 @@ export function DiffPane(props: {
     scrollEl,
   })
 
-  const { scheduleVirtualMeasure, scheduleElementMeasure, cancel: cancelMeasures } = createDiffMeasureSchedulers(
+  const { scheduleElementMeasure, cancel: cancelMeasures } = createDiffMeasureSchedulers(
     { unified: virt, split: splitVirt },
     scrollEl,
   )
@@ -324,10 +342,6 @@ export function DiffPane(props: {
     </Show>
   )
 
-  const threadLayoutSignature = createMemo(() =>
-    (source().threads?.() ?? [])
-      .map((thread) => `${thread.threadId}:${thread.resolved}:${threadCollapsed[thread.threadId] ?? thread.resolved}`)
-      .join('\0'))
   const threadCollapseFor = (thread: DiffThread): ThreadCollapseController => ({
     collapsed: () => threadCollapsed[thread.threadId] ?? thread.resolved,
     setCollapsed: (collapsed) => setThreadCollapsed(thread.threadId, collapsed),
@@ -370,7 +384,11 @@ export function DiffPane(props: {
         else if (isCodeRow(row) || row.kind === 'gap') paths.add(row.path)
       }
     }
-    if (paths.size) hydrator.prioritize([...paths])
+    visibleHydrationPaths = paths
+    if (paths.size) {
+      parsedPublisher.flush(paths)
+      hydrator.prioritize([...paths])
+    }
   })
   createEffect(() => {
     if (scrollEl()) {
@@ -378,15 +396,13 @@ export function DiffPane(props: {
       if (viewMode() === 'split') splitVirt.measure()
     }
   })
-  createEffect(() => {
-    rows().length
-    if (scrollEl()) scheduleVirtualMeasure('unified')
-  })
-  createEffect(() => {
-    if (viewMode() !== 'split') return
-    bands().length
-    if (scrollEl()) scheduleVirtualMeasure('split')
-  })
+  const measureMountedRows = () => {
+    const element = scrollEl()
+    if (!element) return
+    const target = viewMode() === 'split' ? 'split' : 'unified'
+    const selector = target === 'split' ? '.diff-split-band[data-index]' : '.diff-row[data-index]'
+    for (const row of element.querySelectorAll<HTMLElement>(selector)) scheduleElementMeasure(target, row)
+  }
   // Depend on the composer's *key* through a memo (equality-checked), not the composer object: the
   // object is replaced on every keystroke, and re-measuring per keystroke remounts the virtual rows,
   // which destroys the focused textarea (flicker and lost selection). Only opening, closing, or
@@ -394,22 +410,12 @@ export function DiffPane(props: {
   const lineComposerKey = createMemo(() => lineComposer()?.key ?? null)
   createEffect(() => {
     lineComposerKey()
-    if (!scrollEl()) return
-    scheduleVirtualMeasure('unified')
-    if (viewMode() === 'split') scheduleVirtualMeasure('split')
-  })
-  createEffect(() => {
-    threadLayoutSignature()
-    if (!scrollEl()) return
-    scheduleVirtualMeasure('unified')
-    if (viewMode() === 'split') scheduleVirtualMeasure('split')
+    measureMountedRows()
   })
   // Same argument as the two effects above, for the source's own annotations.
   createEffect(() => {
     source().lineExtraSignature?.()
-    if (!scrollEl()) return
-    scheduleVirtualMeasure('unified')
-    if (viewMode() === 'split') scheduleVirtualMeasure('split')
+    measureMountedRows()
   })
   const scrollRestoration = createDiffScrollRestoration({
     scope: props.source.scope,
@@ -524,11 +530,15 @@ export function DiffPane(props: {
         splitVirt={splitVirt}
         stickyHead={stickyHead}
         publishScrollEl={(element, mode) => scrollRestoration.publish(element, mode)}
-        onScroll={(element) => scrollRestoration.onScroll(element)}
+        onScroll={(element) => {
+          parsedPublisher.markScrolling()
+          scrollRestoration.onScroll(element)
+        }}
         maxCols={maxCols}
         scheduleElementMeasure={scheduleElementMeasure}
         shouldMeasureRow={shouldMeasureRow}
         shouldMeasureBand={shouldMeasureBand}
+        hasLineExtra={(row) => source().hasLineExtra?.(row) ?? false}
         onMutated={invalidate}
         resolveThread={(threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported()}
         replyReview={(databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported()}
