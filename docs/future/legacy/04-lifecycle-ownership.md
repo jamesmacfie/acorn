@@ -18,10 +18,11 @@ Memory contributes Terminal launch context without a circular dependency.
   snapshots before emission and retains the bounded window specified in the target architecture;
   Workflows reads persisted handoff data. Findings subscribes through manifest grants and resolves
   reads at call time.
-- Register the bounded, awaited pre-teardown hook described in the target architecture. Move archive
-  evidence formatting into Findings. The trusted producer obtains the bounded Git diff and PTY output
-  before teardown; do not widen Findings' Git/process permissions. Preserve ordering before PTY
-  buffer/worktree destruction.
+- The bounded, awaited pre-teardown hook exists: `archiveTask` awaits
+  `TaskSessionsBridge.captureArchiveReviewInput` and reports `reviewCaptureFailed` rather than failing
+  the archive. What remains is ownership. Move archive evidence formatting out of composition and into
+  Findings. The trusted producer obtains the bounded Git diff and PTY output before teardown; do not
+  widen Findings' Git/process permissions. Preserve ordering before PTY buffer/worktree destruction.
 - Add Terminal's launch-context contribution and register Memory through it. Terminal owns delivery;
   Memory no longer requires a root-injected launch thunk. Preserve send-to-agent as a separate action.
 - Remove the product callbacks and capability imports from `apps/node/src/composition/pluginDeps.ts`.
