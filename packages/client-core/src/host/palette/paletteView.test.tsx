@@ -256,6 +256,7 @@ describe('the interactive frames', () => {
     await settle()
 
     expect(field().placeholder).toBe('Search issues…')
+    expect(document.querySelector('.palette-crumbs')).toBeNull()
     expect(options().map((row) => row.textContent)).toEqual(['Searching…'])
     expect(dialog()?.getAttribute('aria-busy')).toBe('true')
     // An explanatory row is not a tab stop and not the cursor: there is nothing to press Enter on.
