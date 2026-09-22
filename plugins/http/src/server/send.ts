@@ -1,8 +1,5 @@
-// The API panel's request executor. Runs in the Hono server, a plain Node process (apps/node), so
-// this needs no bridge. A bridge exists to hold a stateful Node handle (a pg.Pool, a PTY); fetch is
-// stateless.
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+// The API panel's request executor runs in the HTTP plugin's isolated Node worker. Short-lived
+// commands use the host process broker so they run in the task's worktree without worker permissions.
 import { eq, and } from 'drizzle-orm'
 import { buildSessionEnv, type CoreServices, type PluginDatabase, type SessionTaskInfo } from '@acorn/plugin-api/node'
 import { httpVariables } from '../node/schema'
@@ -22,11 +19,9 @@ import {
 } from '../shared/model'
 import { openHttpValue } from './storage'
 
-// What this module needs from core, now that it has no handle to core's database: resolve the execution
-// task and its worktree, find the project's folder for fallback cwd, and open its own ciphertext.
-export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secrets'>
-
-const exec = promisify(execFile)
+// Resolve the execution task and worktree, find the project's fallback checkout, open stored values,
+// and run command variables through the host process broker.
+export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secrets' | 'proc'>
 
 // Caps. The response cap protects the client (the body is base64'd into JSON); the command cap
 // bounds a variable script that decides to print a file.
@@ -34,8 +29,6 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
 const COMMAND_TIMEOUT_MS = 15_000
 const COMMAND_MAX_BUFFER = 1 << 20
-// All command variables together get one budget: N vars x 15s serial would hang a send.
-const ALL_COMMANDS_TIMEOUT_MS = 30_000
 
 export class SendError extends Error {}
 
@@ -70,7 +63,6 @@ export function referencedVariableNames(input: HttpSendInput): Set<string> {
 
 // --- variable resolution ------------------------------------------------------------------
 
-/**
 /**
  * Flattens every variable layer into one lookup for interpolation (docs/http-client.md § Sending).
  */
@@ -130,19 +122,30 @@ async function resolveVarsWithSensitivity(
     if (row.kind === 'value') vars[row.name] = opened.get(row.id)!
   }
 
-  // Commands run concurrently under one shared deadline.
+  // Commands run concurrently, so each command's timeout also bounds the whole group.
   const commands = enabled.filter((r) => r.kind === 'command')
   if (commands.length) {
     if (!cwd) throw new SendError('Command variables need a project checkout — set the project path first')
     const env = buildSessionEnv({ taskId: input.executionTaskId ?? '', cwd, task: taskInfo })
-    const deadline = AbortSignal.timeout(ALL_COMMANDS_TIMEOUT_MS)
     const results = await Promise.all(
       commands.map(async (row) => {
         try {
           // bash -lc, not /bin/sh -c: a login shell picks up nvm/rbenv/direnv shims, which is what
           // makes `op read …` or `mise exec …` work the way it does in the user's own terminal.
-          const { stdout } = await exec('bash', ['-lc', opened.get(row.id)!], { cwd, env, timeout: COMMAND_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, signal: deadline })
-          const line = lastLine(stdout)
+          // The host broker runs outside this plugin's permission-scoped worker. A child spawned in
+          // the worker inherits its Node permissions and cannot load a CLI outside the plugin bundle.
+          const result = await core.proc.runProcess({
+            file: 'bash', args: ['-lc', opened.get(row.id)!], cwd, env,
+            timeoutMs: COMMAND_TIMEOUT_MS, maxOutputBytes: COMMAND_MAX_BUFFER,
+          })
+          if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start: ${result.spawnError}`)
+          if (result.timedOut) throw new SendError(`Variable "${row.name}": command timed out after ${COMMAND_TIMEOUT_MS / 1000} seconds`)
+          if (result.truncated) throw new SendError(`Variable "${row.name}": command produced more than ${COMMAND_MAX_BUFFER} bytes of output`)
+          if (result.code !== 0) {
+            const detail = result.stderr.trim().slice(0, 500)
+            throw new SendError(`Variable "${row.name}": command exited ${result.code}${detail ? `: ${detail}` : ''}`)
+          }
+          const line = lastLine(result.stdout)
           if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
           return [row.name, line] as const
         } catch (err) {

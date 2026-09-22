@@ -188,6 +188,34 @@ describe('http as a loaded plugin with its own tables', () => {
     }
   }, 60_000)
 
+  it('resolves a command variable outside the plugin package and attempts the request', async () => {
+    await running?.dispose()
+    running = null
+    const checkout = join(dataRoot, 'send-project')
+    mkdirSync(checkout)
+    const now = Date.now()
+    await core.db.insert(schema.projects).values({
+      id: 'proj-send', name: 'send', path: checkout, workspaceId: 'ws-1', sort: 1, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+    writeFileSync(join(checkout, 'base-url.mjs'), 'process.stdout.write("http://127.0.0.1:1")')
+    const { route } = await boot()
+    const variable = await call(route!, '/projects/proj-send/vars', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'BASE_URL', kind: 'command', value: 'node base-url.mjs', enabled: true }),
+    })
+    expect(variable.status).toBe(201)
+    const sent = await call(route!, '/projects/proj-send/send', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ method: 'GET', url: '{{BASE_URL}}/health' }),
+    })
+    expect(sent.status).toBe(200)
+    const outcome = (await sent.json()) as { ok: boolean; error: string }
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error).not.toContain('fetch is not defined')
+  }, 60_000)
+
   it('fails contained when a chain is broken, and leaves the node bootable', async () => {
     await running?.dispose()
     running = null

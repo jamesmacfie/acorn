@@ -42,9 +42,8 @@ Variables resolve in one pass, lowest precedence first: task builtins, then proj
 per-request overrides. Only the names a request actually references get resolved, because a command
 variable's value comes from running its shell command, and an override present at send time replaces
 that variable before its command would otherwise run, not after, so an overridden command variable's
-command never runs. Command variables execute through the process broker; each command gets 15
-seconds and a 1 MiB output cap, and all of a request's command variables share one 30-second budget
-so that several slow commands cannot add up to several times the wait. This is the same mechanism the
+command never runs. Command variables execute concurrently through the host process broker; each
+command gets 15 seconds and a 1 MiB per-stream output cap. This is the same mechanism the
 Database pane uses for `dbUrlScript`, but with no repo-config trust gate: a command variable's command
 is typed by the owner straight into the app's own database, not read from a committed
 `.acorn/config.toml`, so there is no repo-authored code here to authorize.
@@ -56,7 +55,8 @@ header on a cross-origin redirect and a hand-rolled loop would have to reproduce
 shows the final URL and whether a redirect happened, not each hop.
 
 There is no core HTTP service. Nothing central inspects an outbound request and there is no host
-allowlist: the plugin's own validation is the whole control. That holds while every plugin is
+allowlist: this plugin declares an any-host fetch grant because the owner chooses each URL, and its
+own validation is the whole control. That holds while every plugin is
 first-party code in this repo, and it has to change before a third-party plugin can make outbound
 requests, because at that point "each plugin validates its own" stops being a control. It is
 described here rather than built, because a guard nobody can point at is worse than a documented
