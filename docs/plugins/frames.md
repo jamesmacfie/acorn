@@ -163,9 +163,9 @@ hand.
 
 What crosses is data, all the way down. A handler is an id the host mints a closure for, never a
 function; text is a node, never a prop; `class`, `style` and every other door into the host's DOM are
-dropped with a row on the plugin's page; a node name this build does not know draws a labelled
-placeholder, which is the forward-compatibility rule above applied to drawing. A batch applies whole or
-not at all, and a worker that stops answering is terminated with a placeholder in every tree it served.
+dropped with a row on the plugin's page; a node name this build does not know is omitted. A batch
+applies whole or not at all, and a worker that stops answering is terminated and removed from every
+place it contributed.
 The wire is `@acorn/protocol/tree/`, the host is `client-core/src/host/tree/`, and
 `docs/shell.md § The plugin worker` has the sandbox.
 

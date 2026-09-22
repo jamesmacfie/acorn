@@ -468,10 +468,9 @@ question about which host is drawing, and a copy of that check here would be a c
 diverge.
 ### Unknown nodes and failed trees
 
-Three behaviours, the same on both hosts. A node type this build cannot draw renders as a labelled
-placeholder. So does a failed slot. And there is one error boundary per tree. On this host all three
-draw as an `Alert` in `warn` tone. A new node name from a newer plugin is a placeholder and a roster
-row, never a crash.
+Three behaviours are the same on both hosts. A node type this build cannot draw is omitted, a failed
+slot draws nothing, and one error boundary contains each tree. Plugin failures remain available to
+diagnostics without replacing the owner's UI with an inline error.
 
 ### What the TUI never does
 

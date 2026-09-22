@@ -4,7 +4,6 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TEXT_NODE, isKitNode, type KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { KIT_COMPONENTS } from './components'
 import { kitComponent } from './kitEntry'
-import { TreePlaceholder } from './placeholder'
 import { createTreeState } from './treeState'
 
 // The DOM host's end of the remote tree (docs/plugins.md § The tree contract).
@@ -50,7 +49,7 @@ export function TreeHost(props: TreeHostProps) {
     return (
       <Show when={stored()} keyed={false}>
         <Show when={type() !== TEXT_NODE} fallback={<>{String(stored()!.props.value ?? '')}</>}>
-          <Show when={isKitNode(type())} fallback={<TreePlaceholder pluginId={props.pluginId} detail={type()} />}>
+          <Show when={isKitNode(type())}>
             <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
               <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
             </Dynamic>
@@ -61,11 +60,11 @@ export function TreeHost(props: TreeHostProps) {
   }
 
   return (
-    <Show when={!state.failed()} fallback={<TreePlaceholder pluginId={props.pluginId} detail={state.failed() ?? undefined} />}>
+    <Show when={!state.failed()}>
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
-          its own tree down and nothing else. The owner's surface around it is untouched, which is the
-          containment promise the design makes. */}
-      <ErrorBoundary fallback={(error: unknown) => <TreePlaceholder pluginId={props.pluginId} detail={error instanceof Error ? error.message : String(error)} />}>
+          its own tree down and nothing else. A failed optional contribution stays out of the owner's
+          UI rather than replacing it with an error. */}
+      <ErrorBoundary fallback={null}>
         {/* One boundary per root, not per node and not one for the whole slot. A heavy node is a
             loader (./kitEntry.ts), and a pending `lazy()` renders as an empty string — invisible on
             the DOM, refused by a cell host, so `fallback={null}` is the shape the pane registry

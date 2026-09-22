@@ -347,8 +347,9 @@ out of it. The document's `worker-src` names `'self' blob:` and never the plugin
 The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
 bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
 unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
-into a function. A worker that misses two heartbeats is terminated and every tree it served shows a
-labelled placeholder.
+into a function. A worker that misses two heartbeats is terminated and every tree it served is removed
+from the UI. The failure remains in the plugin diagnostics instead of replacing the contribution with
+an inline error.
 
 ### The renderer bridge
 
