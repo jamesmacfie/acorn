@@ -39,6 +39,9 @@ never debounced — the reader presses Enter once, sees a pending row, and canno
 failure keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a
 character; the end of the composition schedules once.
 
+When a search provides a placeholder, that field names the search. Its breadcrumb shows parent groups
+only, so a top-level search starts with the field rather than repeating its title above it.
+
 **A setting shows what is set before it changes it.** Entering a `setting` frame asks its owner what
 the value currently is, draws the two-to-thirty-two declared choices, and marks the one that is set.
 Picking a choice writes it, keeps the frame open, and marks whatever the owner says it *stored* — never
