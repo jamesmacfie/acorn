@@ -1,8 +1,8 @@
-// CodeMirror's grammar and highlight-style half, as this host's answer: a throw.
+// CodeMirror's grammar half, as this host's answer: a throw.
 //
 // The sixth alias in the host switch (../vite.config.ts), and the third that replaces a package
-// rather than swapping a component for one. Three sets of specifiers resolve here —
-// `@codemirror/theme-one-dark`, every `@codemirror/lang-*` and every `@codemirror/legacy-modes/mode/*`.
+// rather than swapping a component for one. Two sets of specifiers resolve here — every
+// `@codemirror/lang-*` and every `@codemirror/legacy-modes/mode/*`.
 //
 // **`@codemirror/language` is not one of them, and the reason is worth keeping.** It was, for an
 // afternoon, and it broke the editor pane: `codemirror` depends on it, the `editor` pane imports
@@ -10,7 +10,7 @@
 // the stub was handed to a package that works here. It is a declared dependency instead. A stub may
 // only stand in front of a specifier no working surface reaches.
 //
-// **Why they cannot be here.** All four are reached from one surface, client-core's
+// **Why they cannot be here.** All of them are reached from one surface, client-core's
 // `features/editor/DocumentSurface.tsx`, which holds an `HTMLElement` and mounts a CodeMirror
 // `EditorView` into it. There is no DOM in a terminal, so that surface cannot draw here whatever is
 // installed; it is in the graph because a third-party plugin may declare a document region and
@@ -37,14 +37,6 @@ const absent = (what: string): never => {
   )
 }
 
-// ── `@codemirror/theme-one-dark` ──────────────────────────────────────────────────────────────
-
-/** A proxy rather than an empty object, so a reader of any field gets the message rather than
- *  `undefined`. `client-core/src/features/editor/theme.ts` is the one caller, and it only ever hands
- *  this to `syntaxHighlighting`. */
-const style = (name: string): Record<string, never> => new Proxy({}, { get: () => absent(name) })
-export const oneDarkHighlightStyle = style('oneDarkHighlightStyle')
-
 // ── `@codemirror/lang-*` and `@codemirror/legacy-modes/mode/*` ────────────────────────────────
 //
 // One export per grammar `client-core/src/features/editor/language.ts` names, because it reads the
@@ -66,7 +58,10 @@ export const xml = (): never => absent('the XML grammar')
 export const yaml = (): never => absent('the YAML grammar')
 
 /** The legacy modes, which are plain objects rather than functions where the real package is
- *  concerned — so these are proxies, and reading any field of one says the same thing. */
+ *  concerned — so these are proxies, and reading any field of one says the same thing. A proxy
+ *  rather than an empty object, so a reader of any field gets the message rather than `undefined`. */
+const style = (name: string): Record<string, never> => new Proxy({}, { get: () => absent(name) })
+
 export const properties = style('the INI mode')
 export const ruby = style('the Ruby mode')
 export const shell = style('the shell mode')
