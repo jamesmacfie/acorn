@@ -748,6 +748,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-menu-item:hover:not(:disabled) { background: var(--bg-hover); }
 .ui-menu-item:disabled { opacity: 0.45; cursor: default; }
 .ui-menu-item[data-tone='danger'] { color: var(--danger); }
+/* Armed to confirm, wearing the same ring a ConfirmButton does. */
+.ui-menu-item[data-armed] { box-shadow: var(--ring); }
 .ui-menu-item:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
 .ui-menu-leading { flex: none; display: inline-flex; align-items: center; }
 .ui-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
 import { formatFileReference } from '@acorn/plugin-api/client'
-import { ConfirmButton, Menu, RowActions } from '@acorn/plugin-api/ui'
+import { Menu, RowActions } from '@acorn/plugin-api/ui'
 import type { ChangesModel } from './changesModel'
 import type { FileRow } from './model'
 
@@ -12,8 +12,8 @@ import type { FileRow } from './model'
 // reader does over and over on the way to a commit and a menu is one click too many for it; what is
 // left is the two verbs you reach for once.
 //
-// Discard is a `ConfirmButton` rather than a `Menu.Item`: it cannot be undone, and an armed label is
-// the prompt on every host, terminal included (docs/ui-design.md § The closed kit).
+// Discard is a `Menu.Item` with `confirm`: it cannot be undone, and the armed label is the prompt on
+// every host, terminal included (docs/ui-design.md § The closed kit).
 export function FileTools(props: { row: FileRow; model: ChangesModel }) {
   const row = () => props.row
   return (
@@ -34,17 +34,15 @@ export function FileTools(props: { row: FileRow; model: ChangesModel }) {
           >
             Send to agent
           </Menu.Item>
-          <ConfirmButton
-            variant="bare"
-            size="sm"
-            label="Discard changes"
-            tip="Discard changes"
-            tipSub="Restore this file — cannot be undone"
-            confirmLabel="Sure?"
-            onConfirm={() => void props.model.discard(row().path, row().status === 'untracked')}
+          <Menu.Item
+            context={menu}
+            tone="danger"
+            confirm="Discard?"
+            title="Put this file back the way the last commit has it — cannot be undone"
+            onSelect={() => void props.model.discard(row().path, row().status === 'untracked', row().oldPath)}
           >
             Discard
-          </ConfirmButton>
+          </Menu.Item>
         </>
       )}
     </RowActions>

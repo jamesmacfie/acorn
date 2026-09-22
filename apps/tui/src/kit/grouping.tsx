@@ -5,6 +5,7 @@ import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import { isCompact, slotColor } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { GLYPHS } from './glyphs'
@@ -606,20 +607,29 @@ Modal.Actions = ModalActions
  *
  *  A row rather than a button, because the only thing a reader can drive in a cell overlay is a
  *  collection — the same reason the quit confirmation is a list (../chrome/Shell.tsx). The context is
- *  the menu's own, so an item closes the list it is in. */
+ *  the menu's own, so an item closes the list it is in.
+ *
+ *  `confirm` is the armed label a destructive item wears between its first press and its second. The
+ *  armed row is the prompt here exactly as it is on the DOM, which is the whole reason the prop lives
+ *  on the item rather than a button the caller drops into the list: this host has no button to drop. */
 Menu.Item = (props: {
   context: { close: () => void }
   onSelect: () => void
   disabled?: boolean
   closeOnSelect?: boolean
+  confirm?: string
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
   trailing?: JSX.Element
   title?: string
   children: JSX.Element
 }) => {
+  const armed = createArmedConfirm()
+  const isArmed = () => !!props.confirm && armed.armed() !== null
   const control = stop({
     onPress: () => {
+      // Arming leaves the list open, or the prompt would close under the press that raised it.
+      if (props.confirm && !armed.request('confirm')) return
       props.onSelect()
       if (props.closeOnSelect !== false) props.context.close()
     },
@@ -631,10 +641,11 @@ Menu.Item = (props: {
       {slot(props.leading)}
       <Line {...litControl({
         focused: control.focused(),
+        strong: isArmed(),
         disabled: props.disabled,
-        tone: props.tone === 'danger' ? 'danger' : undefined,
+        tone: isArmed() || props.tone === 'danger' ? 'danger' : undefined,
       })}>
-        {flatten(props.children)}
+        {isArmed() ? props.confirm ?? '' : flatten(props.children)}
       </Line>
       <box flexGrow={1} />
       {slot(props.trailing)}

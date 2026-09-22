@@ -87,9 +87,9 @@ function OperationBanner(props: { model: ChangesModel }) {
  *  DOM-only halves of `Menu` and the terminal host's table has neither, as the view menu and the
  *  commit options both found. Each label says the whole verb instead.
  *
- *  Force push is a `ConfirmButton` rather than a `Menu.Item`, on the pattern the row's Discard set
- *  (./fileTools.tsx): the armed label is the prompt on every host, and a dialog was refused by the
- *  programme's decisions table. */
+ *  Force push is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
+ *  the armed label is the prompt on every host, and a dialog was refused by the programme's
+ *  decisions table. */
 function RemoteMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const run = (action: RemoteAction) => void model().remote(action)
@@ -117,17 +117,15 @@ function RemoteMenu(props: { model: ChangesModel }) {
           </Menu.Item>
           <Menu.Item context={menu} title={COMMAND.rebase} onSelect={() => run('rebase')}>Pull with rebase</Menu.Item>
           <Menu.Item context={menu} title={COMMAND.push} onSelect={() => run('push')}>Push</Menu.Item>
-          <ConfirmButton
-            variant="bare"
-            size="sm"
-            label="Force push"
-            tip="Replace the upstream with this branch"
-            tipSub={COMMAND.force}
-            confirmLabel="Force push?"
-            onConfirm={() => run('force')}
+          <Menu.Item
+            context={menu}
+            tone="danger"
+            confirm="Force push?"
+            title={`${COMMAND.force} — replaces the upstream with this branch`}
+            onSelect={() => run('force')}
           >
             Force push
-          </ConfirmButton>
+          </Menu.Item>
         </>
       )}
     </Menu>

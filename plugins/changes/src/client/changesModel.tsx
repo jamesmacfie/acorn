@@ -376,9 +376,10 @@ export function createChangesModel(task: Task) {
     unstage: (paths: string[]) => gitAction(() => localGitApi.unstage(task.id, paths)),
     stageAll: () => gitAction(() => localGitApi.stageAll(task.id)),
     unstageAll: () => gitAction(() => localGitApi.unstageAll(task.id)),
-    // Both are destructive and both arm through `ConfirmButton`, so the button is the prompt and the
-    // model just does the thing.
-    discard: (path: string, untracked: boolean) => gitAction(() => localGitApi.discard(task.id, path, untracked)),
+    // Both are destructive and both arm before they run — the row's item through `Menu.Item`'s
+    // `confirm`, Discard all through `ConfirmButton` — so the control is the prompt and the model
+    // just does the thing. `oldPath` rides along for a rename, which takes both of its names.
+    discard: (path: string, untracked: boolean, oldPath?: string) => gitAction(() => localGitApi.discard(task.id, path, untracked, oldPath)),
     discardAll: () => gitAction(() => localGitApi.discardAll(task.id)),
     sendRef,
     sendNotes,

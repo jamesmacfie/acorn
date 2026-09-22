@@ -93,7 +93,7 @@ export function localGitBridge(
     },
     stage: (taskId, paths) => withRoot(taskId, (root) => stageFiles(root, paths)),
     unstage: (taskId, paths) => withRoot(taskId, (root) => unstageFiles(root, paths)),
-    discard: (taskId, path, untracked) => withRoot(taskId, (root) => discardFile(root, path, !!untracked)),
+    discard: (taskId, path, untracked, oldPath) => withRoot(taskId, (root) => discardFile(root, path, !!untracked, oldPath)),
     // The two hooked mutations. The refusal reaches the pane as the same `{ ok: false, reason }` a git
     // failure does, with the blaming plugin's name in front of it, so the owner's UI needs no second
     // shape for "somebody said no" (docs/plugins.md § Hooks).

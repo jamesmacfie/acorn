@@ -234,11 +234,25 @@ export function unstageFiles(worktree: string, paths: readonly string[], size = 
   return runChunked(worktree, paths, ['restore', '--staged'], size)
 }
 
-// Discard restores the worktree copy. It is destructive, so the caller must confirm first.
-// Untracked files aren't restorable; delete them via git clean, scoped to the one path.
-export async function discardFile(worktree: string, path: string, untracked: boolean): Promise<GitActionResult> {
-  if (!isValidRelPath(path)) return { ok: false, reason: 'Invalid path.' }
-  return untracked ? run(worktree, ['clean', '-f', '--', path]) : run(worktree, ['restore', '--', path])
+// Discard puts the file back the way HEAD has it. It is destructive, so the caller must confirm first.
+//
+// Both halves on purpose. `git restore -- path` alone only rewrites the worktree from the index, so a
+// file that was staged came straight back and the row never went away: discarding a newly added file
+// did nothing at all, because the index still held it. `--source=HEAD --staged --worktree` is the one
+// form that covers every row the pane can show — a staged add, a staged edit, an unstaged edit, a
+// deletion either way, and an unmerged file, which it resolves to our side.
+//
+// A rename takes both names. Restoring only the new one leaves the old one deleted in the worktree,
+// which is half a discard and reads as a bug.
+//
+// Untracked files are in neither HEAD nor the index, so there is nothing to restore them from and
+// `git clean` deletes them instead, scoped to the one path.
+export async function discardFile(worktree: string, path: string, untracked: boolean, oldPath?: string): Promise<GitActionResult> {
+  const paths = oldPath ? [path, oldPath] : [path]
+  if (!paths.every(isValidRelPath)) return { ok: false, reason: 'Invalid path.' }
+  return untracked
+    ? run(worktree, ['clean', '-f', '--', ...paths])
+    : run(worktree, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...paths])
 }
 
 // Bulk variants for the ChangesPane toolbar: the whole working tree at once.

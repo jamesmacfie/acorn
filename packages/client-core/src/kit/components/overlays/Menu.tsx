@@ -3,6 +3,7 @@ import { Portal } from 'solid-js/web'
 import { createDomCollection } from '../../keys/collection'
 import { restoreFocusOnCleanup, trapTab } from '../../keys/trap'
 import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../../lib/anchor'
+import { createArmedConfirm } from '../../lib/confirm'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
 // why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
@@ -126,37 +127,60 @@ export function ContextMenu(props: {
 }
 
 /** One action. `onSelect` fires and the menu closes; an item that leaves it open is usually a
- *  checkbox in disguise. See docs/ui-design.md § Menus and right-click for `closeOnSelect`. */
+ *  checkbox in disguise. See docs/ui-design.md § Menus and right-click for `closeOnSelect`.
+ *
+ *  `confirm` is the armed label a destructive item wears after its first press: the item stays put,
+ *  reads `Discard?`, and only the second press calls `onSelect`. It belongs here rather than at the
+ *  call site because a `ConfirmButton` dropped into a menu is a button among menu items — a different
+ *  height, and no `.ui-menu-item` for the roving focus to land on, so the arrows walk straight past
+ *  it. */
 Menu.Item = (props: {
   context: MenuContext
   onSelect: () => void
   disabled?: boolean
   /** Default true. */
   closeOnSelect?: boolean
+  /** Arm to confirm: the label the item wears between the first press and the second. */
+  confirm?: string
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
   trailing?: JSX.Element
   title?: string
   children: JSX.Element
-}) => (
-  <button
-    type="button"
-    ref={(el) => props.context.register(el)}
-    class="ui-menu-item"
-    role="menuitem"
-    data-tone={props.tone ?? 'neutral'}
-    disabled={props.disabled}
-    title={props.title}
-    onClick={() => {
-      if (props.closeOnSelect !== false) props.context.close()
-      props.onSelect()
-    }}
-  >
-    <Show when={props.leading}><span class="ui-menu-leading">{props.leading}</span></Show>
-    <span class="ui-menu-label">{props.children}</span>
-    <Show when={props.trailing}><span class="ui-menu-trailing">{props.trailing}</span></Show>
-  </button>
-)
+}) => {
+  const armed = createArmedConfirm()
+  // One item, one key, the same degenerate case ConfirmButton is (kit/lib/confirm.ts).
+  const isArmed = () => !!props.confirm && armed.armed() !== null
+  return (
+    <button
+      type="button"
+      ref={(el) => props.context.register(el)}
+      class="ui-menu-item"
+      role="menuitem"
+      data-tone={isArmed() ? 'danger' : props.tone ?? 'neutral'}
+      data-armed={isArmed() ? '' : undefined}
+      disabled={props.disabled}
+      title={props.title}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !isArmed()) return
+        // The menu's own Escape would close the surface. An armed item takes the first one.
+        event.preventDefault()
+        event.stopPropagation()
+        armed.disarm()
+      }}
+      onClick={() => {
+        // Arming leaves the menu open, or the prompt would close under the press that raised it.
+        if (props.confirm && !armed.request('confirm')) return
+        if (props.closeOnSelect !== false) props.context.close()
+        props.onSelect()
+      }}
+    >
+      <Show when={props.leading}><span class="ui-menu-leading">{props.leading}</span></Show>
+      <span class="ui-menu-label">{isArmed() ? props.confirm : props.children}</span>
+      <Show when={props.trailing}><span class="ui-menu-trailing">{props.trailing}</span></Show>
+    </button>
+  )
+}
 
 /** A non-interactive heading row. */
 Menu.Label = (props: { children: JSX.Element }) => (

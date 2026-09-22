@@ -35,10 +35,12 @@ does not: a new commit is both, so the GitHub pane sets only `signature`.
 
 Behind the changes pane's two signatures is one resource, `LocalStatus`, which carries the branch, its
 upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
-can describe different trees. It is one `git status --porcelain=v2 --branch` call plus two numstats and
-a filesystem check for a half-finished merge or rebase. Two reads would disagree for a poll interval,
-which is why the header's totals, the groups, the branch bar's counts and the banner all derive from
-this one record.
+can describe different trees. It is one `git status --porcelain=v2 --branch --untracked-files=all`
+call plus two numstats and a filesystem check for a half-finished merge or rebase. Two reads would
+disagree for a poll interval, which is why the header's totals, the groups, the branch bar's counts
+and the banner all derive from this one record. The last flag is what makes an untracked directory
+arrive as the files inside it: git's default collapses one to a single `dir/` entry, and a row named
+after a directory has no patch to show and no file to discard.
 
 Two members exist for what a caller draws that the viewer has no concept of: `lineExtra` puts content
 under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
@@ -83,6 +85,12 @@ rather than reading as a modification, it has no line counts, and it has no chec
 answer to "stage a conflict" is "mark it resolved" and there is no half of one that can sit in the
 index while the rest does not. Its overflow menu says so. A tracked file staged and then edited again
 is one row with an indeterminate checkbox, and ticking that stages the rest.
+
+Discard means one thing wherever the row sits: put this file back the way the last commit has it. It
+is `git restore --source=HEAD --staged --worktree`, both areas at once, because a worktree-only
+restore rewrites the file from the index and a file that was staged simply comes back — discarding a
+newly added file did nothing at all. A rename is discarded by both of its names, or the old one stays
+deleted. An untracked file has nothing to restore from, so it is deleted instead.
 
 It stacks one staging area at a time, and `stackFor` in `plugins/changes/src/client/model.ts` says
 why: git reports a file staged and then edited again twice, once per area, and the row model keys a

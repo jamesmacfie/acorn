@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
@@ -294,6 +294,25 @@ describe('local diff over a real worktree', () => {
     expect((await stageFiles(dir, [])).ok).toBe(false)
     expect((await commitStaged(dir, '  ')).ok).toBe(false)
     expect((await commitStaged(dir, 'nothing staged')).ok).toBe(false) // git refuses an empty commit
+  })
+
+  // A file staged for the first time: a worktree-only restore rewrote it from the index, which is
+  // where the staged copy was, so the row never went away.
+  it('discards a staged add', { timeout: 15_000 }, async () => {
+    writeFileSync(join(dir, 'fresh.ts'), 'brand new\n')
+    await stageFiles(dir, ['fresh.ts'])
+    expect(await discardFile(dir, 'fresh.ts', false)).toEqual({ ok: true })
+    expect((await localStatus(dir)).changes).toEqual([])
+    expect(existsSync(join(dir, 'fresh.ts'))).toBe(false)
+  })
+
+  // A rename is two names, and discarding only the new one leaves the old one deleted.
+  it('discards both halves of a rename', { timeout: 15_000 }, async () => {
+    git('mv', 'src/a.ts', 'src/moved.ts')
+    expect((await localStatus(dir)).changes[0]).toMatchObject({ path: 'src/moved.ts', oldPath: 'src/a.ts' })
+    expect(await discardFile(dir, 'src/moved.ts', false, 'src/a.ts')).toEqual({ ok: true })
+    expect((await localStatus(dir)).changes).toEqual([])
+    expect(existsSync(join(dir, 'src', 'a.ts'))).toBe(true)
   })
 
   // `git commit -a` is what the Commit tracked button asks for: every tracked change, and nothing
