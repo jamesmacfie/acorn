@@ -262,8 +262,11 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
     })
 
+    const runProcess = vi.spyOn(fx.core.proc, 'runProcess')
     const vars = await resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
+    expect(runProcess).toHaveBeenCalledOnce()
+    expect(runProcess).toHaveBeenCalledWith(expect.objectContaining({ file: 'bash', cwd: worktree, timeoutMs: 15_000 }))
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
     expect(taskId).toBe('task-1')
