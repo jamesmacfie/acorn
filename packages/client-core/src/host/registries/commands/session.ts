@@ -176,8 +176,8 @@ export type CommandSession = {
   frames: Accessor<readonly SessionFrame[]>
   /** The frame on top, or `null` while closed. */
   frame: Accessor<SessionFrame | null>
-  /** Where this frame is, from the top level down to and including its own title. Empty at the root,
-   *  which is the one frame that is not a command. */
+  /** Where this frame is. A search with its own placeholder shows only its parent titles, since the
+   *  field already names the search. Empty at the root. */
   breadcrumb: Accessor<readonly string[]>
   /** What the top frame is: the root, a group, a search, an input or a setting. A renderer draws the
    *  same field and list for all five and reads this only to label the field and to know that Enter
@@ -869,7 +869,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     context: captured,
     frames,
     frame,
-    breadcrumb: () => frame()?.breadcrumb ?? [],
+    breadcrumb: () => {
+      const current = frame()
+      if (!current) return []
+      return current.kind === 'search' && current.placeholder
+        ? current.breadcrumb.slice(0, -1)
+        : current.breadcrumb
+    },
     kind: () => frame()?.kind ?? 'root',
     query: () => frame()?.query ?? '',
     placeholder: () => frame()?.placeholder ?? '',
