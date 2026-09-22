@@ -37,8 +37,11 @@ export const TREE_LIMITS = {
   /** Host requests one mounted tree may have outstanding. A tree that has asked eight questions and
    *  awaited none of them is not waiting on an answer. */
   hostRequestsPerSlot: 8,
-  /** How long the owner's handler has before the tree is told the request failed. The owner is code in
-   *  this process, so this is a stuck promise rather than a network round trip. */
+  /** How long an `owner.invoke` handler has before the tree is told the request failed. The owner is
+   *  code in this process, so this is a stuck promise rather than a network round trip.
+   *
+   *  `overlay.open` is deliberately not held to it. What settles that one is a person closing a modal,
+   *  and no deadline written here is the right answer to how long somebody takes. */
   hostRequestMs: 10_000,
 } as const
 

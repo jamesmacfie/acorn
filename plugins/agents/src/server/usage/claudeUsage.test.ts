@@ -88,8 +88,15 @@ describe('Claude usage parsing', () => {
     expect(() => parseClaudeUsageOutput('nothing useful')).toThrowError(expect.objectContaining({ code: 'parse_failure' }))
   })
 
-  it('keeps reset text when an absolute format cannot be parsed', () => {
-    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', capturedAt)).toBeNull()
+  it('reads the absolute reset forms the CLI prints, and keeps the words when it cannot', () => {
+    // Noon on 24 July 2026 is `capturedAt`.
+    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', capturedAt)).toBe(new Date(2026, 6, 24, 16, 59).getTime())
+    // A time already gone today is tomorrow's.
+    expect(parseClaudeReset('Resets 9am', capturedAt)).toBe(new Date(2026, 6, 25, 9).getTime())
+    expect(parseClaudeReset('Resets Sep 24 at 11:59pm', capturedAt)).toBe(new Date(2026, 8, 24, 23, 59).getTime())
+    // Midnight is 12am on the day it starts, not noon.
+    expect(parseClaudeReset('Resets Sep 25 at 12am', capturedAt)).toBe(new Date(2026, 8, 25, 0, 0).getTime())
+    expect(parseClaudeReset('Resets when the moon is right', capturedAt)).toBeNull()
   })
 })
 

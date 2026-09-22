@@ -145,7 +145,10 @@ const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate)
 // Whose stream an event belongs to. Absent means the session's own.
 const subagentIdOf = (event: AgentNormalizedEvent): string | undefined => {
   if (event.type === 'tool') return event.tool.subagentId
-  if (event.type === 'assistant_message' || event.type === 'reasoning' || event.type === 'file_change') {
+  if (
+    event.type === 'user_message' || event.type === 'assistant_message'
+    || event.type === 'reasoning' || event.type === 'file_change'
+  ) {
     return event.subagentId
   }
   return undefined

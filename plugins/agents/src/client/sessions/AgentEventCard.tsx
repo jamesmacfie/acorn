@@ -99,12 +99,16 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
-          const attachments = () =>
-            props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
+          // The turn's attachments belong to the reader's own turn. A subagent's brief sits inside that
+          // same turn, so left ungated it drew the parent's pictures and context manifest under a
+          // document the reader never wrote.
+          const attachments = () => message().subagentId
+            ? []
+            : props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
-                <Text emphasis="eyebrow">You</Text>
+                <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'You'}</Text>
                 <AgentMarkdown
                   text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
                   taskId={props.taskId}
@@ -119,7 +123,7 @@ export default function AgentEventCard(props: {
                     </Index>
                   </Inline>
                 </Show>
-                <Show when={props.turn?.input.some((part) => part.type === 'context')}>
+                <Show when={!message().subagentId && props.turn?.input.some((part) => part.type === 'context')}>
                   <Fold label="Context manifest" level="sub">
                     <Stack gap="row">
                       <For each={props.turn?.input.filter((part) => part.type === 'context') ?? []}>
@@ -157,10 +161,14 @@ export default function AgentEventCard(props: {
             // The same card the reader's own turn gets, in the other stripe colour: the two sides of
             // the conversation are the pair that has to be told apart at a glance, and everything
             // else in the stream is a tool call or a note rather than somebody talking.
+            //
+            // A subagent's run is that same pair one level down — the brief it was handed and the
+            // report it hands back — so both of its cards say whose run this is and keep the stripes
+            // that tell the two apart.
             <Card pad="sm" stripe="ok">
               <Stack gap="row">
                 <Inline spread>
-                  <Text emphasis="eyebrow">Agent</Text>
+                  <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'Agent'}</Text>
                   <CopyOutputMenu text={() => message().text} event={message} />
                 </Inline>
                 <AgentMarkdown text={message().text} taskId={props.taskId} />

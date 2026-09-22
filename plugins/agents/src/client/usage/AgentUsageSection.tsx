@@ -1,8 +1,8 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Facts, IconButton, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Facts, IconButton, Inline, Meter, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { agentUsageStore } from './usageStore'
 import { providerMetaLine, providerUsageRows } from './usageModel'
-import { usageTone } from '../sessions/stateTone'
+import { usageMeterTone, usageTone } from '../sessions/stateTone'
 
 // What each harness's own plan has left, read off the provider's CLI rather than any acorn record
 // (docs/managed-agents.md § Plan usage). One block per provider: a health dot, whose account it is,
@@ -49,7 +49,26 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
             <Facts
               size="sm"
               grouping="rows"
-              items={providerUsageRows(provider).map((row) => ({ label: row.label, value: row.value }))}
+              items={providerUsageRows(provider).map((row) => ({
+                label: row.label,
+                // A quota row carries a bar under its sentence; the cost and token rows below it are
+                // not a share of anything, so they stay text. The mark on the bar is where a steady
+                // spend would have left the fill by now, so "27% left" reads as comfortable or not
+                // without doing the arithmetic against the reset time beside it.
+                value: row.meter
+                  ? (
+                    <Stack gap="inline">
+                      <Text>{row.value}</Text>
+                      <Meter
+                        value={row.meter.fill}
+                        mark={row.meter.pace ?? undefined}
+                        tone={usageMeterTone(row.meter.health)}
+                        label={`${row.label}: ${row.value}`}
+                      />
+                    </Stack>
+                  )
+                  : row.value,
+              }))}
             />
           </Stack>
         )}
