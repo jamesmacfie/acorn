@@ -19,7 +19,7 @@ export const localGitApi = {
   newSide: (taskId: string, path: string, scope: 'unstaged' | 'staged') => readJson<{ text: string } | { error: string }>(localNewSideRoute(taskId, path, scope)),
   stage: (taskId: string, paths: string[]) => post<ActionResult>(localActionRoute(taskId, 'stage'), { paths }),
   unstage: (taskId: string, paths: string[]) => post<ActionResult>(localActionRoute(taskId, 'unstage'), { paths }),
-  discard: (taskId: string, path: string, untracked?: boolean) => post<ActionResult>(localActionRoute(taskId, 'discard'), { path, untracked }),
+  discard: (taskId: string, path: string, untracked?: boolean, oldPath?: string) => post<ActionResult>(localActionRoute(taskId, 'discard'), { path, untracked, oldPath }),
   headCommit: (taskId: string) => readJson<HeadCommit | null>(localHeadCommitRoute(taskId)),
   commit: (taskId: string, message: string, options: CommitOptions = {}) =>
     post<ActionResult>(localActionRoute(taskId, 'commit'), { message, ...options }),

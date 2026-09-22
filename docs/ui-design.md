@@ -1044,9 +1044,15 @@ sandboxed plugin frame, where the "viewport" is just the frame.
 
 `Menu.tsx` layers menu semantics on the same hook: items are buttons, not Rows, because menus have
 their own semantics and forcing every clickable through one shared component would blur that.
-`Menu.Item`'s `onSelect` closes the menu, with one exception: `closeOnSelect={false}` exists for
-arm-to-confirm items, whose first press has to survive to show its armed label
-(`createArmedConfirm`, `kit/lib/confirm.ts`) rather than close under it.
+`Menu.Item`'s `onSelect` closes the menu, with one exception: `closeOnSelect={false}` exists for an
+item that toggles something, whose press has to leave the list open to show the new state.
+
+Arm-to-confirm is `Menu.Item`'s own `confirm` prop, not a `ConfirmButton` dropped into the list. The
+item keeps its place, reads `Discard?` between the first press and the second, and only then calls
+`onSelect` (`createArmedConfirm`, `kit/lib/confirm.ts`). A button among menu items is the wrong
+height and carries no `.ui-menu-item`, so the roving focus walks straight past it and the keyboard
+cannot reach the one row in the menu that matters most. Changes' Discard and Force push were both
+that shape and are both items now.
 
 An `AnchorTarget` can be a point as well as an element; a point is a zero-size rect, so everything
 downstream of the positioning math already works unchanged, which is what lets `ContextMenu` reuse

@@ -37,9 +37,14 @@ const inFlight = new Map<string, Promise<string | null>>()
 // (docs/plugins.md § Hearing a core event § HEAD moved). The changes plugin's own parser skips any
 // line that does not start with `?`, `1`, `2` or `u`, so the headers cost it nothing and the two
 // callers share one process rather than spawning one each.
+//
+// `--untracked-files=all` because git's default collapses a wholly untracked directory to one entry
+// named `dir/`, and the changes pane can do nothing with that: there is no file to diff and no file
+// to discard. Ignored directories are still skipped, so the extra walk is over files somebody is
+// about to be asked about anyway.
 const run = async (path: string): Promise<string | null> => {
   try {
-    return (await gitOrThrow(['status', '--porcelain=v2', '--branch'], { cwd: path, timeoutMs: 10_000 })).stdout
+    return (await gitOrThrow(['status', '--porcelain=v2', '--branch', '--untracked-files=all'], { cwd: path, timeoutMs: 10_000 })).stdout
   } catch {
     return null
   }

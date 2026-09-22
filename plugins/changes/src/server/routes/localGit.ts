@@ -32,7 +32,7 @@ export type LocalGitBridge = {
   /** A row's checkbox sends one path, a group's sends many. */
   stage(taskId: string, paths: string[]): Promise<GitActionResult>
   unstage(taskId: string, paths: string[]): Promise<GitActionResult>
-  discard(taskId: string, path: string, untracked?: boolean): Promise<GitActionResult>
+  discard(taskId: string, path: string, untracked?: boolean, oldPath?: string): Promise<GitActionResult>
   /** HEAD's hash and message, for the field an amend fills. Null before the branch has a commit. */
   headCommit(taskId: string): Promise<HeadCommit | null>
   commit(taskId: string, message: string, options?: CommitOptions): Promise<GitActionResult>
@@ -65,7 +65,8 @@ export const setLocalGitBridge = (bridge: LocalGitBridge | null): void => setRou
 // nothing after it stages nothing while reporting success, which the pane would draw as a stage that
 // did not happen.
 const pathsBody = z.object({ paths: z.array(z.string().min(1)).min(1) })
-const discardBody = z.object({ path: z.string().min(1), untracked: z.boolean().optional() })
+// `oldPath` is a rename's other name, so discarding one row puts both back (../localDiff.ts § discardFile).
+const discardBody = z.object({ path: z.string().min(1), untracked: z.boolean().optional(), oldPath: z.string().min(1).optional() })
 // Every flag the commit menu can set, each optional and each strictly a boolean: `{ amend: 'yes' }`
 // is a caller bug, and coercing it would commit an amend somebody never asked for.
 const commitBody = z.object({
@@ -141,7 +142,7 @@ export const localGit = new Hono<AppEnv>()
   .post('/:id/local/discard', async (c) => {
     const p = discardBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, LOCAL_GIT, (b) => b.discard(id(c), p.data.path, p.data.untracked))
+    return viaBridge(c, LOCAL_GIT, (b) => b.discard(id(c), p.data.path, p.data.untracked, p.data.oldPath))
   })
   .get('/:id/local/head-commit', (c) => viaBridge(c, LOCAL_GIT, (b) => b.headCommit(id(c))))
   .post('/:id/local/commit', async (c) => {

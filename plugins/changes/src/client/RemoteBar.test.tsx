@@ -150,7 +150,7 @@ describe('the remote menu', () => {
     expect(remote).not.toHaveBeenCalled()
     expect(document.querySelector('.ui-menu')?.textContent).toContain('Force push?')
 
-    document.querySelector<HTMLButtonElement>('.ui-menu .ui-confirm button')!.click()
+    document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
     expect(remote).toHaveBeenCalledWith('force')
   })
 })

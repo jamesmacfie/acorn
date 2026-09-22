@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -84,6 +84,15 @@ describe('the coalesced worktree status read', () => {
     expect(dirty.dirty).toBe(true)
     expect(dirty.count).toBe(1)
     expect(statuses()).toBe(2)
+  })
+
+  // Git's own default collapses a wholly untracked directory to one `? out/` entry, which the changes
+  // pane can neither diff nor discard: there is no file behind that name.
+  it('names every untracked file rather than the directory holding them', async () => {
+    mkdirSync(join(worktree, 'out'))
+    writeFileSync(join(worktree, 'out', 'one.txt'), '1')
+    writeFileSync(join(worktree, 'out', 'two.txt'), '2')
+    expect((await worktreeStatus(worktree)).count).toBe(2)
   })
 
   it('never caches a failure, so "we could not tell" cannot become "clean"', async () => {
