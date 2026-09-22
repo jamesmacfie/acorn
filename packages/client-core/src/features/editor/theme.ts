@@ -81,6 +81,10 @@ const highlightStyle = (c: Palette): HighlightStyle => HighlightStyle.define([
 const LIGHT_SYNTAX = highlightStyle(LIGHT)
 const DARK_SYNTAX = highlightStyle(DARK)
 
+/** A token, thinned out. Used where something has to sit behind the text without hiding it. */
+const wash = (name: string, percent: number): string =>
+  `color-mix(in srgb, ${token(name)} ${percent}%, transparent)`
+
 function currentTheme(): Extension {
   const dark = isAppDark()
   return [
@@ -88,9 +92,28 @@ function currentTheme(): Extension {
       '&': { color: token('--text'), backgroundColor: token('--bg') },
       '.cm-content': { caretColor: token('--text'), fontFamily: token('--font-mono') },
       '.cm-cursor, .cm-dropCursor': { borderLeftColor: token('--text') },
-      '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: token('--bg-selected') },
-      '&.cm-focused .cm-selectionBackground': { backgroundColor: token('--bg-selected') },
+      // Selecting inside one line used to show nothing at all, and the four rules below are why.
+      //
+      // CodeMirror draws the selection as rectangles in a layer under `.cm-content`, so an opaque
+      // background on a line paints straight over it. The line a selection sits on is the line the
+      // cursor is on, so `.cm-activeLine` hid every selection that fitted inside one line, while a
+      // selection across several lines showed on all but its last and looked fine. The current line
+      // has nothing to say while text is selected, so it stands down for as long as the selection
+      // layer has anything in it, and keeps its full-strength colour the rest of the time.
+      //
+      // The selection itself takes the accent rather than another step on the grey ramp, and
+      // `.cm-selectionMatch` — the other copies of the selected word, which only ever appear for a
+      // one-line selection — takes a weaker version of the same colour, so the two read as one
+      // idea. Its stock colour is a lime green that belongs to no theme here.
+      //
+      // The focused selection spells its selector out because CodeMirror's base theme names the
+      // whole path for that one, and a shorter selector loses to it on specificity no matter which
+      // sheet comes last. Matching the shape is what puts us on top.
+      '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: wash('--accent', 34) },
+      '.cm-selectionBackground': { backgroundColor: token('--bg-selected') },
+      '.cm-selectionMatch': { backgroundColor: wash('--accent', 16) },
       '.cm-activeLine': { backgroundColor: token('--bg-hover') },
+      '&:has(.cm-selectionBackground) .cm-activeLine': { backgroundColor: 'transparent' },
       '.cm-gutters': { backgroundColor: token('--bg'), color: token('--text-faint'), borderRight: `1px solid ${token('--border')}` },
       '.cm-activeLineGutter': { backgroundColor: token('--bg-hover'), color: token('--text-muted') },
       '.cm-panels': { backgroundColor: token('--bg-subtle'), color: token('--text') },
