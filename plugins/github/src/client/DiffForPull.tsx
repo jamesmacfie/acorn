@@ -2,7 +2,7 @@ import { createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
 import { filesKey, filePatchKey, pullKey, type PullFile } from '../shared/api'
-import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
+import { fetchFilePatches, fileBlobOptions, fileSummariesOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { DiffPane } from '@acorn/plugin-api/ui'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
@@ -12,9 +12,9 @@ import { DIFF_LINE_POINT } from './extensionPoints'
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
 // files, where their patch bodies come from, which threads to interleave, and what a comment does.
 //
-// The files query returns the full changed-file payload up front. `fetchPatches` below only covers a
-// body still missing from a partial or restored cache; binary and too-large files have no patch and
-// the shell renders a "No diff" row instead.
+// Browse requests full files. A task opened from the PR list already has file summaries in cache, so
+// its diff can draw file rows immediately and fetch patch bodies through the hydrator in small batches.
+// Binary and too-large files have no patch; the shell renders a "No diff" row for them.
 export type PullRoute = {
   owner: string
   repo: string
@@ -29,7 +29,9 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const repo = props.route.repo
   const number = props.route.number
 
-  const files = createQuery(() => filesOptions(owner, repo, number, true))
+  const files = createQuery<PullFile[]>(() => props.router
+    ? filesOptions(owner, repo, number, true)
+    : fileSummariesOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
 
@@ -48,10 +50,12 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     // Patch-body source, checked in order: the per-path patch cache entry, then the warmed files
     // query (which also resolves binary and too-large files to their legitimate null patch).
     cachedFile: (path) => {
+      const current = files.data?.find((file) => file.path === path)
       const direct = queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path))
-      if (direct) return direct
+      if (direct && direct.sha === current?.sha) return direct
       const warmed = queryClient.getQueryData<PullFile[]>(filesKey(owner, repo, number))
-      return warmed?.find((file) => file.path === path) ?? null
+      const file = warmed?.find((entry) => entry.path === path)
+      return file && file.sha === current?.sha ? file : null
     },
     // Anything still missing comes from the batch patch endpoint, seeding per-path cache entries.
     fetchPatches: async (paths, signal) => {

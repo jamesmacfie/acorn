@@ -61,9 +61,10 @@ the port is the right size.
 
 ## Data flow
 
-The GitHub plugin returns file metadata plus an optional patch. Large or missing patch bodies are
-loaded lazily from the blob route. The Changes plugin obtains a local diff through the core Git
-service. Both paths normalize into file/hunk/line rows before rendering.
+The GitHub task pane uses the file summaries already warmed by the PR list, then loads patch bodies
+in small batches as the diff hydrates. Repository browse can start with full file payloads. Large or
+missing patch bodies are loaded lazily from the blob route. The Changes plugin obtains a local diff
+through the core Git service. Both paths normalize into file/hunk/line rows before rendering.
 
 The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
 scroller and clicking a row scrolls to it, the way the pull-request pane's list works. Staging is a
