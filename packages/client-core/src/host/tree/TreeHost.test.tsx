@@ -112,6 +112,25 @@ describe('a tree becomes the host’s own components', () => {
     expect(second!.dataset.tone).toBe('danger')
   })
 
+  it('updates a remote model picker when its backend and model change', async () => {
+    const h = harness()
+    const backends = [
+      { id: 'harness:claude-code', kind: 'harness', label: 'Claude Code', models: [{ id: 'sonnet', label: 'Sonnet' }], defaultModelId: '' },
+      { id: 'harness:codex', kind: 'harness', label: 'Codex', models: [{ id: 'gpt-one', label: 'GPT One' }], defaultModelId: '' },
+    ]
+    h.mount()
+    h.apply([{ op: 'insert', parent: null, index: 0, node: node('picker', 'ModelBackendPicker', {
+      backends, backendId: 'harness:claude-code', modelId: '', onChange: { $handler: 7 },
+    }) }])
+    expect(await settled(() => !!host.querySelector('button[title="Generate with"]'))).toBe(true)
+
+    h.apply([{ op: 'patch', id: 'picker', props: { backendId: 'harness:codex', modelId: 'gpt-one' } }])
+    await frame()
+
+    expect(host.querySelector('button[title="Generate with"]')?.textContent).toContain('Codex')
+    expect(host.querySelector('button[title="Model"]')?.textContent).toContain('GPT One')
+  })
+
   it('moves the element it has rather than building a new one', async () => {
     const h = harness()
     h.mount()

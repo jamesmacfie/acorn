@@ -416,7 +416,7 @@ connection deleted between the two does.
 
 Codex's model catalog is a separate, bounded read through its app-server. The agent profile owns
 that read; core only projects the returned catalog into `ModelBackend`. Successful reads are cached
-for one minute and failed reads for ten seconds to avoid starting Codex for every picker mount.
+for one minute. A failed read can be retried from Memory review without leaving the page.
 Claude's catalog is the profile's stable CLI aliases. A harness with an empty selected model id omits
 `-m` or `--model` and uses the CLI default.
 

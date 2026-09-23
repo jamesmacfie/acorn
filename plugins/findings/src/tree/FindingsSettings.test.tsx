@@ -25,7 +25,7 @@ function applied(ops: TreeMutation[]): Map<string, TreeNode> {
   return nodes
 }
 
-function mount() {
+function mount(codexCatalogAvailable: () => boolean = () => true) {
   const ops: TreeMutation[] = []
   const batches: TreeMutation[][] = []
   const root = createRemoteRoot((batch) => {
@@ -33,24 +33,27 @@ function mount() {
     ops.push(...batch)
   })
   const put = vi.fn(async (_path: string, body: unknown) => body)
+  const get = vi.fn(async (path: string) => path === findingsSettingsRoute
+    ? { automaticPreparation: true, notifyWhenReady: false, backendId: null, modelId: null }
+    : {
+        backends: [{
+          id: 'harness:claude-code',
+          kind: 'harness',
+          label: 'Claude Code',
+          glyph: 'brand:agents/claude',
+          models: [{ id: 'sonnet', label: 'Sonnet' }],
+          defaultModelId: '',
+        }, {
+          id: 'harness:codex', kind: 'harness', label: 'Codex',
+          models: codexCatalogAvailable() ? [{ id: 'gpt-one', label: 'GPT One' }] : [],
+          defaultModelId: '',
+          ...(codexCatalogAvailable() ? {} : { catalogUnavailable: true }),
+        }],
+        missing: [],
+      })
   const bridge = {
     api: {
-      get: async (path: string) => path === findingsSettingsRoute
-        ? { automaticPreparation: true, notifyWhenReady: false, backendId: null, modelId: null }
-        : {
-            backends: [{
-              id: 'harness:claude-code',
-              kind: 'harness',
-              label: 'Claude Code',
-              glyph: 'brand:agents/claude',
-              models: [{ id: 'sonnet', label: 'Sonnet' }],
-              defaultModelId: '',
-            }, {
-              id: 'harness:codex', kind: 'harness', label: 'Codex',
-              models: [{ id: 'gpt-one', label: 'GPT One' }], defaultModelId: '',
-            }],
-            missing: [],
-          },
+      get,
       put,
     },
   } as unknown as AcornBridge
@@ -67,7 +70,7 @@ function mount() {
   })
   const nodes = () => [...applied(ops).values()]
   const checkbox = () => nodes().find((node) => node.type === 'Checkbox' && node.props.label === 'Prepare memory suggestions when I archive a task')
-  return { root, put, nodes, checkbox, batches }
+  return { root, get, put, nodes, checkbox, batches }
 }
 
 describe('FindingsSettings', () => {
@@ -126,6 +129,33 @@ describe('FindingsSettings', () => {
     })
     expect(page.nodes().find((node) => node.type === 'ModelBackendPicker')?.props)
       .toMatchObject({ backendId: 'harness:codex', modelId: 'gpt-one' })
+    page.root.dispose()
+  })
+
+  it('retries a failed Codex catalog read without resetting the selected backend', async () => {
+    let codexAvailable = false
+    const page = mount(() => codexAvailable)
+    await settle()
+    await settle()
+    page.root.dispatch((page.checkbox()?.props.onChange as { $handler: number }).$handler, true)
+    await settle()
+    page.root.dispatch((page.nodes().find((node) => node.type === 'ModelBackendPicker')?.props.onChange as { $handler: number }).$handler,
+      { backendId: 'harness:codex', modelId: '' })
+    await settle()
+
+    const retry = page.nodes().find((node) => node.type === 'Button' && node.props.label === 'Retry model list')
+    expect(retry).toBeDefined()
+    codexAvailable = true
+    page.root.dispatch((retry?.props.onPress as { $handler: number }).$handler, undefined)
+    await settle()
+    await settle()
+
+    const picker = page.nodes().find((node) => node.type === 'ModelBackendPicker')
+    expect(picker?.props.backendId).toBe('harness:codex')
+    expect((picker?.props.backends as Array<{ id: string; models: Array<{ id: string }> }>).find((backend) => backend.id === 'harness:codex')?.models)
+      .toEqual([{ id: 'gpt-one', label: 'GPT One' }])
+    expect(page.nodes().some((node) => node.type === 'Button' && node.props.label === 'Retry model list')).toBe(false)
+    expect(page.get).toHaveBeenCalledTimes(3)
     page.root.dispose()
   })
 })

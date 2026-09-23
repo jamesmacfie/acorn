@@ -4,8 +4,7 @@ import { AGENT_TOOL_PASSTHROUGH, brokerEnv } from '@acorn/plugin-api/node'
 import { JsonRpcProcess } from '../drivers/jsonRpcProcess'
 
 const CACHE_MS = 60_000
-const FAILURE_CACHE_MS = 10_000
-const PROBE_TIMEOUT_MS = 4_000
+const PROBE_TIMEOUT_MS = 10_000
 const MAX_PAGES = 5
 
 type ModelPage = { models: ModelCatalogEntry[]; nextCursor: string | null }
@@ -58,20 +57,16 @@ export async function fetchCodexModels(command: string, open: (command: string) 
 }
 
 let cached: { models: ModelCatalogEntry[]; at: number } | null = null
-let failedAt = 0
 let pending: Promise<{ models: ModelCatalogEntry[]; unavailable?: boolean }> | null = null
 
 export function codexModels(command: string): Promise<{ models: ModelCatalogEntry[]; unavailable?: boolean }> {
   const now = Date.now()
   if (cached && now - cached.at < CACHE_MS) return Promise.resolve({ models: cached.models })
-  if (failedAt && now - failedAt < FAILURE_CACHE_MS) return Promise.resolve({ models: cached?.models ?? [], unavailable: true })
   if (pending) return pending
   pending = fetchCodexModels(command).then((models) => {
     cached = { models, at: Date.now() }
-    failedAt = 0
     return { models }
   }).catch(() => {
-    failedAt = Date.now()
     return { models: cached?.models ?? [], unavailable: true }
   }).finally(() => { pending = null })
   return pending
