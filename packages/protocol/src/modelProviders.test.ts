@@ -137,9 +137,10 @@ describe('defaultModelIdFor', () => {
     defaultModelId,
   })
 
-  it('prefers the declared default, then the first model, then nothing', () => {
+  it('lets harnesses use the CLI default while connections fall back to their first model', () => {
     expect(defaultModelIdFor(backend([{ id: 'a', label: 'A' }], 'b'))).toBe('b')
-    expect(defaultModelIdFor(backend([{ id: 'a', label: 'A' }], ''))).toBe('a')
+    expect(defaultModelIdFor(backend([{ id: 'a', label: 'A' }], ''))).toBe('')
+    expect(defaultModelIdFor({ ...backend([{ id: 'a', label: 'A' }], ''), kind: 'connection' })).toBe('a')
     expect(defaultModelIdFor(backend([], ''))).toBe('')
     expect(defaultModelIdFor(undefined)).toBe('')
   })

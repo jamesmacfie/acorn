@@ -65,7 +65,7 @@ export function effectiveModelPick(
     // The model is checked against the backend's list too: a provider that dropped a model between
     // releases would otherwise be asked for one it no longer serves.
     const known = held.models.some((model) => model.id === remembered.modelId)
-    return { backendId: remembered.backendId, modelId: known ? remembered.modelId : defaultModelIdFor(held) }
+    return { backendId: remembered.backendId, modelId: known || (held.catalogUnavailable && held.kind === 'harness') ? remembered.modelId : defaultModelIdFor(held) }
   }
   const first = backends[0]
   return first ? { backendId: first.id, modelId: defaultModelIdFor(first) } : null
