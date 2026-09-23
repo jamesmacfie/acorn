@@ -62,6 +62,8 @@ export type AgentProfileContribution = {
   // model select — what it already does for a provider with no catalog.
   models?: ModelCatalogEntry[]
   defaultModelId?: string
+  /** Optional live catalog, owned by the profile. A failed read leaves its static models available. */
+  listModels?: (command: string) => Promise<{ models: ModelCatalogEntry[]; unavailable?: boolean }>
   // A Lucide name or a `brand:` mark, for the Settings list and the wizard.
   glyph?: string
 }

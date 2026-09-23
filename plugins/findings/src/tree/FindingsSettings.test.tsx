@@ -44,7 +44,10 @@ function mount() {
               label: 'Claude Code',
               glyph: 'brand:agents/claude',
               models: [{ id: 'sonnet', label: 'Sonnet' }],
-              defaultModelId: 'sonnet',
+              defaultModelId: '',
+            }, {
+              id: 'harness:codex', kind: 'harness', label: 'Codex',
+              models: [{ id: 'gpt-one', label: 'GPT One' }], defaultModelId: '',
             }],
             missing: [],
           },
@@ -95,9 +98,34 @@ describe('FindingsSettings', () => {
       automaticPreparation: true,
       notifyWhenReady: false,
       backendId: 'harness:claude-code',
-      modelId: 'sonnet',
+      modelId: null,
     })
     expect(page.nodes().some((node) => node.type === 'ModelBackendPicker')).toBe(true)
+    page.root.dispose()
+  })
+
+  it('saves a selected CLI and model from the shared picker', async () => {
+    const page = mount()
+    await settle()
+    await settle()
+    const checkbox = page.checkbox()?.props.onChange as { $handler: number }
+    page.root.dispatch(checkbox.$handler, true)
+    await settle()
+
+    const picker = page.nodes().find((node) => node.type === 'ModelBackendPicker')
+    const handler = picker?.props.onChange as { $handler: number } | undefined
+    expect(handler).toBeDefined()
+    page.root.dispatch(handler!.$handler, { backendId: 'harness:codex', modelId: 'gpt-one' })
+    await settle()
+
+    expect(page.put).toHaveBeenLastCalledWith(findingsSettingsRoute, {
+      automaticPreparation: true,
+      notifyWhenReady: false,
+      backendId: 'harness:codex',
+      modelId: 'gpt-one',
+    })
+    expect(page.nodes().find((node) => node.type === 'ModelBackendPicker')?.props)
+      .toMatchObject({ backendId: 'harness:codex', modelId: 'gpt-one' })
     page.root.dispose()
   })
 })

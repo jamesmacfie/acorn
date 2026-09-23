@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type AgentProfileContribution, codexJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
 import { codexMcpCommands } from './mcpCommands'
+import { codexModels } from './codexModels'
 
 function materializeSchema(schema: object): string {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-schema-'))
@@ -62,9 +63,8 @@ export const codexProfile: AgentProfileContribution = {
     ],
   }),
   streamJson: codexJsonAdapter,
-  // No `models`, deliberately. Codex reads its list from `~/.codex/config.toml` and the owner's own
-  // account, so a copy here would be a second list that drifts from the one that decides. The picker
-  // hides its model select for a backend with no catalog, which is the right answer: the CLI's
-  // configured default runs unless a caller names something, and then `-m` carries it.
+  // The app-server supplies the account's picker-visible models. An empty default model id keeps the
+  // CLI's configured default unless the owner explicitly chooses a model in acorn.
+  listModels: codexModels,
   glyph: 'brand:agents/codex',
 }

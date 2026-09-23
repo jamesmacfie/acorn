@@ -1447,6 +1447,29 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'ModelBackendPicker',
+    does: 'offers the CLI default alongside a harness model',
+    render: (record) => (
+      <ModelBackendPicker
+        backendId="harness:codex"
+        modelId="gpt-one"
+        onChange={(pick) => record(pick.modelId)}
+        backends={[{
+          id: 'harness:codex', kind: 'harness', label: 'Codex', defaultModelId: '',
+          models: [{ id: 'gpt-one', label: 'GPT One' }],
+        }]}
+      />
+    ),
+    size: { width: 42, height: 8 },
+    drive: async (screen, pressed) => {
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('Use Codex default')
+      await open.press('ARROW_UP')
+      await open.press('RETURN')
+      expect(pressed).toEqual([''])
+    },
+  },
+  {
     node: 'DocumentTabs',
     does: 'opens the next document with the arrows and closes the current one with Delete',
     render: (record) => (

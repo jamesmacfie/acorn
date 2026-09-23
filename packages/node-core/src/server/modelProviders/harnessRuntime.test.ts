@@ -163,6 +163,28 @@ describe('generateTextForHarness', () => {
 })
 
 describe('harnessBackends', () => {
+  it('projects a profile-owned catalog and marks a failed refresh', async () => {
+    const listModels = vi.fn().mockResolvedValueOnce({ models: [{ id: 'live', label: 'Live' }] })
+      .mockRejectedValueOnce(new Error('offline'))
+    const dispose = agentProfileRegistry.register({
+      id: 'fixture-catalog', label: 'Catalog', kind: 'agent', command: FAKE_AGENT,
+      backendPreference: 'node-pty', transport: 'pty',
+      models: [{ id: 'static', label: 'Static' }], defaultModelId: '', listModels,
+      aiArgv: (command, opts) => ({ file: command, args: [opts.prompt] }),
+    })
+    try {
+      const first = await harnessBackends()
+      expect(first.backends.find((backend) => backend.id === 'harness:fixture-catalog'))
+        .toMatchObject({ models: [{ id: 'live', label: 'Live' }], defaultModelId: '' })
+      const second = await harnessBackends()
+      expect(second.backends.find((backend) => backend.id === 'harness:fixture-catalog'))
+        .toMatchObject({ models: [{ id: 'static', label: 'Static' }], catalogUnavailable: true })
+      expect(listModels).toHaveBeenCalledWith(FAKE_AGENT)
+    } finally {
+      dispose()
+    }
+  })
+
   it('lists an installed one-shot profile and sets the missing ones aside', async () => {
     const installed = agentProfileRegistry.register({
       id: 'fixture-installed', label: 'Installed', kind: 'agent', command: FAKE_AGENT,
