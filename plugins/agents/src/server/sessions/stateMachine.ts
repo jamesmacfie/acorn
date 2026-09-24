@@ -175,8 +175,8 @@ export const quietedSubagents = (roster: AgentSubagent[], quietBefore: number): 
     .map((entry) => entry.id)
 
 // ponytail: keep every in-flight entry plus the last 20 settled ones. The session row is re-serialised
-// and broadcast after every event, so an unbounded roster would grow every frame; the full history
-// stays in the event ledger, which is what the transcript reads. Give the roster its own table and
+// and broadcast whenever the roster changes, so an unbounded roster would grow every frame; the full
+// history stays in the event ledger, which is what the transcript reads. Give the roster its own table and
 // route if a session ever needs more than this at a glance.
 const RETAINED_SETTLED_SUBAGENTS = 20
 

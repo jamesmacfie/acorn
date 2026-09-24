@@ -1,8 +1,10 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey, type Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
+import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import type { Disposable } from '../../kit/lib/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
@@ -276,5 +278,35 @@ describe('task lineage in the core rail fallback', () => {
     const after = [...host.querySelectorAll<HTMLElement>('.tabrail-item')]
       .find((row) => row.querySelector('button')?.getAttribute('aria-label') === 'Child')
     expect(after).toBe(before)
+  })
+})
+
+describe('a row whose markers are read again', () => {
+  // A contributor builds fresh marker objects on every read, and the agents plugin's rail marker is
+  // read again on every event a streaming agent sends. Rebuilding the elements each time restarted a
+  // spinning marker's turn 25 times a second.
+  it('keeps the marker elements while the markers say the same thing', () => {
+    const [tick, setTick] = createSignal(0)
+    const [label, setLabel] = createSignal('1 agent working')
+    registered.push(railMarkerRegistry.register({
+      id: 'test',
+      order: 10,
+      markers: (target) => {
+        tick()
+        return target.kind === 'task'
+          ? [{ id: 'working', label: label(), icon: 'loader-circle', tone: 'accent', busy: true, placements: ['top-end'] }]
+          : []
+      },
+    }))
+    mount()
+    const before = [...host.querySelectorAll('.tabrail-marker')]
+    expect(before).toHaveLength(2)
+
+    for (let index = 1; index <= 25; index++) setTick(index)
+    expect([...host.querySelectorAll('.tabrail-marker')]).toEqual(before)
+    expect(host.querySelectorAll('.tabrail-marker')[0]).toBe(before[0])
+
+    setLabel('2 agents working')
+    expect(host.querySelector('.tabrail-task')?.getAttribute('data-tip-legend')).toContain('2 agents working')
   })
 })

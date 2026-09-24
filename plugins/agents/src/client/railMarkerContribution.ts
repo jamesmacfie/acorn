@@ -40,8 +40,10 @@ export function agentRailMarkers({ working, attention }: AgentRailState): RailMa
   return []
 }
 
+// The task's own slice, not the roster: this runs for every row in the rail, and a slice only wakes the
+// row whose task changed (managedStore.ts § taskSlices).
 const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) =>
-  managedAgentStore.sessions().filter((session) => session.taskId === taskId && predicate(session)).length
+  managedAgentStore.sessionsForTask(taskId).filter(predicate).length
 
 export const agentRailMarkerContribution: RailMarkerContribution = {
   id: 'agents',

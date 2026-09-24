@@ -31,11 +31,11 @@ export const agentSessions = sqliteTable(
     parentTurnId: text('parent_turn_id'),
     // The subagent roster, projected from this session's own `subagent` events by
     // server/sessions/sessionRepository.ts. On the row rather than in a table of its own because the row is
-    // already broadcast to every client after every event, which is what makes the task sidebar's
+    // broadcast to every client whenever an event changes it, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),
     // How many turns are queued and waiting to dispatch. On the row for the same reason as the subagent
-    // roster: the row is broadcast after every event, so the task sidebar can mark a session whose only
+    // roster: the row is broadcast whenever it changes, so the task sidebar can mark a session whose only
     // sign of a waiting prompt is this count. Kept current by server/sessions/store.ts on every turn that
     // enters or leaves the queue.
     queuedTurns: integer('queued_turns').notNull().default(0),

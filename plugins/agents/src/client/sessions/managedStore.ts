@@ -1,5 +1,5 @@
 import { agentTelemetry } from './agentTelemetry'
-import { batch, createEffect, createRoot, createSignal } from 'solid-js'
+import { batch, createEffect, createRoot, createSignal, untrack, type Signal } from 'solid-js'
 import { activeNodeId, createLogger, describeError, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { fromManagedSession } from '../../contract/attention'
 import { wsOnAgentFrame } from './wsChannel'
@@ -25,6 +25,12 @@ const log = createLogger('agents', 'agents')
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [delegations, setDelegations] = createSignal<Record<string, AgentSessionDelegation>>({})
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
+// Each task's sessions, for readers that ask about one task. The rail marker runs once per task row,
+// and it filtered the whole roster twice on every roster change. With 30 tasks and 100 sessions that
+// was 6,000 comparisons for each event a streaming agent sent. A slice is its own signal, written
+// only when that task's rows change, so rows for other tasks don't run at all. A slice is made on
+// first read and kept, because a reader may still hold it. There is one per task anyone asked about.
+const taskSlices = new Map<string, Signal<readonly AgentSession[]>>()
 let subscribers = 0
 let disposeSocket: (() => void) | null = null
 const snapshotRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -60,10 +66,42 @@ const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 const byRecent = (a: AgentSession, b: AgentSession): number =>
   b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
 
+const sameRows = (a: readonly AgentSession[], b: readonly AgentSession[]): boolean =>
+  a.length === b.length && a.every((session, index) => session === b[index])
+
+// Every write to the roster, so the task slices cannot drift from it.
+function setRoster(update: (current: AgentSession[]) => AgentSession[]): void {
+  const previous = untrack(sessions)
+  batch(() => {
+    const next = setSessions(update)
+    if (next === previous || !taskSlices.size) return
+    const byTask = new Map<string, AgentSession[]>()
+    for (const session of next) {
+      if (!taskSlices.has(session.taskId)) continue
+      const rows = byTask.get(session.taskId)
+      if (rows) rows.push(session)
+      else byTask.set(session.taskId, [session])
+    }
+    for (const [taskId, [slice, setSlice]] of taskSlices) {
+      const rows = byTask.get(taskId) ?? []
+      if (!sameRows(untrack(slice), rows)) setSlice(rows)
+    }
+  })
+}
+
+function sessionsForTask(taskId: string): readonly AgentSession[] {
+  let slice = taskSlices.get(taskId)
+  if (!slice) {
+    slice = createSignal<readonly AgentSession[]>(untrack(sessions).filter((session) => session.taskId === taskId))
+    taskSlices.set(taskId, slice)
+  }
+  return slice[0]()
+}
+
 function upsertSession(session: AgentSession): void {
   agentTelemetry.observe('agents.session.update', 1)
   if (deletedSessionIds.has(session.id)) return
-  setSessions((current) => {
+  setRoster((current) => {
     const found = current.some((item) => item.id === session.id)
     const next = found
       ? current.map((item) => item.id === session.id ? newestManagedSession(item, session) : item)
@@ -72,13 +110,13 @@ function upsertSession(session: AgentSession): void {
   })
   setSnapshots((current) => {
     const snapshot = current[session.id]
-    return snapshot
-      ? { ...current, [session.id]: { ...snapshot, session: newestManagedSession(snapshot.session, session) } }
-      : current
+    if (!snapshot) return current
+    const newest = newestManagedSession(snapshot.session, session)
+    return newest === snapshot.session ? current : { ...current, [session.id]: { ...snapshot, session: newest } }
   })
   // Notices come from the row, not from the events. The node projects `attention` from the driver's
-  // own events and re-broadcasts the row after every one, so the client reads a state instead of
-  // guessing one per event — which is why a ten-step workflow used to raise ten "completed" rows.
+  // own events and broadcasts the row whenever an event changes it, so the client reads a state instead
+  // of guessing one per event — which is why a ten-step workflow used to raise ten "completed" rows.
   observeAttention([fromManagedSession(session, activeNodeId() ?? '')])
 }
 
@@ -94,7 +132,7 @@ function upsertSessions(incoming: readonly AgentSession[]): void {
   const wanted = incoming.filter((session) => !deletedSessionIds.has(session.id))
   if (!wanted.length) return
   batch(() => {
-    setSessions((current) => {
+    setRoster((current) => {
       const merged = new Map(current.map((item) => [item.id, item]))
       for (const session of wanted) {
         const held = merged.get(session.id)
@@ -145,7 +183,7 @@ function removeSession(sessionId: string): void {
   seenEventIds.delete(sessionId)
   usageLines.delete(sessionId)
   completeThrough.delete(sessionId)
-  setSessions((current) => current.filter((session) => session.id !== sessionId))
+  setRoster((current) => current.filter((session) => session.id !== sessionId))
   setDelegations((current) => {
     if (!(sessionId in current)) return current
     const next = { ...current }
@@ -218,6 +256,29 @@ function seatEvent(events: AgentEventRecord[], event: AgentEventRecord): boolean
   while (at > 0 && events[at - 1].seq > event.seq) at--
   events.splice(at, 0, event)
   return false
+}
+
+// The row's sequence and clock, moved by its own event. The node sends the whole row only when an
+// event changes something else on it (server/sessions/runtimeEngine.ts § record), and these two change
+// with every event. The pane marks read up to `lastEventSeq`. The roster sorts by `updatedAt`, and
+// Agent Center shows each row's age from it. The node sets it to the event's time.
+function advanceRow(event: AgentEventRecord): void {
+  setRoster((current) => {
+    const at = current.findIndex((session) => session.id === event.sessionId)
+    const held = current[at]
+    if (!held || held.lastEventSeq >= event.seq) return current
+    const moved = { ...held, lastEventSeq: event.seq, updatedAt: Math.max(held.updatedAt, event.createdAt) }
+    // Its clock only goes forward, so the row can only move up, and a streaming session is usually
+    // first already. It steps up to its place instead of the roster being sorted per event.
+    const next = [...current]
+    let to = at
+    while (to > 0 && byRecent(moved, next[to - 1]!) < 0) {
+      next[to] = next[to - 1]!
+      to--
+    }
+    next[to] = moved
+    return next
+  })
 }
 
 function appendEvent(event: AgentEventRecord): void {
@@ -337,7 +398,10 @@ function isAgentFrame(value: unknown): value is AgentWsFrame {
 
 function onFrame(value: unknown): void {
   if (!isAgentFrame(value)) return
-  if (value.channel === 'agent:event') appendEvent(value.event)
+  if (value.channel === 'agent:event') batch(() => {
+    appendEvent(value.event)
+    advanceRow(value.event)
+  })
   else if (value.channel === 'agent:session') {
     upsertSession(value.session)
     // The session row is published independently of its spawn projection. A fresh delegated row
@@ -354,6 +418,8 @@ function onFrame(value: unknown): void {
 
 export const managedAgentStore = {
   sessions,
+  /** One task's sessions, in the roster's order. Wakes its reader only when that task's rows change. */
+  sessionsForTask,
   delegations,
   snapshots,
   /**
@@ -494,7 +560,7 @@ export const managedAgentStore = {
   // keeping it would silently swallow the new node's first events for any id that collided. The
   // attention gate clears itself on the same event (client-core deliver.ts).
   clear(): void {
-    setSessions([])
+    setRoster(() => [])
     setDelegations({})
     setSnapshots({})
     deletedSessionIds.clear()

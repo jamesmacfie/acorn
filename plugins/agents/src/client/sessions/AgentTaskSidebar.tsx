@@ -245,8 +245,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     >
                       {(child) => (
                         // The subagent roster, indented under the session that spawned it. Read straight
-                        // off the session row, which the WebSocket pushes after every event this node
-                        // records, so these rows appear and settle live for every session in the task and
+                        // off the session row, which the WebSocket pushes whenever an event this node
+                        // records changes it, so these rows appear and settle live for every session in the task and
                         // not only the one that happens to be open. Nothing extra is fetched
                         // (docs/managed-agents.md § Subagents).
                         <Row
