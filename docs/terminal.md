@@ -25,6 +25,12 @@ startup, keeps a bounded replay tail, and exposes attach/detach/input/resize/kil
 Reattach order is reset/framebuffer, buffered output produced during serialization, then live output.
 Raw output is not replayed as screen history. A lost stream does not imply the process died.
 
+A `term:attach` frame can carry the viewer's `cols` and `rows`. The Node resizes the PTY and the
+screen before it takes the snapshot, so a surface attaches in one message instead of posting a resize
+and waiting for it. The field is optional in both directions. A frame without it attaches at the
+session's last size, and a Node that predates it ignores it. The drawer surface covers the second case
+by comparing the size in `ready` with its own and posting a resize when they differ.
+
 The Node batches PTY output before it goes over the wire: buffered bytes flush as one `output` frame
 roughly every 16 milliseconds (about one frame at 60 frames per second) instead of one frame per PTY
 chunk, so a busy TUI does not send a frame for every keystroke echo.

@@ -115,27 +115,29 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     const unwatchAppearance = watchAppearance(applyAppearance)
 
     let pendingOutput = 0
-    let detach: (() => void) | undefined
-    // Size the PTY and main-owned framebuffer to the fitted dims before attaching, so the serialized
-    // screen and subsequent TUI redraws share the renderer's width.
-    void api.resize(props.sessionId, term.cols, term.rows).then(() => {
-      if (disposed) return
-      detach = api.attach(props.sessionId, (m) => {
-        if (m.type === 'output') {
-          const size = m.data.length
-          pendingOutput += size
-          telemetry.observe('terminal.output.size', size)
-          telemetry.observe('terminal.pending.size', pendingOutput)
-          void telemetry.measure('terminal.write', () => new Promise<void>((resolve) => {
-            term.write(m.data, () => { pendingOutput -= size; resolve() })
-          }))
-        }
-        else if (m.type === 'exit') {
-          term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
-          props.onExit?.(m.exitCode)
-        }
-      })
-    })
+    // The fitted size rides on the attach. The node sizes the PTY and its screen before it serializes
+    // the snapshot, so the snapshot and later TUI redraws share this renderer's width. This used to be
+    // a resize request, with the attach sent only once it answered, and on a task switch that request
+    // queued behind every other one. A node older than the size field ignores it and reports the old
+    // size in `ready`, so a mismatch there still posts the resize.
+    const detach = api.attach(props.sessionId, (m) => {
+      if (m.type === 'ready') {
+        if (m.session.cols !== term.cols || m.session.rows !== term.rows) void api.resize(props.sessionId, term.cols, term.rows)
+      }
+      else if (m.type === 'output') {
+        const size = m.data.length
+        pendingOutput += size
+        telemetry.observe('terminal.output.size', size)
+        telemetry.observe('terminal.pending.size', pendingOutput)
+        void telemetry.measure('terminal.write', () => new Promise<void>((resolve) => {
+          term.write(m.data, () => { pendingOutput -= size; resolve() })
+        }))
+      }
+      else if (m.type === 'exit') {
+        term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
+        props.onExit?.(m.exitCode)
+      }
+    }, { cols: term.cols, rows: term.rows })
     // Shift+Enter → newline instead of submit. Terminals send CR (\r) for Enter and Claude submits
     // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
     // the event so xterm doesn't also send the CR that would submit.
@@ -174,7 +176,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
       disposed = true
       applyFontSize = undefined
       shown = undefined
-      detach?.()
+      detach()
       unwatchAppearance()
       ro.disconnect()
       term.dispose()

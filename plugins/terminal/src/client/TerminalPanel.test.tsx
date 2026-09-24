@@ -46,16 +46,24 @@ vi.mock('./theme', () => ({ baseTheme: () => ({}), monoFont: () => 'monospace', 
 
 const attaches: string[] = []
 const detaches: string[] = []
+const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
+const listeners = new Map<string, (m: ServerMsg) => void>()
+const resizes: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
     list: async () => roster,
     profiles: async () => [],
-    resize: async () => true,
+    resize: async (id: string, cols: number, rows: number) => {
+      resizes.push(`${id} ${cols}x${rows}`)
+      return true
+    },
     write: () => {},
     interrupt: async () => true,
     remove: async () => true,
-    attach: (id: string, _on: (m: ServerMsg) => void) => {
+    attach: (id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }) => {
       attaches.push(id)
+      attachSizes.push(size)
+      listeners.set(id, on)
       return () => detaches.push(id)
     },
   }),
@@ -116,6 +124,9 @@ afterEach(async () => {
   document.body.replaceChildren()
   attaches.length = 0
   detaches.length = 0
+  attachSizes.length = 0
+  listeners.clear()
+  resizes.length = 0
   StubTerminal.built = 0
   roster = []
   await refreshSessions()
@@ -218,5 +229,35 @@ describe('the terminal drawer keeps every open session on screen', () => {
     expect(surfaces()[0].hidden).toBe(false)
     expect(attaches).toEqual([A, B])
     expect(detaches).toEqual([A])
+  })
+})
+
+describe('a surface attaches in one request', () => {
+  // One session, so the tab an earlier test left active for this task cannot be the one shown.
+  beforeEach(() => { roster = [session(A, 'first')] })
+
+  it('sends its size with the attach and posts no resize when the node took it', async () => {
+    mount()
+    await settle()
+
+    // The stub xterm fits to 80x24. The size rides on the attach rather than on a resize the attach
+    // waits for.
+    expect(attaches).toEqual([A])
+    expect(attachSizes).toEqual([{ cols: 80, rows: 24 }])
+    expect(resizes).toEqual([])
+
+    listeners.get(A)?.({ type: 'ready', session: session(A, 'first'), replayed: true })
+    await settle()
+    expect(resizes).toEqual([])
+  })
+
+  it('still resizes against a node that ignored the size', async () => {
+    mount()
+    await settle()
+
+    // An older node attaches at the size it last had and says so in `ready`.
+    listeners.get(A)?.({ type: 'ready', session: { ...session(A, 'first'), cols: 120, rows: 40 }, replayed: true })
+    await settle()
+    expect(resizes).toEqual([`${A} 80x24`])
   })
 })

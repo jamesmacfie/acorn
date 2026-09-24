@@ -19,7 +19,7 @@ export type TerminalApi = {
   resize(id: string, cols: number, rows: number): Promise<boolean>
   send(id: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   write(id: string, data: string): void
-  attach(id: string, on: (m: ServerMsg) => void): () => void
+  attach(id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
   workflow: {
     onNotice(cb: (n: WorkflowNotice) => void): () => void

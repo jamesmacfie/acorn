@@ -153,6 +153,17 @@ function flushOutput(s: Session) {
   s.display.publish({ type: 'output', data })
 }
 
+// The PTY and the display emulator always share one size, so a snapshot and the program's own
+// redraws agree on the width. The size comes from the client, so it is clamped.
+function resizeSession(s: Session, cols: unknown, rows: unknown) {
+  const c = clampDim(cols, s.meta.cols)
+  const r = clampDim(rows, s.meta.rows)
+  s.meta.cols = c
+  s.meta.rows = r
+  s.display.resize(c, r)
+  if (s.meta.status === 'running') s.pty.resize(c, r)
+}
+
 // Non-output frames flush pending output first: exit must not overtake buffered bytes.
 function emit(s: Session, msg: ServerMsg) {
   flushOutput(s)
@@ -677,12 +688,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     resize: async (id, cols, rows) => {
       const s = sessions.get(id)
       if (!s) return false
-      const c = clampDim(cols, s.meta.cols)
-      const r = clampDim(rows, s.meta.rows)
-      s.meta.cols = c
-      s.meta.rows = r
-      s.display.resize(c, r)
-      if (s.meta.status === 'running') s.pty.resize(c, r)
+      resizeSession(s, cols, rows)
       return true
     },
   }
@@ -763,9 +769,12 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     // attach is subscribe plus restore. The subscription is an attachment, not the session itself, so
     // detaching or reloading never kills the PTY or tmux. TerminalDisplay serializes its canonical
     // framebuffer and buffers concurrent live frames, preserving snapshot-before-live ordering.
-    attach: (id, sink) => {
+    attach: (id, sink, size) => {
       const s = sessions.get(id)
       if (!s) return
+      // A viewer that sent its size gets a snapshot drawn at that size. It used to post a resize and
+      // wait for the answer before attaching, one more round trip before a returning terminal drew.
+      if (size) resizeSession(s, size.cols, size.rows)
       flushOutput(s)
       // The ring is what a cold attach rebuilds the screen from, and it is read only when there is no
       // emulator yet (./terminalDisplay.ts § TerminalDisplay).
