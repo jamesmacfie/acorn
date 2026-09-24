@@ -346,6 +346,103 @@ function orderByRequires(loaded: readonly LoadedPlugin[]): LoadedPlugin[] {
   return ordered
 }
 
+// What one package on disk produced. A client-only package whose name collides with a built-in is
+// both installed and a failure, so these are independent rather than a union.
+type EntryOutcome = { loaded?: LoadedPlugin; installed?: InstalledPlugin; failure?: UnstampedFailure }
+
+// Never rejects: every way a package can fail is a failure row, so one bad package cannot stop its
+// siblings from loading.
+async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: ReadonlySet<string>): Promise<EntryOutcome> {
+  const { manifest, dir } = entry
+  // No node bundle. Its client bundle still has to reach every paired device, which is the whole
+  // reason `installed` exists alongside `loaded`.
+  if (!manifest.node) {
+    // But it may still contribute to the node, as data. A managed agent harness is the one kind that
+    // needs no route of its own and therefore no bundle at all (docs/managed-agents.md § Harnesses),
+    // and the whole point of that tier is that adding an agent costs one manifest.
+    //
+    // It goes through the host as a real plugin with an empty `init`, rather than being delivered
+    // beside it, so it gets everything a plugin row gets: a line in Settings → Plugins, an owner who
+    // can disable it, and registrations that roll back with the rest.
+    if (manifest.contributions.harnesses.length === 0) return { installed: entry }
+    // Shadowing is a node-half concept: there is nothing here to run in a built-in's place, and
+    // letting the id through would delete that built-in from the graph and put nothing back.
+    if (builtins.has(manifest.id)) {
+      return {
+        installed: entry,
+        failure: { id: manifest.id, dir, reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name` },
+      }
+    }
+    return {
+      installed: entry,
+      loaded: {
+        manifest,
+        plugin: { name: manifest.id, init: () => {} },
+        dir,
+        shadowsBuiltin: false,
+        migrationsFolder: null,
+        storage: {
+          open: () => {
+            throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but ships no node half.`)
+          },
+        },
+      },
+    }
+  }
+
+  let migrationsFolder: string | null = null
+  if (manifest.migrations) {
+    const declared = resolveInRoot(dir, manifest.migrations)
+    if (!declared) {
+      return { failure: { id: manifest.id, dir, reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory` } }
+    }
+    try {
+      migrationsFolder = pluginMigrationsChain(manifest.id, declared)
+    } catch (error) {
+      return { failure: { id: manifest.id, dir, reason: error instanceof Error ? error.message : String(error) } }
+    }
+  }
+
+  // Lexical + symlink confinement, the same helper CoreServices uses for worktree paths: a bundle
+  // must not be able to point the loader at a file outside its own directory.
+  const entrypoint = resolveInRoot(dir, manifest.node)
+  if (!entrypoint) {
+    return { failure: { id: manifest.id, dir, reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory` } }
+  }
+
+  let plugin: NodePlugin
+  try {
+    plugin = await isolateNodePlugin({
+      entrypoint,
+      pluginDir: dir,
+      plugin: manifest.id,
+      dataRoot,
+      migrationsFolder,
+      permissions: manifest.permissions.node,
+    })
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
+    const resource = error instanceof Error && 'resource' in error ? ` (${String((error as Error & { resource?: unknown }).resource)})` : ''
+    return { failure: { id: manifest.id, dir, reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}` } }
+  }
+
+  const storage: PluginStorage = {
+    open: () => {
+      if (!migrationsFolder) {
+        throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but declares no migrations.`)
+      }
+      return openPluginDb(dataRoot, manifest.id, { migrationsFolder })
+    },
+  }
+  // Installed only now. A package whose node half declared itself and then failed to import is
+  // broken, not client-only, and distributing the UI of a plugin whose routes will never exist would
+  // put a row on every paired device claiming a plugin that is not running anywhere.
+  return {
+    loaded: { manifest, plugin, dir, shadowsBuiltin: builtins.has(manifest.id), migrationsFolder, storage },
+    installed: entry,
+  }
+}
+
 export async function loadExternalPlugins(
   dataRoot: string,
   options: {
@@ -364,102 +461,20 @@ export async function loadExternalPlugins(
   const installed: InstalledPlugin[] = []
   const failures: UnstampedFailure[] = [...scan.failures]
 
-  for (const entry of scan.installed) {
-    const { manifest, dir } = entry
-    // No node bundle. Its client bundle still has to reach every paired device, which is the whole
-    // reason `installed` exists alongside `loaded`.
-    if (!manifest.node) {
-      installed.push(entry)
-      // But it may still contribute to the node, as data. A managed agent harness is the one kind that
-      // needs no route of its own and therefore no bundle at all (docs/managed-agents.md § Harnesses),
-      // and the whole point of that tier is that adding an agent costs one manifest.
-      //
-      // It goes through the host as a real plugin with an empty `init`, rather than being delivered
-      // beside it, so it gets everything a plugin row gets: a line in Settings → Plugins, an owner who
-      // can disable it, and registrations that roll back with the rest.
-      if (manifest.contributions.harnesses.length > 0) {
-        // Shadowing is a node-half concept: there is nothing here to run in a built-in's place, and
-        // letting the id through would delete that built-in from the graph and put nothing back.
-        if (builtins.has(manifest.id)) {
-          failures.push({ id: manifest.id, dir, reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name` })
-          continue
-        }
-        loaded.push({
-          manifest,
-          plugin: { name: manifest.id, init: () => {} },
-          dir,
-          shadowsBuiltin: false,
-          migrationsFolder: null,
-          storage: {
-            open: () => {
-              throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but ships no node half.`)
-            },
-          },
-        })
-      }
-      continue
+  // Every package starts at once, and the results fold back in directory order. A worker's start
+  // happens almost entirely off this thread: its bootstrap and the bundle's evaluation take about
+  // 45 ms a package. Awaiting them one at a time would make boot wait for the sum.
+  const outcomes = await Promise.all(scan.installed.map((entry) => loadEntry(entry, dataRoot, builtins)))
+  for (const outcome of outcomes) {
+    if (outcome.failure) failures.push(outcome.failure)
+    if (outcome.loaded) {
+      // Shadowing a built-in during a staged migration (docs/plugins.md § The dev loop). Loud rather
+      // than silent, because "the version running is not the one in this binary" is the single most
+      // confusing thing a support thread can fail to mention.
+      if (outcome.loaded.shadowsBuiltin) log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)
+      loaded.push(outcome.loaded)
     }
-
-    let migrationsFolder: string | null = null
-    if (manifest.migrations) {
-      const declared = resolveInRoot(dir, manifest.migrations)
-      if (!declared) {
-        failures.push({ id: manifest.id, dir, reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory` })
-        continue
-      }
-      try {
-        migrationsFolder = pluginMigrationsChain(manifest.id, declared)
-      } catch (error) {
-        failures.push({ id: manifest.id, dir, reason: error instanceof Error ? error.message : String(error) })
-        continue
-      }
-    }
-
-    // Lexical + symlink confinement, the same helper CoreServices uses for worktree paths: a bundle
-    // must not be able to point the loader at a file outside its own directory.
-    const entrypoint = resolveInRoot(dir, manifest.node)
-    if (!entrypoint) {
-      failures.push({ id: manifest.id, dir, reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory` })
-      continue
-    }
-
-    let plugin: NodePlugin
-    try {
-      plugin = await isolateNodePlugin({
-        entrypoint,
-        pluginDir: dir,
-        plugin: manifest.id,
-        dataRoot,
-        migrationsFolder,
-        permissions: manifest.permissions.node,
-      })
-    } catch (error) {
-      const code = error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
-      const resource = error instanceof Error && 'resource' in error ? ` (${String((error as Error & { resource?: unknown }).resource)})` : ''
-      failures.push({ id: manifest.id, dir, reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}` })
-      continue
-    }
-
-    // Shadowing a built-in during a staged migration (docs/plugins.md § The dev loop). Loud rather
-    // than silent, because "the version running is not the one in this binary" is the single most
-    // confusing thing a support thread can fail to mention.
-    const shadowsBuiltin = builtins.has(manifest.id)
-    if (shadowsBuiltin) {
-      log.warn(`${manifest.id}: loading from ${dir} INSTEAD of the built-in`)
-    }
-    const storage: PluginStorage = {
-      open: () => {
-        if (!migrationsFolder) {
-          throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but declares no migrations.`)
-        }
-        return openPluginDb(dataRoot, manifest.id, { migrationsFolder })
-      },
-    }
-    loaded.push({ manifest, plugin, dir, shadowsBuiltin, migrationsFolder, storage })
-    // Only now. A package whose node half declared itself and then failed to import is broken, not
-    // client-only, and distributing the UI of a plugin whose routes will never exist would put a row
-    // on every paired device claiming a plugin that is not running anywhere.
-    installed.push(entry)
+    if (outcome.installed) installed.push(outcome.installed)
   }
 
   // Dependencies, once every package on disk has been seen. It cannot happen inside the loop above: a

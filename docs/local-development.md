@@ -250,9 +250,10 @@ because the loader then transpiles as it imports.
 
 `graph` also depends on the data root. `apps/desktop/test/boot.test.ts` boots a fresh root, and its
 `graph` step takes a few milliseconds. A root that has run the app before holds the bundled loaded
-plugins, and `graph` then includes starting an isolated worker for each one with a node half, one
-after another. Time a launch against an established root, such as a `pnpm dev:agent -- --reuse`
-session, before quoting a node boot figure.
+plugins, and `graph` then includes starting an isolated worker for each one with a node half. The
+workers start together, and on an M2 Pro the step is about 110 ms for the seven bundled ones. Time a
+launch against an established root, such as a `pnpm dev:agent -- --reuse` session, before quoting a
+node boot figure.
 
 **`[renderer:boot] first paint` does not print from a background window.** It is a
 `requestAnimationFrame` callback, and macOS pauses those while the window is occluded, so a launch
