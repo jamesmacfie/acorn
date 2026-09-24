@@ -228,6 +228,12 @@ export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
 export const agentToolsCatalogRoute = '/v1/core/agent-tools'
 export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string }
 export const rendererAgentToolRoute = (taskId: string, name: string) => `/v1/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
+// A tool result the MCP server hands the agent as an image rather than as JSON text. `data` is base64.
+export type ToolImageResult = { type: 'image'; mimeType: string; data: string }
+export const isToolImageResult = (value: unknown): value is ToolImageResult => {
+  const v = value as Partial<ToolImageResult> | null
+  return !!v && v.type === 'image' && typeof v.mimeType === 'string' && v.mimeType.startsWith('image/') && typeof v.data === 'string'
+}
 
 
 // Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP

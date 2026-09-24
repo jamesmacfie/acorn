@@ -16,6 +16,7 @@ import {
   PROJECTS_QUERY,
   TEAMS_QUERY,
   VIEWER_QUERY,
+  fetchLinearUpload,
   issuesFilter,
   type LinearNode,
   type LinearProjectNode,
@@ -24,8 +25,9 @@ import {
   linearData,
   linearError,
   linearFetch,
+  linearUploadTarget,
 } from './'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderItemDetail, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderItemComment, type ProviderItemDetail, type ProviderItemImage, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>
@@ -242,6 +244,45 @@ const linearItemDetail: ProviderItemDetail = async (context, identifier) => {
   throw new Error(result.failure.error)
 }
 
+const failureOf = (status: 401 | 502) => new ProviderOperationError(status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status)
+
+// One comment, from the pane's route or the agent's `issue_comment`. `id` is optional and ours to
+// choose; see COMMENT_CREATE.
+export async function createLinearComment(
+  secret: string,
+  input: { issueId: string; body: string; parentId?: string; id?: string },
+): Promise<{ url?: string }> {
+  const response = await linearFetch(secret, COMMENT_CREATE, { input })
+  const error = linearError(response)
+  if (error) throw failureOf(error.status)
+  const data = await linearData<{ commentCreate: { success: boolean; comment: { url: string } | null } }>(response)
+  if (!data.commentCreate.success) throw failureOf(502)
+  return { url: data.commentCreate.comment?.url }
+}
+
+// What `issue_comment` posts through. commentCreate keys off Linear's issue UUID rather than the
+// identifier, and the cached detail carries it, so a warm cache makes this one request.
+const linearComment: ProviderItemComment = async (context, identifier, body) => {
+  const issue = (await linearItemDetail(context, identifier)) as LinearIssueDetail | null
+  if (!issue) return null
+  return createLinearComment(context.secret, { issueId: issue.id, body, ...(context.idempotencyKey ? { id: context.idempotencyKey } : {}) })
+}
+
+// What `issue_image` reads through. A screenshot pasted into a ticket lives on Linear's private upload
+// host. Anything that is not an image comes back with its type and no bytes, so a video attachment is
+// refused by core without being downloaded first.
+const linearImage: ProviderItemImage = async ({ secret }, url) => {
+  const target = linearUploadTarget(url)
+  if (!target) return null
+  const response = await fetchLinearUpload(secret, target)
+  if (!response) throw failureOf(502)
+  const error = linearError(response)
+  if (error) throw failureOf(error.status)
+  const mimeType = response.headers.get('content-type') ?? ''
+  if (!mimeType.startsWith('image/')) return { mimeType, data: '' }
+  return { mimeType, data: Buffer.from(await response.arrayBuffer()).toString('base64') }
+}
+
 const linearScopeQuery = async <T>(secret: string, query: string): Promise<T> => {
   const response = await linearFetch(secret, query, {})
   const error = linearError(response)
@@ -352,6 +393,8 @@ export const linearProvider = publicProvider({
   projects: linearProjectSource,
   codec: linearCodec,
   detail: linearItemDetail,
+  comment: linearComment,
+  image: linearImage,
   taskContext: {
     summarize(ref, item, state) {
       const parsed = item as LinearCached | null
@@ -375,24 +418,6 @@ export const linearProvider = publicProvider({
     },
     canAutoLink: () => 'linkify-only',
   },
-  mutations: [
-    {
-      id: 'linear.comment',
-      capability: 'comments',
-      risk: 'write',
-      freshness: 'live-fetch-first',
-      invalidates: ['linear.issues.detail'],
-      idempotent: false,
-      async run({ secret, input }) {
-        const response = await linearFetch(secret, COMMENT_CREATE, { input })
-        const error = linearError(response)
-        if (error) throw new ProviderOperationError(error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', error.status)
-        const data = await linearData<{ commentCreate: { success: boolean } }>(response)
-        if (!data.commentCreate.success) throw new ProviderOperationError('provider_unavailable', 502)
-        return { ok: true }
-      },
-    },
-  ],
   budgets: { ...defaultBudgets, maxResolutionBatch: 50, maxContextItems: 50 },
   memory: { linkedItems: true, mutations: ['linear.comment'], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
   conformance: {

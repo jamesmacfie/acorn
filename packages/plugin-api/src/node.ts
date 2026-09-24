@@ -208,10 +208,13 @@ export type {
   CodecResult,
   MirroredResourceContribution,
   ProviderDetailContext,
+  ProviderItemComment,
   ProviderItemDetail,
+  ProviderItemImage,
   ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
+  ProviderWriteContext,
 } from '@acorn/node-core/server/integrations'
 export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core/server/integrations'
 export { connectionHasCapability } from '@acorn/node-core/server/integrations'

@@ -1,9 +1,9 @@
 # Dashboards: what remains
 
-> Updated scope, 2026-09-13: [workflow v2](../workflow_v2/README.md) now owns shared source discovery,
-> typed records, query reuse, and dashboard authoring. Its contracts supersede the overlapping
-> assumptions below, including the SQL prerequisite for dynamic discovery. Taskless SQL and
-> provider write-back remain separate proposals, outside workflow v2.
+> Updated scope, 2026-09-13: workflow v2 shipped shared source discovery, typed records, query reuse,
+> and dashboard authoring. [Data sources](../../data-sources.md) and [dashboards](../../dashboards.md)
+> own those contracts, and they win over the overlapping assumptions below, including the SQL
+> prerequisite for dynamic discovery. Taskless SQL and provider write-back remain separate proposals.
 
 **The accepted 2026-08-17 redesign is built, end to end** — the scheduler beneath it
 ([`docs/schedules.md`](../../schedules.md)), the measure history it feeds, the grid gesture, the

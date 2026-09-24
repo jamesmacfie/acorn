@@ -404,11 +404,14 @@ node: ProfileDef
 node: ProjectRef
 node: ProvidedNodeRecord
 node: ProviderDetailContext
+node: ProviderItemComment
 node: ProviderItemDetail
+node: ProviderItemImage
 node: ProviderOperationError
 node: ProviderProjectSource
 node: ProviderResourceContext
 node: ProviderResourceRefreshContext
+node: ProviderWriteContext
 node: QueryBindingContext
 node: QueryBindings
 node: QueryConsumer

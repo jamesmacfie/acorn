@@ -749,6 +749,31 @@ cover the corresponding state and rendering contracts.
     **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
     entry should be absent throughout, because `dsh` alone has no interactive mode.
 
+The next six are workflow v2's release checks ([workflows.md](./workflows.md) § Typed data and
+conditions, § Record processing history, § Scheduled roots). Controlled provider fixtures cover them
+in the suites, but they need connected GitHub, Linear, and Rollbar test accounts and a configured
+model provider, and none had been run against real accounts when the programme shipped. Build each of
+the first four by hand, then again through **Generate**, and compare the resolved queries and
+bindings rather than the prose.
+
+73. Query open pull requests by one author in a real repository and preview them. Publish Find records
+    → For each → a review workflow. A closed pull request is left out whatever its merge readiness,
+    numbers stay numbers in the bindings, and each selected pull request gets one child task.
+74. Query Linear issues by project, exact state, and **Updated in last 24 hours**. The child fetches
+    details, sets a typed **Requires work** boolean, and starts an analysis grandchild only when it is
+    true. A false value creates no task and is not a failure.
+75. Query Rollbar error groups first seen since midnight in a named timezone. An older group with a
+    fresh occurrence is left out. Each child fetches the stack trace through **Get record details**.
+76. Save one of those queries, then use it from a workflow and a dashboard panel. Editing the panel's
+    display changes no source state. Publishing a change to the shared query updates the panel and
+    marks the workflow's schedule for review.
+77. Schedule the Linear workflow with **Start tracking from now**. After an issue changes, the next
+    check starts one child for it, the record history links its task and run, and **Run now** during
+    an active run is skipped with a link to that run.
+78. Build and schedule a workflow using only the keyboard in the desktop window: open the editor, pick
+    fields, publish, and activate the schedule. Focus stays visible and returns to its trigger when
+    each dialog closes.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
