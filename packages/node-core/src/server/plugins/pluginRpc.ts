@@ -79,6 +79,11 @@ export class PluginRpcEndpoint {
   readonly #remoteFunctions = new Map<number, (...args: unknown[]) => unknown>()
   readonly #localSignals = new Map<number, { signal: AbortSignal; listener: () => void; posted: boolean; sent: boolean }>()
   readonly #remoteSignals = new Map<number, AbortController>()
+  // Reply buffers for synchronous calls, handed back once their answer has been read. A fresh 4 MiB
+  // buffer per call is garbage that only the collectors of both threads can free, and an idle node
+  // making a couple of sync calls a minute held about a hundred of them, 400 MB, waiting for that.
+  // There is more than one only while a call is nested inside another one's wait.
+  readonly #replyBuffers: SharedArrayBuffer[] = []
   #nextFunctionId = 1
   #nextCallId = 1
   #nextSignalId = 1
@@ -248,11 +253,12 @@ export class PluginRpcEndpoint {
   }
 
   #callSync(functionId: number, args: unknown[], path: string): unknown {
-    const reply = new SharedArrayBuffer(SYNC_REPLY_BYTES)
-    const control = new Int32Array(reply, 0, 2)
     // Sync references may only receive already-cloneable data. Request/Response-bearing callbacks are
     // intentionally classified async by each side.
     const encoded = this.#encodeSync(args, `${path}.args`) as unknown[]
+    const reply = this.#replyBuffers.pop() ?? new SharedArrayBuffer(SYNC_REPLY_BYTES)
+    const control = new Int32Array(reply, 0, 2)
+    Atomics.store(control, 0, 0)
     this.#port.postMessage({ __acornRpc: 'sync-call', functionId, args: encoded, reply } satisfies WireSyncRequest)
     const deadline = Date.now() + SYNC_REPLY_TIMEOUT_MS
     while (Atomics.load(control, 0) === 0) {
@@ -263,6 +269,8 @@ export class PluginRpcEndpoint {
     }
     const length = Atomics.load(control, 1)
     const payload = deserialize(new Uint8Array(reply, HEADER_BYTES, length)) as { ok: boolean; value: unknown }
+    // Only once answered: a buffer whose call timed out may still be written to, so it is dropped.
+    this.#replyBuffers.push(reply)
     const decoded = this.decode(payload.value, `${path}.result`)
     if (!payload.ok) throw decoded
     return decoded
