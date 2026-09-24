@@ -3,7 +3,7 @@ import type { AgentSession } from '../../contract/wire.ts'
 // The run behind a workflow-started session, read off the row.
 //
 // The node writes `workflowRunId` and `workflowStepId` onto the session's config when a step starts it
-// (../../server/sessions/sessionExecute.ts) and re-broadcasts the row after every event it records, so
+// (../../server/sessions/sessionExecute.ts) and broadcasts the row whenever it changes, so
 // this answers while the step is still running and costs no request.
 //
 // Its own module rather than a function in ./AgentCenter.tsx, because a `.tsx` file cannot be imported

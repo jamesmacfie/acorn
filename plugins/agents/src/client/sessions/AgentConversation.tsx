@@ -43,7 +43,7 @@ export default function AgentConversation(props: AgentConversationProps & {
   //
   // Falling back to the step's own session is what lets a caller draw a step that is still running.
   // The node writes `config.workflowStepId` when it starts the session
-  // (../../server/sessions/sessionExecute.ts) and re-broadcasts the row after every event it records,
+  // (../../server/sessions/sessionExecute.ts) and broadcasts the row whenever it changes,
   // and this client holds an app-lifetime subscription to that, so the lookup is a scan of a roster
   // that is already in memory.
   const sessionId = createMemo(() => props.sessionId

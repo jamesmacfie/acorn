@@ -117,8 +117,8 @@ export class AgentSessionRepository {
         : projection.configJson
       // The subagent roster projected onto the row in the same transaction as the event insert, so a
       // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
-      // row rather than in a table of its own because runtimeEngine.record() already broadcasts the
-      // row after every event, which is what makes the sidebar's sub-rows live for a session nobody
+      // row rather than in a table of its own because runtimeEngine.record() broadcasts the row
+      // whenever an event changes it, which is what makes the sidebar's sub-rows live for a session nobody
       // has opened (docs/managed-agents.md § Subagents).
       // An event the harness attributed to a child marks that child heard from, which is what keeps a
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only

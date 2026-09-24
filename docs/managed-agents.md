@@ -16,6 +16,15 @@ and question requests, attachments, artifacts, usage snapshots, and lifecycle st
 event has a durable sequence. HTTP pagination is the replay authority, and the WebSocket is the live
 tail.
 
+On that tail, each recorded event goes out as an `agent:event` frame. The session row follows as an
+`agent:session` frame only when the event changed something a client keeps, which is about one event
+in 30 on a real ledger. `runtimeEngine.ts` compares the row with the last one broadcast, whoever sent
+it, leaving out `lastEventSeq`, `updatedAt`, and each subagent's heard-from time. A
+`session_metadata` event always sends, because it is the one event that writes `config`, and the
+comparison skips `config` for its size. The client moves `lastEventSeq` and `updatedAt` on its held
+row from each event frame (`managedStore.ts` § advanceRow). A client that doesn't do this sees those
+two fields lag until the next row.
+
 Session state changes and their event records are committed together. Once a turn has committed any
 events, a restart never silently resubmits it. Reconciliation marks interrupted work and leaves an
 explicit state for the owner to inspect.
@@ -313,7 +322,7 @@ Both managed harnesses can use their provider's native subagent feature, and suc
 addressed, sent a turn, forked, or handed to a terminal, so making it a session row would be a lie in
 every table that reads one. It is a projection instead: each session's row carries a `subagents`
 roster, folded from that session's own `subagent` events by `recordEvent`, in the same transaction as
-the event insert. The runtime already broadcasts a session row after every event it records, and agent
+the event insert. The runtime broadcasts a session row whenever an event it records changes the row, and agent
 frames are pushed to every client rather than subscribed to per id, so the task sidebar's sub-rows
 appear and settle live for every session in the task, not only the open one, and nothing extra is
 fetched. Each sub-row is inset behind a one-pixel left rule, aligned with its parent's text, to show
@@ -322,7 +331,7 @@ history stays in the event ledger, which is what the transcript reads.
 
 A session row also carries `queuedTurns`, the count of follow-ups waiting to dispatch. It is a column
 on the session row, kept current by the store whenever a turn enters or leaves the queue, folded there
-for the same reason as the subagent roster: the row is broadcast after every event, so a value on the
+for the same reason as the subagent roster: the row is broadcast whenever it changes, so a value on the
 row reaches every client live, and a count computed only when the list is fetched would be overwritten
 by the next broadcast. A queued turn leaves `runtimeState` at `ready` or `working`, so without this
 count the task sidebar has no way to mark a session whose only sign of a waiting prompt is the prompt

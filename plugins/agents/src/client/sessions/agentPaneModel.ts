@@ -50,8 +50,8 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
 
   const taskSessions = createMemo(() =>
-    managedAgentStore.sessions()
-      .filter((session) => session.taskId === task.id && !session.archivedAt)
+    managedAgentStore.sessionsForTask(task.id)
+      .filter((session) => !session.archivedAt)
       .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)))
   const sessionRoster = createMemo(() => agentSessionRoster(taskSessions(), managedAgentStore.delegations()))
   const selected = createMemo(() => {

@@ -1,8 +1,8 @@
-import { createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
+import { createMemo, createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from '../../kit/lib/cx'
 import Icon from '../../kit/components/content/Icon'
 import { StatusDot } from '../../kit/components/primitives'
-import { resolveRailMarkers, type RailMarker, type RailTone } from './railMarkers'
+import { resolveRailMarkers, sameRailMarkers, type RailMarker, type RailTone } from './railMarkers'
 import { railDotProps } from '../../kit/lib/displayMeta'
 import './tabrail.css'
 
@@ -40,7 +40,10 @@ export function RailTab(props: RailTabProps) {
     'busy', 'busyLabel', 'sublabel', 'markers', 'onClick', 'style', 'classList',
   ])
   const tipLabel = () => (own.busy && own.busyLabel ? own.busyLabel : own.label)
-  const resolved = () => resolveRailMarkers(own.markers ?? [])
+  // Holds its value while the markers say the same thing. Contributors build fresh marker objects on
+  // every read, and `For` below keys on identity, so each re-render rebuilt every marker element. A
+  // spinning marker restarted its turn each time, which was 25 times a second while an agent streamed.
+  const resolved = createMemo(() => resolveRailMarkers(own.markers ?? []), undefined, { equals: sameRailMarkers })
   const legend = () => resolved().legend
   const describedBy = createUniqueId()
 

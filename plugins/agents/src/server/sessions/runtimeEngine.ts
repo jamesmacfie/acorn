@@ -34,6 +34,23 @@ import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 
 /**
+ * A session row as a client keeps it, for telling whether a recorded event changed it.
+ *
+ * It leaves out four fields. `lastEventSeq` and `updatedAt` move with every event, and the client
+ * moves them itself from the event frame (../../client/sessions/managedStore.ts § advanceRow). A
+ * subagent's `updatedAt` is the node's clock for quieting a silent child, and no client reads it. The
+ * status that quieting changes is still compared. `config` is too large to compare per event, and
+ * record() handles it separately.
+ */
+const listedRow = (session: AgentSession): string => JSON.stringify({
+  ...session,
+  config: null,
+  lastEventSeq: 0,
+  updatedAt: 0,
+  subagents: session.subagents.map(({ updatedAt: _heardAt, ...entry }) => entry),
+})
+
+/**
  * acorn's own tool servers for one session, or none.
  *
  * Two doors exist and a harness gets one. Claude Code and Codex register acorn through their own CLI
@@ -182,6 +199,8 @@ export class ManagedAgentEngine {
   protected readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
   protected readonly subagentQuietMs: number
   protected readonly listeners = new Set<RuntimeListener>()
+  // The last row broadcast for each session, as `listedRow` reads it. See record().
+  protected readonly sentRows = new Map<string, string>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
   protected providerCache: { expiresAt: number; descriptors: AgentProviderDescriptor[] } | null = null
@@ -667,7 +686,14 @@ export class ManagedAgentEngine {
     this.emit({ channel: 'agent:event', event: record })
     await this.emitProjection(sessionId, turnId, event)
     const session = await this.store.requireSession(sessionId)
-    this.emit({ channel: 'agent:session', session })
+    // Only when the event changed what the row says. Most events in a streamed reply move nothing on
+    // the row except its sequence and clock, and the row runs 26 KB on average and up to 58 KB, mostly
+    // the harness's skills list. Sent after every event, rows were about 96% of the agent socket's
+    // bytes. The comparison skips `config` because of its size, so the one event that writes it,
+    // `session_metadata`, always sends.
+    if (event.type === 'session_metadata' || this.sentRows.get(sessionId) !== listedRow(session)) {
+      this.emit({ channel: 'agent:session', session })
+    }
     return record
   }
 
@@ -697,6 +723,11 @@ export class ManagedAgentEngine {
   }
 
   protected emit(frame: AgentWsFrame): void {
+    // Every broadcast row counts, whoever sent it, so record() compares against what clients last
+    // heard. A read mark sends its own row with `attention: none`, and the next event that puts
+    // `unread` back must be sent even though the last row record() sent also said `unread`.
+    if (frame.channel === 'agent:session') this.sentRows.set(frame.session.id, listedRow(frame.session))
+    else if (frame.channel === 'agent:deleted') this.sentRows.delete(frame.sessionId)
     this.publish?.(frame)
     for (const listener of this.listeners) listener(frame)
     void this.webhooks.accept(frame).catch((error) => {

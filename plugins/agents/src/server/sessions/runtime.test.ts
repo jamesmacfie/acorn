@@ -632,6 +632,56 @@ describe('managed agent runtime conformance', () => {
     ])
   })
 
+  it('sends the session row when a recorded event changes it, not after every event', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new TrailingEventDriver()
+    registry.registerNative('fake', () => driver)
+    const frames: { channel: string; session?: { runtimeState: string; attention: string; lastEventSeq: number } }[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+      publish: (frame) => void frames.push(frame as (typeof frames)[number]),
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Exercise the protocol.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+
+    // A reply streaming in after the turn settled: the first fragment marks the session unread, and
+    // the forty after it change nothing on the row but its sequence and clock.
+    frames.length = 0
+    for (let index = 0; index < 41; index++) await driver.push({ type: 'assistant_message', text: `part ${index} ` })
+    const rows = frames.filter((frame) => frame.channel === 'agent:session')
+    expect(frames.filter((frame) => frame.channel === 'agent:event')).toHaveLength(41)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.session).toMatchObject({ runtimeState: 'ready', attention: 'unread' })
+
+    // A write that changes the row outside an event still reaches clients, once, through its own
+    // broadcast; and the next change an event makes is still sent, even though it restores what the
+    // last event-driven frame said.
+    frames.length = 0
+    await runtime.patchSession(session.id, { lastReadSeq: 1_000 })
+    await driver.push({ type: 'assistant_message', text: 'and one more' })
+    expect(frames.filter((frame) => frame.channel === 'agent:session').map((frame) => frame.session!.attention))
+      .toEqual(['none', 'unread'])
+  })
+
   it('holds a settled session settled when the provider streams past its turn', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
