@@ -16,6 +16,9 @@ import { ownerId } from '../middleware/requireUser'
 import { ProviderOperationError } from '../integrations/types'
 import { resolveQuery } from '../queries/runtime'
 import { respondError } from '../respond'
+import { createLogger } from '../telemetry/logger'
+
+const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
   query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
@@ -47,19 +50,35 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
       return { problems: [message(error)] }
     }
   }
+  // Kept so a give-up can be logged with what the model actually said, which the result drops.
+  let lastReply = ''
   try {
     const models = createModelService(getDb(c.env), c.env.SECRETS)
-    return c.json(await runAuthoringTurn({
+    const result = await runAuthoringTurn({
       request,
       system: authoringSystemPrompt(request.target, TARGET_PROMPTS[request.target]),
       signal: c.req.raw.signal,
-      generate: input => models.generateText({
-        userId: ownerId(c), backendId: request.backendId,
-        input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
-      }),
+      generate: async input => {
+        const generated = await models.generateText({
+          userId: ownerId(c), backendId: request.backendId,
+          input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
+        })
+        lastReply = generated.text
+        return generated
+      },
       validate,
       metadata: metadataRequest => authoringMetadata({ env: c.env, turn: request, request: metadataRequest, invocation, validate }),
-    }))
+    })
+    // Both are a 200 to the client, so without this line a failed turn leaves no trace anywhere.
+    // The reply can quote sample records; the collector scrubs secrets and cuts it to 512 characters.
+    const problems = result.state === 'stopped' ? [result.reason] : result.state === 'proposal' ? result.problems : []
+    if (problems.length) {
+      log.warn('turn ended without a valid candidate', {
+        target: request.target, state: result.state, provider: result.providerId, model: result.modelId,
+        problems: problems.join(' | '), reply: lastReply,
+      })
+    }
+    return c.json(result)
   } catch (error) {
     if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
     if (c.req.raw.signal.aborted) return respondError(c, 408, 'cancelled')

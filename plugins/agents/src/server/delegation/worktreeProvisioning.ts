@@ -1,6 +1,6 @@
 import type { CreateAgentSessionInput } from '../../shared/schemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
-import { promptWithResultContract } from '../sessions/resultContract'
+import { delegatedTurn } from './reports'
 import type { AgentDelegationStore, AgentSpawn, AgentSpawnProvisioning } from './store'
 
 export type WorktreeTaskService = {
@@ -46,17 +46,24 @@ export class WorktreeProvisioning {
 
     const turnKey = `delegation:${spawn.id}:turn`
     let turn = await this.runtime.store.turnForIdempotency(session.id, turnKey)
-    turn ??= await this.runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: promptWithResultContract(plan.prompt, plan.resultSchema) }],
-      source: 'delegation',
-      effectivePolicy: {
-        delegationSpawnId: spawn.id,
-        toolCeiling: plan.toolCeiling,
-        ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
-        ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
-      },
-      idempotencyKey: turnKey,
-    })
+    if (!turn) {
+      const parent = plan.parentSessionId ? await this.runtime.store.getSession(plan.parentSessionId) : null
+      turn = await this.runtime.enqueueTurn(session.id, {
+        ...delegatedTurn(
+          parent ? { sessionId: parent.id, title: parent.title } : { sessionId: null, title: 'Terminal agent' },
+          plan.prompt,
+          plan.resultSchema,
+          {
+            delegationSpawnId: spawn.id,
+            toolCeiling: plan.toolCeiling,
+            ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
+            ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
+          },
+        ),
+        source: 'delegation',
+        idempotencyKey: turnKey,
+      })
+    }
     return this.store.complete(spawn.id, session.id, turn.id)
   }
 }
