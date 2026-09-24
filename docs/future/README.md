@@ -15,6 +15,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [legacy/](./legacy/README.md) | Architecture review, plugin ownership, compatibility removal, and a coordinated version-1 reset. Evidence, target contracts, and 13 implementation tickets. | Tickets 01–12 implemented; ticket 13 acceptance recorded with host limits, 2026-09-23. |
+| [legacy/performance/](./legacy/performance/README.md) | Desktop startup, task switching, streaming work, and memory, measured against the September performance programme. Eight areas, each with verify-before-building lists. | Proposal, 2026-09-24. Not started. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
