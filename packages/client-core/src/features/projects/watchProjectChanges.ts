@@ -6,7 +6,7 @@
 // creating a project, which was right for that window and silent for every other one.
 import { activeCacheId } from '../../infra/node/activeNode'
 import { clientFor } from '../../infra/node/fleet'
-import { projectsKey, workspacesKey } from '../../infra/queries'
+import { projectsKey, runTargetsKey, workspacesKey } from '../../infra/queries'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { wsOnNodeEvent } from '../../infra/node/wsClient'
 
@@ -18,6 +18,9 @@ export function watchProjectChanges(): () => void {
     // Workspace rows embed their project membership, so moving, creating, or deleting a project
     // invalidates both projections even though `project:changed` remains the one wire contract.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: workspacesKey })
+    // Run targets come partly from the project row (its dev script and run-target list). The frame
+    // names the project, not its tasks, and the reads are small, so every task's list is refreshed.
+    void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: runTargetsKey })
     clientEvents.emit('project:changed', event)
   })
 }

@@ -1,10 +1,10 @@
 // Stays with the composition root for the same reason as App.tsx: it arranges pane, keybinding and
 // slot contributions into the task screen this app draws. Every part it arranges comes from
 // client-core; the layout of them is the app's.
-import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
+import { prefsOptions, runTargetsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
 import { archiveTask } from '@acorn/client-core/features/tasks'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands'
@@ -59,14 +59,10 @@ export default function TaskView(props: {
   const workspace = () => workspaceForProject(workspacesQuery.data, props.task.projectId)
   const status = () => taskStatus(props.task.id)
 
-  const [runTargets, { refetch: refetchTargets }] = createResource(
-    () => props.task.id,
-    async (id) => {
-      if (!hasEngine()) return []
-      const result = await runApi.targets(id)
-      return 'targets' in result ? result.targets : []
-    },
-  )
+  // Through the query cache rather than a per-mount read, so a return to this task draws its run
+  // buttons in the same frame as the panes instead of shifting the switcher once they arrive.
+  const targetsQuery = createQuery(() => runTargetsOptions(props.task.id, hasEngine()))
+  const runTargets = () => targetsQuery.data ?? []
   const [runError, setRunError] = createSignal('')
   async function toggleTarget(id: string, running: boolean) {
     if (!hasEngine()) return
@@ -74,7 +70,7 @@ export default function TaskView(props: {
     const result = running ? await runApi.stop(props.task.id, id) : await runApi.start(props.task.id, id)
     if (!result.ok) setRunError(result.reason ?? `Unable to ${running ? 'stop' : 'start'} ${id}`)
     await refreshSessionSources()
-    await refetchTargets()
+    await targetsQuery.refetch()
     if (!running && result.ok) props.onOpenTerminal()
   }
 
@@ -247,8 +243,8 @@ export default function TaskView(props: {
 
   const extraButtons = () => (
     <>
-      <Show when={(runTargets() ?? []).length}>
-        <For each={runTargets() ?? []}>
+      <Show when={runTargets().length}>
+        <For each={runTargets()}>
           {(target) => (
             <RailTab
               class="pane-switch-run"
