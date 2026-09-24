@@ -1,7 +1,7 @@
 import { createRoot, createSignal } from 'solid-js'
 import { afterEach, expect, it } from 'vitest'
-import { createCollection } from './collection'
-import { _resetCollectionState } from './collectionState'
+import { createCollection, revealCollectionItem } from './collection'
+import { _resetCollectionState, collectionState } from './collectionState'
 
 afterEach(_resetCollectionState)
 
@@ -35,4 +35,19 @@ it('resolves row ids and tab stops with linear work on mount and refresh', () =>
       dispose()
     }
   })
+})
+
+it('takes its registration back out when its id has moved on by the time it is disposed', () => {
+  // A task-scoped id reads the task through props, and a task switch hands those props the next task
+  // before it disposes the old view. The stale entry used to stay registered, holding the old view.
+  const [task, setTask] = createSignal('a')
+  const dispose = createRoot((dispose) => {
+    createCollection({ id: () => `list.${task()}`, items: () => [{ key: 'x', label: 'x' }], role: 'listbox' })
+    return dispose
+  })
+  setTask('b')
+  dispose()
+  revealCollectionItem('list.a', 'x')
+  expect(collectionState('list.a').active).toBeNull()
+  expect(collectionState('list.b').active).toBeNull()
 })

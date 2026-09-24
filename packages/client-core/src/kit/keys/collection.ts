@@ -142,8 +142,13 @@ export function createCollection(options: CollectionOptions): Collection {
   }
   // Registered for the life of the node, and taken back out with it: a stale entry would scroll a
   // collection that is no longer on screen.
-  live.set(options.id(), reveal)
-  onCleanup(() => { if (live.get(options.id()) === reveal) live.delete(options.id()) })
+  // The id is read once, here. Read again in the cleanup it can already name the next owner's
+  // collection: a task-scoped id reads the task through props, and by the time a task switch disposes
+  // the old view those props answer with the new task. The old entry then stayed in `live`, and its
+  // `reveal` held the whole detached view, until that task was opened again.
+  const id = options.id()
+  live.set(id, reveal)
+  onCleanup(() => { if (live.get(id) === reveal) live.delete(id) })
 
   return {
     active,
