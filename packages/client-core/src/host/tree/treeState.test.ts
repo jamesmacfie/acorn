@@ -36,6 +36,44 @@ describe('a remove takes its whole subtree with it', () => {
   })
 })
 
+describe('a batch edits each child list in op order', () => {
+  it('lands inserts, moves and removes where a one-op-at-a-time apply would', () => {
+    const { state, refusals } = host()
+    state._apply([
+      { op: 'insert', parent: null, index: 0, node: leaf('list') },
+      { op: 'insert', parent: 'list', index: 0, node: leaf('a') },
+      { op: 'insert', parent: 'list', index: 1, node: leaf('b') },
+      { op: 'insert', parent: 'list', index: 2, node: leaf('c') },
+      { op: 'insert', parent: 'list', index: 1, node: leaf('d') },
+      { op: 'move', id: 'c', parent: 'list', index: 0 },
+      { op: 'remove', id: 'b' },
+      { op: 'insert', parent: null, index: 0, node: leaf('other') },
+      { op: 'move', id: 'a', parent: 'other', index: 0 },
+    ])
+    expect(refusals).toEqual([])
+    expect(state.roots()).toEqual(['other', 'list'])
+    expect(state.nodes.list!.children).toEqual(['c', 'd'])
+    expect(state.nodes.other!.children).toEqual(['a'])
+  })
+
+  it('forgets children added earlier in the same batch as their removed parent', () => {
+    const { state, refusals } = host()
+    state._apply([
+      { op: 'insert', parent: null, index: 0, node: leaf('parent') },
+      { op: 'insert', parent: 'parent', index: 0, node: leaf('child') },
+      { op: 'insert', parent: 'child', index: 0, node: leaf('grandchild') },
+      { op: 'remove', id: 'parent' },
+    ])
+    expect(Object.keys(state.nodes)).toEqual([])
+    expect(state.roots()).toEqual([])
+
+    // A leaked parent entry would make this a duplicate id.
+    state._apply([{ op: 'insert', parent: null, index: 0, node: leaf('child') }])
+    expect(refusals).toEqual([])
+    expect(state.roots()).toEqual(['child'])
+  })
+})
+
 describe('a batch costs its own ops, not the tree', () => {
   it('empties a tree at the node cap without blocking a second', () => {
     const { state, refusals } = host()
