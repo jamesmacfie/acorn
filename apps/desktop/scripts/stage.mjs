@@ -26,6 +26,9 @@ const need = (path, hint) => {
 const dist = need(resolve(ROOT, 'apps/node/dist'), 'run `pnpm --filter @acorn/node build` first.')
 need(resolve(dist, 'service.js'), 'run `pnpm --filter @acorn/node build` first.')
 need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
+// The service's chunk names carry a content hash, so every build that changes the node writes new
+// ones. Cleared first, or each old chunk stays beside the helper and ships as a resource.
+rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 cpSync(dist, HELPER, { recursive: true })
 
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
