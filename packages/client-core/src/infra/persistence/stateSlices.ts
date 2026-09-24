@@ -3,6 +3,7 @@ import { dashboardsSlice } from '../../features/dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
 import { defaultLayout, normalizeLayout, type TaskLayout } from '../../features/tasks/taskLayout'
 import { hydrateTaskLayout, hydrateWorkspaceView, taskLayouts, workspaceViews } from '../../features/tasks/tasks'
+import { currentWorkspaceId } from '../../features/workspaces/lastWorkspace'
 import type { WorkspaceView } from '../../features/workspaces/workspaceViewTransition'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
@@ -40,8 +41,10 @@ const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
 const parseWorkspaceView = (raw: unknown): WorkspaceView => {
   const value = parseJson(raw)
   if (value && typeof value === 'object') {
-    const candidate = value as { source?: unknown; taskId?: unknown }
-    if (typeof candidate.source === 'string') return { source: candidate.source }
+    const candidate = value as { source?: unknown; path?: unknown; taskId?: unknown }
+    if (typeof candidate.source === 'string') {
+      return typeof candidate.path === 'string' ? { source: candidate.source, path: candidate.path } : { source: candidate.source }
+    }
     if (typeof candidate.taskId === 'string') return { taskId: candidate.taskId }
   }
   return { source: '' }
@@ -62,11 +65,40 @@ export const workspaceViewSlice: PersistedStateSlice<WorkspaceView> = {
   // A source a plugin contributes is only on offer where that plugin is installed and its provider
   // connected, so a view naming one has to survive being read on a client that cannot draw it.
   unknownIds: 'retain-inert',
-  maxBytes: 512,
+  // Room for a page address beside the source.
+  maxBytes: 2 * 1024,
   binding: {
     values: workspaceViews,
     hydrate: hydrateWorkspaceView,
   },
+}
+
+// Which workspace was open, so a launch knows which workspace's memory above to reopen. Both clients
+// write it, and each decides what restoring it means, so `hydrate` is theirs: the terminal replays a
+// switch (apps/tui/src/chrome/restore.ts), the desktop waits for the whole pass and then opens it
+// (apps/desktop/src/client/App.tsx). The node's rather than the device's for the reason the memory
+// above is: the terminal has no `localStorage`.
+export const lastWorkspaceSlice = (hydrate: (workspaceId: string) => void): PersistedStateSlice<string> => {
+  // Written back until a workspace is open. The pass can write before the client has settled on one,
+  // and a boot that fails in that gap flushes its pending writes as it is torn down, which used to
+  // save an empty value over the right one.
+  let saved = ''
+  return {
+    id: 'core.last-workspace',
+    key: PrefKeys.lastWorkspace,
+    scope: 'app',
+    // After `core.workspace-views`, because the terminal's switch reads that memory.
+    restore: 'view',
+    version: 1,
+    codec: { parse: (raw) => (typeof raw === 'string' ? raw : ''), serialize: (value) => value },
+    empty: () => '',
+    unknownIds: 'drop',
+    maxBytes: 512,
+    binding: appStateBinding(() => currentWorkspaceId() ?? saved, (value) => {
+      saved = value
+      hydrate(value)
+    }),
+  }
 }
 
 const parseNotices = (raw: unknown): Notice[] => {

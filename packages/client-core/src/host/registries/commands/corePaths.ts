@@ -1,8 +1,8 @@
 // Core's own URL shapes, in one place.
 //
-// These strings were already hardcoded in three places: the last-path persistence slice built
-// `/p/${projectId}` by hand, `pathForTask` built `/t/${id}`, and the shell's route contributions
-// declared the patterns a fourth time. Collecting them here is what lets the kind-based route lookup
+// These strings used to be hardcoded in several places: a persistence slice built `/p/${projectId}`
+// by hand, `pathForTask` built `/t/${id}`, and the shell's route contributions declared the patterns
+// again. Collecting them here is what lets the kind-based route lookup
 // go: core no longer has to ask the source registry for a path it owns.
 //
 // Plugin routes are not here. A plugin owns its own patterns (plugins/github/src/client/routes.ts)
@@ -14,8 +14,7 @@ export const PROJECT_ROUTE = '/p/:projectId'
 export const CREATE_TASK_ROUTE = '/p/:projectId/new'
 export const TASK_ROUTE = '/t/:taskId'
 
-// The prefix every project-scoped URL shares, plugin-contributed ones included. The last-path slice
-// uses it to decide whether the current location is worth remembering.
+// The prefix every project-scoped URL shares, plugin-contributed ones included.
 export const PROJECT_PATH_PREFIX = '/p/'
 
 // The one segment core reserves for a loaded plugin's project-scoped URLs, and the per-plugin prefix
@@ -35,8 +34,8 @@ export const taskPath = (taskId: string): string => `/t/${encodeURIComponent(tas
 
 export const isProjectPath = (path: string): boolean => path.startsWith(PROJECT_PATH_PREFIX)
 
-// The project id in a project-scoped path, or null. Used by the last-path restore to check a
-// remembered URL still names a project this node has.
+// The project id in a project-scoped path, or null. Used by the workspace view memory to check a
+// remembered page still belongs to its workspace (features/workspaces/workspaceViewTransition.ts).
 export function projectIdFromPath(path: string): string | null {
   const match = /^\/p\/([^/?#]+)/.exec(path)
   return match ? decodeURIComponent(match[1]) : null

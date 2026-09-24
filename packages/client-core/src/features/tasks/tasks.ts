@@ -36,9 +36,8 @@ export function setSelectedSource(source: string | null): void {
 
 // Per-workspace memory of the last view, a rail source or a task, so switching workspaces returns
 // you to what you were looking at. Persisted by the `core.workspace-views` slice
-// (infra/persistence/stateSlices.ts), so it also survives a relaunch; first-load restore of the
-// workspace you were actually in comes from the last_source and last_task prefs on the desktop and
-// from the last_workspace pref in the terminal.
+// (infra/persistence/stateSlices.ts), so it also survives a relaunch. Both clients reopen on the
+// `last_workspace` pref and read what to show from here.
 //
 // A signal rather than a Map because the persistence pass reads it, and keyed by bare workspace id
 // with the node added at write time by `storageKeyFor` — the same shape as `taskLayouts` below, and

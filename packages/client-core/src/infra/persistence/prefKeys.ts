@@ -11,11 +11,14 @@ export const PrefKeys = {
   // Visual style, the appearance axis orthogonal to theme. One key rather than four, because there is
   // no OS signal to follow and nobody wants square panes by day and rounded by night.
   style: 'style',
+  // Retired, and read by nothing. The desktop used to reopen from these three, which disagreed with
+  // each other (docs/state-ownership.md). Still listed as device keys so a leftover in `localStorage`
+  // stays there instead of being drained to the node.
   lastTask: 'last_task',
   lastPath: 'last_path',
   lastSource: 'last_source',
-  // Which workspace the terminal client was showing when it was last closed, so `acorn` reopens on
-  // it (apps/tui/src/chrome/restore.ts). The node's, not the device's: the terminal has no
+  // Which workspace was showing when a client was last closed, so both reopen on it
+  // (infra/persistence/stateSlices.ts). The node's, not the device's: the terminal has no
   // `localStorage`, so a device key would be written nowhere and read back as nothing.
   lastWorkspace: 'last_workspace',
   taskLayouts: 'task_layouts',
