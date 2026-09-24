@@ -3,7 +3,7 @@ import { desc, eq, inArray, isNotNull, or, sum } from 'drizzle-orm'
 import type { WorkflowRunner } from './workflowRunner'
 import type { WorkflowStepProjection } from '../shared/api'
 import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../shared/runStatus'
-import { workflowDispatches, workflowRuns, workflowSteps, workflowTurnAdmissions } from '../node/schema'
+import { workflowDispatches, workflowRuns, workflowTurnAdmissions } from '../node/schema'
 
 /** Projects workflow rows into the Node-wide run list without double-counting child usage. */
 export async function workflowRunList(db: PluginDatabase) {
@@ -22,16 +22,8 @@ export async function workflowRunList(db: PluginDatabase) {
       .where(inArray(workflowTurnAdmissions.runId, rows.map((row) => row.id)))
       .groupBy(workflowTurnAdmissions.runId)
     : []
-  const legacyCostRows = rows.length
-    ? await db
-      .select({ id: workflowSteps.runId, costUsd: sum(workflowSteps.costUsd) })
-      .from(workflowSteps)
-      .where(inArray(workflowSteps.runId, rows.map((row) => row.id)))
-      .groupBy(workflowSteps.runId)
-    : []
   const treeCosts = new Map(treeCostRows.map((row) => [row.id, Number(row.costUsd ?? 0)]))
   const runCosts = new Map(runCostRows.map((row) => [row.id, Number(row.costUsd ?? 0)]))
-  const legacyCosts = new Map(legacyCostRows.map((row) => [row.id, Number(row.costUsd ?? 0)]))
   return {
     runs: rows.map((row) => ({
       id: row.id,
@@ -41,8 +33,8 @@ export async function workflowRunList(db: PluginDatabase) {
       endedAt: TERMINAL_WORKFLOW_STATUSES.has(row.status) ? row.updatedAt : null,
       taskId: row.taskId,
       costUsd: row.depth === 0
-        ? treeCosts.get(row.id) ?? legacyCosts.get(row.id) ?? null
-        : runCosts.get(row.id) ?? legacyCosts.get(row.id) ?? null,
+        ? treeCosts.get(row.id) ?? null
+        : runCosts.get(row.id) ?? null,
       ...(row.error ? { detail: row.error.slice(0, 200) } : {}),
     })),
   }

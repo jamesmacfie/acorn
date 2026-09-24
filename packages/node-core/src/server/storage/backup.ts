@@ -1,12 +1,13 @@
 import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { runProcess } from '../core/proc'
 import { PLUGIN_DB_DIR } from '../plugins/storage'
 import { resolveDatabasePath } from './paths'
 import { openSqlite } from './sqlite'
 
-// POST /v2/core/backup. docs/data-layer.md § Backup and import covers what is excluded and why.
+// POST /v1/core/backup. docs/data-layer.md § Backup and import covers what is excluded and why.
 // This is SQLite's online-backup API into a staging directory, a scrub, a manifest, and `tar`.
 //
 // Each database opens through a fresh readonly handle rather than the live one, because AppDatabase
@@ -22,7 +23,7 @@ export type BackupResult = {
 }
 
 const EXCLUDED = [
-  'credentials (integrations.access_token)',
+  'credentials (integrations.encrypted_credentials)',
   'device tokens (the devices table)',
   'the TLS private key',
   'the session encryption key (session.key)',
@@ -50,7 +51,7 @@ function scrubCore(copy: string): void {
   const handle = openSqlite(copy)
   try {
     // Blanked rather than deleted (docs/data-layer.md § Backup and import).
-    handle.exec("UPDATE integrations SET access_token = ''")
+    handle.exec("UPDATE integrations SET encrypted_credentials = ''")
     // Deleted outright, not blanked (docs/data-layer.md § Backup and import).
     handle.exec('DELETE FROM devices')
     // 24 hours of replay records for requests that can never be replayed against a new node.
@@ -107,7 +108,7 @@ export async function createBackup(dataDir: string, destPath: string): Promise<B
       join(staging, 'manifest.json'),
       // Name the exclusions in the archive itself. Someone restoring this in a year has the file
       // and not the release notes, and the archive should answer "where did my GitHub token go".
-      `${JSON.stringify({ kind: 'acorn-backup', version: 1, createdAt: Date.now(), files, excluded: EXCLUDED }, null, 2)}\n`,
+      `${JSON.stringify({ kind: 'acorn-backup', version: 1, baseline: ACORN_BASELINE, createdAt: Date.now(), files, excluded: EXCLUDED }, null, 2)}\n`,
       { mode: 0o600 },
     )
 

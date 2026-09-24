@@ -2,7 +2,7 @@
 // the signing-key lifecycle).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
-import { normalizeToolCeiling, toolCeilingSchema, type ToolCeiling } from '@acorn/protocol/workflow.ts'
+import { normalizeToolCeiling, toolCeilingSchema, type ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 
 // 'service': the node calling its own HTTP surface over loopback (notes seeding, workflow context
 //   assembly). Full reach, minted in-process, and never placed in a child's environment.

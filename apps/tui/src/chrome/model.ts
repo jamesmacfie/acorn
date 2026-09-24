@@ -17,9 +17,9 @@ import {
   activeTaskId, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs/railSources.ts'
-import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
-import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
+import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs'
+import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces'
+import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { scheduleSettle } from '../keys/regions'
 import { chosenWorkspace, placeRestored, setChosenWorkspace } from './state'
 

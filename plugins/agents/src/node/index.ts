@@ -11,7 +11,7 @@ import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../se
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS, type AgentTurnChangedEvent } from '../contract/lifecycle'
+import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { createSessionControl } from '../server/sessions/sessionControl'
@@ -84,7 +84,6 @@ export type AgentsPluginDeps = {
   // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
   // spawn cannot race the repair of the same creating ledger row.
   reconciled: Promise<void>
-  onCompletedTurn?: (event: AgentTurnChangedEvent) => Promise<void>
 }
 
 // `dataDir` stays a parameter, unlike changes' and github's: the runtime writes attachments, artifacts
@@ -166,7 +165,6 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           return (await sessions.list()).some((terminal) =>
             terminal.agentSessionId === sessionId && terminal.status === 'running')
         },
-        onCompletedTurn: deps.onCompletedTurn,
       })
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
       ctx.dataSources.register(sessionSource)
@@ -234,7 +232,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
       // pointer at the route above; nothing here knows workflows is on the same list.
-      ctx.runs.register({ runs: '/v2/p/agents/runs' })
+      ctx.runs.register({ runs: '/v1/p/agents/runs' })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).

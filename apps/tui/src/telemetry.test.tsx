@@ -9,7 +9,7 @@ import {
   startClientTelemetry,
 } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { prefsKey } from '@acorn/protocol/api.ts'
-import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { _resetBoot, bootMark, emitBootSpans } from './boot'
 import { renderFixture } from './harness'
 

@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
+import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
@@ -23,6 +24,8 @@ import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/wor
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
+import { WORKFLOW_REVIEW_INPUT } from '../contract/reviewInput'
+import { workflowReviewInput } from '../server/workflowReviewInput'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/workflowTools'
 import { validateWorkflow } from '../server/workflowValidation'
@@ -43,14 +46,9 @@ export type WorkflowsPluginDeps = {
   // workflow:start, gate, cancel, and kill all await it: reconcile() sweeps every 'running' step to
   // 'pending', so a run started before the sweep has its live step re-queued underneath it.
   reconciled: Promise<void>
-  // plugins/memory's auto-generation trigger, as a thunk. Optional, so a node with memory disabled
-  // still runs workflows and the run produces no memory proposals.
-  memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
-  reviewBoundary?: (input: { taskId: string; runId: string; status: string; transcriptTail: string | null }) => Promise<void>
   // '' when every check passed, a rendered list when some failed, null when there is nothing to check
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
   // treats null as a hard failure and '' as done.
-  failingChecks: (taskId: string) => Promise<string | null>
   scheduler?: () => WorkflowScheduleScheduler
 }
 
@@ -84,6 +82,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       { verb: 'run-changed', description: 'A workflow run changed durable status' },
       { verb: 'gate-changed', description: 'A workflow approval gate started or settled' },
       { verb: 'child-changed', description: 'A dispatched child workflow changed durable state' },
+      { verb: 'completed', description: 'A workflow run reached a terminal status' },
     ],
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
     // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
@@ -94,6 +93,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       const store = ctx.storage.open()
       const core = ctx.core
       const notices = buildNotices(ctx)
+      const failingChecks = async (taskId: string): Promise<string | null> =>
+        (await ctx.capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null
+      ctx.capabilities.provide(WORKFLOW_REVIEW_INPUT, workflowReviewInput(store, () => ctx.capabilities.get(NOTES_STORE)))
 
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first
@@ -217,7 +219,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             // assembler, not a child process. It keeps full reach so context assembly survives the
             // task-scope restriction that applies to agents.
             const loopback = deps.internalEnv({ scope: 'service' })
-            const res = await fetch(`${loopback.ACORN_API_URL}/v2/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
+            const res = await fetch(`${loopback.ACORN_API_URL}/v1/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
               headers: { 'x-acorn-internal': loopback.ACORN_API_TOKEN ?? '' },
             })
             if (!res.ok) return ''
@@ -229,13 +231,13 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // Policy verdicts are re-derived here: a lying step result is ignored by construction.
         evaluatePolicy: async (taskId, policy) => {
           if (policy === 'checks-green') {
-            const failing = await deps.failingChecks(taskId)
+            const failing = await failingChecks(taskId)
             if (failing === '') return { pass: true }
             return { pass: false, detail: failing == null ? 'No PR/checks to verify.' : `Failing checks:\n${failing}` }
           }
           return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
         },
-        failingChecks: deps.failingChecks,
+        failingChecks,
         notify: buildNotify(ctx),
         // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
         stepChanged: (runId, stepId, status) => ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
@@ -246,19 +248,12 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           await scheduleService?.settleRun(runId).catch(error => ctx.log.warn(`workflow schedule settlement failed: ${describeError(error).message}`))
-          const [run] = await store.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
+          const [run] = await store.select({ status: workflowRuns.status, completedAt: workflowRuns.updatedAt }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
           // `setRun` announces the terminal status before this callback. Repeat it after schedule
           // settlement so clients that refresh both read models cannot race the schedule write.
           if (run) ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status: run.status })
-          const handoff = await ctx.capabilities
-            .require(NOTES_STORE)
-            .read({ scope: 'task', taskId }, `workflow-handoffs-${runId}`)
-            .catch(() => null)
-          if (deps.reviewBoundary) {
-            await deps.reviewBoundary({ taskId, runId, status: run?.status ?? 'unknown', transcriptTail: handoff?.body ?? null }).catch(() => undefined)
-          } else if (deps.memoryReviewTrigger) {
-            await deps.memoryReviewTrigger(taskId, handoff?.body ?? `Workflow ${runId} reached a terminal state.`)
-          }
+          if (run) ctx.events.send({ channel: pluginChannel('workflows', 'completed'),
+            taskId, runId, status: run.status, completedAt: run.completedAt })
         },
         startRunTarget: async (taskId, targetId) => {
           // terminal.runTargets, resolved at call time. A node with terminal disabled cannot start a
@@ -609,7 +604,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
       // the route above, so nothing here knows what else is on that list.
-      ctx.runs.register({ runs: '/v2/p/workflows/runs' })
+      ctx.runs.register({ runs: '/v1/p/workflows/runs' })
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability

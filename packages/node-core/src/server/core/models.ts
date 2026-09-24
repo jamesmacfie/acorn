@@ -3,14 +3,15 @@ import { availableModelConnections, parseBackendId } from '@acorn/protocol/model
 import type { SecretService } from './secrets'
 import type { AppDatabase } from '../db'
 import { connectionSummary, listConnections } from '../integrations/connections'
-import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { generateTextForConnection } from '../modelProviders/runtime'
 import { generateTextForHarness, harnessBackends } from '../modelProviders/harnessRuntime'
 import type { GenerateTextInput, GenerateTextResult } from '../modelProviders/types'
+import { ProviderOperationError } from '../integrations/types'
 
 export type GenerateTextRequest = {
   userId: string
-  // `connection:<uuid>`, `harness:<profileId>`, or a bare uuid from before core minted these ids.
+  // `connection:<uuid>` or `harness:<profileId>`.
   backendId: string
   input: GenerateTextInput
   timeoutMs?: number
@@ -24,7 +25,7 @@ export type ModelService = {
   // or an agent CLI installed on this machine.
   //
   // A plugin that generates text has to offer a picker, and its frame cannot get one any other way.
-  // `/v2/core/integrations` has no bridge scope, and adding one would hand every installed plugin
+  // `/v1/core/integrations` has no bridge scope, and adding one would hand every installed plugin
   // the whole connection roster to serve one dropdown. This returns ids and labels only. Core still
   // resolves the key, or the command, inside `generateText`.
   available(userId: string): Promise<ModelBackend[]>
@@ -32,15 +33,21 @@ export type ModelService = {
 
 export function createModelService(db: AppDatabase, secrets: SecretService): ModelService {
   return {
-    generateText: ({ backendId, ...request }) => {
-      const backend = parseBackendId(backendId)
-      return backend.kind === 'harness'
-        ? generateTextForHarness({ profileId: backend.id, input: request.input, ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}) })
-        : generateTextForConnection({ ...request, connectionId: backend.id, db, secrets })
+    generateText: async ({ backendId, ...request }) => {
+      let backend: ReturnType<typeof parseBackendId>
+      try {
+        backend = parseBackendId(backendId)
+      } catch {
+        throw new ProviderOperationError('provider_bad_config', 400, 'Backend ID must be connection:<id> or harness:<id>.')
+      }
+      if (backend.kind === 'harness') {
+        return generateTextForHarness({ profileId: backend.id, input: request.input, ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}) })
+      }
+      return generateTextForConnection({ ...request, connectionId: backend.id, db, secrets })
     },
     available: async (userId) => {
       const rows = await listConnections(db, userId)
-      // The projection `/v2/core/integrations` serves, called rather than restated so a plugin's
+      // The projection `/v1/core/integrations` serves, called rather than restated so a plugin's
       // picker and the shell's agree on what "available" means.
       const connections = availableModelConnections({
         providers: connectionProviderRegistry.list().map((provider) => provider.toPublic()),

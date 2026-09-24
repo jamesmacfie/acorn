@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '../../contract/wire.ts'
 import type { AgentPaneModel } from './agentPaneModel'
 import { agentSessionRoster } from './sessionRoster'
 import {

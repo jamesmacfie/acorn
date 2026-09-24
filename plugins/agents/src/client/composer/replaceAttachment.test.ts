@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 import { decideReplacement, MAX_DRAFT_ATTACHMENT_BYTES } from './replaceAttachment'
 
 // The compare-and-swap at the heart of "a plugin edited this attachment, put the new one in the turn"

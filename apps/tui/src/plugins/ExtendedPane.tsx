@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
-import type { ExtendedPaneProps } from '@acorn/client-core/host/chrome/extendedPane.ts'
+import type { ExtendedPaneProps } from '@acorn/client-core/host/chrome'
 import { ExtensionRows, InlineSlot } from '../kit/host'
 import { Line } from '../kit/cells'
 

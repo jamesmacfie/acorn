@@ -10,7 +10,7 @@ import { PluginTrustStore } from './plugins/pluginTrustStore'
 import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
 import { ServiceHost } from './supervision/serviceHost'
 import { startHelperTelemetry } from './telemetry'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('service-host')
 

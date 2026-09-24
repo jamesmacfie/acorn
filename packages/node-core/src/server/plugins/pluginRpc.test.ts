@@ -133,3 +133,29 @@ describe('plugin RPC value shapes', () => {
     expect(decoded.at).toBeInstanceOf(Date)
   })
 })
+
+it('forwards an abort after an async callback has started', async () => {
+  const { port1, port2 } = new MessageChannel()
+  const host = new PluginRpcEndpoint(port1, () => 'async')
+  const worker = new PluginRpcEndpoint(port2, () => 'async')
+  let started!: () => void
+  const running = new Promise<void>((resolve) => { started = resolve })
+  try {
+    const remote = host.decode(await worker.encode({
+      run: async ({ signal }: { signal: AbortSignal }) => {
+        started()
+        return new Promise((resolve) => {
+          signal.addEventListener('abort', () => resolve(signal.reason), { once: true })
+        })
+      },
+    })) as { run(args: { signal: AbortSignal }): Promise<string> }
+    const controller = new AbortController()
+    const result = remote.run({ signal: controller.signal })
+    await running
+    controller.abort('cancelled')
+    expect(await result).toBe('cancelled')
+  } finally {
+    host.close(new Error('done'))
+    worker.close(new Error('done'))
+  }
+}, 2_000)

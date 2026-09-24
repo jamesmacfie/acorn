@@ -70,8 +70,8 @@ The map is edited in Settings → Integrations, under the connection itself, and
 host's for every provider rather than any one plugin's. Under the connection because one Linear or
 Rollbar connection usually serves every workspace on the machine, so its whole map reads better in one
 place than a checkbox list repeated on every workspace page. The host's because of ownership: the
-table is core's, the routes are core's (`PUT /v2/core/integrations/:id/mappings` replaces every row
-one connection owns; `PUT /v2/core/workspaces/:id/external-projects` is the same table from the
+table is core's, the routes are core's (`PUT /v1/core/integrations/:id/mappings` replaces every row
+one connection owns; `PUT /v1/core/workspaces/:id/external-projects` is the same table from the
 workspace's side), and a plugin cannot write it at all — both are permanently unmappable on the frame
 bridge, and `CoreServices.projects` exposes a provider-scoped read with no write. When the only writer
 lived inside the Linear plugin's browse pane, deleting that pane made the mapping unwritable and left

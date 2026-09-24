@@ -1,10 +1,10 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from './wire.ts'
 
 // agents.draftAttachments: read one unsent image attachment, and store an altered copy of it.
 //
 // The seam a plugin that edits an attachment reaches agents through (docs/managed-agents.md § Draft
-// attachments). A loaded plugin cannot call `/v2/p/agents/*` from its sandbox and should not be able
+// attachments). A loaded plugin cannot call `/v1/p/agents/*` from its sandbox and should not be able
 // to: cross-plugin route confinement is a security boundary, not an inconvenience. So the dependency is
 // declared instead, in `requires.plugins` and `permissions.node.capabilities`, where a person reading
 // the manifest at install time can see it.

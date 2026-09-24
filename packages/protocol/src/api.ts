@@ -194,6 +194,7 @@ export type ContextItem = {
   id: string
   kind: string
   label: string
+  providerId?: string // linked external item; stable filter key, unlike its display kind
   body?: string
   details?: string[]
   jump?: ContextPaneIntent
@@ -215,32 +216,27 @@ export type ContextSectionResult = {
 export type TaskContext = {
   task: { id: string; title: string; projectId: string; repo?: string; branch: string | null; worktreePath: string | null; pullNumber: number | null }
   sections: ContextSectionResult[]
-  pr?: { number: number; title: string; body: string | null; changedFiles: string[] }
-  issues: { provider: string; identifier: string; title: string; detail: string; cache: 'present' | 'missing' }[]
-  notes: { slug?: string; scope?: 'global' | 'workspace' | 'task'; title: string; body: string }[]
-
-  memory: { name: string; description: string }[]
 }
 export const taskContextRoute = (id: string, include?: TaskContextInclude[] | 'all') =>
-  `/v2/core/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
+  `/v1/core/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
 
 // Agent tools (docs/agent-tools.md): the registry projects to the harness HTTP surface below and to
 // the MCP server. The permissions page reads the static catalog and persists per-tier and per-tool
 // toggles as one prefs slice under this key (JSON `{ tiers?, tools? }`).
 export type ToolRisk = 'read' | 'write' | 'execute'
 export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
-export const agentToolsCatalogRoute = '/v2/core/agent-tools'
+export const agentToolsCatalogRoute = '/v1/core/agent-tools'
 export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string }
-export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
+export const rendererAgentToolRoute = (taskId: string, name: string) => `/v1/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
 
 // Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
 // run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
-export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
-export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
-export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
-export const runStopRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
-export const runStatusRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
+export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
+export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
+export const runStartRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
+export const runStopRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
+export const runStatusRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
 export type RepoConfigTrustReview = {
   taskId: string
@@ -249,36 +245,36 @@ export type RepoConfigTrustReview = {
   current: { hash: string; text: string; files: Array<{ path: string; content: string }> } | null
   previous: { hash: string; text: string; ackedAt: number } | null
 }
-export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId}/config-trust`
+export const repoConfigTrustRoute = (taskId: string) => `/v1/core/tasks/${taskId}/config-trust`
 
 
 
 
-export const taskStatusesRoute = '/v2/core/task-statuses'
-export const projectsRoute = '/v2/core/projects'
+export const taskStatusesRoute = '/v1/core/task-statuses'
+export const projectsRoute = '/v1/core/projects'
 export const projectRoute = (id: string) => `${projectsRoute}/${encodeURIComponent(id)}`
 export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
-export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
+export const taskArchiveRoute = (id: string) => `/v1/core/tasks/${id}/archive`
 // What every plugin has to say about archiving this task, asked once when the dialog opens
 // (node-core/server/pluginHost/taskChecks.ts).
-export const taskArchiveConcernsRoute = (id: string) => `/v2/core/tasks/${id}/archive-concerns`
-export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
-export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
-export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
-export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/starter`
+export const taskArchiveConcernsRoute = (id: string) => `/v1/core/tasks/${id}/archive-concerns`
+export const taskPreviewUrlRoute = (id: string) => `/v1/core/tasks/${id}/preview-url`
+export const taskOnCreatedRoute = (id: string) => `/v1/core/tasks/${id}/on-created`
+export const taskMcpRoute = (id: string) => `/v1/core/tasks/${id}/mcp`
+export const taskMcpStarterRoute = (id: string) => `/v1/core/tasks/${id}/mcp/starter`
 
 
-export const prefsRoute = '/v2/core/prefs'
+export const prefsRoute = '/v1/core/prefs'
 // Where every runtime that is not the node posts its telemetry (docs/telemetry.md § Other runtimes).
 // Device-only, because a record admitted here reaches every sink, and a sink can send it off the
 // machine.
-export const coreTelemetryRoute = '/v2/core/telemetry'
+export const coreTelemetryRoute = '/v1/core/telemetry'
 // What Settings → Telemetry draws: counters, never records (docs/telemetry.md § What the page
 // shows). Device-only, like the route above, and for a smaller reason: it names which plugins are
 // reading the stream, which is a fact about this machine's installation.
-export const coreTelemetrySummaryRoute = '/v2/core/telemetry/summary'
+export const coreTelemetrySummaryRoute = '/v1/core/telemetry/summary'
 
 /** The node's own account of what it has collected since it started.
  *
@@ -375,7 +371,6 @@ export type {
   PluginFrameSurface,
   PluginKeybindingDescriptor,
   PluginNodeStatDescriptor,
-  PluginPaletteDescriptor,
   PluginPaneRegion,
   PluginRefResolverDescriptor,
   PluginSlotDescriptor,
@@ -648,22 +643,22 @@ export type PluginUninstallResult = { restartRequired: boolean; dataPurged: bool
 // candidate-then-commit means a failed reload changed nothing and the previous instance still serves.
 export type PluginReloadResult = { id: string; version: string; state: 'reloaded' | 'failed'; reason?: string }
 
-export const corePluginsRoute = '/v2/core/plugins'
-export const corePluginInstallRoute = '/v2/core/plugins/install'
-export const corePluginRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}`
-export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/update`
-export const corePluginReloadRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/reload`
+export const corePluginsRoute = '/v1/core/plugins'
+export const corePluginInstallRoute = '/v1/core/plugins/install'
+export const corePluginRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}`
+export const corePluginUpdateRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/update`
+export const corePluginReloadRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/reload`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
 // an install route the agent can reach (client-core/host/frames/scopes.ts).
-export const corePluginRequestRoute = (requestId: string) => `/v2/core/plugins/requests/${encodeURIComponent(requestId)}`
+export const corePluginRequestRoute = (requestId: string) => `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
-export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/client.js`
+export const corePluginBundleRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/client.js`
 // Every client paired with a node, and the revoke for one of them. Device-only, like the plugin list:
 // this is node administration.
-export const coreDevicesRoute = '/v2/core/devices'
-export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
+export const coreDevicesRoute = '/v1/core/devices'
+export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
 
 // Settings → Security (docs/security.md § Audit, § Filesystem and backup).
 //
@@ -671,7 +666,7 @@ export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeU
 // where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count. A security
 // warning that cries wolf is worse than no warning.
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
-export const coreSecurityRoute = '/v2/core/security'
+export const coreSecurityRoute = '/v1/core/security'
 
 // Settings → Nodes: who this node is attached to, and the button that drops it
 // (docs/node-enrollment.md § Detaching). Device-only, like devices and plugins: an attachment is
@@ -684,7 +679,7 @@ export type NodeAttachmentState = {
   attachment: NodeAttachment | null
   error: { at: number; reason: string } | null
 }
-export const coreAttachmentRoute = '/v2/core/attachment'
+export const coreAttachmentRoute = '/v1/core/attachment'
 
 // Nodes this node's plugins know about (docs/plugins.md § Node providers). The client fans this out
 // over every reachable node and unions the answers, so a provider running on one node is visible from
@@ -693,9 +688,9 @@ export const coreAttachmentRoute = '/v2/core/attachment'
 // `enrollment.deviceToken` is deliberately absent from this projection. The adopt route below is the
 // only way to get one, it answers the host rather than the renderer, and that keeps "a device token
 // never reaches the renderer" true for the second door as well as the first.
-export const coreNodeProvidersRoute = '/v2/core/nodes'
-export const coreNodeAdoptRoute = '/v2/core/nodes/adopt'
-export const coreNodeLifecycleRoute = (verb: 'create' | 'destroy' | 'start' | 'stop') => `/v2/core/nodes/${verb}`
+export const coreNodeProvidersRoute = '/v1/core/nodes'
+export const coreNodeAdoptRoute = '/v1/core/nodes/adopt'
+export const coreNodeLifecycleRoute = (verb: 'create' | 'destroy' | 'start' | 'stop') => `/v1/core/nodes/${verb}`
 
 // The append-only audit trail. `details` is an allowlisted bag of scalars chosen per action: never a
 // request body, a credential, or a file's contents.
@@ -719,21 +714,21 @@ export type AuditVocabularyEntry = { action: string; label: string }
 // beside it, the two are always fetched together, and it is a few dozen short strings. Optional on the
 // wire because an older node's page will not carry it.
 export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary?: AuditVocabularyEntry[] }
-export const coreAuditRoute = '/v2/core/audit'
+export const coreAuditRoute = '/v1/core/audit'
 
-// `POST /v2/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the node's filesystem,
+// `POST /v1/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the node's filesystem,
 // which is why the client offers a native save dialog only for the local node. `excluded` is echoed
 // back and written into the archive's manifest, so "why is my GitHub token gone" is answered for
 // whoever restores it a year later.
 export type BackupResult = { path: string; bytes: number; files: string[]; excluded: string[] }
 export type BackupSuggestion = { suggestedPath: string }
-export const coreBackupRoute = '/v2/core/backup'
+export const coreBackupRoute = '/v1/core/backup'
 
 // Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live in
 // ./schedules.ts, which needs zod for the cadence parser. This module does not carry that dependency.
 //
 // A key contains a colon ('core:audit-prune'), so every builder below encodes it.
-export const schedulesRoute = '/v2/core/schedules'
+export const schedulesRoute = '/v1/core/schedules'
 export const scheduleRoute = (key: string) => `${schedulesRoute}/${encodeURIComponent(key)}`
 export const scheduleRunNowRoute = (key: string) => `${scheduleRoute(key)}/run`
 export const scheduleRunsRoute = (key: string) => `${scheduleRoute(key)}/runs`
@@ -751,29 +746,29 @@ export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/conf
 //
 // An empty series answers 200 with an empty array, never 404. Absence is data, and a panel given a
 // trend a minute ago has a cold state to render rather than an error to branch on.
-export const dashboardHistoryRoute = '/v2/core/dashboards/history'
+export const dashboardHistoryRoute = '/v1/core/dashboards/history'
 export type DashboardMeasureSample = { bucket: number; value: number }
 export type DashboardHistoryResponse = { signature: string; samples: DashboardMeasureSample[] }
 
 // Workspaces (named groups of Projects): the top-level unit.
-export const workspacesRoute = '/v2/core/workspaces'
-export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
-export const workspaceBootstrapRoute = '/v2/core/workspaces/bootstrap'
-export const workspaceExternalProjectsRoute = (id: string) => `/v2/core/workspaces/${id}/external-projects`
+export const workspacesRoute = '/v1/core/workspaces'
+export const workspaceRoute = (id: string) => `/v1/core/workspaces/${id}`
+export const workspaceBootstrapRoute = '/v1/core/workspaces/bootstrap'
+export const workspaceExternalProjectsRoute = (id: string) => `/v1/core/workspaces/${id}/external-projects`
 // Tasks (Project -> Task units of work): rail rows.
-export const tasksRoute = '/v2/core/tasks'
-export const taskRoute = (id: string) => `/v2/core/tasks/${id}`
-export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`
-export const integrationsRoute = '/v2/core/integrations'
-export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
-export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
-export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
-export const integrationMappingsRoute = (id: string) => `/v2/core/integrations/${id}/mappings`
+export const tasksRoute = '/v1/core/tasks'
+export const taskRoute = (id: string) => `/v1/core/tasks/${id}`
+export const taskLinksRoute = (id: string) => `/v1/core/tasks/${id}/links`
+export const integrationsRoute = '/v1/core/integrations'
+export const integrationRoute = (id: string) => `/v1/core/integrations/${id}`
+export const integrationTestRoute = (id: string) => `/v1/core/integrations/${id}/test`
+export const integrationProjectsRoute = (id: string) => `/v1/core/integrations/${id}/projects`
+export const integrationMappingsRoute = (id: string) => `/v1/core/integrations/${id}/mappings`
 // The read half of the model seam: every backend a Generate control can spend, which is every
 // connected key plus every agent CLI installed on this machine (./modelProviders.ts § ModelBackend).
-// Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v2/core/*` has no
+// Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v1/core/*` has no
 // bridge scope (docs/integrations.md § Model providers).
-export const modelBackendsRoute = '/v2/core/models/backends'
+export const modelBackendsRoute = '/v1/core/models/backends'
 
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and stop unrelated query data sharing keys.

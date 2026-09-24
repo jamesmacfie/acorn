@@ -3,7 +3,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { type DataSourceDescription, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { DashboardRevision } from '@acorn/protocol/dashboards.ts'
-import { projectDashboardPanel, type DashboardQueryProjection } from '@acorn/dashboards-core/typedProjection.ts'
+import { projectDashboardPanel, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { writeJson } from '../../infra/node/apiClient'
 import { Alert, Button, Card, EmptyState } from '../../kit/components/primitives'
@@ -34,11 +34,11 @@ export default function PublishedDashboardPanel(props: {
       const results: DashboardQueryProjection[] = []
       for (const entry of published.content.queries) {
         const resolved = await queriesClient(nodeId, scope()).resolve(entry.reference, {}, signal)
-        const description = await writeJson<DataSourceDescription>('/v2/core/data-sources/describe', {
+        const description = await writeJson<DataSourceDescription>('/v1/core/data-sources/describe', {
           method: 'POST', nodeId, signal, headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }),
         })
-        const result = await writeJson<DataSourceResult>('/v2/core/data-sources/query', {
+        const result = await writeJson<DataSourceResult>('/v1/core/data-sources/query', {
           method: 'POST', nodeId, signal, headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ operation: 'query', query: resolved.query, mode: 'execution', evaluationTime: Date.now(), pageSize: DATA_LIMITS.options }),
         })

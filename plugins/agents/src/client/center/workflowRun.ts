@@ -1,4 +1,4 @@
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 
 // The run behind a workflow-started session, read off the row.
 //

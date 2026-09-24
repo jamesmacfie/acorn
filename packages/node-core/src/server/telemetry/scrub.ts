@@ -10,7 +10,7 @@
 // path is still caught by the token pass.
 //
 // What this deliberately does not do is shorten every absolute path it sees. A route pattern
-// (`/v2/core/tasks/:id`), a channel name and a plugin namespace are all slash-shaped, and a
+// (`/v1/core/tasks/:id`), a channel name and a plugin namespace are all slash-shaped, and a
 // scrubber that collapsed them would make every log line and every span attribute unreadable to buy
 // nothing: the paths worth hiding are the owner's home directory and the data root, and those two
 // are named (docs/telemetry.md § What never leaves the machine).

@@ -60,14 +60,14 @@ describe('per-node cache partitioning', () => {
   it('hands back the same client and a per-node persister key for a given node', () => {
     expect(clientFor('node-a')).toBe(clientFor('node-a'))
     expect(clientFor('node-a').client).not.toBe(clientFor('node-b').client)
-    expect(cacheKeyFor('node-a')).toBe('acorn-cache:node-a')
+    expect(cacheKeyFor('node-a')).toBe('acorn-cache:acorn-1:node-a')
   })
 
   it('keeps the origin partition when there is no broker to name a node', () => {
     // `dev:node` in a browser: the serving origin is the node, so there is no nodeId, but the
     // persisted cache still needs a stable key.
     expect(activeCacheId()).toBe('origin')
-    expect(cacheKeyFor(activeCacheId())).toBe('acorn-cache:origin')
+    expect(cacheKeyFor(activeCacheId())).toBe('acorn-cache:acorn-1:origin')
   })
 })
 
@@ -161,7 +161,7 @@ describe('dropNode', () => {
     dropNode('remote')
 
     expect(client.getQueryData(['tasks'])).toBeUndefined()
-    expect(idb.del).toHaveBeenCalledWith('acorn-cache:remote')
+    expect(idb.del).toHaveBeenCalledWith('acorn-cache:acorn-1:remote')
     expect(nodes().map((node) => node.nodeId)).toEqual(['local-node'])
     expect(nodeState('remote')).toBe('offline')
     // A fresh client, not the cleared one: the removed node's cache is gone, not reusable.

@@ -8,7 +8,7 @@ import type {
   AgentWebAction,
   AgentWebActivity,
   AgentWebResult,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
@@ -65,7 +65,7 @@ export function codexGeneratedArtifact(notification: JsonRpcNotification): Agent
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
 // Codex's `webSearch` thread item, read into the provider-neutral shape
-// (@acorn/protocol/managedAgents.ts § AgentWebActivity). A live capture of both a search and a page
+// (@acorn/plugin-agents/contract/wire § AgentWebActivity). A live capture of both a search and a page
 // open is in ./__fixtures__/codexWebSearchWire.json, and it is why nothing here is read off
 // `item/started`: that notification carries an empty query and two nulls. Everything a card shows
 // arrives on `item/completed`, and the transcript's fold is what keeps the two as one card.

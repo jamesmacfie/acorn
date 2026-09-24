@@ -3,9 +3,22 @@ import { describe, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({ allRuns: vi.fn(), taskNavigation: vi.fn() }))
 vi.mock('../workflowsClient', () => ({ workflowApi: api }))
 
-const { taskHasWorkflowRuns, workflowRunCountsSchedule, workflowTaskGroups } = await import('./runStore')
+const { rememberWorkflowRun, taskHasWorkflowRuns, workflowRunCountsSchedule, workflowTaskGroups } = await import('./runStore')
 
 describe('workflow run navigation cache', () => {
+  it('exposes a known run before navigation and lets the next node read reconcile it', async () => {
+    expect(taskHasWorkflowRuns('recent-link')).toBe(false)
+    rememberWorkflowRun('recent-link')
+    expect(taskHasWorkflowRuns('recent-link')).toBe(true)
+    expect(taskHasWorkflowRuns('other-task')).toBe(false)
+
+    api.allRuns.mockResolvedValueOnce({ runs: [{ taskId: 'other-task' }] })
+    api.taskNavigation.mockResolvedValueOnce({ groups: [] })
+    await workflowRunCountsSchedule.run()
+    expect(taskHasWorkflowRuns('recent-link')).toBe(false)
+    expect(taskHasWorkflowRuns('other-task')).toBe(true)
+  })
+
   it('retains the last known run and group state while the node is unavailable', async () => {
     api.allRuns.mockResolvedValueOnce({ runs: [{ taskId: 'root' }] })
     api.taskNavigation.mockResolvedValueOnce({ groups: [{ rootTaskId: 'root', descendants: 2, running: 1, attention: 1 }] })

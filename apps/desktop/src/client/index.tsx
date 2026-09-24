@@ -1,6 +1,6 @@
 /* @refresh reload */
-import { reportResponsiveness } from '@acorn/client-core/infra/platform/index.ts'
-import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry/responsiveness.ts'
+import { reportResponsiveness } from '@acorn/client-core/infra/platform'
+import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
@@ -12,8 +12,8 @@ import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-co
 import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
-import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
-import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
+import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources'
+import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
 import { watchPluginChanges } from '@acorn/client-core/host/plugins/reload.ts'
 import { watchTaskChanges } from '@acorn/client-core/features/tasks/watchTaskChanges.ts'
 import { watchConnectionChanges } from '@acorn/client-core/features/integrations/watchConnectionChanges.ts'
@@ -22,7 +22,7 @@ import { watchWorkspaceChanges } from '@acorn/client-core/features/workspaces/wa
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const noop = () => null
 

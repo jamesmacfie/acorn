@@ -73,7 +73,7 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
 - the palette session has one fixture suite and both hosts are held to it.
-  `host/registries/commands/session.test.tsx` drives the session directly and asserts what the reader
+  `host/registries/commands/sessionStore.test.tsx` drives the session directly and asserts what the reader
   feels: what the empty root lists, what typing searches, what Enter does to a group, what Escape gives
   back, what happens when the thing you opened over moves. None of it mentions a dialog or a cell,
   which is the point — if either host needed a different answer to any of them, they would be two
@@ -177,7 +177,7 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   `apps/desktop/test/boot.test.ts` is for the shell: does `acorn`'s world come up. Against a fresh
   data root and a fresh config directory it runs the real path — a real standalone node started and
   supervised, the real fleet store and device-token files, the real broker over pinned TLS — and asks
-  what the renderer asks first: is there a node, does a `/v2` request reach it, did the event
+  what the renderer asks first: is there a node, does a `/v1` request reach it, did the event
   socket's upgrade authenticate. Then the three things only this host has to answer: a second `acorn`
   attaches rather than starting a second node, a token the node refuses reads as `revoked` and stops
   retrying, and quitting drains the child and releases the root's lock. The two boot tests are shaped
@@ -260,8 +260,8 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
 `apps/desktop/test/boot.test.ts` is the shell's loadability check: it catches "the shell
 cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
 which spawns the real `service.js` over the service protocol, then asks the helper the first two
-questions the renderer asks: which nodes are there, and can a `/v2` request reach one. A 200 from
-`/v2/node` means the pinned TLS connection came up and the device token authenticated, so one
+questions the renderer asks: which nodes are there, and can a `/v1` request reach one. A 200 from
+`/v1/node` means the pinned TLS connection came up and the device token authenticated, so one
 assertion covers the custody stack end to end. Two more check the gate: a socket without the secret
 is refused, and a plain HTTP request gets 426.
 

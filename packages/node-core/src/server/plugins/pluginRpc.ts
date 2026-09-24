@@ -14,7 +14,8 @@ type WireSyncRequest = { __acornRpc: 'sync-call'; functionId: number; args: unkn
 type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; status?: unknown; permission?: unknown; resource?: unknown }
 type WireRequestValue = { __acornRpc: 'request'; url: string; method: string; headers: [string, string][]; body: Uint8Array | null }
 type WireResponseValue = { __acornRpc: 'response'; status: number; statusText: string; headers: [string, string][]; body: Uint8Array }
-type WireAbortSignal = { __acornRpc: 'abort-signal'; aborted: boolean; reason?: unknown }
+type WireAbortSignal = { __acornRpc: 'abort-signal'; id?: number; aborted: boolean; reason?: unknown }
+type WireAbort = { __acornRpc: 'abort'; id: number; reason: unknown }
 
 type FunctionMode = (path: string, fn: (...args: never[]) => unknown) => 'sync' | 'async'
 
@@ -73,11 +74,14 @@ const errorFromWire = (wire: WireError): Error => {
 /** A small, symmetric RPC endpoint. It deliberately knows nothing about plugin permissions: the
  * object exported through it is already the owner- and permission-scoped context built by the host. */
 export class PluginRpcEndpoint {
-  readonly #functions = new Map<number, (...args: never[]) => unknown>()
-  readonly #pending = new Map<number, { resolve(value: unknown): void; reject(error: unknown): void }>()
+  readonly #functions = new Map<number, { fn: (...args: never[]) => unknown; path: string }>()
+  readonly #pending = new Map<number, { resolve(value: unknown): void; reject(error: unknown): void; signalIds: Set<number> }>()
   readonly #remoteFunctions = new Map<number, (...args: unknown[]) => unknown>()
+  readonly #localSignals = new Map<number, { signal: AbortSignal; listener: () => void; posted: boolean; sent: boolean }>()
+  readonly #remoteSignals = new Map<number, AbortController>()
   #nextFunctionId = 1
   #nextCallId = 1
+  #nextSignalId = 1
   readonly #port: MessagePort
   readonly #mode: FunctionMode
 
@@ -88,10 +92,10 @@ export class PluginRpcEndpoint {
     port.start()
   }
 
-  async encode(value: unknown, path = 'value'): Promise<unknown> {
+  async encode(value: unknown, path = 'value', signalIds?: Set<number>): Promise<unknown> {
     if (typeof value === 'function') {
       const id = this.#nextFunctionId++
-      this.#functions.set(id, value as (...args: never[]) => unknown)
+      this.#functions.set(id, { fn: value as (...args: never[]) => unknown, path })
       return { __acornRpc: 'function', id, sync: this.#mode(path, value as (...args: never[]) => unknown) === 'sync' } satisfies WireFunction
     }
     if (value instanceof Request) {
@@ -113,13 +117,22 @@ export class PluginRpcEndpoint {
       } satisfies WireResponseValue
     }
     if (value instanceof AbortSignal) {
+      // Async call arguments keep a listener until the reply. Other values carry only a snapshot.
+      const id = signalIds && !value.aborted ? this.#nextSignalId++ : undefined
+      if (id !== undefined) {
+        const listener = () => { this.#sendAbort(id) }
+        this.#localSignals.set(id, { signal: value, listener, posted: false, sent: false })
+        signalIds!.add(id)
+        value.addEventListener('abort', listener, { once: true })
+      }
       return {
         __acornRpc: 'abort-signal',
+        ...(id === undefined ? {} : { id }),
         aborted: value.aborted,
-        ...(value.aborted ? { reason: await this.encode(value.reason, `${path}.reason`) } : {}),
+        ...(value.aborted ? { reason: await this.encode(value.reason, `${path}.reason`, signalIds) } : {}),
       } satisfies WireAbortSignal
     }
-    if (Array.isArray(value)) return Promise.all(value.map((item, index) => this.encode(item, `${path}[${index}]`)))
+    if (Array.isArray(value)) return Promise.all(value.map((item, index) => this.encode(item, `${path}[${index}]`, signalIds)))
     if (!isRecord(value) || carriesItsOwnShape(value)) return value
 
     const out: Record<string, unknown> = {}
@@ -127,19 +140,19 @@ export class PluginRpcEndpoint {
     // fields from SecretService, for example, would put its encryption key on the wire.
     const prototype = Object.getPrototypeOf(value) as object | null
     if (prototype === Object.prototype || prototype === null) {
-      for (const [key, item] of Object.entries(value)) out[key] = await this.encode(item, `${path}.${key}`)
+      for (const [key, item] of Object.entries(value)) out[key] = await this.encode(item, `${path}.${key}`, signalIds)
       return out
     }
     for (const key of Object.getOwnPropertyNames(prototype)) {
       if (key === 'constructor') continue
       const item = (value as Record<string, unknown>)[key]
-      if (typeof item === 'function') out[key] = await this.encode(item.bind(value), `${path}.${key}`)
+      if (typeof item === 'function') out[key] = await this.encode(item.bind(value), `${path}.${key}`, signalIds)
     }
     return out
   }
 
-  decode(value: unknown, path = 'value'): unknown {
-    if (Array.isArray(value)) return value.map((item, index) => this.decode(item, `${path}[${index}]`))
+  decode(value: unknown, path = 'value', signalIds?: Set<number>): unknown {
+    if (Array.isArray(value)) return value.map((item, index) => this.decode(item, `${path}[${index}]`, signalIds))
     if (!isRecord(value) || carriesItsOwnShape(value)) return value
     if (value.__acornRpc === 'function') {
       const wire = value as WireFunction
@@ -162,25 +175,73 @@ export class PluginRpcEndpoint {
     }
     if (value.__acornRpc === 'abort-signal') {
       const wire = value as WireAbortSignal
-      return wire.aborted ? AbortSignal.abort(this.decode(wire.reason, `${path}.reason`)) : new AbortController().signal
+      if (wire.aborted) return AbortSignal.abort(this.decode(wire.reason, `${path}.reason`, signalIds))
+      const controller = new AbortController()
+      if (wire.id !== undefined) {
+        this.#remoteSignals.set(wire.id, controller)
+        signalIds?.add(wire.id)
+      }
+      return controller.signal
     }
     const out: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value)) out[key] = this.decode(item, `${path}.${key}`)
+    for (const [key, item] of Object.entries(value)) out[key] = this.decode(item, `${path}.${key}`, signalIds)
     return out
   }
 
   async call(functionId: number, args: unknown[], path = 'call'): Promise<unknown> {
     const callId = this.#nextCallId++
-    const encoded = await this.encode(args, `${path}.args`) as unknown[]
+    const signalIds = new Set<number>()
+    let encoded: unknown[]
+    try {
+      encoded = await this.encode(args, `${path}.args`, signalIds) as unknown[]
+    } catch (error) {
+      this.#clearLocalSignals(signalIds)
+      throw error
+    }
     return new Promise((resolve, reject) => {
-      this.#pending.set(callId, { resolve, reject })
-      this.#port.postMessage({ __acornRpc: 'call', callId, functionId, args: encoded } satisfies WireRequest)
+      this.#pending.set(callId, { resolve, reject, signalIds })
+      try {
+        this.#port.postMessage({ __acornRpc: 'call', callId, functionId, args: encoded } satisfies WireRequest)
+      } catch (error) {
+        this.#pending.delete(callId)
+        this.#clearLocalSignals(signalIds)
+        reject(error)
+        return
+      }
+      for (const id of signalIds) {
+        const tracked = this.#localSignals.get(id)
+        if (!tracked) continue
+        tracked.posted = true
+        if (tracked.signal.aborted) this.#sendAbort(id)
+      }
     })
   }
 
+  #sendAbort(id: number): void {
+    const tracked = this.#localSignals.get(id)
+    if (!tracked?.posted || tracked.sent || !tracked.signal.aborted) return
+    tracked.sent = true
+    void this.encode(tracked.signal.reason, 'abort.reason').then((reason) => {
+      if (this.#localSignals.has(id)) this.#port.postMessage({ __acornRpc: 'abort', id, reason } satisfies WireAbort)
+    }).catch(() => {})
+  }
+
+  #clearLocalSignals(ids: Set<number>): void {
+    for (const id of ids) {
+      const tracked = this.#localSignals.get(id)
+      if (!tracked) continue
+      tracked.signal.removeEventListener('abort', tracked.listener)
+      this.#localSignals.delete(id)
+    }
+  }
+
   close(error: Error): void {
-    for (const pending of this.#pending.values()) pending.reject(error)
+    for (const pending of this.#pending.values()) {
+      this.#clearLocalSignals(pending.signalIds)
+      pending.reject(error)
+    }
     this.#pending.clear()
+    this.#remoteSignals.clear()
     this.#functions.clear()
     this.#remoteFunctions.clear()
     this.#port.close()
@@ -210,7 +271,7 @@ export class PluginRpcEndpoint {
   #encodeSync(value: unknown, path: string): unknown {
     if (typeof value === 'function') {
       const id = this.#nextFunctionId++
-      this.#functions.set(id, value as (...args: never[]) => unknown)
+      this.#functions.set(id, { fn: value as (...args: never[]) => unknown, path })
       return { __acornRpc: 'function', id, sync: this.#mode(path, value as (...args: never[]) => unknown) === 'sync' } satisfies WireFunction
     }
     if (Array.isArray(value)) return value.map((item, index) => this.#encodeSync(item, `${path}[${index}]`))
@@ -221,6 +282,11 @@ export class PluginRpcEndpoint {
   }
 
   #enqueue(message: unknown): void {
+    if (isRecord(message) && message.__acornRpc === 'abort') {
+      const wire = message as WireAbort
+      this.#remoteSignals.get(wire.id)?.abort(this.decode(wire.reason, 'abort.reason'))
+      return
+    }
     if (isRecord(message) && message.__acornRpc === 'result') {
       this.#settle(message as WireResponse)
       return
@@ -245,13 +311,16 @@ export class PluginRpcEndpoint {
     if (!isRecord(message)) return
     if (message.__acornRpc === 'call') {
       const request = message as WireRequest
+      const signalIds = new Set<number>()
       try {
-        const fn = this.#functions.get(request.functionId)
-        if (!fn) throw new Error(`Unknown plugin RPC function ${request.functionId}.`)
-        const value = await fn(...this.decode(request.args, 'remote.args') as never[])
+        const entry = this.#functions.get(request.functionId)
+        if (!entry) throw new Error(`Unknown plugin RPC function ${request.functionId}.`)
+        const value = await entry.fn(...this.decode(request.args, 'remote.args', signalIds) as never[])
         this.#port.postMessage({ __acornRpc: 'result', callId: request.callId, ok: true, value: await this.encode(value, 'remote.result') } satisfies WireResponse)
       } catch (error) {
         this.#port.postMessage({ __acornRpc: 'result', callId: request.callId, ok: false, value: errorToWire(error) } satisfies WireResponse)
+      } finally {
+        for (const id of signalIds) this.#remoteSignals.delete(id)
       }
       return
     }
@@ -267,11 +336,11 @@ export class PluginRpcEndpoint {
   #answerSync(request: WireSyncRequest): void {
     let payload: { ok: boolean; value: unknown }
     try {
-      const fn = this.#functions.get(request.functionId)
-      if (!fn) throw new Error(`Unknown plugin RPC function ${request.functionId}.`)
-      const value = fn(...this.decode(request.args, 'remote.sync.args') as never[])
+      const entry = this.#functions.get(request.functionId)
+      if (!entry) throw new Error(`Unknown plugin RPC function ${request.functionId}.`)
+      const value = entry.fn(...this.decode(request.args, 'remote.sync.args') as never[])
       if (value instanceof Promise) throw new Error('An asynchronous plugin callback crossed a synchronous RPC seam.')
-      payload = { ok: true, value: this.#encodeSync(value, 'remote.sync.result') }
+      payload = { ok: true, value: this.#encodeSync(value, `${entry.path}.result`) }
     } catch (error) {
       payload = { ok: false, value: errorToWire(error) }
     }
@@ -293,6 +362,7 @@ export class PluginRpcEndpoint {
     const pending = this.#pending.get(response.callId)
     if (!pending) return
     this.#pending.delete(response.callId)
+    this.#clearLocalSignals(pending.signalIds)
     const value = this.decode(response.value, 'remote.result')
     if (response.ok) pending.resolve(value)
     else pending.reject(value)

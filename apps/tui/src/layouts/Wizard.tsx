@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
-import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
+import type { LayoutProps } from '@acorn/client-core/host/layouts'
 import { Button } from '../kit/asking'
 import { Line } from '../kit/cells'
 import { Panel } from '../panel'

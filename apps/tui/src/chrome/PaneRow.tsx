@@ -1,9 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createComponent, ErrorBoundary, Show, Suspense } from 'solid-js'
+import { createComponent, createEffect, ErrorBoundary, Show, Suspense, type Accessor } from 'solid-js'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import { Tabs } from '../kit/grouping'
 import { Line } from '../kit/cells'
 import { Alert, EmptyState } from '../kit/showing'
+import { nodeRecoveryCount } from './nodeState'
 import { panesFor, showPane, shownPane } from './panes'
 
 // The pane row: one line of pane labels, and the pane under it.
@@ -42,7 +43,19 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
 // pane, as on the DOM, drawn as an `Alert` in `warn` tone: a pane that throws is one pane with a
 // message in it, not a blank terminal (docs/tui.md § Unknown nodes and failed
 // trees). `ContributionBoundary` itself is not reused — its fallback is `<section>` and `<strong>`.
-export function PaneBody(props: { task: Task }) {
+export function resetPaneAfterRecovery(recovery: Accessor<number>, reset: () => void): void {
+  const failedAt = recovery()
+  createEffect(() => {
+    if (recovery() > failedAt) reset()
+  })
+}
+
+function PaneFailure(props: { error: unknown; nodeId: string; reset: () => void; paneId: string }) {
+  resetPaneAfterRecovery(() => nodeRecoveryCount(props.nodeId), props.reset)
+  return <Alert tone="warn" title={props.paneId}>{props.error instanceof Error ? props.error.message : String(props.error)}</Alert>
+}
+
+export function PaneBody(props: { task: Task; nodeId: string }) {
   const shown = () => shownPane(props.task)
   return (
     <Show
@@ -60,8 +73,8 @@ export function PaneBody(props: { task: Task }) {
           draws at all. */}
       {(pane) => (
         <box flexDirection="column" flexGrow={1} overflow="hidden">
-          <ErrorBoundary fallback={(error) => (
-            <Alert tone="warn" title={pane().id}>{error instanceof Error ? error.message : String(error)}</Alert>
+          <ErrorBoundary fallback={(error, reset) => (
+            <PaneFailure error={error} nodeId={props.nodeId} reset={reset} paneId={pane().id} />
           )}>
             {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
                 set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to

@@ -12,8 +12,8 @@
 //
 // A suite that asserts the assembled mount table must not use this: it runs `initPlugins` over the
 // real plugin list, which is where the provider routers come from now.
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
 import { githubProvider } from '@acorn/plugin-github/testkit'
 import { createLinearFetch } from '@acorn/plugin-linear/testkit'
 import { linearProvider } from '@acorn/plugin-linear/testkit'

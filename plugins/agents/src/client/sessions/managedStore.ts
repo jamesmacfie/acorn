@@ -1,6 +1,7 @@
 import { agentTelemetry } from './agentTelemetry'
 import { batch, createEffect, createRoot, createSignal } from 'solid-js'
-import { activeNodeId, createLogger, describeError, fromManagedSession, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import { activeNodeId, createLogger, describeError, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import { fromManagedSession } from '../../contract/attention'
 import { wsOnAgentFrame } from './wsChannel'
 import type {
   AgentEventRecord,
@@ -10,7 +11,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
   AgentWsFrame,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'

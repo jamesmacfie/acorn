@@ -24,14 +24,14 @@ type ManifestTool = { name: string; description: string; inputSchema: Record<str
 // → empty list (a plain terminal shows no acorn tools; they appear once a task session connects).
 async function fetchManifest(): Promise<ManifestTool[]> {
   if (!TASK_ID) return []
-  const res = await apiGet(`/v2/core/tasks/${TASK_ID}/tools`)
+  const res = await apiGet(`/v1/core/tasks/${TASK_ID}/tools`)
   if (!res.ok) return []
   return ((res.data as { tools?: ManifestTool[] }).tools ?? []).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
 }
 
 export function buildServer(): Server {
   const server = new Server(
-    { name: process.env.ACORN_MCP_NAME ?? 'acorn', version: '0.1.0' },
+    { name: process.env.ACORN_MCP_NAME ?? 'acorn', version: '1.0.0' },
     { capabilities: { tools: { listChanged: true } } },
   )
 
@@ -46,7 +46,7 @@ export function buildServer(): Server {
     const callId = randomUUID()
     const res = await apiSend(
       'POST',
-      `/v2/core/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`,
+      `/v1/core/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`,
       req.params.arguments ?? {},
       { callId },
     )

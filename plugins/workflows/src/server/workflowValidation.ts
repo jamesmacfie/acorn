@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowDataProblems } from './workflowDataValidation'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
@@ -185,7 +186,7 @@ function budgetNarrows(parent: WorkflowBudget | undefined, child: WorkflowBudget
 
 export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCatalog): string[] {
   const errors: string[] = []
-  if (def.formatVersion !== 2) errors.push('Unsupported workflow format. Set formatVersion to 2 and give every step a stable id.')
+  if (def.formatVersion !== 1 || def.baseline !== ACORN_BASELINE) errors.push(`Incompatible workflow. Set formatVersion to 1 and baseline to ${ACORN_BASELINE}.`)
   if (!def.name?.trim()) errors.push('workflow has no name')
   if (!Array.isArray(def.steps) || !def.steps.length) return [...errors, 'workflow has no steps']
   errors.push(...workflowValueProblems(def))

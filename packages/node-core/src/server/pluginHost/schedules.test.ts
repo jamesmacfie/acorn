@@ -62,7 +62,7 @@ describe('plugin schedules', () => {
   const declared: PluginScheduleDescriptor = {
     id: 'refresh',
     name: 'Refresh the mirror',
-    run: `/v2/p/${PLUGIN}/schedules/refresh`,
+    run: `/v1/p/${PLUGIN}/schedules/refresh`,
     cadence: { every: 3600 },
     timeout: 120,
   }

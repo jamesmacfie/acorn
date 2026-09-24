@@ -344,12 +344,12 @@ treated as a new grant. Plugin API major 12 marks that contract; major 13 remove
 client-fetched collection contribution in favour of Node-owned typed data sources.
 
 Memory remains compiled because it owns trusted approval and writes knowledge files. It contributes
-review validation, completion callbacks, and legacy proposal contents through public Findings
-extension points. Findings has no Memory capability, route grant, process execution, network access,
-secret access, or raw legacy-directory access.
+review validation and completion callbacks through the Findings review-target extension point. Its
+agent tool submits proposals through a host-verified Findings adapter. Findings has no Memory
+capability, route grant, process execution, network access, or secret access.
 
 `apps/node/test/integration/plugins/findings.test.ts` starts from a populated database written through
 the compiled path. It then loads the built package and checks observation IDs, candidate revisions,
-dismissal actions, migration mappings, tools, context, and an independently installed producer. The
+dismissal actions, tools, context, and an independently installed producer. The
 same test covers package updates, disable and re-enable, uninstall and reinstall without purge, and a
 failed migration that leaves the data readable after the package is repaired.

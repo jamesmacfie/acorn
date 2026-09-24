@@ -31,7 +31,7 @@ beforeEach(async () => {
     userId: 'james',
     provider: 'linear',
     label: 'Linear – work',
-    authRef: 'SUPER-SECRET-CIPHERTEXT',
+    encryptedCredentials: 'SUPER-SECRET-CIPHERTEXT',
     authKind: 'api-key',
     account: null,
     scopes: '[]',
@@ -117,8 +117,8 @@ describe('createBackup', () => {
     try {
       const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
       // Blanked rather than deleted (docs/data-layer.md § Backup and import).
-      expect(core.prepare('SELECT access_token, label FROM integrations').all()).toEqual([
-        { access_token: '', label: 'Linear – work' },
+      expect(core.prepare('SELECT encrypted_credentials, label FROM integrations').all()).toEqual([
+        { encrypted_credentials: '', label: 'Linear – work' },
       ])
       // Deleted outright: a device row IS its credential's public half, and a restored node must re-pair.
       expect(core.prepare('SELECT count(*) AS n FROM devices').get()).toEqual({ n: 0 })

@@ -6,16 +6,16 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
-import { DEV_BUILD_MARKER, reconcileBundledPlugins } from '@acorn/node-core/server/plugins/bundled.ts'
-import { markPluginUserManaged, readBundledPluginState } from '@acorn/node-core/server/plugins/bundledState.ts'
-import { loadExternalPlugins } from '@acorn/node-core/server/plugins/loader.ts'
-import { pluginDir } from '@acorn/node-core/server/plugins/installer.ts'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
+import { DEV_BUILD_MARKER, reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
+import { markPluginUserManaged, readBundledPluginState } from '@acorn/node-core/server/plugins'
+import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
+import { pluginDir } from '@acorn/node-core/server/plugins'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { pluginState } from '@acorn/node-core/server/pluginHost/state.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { pluginState } from '@acorn/node-core/server/pluginHost'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { assembleNodeGraph } from '../../../src/composition/composition'
 import { buildPluginStateBridge } from '../../../src/composition/pluginState'
@@ -32,7 +32,7 @@ async function seedRailScope(db: AppDatabase): Promise<void> {
   const now = 1
   await db.insert(schema.integrations).values({
     id: 'rollbar-production', userId: 'dogfood-user', provider: 'rollbar', label: 'Production',
-    authRef: 'sealed', authKind: 'api-key', createdAt: now, updatedAt: now,
+    encryptedCredentials: 'sealed', authKind: 'api-key', createdAt: now, updatedAt: now,
   })
   await db.insert(schema.workspaces).values({ id: 'dogfood-workspace', name: 'Dogfood', createdAt: now, updatedAt: now })
   await db.insert(schema.projects).values({
@@ -78,7 +78,7 @@ describe('loading rollbar from disk', () => {
       expect(installed[0]?.client?.bytes).toBeGreaterThan(1_000)
       expect(installed[0]?.manifest.contributions).toMatchObject({
         frames: [{ target: 'pane', id: 'rollbar' }, { target: 'pane', id: 'rollbar-item', scope: 'project' }],
-        sources: [{ id: 'rollbar-items', items: '/v2/p/rollbar/rail-items' }],
+        sources: [{ id: 'rollbar-items', items: '/v1/p/rollbar/rail-items' }],
       })
 
       plugins = await initPlugins([loaded[0].plugin], {

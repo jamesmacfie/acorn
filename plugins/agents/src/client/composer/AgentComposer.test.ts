@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentController, AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
+import type { AgentController, AgentRuntimeState } from '../../contract/wire.ts'
 import {
   agentComposerDisabledMessage,
   agentSessionIsStarting,

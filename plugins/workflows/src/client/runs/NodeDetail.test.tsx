@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
 import { provideClientCapability, type Disposable } from '@acorn/plugin-api/testkit/client'
 import { AGENTS_CONVERSATION, type AgentConversationProps } from '@acorn/plugin-agents/contract/conversation.ts'
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '../../contract/wire.ts'
 import type { RunPaneModel } from './runPaneModel'
 
 // Which controls a node offers is the pane's whole promise: a stale button is a race, not a bug

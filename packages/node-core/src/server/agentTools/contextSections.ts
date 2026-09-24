@@ -16,8 +16,6 @@ type ContextDraft = {
   // A descriptor may carry already-formatted reference text. Compiled contributions normally leave
   // this absent and use their pure `format` function below.
   compact?: string
-  // Kept separate from canonical `items` (docs/agent-tools.md § Context sections).
-  compatibility?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
   absent?: ContextSectionResult['absent']
   // A loaded section may have truncated at its own data source before the host sees its bounded list.
   // Core adds this to anything omitted by the registry budget.
@@ -80,20 +78,6 @@ function applyBudget(items: ContextItem[], budget: ContextBudget): { items: Cont
   }
 }
 
-function budgetCompatibilityProjection(
-  compatibility: ContextDraft['compatibility'],
-  budget: ContextBudget,
-): ContextDraft['compatibility'] {
-  if (!compatibility) return undefined
-  const limit = budget.maxItems ?? Number.POSITIVE_INFINITY
-  const result: NonNullable<ContextDraft['compatibility']> = {}
-  if (compatibility.pr) result.pr = budget.maxBytesPerItem ? { ...compatibility.pr, body: compatibility.pr.body == null ? null : truncateBytes(compatibility.pr.body, budget.maxBytesPerItem) } : compatibility.pr
-  if (compatibility.issues) result.issues = compatibility.issues.slice(0, limit)
-  if (compatibility.notes) result.notes = compatibility.notes.slice(0, limit).map((note) => ({ ...note, body: budget.maxBytesPerItem ? truncateBytes(note.body, budget.maxBytesPerItem) : note.body }))
-  if (compatibility.memory) result.memory = compatibility.memory.slice(0, limit)
-  return result
-}
-
 export const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
 // Invariant: a section's `compact` must be computed independently of which other sections are
@@ -117,7 +101,6 @@ export const linkedIssuesSection: ContextSectionContribution = {
     const links = (await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))).sort(
       (a, b) => a.provider.localeCompare(b.provider) || a.createdAt - b.createdAt,
     )
-    const issues: TaskContext['issues'] = []
     const items: ContextItem[] = []
     const providerCounts = new Map<string, number>()
     let missing = 0
@@ -145,13 +128,10 @@ export const linkedIssuesSection: ContextSectionContribution = {
         label: link.identifier,
         details: [`Cache: ${state}`],
       }
-      items.push(item)
-      const title = item.label.includes(' — ') ? item.label.slice(item.label.indexOf(' — ') + 3) : link.identifier
-      issues.push({ provider: link.provider, identifier: link.identifier, title, detail: item.details?.[0] ?? '', cache: parsed?.ok ? 'present' : 'missing' })
+      items.push({ ...item, providerId: link.provider })
     }
     return {
       items,
-      compatibility: { issues },
       absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
     }
   },
@@ -236,9 +216,6 @@ export async function assembleContext(
   const ctx: TaskContext = {
     task: { id: task.id, title: task.title, projectId, repo: repo || undefined, branch: task.branch, worktreePath: task.worktreePath, pullNumber: task.pullNumber },
     sections: [],
-    issues: [],
-    notes: [],
-    memory: [],
   }
   // Budget shaping and PII stripping, as somebody else's plugin (server/pluginHost/hooks.ts,
   // docs/plugins.md § Hooks). What is offered is which sections are in, as names: a handler can drop
@@ -270,9 +247,7 @@ export async function assembleContext(
     }
     const budgeted = applyBudget(draft.items, contribution.budget)
     const omitted = budgeted.omitted + (draft.omitted ?? 0)
-    const compatibility = budgetCompatibilityProjection(draft.compatibility, contribution.budget)
-    if (compatibility) Object.assign(ctx, compatibility)
-    const items = budgeted.items.map((item) => ({ ...item, jump: contribution.jump?.(item) }))
+    const items = budgeted.items.map((item) => ({ ...item, jump: contribution.jump?.(item) ?? item.jump }))
     const rawCompact = draft.compact ?? contribution.format(items, omitted, draft.absent)
     const sectionBytes = Math.min(contribution.maxBytes ?? remainingBytes, remainingBytes)
     const sectionTokens = Math.min(contribution.maxTokens ?? remainingTokens, remainingTokens)

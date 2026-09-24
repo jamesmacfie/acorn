@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { For, onCleanup } from 'solid-js'
-import { activeToasts, dismissToast, type Toast } from '@acorn/client-core/features/notifications/toast.ts'
+import { activeToasts, dismissToast, type Toast } from '@acorn/client-core/features/notifications'
 import { Alert } from '../kit/showing'
 
 // Transient feedback, one line each, above the footer.

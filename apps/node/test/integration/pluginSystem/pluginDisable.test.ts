@@ -2,18 +2,18 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { pluginRouteContributions } from '@acorn/node-core/server/routeRegistry.ts'
-import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
-import { getContextSections } from '@acorn/node-core/server/agentTools/contextSections.ts'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
-import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
+import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
+import { agentToolContributions } from '@acorn/node-core/server/agentTools'
+import { getContextSections } from '@acorn/node-core/server/agentTools'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
+import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders'
 import type { PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { SecretService } from '@acorn/node-core/server/core/index.ts'
-import { nodePlugins } from '../../../src/composition/plugins'
+import { nodePlugins, type NodePluginDeps } from '../../../src/composition/plugins'
 import { readGolden, writeGolden } from '../../helpers/golden'
 
 // Stubs, not fakes, because nothing here runs during init. The test is which contributions land, and
@@ -22,22 +22,18 @@ const buildPlugins = (dataDir: string) =>
   nodePlugins(dataDir, {
     agents: {
       internalEnv: () => ({}),
-      memoryReviewTrigger: async () => undefined,
+      reconciled: Promise.resolve(),
     },
     notes: { internalEnv: () => ({}) },
     terminal: {
       internalEnv: () => ({}),
-      launchInjector: async () => undefined,
-      memoryReviewTrigger: async () => undefined,
       reconciled: Promise.resolve(),
     },
     workflows: {
       internalEnv: () => ({}),
       reconciled: Promise.resolve(),
-      memoryReviewTrigger: async () => undefined,
-      failingChecks: async () => null,
     },
-  } as never)
+  } satisfies NodePluginDeps)
 
 // Every registry a node plugin can write to. For why connection and integration are separate lists,
 // see docs/integrations.md § Connection and integration contributions. github is the only

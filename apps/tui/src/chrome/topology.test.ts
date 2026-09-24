@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setActiveTaskId, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
-import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
+import type { Disposable } from '@acorn/client-core/kit/lib'
 import { BROWSE, MENU, PANES, SOURCE, TASKS, topology } from './topology'
 
 // The shell's answers to the three questions the keys module cannot answer for itself.

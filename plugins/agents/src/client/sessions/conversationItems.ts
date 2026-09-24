@@ -6,7 +6,7 @@ import type {
   AgentToolCall,
   AgentUsage,
   AgentWebActivity,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
 // replayed page, an older node, or a subagent's roster usage folds the way it always did.

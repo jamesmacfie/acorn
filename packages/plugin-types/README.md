@@ -40,8 +40,9 @@ your manifest at it and every contribution array is validated as you type:
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "my-widget",
   "name": "My widget",
-  "version": "0.1.0",
-  "apiVersion": "13"
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "1"
 }
 ```
 

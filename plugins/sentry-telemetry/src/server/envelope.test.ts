@@ -7,7 +7,7 @@ const TRACE = 'a'.repeat(32)
 const OTHER_TRACE = 'b'.repeat(32)
 const hex16 = (seed: string) => seed.repeat(16).slice(0, 16)
 
-const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '0.1.0', records })
+const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '1.0.0', records })
 
 // Ids are the one thing a test cannot match, so it supplies them: `id-1`, `id-2`, in call order.
 const options = (overrides: Partial<EnvelopeOptions> = {}): EnvelopeOptions => {
@@ -15,7 +15,7 @@ const options = (overrides: Partial<EnvelopeOptions> = {}): EnvelopeOptions => {
   return {
     settings: DEFAULT_SETTINGS,
     environment: 'development',
-    release: 'acorn@0.1.0',
+    release: 'acorn@1.0.0',
     newId: () => `id-${(next += 1)}`,
     ...overrides,
   }
@@ -31,7 +31,7 @@ const span = (
   start: 1_700_000_000_000,
   durationMs: 250,
   status: 'ok',
-  attrs: { owner: 'core', runtime: 'node', seam: 'http.request', route: '/v2/core/tasks/:id' },
+  attrs: { owner: 'core', runtime: 'node', seam: 'http.request', route: '/v1/core/tasks/:id' },
   ...over,
 })
 
@@ -68,7 +68,7 @@ describe('errors', () => {
       logger: 'github',
       server_name: 'node-1',
       environment: 'development',
-      release: 'acorn@0.1.0',
+      release: 'acorn@1.0.0',
       contexts: { trace: { trace_id: TRACE, span_id: hex16('1') } },
       tags: { owner: 'github', runtime: 'node', 'task.id': 'task-7' },
     })
@@ -166,9 +166,9 @@ describe('spans', () => {
   })
 
   it('never exports successful telemetry and preference request spans', () => {
-    const telemetry = span({ name: 'http.request', durationMs: 5_000, attrs: { route: '/v2/core/telemetry' } })
-    const prefs = span({ spanId: hex16('2'), name: 'http.request', durationMs: 5_000, attrs: { route: '/v2/core/prefs' } })
-    const failed = span({ spanId: hex16('3'), name: 'http.request', status: 'error', attrs: { route: '/v2/core/telemetry' } })
+    const telemetry = span({ name: 'http.request', durationMs: 5_000, attrs: { route: '/v1/core/telemetry' } })
+    const prefs = span({ spanId: hex16('2'), name: 'http.request', durationMs: 5_000, attrs: { route: '/v1/core/prefs' } })
+    const failed = span({ spanId: hex16('3'), name: 'http.request', status: 'error', attrs: { route: '/v1/core/telemetry' } })
     expect(sentrySpans([telemetry, prefs, failed] as never)).toEqual([failed])
   })
 })

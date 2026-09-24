@@ -15,9 +15,9 @@ Settings → Integrations lists provider descriptors and connection state. A con
 replaced, tested, disabled, enabled, or deleted. Secret fields are write-only, so the client receives
 presence, health, scopes, and account metadata instead of plaintext.
 
-Provider routes are projected under `/v2/p/<provider>/...` and are protected from task-scoped internal
+Provider routes are projected under `/v1/p/<provider>/...` and are protected from task-scoped internal
 callers by the provider-access gate. The generic administration routes are under
-`/v2/core/integrations`.
+`/v1/core/integrations`.
 
 Built-in providers may contribute a Hono router. Loaded providers must contribute the portable fetch
 carrier instead; the host rejects a live Hono instance from that tier. Both carriers pass through the
@@ -51,7 +51,7 @@ the login. `name` is what the owner typed in Settings, and is null until they ty
 
 Show a connection with `connectionName` from `protocol/integrations.ts`, which reads the name and
 falls back to the label. Nothing reads either field on its own to put a connection in front of
-someone. `PATCH /v2/core/integrations/:id` carries the rename, and sending `name: null` clears it back
+someone. `PATCH /v1/core/integrations/:id` carries the rename, and sending `name: null` clears it back
 to the label.
 
 The two are separate columns rather than one editable field for two reasons. A rotate rewrites
@@ -109,7 +109,7 @@ contract, see [agent tools](./agent-tools.md) § issue_detail.
 A provider may declare a `projects` source on its connection contribution: given a connection and its
 unsealed credential, list the projects that connection offers as `{ id, label }`. It exists so core's
 own project map can ask every provider the same question without knowing which provider it
-is asking, and it is served on a core route, `GET /v2/core/integrations/:id/projects`.
+is asking, and it is served on a core route, `GET /v1/core/integrations/:id/projects`.
 
 Declaring it is optional and its absence is the answer rather than an error: a provider with nothing
 to enumerate never appears in the picker. The public descriptor carries `supportsProjects`, derived
@@ -139,9 +139,9 @@ nullable column and this key is what stops a link being stored twice.
 
 It is edited from the connection, in Settings → Integrations, not from a workspace at a time: one
 Linear or Rollbar connection usually serves every workspace on the machine, so its whole map reads
-better in one place. `GET` and `PUT /v2/core/integrations/:id/mappings` carry it. The write replaces
+better in one place. `GET` and `PUT /v1/core/integrations/:id/mappings` carry it. The write replaces
 every row that connection owns, across all workspaces, which is what keeps a sibling connection's
-rows out of it without anyone having to merge. `PUT /v2/core/workspaces/:id/external-projects` is the
+rows out of it without anyone having to merge. `PUT /v1/core/workspaces/:id/external-projects` is the
 same table from the other side, still there for a plugin replacing its own provider's slice.
 
 Neither route is reachable from a plugin frame. Both spend nothing and read nothing outbound, but the
@@ -276,8 +276,8 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
 | Command | Route | Rows |
 | --- | --- | --- |
-| Linear: find an issue | `/v2/p/linear/palette/issues` | active issues in the Linear projects the routed project's workspace links |
-| Rollbar: find an item | `/v2/p/rollbar/palette/issues` | active items in the connections the routed project's workspace maps |
+| Linear: find an issue | `/v1/p/linear/palette/issues` | active issues in the Linear projects the routed project's workspace links |
+| Rollbar: find an item | `/v1/p/rollbar/palette/issues` | active items in the connections the routed project's workspace maps |
 
 Each route is given two things and nothing else: `projectId`, the project the palette session
 captured, and `q`, the typed text. Neither the manifest nor a previous answer writes either one.
@@ -364,7 +364,7 @@ stored a key for, or an agent CLI installed on this machine. `ModelBackend` in
 flat: an id, a kind of `connection` or `harness`, a label, an optional glyph, a model catalog that may
 be empty, and a default model id that may be `''`. A connection's auth kind, scopes, account and
 timestamps do not cross it, because no consumer reads them and a harness has none of them. A caller
-that wants the connection row itself still has `/v2/core/integrations`.
+that wants the connection row itself still has `/v1/core/integrations`.
 
 A CLI is not a synthesized connection, and that is the decision the rest of this section follows
 from. `generateTextForConnection` reads a database row, checks its status, reveals its secret and
@@ -382,22 +382,22 @@ or Anthropic HTTP call, and nothing more. There is no generic model *generate* e
 calls `CoreServices.models.generateText` and owns its own route, because a shared endpoint would be an
 unbudgeted proxy to whatever the caller asked for. Each connection provider registers before its
 matching model adapter, and the model registry refuses an adapter naming a connection provider that
-has not registered yet, or one that has not declared `textGeneration`.
+has not registered yet, or one that has not declared `textGeneration`. A loaded plugin can register
+the same adapter through `ctx.providers.model`. The host checks that it owns the matching connection
+provider before an adapter can receive a stored secret. The worker transport forwards cancellation
+to an adapter call that is already running.
 
 **Core mints the ids and core parses them.** There are two prefixes and no others:
 `connection:<uuid>` is an integrations row this owner holds, and `harness:<profileId>` is an entry in
-the agent-profile registry that declares a one-shot text mode. A string with no prefix is read as a
-connection uuid, and that rule is permanent rather than transitional: two stores hold a bare uuid
-written before these ids existed, the `connectionId` of a saved `database:generate` workflow step and
-the changes plugin's own device preference, and neither is rewritten. `parseBackendId` beside the
-type is the one reader, with a test that a bare uuid and its prefixed form resolve to the same
-connection. Because an id reaches a saved workflow step and a device preference, renaming a profile
+the agent-profile registry that declares a one-shot text mode. Both prefixes require a nonempty ID.
+Core rejects bare IDs and unknown prefixes with a 400 response. `parseBackendId` beside the type is
+the one reader. Because an id reaches a saved workflow step and a device preference, renaming a profile
 is a compatibility break rather than a label edit, the same rule
 [managed-agents.md](./managed-agents.md) § Harnesses states for harness ids.
 
 **Connections come first in the list, and things depend on it.** `models.available(userId)` returns
 every connected model provider with text generation available, in the order
-`/v2/core/integrations` already serves them, and then every profile with a one-shot mode whose
+`/v1/core/integrations` already serves them, and then every profile with a one-shot mode whose
 command is on this machine, in registry order. Two paths take `available()[0]` without asking anyone:
 the database plugin's palette route, where **Generate SQL** runs with no picker at all, and the
 changes plugin's fallback when nothing has been picked yet. Both keep spending the key the owner
@@ -415,7 +415,7 @@ profile that goes missing between the two fails the call with `provider_not_conn
 connection deleted between the two does.
 
 **`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
-in `server/modelProviders/runtime.ts`, unchanged. A `harness:` id goes to `generateTextForHarness` in
+in `server/modelProviders/runtime.ts`. A `harness:` id goes to `generateTextForHarness` in
 `server/modelProviders/harnessRuntime.ts`. Both return the same result, whose `backendId` says which
 was spent, and both run behind the same `validateInput` first: a 60-second ceiling, 100,000 system
 characters, 1,000,000 prompt characters, and 128,000 output tokens. `maxOutputTokens` is validated
@@ -448,23 +448,23 @@ it never falls through to a stored API credential or a different CLI. A profile 
 including Aider, is unavailable for this path and keeps the deterministic prompt fallback.
 
 **One core read route, and it is not the generate endpoint this section refuses.**
-`GET /v2/core/models/backends` is device-only and answers `backends` in list order plus `missing`,
+`GET /v1/core/models/backends` is device-only and answers `backends` in list order plus `missing`,
 which is every profile with a one-shot mode whose command is not on this machine. The refusal above
 is of a generic generate endpoint, an unbudgeted proxy to whatever a caller asked for. This is the
-ids-and-labels projection `/v2/core/integrations` already serves for connections, and its consumers
+ids-and-labels projection `/v1/core/integrations` already serves for connections, and its consumers
 are core's own surfaces: the onboarding wizard's step, the Settings section that lists the backends
 and holds the shared default, and the project-settings gate on the AI-SQL schema editor that used to
 count connections client-side. Nothing but the wizard reads `missing`. A plugin frame keeps the proxy
-route its own plugin serves, because `/v2/core/*` has no bridge scope and minting one would hand
+route its own plugin serves, because `/v1/core/*` has no bridge scope and minting one would hand
 every installed plugin the whole roster to serve one dropdown.
 
 Three routes consume the seam, and each owns its own prompt:
 
 | Consumer | Route | Prompt | Answer |
 | --- | --- | --- | --- |
-| database | `POST /v2/p/database/tasks/:taskId/generate` | The live schema, the repo's schema notes, and any saved queries picked as worked examples | SQL, with the fences stripped |
-| changes | `POST /v2/p/changes/tasks/:id/local/commit-message` | The branch name and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the editor's draft |
-| workflows | `POST /v2/p/workflows/defs/generate` | What a workflow is, the step kinds generated from the node's own catalog, and the workspace's valid definitions as worked examples, capped at 90,000 characters | A whole definition, into the editor's draft as one undo step |
+| database | `POST /v1/p/database/tasks/:taskId/generate` | The live schema, the repo's schema notes, and any saved queries picked as worked examples | SQL, with the fences stripped |
+| changes | `POST /v1/p/changes/tasks/:id/local/commit-message` | The branch name and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the editor's draft |
+| workflows | `POST /v1/p/workflows/defs/generate` | What a workflow is, the step kinds generated from the node's own catalog, and the workspace's valid definitions as worked examples, capped at 90,000 characters | A whole definition, into the editor's draft as one undo step |
 
 All three take a `backendId` and none of them chooses it: the person picking from the dropdown does,
 or the plugin's own fallback to the first available backend. All three check the same thing before

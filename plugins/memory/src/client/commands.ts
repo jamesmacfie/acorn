@@ -10,21 +10,19 @@ import {
 import { memoryApi } from './memoryClient'
 import { MEMORY_SOURCE_ID } from './proposalTarget'
 
-// Memory in the palette: search what this project can see, and open the proposals waiting for a
-// decision (docs/notes-and-memory.md § From the command palette).
+// Memory in the palette: search what this project can see and open canonical review.
 //
-// **The two go to different places, because they answer different questions.** A search hit is a
+// A search hit is a
 // memory this task's context could be drawing on, so it reveals in the Context pane's memory section:
 // the reader is shown it where they are already working (client-core/host/registries/commands/
-// clientEvents.ts § `context:reveal`). A pending proposal is not task-scoped at all — accepting one
-// falls back to the project folder when the task's worktree is gone — so it opens the Memory page.
+// clientEvents.ts § `context:reveal`). Review opens the Memory page.
 //
-// **Which is why only the search is task-scoped.** The search itself is project-visible, that is the
+// Only search is task-scoped. The search itself is project-visible, that is the
 // node route's own scope, but the surface a hit opens in belongs to a task and a row that cannot be
 // opened is not worth offering. The project the query names is the captured one.
 //
-// Accepting and rejecting a proposal stay in that section: each needs the proposal's body and its
-// verification flags in front of the reader. Adding a memory needs a name, a type, a scope and a body,
+// Review actions stay on the Memory page, with the candidate body in front of the reader.
+// Adding a memory needs a name, a type, a scope and a body,
 // which is four fields rather than one line (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 const CONTEXT_PANE = 'context'
@@ -86,15 +84,13 @@ export const memoryCommands: readonly ContributedCommand[] = [
   },
   {
     id: 'memory.proposals.open',
-    title: 'Review memory proposals',
+    title: 'Review memory suggestions',
     hint: 'what an agent suggested this project should remember',
     keywords: ['memory', 'proposals', 'review'],
     category: 'navigation',
     palette: true,
     requires: { plugin: 'memory' },
-    // The Memory page, not the Context pane's fold. A pending proposal is not task-scoped, so this
-    // row no longer needs a task to be worth offering, and it lands where every pending proposal is
-    // rather than the handful this task happens to have raised (./MemoryCenter.tsx).
+    // The Memory page is project-scoped and remains useful without an active task.
     run: (context) => openMemory(context),
   },
 ]

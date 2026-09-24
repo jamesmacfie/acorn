@@ -12,6 +12,7 @@ import { SecretService } from './secrets'
 import { createTaskService, type CompiledTaskService, type TaskService } from './tasks'
 import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
 import { createTelemetryService, type TelemetryService } from './telemetry'
+import { verifyAgentToolProvenance } from '../agentTools/provenance'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -45,6 +46,8 @@ export type CoreProcService = {
 }
 
 export type CoreServices = {
+  /** Verify provenance that the authenticated tool route minted for one signed invocation. */
+  agentToolProvenance?: { verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean> }
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
@@ -96,6 +99,7 @@ export function createCoreServices(options: {
   const tasks = createTaskService(options.db)
   const projects = createProjectService(options.db)
   return {
+    agentToolProvenance: { verify: verifyAgentToolProvenance },
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
     fs: fs satisfies CoreFsService,

@@ -1,5 +1,5 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
-import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 
 export type TerminalSessions = {
   // Spawns the PTY. The engine re-derives the cwd from `taskId`, creating the task's worktree if

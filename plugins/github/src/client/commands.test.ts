@@ -104,7 +104,7 @@ describe('the github plugin catalogue', () => {
     expect((await find.query('grace', world, signal())).map((row) => row.ref)).toEqual(['7'])
     expect((await find.query('#42', world, signal())).map((row) => row.ref)).toEqual(['42'])
     expect(mocks.readJson).toHaveBeenCalledTimes(1)
-    expect(mocks.readJson).toHaveBeenCalledWith('/v2/p/github/repos/runn-fast/acorn/pulls?state=open')
+    expect(mocks.readJson).toHaveBeenCalledWith('/v1/p/github/repos/runn-fast/acorn/pulls?state=open')
   })
 
   it('selects the rail source before navigating, because the shell draws from the source', async () => {

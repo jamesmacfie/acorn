@@ -1,5 +1,5 @@
-import { roleCell, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
-import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { roleCell, type CellStyle } from '@acorn/client-core/kit/tokens'
+import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens'
 import type { Color } from '../colour'
 import { isCompact, slotColor } from '../appearance'
 import { ATTRS } from '../paint/buffer'

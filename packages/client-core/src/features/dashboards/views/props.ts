@@ -2,7 +2,7 @@ import type {
   DashboardDisplayField,
   DashboardDisplayRow,
   DashboardDisplaySchema,
-} from '@acorn/dashboards-core/display.ts'
+} from '@acorn/dashboards-core/render'
 import type { PanelTone, PanelView } from '../model'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping

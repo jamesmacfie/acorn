@@ -6,7 +6,7 @@ import type {
   AgentSubagent,
   AgentSubagentStatus,
   AgentSubagentUpdate,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 export type AgentMachineState = {
   runtimeState: AgentRuntimeState

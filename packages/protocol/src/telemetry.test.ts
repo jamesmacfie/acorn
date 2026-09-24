@@ -15,7 +15,7 @@ const SPAN = 'b'.repeat(16)
 describe('the record shapes', () => {
   it('parses one of each kind', () => {
     const records = [
-      { kind: 'span', traceId: TRACE, spanId: SPAN, name: 'http.request', start: 1, durationMs: 2, status: 'ok', attrs: { route: '/v2/core/tasks/:id' } },
+      { kind: 'span', traceId: TRACE, spanId: SPAN, name: 'http.request', start: 1, durationMs: 2, status: 'ok', attrs: { route: '/v1/core/tasks/:id' } },
       { kind: 'log', at: 1, level: 'info', logger: 'server', body: 'listening', attrs: {} },
       { kind: 'event', at: 1, name: 'ws.shed', attrs: { channel: 'term' } },
       { kind: 'metric', at: 1, name: 'git.status', type: 'histogram', value: { count: 3, sum: 9, min: 1, max: 5, p50: 3, p95: 5 }, attrs: {} },
@@ -39,7 +39,7 @@ describe('the record shapes', () => {
   })
 
   it('carries the node and the version on the batch, not on every record', () => {
-    const batch = telemetryBatchSchema.safeParse({ node: 'node-1', version: '0.1.0', records: [] })
+    const batch = telemetryBatchSchema.safeParse({ node: 'node-1', version: '1.0.0', records: [] })
     expect(batch.success).toBe(true)
   })
 })

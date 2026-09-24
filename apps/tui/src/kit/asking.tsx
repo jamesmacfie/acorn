@@ -2,13 +2,13 @@
 import { createEffect, createSignal, For, Index, on, onCleanup, Show, splitProps, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { GLYPHS } from './glyphs'
-import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
+import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 import {
   COLLECTION_INTENTS, createCollectionIntents,
-} from '@acorn/client-core/kit/keys/collectionIntents.ts'
+} from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import type { Size } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { Intent } from '@acorn/client-core/kit/keys'
+import type { Size } from '@acorn/client-core/kit/tokens'
 // The prop types, not the components. A node's props are one contract on both hosts — a pane compiles
 // against one of them and runs on either — and this host had hand-written copies that had quietly lost
 // `tip`, `iconOnly`, `min` and the rest, so nothing in the roster type-checked

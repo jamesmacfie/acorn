@@ -112,7 +112,7 @@ describe('consolidated findings review', () => {
     expect((await running).state).toBe('cancelled')
     expect(store.bundles({ kind: 'project', projectId: 'project-1' }, true)[0]!.candidates).toHaveLength(1)
     store = new FindingsReviewStore(db.db, () => 1_700_000_000_000 + sequence, () => `id-${++sequence}`)
-    expect(store.preparationSource(preparing.id)).toEqual({ taskId: 'task-1', boundaryKey: 'manual:cancel', backendId: 'connection:model-1', modelId: 'fixture-model' })
+    expect(store.preparationSource(preparing.id)).toEqual({ taskId: 'task-1', boundaryKey: 'manual:cancel', targetKind: 'memory:change', backendId: 'connection:model-1', modelId: 'fixture-model' })
     const resumed = await store.prepare({ scope: preparing.scope, boundaryKey: 'manual:cancel', targetKind: 'memory:change', target: target(), observations: [...inputs, observation('new-input')], synthesize: async (items) => ({ groups: [{ payload: { body: 'resumed' }, sourceIds: items.map((item) => item.id), explanation: 'Resumed.' }], omissions: [] }) })
     expect(resumed).toMatchObject({ state: 'ready', inputCount: 51, pendingCount: 0, backendId: 'connection:model-1', modelId: 'fixture-model' })
     expect(resumed.candidates).toHaveLength(2)
@@ -168,14 +168,4 @@ describe('consolidated findings review', () => {
     expect(result.outcomes).toContainEqual(expect.objectContaining({ observationId: 'task-only', outcome: 'not-selected', explanation: 'Task-specific.' }))
   })
 
-  it('reconciles a legacy verdict recorded while findings was disabled without another candidate', () => {
-    const validation = { payload: { body: 'Keep owner boundaries.' }, payloadHash: 'payload-hash', fingerprint: 'fingerprint', subjectKey: 'owner-boundaries', warnings: ['verified'] }
-    const input = { legacyId: 'legacy-1', scope: { kind: 'project' as const, projectId: 'project-1' }, observationId: 'observation-1', targetKind: 'memory:change', targetVersion: 1, validation, createdAt: 1 }
-    const imported = store.importLegacy({ ...input, status: 'pending' })
-    expect(store.candidate(imported.candidateId)?.status).toBe('ready')
-    expect(store.importLegacy({ ...input, status: 'accepted' })).toEqual(imported)
-    expect(store.candidate(imported.candidateId)?.status).toBe('applied')
-    expect(store.history(imported.candidateId).map((entry) => entry.action)).toEqual(['applied'])
-    expect(() => store.importLegacy({ ...input, status: 'rejected' })).toThrow(/lifecycle changed incompatibly/)
-  })
 })

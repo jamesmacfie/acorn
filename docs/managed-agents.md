@@ -1,5 +1,10 @@
 # Managed agents
 
+Session, turn, event, request, and attachment wire types live in
+`plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
+`plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined
+by `packages/protocol/src/attention.ts`; Agents maps its session rows to that snapshot.
+
 The agents plugin manages structured Claude and Codex sessions. It stores a durable normalized event
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live
 WebSocket streams.
@@ -922,6 +927,8 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 | How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
 | Agent session | group, task-scoped | Fork, retry, compact, continue in terminal, regenerate title, rename, the two exports and archive — the open session's ••• menu, while the pane is on screen |
 
+The JSON session export includes `version: 1` and `baseline: "acorn-1"` alongside its snapshot.
+
 **New agent session is a picker, not an action, and it needs an open task.** A session is created
 against a task worktree, so there is nothing to start one in when no task is open and the palette
 hides the row rather than offering one that can only fail. Which harness runs it is a choice, and the
@@ -988,7 +995,7 @@ and drawn inline in the transcript with their download action. Other artifact me
 download row.
 
 A sent attachment is drawn the same way, from the same kind of route
-(`GET /v2/p/agents/attachments/:id/content`, no-store and `nosniff`, guarded by the attachment's own
+(`GET /v1/p/agents/attachments/:id/content`, no-store and `nosniff`, guarded by the attachment's own
 task). Each one is a tile that sizes to its own contents: a picture draws as a cropped band above its
 filename and opens full size in a modal on press, and anything else draws an icon above its filename and
 downloads on press. The turn's text names each attachment as `[Attachment: <id>]`, which is what a

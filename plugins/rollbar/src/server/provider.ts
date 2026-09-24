@@ -436,7 +436,7 @@ export const rollbarProvider = publicProvider({
   conformance: {
     ref: { providerId: 'rollbar', connectionId: 'rollbar-test', displayId: '142' },
     // Legacy bare RollbarItem row (pre-itemId). Must migrate.
-    legacyCache: {
+    cachedItem: {
       integrationId: 'rollbar-test', identifier: '142', title: 'TypeError', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
     },

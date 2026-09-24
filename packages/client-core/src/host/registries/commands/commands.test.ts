@@ -26,7 +26,7 @@ import {
 // running one does.
 //
 // The first half is characterization, written before the shared session existed so that the session
-// could be held to it. It is: `./session.test.tsx` asserts the same order over real rows, and neither
+// could be held to it. It is: `./sessionStore.test.tsx` asserts the same order over real rows, and neither
 // host composes a list of its own any more. What stays here is the registry's own half — which
 // commands are discoverable, when a dynamic title is read, and that a palette row and a shortcut
 // reach one registration by the same id.
@@ -94,7 +94,7 @@ describe('the row a command becomes', () => {
     register(leaf('cmd.same', { run }))
     expect(paletteActions().map((row) => row.id)).toEqual(['cmd.same'])
     // The palette's path and a shortcut's path reaching the one registered leaf. The row the session
-    // builds around that id is ./session.test.tsx.
+    // builds around that id is ./sessionStore.test.tsx.
     await executeCommand('cmd.same')
     await executeCommand('cmd.same')
     expect(run).toHaveBeenCalledTimes(2)

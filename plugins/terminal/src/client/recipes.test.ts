@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { invokeLayoutRecipe, recipeToLayout, type RecipeServices } from './recipes'
-import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { paneRegistry } from '@acorn/plugin-api/testkit/client'
 
 const paneRegistrations: { dispose(): void }[] = []
 beforeAll(() => {

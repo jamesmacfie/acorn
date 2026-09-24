@@ -50,7 +50,7 @@ async function world() {
     name: 'query-fixture',
     init(ctx) {
       context = ctx
-      ctx.dataSources.register({ sourceId: 'items', name: 'Items', singular: 'Item', plural: 'Items', identityScope: 'Source', handler: '/v2/p/query-fixture/source' })
+      ctx.dataSources.register({ sourceId: 'items', name: 'Items', singular: 'Item', plural: 'Items', identityScope: 'Source', handler: '/v1/p/query-fixture/source' })
       ctx.routes.fetch(async request => {
         const input = dataSourceRequestSchema.parse(await request.json())
         if (input.operation === 'describe') {

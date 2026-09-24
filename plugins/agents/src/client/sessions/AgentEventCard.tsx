@@ -1,8 +1,8 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '../../contract/wire.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
+import { dispatchLayout, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, Text,
@@ -291,7 +291,7 @@ export default function AgentEventCard(props: {
               meta={<Text emphasis="muted">Open terminal →</Text>}
               onPress={() => {
                 setTerminalOpen(props.taskId, true)
-                requestTerminalFocus(props.taskId, terminal().terminalSessionId)
+                requestTerminalFocusIntent(props.taskId, terminal().terminalSessionId)
               }}
             >
               {terminal().title}

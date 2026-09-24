@@ -63,7 +63,7 @@ const ref = (c: { req: { param(k: string): string } }): string | null => {
 // daemon, so there is no 'service'-scope caller to keep working.
 //
 // Subtrees are enumerated rather than exempting the `/tasks/` path string, because the router mounts
-// under `/v2/p/docker` and a full-path guard would depend on the mount prefix. The route test walks
+// under `/v1/p/docker` and a full-path guard would depend on the mount prefix. The route test walks
 // Hono's route table and fails if a daemon-wide path arrives without a device gate. Hono's trailing
 // `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
 export const docker = new Hono<AppEnv>()

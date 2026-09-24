@@ -12,8 +12,8 @@
 //
 // Installed from the two process entries and not from `startServiceRuntime`, which boots three
 // times in one process in its own test. Process-level handlers belong to the process.
-import { emitError, flushTelemetry } from '@acorn/node-core/server/telemetry/collector.ts'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { emitError, flushTelemetry } from '@acorn/node-core/server/telemetry'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('crash')
 

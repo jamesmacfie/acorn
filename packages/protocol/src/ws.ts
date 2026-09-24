@@ -13,7 +13,7 @@
 
 import { z } from 'zod'
 
-export const WS_PATH = '/v2/events'
+export const WS_PATH = '/v1/events'
 
 // The index signature is load-bearing twice over: it lets an owner's frame satisfy this without a cast
 // at every send site, and it suppresses excess-property checks so existing literal sends still

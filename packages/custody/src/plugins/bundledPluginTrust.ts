@@ -2,10 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
-import { readPluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
+import { readPluginManifest } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
 import type { PluginTrustStore } from './pluginTrustStore'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('plugins')
 

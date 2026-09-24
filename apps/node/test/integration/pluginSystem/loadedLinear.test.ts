@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { loadExternalPlugins } from '@acorn/node-core/server/plugins/loader.ts'
+import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 

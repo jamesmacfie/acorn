@@ -53,6 +53,7 @@ command from the same manifest, uses the canonical `meta+ctrl+alt+shift+key` spe
     "frames": [{ "target": "pane", "id": "editor", "label": "Editor" }],
     "commands": [{
       "id": "search",
+      "kind": "action",
       "title": "Editor: find in files",
       "category": "action",
       "palette": true,
@@ -72,16 +73,9 @@ command from the same manifest, uses the canonical `meta+ctrl+alt+shift+key` spe
 binding ids must remain stable across versions because the qualified binding id is the key in the
 user's persisted override map.
 
-The older `contributions.palette` array remains an alias for a command with `palette: true`, and it
-never produces a second row. It survived the `10` bump on purpose: a removal is a major on its own
-announcement, and folding it into a batch bought for something else would take it off manifests
-written against a number that never said it was going. Nothing in the host branches on it — the
-registration pass rewrites each entry into a command descriptor before anything else sees it — so it
-costs one `flatMap` and no second code path.
-
 ### Command kinds
 
-A command descriptor carries an optional `kind`. Omitted, or `action`, it is one closed verb the host
+A command descriptor requires `kind`. An `action` is one closed verb the host
 runs, which is what every command was before 2026-09-03 and what every already-installed manifest
 still parses as. The other four are additive:
 
@@ -118,7 +112,7 @@ somebody else's network.
 A route's answer never chooses behaviour. Every field but the ones listed above is dropped before the
 row is rendered, malformed rows are dropped individually, and the verb that runs when a row is picked
 or a submission succeeds is the static one the manifest declared. A search, an input or a setting
-needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
+needs a `node` entrypoint, because only a node half serves `/v1/p/<id>/`.
 
 ```json
 {
@@ -131,7 +125,7 @@ needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
         "kind": "search",
         "parentId": "issues",
         "scope": "project",
-        "route": "/v2/p/linear/issues/search",
+        "route": "/v1/p/linear/issues/search",
         "placeholder": "Search issues…",
         "onSelect": { "verb": "navigate", "surface": "linear-issue" }
       },
@@ -141,8 +135,8 @@ needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
         "kind": "setting",
         "parentId": "issues",
         "scope": "project",
-        "readRoute": "/v2/p/linear/issues/grouping",
-        "writeRoute": "/v2/p/linear/issues/grouping",
+        "readRoute": "/v1/p/linear/issues/grouping",
+        "writeRoute": "/v1/p/linear/issues/grouping",
         "options": [
           { "value": "status", "label": "Status" },
           { "value": "assignee", "label": "Assignee" }
@@ -192,7 +186,7 @@ manifest is parsed:
       "id": "linear-issues",
       "label": "Linear",
       "order": 20,
-      "items": "/v2/p/linear/rail-items",
+      "items": "/v1/p/linear/rail-items",
       "onSelect": { "verb": "navigate", "surface": "linear-issue" }
     }]
   }
@@ -215,7 +209,7 @@ the host with its own components, under constraints the source declares:
   "id": "linear-issues",
   "label": "Linear",
   "order": 20,
-  "items": "/v2/p/linear/rail-items",
+  "items": "/v1/p/linear/rail-items",
   "panels": { "fieldRole": "status", "views": ["list", "board"], "max": 6 }
 }] } }
 ```
@@ -240,6 +234,7 @@ parse error rather than a surface nobody can reach:
     "frames": [{ "target": "overlay", "id": "files", "label": "Go to file" }],
     "commands": [{
       "id": "open-files",
+      "kind": "action",
       "title": "Go to file",
       "action": { "verb": "openOverlay", "overlay": "files" }
     }],
@@ -273,7 +268,7 @@ continue to work while the iframe has focus. Claims are disclosed in the device 
 Settings → Shortcuts.
 
 `urlSource` replaces `url` when the start URL is dynamic and must be inside the plugin's own
-`/v2/p/<id>/` namespace; it answers `{ "url": "..." }` and receives task/project ids as query
+`/v1/p/<id>/` namespace; it answers `{ "url": "..." }` and receives task/project ids as query
 parameters when present.
 
 When a plugin has a client bundle, frames, webviews, and descriptors are gated on trust, per device and per
@@ -344,8 +339,8 @@ A plugin that knows something about a task the owner is about to archive says so
 check**, and that is the only way anything gets into the archive dialog.
 
 ```
-GET  /v2/p/<id>/archive/check?taskId=…   → { concern } | { concern: null }
-POST /v2/p/<id>/archive/apply            ← { taskId }
+GET  /v1/p/<id>/archive/check?taskId=…   → { concern } | { concern: null }
+POST /v1/p/<id>/archive/apply            ← { taskId }
 ```
 
 Two feeders, one registry, exactly like schedules and data sources: a compiled plugin calls

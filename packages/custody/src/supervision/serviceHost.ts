@@ -13,7 +13,7 @@ import {
   type ServiceStartResult,
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('service-host')
 

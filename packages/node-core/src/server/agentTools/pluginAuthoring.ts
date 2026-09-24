@@ -74,7 +74,7 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // `@acorn/protocol/plugin/bridge.ts` and this file stops compiling until it is described here. A type
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
-  api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
+  api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v1/p/<id>/ namespace always passes",
   'api.bytes': `the same call for a route whose body is bytes: bridge.api.getBytes / postBytes, GET and POST only, `
     + `capped at ${MAX_PLUGIN_BYTES} bytes each way. Same permission decision as \`api\`, made before the body is `
     + `looked at. Reach for it instead of base64 whenever you are moving a file`,
@@ -178,7 +178,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the node
       // cannot import it (docs/agent-tools.md § plugin_authoring). The `note` below says what makes an
       // unknown scope survivable instead.
-      note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v2/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
+      note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v1/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
     },
     bridge: {
       version: PLUGIN_BRIDGE_VERSION,
@@ -231,7 +231,7 @@ filename, so renaming a plugin is a new plugin plus a data migration plus a tomb
 A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary), no
 \`ctx.tools\`/\`ctx.contextSections\`, and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
-strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
+strips the mount, so \`/v1/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
 \`ctx.schedules\`, \`ctx.dataSources\`, \`ctx.taskChecks\`, \`ctx.runs\`, \`ctx.audit\`,
 \`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
 \`ctx.events.send\`/\`status\`/\`on\` are there, shaped by the manifest. Those registries are owner-bound:
@@ -239,7 +239,7 @@ the host stamps your plugin id on whatever you register, so you cannot file a sc
 under another package's name. Declaring the same thing in the manifest goes through the same seam, so
 pick one — the manifest is what the owner reads at install.
 Declare loaded agent tools and task-context sections only in \`contributions.agentTools\` and
-\`contributions.contextSections\`. Each names a route in YOUR \`/v2/p/<id>/\` namespace; the host
+\`contributions.contextSections\`. Each names a route in YOUR \`/v1/p/<id>/\` namespace; the host
 turns the descriptor into the same tool registry or context assembler used by compiled plugins, and
 removes it on update/unload. Tool input is bounded JSON Schema, not Zod in your bundle. Context returns
 bounded data and compact reference text, never a renderer or callback.
@@ -300,7 +300,7 @@ bytes are a new origin and a new document.
 
 - Schema changes are append-only. Never edit or reorder a shipped migration; Drizzle validates the chain
   against \`meta/_journal.json\` and a reordered chain already fails. There is no downgrade support.
-- Every descriptor path is confined at parse time to \`/v2/p/<id>/\`. Another plugin's namespace is always
+- Every descriptor path is confined at parse time to \`/v1/p/<id>/\`. Another plugin's namespace is always
   denied, whatever the manifest declares.
 - \`window.confirm\` and \`alert\` are suppressed in a frame, and \`navigator.clipboard\` refuses to write.
   Draw your own confirmation; use the bridge's \`ui.copy\`.

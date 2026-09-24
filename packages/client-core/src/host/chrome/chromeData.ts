@@ -37,17 +37,17 @@ import { createLogger } from '../../infra/telemetry/logger'
 const log = createLogger('plugin-chrome')
 
 // Reads a plugin's descriptor routes (badges, rail items, and agent context). The manifest's
-// routes were confined to `/v2/p/<id>/` at parse time, but this arrives as a roster row, so the path is
+// routes were confined to `/v1/p/<id>/` at parse time, but this arrives as a roster row, so the path is
 // re-checked here and a malformed body is dropped rather than thrown into the shell chrome
 // (docs/security.md § Third-party plugin bundles; docs/plugins.md § Cooperative extension points).
 
-// Re-spelled rather than imported: the namespace is node-core's (server/routeRegistry.ts) and
+// Re-spelled rather than imported: the namespace is node-core's (server/routes/registry.ts) and
 // @acorn/protocol may not name a plugin route, so the client holds its own copy. See
 // plugins/frames/scopes.ts.
-const PLUGIN_NAMESPACE = '/v2/p/'
+const PLUGIN_NAMESPACE = '/v1/p/'
 
 /** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
- * `/v2/p/id/../other` route cannot escape after URL parsing.
+ * `/v1/p/id/../other` route cannot escape after URL parsing.
  *
  * `path` is typed but arrives as a roster row, so a missing one is a `false` rather than a throw: a
  * descriptor from a newer node may not carry the field this build reads it out of. */

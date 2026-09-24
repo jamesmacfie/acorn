@@ -8,6 +8,8 @@ import { createSignal } from 'solid-js'
 import type { ItemRowTarget } from '@acorn/plugin-api/client'
 import type { DataRecord } from '@acorn/protocol/dataSources.ts'
 import { parseDataValue, type DataValue } from '@acorn/protocol/dataValues.ts'
+import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+import type { WorkflowInput } from '../contract/wire.ts'
 
 export type WorkflowSourceItemTarget = ItemRowTarget & { record?: DataRecord }
 
@@ -34,6 +36,22 @@ export function prefillFromItem(item: { title?: string; body?: string; link?: st
     ...(both ? { issue: both, item: both, context: both } : {}),
     ...(item.link ? { link: item.link, url: item.link } : {}),
   }
+}
+
+/** Parse the answers exactly as the run route expects; the item remains a source of defaults. */
+export function collectItemWorkflowInputs(inputs: readonly WorkflowInput[], valueOf: (name: string) => string): Record<string, DataValue> {
+  return Object.fromEntries(inputs.flatMap((input) => {
+    const raw = valueOf(input.name)
+    if (raw === '') return []
+    const value = !input.schema || input.schema.type === 'string' ? raw : JSON.parse(raw)
+    if (input.schema) validateDataValue(value, input.schema)
+    return [[input.name, value]]
+  }))
+}
+
+export function itemWorkflowInputsReady(defId: string, inputs: readonly WorkflowInput[], valueOf: (name: string) => string): boolean {
+  if (!defId || inputs.some((input) => input.required && !valueOf(input.name).trim())) return false
+  try { collectItemWorkflowInputs(inputs, valueOf); return true } catch { return false }
 }
 
 /** The row menu's ask, held until the overlay draws it. One at a time: a second right-click replaces

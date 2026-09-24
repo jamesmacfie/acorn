@@ -44,9 +44,9 @@ Settings → Integrations and the first-run wizard both run the OAuth device aut
 the same `createDeviceFlow` helper in `packages/client-core/src/features/integrations/deviceFlow.ts`, so the
 polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
-1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
+1. `POST /v1/p/github/auth/device/start` asks GitHub for a device code.
 2. The owner enters the user code at GitHub's verification URI.
-3. `POST /v2/p/github/auth/device/poll` checks the provider at GitHub's requested interval.
+3. `POST /v1/p/github/auth/device/poll` checks the provider at GitHub's requested interval.
 4. On success the Node validates the token and stores it in an encrypted `integrations` row. The
    GitHub account is provider metadata; it does not bind the node-owner identity, which core mints at
    boot.
@@ -193,7 +193,7 @@ Linear reference panels are contributed through a provider contract, so the GitH
 import Linear's implementation. Linear is a loaded plugin, so the panel it renders there is a
 sandboxed frame whose overlay chrome the host draws. GitHub does depend on `@acorn/plugin-linear` for
 two things in `contract/`: the ticket-reference text scanner and the query-options factory over
-`/v2/p/linear/issues`. Both are the sanctioned cross-plugin surface, and neither reaches Linear's
+`/v1/p/linear/issues`. Both are the sanctioned cross-plugin surface, and neither reaches Linear's
 UI.
 
 ## Actions and logs

@@ -91,18 +91,18 @@ afterEach(() => {
 describe('fetch', () => {
   it('pins the frame’s own node, which no message can name', () => {
     const services = build({ binding: binding({ nodeId: 'node-b' }) })
-    void services.fetch('GET', '/v2/p/board/items', undefined, new AbortController().signal)
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/board/items', expect.objectContaining({ method: 'GET', nodeId: 'node-b' }))
+    void services.fetch('GET', '/v1/p/board/items', undefined, new AbortController().signal)
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/items', expect.objectContaining({ method: 'GET', nodeId: 'node-b' }))
   })
 
   it('sends a body as JSON and omits the header when there is none', () => {
     const signal = new AbortController().signal
-    void build().fetch('POST', '/v2/p/board/items', { title: 'x' }, signal)
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/board/items', expect.objectContaining({
+    void build().fetch('POST', '/v1/p/board/items', { title: 'x' }, signal)
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/items', expect.objectContaining({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ title: 'x' }),
     }))
-    void build().fetch('DELETE', '/v2/p/board/items/1', undefined, signal)
+    void build().fetch('DELETE', '/v1/p/board/items/1', undefined, signal)
     expect(sendRaw.mock.calls.at(-1)?.[1]).not.toHaveProperty('body')
   })
 })

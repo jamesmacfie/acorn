@@ -11,10 +11,10 @@ import { ownerId } from '../middleware/requireUser'
 //
 // docs/integrations.md § Model providers refuses a generic core generate route, and still does: that
 // would be an unbudgeted proxy to whatever a caller asked for. This is the ids-and-labels projection
-// `/v2/core/integrations` already serves for connections, and its consumers are core's own surfaces —
+// `/v1/core/integrations` already serves for connections, and its consumers are core's own surfaces —
 // the onboarding wizard's step, the Settings section, and the project-settings gate that used to count
 // connections client-side. A plugin frame keeps the proxy route its own plugin serves, because
-// `/v2/core/*` has no bridge scope and minting one would hand every installed plugin the whole roster
+// `/v1/core/*` has no bridge scope and minting one would hand every installed plugin the whole roster
 // to serve one dropdown.
 export const models = new Hono<AppEnv>()
   .get('/backends', async (c) => {

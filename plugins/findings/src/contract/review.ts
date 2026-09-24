@@ -76,6 +76,7 @@ export type FindingPreparationRequest = {
 }
 
 export type FindingTargetController = {
+  submitProposal(input: { taskId: string; sourceKey: string; title: string; body: string; payload: unknown }): Promise<{ observationId: string; candidateId: string; bundleId: string; revision: number; payloadHash: string }>
   applying(candidateId: string, revision: number, operationId: string): Promise<FindingCandidateRevision>
   applied(candidateId: string, revision: number, operationId: string, targetReference: string): Promise<FindingCandidateRevision>
   conflict(candidateId: string, revision: number, operationId: string, reason: string): Promise<FindingCandidateRevision>
@@ -89,19 +90,26 @@ export type FindingsReviewCapability = {
 
 export const FINDINGS_REVIEW = capabilityId<FindingsReviewCapability>('findings.review.v1')
 
+/** Host-verified agent tool submission. A tool invocation proof binds one signed session and task. */
+export type FindingsAgentProposalCapability = {
+  submit(input: { taskId: string; sessionId: string; proof: string; sourceKey: string; title: string; body: string; payload: unknown }): Promise<{ observationId: string; candidateId: string; bundleId: string; revision: number; payloadHash: string }>
+}
+export const FINDINGS_AGENT_PROPOSAL = capabilityId<FindingsAgentProposalCapability>('findings.agentProposal.v1')
+
 const scopeQuery = (scope: FindingScope): string => scope.kind === 'private' ? 'scope=private'
   : scope.kind === 'task' ? `scope=task&taskId=${encodeURIComponent(scope.taskId)}`
     : scope.kind === 'project' ? `scope=project&projectId=${encodeURIComponent(scope.projectId)}`
       : `scope=workspace&workspaceId=${encodeURIComponent(scope.workspaceId)}`
-export const findingsBundlesRoute = (scope: FindingScope, history = false): string => `/v2/p/findings/review/bundles?${scopeQuery(scope)}${history ? '&history=true' : ''}`
-export const findingsReviewAttentionRoute = '/v2/p/findings/review/attention'
-export const findingsPrepareRoute = (taskId: string): string => `/v2/p/findings/tasks/${encodeURIComponent(taskId)}/review/prepare`
-export const findingsCandidateRoute = (id: string): string => `/v2/p/findings/review/candidates/${encodeURIComponent(id)}`
+export const findingsBundlesRoute = (scope: FindingScope, history = false): string => `/v1/p/findings/review/bundles?${scopeQuery(scope)}${history ? '&history=true' : ''}`
+export const findingsReviewAttentionRoute = '/v1/p/findings/review/attention'
+export const findingsReviewTargetsRoute = '/v1/p/findings/review/targets'
+export const findingsPrepareRoute = (taskId: string): string => `/v1/p/findings/tasks/${encodeURIComponent(taskId)}/review/prepare`
+export const findingsCandidateRoute = (id: string): string => `/v1/p/findings/review/candidates/${encodeURIComponent(id)}`
 export const findingsCandidateEditRoute = (id: string): string => `${findingsCandidateRoute(id)}/edit`
 export const findingsCandidateDecisionRoute = (id: string): string => `${findingsCandidateRoute(id)}/decision`
 export const findingsCandidateHistoryRoute = (id: string): string => `${findingsCandidateRoute(id)}/history`
-export const findingsCancelPreparationRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/cancel`
-export const findingsDismissBundleRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/dismiss`
-export const findingsRetryPreparationRoute = (bundleId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/retry`
-export const findingsRestoreObservationRoute = (bundleId: string, observationId: string): string => `/v2/p/findings/review/bundles/${encodeURIComponent(bundleId)}/outcomes/${encodeURIComponent(observationId)}/restore`
+export const findingsCancelPreparationRoute = (bundleId: string): string => `/v1/p/findings/review/bundles/${encodeURIComponent(bundleId)}/cancel`
+export const findingsDismissBundleRoute = (bundleId: string): string => `/v1/p/findings/review/bundles/${encodeURIComponent(bundleId)}/dismiss`
+export const findingsRetryPreparationRoute = (bundleId: string): string => `/v1/p/findings/review/bundles/${encodeURIComponent(bundleId)}/retry`
+export const findingsRestoreObservationRoute = (bundleId: string, observationId: string): string => `/v1/p/findings/review/bundles/${encodeURIComponent(bundleId)}/outcomes/${encodeURIComponent(observationId)}/restore`
 export const findingsSplitCandidateRoute = (candidateId: string): string => `${findingsCandidateRoute(candidateId)}/split`

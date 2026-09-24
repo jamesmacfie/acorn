@@ -4,9 +4,9 @@
 // `AgentConfigOption[]` when a session starts, so a default is a value keyed by the provider id and
 // the option id it came from. A harness added later is defaultable the moment it advertises anything,
 // with no change on this side.
-import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption } from '../contract/wire.ts'
 
-export const agentSessionDefaultsRoute = '/v2/p/agents/session-defaults'
+export const agentSessionDefaultsRoute = '/v1/p/agents/session-defaults'
 export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 
 /** providerId to optionId to the value that option is set to. */

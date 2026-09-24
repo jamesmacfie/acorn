@@ -3,9 +3,11 @@
 //
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
 // platform concerns and live in client-core/features/tasks/taskBridge.ts.
-import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../shared/api'
-import { readJson, writeJson, wsAttach, wsOnNotice, wsOnWorkflowStepEvent, wsWrite, type WorkflowNotice } from '@acorn/plugin-api/client'
+import type { SendSubmit } from '../shared/send'
+import { readJson, writeJson, wsOnNotice, wsOnWorkflowStepEvent, type WorkflowNotice } from '@acorn/plugin-api/client'
+import { wsAttach, wsWrite } from './wsChannel'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -15,6 +17,7 @@ export type TerminalApi = {
   interrupt(id: string): Promise<boolean>
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
+  send(id: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   write(id: string, data: string): void
   attach(id: string, on: (m: ServerMsg) => void): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
@@ -40,6 +43,7 @@ export const terminalApi = (): TerminalApi => {
     interrupt: (id) => post<boolean>(terminalSessionActionRoute(id, 'interrupt')),
     remove: (id) => post<boolean>(terminalSessionActionRoute(id, 'remove')),
     resize: (id, cols, rows) => post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows }),
+    send: (id, text, submit) => post(terminalSessionActionRoute(id, 'send'), { text, submit }),
     write: wsWrite,
     attach: wsAttach,
     workflow: { onNotice: wsOnNotice, onStepEvent: wsOnWorkflowStepEvent },

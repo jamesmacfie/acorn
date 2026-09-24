@@ -4,7 +4,7 @@ import {
   Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
   paneCollapseKey, Row, Rows, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { type ChangesModel } from './changesModel'
 import { CommitField, CommitOptionsMenu, commitButtonLabel, commitButtonTip, gitCommitLine } from './commitEditor'
 import { CommitModal } from './CommitModal'

@@ -20,10 +20,10 @@ afterEach(() => {
 
 describe('requestHash', () => {
   it('is stable and separates method, path and body', () => {
-    expect(requestHash('POST', '/v2/core/tasks', '{"a":1}')).toBe(requestHash('POST', '/v2/core/tasks', '{"a":1}'))
-    expect(requestHash('POST', '/v2/core/tasks', '{"a":1}')).not.toBe(requestHash('PUT', '/v2/core/tasks', '{"a":1}'))
-    expect(requestHash('POST', '/v2/core/tasks', '{"a":1}')).not.toBe(requestHash('POST', '/v2/core/other', '{"a":1}'))
-    expect(requestHash('POST', '/v2/core/tasks', '{"a":1}')).not.toBe(requestHash('POST', '/v2/core/tasks', '{"a":2}'))
+    expect(requestHash('POST', '/v1/core/tasks', '{"a":1}')).toBe(requestHash('POST', '/v1/core/tasks', '{"a":1}'))
+    expect(requestHash('POST', '/v1/core/tasks', '{"a":1}')).not.toBe(requestHash('PUT', '/v1/core/tasks', '{"a":1}'))
+    expect(requestHash('POST', '/v1/core/tasks', '{"a":1}')).not.toBe(requestHash('POST', '/v1/core/other', '{"a":1}'))
+    expect(requestHash('POST', '/v1/core/tasks', '{"a":1}')).not.toBe(requestHash('POST', '/v1/core/tasks', '{"a":2}'))
   })
 
   // The separator matters: without it, ('POST', '/a', 'b') and ('POST', '/ab', '') would collide.
@@ -34,7 +34,7 @@ describe('requestHash', () => {
 
 describe('idempotency store', () => {
   it('round-trips a stored response', async () => {
-    const hash = requestHash('POST', '/v2/core/tasks', '{}')
+    const hash = requestHash('POST', '/v1/core/tasks', '{}')
     await store.save(DEVICE, 'key-1', hash, 201, '{"id":"t1"}')
     expect(await store.lookup(DEVICE, 'key-1')).toEqual({ requestHash: hash, responseStatus: 201, responseBody: '{"id":"t1"}' })
   })

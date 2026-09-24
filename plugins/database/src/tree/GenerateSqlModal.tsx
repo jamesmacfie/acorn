@@ -43,7 +43,7 @@ export default function GenerateSqlModal(props: {
   const [prompt, setPrompt] = createSignal('')
   // The first backend, not the shared "Generate with" default the commit wand and the workflow
   // generator both open on. This dialog is a tree in a worker, and that default is a device
-  // preference: it lives in the host's `localStorage`, and `/v2/core/prefs` has no bridge scope on
+  // preference: it lives in the host's `localStorage`, and `/v1/core/prefs` has no bridge scope on
   // purpose, so a frame cannot read it. `bridge.state` is the same prefs store but namespaced
   // `plugin:database:*`, which is what keeps one plugin out of another's — and out of core's.
   //

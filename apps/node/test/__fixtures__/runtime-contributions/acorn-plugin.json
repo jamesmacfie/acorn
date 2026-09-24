@@ -2,9 +2,11 @@
   "id": "runtime-fixture",
   "name": "Runtime contribution fixture",
   "version": "1.0.0",
-  "apiVersion": "13",
+  "apiVersion": "1",
   "node": "./node.js",
-  "permissions": { "node": {} },
+  "permissions": {
+    "node": {}
+  },
   "contributions": {
     "agentTools": [
       {
@@ -12,23 +14,34 @@
         "description": "Echo validated arguments and verified task origin.",
         "inputSchema": {
           "type": "object",
-          "properties": { "message": { "type": "string", "maxLength": 40 } },
-          "required": ["message"],
+          "properties": {
+            "message": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "required": [
+            "message"
+          ],
           "additionalProperties": false
         },
         "risk": "read",
         "scope": "task",
-        "handler": "/v2/p/runtime-fixture/tools/echo",
+        "handler": "/v1/p/runtime-fixture/tools/echo",
         "timeoutMs": 1000,
         "maxOutputBytes": 4096
       },
       {
         "id": "mutate",
         "description": "Mutate once for retry-semantics testing.",
-        "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "risk": "write",
         "scope": "task",
-        "handler": "/v2/p/runtime-fixture/tools/mutate",
+        "handler": "/v1/p/runtime-fixture/tools/mutate",
         "requiresSession": true,
         "timeoutMs": 1000,
         "maxOutputBytes": 4096
@@ -36,10 +49,14 @@
       {
         "id": "lost",
         "description": "Lose a reply after one mutation.",
-        "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "risk": "write",
         "scope": "task",
-        "handler": "/v2/p/runtime-fixture/tools/lost",
+        "handler": "/v1/p/runtime-fixture/tools/lost",
         "requiresSession": true,
         "timeoutMs": 1000,
         "maxOutputBytes": 4096
@@ -47,20 +64,28 @@
       {
         "id": "slow",
         "description": "Wait beyond the declared deadline.",
-        "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "risk": "read",
         "scope": "task",
-        "handler": "/v2/p/runtime-fixture/tools/slow",
+        "handler": "/v1/p/runtime-fixture/tools/slow",
         "timeoutMs": 100,
         "maxOutputBytes": 4096
       },
       {
         "id": "large",
         "description": "Return more than the declared output ceiling.",
-        "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "risk": "read",
         "scope": "task",
-        "handler": "/v2/p/runtime-fixture/tools/large",
+        "handler": "/v1/p/runtime-fixture/tools/large",
         "timeoutMs": 1000,
         "maxOutputBytes": 1024
       }
@@ -71,12 +96,13 @@
         "label": "Runtime fixture",
         "scope": "task",
         "order": 25,
-        "read": "/v2/p/runtime-fixture/context",
+        "read": "/v1/p/runtime-fixture/context",
         "defaultIncluded": false,
         "timeoutMs": 1000,
         "maxBytes": 4096,
         "maxTokens": 512
       }
     ]
-  }
+  },
+  "baseline": "acorn-1"
 }

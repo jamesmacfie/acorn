@@ -363,7 +363,7 @@ A region is one of three things:
 | --- | --- |
 | `{ "kind": "remote", "entry": "pane" }` | A tree the plugin's bundle emits from a worker, named by a key of the object it passed to `mountTree`. The host mounts its own components for it. |
 | `"frame"` | The plugin's own bundle in a sandboxed iframe, drawing its own pixels. |
-| `{ "kind": "document", "read": "/v2/p/<id>/…" }` | A host-drawn editor. The plugin contributes routes and a language id, and no code at all. |
+| `{ "kind": "document", "read": "/v1/p/<id>/…" }` | A host-drawn editor. The plugin contributes routes and a language id, and no code at all. |
 
 A pane whose regions are all documents runs none of the plugin's code, so it is gated like a descriptor
 rather than behind the bytes-hash prompt. A `remote` region is gated exactly as a `frame` one is: the
@@ -374,7 +374,7 @@ tree path changes where a plugin's bytes run, not whose they are.
   "target": "pane", "id": "database", "label": "Database",
   "layout": "document-over-frame",
   "regions": {
-    "document": { "kind": "document", "languageId": "sql", "read": "/v2/p/database/tasks/:taskId/scratch" },
+    "document": { "kind": "document", "languageId": "sql", "read": "/v1/p/database/tasks/:taskId/scratch" },
     "frame": { "kind": "remote", "entry": "panel" }
   }
 }]

@@ -7,7 +7,7 @@ import { isAbsolute, resolve } from 'node:path'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import type { TaskStatus, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { TaskStatus } from '@acorn/protocol/task.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
 import { getProject, type ProjectRow } from '../projects'
@@ -165,7 +165,7 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
 // (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
-export function taskContext(t: TaskRef | undefined, github?: { owner: string; name: string } | null): Pick<TerminalSession, 'repo' | 'pull'> {
+export function taskContext(t: TaskRef | undefined, github?: { owner: string; name: string } | null): { repo?: { owner: string; name: string }; pull?: { number: number } } {
   if (!t) return {}
   return {
     repo: github ?? undefined,

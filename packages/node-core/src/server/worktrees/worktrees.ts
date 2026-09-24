@@ -2,7 +2,7 @@ import { gitOrThrow } from '../core/git'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
-import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
+import type { WorktreeResult } from '@acorn/protocol/task.ts'
 import { isContainedPath, worktreeBranchDirName } from './pathGuards'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
 

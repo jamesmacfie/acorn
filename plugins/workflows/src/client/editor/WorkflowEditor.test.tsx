@@ -10,8 +10,8 @@ import { generateReason } from './GenerateModal'
 // the button is drawn at all, whether a whole definition lands as one undo entry, and what a refusal
 // reads as. The prompt and the grounding are pure and tested on the node side.
 
-const original: WorkflowDef = { name: 'Ship it', steps: [{ name: 'plan', prompt: 'Plan the change' }] }
-const generated: WorkflowDef = {
+const original: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Ship it', steps: [{ name: 'plan', prompt: 'Plan the change' }] }
+const generated: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
   name: 'Investigate',
   steps: [
     { name: 'angle-one', prompt: 'One angle' },

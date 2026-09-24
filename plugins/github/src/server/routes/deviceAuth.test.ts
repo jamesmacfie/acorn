@@ -1,14 +1,14 @@
 import { makeTestDb, schema, testGate, testSecretEnv, type TestDb } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { AppEnv, Principal } from '@acorn/plugin-api/testkit'
+import type { Env } from '@acorn/plugin-api/testkit'
 // Core's schema: the device flow writes core's `integrations` row through core's own
 // connectProvider and touches none of this plugin's tables, so this test needs core's handle only.
-import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { decryptSecret } from '@acorn/plugin-api/testkit'
 import { githubDeviceAuth } from './deviceAuth'
 import { githubProvider } from '../provider'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
+import { connectionProviderRegistry } from '@acorn/plugin-api/testkit'
 
 const ENC_KEY = '0'.repeat(64)
 const PRINCIPAL: Principal = { kind: 'device', deviceId: 'd1', userId: 'james' }
@@ -115,8 +115,8 @@ describe('github device flow — poll', () => {
     expect(row.provider).toBe('github')
     expect(row.userId).toBe('james')
     // At rest it is ciphertext, and the plaintext round-trips only under the right key.
-    expect(row.authRef).not.toContain('gho_realtoken')
-    expect(await decryptSecret(row.authRef, ENC_KEY)).toBe('gho_realtoken')
+    expect(row.encryptedCredentials).not.toContain('gho_realtoken')
+    expect(await decryptSecret(row.encryptedCredentials, ENC_KEY)).toBe('gho_realtoken')
   })
 
   it('never echoes the access token back to the client', async () => {
@@ -142,7 +142,7 @@ describe('github device flow — poll', () => {
   })
 })
 
-// This plugin registers with `prefix: ''`, so these paths sit at /v2/p/github/auth/device/* where no
+// This plugin registers with `prefix: ''`, so these paths sit at /v1/p/github/auth/device/* where no
 // core mount gate reaches them and the router has to carry its own. Without it a task-scoped agent
 // token could open a device window, show the owner a code for an account the agent controls, and end
 // up with that account's token stored as the owner's GitHub connection: every later GitHub call made

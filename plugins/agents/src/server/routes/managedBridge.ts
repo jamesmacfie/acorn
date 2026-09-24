@@ -4,7 +4,7 @@
 // runtime's thrown messages into the status codes managed.ts promises. node/index.ts owns composition,
 // not HTTP semantics.
 import { BridgeError } from '@acorn/plugin-api/node'
-import type { AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
 import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'

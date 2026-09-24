@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { PrefKeys } from '@acorn/plugin-api/client'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
   AGENT_TOOL_FOLD_CHOICES,
   defaultAgentToolFoldPrefs,
@@ -13,7 +14,7 @@ import {
 // defaults and the palette's setting command both write through `saveAgentToolFoldMode`.
 
 const stored = (): Record<string, string> => ({
-  [PrefKeys.agentToolFold]: localStorage.getItem(`acorn-pref:${PrefKeys.agentToolFold}`) ?? '',
+  [PrefKeys.agentToolFold]: localStorage.getItem(`acorn-pref:${ACORN_BASELINE}:${PrefKeys.agentToolFold}`) ?? '',
 })
 
 describe('the tool-card fold preference', () => {
@@ -27,7 +28,7 @@ describe('the tool-card fold preference', () => {
 
   it('keeps the reader’s last toggle when the mode changes', async () => {
     const qc = new QueryClient()
-    localStorage.setItem(`acorn-pref:${PrefKeys.agentToolFold}`, JSON.stringify({ mode: 'sticky', last: 'expanded' }))
+    localStorage.setItem(`acorn-pref:${ACORN_BASELINE}:${PrefKeys.agentToolFold}`, JSON.stringify({ mode: 'sticky', last: 'expanded' }))
     await saveAgentToolFoldMode(qc, stored(), 'collapsed')
     expect(readAgentToolFoldPrefs(stored())).toEqual({ mode: 'collapsed', last: 'expanded' })
   })

@@ -35,7 +35,8 @@ the versioned persistence parser and are recoverable only from the workflow-v2 t
 
 ## Persistence
 
-Dashboard composition is the `dashboards` Node preference. Its exact envelope is version 2:
+Dashboard composition is the `dashboards` Node preference. Its exact envelope is version 1 under
+the verified `acorn-1` data root:
 
 ```json
 {
@@ -60,7 +61,7 @@ Dashboard composition is the `dashboards` Node preference. Its exact envelope is
 Definitions are independent from placements. A panel can appear on multiple surfaces with separate
 geometry. Unknown placement owners and missing panel IDs remain inert so a temporarily unavailable
 plugin or pane does not destroy composition. Malformed definitions are dropped; an unversioned or
-non-v2 envelope resets to the empty model instead of invoking compatibility code.
+non-v1 envelope resets to the empty model instead of invoking compatibility code.
 
 Home tabs are placement scopes. Their names and order live in the same preference; panel content
 still lives under ordinary placement and layout keys. Device-local editor recovery is temporary and

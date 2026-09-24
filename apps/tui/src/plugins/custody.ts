@@ -1,12 +1,12 @@
 import { join } from 'node:path'
-import { PluginCache, type BundleFetcher } from '@acorn/custody/plugins/pluginCache.ts'
-import { PluginTrustStore } from '@acorn/custody/plugins/pluginTrustStore.ts'
+import { PluginCache, type BundleFetcher } from '@acorn/custody/plugins'
+import { PluginTrustStore } from '@acorn/custody/plugins'
 import {
   decisionSchema, devGrantSchema, disclosureSchema, NO_DISCLOSURE, putSchema,
-} from '@acorn/custody/plugins/pluginRequests.ts'
-import type { PluginCustody } from '@acorn/client-core/infra/platform/index.ts'
+} from '@acorn/custody/plugins'
+import type { PluginCustody } from '@acorn/client-core/infra/platform'
 import { configDir } from '../node/paths'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('plugins')
 

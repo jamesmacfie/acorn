@@ -25,7 +25,7 @@ alone does anything, which is what makes "nothing leaves this machine that you d
 true by construction rather than by care. With no sink there is no timer and no database read.
 
 The collector re-reads the preference on its own five-second tick rather than being told, because
-`PUT /v2/core/prefs` writes the table directly and has nothing to notify. A switch flipped in
+`PUT /v1/core/prefs` writes the table directly and has nothing to notify. A switch flipped in
 Settings is seen within five seconds. The tick reads consent before handing over its buffered
 window; observing off discards pending records and histograms.
 
@@ -87,7 +87,7 @@ because a plugin should not be able to fail its own route by mislabelling a span
 
 | Key | Values | Set where |
 | --- | --- | --- |
-| `owner` | `core` or a plugin id | The seam that knows. The plugin host binds it into `ctx.telemetry` and `ctx.log`; the request middleware derives it from `/v2/p/<id>` in the path; the scheduler from the schedule key; the hook runner from the handler's registration |
+| `owner` | `core` or a plugin id | The seam that knows. The plugin host binds it into `ctx.telemetry` and `ctx.log`; the request middleware derives it from `/v1/p/<id>` in the path; the scheduler from the schedule key; the hook runner from the handler's registration |
 | `runtime` | `node`, `renderer`, `tui`, `helper` or `shell` | Whichever runtime built the batch. The node stamps its own; a posted batch names the sender, and cannot say `node` |
 
 The conventional ones, set by the seam that has the fact: `seam`, `route`, `method`, `status`,
@@ -314,7 +314,7 @@ when a trace crosses a process.
 **Routine requests are sampled by value before trace sampling.** A request trace stays complete when
 the same batch contains a command, navigation, render, or other meaningful span. A failed request is
 always retained. Outside those traces, Sentry keeps renderer requests taking at least one second and
-node requests taking at least 250 ms. Successful `/v2/core/telemetry` and `/v2/core/prefs` spans are
+node requests taking at least 250 ms. Successful `/v1/core/telemetry` and `/v1/core/prefs` spans are
 never exported: those routes describe the reporting machinery itself and were the overwhelming
 majority of stored spans. The collector still exposes the complete stream to local and other sinks.
 The configured trace sample rate is applied after this gate.
@@ -345,7 +345,7 @@ emits about itself is a `sentry.dropped` counter, with the reason and the catego
 
 Settings → Telemetry is the switch and the evidence beside it: what this node has collected since
 it started, per owner and kind, which plugins are reading the stream, when a batch last went to
-them, and how many records were dropped. `GET /v2/core/telemetry/summary` answers it and the page
+them, and how many records were dropped. `GET /v1/core/telemetry/summary` answers it and the page
 asks every five seconds, which is the collector's own flush window, so the numbers move while
 somebody watches.
 
@@ -416,7 +416,7 @@ reaches every sink, and is scrubbed on the way.
 | Console lines | everywhere under `packages/node-core/src` and `apps/node/src` | log records |
 | Telemetry from another runtime | `server/routes/telemetry.ts` | nothing of its own; it admits what the renderer collected |
 
-A loaded plugin's HTTP routes need nothing extra: they are served under `/v2/p/<id>/`, so the
+A loaded plugin's HTTP routes need nothing extra: they are served under `/v1/p/<id>/`, so the
 request middleware's span already names the plugin.
 
 Installing a crash handler changes what Node does. With any `uncaughtException` listener registered,
@@ -488,6 +488,9 @@ without one, and `ownerOf` answers `undefined`, which the seams read as `core`.
 | Opted-in state transitions | `infra/telemetry/emitter.ts` `startRenderTransition` | one `ui.render` child span with current-turn, first-frame and paint-frame durations; only under an open interaction |
 | Opted-in initial list construction | `infra/telemetry/emitter.ts` `measureRenderBatch` | one `ui.render.batch` span per operation and JavaScript turn, with factory-call count, inclusive factory time and wall time to the microtask checkpoint |
 | Every pane region | `host/registries/panes/panes.ts` `drawLayout` | span `pane.region`, from the host asking for the region to the child's mount |
+
+`@acorn/protocol/telemetry` owns `apiRouteNamespace`. The renderer request seam and desktop
+bridge both use it to group `/v1/p/<plugin>` requests by plugin without recording full paths.
 | Every pane model build | `host/registries/panes/paneModels.ts` | span `pane.model`; a cache hit is not timed |
 | Every plugin frame boot | `host/frames/PluginFrame.tsx` | span `frame.boot`, ended on the frame's first message; an error record on the ten-second deadline |
 | Every bridge message | `host/frames/broker.ts` | histogram `bridge.message.<kind>`; event `bridge.overbudget` when the rate limiter trips |
@@ -547,7 +550,7 @@ boot spans are all inside those five seconds.
 
 ## Other runtimes
 
-`POST /v2/core/telemetry` is where every runtime that is not the node posts its batches. Device
+`POST /v1/core/telemetry` is where every runtime that is not the node posts its batches. Device
 principals only, because everything admitted there reaches every sink and a sink can post it off the
 machine, so a task-scoped agent must not be able to put words in one.
 

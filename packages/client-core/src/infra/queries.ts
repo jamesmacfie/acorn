@@ -6,9 +6,7 @@
 // project, task, workspace, preference, and integration queries.
 import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
 import { readJson } from './node/apiClient'
-import { activeNodeId } from './node/activeNode'
-import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
-import { setPref } from '../features/settings/savePref'
+import { mergePrefs } from './persistence/devicePrefs'
 import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
@@ -80,19 +78,10 @@ export const integrationMappingsOptions = (connectionId: string, enabled: boolea
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
-  // The active node's prefs. Everything left in this store describes that node's resources, and
-  // the per-node QueryClient partition (node/fleet.ts) already keeps one node's answer out of
-  // another's.
-  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> => {
-    const nodePrefs = await readJson<Record<string, string>>(prefsRoute, { signal })
-    seedDevicePrefs(nodePrefs)
-    // One-shot, and a no-op on every fetch after the first: hands back whatever composition state the
-    // previous release seeded into this device's storage. Awaited rather than fired off, so the value
-    // this query resolves with already includes it and the shell restores layouts on the first paint
-    // rather than the second.
-    const drained = await drainMigratedPrefs(activeNodeId(), nodePrefs, setPref)
-    return mergePrefs({ ...nodePrefs, ...drained })
-  },
+  // The per-node QueryClient partition keeps each node's answer separate. Device preferences are
+  // projected by select, including when a persisted query hydrates without fetching.
+  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> =>
+    readJson<Record<string, string>>(prefsRoute, { signal }),
   // A persisted TanStack snapshot can hydrate without running queryFn while it is still fresh. Device
   // preferences live outside that cache, so project them at read time as well or a just-saved shortcut
   // can disappear from every consumer until the node-backed query refetches.

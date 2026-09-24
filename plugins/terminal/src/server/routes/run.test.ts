@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { harness, setRunBridge, type RunBridge } from '@acorn/node-core/server/routes/plugins/harness.ts'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
+import { requireUser } from '@acorn/plugin-api/testkit'
+import { harness, setRunBridge, type RunBridge } from '@acorn/plugin-api/testkit'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 // The client's run surface reuses the harness RunBridge routes. This proves the client-facing
 // verbs (targets/start/stop/status plus the new default-url) and auth/503.

@@ -4,7 +4,7 @@ import { writeJson } from '../../infra/node/apiClient'
 
 export const queriesKey = (nodeId: string, scope: QueryScope) => ['queries', nodeId, scope.workspaceId, scope.projectId ?? null] as const
 export function queriesClient(nodeId: string, scope: QueryScope) {
-  const request = <T>(operation: string, body: object = {}, signal?: AbortSignal) => writeJson<T>(`/v2/core/queries/${operation}`, {
+  const request = <T>(operation: string, body: object = {}, signal?: AbortSignal) => writeJson<T>(`/v1/core/queries/${operation}`, {
     method: 'POST', nodeId, signal,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...body, operation, scope }),

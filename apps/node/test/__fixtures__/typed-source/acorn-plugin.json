@@ -2,11 +2,28 @@
   "id": "typed-source",
   "name": "Typed source conformance",
   "version": "1.0.0",
-  "apiVersion": "13",
+  "apiVersion": "1",
   "node": "./node.mjs",
-  "permissions": { "node": {} },
+  "permissions": {
+    "node": {}
+  },
   "contributions": {
-    "dataSources": [{ "sourceId": "records", "name": "Nested records", "singular": "Record", "plural": "Records", "identityScope": "Record ID is stable within this source.", "handler": "/v2/p/typed-source/source" }],
-    "dataSourceDiscoveries": [{ "discoveryId": "dynamic", "handler": "/v2/p/typed-source/source" }]
-  }
+    "dataSources": [
+      {
+        "sourceId": "records",
+        "name": "Nested records",
+        "singular": "Record",
+        "plural": "Records",
+        "identityScope": "Record ID is stable within this source.",
+        "handler": "/v1/p/typed-source/source"
+      }
+    ],
+    "dataSourceDiscoveries": [
+      {
+        "discoveryId": "dynamic",
+        "handler": "/v1/p/typed-source/source"
+      }
+    ]
+  },
+  "baseline": "acorn-1"
 }

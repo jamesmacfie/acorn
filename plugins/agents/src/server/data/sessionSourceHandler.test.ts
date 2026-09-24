@@ -13,7 +13,7 @@ describe('managed session data source', () => {
       attention: 'none', model: null, taskId: 'task-1', createdAt: 1, updatedAt: 2,
     }] }) } } as unknown as ManagedAgentRuntime
     const handler = createSessionSourceHandler(runtime)
-    const response = await handler(new Request('http://plugin/v2/p/agents/data/sessions', {
+    const response = await handler(new Request('http://plugin/v1/p/agents/data/sessions', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         operation: 'query', mode: 'execution', evaluationTime: 7, pageSize: 25,
         query: { source: { pluginId: 'agents', sourceId: 'sessions' }, scope: { parameters: {} }, sort: [] },

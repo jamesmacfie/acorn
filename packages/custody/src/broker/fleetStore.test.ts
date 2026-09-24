@@ -47,13 +47,13 @@ describe('FleetStore', () => {
     expect(reloaded.tokenFor('node-remote')).toBe('tok-remote')
   })
 
-  it('keeps the token out of fleet.json and both files owner-only', () => {
+  it('keeps the token out of acorn-1-fleet.json and both files owner-only', () => {
     store().remember({ ...remote }, 'tok-remote')
-    const raw = readFileSync(join(dir, 'fleet.json'), 'utf8')
+    const raw = readFileSync(join(dir, 'acorn-1-fleet.json'), 'utf8')
 
     expect(raw).not.toContain('tok-remote')
-    expect(statSync(join(dir, 'fleet.json')).mode & 0o777).toBe(0o600)
-    expect(statSync(join(dir, 'device-token-node-remote')).mode & 0o777).toBe(0o600)
+    expect(statSync(join(dir, 'acorn-1-fleet.json')).mode & 0o777).toBe(0o600)
+    expect(statSync(join(dir, 'acorn-1-device-token-node-remote')).mode & 0o777).toBe(0o600)
   })
 
   it('scopes the local node\'s token by the data dir, not its nodeId', () => {
@@ -61,8 +61,8 @@ describe('FleetStore', () => {
     // that can report the nodeId (deviceTokenStore.ts).
     store().remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
 
-    expect(existsSync(join(dir, 'device-token-local'))).toBe(true)
-    expect(existsSync(join(dir, 'device-token-node-local'))).toBe(false)
+    expect(existsSync(join(dir, 'acorn-1-device-token-local'))).toBe(true)
+    expect(existsSync(join(dir, 'acorn-1-device-token-node-local'))).toBe(false)
     expect(store().tokenFor('node-local')).toBe('tok-local')
   })
 
@@ -120,7 +120,7 @@ describe('FleetStore', () => {
     fleet.forget('node-remote')
 
     expect(fleet.list()).toEqual([])
-    expect(existsSync(join(dir, 'device-token-node-remote'))).toBe(false)
+    expect(existsSync(join(dir, 'acorn-1-device-token-node-remote'))).toBe(false)
     // An orphaned credential would outlive the membership it belonged to.
     expect(store().tokenFor('node-remote')).toBeUndefined()
   })
@@ -137,7 +137,7 @@ describe('FleetStore', () => {
   })
 
   it('starts from an empty fleet rather than guessing at an unparseable file', () => {
-    writeFileSync(join(dir, 'fleet.json'), '{"version":1,"nodes":[{"nodeId":"x"}]}')
+    writeFileSync(join(dir, 'acorn-1-fleet.json'), '{"version":1,"nodes":[{"nodeId":"x"}]}')
     expect(store().list()).toEqual([])
   })
 

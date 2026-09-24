@@ -29,7 +29,7 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   id: 'ntfy',
   name: 'ntfy plugin',
   version: '1.0.0',
-  apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
   client: './dist/client.js',
   ...over,
@@ -82,6 +82,12 @@ afterEach(() => {
 })
 
 describe('resolving a source', () => {
+  it('refuses a historical API-1 folder without a baseline before creating install state', async () => {
+    const source = packageDir({ baseline: undefined, apiVersion: '1' })
+    await expect(installPlugin(root, { path: source })).rejects.toThrow(/baseline/)
+    expect(readdirSync(root)).toEqual([])
+  })
+
   it('installs from a direct tarball URL, pinning the archive hash and entrypoint hashes', async () => {
     const bytes = tarball(packageDir())
     serve(bytes)

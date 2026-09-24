@@ -9,7 +9,7 @@ node stats, context-menu rows (`contextMenus`), restricted URL recognizers (`con
 routes (`routes`), agent-context entries (`agentContexts`), batch reference resolvers
 (`refResolvers`), typed data sources (`dataSources` and `dataSourceDiscoveries`), periodic node-side
 work (`schedules`), and colour themes (`themes`). These are data, not code: the host renders them with its own components and fetches their content
-from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
+from routes in the plugin's own `/v1/p/<id>/` namespace, so they stay live when no frame is
 mounted anywhere (`packages/client-core/src/host/chrome/`). Freshness rides the existing
 invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
 bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
@@ -99,8 +99,8 @@ freshness. The whole entry is two routes and a label:
       "id": "http-requests",
       "label": "HTTP requests",
       "description": "Saved requests and their latest responses",
-      "options": "/v2/p/http/agent-context/options",
-      "capture": "/v2/p/http/agent-context/capture"
+      "options": "/v1/p/http/agent-context/options",
+      "capture": "/v1/p/http/agent-context/capture"
     }]
   }
 }
@@ -126,7 +126,7 @@ cannot survive either side becoming a loaded package.
     "refResolvers": [{
       "id": "linear-refs",
       "kind": "linear.issue",
-      "resolve": "/v2/p/linear/issues"
+      "resolve": "/v1/p/linear/issues"
     }]
   }
 }
@@ -169,7 +169,7 @@ describing a daemon and the daemon here is the node.
     "schedules": [{
       "id": "refresh-mirror",
       "name": "Refresh issue mirror",
-      "run": "/v2/p/linear/schedules/refresh-mirror",
+      "run": "/v1/p/linear/schedules/refresh-mirror",
       "cadence": { "every": 600 },
       "timeout": 120
     }]

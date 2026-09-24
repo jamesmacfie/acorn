@@ -23,7 +23,7 @@ const withDocument = (region: Omit<PluginDocumentRegion, 'languageId'>) =>
 const composed = surface({
   id: 'query',
   layout: 'document-over-frame',
-  regions: { document: document({ read: '/v2/p/board/doc' }), frame: 'frame' },
+  regions: { document: document({ read: '/v1/p/board/doc' }), frame: 'frame' },
 })
 
 const remote = surface({
@@ -34,7 +34,7 @@ const remote = surface({
 
 describe('isHostOwnedSurface', () => {
   it('is true only for a pane whose whole rectangle the host draws', () => {
-    expect(isHostOwnedSurface(withDocument({ read: '/v2/p/board/doc' }))).toBe(true)
+    expect(isHostOwnedSurface(withDocument({ read: '/v1/p/board/doc' }))).toBe(true)
     // A plain frame: every manifest written before this contract existed.
     expect(isHostOwnedSurface(surface())).toBe(false)
     expect(isHostOwnedSurface(surface({ target: 'overlay' }))).toBe(false)
@@ -55,7 +55,7 @@ describe('isHostOwnedSurface', () => {
     expect(isHostOwnedSurface(surface({
       id: 'query',
       layout: 'document-over-frame',
-      regions: { document: document({ read: '/v2/p/board/doc' }), frame: { kind: 'remote', entry: 'panel' } },
+      regions: { document: document({ read: '/v1/p/board/doc' }), frame: { kind: 'remote', entry: 'panel' } },
     }))).toBe(false)
   })
 })
@@ -64,7 +64,7 @@ describe('remoteRegionEntry', () => {
   it('names the bundle entry of a remote region and nothing else', () => {
     expect(remoteRegionEntry({ kind: 'remote', entry: 'pane' })).toBe('pane')
     expect(remoteRegionEntry('frame')).toBeNull()
-    expect(remoteRegionEntry(document({ read: '/v2/p/board/doc' }))).toBeNull()
+    expect(remoteRegionEntry(document({ read: '/v1/p/board/doc' }))).toBeNull()
   })
 })
 
@@ -74,10 +74,10 @@ describe('paneLayoutFor', () => {
   })
 
   it('returns the layout and its regions for routes inside the plugin namespace', () => {
-    const declared = paneLayoutFor('board', withDocument({ read: '/v2/p/board/doc', write: '/v2/p/board/doc' }))
+    const declared = paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', write: '/v1/p/board/doc' }))
     expect(declared).toEqual({
       layout: 'single',
-      regions: { body: { kind: 'document', languageId: 'sql', read: '/v2/p/board/doc', write: '/v2/p/board/doc' } },
+      regions: { body: { kind: 'document', languageId: 'sql', read: '/v1/p/board/doc', write: '/v1/p/board/doc' } },
     })
   })
 
@@ -91,14 +91,14 @@ describe('paneLayoutFor', () => {
   })
 
   it('refuses a read route outside the namespace, because a roster row is bytes a node sent', () => {
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v2/core/tasks' }))).toThrow(/outside board/)
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v2/p/other/doc' }))).toThrow(/outside board/)
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/core/tasks' }))).toThrow(/outside board/)
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/other/doc' }))).toThrow(/outside board/)
     // Dot segments are normalised before the check, so an apparently-owned path cannot escape.
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v2/p/board/../other/doc' }))).toThrow(/outside board/)
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/../other/doc' }))).toThrow(/outside board/)
   })
 
   it('refuses an escaping WRITE route even when the read route is fine', () => {
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v2/p/board/doc', write: '/v2/p/other/doc' })))
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' })))
       .toThrow(/write route/)
   })
 
@@ -111,9 +111,9 @@ describe('paneLayoutFor', () => {
   })
 
   it('refuses an escaping COMPLETIONS route', () => {
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/core/tasks', triggerCharacters: [] } })))
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/core/tasks', triggerCharacters: [] } })))
       .toThrow(/completions route/)
-    expect(paneLayoutFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete', triggerCharacters: [] } })))
-      .toMatchObject({ regions: { body: { completions: { route: '/v2/p/board/complete' } } } })
+    expect(paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete', triggerCharacters: [] } })))
+      .toMatchObject({ regions: { body: { completions: { route: '/v1/p/board/complete' } } } })
   })
 })

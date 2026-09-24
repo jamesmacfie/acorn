@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ensureCert } from '@acorn/node-core/server/transport/tls.ts'
+import { ensureCert } from '@acorn/node-core/server/transport'
 import { PreviewTunnels, type TunnelEvents } from './previewTunnel'
 
 let certDir: string
@@ -35,7 +35,7 @@ beforeEach(async () => {
   upgrades = []
   delivered = []
   server = createHttpsServer({ key: keyPem, cert: certPem, minVersion: 'TLSv1.3' })
-  wss = new WebSocketServer({ server, path: '/v2/tunnel' })
+  wss = new WebSocketServer({ server, path: '/v1/tunnel' })
   wss.on('connection', (socket, req) => {
     upgrades.push(req.url ?? '')
     socket.on('message', (data: Buffer) => delivered.push(data.toString()))

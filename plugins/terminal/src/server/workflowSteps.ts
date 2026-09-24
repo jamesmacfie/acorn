@@ -34,7 +34,7 @@ const COMMAND_FIELDS: StepField[] = [
 ]
 
 const RUN_TARGET_FIELDS: StepField[] = [
-  { id: 'target', label: 'Run target', type: 'select', required: true, optionsRoute: '/v2/p/terminal/tasks/{taskId}/run-targets' },
+  { id: 'target', label: 'Run target', type: 'select', required: true, optionsRoute: '/v1/p/terminal/tasks/{taskId}/run-targets' },
   { id: 'waitForUrl', label: 'Wait for a URL', type: 'boolean', hint: `On by default: the step finishes when the target reports a URL, or fails after ${RUN_TARGET_URL_TIMEOUT_MS / 1000} seconds.` },
 ]
 

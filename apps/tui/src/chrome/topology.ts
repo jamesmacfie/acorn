@@ -11,7 +11,7 @@
 // `regionFocus` call that declares them. Everywhere else the ids arrive as a `RegionRef` from here.
 
 import { activeTaskId, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import type { RegionRef, Topology } from '../keys/regions'
 
 const region = (regionId: string): RegionRef => ({ paneId: 'chrome', regionId })

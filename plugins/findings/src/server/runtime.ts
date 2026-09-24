@@ -89,6 +89,11 @@ export class FindingsRuntime {
   candidate(id: string, revision?: number): FindingCandidateRevision | null { return this.#review?.candidate(id, revision) ?? null }
   bundles(scope: FindingScope, history = false): FindingBundle[] { return this.#review?.bundles(scope, history) ?? [] }
   reviewAttention(): FindingReviewAttention[] { return this.#review?.attention() ?? [] }
+  reviewTargets(): { id: string; label: string }[] {
+    return this.#targetEntries().filter((entry) => this.#targetConnections.has(entry.id))
+      .map((entry) => ({ id: entry.id, label: entry.value.label ?? entry.id }))
+  }
+  hasReviewTarget(id: string): boolean { return this.reviewTargets().some((target) => target.id === id) }
   observations(ids: readonly string[]): FindingObservation[] { return this.#capture.getMany(ids) }
 
   async bundlesForTask(taskId: string, history = false): Promise<FindingBundle[]> {
@@ -103,81 +108,26 @@ export class FindingsRuntime {
     return userId ? this.#core.models.available(userId) : []
   }
 
-  async importLegacyProposal(proposal: {
-    id: string
-    taskId: string
-    projectId: string | null
-    name: string
-    type: string
-    description: string
-    body: string
-    flags: string[]
-    status: 'pending' | 'accepted' | 'rejected'
-    createdAt: number
-    originSessionId: string | null
-  }): Promise<{ observationId: string; candidateId: string; revision: number; payloadHash: string }> {
-    if (!this.#review) throw new FindingCaptureError('unavailable', 'findings review is unavailable')
-    const targetEntry = this.#targetEntries().find((entry) => entry.id === 'memory:change')
-    if (!targetEntry) throw new FindingCaptureError('unavailable', 'memory review target is unavailable')
-    // Legacy files can outlive their project row. Keep those records reviewable as private history
-    // instead of making a deleted project permanently block migration cutover.
-    const liveProject = proposal.projectId ? await this.#core?.projects?.byId(proposal.projectId) : null
-    const scope: FindingScope = liveProject ? { kind: 'project', projectId: liveProject.id } : { kind: 'private' }
-    const recorded = await this.record({
-      scope,
-      origin: { kind: 'legacy', proposalId: proposal.id, ...(proposal.originSessionId ? { sessionId: proposal.originSessionId } : {}) },
-      producerId: 'legacy-memory-proposals',
-      input: {
-        sourceKey: `proposal:${proposal.id}`,
-        kind: 'findings:observation',
-        kindVersion: 1,
-        title: proposal.name.slice(0, 200),
-        body: proposal.body,
-        claimStatus: 'inferred',
-        evidence: [],
-      },
-    })
-    const payload = {
-      operation: 'add',
-      name: proposal.name,
-      type: proposal.type,
-      description: proposal.description,
-      body: proposal.body,
-      scope: scope.kind === 'project' ? { kind: 'project', projectId: scope.projectId } : { kind: 'private' },
-    }
-    const validation = await targetEntry.value.validate({ scope, payload })
-    const imported = this.#review.importLegacy({
-      legacyId: proposal.id,
-      scope,
-      observationId: recorded.id,
-      targetKind: targetEntry.id,
-      targetVersion: targetEntry.value.version,
-      validation: { ...validation, warnings: [...proposal.flags, ...validation.warnings] },
-      status: proposal.status,
-      createdAt: proposal.createdAt,
-    })
-    return { observationId: recorded.id, ...imported }
-  }
-
-  async prepareTask(taskId: string, options: { boundaryKey: string; backendId?: string; modelId?: string }): Promise<FindingBundle> {
+  async prepareTask(taskId: string, options: { boundaryKey: string; targetId: string; backendId?: string; modelId?: string }): Promise<FindingBundle> {
     return this.#prepareTask(taskId, options, true)
   }
 
-  async startPrepareTask(taskId: string, options: { boundaryKey: string; backendId?: string; modelId?: string }): Promise<FindingBundle> {
+  async startPrepareTask(taskId: string, options: { boundaryKey: string; targetId: string; backendId?: string; modelId?: string }): Promise<FindingBundle> {
     return this.#prepareTask(taskId, options, false)
   }
 
-  async #prepareTask(taskId: string, options: { boundaryKey: string; backendId?: string; modelId?: string }, waitForCompletion: boolean): Promise<FindingBundle> {
+  async #prepareTask(taskId: string, options: { boundaryKey: string; targetId: string; backendId?: string; modelId?: string }, waitForCompletion: boolean): Promise<FindingBundle> {
     if (!this.#active) throw new FindingCaptureError('unavailable', 'findings is unavailable')
     if (!this.#review || !this.#core) throw new FindingCaptureError('unavailable', 'findings review is unavailable')
     const review = this.#review, core = this.#core
     const task = await core.tasks.load(taskId)
     if (!task?.projectId) throw new FindingCaptureError('not-found', 'task project is unavailable')
-    const targetEntry = this.#targetEntries().find((entry) => entry.id === 'memory:change')
-    if (!targetEntry) throw new FindingCaptureError('unavailable', 'memory review target is unavailable')
     const scope: FindingScope = { kind: 'project', projectId: task.projectId }
     const persistedSource = review.preparationSourceForBoundary(scope, options.boundaryKey)
     if (persistedSource && persistedSource.taskId !== taskId) throw new FindingCaptureError('conflict', 'preparation boundary belongs to another source task')
+    if (persistedSource && persistedSource.targetKind !== options.targetId) throw new FindingCaptureError('conflict', 'preparation boundary belongs to another target')
+    const targetEntry = this.#targetEntries().find((entry) => entry.id === options.targetId)
+    if (!targetEntry || !this.#targetConnections.has(options.targetId)) throw new FindingCaptureError('unavailable', 'review target is unavailable')
     const frozenIds = review.preparationInputIdsForBoundary(scope, options.boundaryKey)
     const input = frozenIds ? this.#capture.getMany(frozenIds) : await this.#activeTaskObservations(taskId)
     if (frozenIds && input.length !== frozenIds.length) throw new FindingCaptureError('unavailable', 'one or more frozen preparation inputs are unavailable')
@@ -259,6 +209,7 @@ export class FindingsRuntime {
     const source = this.#review.preparationSource(bundleId)
     return this.startPrepareTask(source.taskId, {
       boundaryKey: source.boundaryKey,
+      targetId: source.targetKind,
       ...(source.backendId ? { backendId: source.backendId } : {}),
       ...(source.modelId ? { modelId: source.modelId } : {}),
     })
@@ -317,6 +268,45 @@ export class FindingsRuntime {
     }
   }
 
+  async submitAgentProposal(input: { taskId: string; sessionId: string; proof: string; sourceKey: string; title: string; body: string; payload: unknown }, verify: (taskId: string, sessionId: string, proof: string) => Promise<boolean>): Promise<{ observationId: string; candidateId: string; bundleId: string; revision: number; payloadHash: string }> {
+    if (!(await verify(input.taskId, input.sessionId, input.proof))) throw new FindingCaptureError('forbidden', 'agent proposal provenance is invalid')
+    const entry = this.#targetEntries().find((item) => item.id === 'memory:change')
+    const token = entry && this.#targetConnections.get(entry.id)?.token
+    if (!entry || !token) throw new FindingCaptureError('unavailable', 'memory review target is unavailable')
+    return this.#submitProposal(entry, token, input, { kind: 'agent', sessionId: input.sessionId })
+  }
+
+  async #submitProposal(
+    entry: { id: string; pluginId: string; value: FindingReviewTargetContribution },
+    token: object,
+    input: { taskId: string; sourceKey: string; title: string; body: string; payload: unknown },
+    origin: FindingOrigin,
+  ): Promise<{ observationId: string; candidateId: string; bundleId: string; revision: number; payloadHash: string }> {
+    const available = () => this.#active && this.#targetConnections.get(entry.id)?.token === token
+    if (!available() || !this.#review || !this.#core) throw new FindingCaptureError('unavailable', 'review target is unavailable')
+    const task = await this.#core.tasks.load(input.taskId)
+    if (!task?.projectId) throw new FindingCaptureError('not-found', 'proposal task project is unavailable')
+    const scope: FindingScope = { kind: 'project', projectId: task.projectId }
+    const validation = await entry.value.validate({ scope, payload: input.payload })
+    if (!available()) throw new FindingCaptureError('unavailable', 'review target is unavailable')
+    let proposal: ReturnType<FindingsReviewStore['submitProposal']> | undefined
+    const recorded = await this.#capture.record({
+      scope: { kind: 'task', taskId: input.taskId }, origin,
+      producerId: `review:${entry.id}`,
+      input: { sourceKey: input.sourceKey, kind: 'findings:observation', kindVersion: 1,
+        title: input.title, body: input.body, claimStatus: 'inferred', evidence: [] },
+      afterRecord: ([observation], tx) => {
+        if (!available()) throw new FindingCaptureError('unavailable', 'review target is unavailable')
+        proposal = this.#review!.submitProposal({ scope, observationId: observation!.id,
+          targetKind: entry.id, targetVersion: entry.value.version, validation }, tx)
+      },
+    })
+    this.#announce({ kind: 'task', taskId: input.taskId }, [recorded])
+    this.#emit({ channel: 'plugin:findings:review-changed', scope, revision: 1 })
+    this.#publishBundle(this.#review.bundles(scope, true).find((bundle) => bundle.id === proposal!.bundleId)!)
+    return { observationId: recorded.id, ...proposal! }
+  }
+
   connectTargets(): void {
     if (!this.#review) return
     for (const connection of this.#targetConnections.values()) {
@@ -329,6 +319,7 @@ export class FindingsRuntime {
       const token = {}
       const available = () => this.#active && this.#targetConnections.get(entry.id)?.token === token
       const disconnect = entry.value.connect({
+        submitProposal: (input) => this.#submitProposal(entry, token, input, { kind: 'plugin', pluginId: entry.pluginId, invocationId: input.sourceKey }),
         applying: async (candidateId, revision, operationId) => { if (!available()) throw new FindingCaptureError('unavailable', 'review target is unavailable'); return review.transition(entry.id, candidateId, revision, operationId, 'applying') },
         applied: async (candidateId, revision, operationId, targetReference) => { if (!available()) throw new FindingCaptureError('unavailable', 'review target is unavailable'); return review.transition(entry.id, candidateId, revision, operationId, 'applied', targetReference) },
         conflict: async (candidateId, revision, operationId, reason) => { if (!available()) throw new FindingCaptureError('unavailable', 'review target is unavailable'); return review.transition(entry.id, candidateId, revision, operationId, 'conflict', reason) },

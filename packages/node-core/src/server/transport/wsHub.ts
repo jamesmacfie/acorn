@@ -12,7 +12,6 @@ import type { Duplex } from 'node:stream'
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
 import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
-import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { encodeIdFrame, WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { claimUpgrade } from './upgradeClaim'
@@ -21,9 +20,16 @@ import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('ws')
 
-// A sink is one connection's outlet for a session's ServerMsg frames. terminal.ts adds and removes it
+// A sink is one connection's outlet for stream frames. The owner defines the rest of each payload.
+type StreamMsg =
+  | { type: 'output'; data: string }
+  | { type: 'ready'; session: unknown; replayed: boolean }
+  | { type: 'exit'; exitCode: number | null; signal: string | null }
+  | { type: 'error'; code: string; message: string }
+
+// terminal.ts adds and removes it
 // from a session's subscriber set on attach/detach and calls it to push output.
-export type StreamSink = (msg: ServerMsg) => void
+export type StreamSink = (msg: StreamMsg) => void
 
 // The engine handlers the hub routes client frames to (registered by terminal.ts). attach registers
 // the sink synchronously; the terminal engine owns canonical-snapshot-before-live ordering.
@@ -213,9 +219,9 @@ const encoder = new TextEncoder()
 // One encode per broadcast rather than one per socket: the engine hands the same ServerMsg to every
 // sink attached to a session, so the frame is built by whichever sink asks first. Weak, so a message
 // nobody holds any more takes its frame with it.
-const encodedOutput = new WeakMap<ServerMsg, Uint8Array | null>()
+const encodedOutput = new WeakMap<StreamMsg, Uint8Array | null>()
 
-function outputFrame(id: string, msg: ServerMsg & { type: 'output' }): Uint8Array | null {
+function outputFrame(id: string, msg: Extract<StreamMsg, { type: 'output' }>): Uint8Array | null {
   let frame = encodedOutput.get(msg)
   if (frame === undefined) {
     frame = encodeIdFrame(id, encoder.encode(msg.data))
@@ -224,7 +230,7 @@ function outputFrame(id: string, msg: ServerMsg & { type: 'output' }): Uint8Arra
   return frame
 }
 
-function sendStreamFrame(conn: Conn, id: string, msg: ServerMsg): void {
+function sendStreamFrame(conn: Conn, id: string, msg: StreamMsg): void {
   // `ready`, `exit` and `error` are one frame per attach or per lifetime, and they carry a session
   // object rather than bytes. They stay JSON.
   if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg })

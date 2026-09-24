@@ -344,7 +344,7 @@ export const defaultContentType = (mode: BodyMode): string | null => {
 
 // --- routes -------------------------------------------------------------------------------
 
-const projectScope = (projectId: string) => `/v2/p/http/projects/${encodeURIComponent(projectId)}`
+const projectScope = (projectId: string) => `/v1/p/http/projects/${encodeURIComponent(projectId)}`
 export const httpRequestsRoute = (projectId: string): string => `${projectScope(projectId)}/requests`
 export const httpRequestRoute = (projectId: string, id: string): string => `${projectScope(projectId)}/requests/${encodeURIComponent(id)}`
 export const httpVariablesRoute = (projectId: string): string => `${projectScope(projectId)}/vars`

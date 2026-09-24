@@ -1,6 +1,6 @@
 {
   "name": "@acorn/plugin-editor",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The code editor pane, with ripgrep find-in-files folded into its sidebar.",
   "private": true,
   "type": "module",

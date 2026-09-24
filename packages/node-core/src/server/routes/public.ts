@@ -1,0 +1,7 @@
+export { integrations } from './integrations.ts'
+export { RUN_TARGETS, harness, setRunBridge } from './plugins/harness.ts'
+export type { RunBridge } from './plugins/harness.ts'
+export { taskContext } from './projects/taskContext.ts'
+export { tasks } from './projects/tasks.ts'
+export { TASK_CREATED, TASK_SESSIONS } from './projects/worktree.ts'
+export type { TaskCreatedHook, TaskSessionsBridge } from './projects/worktree.ts'

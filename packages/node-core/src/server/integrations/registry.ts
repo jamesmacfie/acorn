@@ -1,6 +1,6 @@
 import type { IntegrationProviderContribution, ProviderRouteContribution } from './types'
 
-// A module singleton, like routeRegistry and unlike the capability registry, because a provider
+// A module singleton, like the HTTP route registry and unlike the capability registry, because a provider
 // contribution is a static descriptor rather than a per-boot object bound to a database handle. It
 // is written by plugin init rather than by a one-time side-effect import, and that matters because
 // `startServiceRuntime` can run several times in one process (its own test does it four times), so a

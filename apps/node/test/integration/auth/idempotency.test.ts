@@ -5,13 +5,13 @@ import '../../helpers/registerProviders'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import type { PairingWindow } from '@acorn/protocol/node.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { idempotencyStore, type IdempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
+import { deviceService } from '@acorn/node-core/server/auth'
+import { pairingCodes } from '@acorn/node-core/server/auth'
+import { idempotencyStore, type IdempotencyStore } from '@acorn/node-core/server/auth'
 import { idempotency } from '@acorn/node-core/server/middleware/idempotency.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Idempotency-Key semantics (docs/api-reference.md § HTTP conventions) over a counting stub route,
@@ -33,29 +33,29 @@ let env: Env
 // second execution that happened to return the same shape.
 const makeApp = (principal: Principal, gate = idempotency) =>
   new Hono<AppEnv>()
-    .use('/v2/*', async (c, next) => {
+    .use('/v1/*', async (c, next) => {
       c.set('principal', principal)
       c.set('requestId', 'fixed-id')
       await next()
     })
-    .use('/v2/*', requireUser)
-    .use('/v2/*', gate)
-    .post('/v2/core/things', async (c) => {
+    .use('/v1/*', requireUser)
+    .use('/v1/*', gate)
+    .post('/v1/core/things', async (c) => {
       executions += 1
       // Read the body after the middleware already read it. The route must still see it, or every
       // mutation under this middleware would silently lose its payload.
       const body = (await c.req.json().catch(() => ({}))) as { name?: string }
       return c.json({ execution: executions, name: body.name ?? null })
     })
-    .post('/v2/core/boom', (c) => {
+    .post('/v1/core/boom', (c) => {
       executions += 1
       return c.json({ error: { code: 'internal' } }, 500)
     })
-    .post('/v2/core/throw', () => {
+    .post('/v1/core/throw', () => {
       executions += 1
       throw new Error('handler exploded')
     })
-    .delete('/v2/core/things/:id', (c) => {
+    .delete('/v1/core/things/:id', (c) => {
       executions += 1
       return c.body(null, 204)
     })
@@ -85,11 +85,11 @@ const post = (path: string, key: string | undefined, body: unknown, target = app
     env,
   )
 
-describe('Idempotency-Key on /v2', () => {
+describe('Idempotency-Key on /v1', () => {
   it('replays the stored status and body, and executes the handler once', async () => {
     const key = randomUUID()
-    const first = await post('/v2/core/things', key, { name: 'widget' })
-    const second = await post('/v2/core/things', key, { name: 'widget' })
+    const first = await post('/v1/core/things', key, { name: 'widget' })
+    const second = await post('/v1/core/things', key, { name: 'widget' })
     expect(executions).toBe(1)
     expect(first.status).toBe(200)
     expect(second.status).toBe(200)
@@ -100,8 +100,8 @@ describe('Idempotency-Key on /v2', () => {
 
   it('409s the same key with a different request', async () => {
     const key = randomUUID()
-    await post('/v2/core/things', key, { name: 'widget' })
-    const conflict = await post('/v2/core/things', key, { name: 'gadget' })
+    await post('/v1/core/things', key, { name: 'widget' })
+    const conflict = await post('/v1/core/things', key, { name: 'gadget' })
     expect(conflict.status).toBe(409)
     expect(((await conflict.json()) as ApiError).error.code).toBe('idempotency_conflict')
     expect(executions).toBe(1) // the conflicting request never reached the handler
@@ -109,9 +109,9 @@ describe('Idempotency-Key on /v2', () => {
 
   it('does not store a 5xx, so a genuine retry re-executes', async () => {
     const key = randomUUID()
-    expect((await post('/v2/core/boom', key, {})).status).toBe(500)
+    expect((await post('/v1/core/boom', key, {})).status).toBe(500)
     expect(await store.lookup(DEVICE_ID, key)).toBeNull()
-    expect((await post('/v2/core/boom', key, {})).status).toBe(500)
+    expect((await post('/v1/core/boom', key, {})).status).toBe(500)
     expect(executions).toBe(2)
   })
 
@@ -120,9 +120,9 @@ describe('Idempotency-Key on /v2', () => {
   it('stores nothing when the handler throws, and the retry still runs', async () => {
     const key = randomUUID()
     // Hono's own error handler renders the 500 here; createApp() swaps in the ApiError envelope.
-    expect((await post('/v2/core/throw', key, {})).status).toBe(500)
+    expect((await post('/v1/core/throw', key, {})).status).toBe(500)
     expect(await store.lookup(DEVICE_ID, key)).toBeNull()
-    expect((await post('/v2/core/throw', key, {})).status).toBe(500)
+    expect((await post('/v1/core/throw', key, {})).status).toBe(500)
     expect(executions).toBe(2)
   })
 
@@ -130,7 +130,7 @@ describe('Idempotency-Key on /v2', () => {
     const key = randomUUID()
     // Both are in flight before either resolves, which is the window the in-process map exists for:
     // the store has nothing yet, so a second execution is the only other possible outcome.
-    const [a, b] = await Promise.all([post('/v2/core/things', key, { name: 'once' }), post('/v2/core/things', key, { name: 'once' })])
+    const [a, b] = await Promise.all([post('/v1/core/things', key, { name: 'once' }), post('/v1/core/things', key, { name: 'once' })])
     expect(executions).toBe(1)
     expect(await a.json()).toEqual({ execution: 1, name: 'once' })
     expect(await b.json()).toEqual({ execution: 1, name: 'once' })
@@ -138,23 +138,23 @@ describe('Idempotency-Key on /v2', () => {
 
   it('re-executes once the stored row has expired', async () => {
     const key = randomUUID()
-    await post('/v2/core/things', key, { name: 'widget' })
+    await post('/v1/core/things', key, { name: 'widget' })
     clock += 24 * 60 * 60_000 + 1 // past the 24h TTL
-    const again = await post('/v2/core/things', key, { name: 'widget' })
+    const again = await post('/v1/core/things', key, { name: 'widget' })
     expect(executions).toBe(2)
     expect(await again.json()).toEqual({ execution: 2, name: 'widget' })
   })
 
   it('rejects a malformed key before the handler runs', async () => {
-    const res = await post('/v2/core/things', 'not-a-uuid', { name: 'widget' })
+    const res = await post('/v1/core/things', 'not-a-uuid', { name: 'widget' })
     expect(res.status).toBe(400)
     expect(((await res.json()) as ApiError).error.code).toBe('bad_request')
     expect(executions).toBe(0)
   })
 
   it('leaves a request without the header alone', async () => {
-    await post('/v2/core/things', undefined, { name: 'widget' })
-    await post('/v2/core/things', undefined, { name: 'widget' })
+    await post('/v1/core/things', undefined, { name: 'widget' })
+    await post('/v1/core/things', undefined, { name: 'widget' })
     expect(executions).toBe(2)
     expect(await harness.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.idempotency)).toEqual([])
   })
@@ -164,13 +164,13 @@ describe('Idempotency-Key on /v2', () => {
   it('passes a principal with no deviceId straight through', async () => {
     const internalApp = makeApp(internal)
     const key = randomUUID()
-    await post('/v2/core/things', key, { name: 'widget' }, internalApp)
-    await post('/v2/core/things', key, { name: 'widget' }, internalApp)
+    await post('/v1/core/things', key, { name: 'widget' }, internalApp)
+    await post('/v1/core/things', key, { name: 'widget' }, internalApp)
     expect(executions).toBe(2)
   })
 
   // Everything above mounts the middleware itself, which proves the semantics but not the wiring. This
-  // one goes through the assembled app with a real paired device: POST /v2/core/pair/start mints a new
+  // one goes through the assembled app with a real paired device: POST /v1/core/pair/start mints a new
   // code every call, so a replayed one can only have come from the middleware being mounted.
   it('is mounted in createApp() — a retried mutation does not run twice', async () => {
     const app = createApp()
@@ -188,7 +188,7 @@ describe('Idempotency-Key on /v2', () => {
     const key = randomUUID()
     const start = () =>
       app.fetch(
-        new Request(`${ORIGIN}/v2/core/pair/start`, {
+        new Request(`${ORIGIN}/v1/core/pair/start`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': key },
         }),
@@ -203,7 +203,7 @@ describe('Idempotency-Key on /v2', () => {
     const key = randomUUID()
     const del = (target = app) =>
       target.fetch(
-        new Request(`${ORIGIN}/v2/core/things/t1`, { method: 'DELETE', headers: { 'content-type': 'application/json', 'idempotency-key': key } }),
+        new Request(`${ORIGIN}/v1/core/things/t1`, { method: 'DELETE', headers: { 'content-type': 'application/json', 'idempotency-key': key } }),
         env,
       )
     expect((await del()).status).toBe(204)

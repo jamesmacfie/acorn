@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryError, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '@acorn/node-core/server/telemetry/collector.ts'
+import { flushTelemetry, onTelemetryBatch, startTelemetry } from '@acorn/node-core/server/telemetry'
+import { resetTelemetryForTest } from '@acorn/node-core/testkit'
 import { installCrashHandlers, resetCrashHandlersForTest } from './crash'
 
 // The handlers are process-wide, and installing one changes what Node does with an uncaught throw,

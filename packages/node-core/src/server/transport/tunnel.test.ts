@@ -231,7 +231,7 @@ describe('attachTunnel', () => {
 
   it('claims only its own upgrade path', async () => {
     // The events hub attaches to the same listener, so a tunnel that answered every upgrade would have
-    // broken `/v2/events` the moment it was attached.
+    // broken `/v1/events` the moment it was attached.
     //
     // Asserted by watching this request go unanswered, with no second handler registered: the earlier
     // shape of registering a rival handler and checking it wins could not distinguish anything, since
@@ -239,7 +239,7 @@ describe('attachTunnel', () => {
     // was checked. The query carries a valid task and port, so `parseTarget` would accept it if the
     // path comparison were the only thing stopping it.
     await expect(
-      open(`ws://${allowedHost}/v2/events?task=task-1&port=${echoPort}`, { authorization: `Bearer ${DEVICE_TOKEN}` }, 'ping', 700),
+      open(`ws://${allowedHost}/v1/events?task=task-1&port=${echoPort}`, { authorization: `Bearer ${DEVICE_TOKEN}` }, 'ping', 700),
     ).rejects.toThrow()
   })
 })

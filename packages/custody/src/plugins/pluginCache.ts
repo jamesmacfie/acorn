@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('plugins')
 
@@ -19,7 +20,7 @@ const log = createLogger('plugins')
 // this through one narrow module, client-core/host/plugins/host.ts, so the interface is the portable part
 // rather than the storage.
 
-const CACHE_DIR = 'plugin-cache'
+const CACHE_DIR = `${ACORN_BASELINE}-plugin-cache`
 const INDEX_FILE = 'index.json'
 const HASH_RE = /^[0-9a-f]{64}$/
 

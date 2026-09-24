@@ -28,7 +28,7 @@ describe('the command vocabulary', () => {
   it('bounds what travels as a query, because a palette field has no length of its own', () => {
     expect(MAX_COMMAND_SEARCH_QUERY).toBe(200)
     // Truncated by whoever sends it, not refused: a reader who pasted too much wants the first part
-    // searched (client-core/host/registries/commands/session.ts).
+    // searched (client-core/host/registries/commands/sessionStore.ts).
     expect('x'.repeat(1_000).slice(0, MAX_COMMAND_SEARCH_QUERY)).toHaveLength(200)
   })
 })
@@ -53,7 +53,7 @@ describe('a search result row', () => {
     // (docs/command-palette-and-shortcuts.md § What the palette refuses).
     const parsed = commandSearchItemSchema.parse(item({
       action: { verb: 'runNodeAction', path: '/somewhere/else' },
-      route: '/v2/core/tasks',
+      route: '/v1/core/tasks',
       url: 'https://example.test',
     }))
     expect(parsed).toEqual({ id: 'i-1', title: 'Issue one' })

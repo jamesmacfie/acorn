@@ -2,7 +2,7 @@ import type { DataSourceDescription, DataSourceRegistration } from '@acorn/proto
 
 export const issueSource: DataSourceRegistration = {
   sourceId: 'issues', name: 'Linear issues', singular: 'Issue', plural: 'Issues', providerId: 'linear',
-  identityScope: 'Linear issue UUID in the selected connection', handler: '/v2/p/linear/data/issues',
+  identityScope: 'Linear issue UUID in the selected connection', handler: '/v1/p/linear/data/issues',
   titlePointer: '/title', urlPointer: '/url', icon: 'brand:linear',
 }
 

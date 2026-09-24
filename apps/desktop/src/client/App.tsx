@@ -7,53 +7,52 @@ import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
-import { setTaskLookup } from '@acorn/client-core/features/tasks/taskLookup.ts'
+import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx'
 import WorkspacePicker from '@acorn/client-core/kit/components/inputs/WorkspacePicker.tsx'
-import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
-import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
-import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
-import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces'
+import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces'
+import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces'
+import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
-import { initSoundNotices } from '@acorn/client-core/features/notifications/chime.ts'
-import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
+import { initSoundNotices } from '@acorn/client-core/features/notifications'
+import { sessionSummaries } from '@acorn/client-core/features/tasks'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
 import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/features/tasks/tasks.ts'
-import { isTerminalTarget } from '@acorn/client-core/host/keys/install.ts'
+import { isTerminalTarget } from '@acorn/client-core/host/keys'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
-import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
-import { desktopExtras } from '@acorn/client-core/infra/platform/index.ts'
+import { desktopExtras } from '@acorn/client-core/infra/platform'
 import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/features/fleet/NodeChip.tsx'
 import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
-import { warnOnceAboutDisk } from '@acorn/client-core/infra/node/nodeSecurity.ts'
+import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
-import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { appearanceCommands, notificationCommands, settingsPageCommands } from '@acorn/client-core/host/registries/commands/coreCommands.ts'
-import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
+import { clientEvents } from '@acorn/client-core/host/registries/commands'
+import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { appearanceCommands, notificationCommands, settingsPageCommands } from '@acorn/client-core/host/registries/commands'
+import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
-import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
+import { taskBridge } from '@acorn/client-core/features/tasks'
 import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
-import { startClientSchedules } from '@acorn/client-core/host/registries/shell/schedules.ts'
+import { startClientSchedules } from '@acorn/client-core/host/registries/shell'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { createAppStartupRestore } from '@acorn/client-core/infra/persistence/appStartup.ts'
-import { createTaskDeepLink } from '@acorn/client-core/features/tasks/taskDeepLink.ts'
-import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
+import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
+import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
-import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
-import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
-import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
+import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands'
+import { availableSources } from '@acorn/client-core/features/tabs'
+import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
-import { telemetryOn } from '@acorn/client-core/features/settings/telemetrySetting.ts'
+import { telemetryOn } from '@acorn/client-core/features/settings'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -180,7 +179,7 @@ export default function App() {
     // Quitting has no node meaning: a node does not know a window is closing, so this one stays a
     // client handler over the session store.
     const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
-      const active = sessions().filter((session) => session.status === 'running')
+      const active = sessionSummaries().filter((session) => session.running)
       return active.length
         ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
         : null
@@ -194,16 +193,13 @@ export default function App() {
     if (off) onCleanup(off)
   })
 
-  // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
-  // badge can show agent-working activity. No-op when the node does not run the terminal plugin
-  // (hasHostCapability); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
+  // The session-source owners start their own roster subscriptions at activation. The shell starts
+  // its schedules once the node can answer.
   onMount(() => {
-    if (!hasHostCapability({ plugin: 'terminal' })) return
-    onCleanup(initSessions())
     onCleanup(startClientSchedules())
   })
 
-  // Workflow notices are broadcast over `/v2/events` by main, not by the terminal plugin, and a node
+  // Workflow notices are broadcast over `/v1/events` by main, not by the terminal plugin, and a node
   // without a terminal still runs workflows. They were inside the guard above, which meant no gate
   // notice at all on such a node.
   onMount(() => onCleanup(initWorkflowNotices()))

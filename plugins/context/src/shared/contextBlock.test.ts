@@ -8,9 +8,6 @@ const ctx: TaskContext = {
     { id: 'pr', label: 'PR', defaultIncluded: false, budget: { overflow: 'truncate-tail' }, items: [], compact: '## PR #813: fix\nGuards the token.', omitted: 0 },
     { id: 'notes', label: 'Notes', defaultIncluded: true, budget: { overflow: 'truncate-tail' }, items: [], compact: '## Notes\n### Plan\nDo the thing.', omitted: 0 },
   ],
-  issues: [],
-  notes: [],
-  memory: [],
 }
 
 describe('formatContextBlock', () => {

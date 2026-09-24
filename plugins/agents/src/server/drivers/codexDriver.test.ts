@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentDriverEvent } from './types'
 
 const wire = vi.hoisted(() => ({

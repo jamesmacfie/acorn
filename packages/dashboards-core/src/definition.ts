@@ -8,8 +8,7 @@ const strings = (value: unknown): string[] => Array.isArray(value)
   ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
   : []
 
-/** Parse only the dashboard-v2 publication marker. Legacy flat panel definitions are
- * intentionally not admitted after the versioned development-state transition. */
+/** Parse a published dashboard panel. Flat panel definitions have no publication and are refused. */
 export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined {
   if (!isRecord(raw) || !isRecord(raw.publication)) return undefined
   const id = typeof raw.id === 'string' && raw.id ? raw.id : undefined
@@ -38,7 +37,7 @@ export function parsePanels(value: unknown): {
   panels: Record<string, PanelDefinition>
   placements: Record<string, string[]>
 } {
-  if (!isRecord(value) || value.version !== 2) return { panels: {}, placements: {} }
+  if (!isRecord(value) || value.version !== 1) return { panels: {}, placements: {} }
   const panels: Record<string, PanelDefinition> = {}
   if (isRecord(value.panels)) {
     for (const [id, entry] of Object.entries(value.panels)) {

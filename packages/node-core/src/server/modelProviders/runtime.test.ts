@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
 import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
-import { ConnectionProviderRegistry } from '../integrations/connectionRegistry'
+import { ConnectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { publicConnectionProvider } from '../integrations/providerShared'
 import { ProviderOperationError } from '../integrations/types'
 import { makeTestDb, type TestDb } from '../../testkit/db'
@@ -72,7 +72,7 @@ describe('generateTextForConnection', () => {
       userId: 'alice',
       provider: PROVIDER_ID,
       label: 'Runtime model',
-      authRef: await encryptSecret('private-key', ENCRYPTION_KEY),
+      encryptedCredentials: await encryptSecret('private-key', ENCRYPTION_KEY),
       authKind: 'api-key',
       account: null,
       scopes: '[]',
@@ -124,7 +124,7 @@ describe('generateTextForConnection', () => {
     expect(result).toEqual({
       text: 'SELECT 1',
       providerId: PROVIDER_ID,
-      backendId: 'connection-1',
+      backendId: 'connection:connection-1',
       modelId: 'recommended-model',
       usage: { inputTokens: 10, outputTokens: 3 },
     })
@@ -162,7 +162,7 @@ describe('generateTextForConnection', () => {
   })
 
   it('marks unreadable and provider-rejected credentials as needing authentication', async () => {
-    await insertConnection({ authRef: 'not-a-jwe' })
+    await insertConnection({ encryptedCredentials: 'not-a-jwe' })
 
     await expect(generateTextForConnection(args(), dependencies())).rejects.toMatchObject({
       code: 'provider_secret_unreadable',

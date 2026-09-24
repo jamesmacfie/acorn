@@ -18,7 +18,7 @@ const catalog: WorkflowValidationCatalog = {
   structuredProfiles: new Set(['claude-code']),
 }
 
-const def = (name: string): WorkflowDef => ({ formatVersion: 2, name, steps: [{ id: 'only', name: 'only', prompt: 'Do it.' }] })
+const def = (name: string): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'only', name: 'only', prompt: 'Do it.' }] })
 
 // Stands in for `ctx.core.fs.resolveInRoot`, the symlink-aware confinement the node wires in. What
 // the store owes is honouring the answer, which is what the last case here checks.
@@ -87,9 +87,9 @@ describe('workflow definitions stored as rows', () => {
     const user = join(dir, 'home')
     mkdirSync(repo)
     mkdirSync(user)
-    writeFile(repo, 'shared', 'format_version = 2\nname = "the committed one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
-    writeFile(user, 'shared', 'format_version = 2\nname = "the user one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
-    writeFile(user, 'mine-only', 'format_version = 2\nname = "user only"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
+    writeFile(repo, 'shared', 'format_version = 1\nbaseline = "acorn-1"\nname = "the committed one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
+    writeFile(user, 'shared', 'format_version = 1\nbaseline = "acorn-1"\nname = "the user one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
+    writeFile(user, 'mine-only', 'format_version = 1\nbaseline = "acorn-1"\nname = "user only"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n')
     await createDef(store.db, { workspaceId: 'w1', projectId: 'p1', def: def('a row') })
 
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: repo }], { userDir: user, catalog })
@@ -105,8 +105,8 @@ describe('workflow definitions stored as rows', () => {
     const user = join(dir, 'home')
     mkdirSync(repo)
     mkdirSync(user)
-    writeFile(user, 'review-block', 'format_version = 2\nname = "review"\n[[steps]]\nid = "look"\nname = "look"\nprompt = "Review."\n')
-    writeFile(repo, 'main-flow', 'format_version = 2\nname = "main"\n[[steps]]\nid = "build"\nname = "build"\nprompt = "Build."\n[[steps]]\nid = "review"\nworkflow = "review-block"\n')
+    writeFile(user, 'review-block', 'format_version = 1\nbaseline = "acorn-1"\nname = "review"\n[[steps]]\nid = "look"\nname = "look"\nprompt = "Review."\n')
+    writeFile(repo, 'main-flow', 'format_version = 1\nbaseline = "acorn-1"\nname = "main"\n[[steps]]\nid = "build"\nname = "build"\nprompt = "Build."\n[[steps]]\nid = "review"\nworkflow = "review-block"\n')
 
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: repo }], { userDir: user, catalog })
     expect(merged.errors).toEqual([])

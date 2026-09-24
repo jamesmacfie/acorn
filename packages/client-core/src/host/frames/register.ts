@@ -249,7 +249,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // the `pane` case does, because a pane whose regions are all documents has no bundle to mount and
       // no bridge to open.
       //
-      // The routes were confined to `/v2/p/<id>/` when the node parsed the manifest and are confined
+      // The routes were confined to `/v1/p/<id>/` when the node parsed the manifest and are confined
       // again here: the manifest reached this device as a roster row, and a node could have sent
       // something its own parser would have rejected.
       //

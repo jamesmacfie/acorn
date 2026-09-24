@@ -133,7 +133,7 @@ describe('api calls', () => {
 
   it('denies an undeclared path and never reaches the node', async () => {
     const h = withBridge()
-    h.send({ id: 2, kind: 'api', method: 'GET', path: '/v2/core/security' })
+    h.send({ id: 2, kind: 'api', method: 'GET', path: '/v1/core/security' })
     await h.settled(2)
     expect(replyTo(h, 2)).toMatchObject({ id: 2, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     // The assertion that matters: a denial is not a discarded response.
@@ -545,7 +545,7 @@ describe('malformed and hostile traffic', () => {
 describe('byte requests', () => {
   it('hands back bytes without putting them through a JSON parser', async () => {
     const h = withBridge()
-    h.send({ id: 30, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    h.send({ id: 30, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 30)).toEqual({
       id: 30,
@@ -557,11 +557,11 @@ describe('byte requests', () => {
 
   it('carries a byte body and its advisory metadata to the host', async () => {
     const h = withBridge()
-    h.send({ id: 31, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files', bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' })
+    h.send({ id: 31, kind: 'api.bytes', method: 'POST', path: '/v1/p/board/files', bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' })
     await h.settled(2)
     expect(h.svc.fetchBytes).toHaveBeenCalledWith(
       'POST',
-      '/v2/p/board/files',
+      '/v1/p/board/files',
       { bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' },
       expect.anything(),
     )
@@ -572,7 +572,7 @@ describe('byte requests', () => {
   // 12 MiB POST at somebody else's namespace is refused without being read.
   it('refuses another plugin’s namespace without ever calling the transport', async () => {
     const h = withBridge()
-    h.send({ id: 32, kind: 'api.bytes', method: 'GET', path: '/v2/p/agents/attachments/a1/content' })
+    h.send({ id: 32, kind: 'api.bytes', method: 'GET', path: '/v1/p/agents/attachments/a1/content' })
     await h.settled(2)
     expect(replyTo(h, 32)).toMatchObject({ id: 32, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -580,7 +580,7 @@ describe('byte requests', () => {
 
   it('refuses a core path the plugin has no scope for, the same as the JSON path would', async () => {
     const h = withBridge()
-    h.send({ id: 33, kind: 'api.bytes', method: 'POST', path: '/v2/projects', bytes: new Uint8Array([1]), type: 'application/json' })
+    h.send({ id: 33, kind: 'api.bytes', method: 'POST', path: '/v1/projects', bytes: new Uint8Array([1]), type: 'application/json' })
     await h.settled(2)
     expect(replyTo(h, 33)).toMatchObject({ ok: false })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -588,7 +588,7 @@ describe('byte requests', () => {
 
   it('refuses a body over the ceiling before sending it anywhere', async () => {
     const h = withBridge()
-    h.send({ id: 34, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files', bytes: new Uint8Array(MAX_PLUGIN_BYTES + 1), type: 'image/png' })
+    h.send({ id: 34, kind: 'api.bytes', method: 'POST', path: '/v1/p/board/files', bytes: new Uint8Array(MAX_PLUGIN_BYTES + 1), type: 'image/png' })
     await h.settled(2)
     expect(replyTo(h, 34)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -596,7 +596,7 @@ describe('byte requests', () => {
 
   it('refuses a POST with no bytes rather than sending an empty one', async () => {
     const h = withBridge()
-    h.send({ id: 35, kind: 'api.bytes', method: 'POST', path: '/v2/p/board/files' })
+    h.send({ id: 35, kind: 'api.bytes', method: 'POST', path: '/v1/p/board/files' })
     await h.settled(2)
     expect(replyTo(h, 35)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -604,7 +604,7 @@ describe('byte requests', () => {
 
   it('refuses a method the byte path does not carry', async () => {
     const h = withBridge()
-    h.send({ id: 36, kind: 'api.bytes', method: 'DELETE', path: '/v2/p/board/files/a' })
+    h.send({ id: 36, kind: 'api.bytes', method: 'DELETE', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 36)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -614,7 +614,7 @@ describe('byte requests', () => {
     const h = withBridge({}, services({
       fetchBytes: async () => ({ ok: false as const, status: 404, error: { code: 'not_found', message: 'gone', requestId: 'r1', retryable: false } }),
     }))
-    h.send({ id: 37, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    h.send({ id: 37, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 37)).toMatchObject({ ok: false, error: { code: 'not_found', message: 'gone' } })
   })
@@ -623,7 +623,7 @@ describe('byte requests', () => {
     const h = withBridge({}, services({
       fetchBytes: async () => ({ ok: true as const, status: 200, bytes: new Uint8Array(), type: 'application/octet-stream', filename: null }),
     }))
-    h.send({ id: 38, kind: 'api.bytes', method: 'GET', path: '/v2/p/board/files/a' })
+    h.send({ id: 38, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 38)).toMatchObject({ ok: true, body: { bytes: new Uint8Array(), filename: null } })
   })

@@ -12,7 +12,7 @@ const scopeFrom = (query: Record<string, string>): unknown => query.scope === 'p
   : query.scope === 'task' ? { kind: 'task', taskId: query.taskId }
     : query.scope === 'project' ? { kind: 'project', projectId: query.projectId }
       : query.scope === 'workspace' ? { kind: 'workspace', workspaceId: query.workspaceId } : null
-const prepareBody = z.strictObject({ boundaryKey: z.string().trim().min(1).max(300) })
+const prepareBody = z.strictObject({ boundaryKey: z.string().trim().min(1).max(300), targetId: z.string().min(1).max(200) })
 const editBody = z.strictObject({ expectedRevision: z.number().int().min(1), payload: z.unknown(), idempotencyKey: z.string().min(1).max(300) })
 const decisionBody = z.strictObject({ expectedRevision: z.number().int().min(1), action: z.enum(['dismiss', 'dismiss-reason', 'undo-dismiss', 'snooze']), reason: z.string().max(1_000).optional(), until: z.number().int().positive().optional(), idempotencyKey: z.string().min(1).max(300) })
 const restoreBody = z.strictObject({ candidateId: z.string().min(1).max(300), expectedRevision: z.number().int().min(1), idempotencyKey: z.string().min(1).max(300) })
@@ -42,6 +42,7 @@ export const findingsReviewRoutes = (
     return scope.success ? c.json(runtime.bundles(scope.data, c.req.query('history') === 'true')) : respondError(c, 400, 'bad_request')
   })
   .get('/review/attention', (c) => c.json(runtime.reviewAttention()))
+  .get('/review/targets', (c) => c.json(runtime.reviewTargets()))
   .get('/tasks/:id/review/bundles', async (c) => {
     try { return c.json(await runtime.bundlesForTask(c.req.param('id'), c.req.query('history') === 'true')) }
     catch (error) { return routeError(c, error) }
@@ -50,7 +51,7 @@ export const findingsReviewRoutes = (
   .post('/tasks/:id/review/prepare', async (c) => {
     const parsed = prepareBody.safeParse(await c.req.json().catch(() => null)); if (!parsed.success) return respondError(c, 400, 'bad_request')
     try {
-      return c.json(await lifecycle.prepareTask(c.req.param('id'), parsed.data.boundaryKey))
+      return c.json(await lifecycle.prepareTask(c.req.param('id'), parsed.data.boundaryKey, parsed.data.targetId))
     } catch (error) { return routeError(c, error) }
   })
   .get('/review/candidates/:id', (c) => {

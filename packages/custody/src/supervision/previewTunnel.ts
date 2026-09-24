@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type Server, type Socket } from 'node:net'
 import { WebSocket } from 'ws'
 import { pinnedTlsOptions } from '../broker/nodeBroker'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('tunnel')
 
@@ -244,7 +244,7 @@ export class PreviewTunnels {
   }
 
   private pipe(socket: Socket, node: TunnelNode, target: TunnelKey, id: string, head: Buffer): void {
-    const url = new URL('/v2/tunnel', node.endpoint)
+    const url = new URL('/v1/tunnel', node.endpoint)
     url.protocol = 'wss:'
     url.searchParams.set('task', target.taskId)
     url.searchParams.set('port', String(target.port))

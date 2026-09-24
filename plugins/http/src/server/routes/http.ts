@@ -1,4 +1,4 @@
-// Routes for the API panel, mounted at /v2/p/http by this plugin's init (node/index.ts). Every route
+// Routes for the API panel, mounted at /v1/p/http by this plugin's init (node/index.ts). Every route
 // here requires a device principal (docs/http-client.md § Sending), because outbound requests and
 // secret resolution must not be reachable through an internal token.
 //

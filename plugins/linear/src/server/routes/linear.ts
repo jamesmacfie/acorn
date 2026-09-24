@@ -177,7 +177,7 @@ async function mappedScopes(
   return byConnection
 }
 
-// /v2/p/linear: read Linear issues referenced from a PR, plus the rail source's rows. Per-user, cached
+// /v1/p/linear: read Linear issues referenced from a PR, plus the rail source's rows. Per-user, cached
 // locally (never shared). A bare identifier is resolved across all connected Linear integrations;
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.

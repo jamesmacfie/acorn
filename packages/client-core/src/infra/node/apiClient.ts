@@ -1,6 +1,6 @@
 import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
-import { formatTraceparent } from '@acorn/protocol/telemetry.ts'
+import { apiRouteNamespace, formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { nodeTransport } from '../platform'
 import { currentTrace, measure, recordSample, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
@@ -81,19 +81,13 @@ const isWritable = (nodeId: string): boolean => {
 /**
  * A route pattern for the span's `route` attribute, at the coarsest useful grain.
  *
- * The renderer does not have the node's route table, so it cannot know that `/v2/core/tasks/abc` is
- * `/v2/core/tasks/:id`, and sending the raw path would put a row per task in a vendor's transaction
+ * The renderer does not have the node's route table, so it cannot know that `/v1/core/tasks/abc` is
+ * `/v1/core/tasks/:id`, and sending the raw path would put a row per task in a vendor's transaction
  * list. The namespace is the part the renderer does know and the part worth grouping by: core's
  * tasks, or one plugin's sessions. The matched pattern is on the node's own `http.request` span,
  * which is this span's child (docs/telemetry.md § Traces).
  */
-export function apiRouteAttr(path: string): string {
-  const segments = path.split('?')[0].split('/').filter(Boolean)
-  // `/v2/p/<plugin>/<first>` keeps four, so two plugins read apart and so does one plugin's two
-  // routers. Everything else keeps three, which is `/v2/core/<first>`.
-  const keep = segments[0] === 'v2' && segments[1] === 'p' ? 4 : 3
-  return `/${segments.slice(0, keep).join('/')}`
-}
+export const apiRouteAttr = apiRouteNamespace
 
 /**
  * The one place a request leaves the renderer.

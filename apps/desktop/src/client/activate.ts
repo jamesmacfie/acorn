@@ -1,27 +1,26 @@
-import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
-import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/infra/node/nodePlugins.ts'
-import { pluginFailureAttention } from '@acorn/client-core/infra/node/pluginFailures.ts'
-import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
-import { noticeKindContributions } from '@acorn/client-core/features/notifications/kindContributions.ts'
-import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
-import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
-import { directPreferenceSlices } from '@acorn/client-core/infra/persistence/preferenceSlices.ts'
-import { purgeRetiredLocalStorage } from '@acorn/client-core/infra/persistence/legacyStorage.ts'
-import { persistedStateRegistry } from '@acorn/client-core/infra/persistence/persistedState.ts'
-import { coreStateSlices } from '@acorn/client-core/infra/persistence/stateSlices.ts'
-import { noticeKindRegistry } from '@acorn/client-core/host/registries/rail/notices.ts'
-import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell/schedules.ts'
-import { settingsRegistry } from '@acorn/client-core/host/registries/shell/settings.ts'
-import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
+import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/infra/node'
+import { pluginFailureAttention } from '@acorn/client-core/infra/node'
+import { attentionRegistry } from '@acorn/client-core/host/registries/rail'
+import { noticeKindContributions } from '@acorn/client-core/features/notifications'
+import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
+import { clientEvents } from '@acorn/client-core/host/registries/commands'
+import { directPreferenceSlices } from '@acorn/client-core/infra/persistence'
+import { persistedStateRegistry } from '@acorn/client-core/infra/persistence'
+import { coreStateSlices } from '@acorn/client-core/infra/persistence'
+import { noticeKindRegistry } from '@acorn/client-core/host/registries/rail'
+import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell'
+import { settingsRegistry } from '@acorn/client-core/host/registries/shell'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { taskStatusScheduleContribution } from '@acorn/client-core/features/tasks/taskStatus.ts'
+import { taskStatusScheduleContribution } from '@acorn/client-core/features/tasks'
 import { settingsPageContributions } from './pageContributions'
 import { clientPlugins } from './plugins'
 import { activateScopedStateEviction } from './scopedEviction'
 import { shellSlotContributions } from './slotContributions'
 import { coreSourceContributions } from './sourceContributions'
-import { ensurePluginChannel } from '@acorn/client-core/host/plugins/pluginChannel.ts'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { ensurePluginChannel } from '@acorn/client-core/host/plugins'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('client:boot')
 
@@ -50,12 +49,6 @@ registerNoticeTargetHandler('settings', (_taskId, target) => {
   clientEvents.emit('presentation:open-settings', { tab: target.resourceId })
 })
 activateScopedStateEviction()
-// Bytes an older release left in localStorage, some of them credential-bearing. This runs before
-// anything renders, and in the shell rather than in the plugin that wrote them: a loaded plugin's
-// frame has its own storage area and could not reach these (persistence/legacyStorage.ts).
-const swept = purgeRetiredLocalStorage()
-if (swept.length) log.info(`removed ${swept.length} retired local key(s)`)
-
 // The first activation runs with nothing disabled, and that is not a placeholder: the list belongs to
 // a node, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is called
 // once before the first render and again on every node switch.

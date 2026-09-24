@@ -5,7 +5,7 @@ import { redact, SecretUnavailableError, type SecretService } from '../core/secr
 import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,
-} from '../integrations/connectionRegistry'
+} from '../integrations/connectionProviders/registry'
 import { connectionHasCapability, getConnection } from '../integrations/connections'
 import {
   ProviderRequestScheduler,
@@ -15,6 +15,7 @@ import { isProviderOperationError, ProviderOperationError } from '../integration
 import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
 import { broadcastConnectionChanged } from '../notify'
+import { CONNECTION_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
 
 // Exported because the harness runtime applies the same ceiling to a CLI generate. One set of bounds
 // over both backend kinds, so "60 seconds and a million prompt characters" is answered in one place.
@@ -122,7 +123,7 @@ export async function generateTextForConnection(
   // raced, and bracketing all of it inside a secret scope would tie the credential's lifetime to a
   // promise race rather than to the call that needs it. The scrub is applied explicitly at the one
   // place a provider error escapes (see the catch below).
-  const secret = await args.secrets.reveal(connection.authRef, `${connection.provider}: generate text`).catch((error: unknown) => {
+  const secret = await args.secrets.reveal(connection.encryptedCredentials, `${connection.provider}: generate text`).catch((error: unknown) => {
     if (error instanceof SecretUnavailableError) return null
     throw error
   })
@@ -159,7 +160,7 @@ export async function generateTextForConnection(
     return {
       text: generated.text,
       providerId: provider.id,
-      backendId: connection.id,
+      backendId: `${CONNECTION_BACKEND_PREFIX}${connection.id}`,
       modelId: generated.modelId,
       ...(generated.usage ? { usage: generated.usage } : {}),
     }

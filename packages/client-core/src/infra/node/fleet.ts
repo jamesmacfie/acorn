@@ -3,6 +3,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/solid-query'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { del, get, set } from 'idb-keyval'
 import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { fleetBridge, nodeTransport } from '../platform'
 import { emitError, measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -28,7 +29,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 //
 // The invariant that makes it safe is in activeNode.ts: only the active node's provider is mounted,
 // and `setActiveNode` runs before the swap.
-const CACHE_KEY_PREFIX = 'acorn-cache:'
+const CACHE_KEY_PREFIX = `acorn-cache:${ACORN_BASELINE}:`
 
 const log = createLogger('fleet')
 

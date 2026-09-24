@@ -37,22 +37,10 @@ pub struct Handshake {
     pub mcp_entry: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundled_plugins_dir: Option<String>,
-    /// The Electron build's custody root and the safeStorage key its device tokens are encrypted
-    /// under, when both were found. Absent means there is nothing to adopt or nothing readable, and
-    /// the helper starts from an empty fleet. See src/keychain.rs.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub legacy: Option<Legacy>,
     pub env_files: Vec<String>,
     pub version: String,
     pub is_packaged: bool,
     pub app_origin: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Legacy {
-    pub user_data_dir: String,
-    pub safe_storage_key: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -401,9 +389,8 @@ mod tests {
             service_entry: "/s".into(),
             mcp_entry: "/m".into(),
             bundled_plugins_dir: None,
-            legacy: None,
             env_files: vec!["/a/.env".into()],
-            version: "0.1.0".into(),
+            version: "1.0.0".into(),
             is_packaged: false,
             app_origin: "app://acorn".into(),
         })
@@ -412,7 +399,6 @@ mod tests {
         assert!(line.contains("\"isPackaged\":false"), "{line}");
         assert!(line.contains("\"envFiles\":[\"/a/.env\"]"), "{line}");
         assert!(!line.contains("bundledPluginsDir"), "{line}");
-        assert!(!line.contains("legacy"), "{line}");
     }
 
     #[test]

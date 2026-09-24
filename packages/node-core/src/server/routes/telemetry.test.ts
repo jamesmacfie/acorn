@@ -23,16 +23,16 @@ const appFor = (principal: Principal) =>
       c.set('principal', principal)
       await next()
     })
-    .use('/v2/core/telemetry', requireDevice)
-    .use('/v2/core/telemetry/*', requireDevice)
-    .route('/v2/core/telemetry', telemetry)
+    .use('/v1/core/telemetry', requireDevice)
+    .use('/v1/core/telemetry/*', requireDevice)
+    .route('/v1/core/telemetry', telemetry)
 
 const get = (principal: Principal, path: string) =>
   appFor(principal).fetch(new Request(`http://acorn.test${path}`), {} as Env)
 
 const post = (principal: Principal, body: string) =>
   appFor(principal).fetch(
-    new Request('http://acorn.test/v2/core/telemetry', {
+    new Request('http://acorn.test/v1/core/telemetry', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
@@ -69,7 +69,7 @@ const flushed = (): TelemetryRecord[] => {
   return batches.flatMap((batch) => batch.records).filter((r) => r.kind !== 'span' || r.name !== 'http.request')
 }
 
-describe('POST /v2/core/telemetry', () => {
+describe('POST /v1/core/telemetry', () => {
   it('takes a batch from a device and hands it to the sink', async () => {
     await collecting()
     const res = await post(DEVICE, JSON.stringify({ runtime: 'renderer', records: [record()] }))
@@ -147,12 +147,12 @@ describe('POST /v2/core/telemetry', () => {
   })
 })
 
-describe('GET /v2/core/telemetry/summary', () => {
+describe('GET /v1/core/telemetry/summary', () => {
   it('counts what was collected, per owner and kind', async () => {
     await collecting()
     await post(DEVICE, JSON.stringify({ runtime: 'renderer', records: [record({ owner: 'github' }), record({ owner: 'github' }), record()] }))
 
-    const summary = await (await get(DEVICE, '/v2/core/telemetry/summary')).json() as TelemetrySummary
+    const summary = await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary
     expect(summary.collecting).toBe(true)
     expect(summary.enabled).toBe(true)
     const rows = Object.fromEntries(summary.records.map((row) => [`${row.owner}:${row.kind}`, row.count]))
@@ -166,11 +166,11 @@ describe('GET /v2/core/telemetry/summary', () => {
 
   it('names the plugins reading the stream, and says when nothing is', async () => {
     // The sink in `beforeEach` registered with no owner, which is what core's own do.
-    expect((await (await get(DEVICE, '/v2/core/telemetry/summary')).json() as TelemetrySummary).sinks).toEqual(['core'])
+    expect((await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary).sinks).toEqual(['core'])
 
     resetTelemetryForTest()
     startTelemetry({ node: 'node-1', version: '9.9.9' })
-    const summary = await (await get(DEVICE, '/v2/core/telemetry/summary')).json() as TelemetrySummary
+    const summary = await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary
     expect(summary.sinks).toEqual([])
     expect(summary.collecting).toBe(false)
     expect(summary.records).toEqual([])
@@ -179,7 +179,7 @@ describe('GET /v2/core/telemetry/summary', () => {
   it('refuses a task-scoped token, like the rest of this router', async () => {
     // 403 and not 404: `requireDevice` says which kind of principal a route needs, and the route's
     // existence is not the secret. The secret is what it would answer.
-    const res = await get(AGENT, '/v2/core/telemetry/summary')
+    const res = await get(AGENT, '/v1/core/telemetry/summary')
     expect(res.status).toBe(403)
   })
 })

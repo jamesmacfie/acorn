@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, RUN_TARGETS, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../../shared/send'
 
@@ -71,7 +71,7 @@ export const terminal = new Hono<AppEnv>()
   )
   .get('/profiles', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.profiles()))
   // The run targets a task declares, as `{ options }`, for the `terminal:run-target` workflow step's
-  // picker (../workflowSteps.ts). The same targets are on core's `/v2/core/tasks/:id/run`; a field's
+  // picker (../workflowSteps.ts). The same targets are on core's `/v1/core/tasks/:id/run`; a field's
   // `optionsRoute` has to sit in the contributing plugin's own namespace, and answer options rather
   // than run-target rows.
   .get('/tasks/:taskId/run-targets', (c) =>

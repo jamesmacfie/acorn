@@ -413,62 +413,62 @@ const json = (value: unknown) => ({
       // behind it being connected (features/tabs/railSources.ts) — with none, the Menu holds only the
       // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
       // were always answered here; this is the row that lets a reader reach them.
-      if (path === '/v2/core/prefs') return json({})
-      if (path === '/v2/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
-      if (path === '/v2/core/workspaces') return json([
+      if (path === '/v1/core/prefs') return json({})
+      if (path === '/v1/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
+      if (path === '/v1/core/workspaces') return json([
         { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },
         ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE
           ? [{ id: 'ws-2', name: 'second', projects: [{ id: SECOND_PROJECT.id, name: SECOND_PROJECT.name }] }]
           : []),
       ])
-      if (path === '/v2/core/workspaces/ws-1/external-projects') return json({ projects: [] })
-      if (path === '/v2/core/workspaces/ws-2/external-projects') return json({ projects: [] })
-      if (path === '/v2/core/tasks') return json([TASK])
+      if (path === '/v1/core/workspaces/ws-1/external-projects') return json({ projects: [] })
+      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({ projects: [] })
+      if (path === '/v1/core/tasks') return json([TASK])
       // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
       // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a
       // word, so a filter can be shown to keep some rows and drop others.
-      if (path === '/v2/p/probe/items') return json({ items: [
+      if (path === '/v1/p/probe/items') return json({ items: [
         { id: 'reset', title: 'Invalidate the old password on reset' },
         { id: 'rotate', title: 'Rotate the signing key' },
         { id: 'copy', title: 'Password reset copy' },
       ] })
-      if (path === '/v2/core/projects') return json({
+      if (path === '/v1/core/projects') return json({
         projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
       })
-      if (path === `/v2/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
-      if (path === '/v2/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
-      if (path === '/v2/p/notes/workspaces/global/notes') return json([])
+      if (path === `/v1/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
+      if (path === '/v1/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
+      if (path === '/v1/p/notes/workspaces/global/notes') return json([])
       if (path.endsWith('/repro-steps')) return json({ slug: 'repro-steps', title: 'Repro steps', body: BODY, included: true })
       if (path.endsWith('/scratchpad')) return json({ slug: 'scratchpad', title: 'Scratchpad', body: 'Whatever is in hand.\n', included: true })
       // ── One answer per pane in the roster ─────────────────────────────────────────────────────
       // Enough for each pane to draw its own shape rather than an error, because the sweep is about
       // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
       // `Alert` reads the same however unreadable the real thing is.
-      if (path === '/v2/p/agents/providers') return json(AGENT_PROVIDERS)
-      if (path.startsWith('/v2/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, delegations: [], nextCursor: null })
+      if (path === '/v1/p/agents/providers') return json(AGENT_PROVIDERS)
+      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, delegations: [], nextCursor: null })
       // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
       // reads as a session id, and the caller would get a snapshot object where it expects an array
       // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
-      if (path.startsWith('/v2/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
-      if (/^\/v2\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
-      if (path.startsWith('/v2/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
-      if (path === `/v2/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
-      if (path === `/v2/p/changes/tasks/${TASK.id}/review-notes`) return json([])
-      if (path.startsWith(`/v2/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
-      if (path.startsWith(`/v2/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
-      if (path === `/v2/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
-      if (path === `/v2/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
-      if (path.startsWith(`/v2/p/editor/tasks/${TASK.id}/editor/list`)) return json(EDITOR_ENTRIES)
-      if (path === `/v2/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
-      if (path.startsWith(`/v2/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
-      if (path === `/v2/p/github/tasks/${TASK.id}/pulls`) return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
+      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
+      if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
+      if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
+      if (path === `/v1/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
+      if (path === `/v1/p/changes/tasks/${TASK.id}/review-notes`) return json([])
+      if (path.startsWith(`/v1/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
+      if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
+      if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
+      if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
+      if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/list`)) return json(EDITOR_ENTRIES)
+      if (path === `/v1/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
+      if (path.startsWith(`/v1/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
+      if (path === `/v1/p/github/tasks/${TASK.id}/pulls`) return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
       // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
       // rather than "Not found" on all but the first.
-      if (/^\/v2\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
-      if (/^\/v2\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json(pullFiles())
-      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
-      if (path === '/v2/p/github/repos/runn-fast/acorn/labels') return json([])
-      if (path === '/v2/p/github/repos/runn-fast/acorn/mentions') return json([])
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json(pullFiles())
+      if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
+      if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
+      if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])
       // `ACORN_FIXTURE_LOG=1` prints what went unanswered. A pane that starts asking for a new route
       // otherwise shows up as an empty region, and finding out which route it wanted is the difference
       // between a minute and an afternoon.

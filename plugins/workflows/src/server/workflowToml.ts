@@ -130,6 +130,7 @@ export function writeWorkflowToml(def: WorkflowDef): string {
   }
 
   const doc = mark(drop({
+    baseline: def.baseline,
     format_version: def.formatVersion,
     name: def.name,
     posture: def.posture,

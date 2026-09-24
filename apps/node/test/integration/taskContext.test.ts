@@ -9,15 +9,16 @@ import {
   linkedIssuesSection,
   registerContextSection,
   removeContextSections,
-} from '@acorn/node-core/server/agentTools/contextSections.ts'
-import { taskContext } from '@acorn/node-core/server/routes/projects/taskContext.ts'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
+} from '@acorn/node-core/server/agentTools'
+import { taskContext } from '@acorn/node-core/server/routes'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit'
 // Each plugin-owned section is shaped by the plugin that owns its rows, and reaches a test through
 // that plugin's testkit. Core keeps only `issues`.
 import { mirroredPullRequest, prFiles, pullRequests, pullRequestSection, repos } from '@acorn/plugin-github/testkit'
 import { notesSection, type ContextNotesSource } from '@acorn/plugin-notes/testkit'
 import { memorySection, type ContextMemorySource } from '@acorn/plugin-memory/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
+import { buildAgentTools } from '@acorn/node-core/server/agentTools'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
@@ -160,40 +161,52 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       worktreePath: '/wt/acme-api-fix-null-token',
       pullNumber: 813,
     })
-    expect(ctx.pr).toEqual({
-      number: 813,
-      title: 'fix: guard null token',
-      body: '<p>Guards the token.</p>',
-      changedFiles: ['src/auth/login.ts', 'src/auth/token.ts'],
-    })
-    expect(ctx.issues).toEqual([
-      { provider: 'linear', identifier: 'ENG-42', title: 'Login crashes for SSO users', detail: 'In Progress', cache: 'present' },
-      { provider: 'rollbar', identifier: '142', title: '142', detail: 'Cache: missing', cache: 'missing' },
+    expect(Object.keys(ctx).sort()).toEqual(['sections', 'task'])
+    expect(ctx.sections.find((section) => section.id === 'pr')?.items).toEqual([{
+      id: 'pr:813', kind: 'PR', label: '#813 fix: guard null token', body: '<p>Guards the token.</p>',
+      details: ['src/auth/login.ts', 'src/auth/token.ts'], jump: undefined,
+    }])
+    expect(ctx.sections.find((section) => section.id === 'issues')?.items).toMatchObject([
+      { kind: 'Linear', providerId: 'linear', label: expect.stringContaining('ENG-42'), jump: { pane: 'linear', ref: { providerId: 'linear', displayId: 'ENG-42' } } },
+      { kind: 'Rollbar', providerId: 'rollbar', details: ['Cache: missing'] },
     ])
     expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
     expect(ctx.sections.find((section) => section.id === 'issues')).toMatchObject({
       defaultIncluded: true,
       absent: { reason: 'missing-cache' },
     })
-    expect(ctx.notes).toEqual([])
-    expect(ctx.memory).toEqual([])
+    expect(ctx.sections.find((section) => section.id === 'notes')?.items).toEqual([])
+    expect(ctx.sections.find((section) => section.id === 'memory')?.items).toEqual([])
   })
 
   it('include filters slices', async () => {
     const ctx = await fetchCtx('?include=issues')
-    expect(ctx.pr).toBeUndefined()
-    expect(ctx.issues).toHaveLength(2)
+    expect(ctx.sections.map((section) => section.id)).toEqual(['issues'])
+    expect(ctx.sections[0].items).toHaveLength(2)
     const prOnly = await fetchCtx('?include=pr')
-    expect(prOnly.issues).toEqual([])
-    expect(prOnly.pr?.number).toBe(813)
+    expect(prOnly.sections.map((section) => section.id)).toEqual(['pr'])
+    expect(prOnly.sections[0].items[0].id).toBe('pr:813')
+  })
+
+  it('projects the same bounded items to agent tools', async () => {
+    const tools = buildAgentTools({ db: t.db, secrets: t.secrets })
+    const call = async (name: string, input: unknown = {}) => tools.find((tool) => tool.name === name)!.handler(input, { userLogin: 'james', taskId: 'task1' } as never)
+    const context = await fetchCtx()
+    const issues = context.sections.find((section) => section.id === 'issues')!.items
+    const pr = context.sections.find((section) => section.id === 'pr')!.items[0]
+    expect(await call('task_current')).toMatchObject({ links: issues })
+    expect(await call('pr_current')).toEqual(pr)
+    expect(await call('pr_changed_files')).toEqual(pr.details)
+    expect(await call('linked_issues')).toEqual(issues)
+    expect(await call('linked_issues', { provider: 'linear' })).toEqual(issues.filter((item) => item.providerId === 'linear'))
   })
 
   it('composes the M4 seams when sources are registered', async () => {
     notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing', author: 'user' }]
     memorySource = async () => [{ name: 'auth-conventions', description: 'how auth flows work' }]
     const ctx = await fetchCtx()
-    expect(ctx.notes).toEqual([{ slug: 'plan', scope: 'task', title: 'plan', body: 'do the thing' }])
-    expect(ctx.memory).toEqual([{ name: 'auth-conventions', description: 'how auth flows work' }])
+    expect(ctx.sections.find((section) => section.id === 'notes')?.items).toMatchObject([{ id: 'task:plan', label: 'plan', body: 'do the thing' }])
+    expect(ctx.sections.find((section) => section.id === 'memory')?.items).toMatchObject([{ id: 'auth-conventions', details: ['how auth flows work'] }])
   })
 
   it('gives workflow assembly only its own run-scoped handoff note', async () => {
@@ -203,7 +216,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       { slug: 'workflow-handoffs-run-b', scope: 'task', title: 'run b', kind: 'handoff', body: 'other run output', author: 'workflow' },
     ]
     const ctx = await fetchCtx('?include=notes&workflowRunId=run-a')
-    expect(ctx.notes.map((note) => note.slug)).toEqual(['human-plan', 'workflow-handoffs-run-a'])
+    expect(ctx.sections[0].items.map((note) => note.id)).toEqual(['task:human-plan', 'task:workflow-handoffs-run-a'])
     expect(ctx.sections[0].compact).not.toContain('other run output')
   })
 
@@ -229,10 +242,11 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
         return out
       }
       const ctx = await fetchCtx()
-      expect(ctx.notes.map((n) => n.title).sort()).toEqual(['eng-42 plan (plan)', 'handoff (handoff)'])
-      expect(ctx.notes.find((n) => n.title.startsWith('eng-42'))?.body).toContain('Guard the null token')
+      const notes = ctx.sections.find((section) => section.id === 'notes')?.items ?? []
+      expect(notes.map((note) => note.label).sort()).toEqual(['eng-42 plan (plan)', 'handoff (handoff)'])
+      expect(notes.find((note) => note.label.startsWith('eng-42'))?.body).toContain('Guard the null token')
       // include filter still respected: pr-only leaves notes out.
-      expect((await fetchCtx('?include=pr')).notes).toEqual([])
+      expect((await fetchCtx('?include=pr')).sections.some((section) => section.id === 'notes')).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

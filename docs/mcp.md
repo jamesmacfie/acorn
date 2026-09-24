@@ -2,7 +2,7 @@
 
 acorn ships a stdio MCP server for agents launched from a task. The server is a thin child-process
 client: it receives a task-scoped environment, resolves the Node endpoint from the data root, and
-calls `/v2` over loopback. It never opens SQLite or owns a second domain implementation.
+calls `/v1` over loopback. It never opens SQLite or owns a second domain implementation.
 
 ## Launch environment
 

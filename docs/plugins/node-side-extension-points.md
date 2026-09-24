@@ -131,7 +131,7 @@ await push(verdict.payload)   // transformed, or the original if nobody transfor
 
 ```json
 { "id": "scan-push", "point": "changes:before-push", "label": "Secret scan",
-  "route": "/v2/p/secret-scan/push", "mode": "veto", "priority": 50 }
+  "route": "/v1/p/secret-scan/push", "mode": "veto", "priority": 50 }
 ```
 
 The route is on the contributor's own namespace and is called by the host with the payload. A
@@ -247,9 +247,9 @@ plugin that shapes that connection is a plugin inside it, which is what
 sit behind a NAT has a networking problem, not a plugin problem; [future/remote.md](../future/remote.md)
 owns the relay question if it ever becomes ours.
 
-**`ProvidedNode.enrollment.deviceToken` never reaches a client.** `GET /v2/core/nodes` projects it
+**`ProvidedNode.enrollment.deviceToken` never reaches a client.** `GET /v1/core/nodes` projects it
 out — as an explicit field list, so a new field cannot leak by omission — and
-`POST /v2/core/nodes/adopt` is the only way to get one. The desktop host is what calls it: the
+`POST /v1/core/nodes/adopt` is the only way to get one. The desktop host is what calls it: the
 renderer names a provider and a node id, the host fetches the endpoint, fingerprint and credential
 from the Node that listed the record, then probes that endpoint and refuses a certificate whose
 fingerprint is not the one the provider vouched for. So the renderer cannot introduce a Node of its

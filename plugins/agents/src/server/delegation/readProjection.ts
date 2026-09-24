@@ -1,4 +1,4 @@
-import type { AgentEventRecord, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentSession } from '../../contract/wire.ts'
 
 export type AgentReadItem =
   | { type: 'assistant_message'; text: string; turnId: string | null; fromSeq: number; toSeq: number; truncated?: boolean }

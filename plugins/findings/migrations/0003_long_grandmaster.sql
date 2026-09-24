@@ -1,1 +1,0 @@
-ALTER TABLE `finding_preparation_jobs` ADD `usage_json` text;

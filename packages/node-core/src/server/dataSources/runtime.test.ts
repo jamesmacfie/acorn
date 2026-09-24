@@ -48,7 +48,7 @@ async function world(loaded = true, handler = fixtureModule.fetchSource) {
     core: createCoreServices({ db: db.db, activeIdentity: identity, secrets: new SecretService('c'.repeat(64)) }),
     ...(loaded ? { loaded: new Map([[pluginId, binding]]) } : {}),
   })
-  const app = new Hono<AppEnv>().use('*', async (c, next) => { c.set('principal', invocation().principal); await next() }).route('/v2/core/data-sources', dataSources)
+  const app = new Hono<AppEnv>().use('*', async (c, next) => { c.set('principal', invocation().principal); await next() }).route('/v1/core/data-sources', dataSources)
   return { env, host, binding, plugin, app }
 }
 
@@ -86,12 +86,12 @@ describe('typed source transport conformance', () => {
   it('lists, describes, queries, provides options and details through core POST routes', async () => {
     const { env, app } = await world()
     const post = async (operation: string, body: unknown) => {
-      const response = await app.request(`/v2/core/data-sources/${operation}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, env)
+      const response = await app.request(`/v1/core/data-sources/${operation}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, env)
       expect(response.status).toBe(200)
       return response.json()
     }
     expect(await post('list', { parameters: {} })).toMatchObject({ sources: [{ sourceId: 'records' }] })
-    expect(JSON.stringify(await post('list', { parameters: {} }))).not.toContain('/v2/p/')
+    expect(JSON.stringify(await post('list', { parameters: {} }))).not.toContain('/v1/p/')
     expect(await post('describe', { operation: 'describe', source, scope: { parameters: {} } })).toMatchObject({ revision: '1' })
     expect(await post('options', { operation: 'options', source, scope: { parameters: { project: 'a' } }, target: 'field', pointer: '/state' })).toMatchObject({ options: [{ id: 'open' }, { id: 'closed' }], exhausted: true })
     expect(await post('query', query())).toMatchObject({ completeness: { kind: 'complete' } })

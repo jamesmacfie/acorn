@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
-import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 
 export type ToolRisk = SharedToolRisk
 
@@ -9,6 +9,7 @@ export type ToolContext = {
   taskId: string
   userLogin: string
   sessionId?: string
+  provenanceProof?: string
   callId?: string
   toolCeiling?: ToolCeiling
 }
@@ -87,7 +88,7 @@ class AgentToolRegistry {
     this.#registrations.push({ owner, tool })
   }
 
-  // Drop everything one owner contributed, for the same reason routeRegistry.remove exists. This registry
+  // Drop everything one owner contributed, as the HTTP route registry does. This registry
   // is a module singleton but registration happens inside a plugin's init, and a process that starts the
   // service twice would otherwise throw on the duplicate name or keep handlers closed over the first
   // boot's database handle.

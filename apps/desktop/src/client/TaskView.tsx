@@ -5,30 +5,31 @@ import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
-import { archiveTask } from '@acorn/client-core/features/tasks/taskMutations.ts'
+import { archiveTask } from '@acorn/client-core/features/tasks'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands/keybindings.ts'
-import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
-import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/features/tasks/agentSessions.ts'
-import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces'
+import { refreshSessionSources } from '@acorn/client-core/features/tasks'
+import { requestTerminalFocusIntent } from '@acorn/client-core/host/registries/commands'
+import { hasHostCapability } from '@acorn/client-core/infra/node'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
-import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
-import { runApi } from '@acorn/client-core/features/tasks/runClient.ts'
+import { taskBridge } from '@acorn/client-core/features/tasks'
+import { runApi } from '@acorn/client-core/features/tasks'
 import { activeTaskId, dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
-import { formatChord } from '@acorn/client-core/features/tasks/paneShortcuts.ts'
-import { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
+import { formatChord } from '@acorn/client-core/features/tasks'
+import { taskStatus } from '@acorn/client-core/features/tasks'
 import TaskPaneHost from '@acorn/client-core/features/tasks/TaskPaneHost.tsx'
 import { confirmTaskArchive } from '@acorn/client-core/features/tasks/confirmTaskArchive.ts'
 import { Alert, Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { TaskSlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
-import { defaultSourceId } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/features/tasks'
+import { defaultSourceId } from '@acorn/client-core/host/registries/sources'
 import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import '@acorn/client-core/features/tasks/task-view.css'
 import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('tasks')
 
@@ -72,7 +73,7 @@ export default function TaskView(props: {
     setRunError('')
     const result = running ? await runApi.stop(props.task.id, id) : await runApi.start(props.task.id, id)
     if (!result.ok) setRunError(result.reason ?? `Unable to ${running ? 'stop' : 'start'} ${id}`)
-    await refreshSessions()
+    await refreshSessionSources()
     await refetchTargets()
     if (!running && result.ok) props.onOpenTerminal()
   }
@@ -108,8 +109,7 @@ export default function TaskView(props: {
     if (!hasEngine()) return
     const session = await terminalSessions.create({ taskId: props.task.id, profileId })
     props.onOpenTerminal()
-    addSession(session) // create returns the session, no list round trip before focusing it
-    requestTerminalFocus(props.task.id, session.id)
+    requestTerminalFocusIntent(props.task.id, session.id)
   }
 
   onMount(() => {
@@ -181,10 +181,10 @@ export default function TaskView(props: {
     const bindings = registerKeybindings([
       ...paneContributions().flatMap((pane) => pane.defaultChord ? [{
         id: `pane.show.${pane.id}`, command: `pane.show.${pane.id}`, description: `Show ${pane.label} pane`, category: 'Panes',
-        defaultChord: pane.defaultChord, when: 'task' as const, legacyPaneAction: pane.id,
+        defaultChord: pane.defaultChord, when: 'task' as const,
         active: () => paneAvailable(pane, props.task),
       }] : []),
-      { id: 'task.terminal.toggle', command: 'task.terminal.toggle', description: 'Toggle terminal drawer', category: 'Panes', defaultChord: 'meta+shift+t', when: 'task', legacyPaneAction: 'terminal' },
+      { id: 'task.terminal.toggle', command: 'task.terminal.toggle', description: 'Toggle terminal drawer', category: 'Panes', defaultChord: 'meta+shift+t', when: 'task' },
       ...paneContributions().map((pane) => ({
         id: `pane.restore.${pane.id}`, command: `pane.restore.${pane.id}`, description: `Restore ${pane.label} pane row`, category: 'Panes',
         defaultChord: 'escape', when: 'pane' as const, pane: pane.id,

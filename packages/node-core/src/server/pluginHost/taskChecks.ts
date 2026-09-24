@@ -1,7 +1,7 @@
 // What a plugin has to say about a task the owner is about to archive, and the cleanup they may opt
 // into. See docs/plugins.md § Task checks for why this lives node-side and why a concern carries no
 // callback.
-import type { TaskArchiveConcern } from '@acorn/protocol/terminal.ts'
+import type { TaskArchiveConcern } from '@acorn/protocol/task.ts'
 import type { TaskRef } from '../core'
 import { createLogger, describeError } from '../telemetry/logger'
 

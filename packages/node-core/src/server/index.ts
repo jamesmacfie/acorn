@@ -4,7 +4,7 @@ import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
 import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
-import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
+import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routes/registry'
 import { audit } from './routes/security/audit'
 import { runs } from './routes/runs'
 import { backup } from './routes/security/backup'
@@ -33,9 +33,9 @@ import { worktree } from './routes/projects/worktree'
 import { dispatchPluginFetch } from './pluginHost/fetchRoute'
 import './dataSources/coreTasks'
 
-// One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
-// Core mounts only core routers by name, under /v2/core. Every plugin-owned router arrives through the
-// route registry, populated by app/server/routes.ts before this runs, and mounts under /v2/p/<plugin>.
+// One server, one namespace: /v1. createApp() is a factory so the bootstrap can build a fresh instance.
+// Core mounts only core routers by name, under /v1/core. Every plugin-owned router arrives through the
+// route registry, populated by app/server/routes.ts before this runs, and mounts under /v1/p/<plugin>.
 // Core imports no product route module directly (docs/plugins.md).
 export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
@@ -46,12 +46,12 @@ export function createApp() {
     // First, unconditionally. Every response carries a request id, so a user-reported failure is
     // findable in the log.
     .use('*', requestIdMiddleware)
-    .use('/v2/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
-    .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair, pre-auth by construction
-    .use('/v2/*', requireUser) // single 401 gate over the protected router table
+    .use('/v1/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
+    .route('/v1', pairing.open) // GET /v1/node + POST /v1/pair, pre-auth by construction
+    .use('/v1/*', requireUser) // single 401 gate over the protected router table
     // Below the gate: replay is keyed on the caller's deviceId, which only exists once the
     // principal is resolved (docs/api-reference.md § Request processing).
-    .use('/v2/*', idempotency)
+    .use('/v1/*', idempotency)
     // Device-only: mints credentials and administers devices (docs/security.md § Transport and auth).
     // Must sit here, before the router, or a route added under this prefix is reachable ungated.
     .use(`${CORE_NAMESPACE}/pair`, requireDevice)
@@ -163,7 +163,7 @@ export function createApp() {
     // root rather than a core one, because the projection already prefixes each router with its
     // provider id (server/integrations/providerRoutes.ts).
     //
-    // The provider-credential gate lives inside that projection, not as a `/v2/p/:provider/*` mount
+    // The provider-credential gate lives inside that projection, not as a `/v1/p/:provider/*` mount
     // here. Such a mount matches every plugin route, and Hono applies `.use()` by path regardless of
     // registration order, so it would lock task-scoped agents out of surfaces they legitimately use.
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
@@ -179,9 +179,9 @@ export function createApp() {
 
   // Fetch-shaped contributions from loaded plugins are dispatched, not mounted. One handler pair over
   // the whole plugin namespace, resolving the contribution per request, because a reload replaces a
-  // plugin's registry entries while this mount table stays as it was built (routeRegistry.ts
+  // plugin's registry entries while this mount table stays as it was built (routes/registry.ts
   // § resolvePluginFetch). Two mounts because Hono's `/*` does not match the bare path itself, and a
-  // plugin owning its whole namespace has to answer `/v2/p/<id>`.
+  // plugin owning its whole namespace has to answer `/v1/p/<id>`.
   //
   // Registered last, falling through with next() when nothing matches, so a built-in's router and the
   // provider routes answer first and an unclaimed path reaches the app's own 404.

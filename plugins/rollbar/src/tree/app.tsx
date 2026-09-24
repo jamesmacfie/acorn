@@ -112,7 +112,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       }
 
       try {
-        const tasks = await props.bridge.api.get<Task[]>('/v2/core/tasks')
+        const tasks = await props.bridge.api.get<Task[]>('/v1/core/tasks')
         const targets = taskRollbarTargets(tasks.find((task) => task.id === taskId))
         setLinkedTargets(targets)
         const first = targets[0]

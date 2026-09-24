@@ -31,10 +31,10 @@ export default {
   migrations: './migrations',
   permissions: {
     api: [],
-    events: ['plugin:agents:turn-changed', 'plugins:changed'],
+    events: ['plugin:agents:turn-changed', 'plugin:terminal:completed', 'plugin:workflows:completed', 'plugins:changed'],
     node: {
-      core: ['fs', 'tasks', 'projects:read', 'models', 'identity', 'prefs'],
-      capabilities: ['agents.reviewInput.v1'],
+      core: ['fs', 'tasks', 'projects:read', 'models', 'identity', 'prefs', 'agent-tool-provenance'],
+      capabilities: ['agents.reviewInput.v1', 'agents.sessions', 'terminal.reviewInput.v1', 'workflows.reviewInput.v1'],
       secrets: false,
       exec: false,
       net: [],
@@ -46,6 +46,8 @@ export default {
     { verb: 'settings-changed', description: 'The owner changed how findings are prepared for memory review' },
   ],
   contributions: {
+    extensions: [{ id: 'archive-review', point: 'terminal:archive-review', label: 'Capture task evidence',
+      route: '/v1/p/findings/runtime/hooks/archive-review', mode: 'transform' }],
     frames: [
       {
         target: 'pane',
@@ -56,8 +58,8 @@ export default {
         showInSwitcher: false,
         layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
         destinations: [
-          { id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'memory-proposal' },
-          { id: 'memory-bundles', label: 'Open Memory review', targetKind: 'findings-bundle', noticeKind: 'memory-proposal' },
+          { id: 'memory-review', label: 'Review in Memory', targetKind: 'findings-candidate', noticeKind: 'findings-review' },
+          { id: 'memory-bundles', label: 'Open review', targetKind: 'findings-bundle', noticeKind: 'findings-review' },
           { id: 'agent-run', label: 'Open source agent run', targetKind: 'managed-agent' },
           { id: 'workflow-run', label: 'Open source workflow run', targetKind: 'workflow-run' },
         ],
@@ -74,6 +76,7 @@ export default {
     ],
     commands: [{
       id: 'inspect-evidence',
+      kind: 'action',
       title: 'Findings: inspect task evidence',
       hint: 'raw observations and review provenance',
       keywords: ['findings', 'observations', 'evidence', 'diagnostics'],
@@ -83,13 +86,13 @@ export default {
       action: { verb: 'openPane', pane: 'findings' },
     }],
     agentTools: [
-      { id: 'record', description: 'Record one quiet, task-scoped observation with evidence. This creates no notification or review obligation.', inputSchema: record, risk: 'write', requiresSession: true, handler: '/v2/p/findings/runtime/tools/record', timeoutMs: 5_000, maxOutputBytes: 32_768 },
-      { id: 'list', description: 'List this task’s observations with byte-aware cursor pagination, including withdrawn history when requested.', inputSchema: { type: 'object', additionalProperties: false, properties: { cursor: string(400), limit: { type: 'integer', minimum: 1, maximum: 100 }, state: { type: 'string', enum: ['active', 'history'] } } }, risk: 'read', handler: '/v2/p/findings/runtime/tools/list', timeoutMs: 5_000, maxOutputBytes: 262_144 },
-      { id: 'get', description: 'Read one observation from this task, including evidence, corrections, and withdrawal history.', inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: string(200) } }, risk: 'read', handler: '/v2/p/findings/runtime/tools/get', timeoutMs: 5_000, maxOutputBytes: 131_072 },
-      { id: 'withdraw', description: 'Withdraw one active observation recorded by this agent session. Evidence remains in task history.', inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: string(200), reason: string(1_000) } }, risk: 'write', requiresSession: true, handler: '/v2/p/findings/runtime/tools/withdraw', timeoutMs: 5_000, maxOutputBytes: 32_768 },
+      { id: 'record', description: 'Record one quiet, task-scoped observation with evidence. This creates no notification or review obligation.', inputSchema: record, risk: 'write', requiresSession: true, handler: '/v1/p/findings/runtime/tools/record', timeoutMs: 5_000, maxOutputBytes: 32_768 },
+      { id: 'list', description: 'List this task’s observations with byte-aware cursor pagination, including withdrawn history when requested.', inputSchema: { type: 'object', additionalProperties: false, properties: { cursor: string(400), limit: { type: 'integer', minimum: 1, maximum: 100 }, state: { type: 'string', enum: ['active', 'history'] } } }, risk: 'read', handler: '/v1/p/findings/runtime/tools/list', timeoutMs: 5_000, maxOutputBytes: 262_144 },
+      { id: 'get', description: 'Read one observation from this task, including evidence, corrections, and withdrawal history.', inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: string(200) } }, risk: 'read', handler: '/v1/p/findings/runtime/tools/get', timeoutMs: 5_000, maxOutputBytes: 131_072 },
+      { id: 'withdraw', description: 'Withdraw one active observation recorded by this agent session. Evidence remains in task history.', inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: string(200), reason: string(1_000) } }, risk: 'write', requiresSession: true, handler: '/v1/p/findings/runtime/tools/withdraw', timeoutMs: 5_000, maxOutputBytes: 32_768 },
     ],
     contextSections: [{
-      id: 'task_findings', label: 'Task findings', order: 45, read: '/v2/p/findings/runtime/context',
+      id: 'task_findings', label: 'Task findings', order: 45, read: '/v1/p/findings/runtime/context',
       defaultIncluded: true, timeoutMs: 5_000, maxBytes: 16_384, maxTokens: 1_500,
     }],
   },

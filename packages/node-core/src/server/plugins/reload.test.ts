@@ -16,7 +16,7 @@ import { testGate } from '../../testkit/auth'
 import type { Env } from '../bindings'
 import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
-import { PLUGIN_NAMESPACE, pluginRouteContributions } from '../routeRegistry'
+import { PLUGIN_NAMESPACE, pluginRouteContributions } from '../routes/registry'
 import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
 import { dispatchPluginFetch } from '../pluginHost/fetchRoute'
 import { clearRegistrations, initPlugins, type PluginReloadRequest } from '../pluginHost/host'
@@ -72,7 +72,7 @@ const acme = (body: string, extra?: Partial<NodePlugin>): { plugin: NodePlugin; 
 
 const request = (path: string) =>
   new Hono<AppEnv>()
-    .use('/v2/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
+    .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
     .all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
     .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
     .fetch(new Request(`http://acorn.test${path}`), {} as Env)
@@ -94,7 +94,7 @@ describe('plugin reload', () => {
     expect(outcome).toEqual({ ok: false, error: 'the new bundle is broken' })
     // Fully live means all three: the route still serves, the tool is still the old one and there is
     // exactly one of each. A candidate that had written through would have left duplicates.
-    expect(await (await request(`/v2/p/${PLUGIN}`)).text()).toBe('v1')
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v1')
     expect(toolDescriptions()).toEqual(['v1'])
     expect(pluginRouteContributions().filter((route) => route.plugin === PLUGIN)).toHaveLength(1)
     await host.dispose()
@@ -137,12 +137,12 @@ describe('plugin reload', () => {
 
   it('serves the NEW handler, which is the whole reason the app dispatches instead of mounting', async () => {
     const host = await initPlugins([acme('v1').plugin], hostOptions())
-    expect(await (await request(`/v2/p/${PLUGIN}`)).text()).toBe('v1')
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v1')
 
     await host.reload(PLUGIN, { plugin: acme('v2').plugin, binding })
 
-    expect(await (await request(`/v2/p/${PLUGIN}`)).text()).toBe('v2')
-    expect(await (await request(`/v2/p/${PLUGIN}/anything`)).text()).toBe('v2')
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v2')
+    expect(await (await request(`/v1/p/${PLUGIN}/anything`)).text()).toBe('v2')
     await host.dispose()
   })
 
@@ -153,7 +153,7 @@ describe('plugin reload', () => {
     }], hostOptions())
     // Nothing was mounted at this path when the app was built, so a boot-time mount table could never
     // answer it. The fall-through keeps that the app's own 404 rather than the dispatcher's.
-    expect((await request(`/v2/p/${PLUGIN}/late`)).status).toBe(404)
+    expect((await request(`/v1/p/${PLUGIN}/late`)).status).toBe(404)
 
     await host.reload(PLUGIN, {
       plugin: {
@@ -168,8 +168,8 @@ describe('plugin reload', () => {
 
     // Longest prefix wins, so the specific handler answers its own path and the namespace owner keeps
     // everything else.
-    expect(await (await request(`/v2/p/${PLUGIN}/late`)).text()).toBe('late')
-    expect(await (await request(`/v2/p/${PLUGIN}/other`)).text()).toBe('root')
+    expect(await (await request(`/v1/p/${PLUGIN}/late`)).text()).toBe('late')
+    expect(await (await request(`/v1/p/${PLUGIN}/other`)).text()).toBe('root')
     await host.dispose()
   })
 
@@ -179,15 +179,15 @@ describe('plugin reload', () => {
     // path under a built-in's namespace that nothing claims must still be the app's own 404.
     const host = await initPlugins([acme('loaded').plugin], hostOptions())
     const app = new Hono<AppEnv>()
-      .use('/v2/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
+      .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
       .route(`${PLUGIN_NAMESPACE}/${PLUGIN}`, new Hono<AppEnv>().get('/compiled', (c) => c.text('built-in')))
       .all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
       .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
     const call = (path: string) => app.fetch(new Request(`http://acorn.test${path}`), {} as Env)
 
-    expect(await (await call(`/v2/p/${PLUGIN}/compiled`)).text()).toBe('built-in')
-    expect(await (await call(`/v2/p/${PLUGIN}/elsewhere`)).text()).toBe('loaded')
-    expect((await call('/v2/p/nobody/at/all')).status).toBe(404)
+    expect(await (await call(`/v1/p/${PLUGIN}/compiled`)).text()).toBe('built-in')
+    expect(await (await call(`/v1/p/${PLUGIN}/elsewhere`)).text()).toBe('loaded')
+    expect((await call('/v1/p/nobody/at/all')).status).toBe(404)
     await host.dispose()
   })
 
@@ -206,7 +206,7 @@ describe('plugin reload', () => {
     expect(host.roster.find((entry) => entry.name === PLUGIN)).toMatchObject({ state: 'failed' })
 
     expect(await host.reload(PLUGIN, { plugin: acme('fixed').plugin, binding })).toEqual({ ok: true })
-    expect(await (await request(`/v2/p/${PLUGIN}`)).text()).toBe('fixed')
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('fixed')
     expect(host.roster.find((entry) => entry.name === PLUGIN)).toMatchObject({ state: 'active' })
     await host.dispose()
   })

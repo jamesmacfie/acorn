@@ -1,6 +1,6 @@
 import { createMemo, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { DashboardDisplayCell, DashboardDisplayField } from '@acorn/dashboards-core/display.ts'
+import type { DashboardDisplayCell, DashboardDisplayField } from '@acorn/dashboards-core/render'
 import { openInAppUrl } from '../../../host/registries/panes/contentLinks'
 import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../../kit/components/content/Icon'

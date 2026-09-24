@@ -9,7 +9,7 @@ import { Alert, Button, Card, Field, Heading, Inline, Input, Stack, Text } from 
 // The AI branch of the wizard: what this machine can already generate with, and a form for a key if
 // it can generate with nothing.
 //
-// It probes nothing itself. `GET /v2/core/models/backends` runs `which` per read, so mounting this
+// It probes nothing itself. `GET /v1/core/models/backends` runs `which` per read, so mounting this
 // step is the whole of the "detect at first load" behaviour — no boot work, and nothing to cache
 // (docs/integrations.md § Model providers).
 //

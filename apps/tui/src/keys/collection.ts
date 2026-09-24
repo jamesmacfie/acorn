@@ -18,10 +18,10 @@
 
 import { onCleanup } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import { _resetCollectionState } from '@acorn/client-core/kit/keys/collectionState.ts'
+import { _resetCollectionState } from '@acorn/client-core/kit/keys'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
-} from '@acorn/client-core/kit/keys/collectionIntents.ts'
+} from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import {
   activationEntersMain, focusedRenderable, focusRenderable, markCollection, markItem, moveColumn,

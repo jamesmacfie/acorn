@@ -1,9 +1,8 @@
 import { createMemo, createResource, createSignal } from 'solid-js'
-import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, toast, taskBridge, type Task } from '@acorn/plugin-api/client'
+import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, sendToSession, toast, type Task, type SessionSummary } from '@acorn/plugin-api/client'
 import { slotFills } from '@acorn/plugin-api/ui/host'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
-import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
 import { selectionFor, setSectionSelection } from './selectionStore'
 import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary, type TraySelection } from './model'
@@ -28,7 +27,7 @@ const agoText = (at: number): string => {
   return minutes < 1 ? 'now' : `${minutes}m`
 }
 
-export const sessionLabel = (session: TerminalSession | undefined): string =>
+export const sessionLabel = (session: SessionSummary | undefined): string =>
   session ? `${session.title}${session.idle ? ' ●' : ''}` : 'agent session'
 
 export const pillText = (status: SyncStatus): string =>
@@ -39,7 +38,6 @@ export const pillText = (status: SyncStatus): string =>
       : `stale · ${status.changes} change${status.changes === 1 ? '' : 's'}`
 
 export function createContextModel(task: Task) {
-  const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   // Which section folds the reader has shut. Closed-set rather than open-set, because a section is
@@ -76,7 +74,7 @@ export function createContextModel(task: Task) {
   const target = createMemo(() => targetSessionFor(task.id))
   const status = createMemo(() => {
     const session = target()
-    return session ? syncStatus(session.id, assembled()?.sections ?? {}) : null
+    return session ? syncStatus(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, assembled()?.sections ?? {}) : null
   })
 
   function followJump(item: ContextItem) {
@@ -109,8 +107,8 @@ export function createContextModel(task: Task) {
     if (!current) return
     const { block, sections } = assembleBlockFrom(current, effective())
     if (!block.trim()) return setMsg('Nothing selected.')
-    const res = await api.sendToAgent(session.id, block, 'after-ready')
-    if (res.ok) recordSync(session.id, task.id, sections)
+    const res = await sendToSession(session, block, 'after-ready')
+    if (res.ok) recordSync(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, task.id, sections)
     // Success is transient feedback; a failure needs to stay next to the button that failed.
     if (res.ok) return toast(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.', { tone: 'success' })
     setMsg(res.reason ?? 'Send failed.')
@@ -160,7 +158,7 @@ export function createContextModel(task: Task) {
     status,
     sessions: (query: string) =>
       agentSessionsFor(task.id).filter((session) => session.title.toLowerCase().includes(query.toLowerCase())),
-    pickTarget: (session: TerminalSession) => rememberTarget(task.id, session.id),
+    pickTarget: (session: SessionSummary) => rememberTarget(task.id, `${session.nodeId}:${session.sourceId}:${session.sessionId}`),
     followJump,
     refreshContext,
     syncContext,

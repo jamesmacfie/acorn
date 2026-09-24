@@ -20,6 +20,12 @@ export { taskGroups as workflowTaskGroups }
 
 export const taskHasWorkflowRuns = (taskId: string): boolean => (runCounts()[taskId] ?? 0) > 0
 
+// A run link already proves that this task has a run. Make its pane available before the
+// deep link is consumed; the next node read replaces this hint with authoritative counts.
+export const rememberWorkflowRun = (taskId: string): void => {
+  setRunCounts((current) => current[taskId] ? current : { ...current, [taskId]: 1 })
+}
+
 const same = (a: Record<string, number>, b: Record<string, number>): boolean => {
   const keys = Object.keys(a)
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])

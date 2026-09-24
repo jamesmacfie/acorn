@@ -2,6 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "baseline": {
+      "type": "string",
+      "const": "acorn-1"
+    },
     "protocolVersion": {
       "type": "number",
       "const": 1
@@ -25,6 +29,7 @@
     }
   },
   "required": [
+    "baseline",
     "protocolVersion",
     "nodeId",
     "endpoint",

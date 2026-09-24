@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSession, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 
 // Where the scroller sits in the DOM.
 //

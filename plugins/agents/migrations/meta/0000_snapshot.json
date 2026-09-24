@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b71716cd-fbc4-4697-9de0-d01ac7d0eb11",
+  "id": "935e83a1-52f9-4448-83d6-50ce185914da",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_artifacts": {
@@ -639,6 +639,21 @@
           "notNull": false,
           "autoincrement": false
         },
+        "subagents_json": {
+          "name": "subagents_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "queued_turns": {
+          "name": "queued_turns",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "last_event_seq": {
           "name": "last_event_seq",
           "type": "integer",
@@ -708,6 +723,168 @@
             "parent_session_id"
           ],
           "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "agent_spawns": {
+      "name": "agent_spawns",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "root_task_id": {
+          "name": "root_task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "root_session_id": {
+          "name": "root_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_task_id": {
+          "name": "owner_task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_session_id": {
+          "name": "owner_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_spawn_id": {
+          "name": "parent_spawn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "child_task_id": {
+          "name": "child_task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "child_session_id": {
+          "name": "child_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "child_turn_id": {
+          "name": "child_turn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "depth": {
+          "name": "depth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "isolation": {
+          "name": "isolation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provisioning_state": {
+          "name": "provisioning_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provisioning_json": {
+          "name": "provisioning_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "agent_spawns_owner_session_idx": {
+          "name": "agent_spawns_owner_session_idx",
+          "columns": [
+            "owner_session_id"
+          ],
+          "isUnique": false
+        },
+        "agent_spawns_child_session_idx": {
+          "name": "agent_spawns_child_session_idx",
+          "columns": [
+            "child_session_id"
+          ],
+          "isUnique": false
+        },
+        "agent_spawns_root_state_idx": {
+          "name": "agent_spawns_root_state_idx",
+          "columns": [
+            "root_task_id",
+            "root_session_id",
+            "provisioning_state"
+          ],
+          "isUnique": false
+        },
+        "agent_spawns_owner_idempotency_idx": {
+          "name": "agent_spawns_owner_idempotency_idx",
+          "columns": [
+            "owner_task_id",
+            "owner_session_id",
+            "idempotency_key"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},

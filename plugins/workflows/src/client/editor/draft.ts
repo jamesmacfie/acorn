@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // The editor's draft: a definition, a selection, and the operations that change them
 // (docs/workflows.md § Authoring).
 //
@@ -37,7 +38,7 @@ export const INPUT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
 
 export const newDraft = (def: WorkflowDef): WorkflowDraft => ({ def, selection: { kind: 'definition' } })
 
-export const emptyDefinition = (name = 'Untitled workflow'): WorkflowDef => ({ formatVersion: 2, name, steps: [] })
+export const emptyDefinition = (name = 'Untitled workflow'): WorkflowDef => ({ baseline: ACORN_BASELINE, formatVersion: 1, name, steps: [] })
 
 const stepAt = (def: WorkflowDef, name: string): WorkflowStepDef | undefined =>
   def.steps.find((step) => stepIdentity(step) === name)
@@ -144,7 +145,7 @@ export function addNode(draft: WorkflowDraft, kind: string, base?: string): Work
   // Every step the editor writes carries an explicit `after`, so a node added at the end of a list
   // written by hand does not silently inherit the step above it.
   const explicit = draft.def.steps.map((step, index) => (step.after ? step : { ...step, after: [...effectiveAfter(draft.def, index)] }))
-  const step: WorkflowStepDef = { ...(draft.def.formatVersion === 2 ? { id: crypto.randomUUID() } : {}), name, ...(kind === 'agent' ? {} : { kind }), after: parent ? [parent] : [] }
+  const step: WorkflowStepDef = { ...(draft.def.formatVersion === 1 ? { id: crypto.randomUUID() } : {}), name, ...(kind === 'agent' ? {} : { kind }), after: parent ? [parent] : [] }
   return { def: { ...draft.def, steps: [...explicit, step] }, selection: { kind: 'node', name: stepIdentity(step) } }
 }
 

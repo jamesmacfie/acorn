@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentEventRecord, AgentNormalizedEvent, AgentSessionSnapshot, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentNormalizedEvent, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
 
 // How a row finds its turn.
 //

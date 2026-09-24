@@ -1,6 +1,6 @@
 import { ToolError } from '@acorn/plugin-api/node'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { normalizeToolCeiling, RISK_ORDER, type ToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { AgentSession } from '../../contract/wire.ts'
+import { normalizeToolCeiling, RISK_ORDER, type ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { validResultSchema } from '../sessions/resultContract'
 
 export const assertBoundedDelegationConfig = (value: unknown, label: string): void => {

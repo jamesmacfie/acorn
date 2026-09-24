@@ -6,7 +6,7 @@ import { isIP } from 'node:net'
 import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import { type CoreServices, type PluginDatabase, type SecretService, SecretUnavailableError } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
-import type { AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
+import type { AgentWsFrame } from '../contract/wire.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
 

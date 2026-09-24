@@ -79,26 +79,6 @@ pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
     key
 }
 
-/// Electron's `safeStorage` key, for the one-time adoption of a custody root the Electron build left
-/// behind. See docs/shell.md, "Keys and custody".
-///
-/// safeStorage is Chromium's os_crypt. On macOS the password lives in a keychain item named
-/// "<app> Safe Storage" and the AES key is derived from it. The derivation and the decryption belong
-/// to the helper, beside the token store that re-encrypts the results. Rust owns only the part
-/// nothing else can reach.
-///
-/// Returns None whenever there is nothing to adopt or nothing readable, which is supported rather
-/// than an error. The local node mints a fresh device row, remote nodes need re-pairing, and the
-/// fleet UI says so.
-pub fn legacy_safe_storage_key(app_name: &str) -> Option<String> {
-    keyring::Entry::new(&format!("{app_name} Safe Storage"), app_name)
-        .ok()?
-        .get_password()
-        .inspect_err(|error| eprintln!("[keychain] no legacy safeStorage key to adopt: {error}"))
-        .ok()
-        .filter(|password| !password.is_empty())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

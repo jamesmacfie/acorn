@@ -7,11 +7,11 @@ import type {
   AgentSession,
   AgentSessionSnapshot,
   AgentWsFrame,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
-import type { AgentLifecycleFrame, AgentTurnChangedEvent } from '../../contract/lifecycle'
-import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { AgentLifecycleFrame } from '../../contract/lifecycle'
+import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
 import { readAgentConcurrency } from '../concurrencyStore'
 import { agentDriverRegistry, type AgentDriverRegistry } from '../drivers/registry'
@@ -113,7 +113,6 @@ export type AgentRuntimeOptions = {
   publish?(frame: PublishedFrame): void
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
-  onCompletedTurn?(event: AgentTurnChangedEvent): Promise<void>
   // The owner's half of this plugin's hooks (docs/plugins.md § Hooks). Optional so a test can build an
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
@@ -160,7 +159,6 @@ export class ManagedAgentEngine {
   protected readonly publish?: (frame: PublishedFrame) => void
   protected readonly startTerminalHandoff?: (session: AgentSession) => Promise<string>
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
-  protected readonly onCompletedTurn?: (event: AgentTurnChangedEvent) => Promise<void>
   protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
   protected readonly telemetry?: PluginTelemetry
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
@@ -206,7 +204,6 @@ export class ManagedAgentEngine {
     this.publish = options.publish
     this.startTerminalHandoff = options.startTerminalHandoff
     this.terminalHandoffRunning = options.terminalHandoffRunning
-    this.onCompletedTurn = options.onCompletedTurn
     this.hooks = options.hooks
     this.telemetry = options.telemetry
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
@@ -439,20 +436,6 @@ export class ManagedAgentEngine {
     // are deliberately not on this list, and a session with no children never holds a timer.
     if (event.type === 'subagent' || eventSubagentId(event)) this.armSubagentQuiet(sessionId)
     if (settlesTurn) {
-      if (event.type === 'turn_completed' && turnId) {
-        if (this.onCompletedTurn) {
-          const session = await this.store.requireSession(sessionId)
-          const turn = await this.store.turn(turnId)
-          if (turn) void this.onCompletedTurn({
-            taskId: session.taskId,
-            sessionId,
-            turnId,
-            source: turn.source,
-            status: turn.status,
-            attempt: turn.attempt,
-          }).catch((error: unknown) => log.warn(`completed-turn observer failed: ${describeError(error).message}`))
-        }
-      }
       void this.pump()
     }
   }

@@ -30,7 +30,7 @@ describe('provider event storage bounds', () => {
 // query, a search engine decides how many sources come back, and every title and snippet is somebody
 // else's HTML. These cases are the ceiling on all of it.
 describe('web activity bounds', () => {
-  const web = (tool: Partial<import('@acorn/protocol/managedAgents.ts').AgentToolCall>) => {
+  const web = (tool: Partial<import('../../contract/wire.ts').AgentToolCall>) => {
     const event = boundProviderEvent({
       type: 'tool',
       tool: { id: 't', title: 'Search web', status: 'completed', ...tool },

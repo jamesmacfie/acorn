@@ -21,7 +21,7 @@ export function fieldOptionsRoute(
   pluginId: string | null,
   context: { projectId?: string; taskId?: string },
 ): string | undefined {
-  const namespace = pluginId ? `/v2/p/${pluginId}/` : '/v2/p/workflows/'
+  const namespace = pluginId ? `/v1/p/${pluginId}/` : '/v1/p/workflows/'
   if (!route.startsWith(namespace)) return undefined
   const filled = route
     .replace('{projectId}', context.projectId ?? '')

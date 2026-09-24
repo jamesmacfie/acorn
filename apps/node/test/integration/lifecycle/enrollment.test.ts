@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { startControlPlaneStub, type ControlPlaneStub } from '@acorn/node-core/testkit/controlPlaneStub.ts'
+import { startControlPlaneStub, type ControlPlaneStub } from '@acorn/node-core/testkit'
 
 // A real node, booted with the two environment variables set, enrolling with the fifty-line stub
 // (docs/node-enrollment.md).

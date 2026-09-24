@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { decodeIdFrame } from '@acorn/protocol/ws.ts'
+import { apiRouteNamespace } from '@acorn/protocol/telemetry.ts'
 import {
   decodeBytes,
   encodeBytes,
@@ -11,11 +12,11 @@ import {
   type WireFetchBody,
   type WireFetchRequest,
 } from './wire'
-import { watchAppearance } from '@acorn/client-core/kit/tokens/appearance.ts'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { watchAppearance } from '@acorn/client-core/kit/tokens'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 
-import type { ResponsivenessPulse } from '@acorn/client-core/infra/telemetry/responsiveness.ts'
+import type { ResponsivenessPulse } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('helper')
 
@@ -53,9 +54,7 @@ const callContext = (method: HelperMethod, params: unknown): string => {
   if (!request || typeof request !== 'object') return ''
   const { path, requestId } = request as { path?: unknown; requestId?: unknown }
   if (typeof path !== 'string') return ''
-  const segments = path.split('?')[0].split('/').filter(Boolean)
-  const keep = segments[0] === 'v2' && segments[1] === 'p' ? 4 : 3
-  const route = `/${segments.slice(0, keep).join('/')}`
+  const route = apiRouteNamespace(path)
   return ` route=${route}${typeof requestId === 'string' ? ` request=${requestId}` : ''}`
 }
 

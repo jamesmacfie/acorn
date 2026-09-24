@@ -11,7 +11,7 @@
 // task opened in the app afterwards finds the pane this shell left it on.
 
 import { dispatchLayout, layoutForTask, activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
-import { defaultLayout } from '@acorn/client-core/features/tasks/taskLayout.ts'
+import { defaultLayout } from '@acorn/client-core/features/tasks'
 import {
   paneAvailable, paneContribution, paneContributions, type PaneContribution,
 } from '@acorn/client-core/host/registries/panes/panes.ts'

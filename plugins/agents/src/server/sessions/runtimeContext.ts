@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { AgentSession, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentStore } from './store'
 
 export const agentTurnInputText = (turn: AgentTurn): string =>

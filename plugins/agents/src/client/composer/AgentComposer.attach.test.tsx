@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 
 // Attach, end to end through the platform seam. The stub is a host on `window.acorn` rather than a
 // mocked module, so what this drives is the real `pickFiles` — the button, the seam's dispatch, and

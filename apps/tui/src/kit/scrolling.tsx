@@ -2,7 +2,7 @@
 import type { Renderable } from '../tree/compat'
 import { createEffect, createSignal, onCleanup, type JSX } from 'solid-js'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
+import type { Intent } from '@acorn/client-core/kit/keys'
 import { bindKeys } from '../keys/install'
 import { scheduleSettle } from '../keys/regions'
 import { PANE } from '../keys/tiers'

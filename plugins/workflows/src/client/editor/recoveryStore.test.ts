@@ -6,7 +6,7 @@ it('preserves unfinished drafts and clears only the acknowledged exact copy', ()
   const storage = { get length() { return entries.size }, key: (i: number) => [...entries.keys()][i] ?? null,
     getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => { entries.set(key, value) }, removeItem: (key: string) => { entries.delete(key) }, clear: () => entries.clear() }
   const store = workflowRecoveryStore(storage)
-  const base = { name: 'unfinished', steps: [] }
+  const base = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'unfinished', steps: [] }
   const copy = { nodeId: 'node', entityId: 'def', baseRevision: 3, base, local: { ...base, name: 'edited' }, savedAt: 1 }
   expect(store.save(copy)).toBe(true)
   expect(workflowRecoveryStore(storage).latest('node', 'def')).toEqual(copy)

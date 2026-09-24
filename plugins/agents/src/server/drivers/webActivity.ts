@@ -1,4 +1,4 @@
-import type { AgentWebAction } from '@acorn/protocol/managedAgents.ts'
+import type { AgentWebAction } from '../../contract/wire.ts'
 
 /**
  * The one thing about a web call that must not differ by harness: what the row is called.

@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, For, Show } from 'solid-js'
-import type { CommandSession } from '@acorn/client-core/host/registries/commands/session.ts'
+import type { CommandSession } from '@acorn/client-core/host/registries/commands'
 import { Modal, ModalBody } from '../kit/grouping'
 import { Alert, Row } from '../kit/showing'
 import { Input } from '../kit/asking'
@@ -12,7 +12,7 @@ import { overlayKeys } from '../keys/trap'
 // This file used to hold a copy of the desktop's palette: the same resource over every contributed row
 // source, the same composition with the actions and the task and workspace lists, the same fuzzy
 // filter, the same row-to-source map, the same invoke. All of it is
-// `client-core/host/registries/commands/session.ts` now, which is where the two hosts were always
+// `client-core/host/registries/commands/sessionStore.ts` now, which is where the two hosts were always
 // going to have to agree — a group that pushed here and not there would be two products.
 //
 // What stays is the rectangle. There is no backdrop and no dialog: the surface is a `Modal` holding a

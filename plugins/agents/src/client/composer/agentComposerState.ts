@@ -1,4 +1,4 @@
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 
 const STARTING_STATES: ReadonlySet<AgentSession['runtimeState']> = new Set([
   'creating',

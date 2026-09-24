@@ -14,7 +14,7 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 let onFrame: ((value: unknown) => void) | undefined
 vi.mock('./wsChannel', () => ({

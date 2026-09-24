@@ -7,7 +7,7 @@ import { providedNodeStateSchema } from '@acorn/protocol/nodeProviders.ts'
 // The reference node provider: nodes read out of a JSON file on the node's own disk.
 //
 // It exists because a seam with no consumer is a seam nobody has tried. Until the first-party cloud
-// plugin exists, this is what exercises `ctx.providers.nodes`, `/v2/core/nodes`, adoption and the four
+// plugin exists, this is what exercises `ctx.providers.nodes`, `/v1/core/nodes`, adoption and the four
 // lifecycle verbs, and it is what the tests run against. It is also the honest answer to "could
 // someone else write one of these?": this package imports nothing but `@acorn/plugin-api`, `zod` and
 // two protocol types, which is exactly what a stranger has.

@@ -27,7 +27,7 @@ import type {
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { runProcess } from '../core/proc'
 import { resolveInRoot } from '../core/fs'
-import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifest, speaksApiVersion, type PluginManifest } from './manifest'
+import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
 
@@ -273,13 +273,14 @@ const digestOf = (root: string, relPath: string | undefined): string | undefined
 
 function validate(root: string, expectId: string | null): PluginManifest {
   assertConfined(root)
-  const manifest = readPluginManifest(root)
-  if (!manifest) fail(`${MANIFEST_FILE} is missing or does not match the plugin manifest schema.`)
-  if (!speaksApiVersion(manifest!.apiVersion)) {
-    fail(`That package is built for acorn plugin API ${manifest!.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
+  const parsed = readPluginManifestResult(root)
+  if (!parsed.ok) return fail(parsed.reason)
+  const manifest = parsed.manifest
+  if (!speaksApiVersion(manifest.apiVersion)) {
+    fail(`That package is built for acorn plugin API ${manifest.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
   }
-  if (expectId && manifest!.id !== expectId) fail(`That package is '${manifest!.id}', not '${expectId}'.`)
-  return manifest!
+  if (expectId && manifest.id !== expectId) fail(`That package is '${manifest.id}', not '${expectId}'.`)
+  return manifest
 }
 
 // ── Versions ──────────────────────────────────────────────────────────────────────────────────────
@@ -374,11 +375,10 @@ export async function updatePlugin(dataRoot: string, id: string, options: Instal
 }
 
 async function place(dataRoot: string, source: PluginInstallSource, expectId: string | null, options: InstallOptions): Promise<PluginInstallResult> {
+  if ('path' in source) return linkLocal(dataRoot, source, expectId, options)
   const root = pluginInstallRoot(dataRoot)
   mkdirSync(root, { recursive: true, mode: 0o700 })
   sweepDebris(dataRoot)
-
-  if ('path' in source) return linkLocal(dataRoot, source, expectId, options)
 
   const staging = join(root, `.staging-${randomUUID().slice(0, 8)}`)
   mkdirSync(staging, { recursive: true, mode: 0o700 })
@@ -422,6 +422,8 @@ function linkLocal(dataRoot: string, source: { path: string }, expectId: string 
   const manifest = validate(source.path, expectId)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
 
+  mkdirSync(pluginInstallRoot(dataRoot), { recursive: true, mode: 0o700 })
+  sweepDebris(dataRoot)
   const target = pluginDir(dataRoot, manifest.id)
   rmSync(target, { recursive: true, force: true })
   symlinkSync(source.path, target)

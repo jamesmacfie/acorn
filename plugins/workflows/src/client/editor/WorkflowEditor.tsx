@@ -369,7 +369,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       </Alert>}</Show>
       <Show when={authoringOpen() && workspaceId()}>
         <AuthoringConversation
-          endpoint="/v2/p/workflows/defs/authoring/turn"
+          endpoint="/v1/p/workflows/defs/authoring/turn"
           target="workflow"
           targetId={store.ref()?.id ?? `new:${props.projectId}`}
           scope={{ workspaceId: workspaceId(), projectId: props.projectId }}

@@ -1,0 +1,6 @@
+export { runChromeAction } from './actions.ts'
+export { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData.ts'
+export { setExtendedPane } from './extendedPane.ts'
+export type { ExtendedPaneProps } from './extendedPane.ts'
+export { setSourcePanel } from './sourcePanel.ts'
+export type { SourcePanel } from './sourcePanel.ts'

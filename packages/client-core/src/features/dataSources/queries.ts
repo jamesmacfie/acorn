@@ -17,7 +17,7 @@ export function dataSourceQueryKey(nodeId: string, request: DataSourceRequest, r
 export function dataSourceQueryOptions<R extends DataSourceRequest>(nodeId: string, request: R, revision?: string) {
   return {
     queryKey: dataSourceQueryKey(nodeId, request, revision),
-    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceResponse<R>>(`/v2/core/data-sources/${request.operation}`, {
+    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceResponse<R>>(`/v1/core/data-sources/${request.operation}`, {
       method: 'POST', nodeId, signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
     // Results stay attached to their full request key; consumers never display another query's rows.
@@ -27,7 +27,7 @@ export function dataSourceQueryOptions<R extends DataSourceRequest>(nodeId: stri
 export function dataSourceCatalogOptions(nodeId: string, scope: DataSourceScope) {
   return {
     queryKey: dataSourceCatalogKey(nodeId, scope),
-    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceCatalog>('/v2/core/data-sources/list', {
+    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceCatalog>('/v1/core/data-sources/list', {
       method: 'POST', nodeId, signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(scope),
     }),
     staleTime: 60_000,
@@ -36,7 +36,7 @@ export function dataSourceCatalogOptions(nodeId: string, scope: DataSourceScope)
 export function discoverDataSourcesOptions(nodeId: string, request: DataSourceDiscoveryRequest) {
   return {
     queryKey: [...dataSourceCatalogKey(nodeId, request.scope), 'discover', request.pluginId, request.discoveryId, request.cursor ?? null] as const,
-    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceDiscoveryPage>('/v2/core/data-sources/discover', {
+    queryFn: ({ signal }: { signal: AbortSignal }) => writeJson<DataSourceDiscoveryPage>('/v1/core/data-sources/discover', {
       method: 'POST', nodeId, signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
     staleTime: 60_000,

@@ -1,5 +1,6 @@
 import { createSignal, For, Show, type Component } from 'solid-js'
-import { agentToolTone, dispatchLayout } from '@acorn/plugin-api/client'
+import { dispatchLayout } from '@acorn/plugin-api/client'
+import { agentToolTone } from '@acorn/plugin-agents/contract/toolTone.ts'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Badge, Button, CodeBlock, Fold, Inline, Stack, StatusDot } from '@acorn/plugin-api/ui'
 

@@ -12,7 +12,7 @@ import { managedAgentApi } from '../sessions/managedClient'
 import { managedAgentStore } from '../sessions/managedStore'
 import { openManagedSession, selectManagedSession } from '../sessions/managedSelection'
 import { workflowRunOf } from './workflowRun'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 import {
   Alert, Card, Chip, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row,
   Rows, SegmentedControl, Select, Stack, StatusDot, Text,

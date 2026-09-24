@@ -75,6 +75,7 @@ export const createMemoryFindingsTarget = (args: { db: PluginDatabase; memory: M
   }
   const contribution: FindingReviewTargetContribution = {
     version: 1,
+    label: 'Memory changes',
     validate,
     acceptedFingerprints: async (scope) => {
       const resolvedScope = scope.kind === 'project' ? { kind: 'project' as const, projectId: scope.projectId } : { kind: 'private' as const }

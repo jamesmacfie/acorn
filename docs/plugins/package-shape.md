@@ -174,7 +174,8 @@ workflow definitions, are `search` commands their plugins register through `ctx.
 ([command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md)). `ctx.paletteRows` went with
 them. The manifest's `contributions.palette` alias did **not**: it names a command rather than a row,
 it has always been read as one, and its removal is a separate announcement rather than something this
-batch could carry quietly.
+batch could carry quietly. The alias was removed in the architecture reset; manifests now declare
+explicit `commands` with a `kind`.
 
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major
@@ -218,7 +219,7 @@ There are two node context types, and the difference between them is the differe
   contribution kind that tier actually has.
 - **`CompiledNodePluginContext`** is `NodePluginContext` plus the six seams only a plugin compiled into
   this binary gets: `routes.register` (a live Hono instance), `tools`, `contextSections`,
-  `providers.model`, `events.channel` and `events.streams`.
+  `events.channel` and `events.streams`.
   [contribution-kinds.md](../contribution-kinds.md) says why, kind by kind, and what would have to be
   true for one to move.
 

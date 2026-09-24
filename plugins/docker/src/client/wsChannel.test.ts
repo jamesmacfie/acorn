@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 
 // Core's test covers the transport, the reconnect edge, and the fleet filter. This one covers
 // docker's part: a stream routes by kind and id, and a live subscription re-attaches after a drop.
@@ -44,11 +44,11 @@ function installBridge(): Bridge {
 
 let bridge: Bridge
 let channel: typeof import('./wsChannel')
-let client: typeof import('@acorn/client-core/infra/node/wsClient.ts')
+let client: typeof import('@acorn/plugin-api/testkit/ws-client')
 
 beforeEach(async () => {
   bridge = installBridge()
-  client = await import('@acorn/client-core/infra/node/wsClient.ts')
+  client = await import('@acorn/plugin-api/testkit/ws-client')
   channel = await import('./wsChannel')
   client._resetWsClient()
   channel._resetDockerWsChannel()

@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRequest } from '../../contract/wire.ts'
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 

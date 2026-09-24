@@ -32,7 +32,7 @@ describe('workflow tree safety', () => {
       status: 'running',
       posture: 'gated',
       trigger: 'manual',
-      defJson: JSON.stringify({ name: id, steps: [{ name: 'work' }] }),
+      defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: id, steps: [{ name: 'work' }] }),
       rootRunId: options.rootRunId ?? id,
       parentRunId: options.parentRunId ?? null,
       parentStepId: options.parentRunId ? 'parent-step' : null,

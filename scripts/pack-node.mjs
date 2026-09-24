@@ -53,6 +53,7 @@ const RUNTIME = [
   'node-pty',
   'openai',
   'pg',
+  'playwright-core',
   'smol-toml',
   'ws',
   'zod',
@@ -91,6 +92,7 @@ function importedPackages(files) {
     for (const pattern of patterns) {
       for (const match of source.matchAll(pattern)) {
         const specifier = match[1]
+        if (specifier.includes('${')) continue // a template placeholder in a bundled error message
         if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:')) continue
         found.add(specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0])
       }

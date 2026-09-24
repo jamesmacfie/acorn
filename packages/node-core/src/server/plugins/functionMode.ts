@@ -26,5 +26,6 @@ const leafOf = (path: string): string =>
 export const pluginFunctionMode = (path: string, fn: (...args: never[]) => unknown): 'sync' | 'async' => {
   if (path === 'plugin.init' || path === 'plugin.ready' || path === 'plugin.dispose') return 'async'
   if (fn.constructor.name === 'AsyncFunction') return 'async'
+  if (path === 'remote.args[0].telemetry.measure.args[1]') return 'sync'
   return SYNC_CONTRACTS.test(path) || SYNC_METHODS.includes(leafOf(path)) ? 'sync' : 'async'
 }

@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { PrefKeys } from '@acorn/plugin-api/client'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { defaultDockerPrefs, readDockerPrefs, saveDockerPref } from './dockerPrefs'
 
 // One key holding two switches, so the only interesting question is what happens to the switch you did
@@ -8,7 +9,7 @@ import { defaultDockerPrefs, readDockerPrefs, saveDockerPref } from './dockerPre
 // for exactly this reason (docs/command-palette-and-shortcuts.md).
 
 const stored = (): Record<string, string> => ({
-  [PrefKeys.dockerPrefs]: localStorage.getItem(`acorn-pref:${PrefKeys.dockerPrefs}`) ?? '',
+  [PrefKeys.dockerPrefs]: localStorage.getItem(`acorn-pref:${ACORN_BASELINE}:${PrefKeys.dockerPrefs}`) ?? '',
 })
 
 describe('the docker preferences', () => {

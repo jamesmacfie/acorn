@@ -4,6 +4,7 @@ import { createRemoteRoot } from '@acorn/plugin-api/testkit/client'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { findingsSettingsRoute } from '../contract/lifecycle'
+import { findingsReviewTargetsRoute } from '../contract/review'
 import { FindingsSettings } from './FindingsSettings'
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -36,7 +37,8 @@ function mount() {
   const bridge = {
     api: {
       get: async (path: string) => path === findingsSettingsRoute
-        ? { automaticPreparation: true, notifyWhenReady: false, backendId: null, modelId: null }
+        ? { automaticPreparation: true, notifyWhenReady: false, backendId: null, modelId: null, targetId: null }
+        : path === findingsReviewTargetsRoute ? [{ id: 'memory:change', label: 'Memory changes' }]
         : {
             backends: [{
               id: 'harness:claude-code',
@@ -63,7 +65,7 @@ function mount() {
     },
   })
   const nodes = () => [...applied(ops).values()]
-  const checkbox = () => nodes().find((node) => node.type === 'Checkbox' && node.props.label === 'Prepare memory suggestions when I archive a task')
+  const checkbox = () => nodes().find((node) => node.type === 'Checkbox' && node.props.label === 'Prepare suggestions when I archive a task')
   return { root, put, nodes, checkbox, batches }
 }
 
@@ -96,8 +98,11 @@ describe('FindingsSettings', () => {
       notifyWhenReady: false,
       backendId: 'harness:claude-code',
       modelId: 'sonnet',
+      targetId: 'memory:change',
     })
     expect(page.nodes().some((node) => node.type === 'ModelBackendPicker')).toBe(true)
+    expect(page.nodes().find((node) => node.type === 'Select' && node.props.label === 'Review target')?.props.options)
+      .toEqual([{ value: 'memory:change', label: 'Memory changes' }])
     page.root.dispose()
   })
 })

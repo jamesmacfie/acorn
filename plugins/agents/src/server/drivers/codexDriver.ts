@@ -6,7 +6,7 @@ import type {
   AgentConfigOption,
   AgentInputPart,
   AgentProviderDescriptor,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { CodexChildRouter } from './codexChildRouting'
 import {
@@ -254,7 +254,7 @@ export class CodexAgentDriver implements AgentDriver {
     })
 
     await rpc.request('initialize', {
-      clientInfo: { name: 'acorn', version: '0.1.0' },
+      clientInfo: { name: 'acorn', version: '1.0.0' },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,

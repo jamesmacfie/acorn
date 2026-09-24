@@ -22,7 +22,8 @@ const catalog: WorkflowValidationCatalog = {
 }
 
 const leaf = (name = 'child', inputs?: WorkflowDef['inputs']): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name,
   inputs,
   steps: [{ id: 'work', name: 'work', prompt: 'Do it.' }],
@@ -66,7 +67,8 @@ describe('scoped workflow resolution', () => {
       ]),
     })
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Parent',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{
@@ -97,8 +99,8 @@ describe('scoped workflow resolution', () => {
   })
 
   it('resolves repository and user sources without accepting traversal', async () => {
-    writeWorkflow(repoDir, 'review', 'format_version = 2\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
-    writeWorkflow(userDir, 'personal', 'format_version = 2\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeWorkflow(repoDir, 'review', 'format_version = 1\nbaseline = "acorn-1"\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeWorkflow(userDir, 'personal', 'format_version = 1\nbaseline = "acorn-1"\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
 
     await expect(resolveScopedWorkflowDefinition(
       store.db,
@@ -138,7 +140,8 @@ describe('scoped workflow resolution', () => {
     const first = await createDef(store.db, { workspaceId: scope.workspaceId, def: leaf('first') })
     const second = await createDef(store.db, { workspaceId: scope.workspaceId, def: leaf('second') })
     const dispatch = (name: string, id: string): WorkflowDef => ({
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name,
       steps: [{ id: 'next', name: 'next', kind: 'workflow', childWorkflow: { ref: { source: 'database', id } } }],
     })
@@ -171,7 +174,8 @@ describe('scoped workflow resolution', () => {
       def: leaf('child', [{ name: 'ticket', schema: { type: 'string' }, required: true }]),
     })
     const root = (inputs: NonNullable<WorkflowDef['steps'][number]['childWorkflow']>['inputs']): WorkflowDef => ({
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'root',
       steps: [{ id: 'child', name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: child.id }, inputs } }],
     })

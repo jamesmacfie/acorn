@@ -36,7 +36,7 @@ that discovered it. Refreshing discovery cannot replace a static descriptor.
 
 ## Operations and transport
 
-Use POST JSON under `/v2/core/data-sources`. The `list` body is a scope, and `discover` adds a plugin
+Use POST JSON under `/v1/core/data-sources`. The `list` body is a scope, and `discover` adds a plugin
 and discovery ID. The other routes require a matching `operation` discriminator:
 
 | Route | Request | Response |
@@ -167,7 +167,7 @@ only its own declared inputs; a consumer's outer bindings can address its admitt
 outputs, or current item. `packages/protocol/src/dataQueryResolution.ts` resolves bindings without
 string coercion. The consumer controls which predecessor outputs enter that context.
 
-POST JSON to `/v2/core/queries/:operation`, with the matching `operation` and `scope` in the body.
+POST JSON to `/v1/core/queries/:operation`, with the matching `operation` and `scope` in the body.
 Operations are `list`, `get`, `create`, `save`, `publish`, `published`, `delete`, `consumers`,
 `consumer`, and `resolve`. Saves, deletes, and publication require `expectedRevision`. Conflicts
 return 409 and preserve the stored draft. Drafts can retain unavailable sources and broken references

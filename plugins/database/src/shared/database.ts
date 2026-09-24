@@ -52,7 +52,7 @@ export type DbSavedQuery = { id: string; name: string; notes: string | null; sql
 // rather than spelled at each call site so the frame, the manifest's document region, and the route
 // table cannot drift apart. The manifest declares the scratch and completions paths as literals with
 // `:taskId` in them, the one form these helpers cannot produce.
-export const DATABASE_ROUTE_PREFIX = '/v2/p/database'
+export const DATABASE_ROUTE_PREFIX = '/v1/p/database'
 const taskRoute = (taskId: string, rest: string) => `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
 
 export const databaseTablesRoute = (taskId: string) => taskRoute(taskId, '/tables')
@@ -70,7 +70,7 @@ export const databaseQueriesRoute = (taskId: string) => taskRoute(taskId, '/quer
 export const databaseScratchRoute = (taskId: string) => taskRoute(taskId, '/scratch')
 export const databaseQueryRoute = (taskId: string, queryId: string) => taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
 // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
-// machine. A plugin route rather than a bridge call because `/v2/core/integrations` has no bridge
+// machine. A plugin route rather than a bridge call because `/v1/core/integrations` has no bridge
 // scope, and the frame needs ids and labels, not keys.
 //
 // The path still says `model-connections` after the rename. Only code that ships with this plugin

@@ -12,10 +12,10 @@ import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { createExternalItemStore, type ExternalItemStore } from './itemStore'
 import { SecretUnavailableError, type SecretService } from '../core/secrets'
-import { connectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry } from './connectionProviders/registry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
-import { ProviderOperationError, type ProviderCredentials } from './types'
+import { ProviderOperationError } from './types'
 import { resolvedConnectionCapabilities } from './connectionCapabilities'
 
 export { connectionHasCapability } from './connectionCapabilities'
@@ -100,7 +100,7 @@ export async function connectProvider(
         label: normalized.label,
         // Nobody has named this yet, so every surface falls back to the provider's own label.
         name: null,
-        authRef: await secrets.seal(normalized.secret),
+        encryptedCredentials: await secrets.seal(normalized.secret),
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
         scopes: JSON.stringify(normalized.scopes),
@@ -137,7 +137,7 @@ export async function rotateConnection(
   await db
     .update(schema.integrations)
     .set({
-      authRef: await secrets.seal(normalized.secret),
+      encryptedCredentials: await secrets.seal(normalized.secret),
       authKind: provider.connection.authKind,
       account: normalized.account ? JSON.stringify(normalized.account) : null,
       scopes: JSON.stringify(normalized.scopes),
@@ -152,7 +152,7 @@ export async function rotateConnection(
   broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: 'connected' })
   return connectionSummary({
     ...row,
-    authRef: '',
+    encryptedCredentials: '',
     authKind: provider.connection.authKind,
     account: normalized.account ? JSON.stringify(normalized.account) : null,
     scopes: JSON.stringify(normalized.scopes),
@@ -173,7 +173,7 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
   // Provider boundaries), so an echoed credential is scrubbed before it becomes `lastError` or a log
   // line.
   const health = await secrets
-    .use(row.authRef, `${row.provider}: test connection`, (secret) =>
+    .use(row.encryptedCredentials, `${row.provider}: test connection`, (secret) =>
       providerRequestScheduler.run(provider.id, row.id, provider.budgets, () => provider.connection.test(secret, json(row.config, {}))),
     )
     .catch(async (error: unknown) => {
@@ -257,7 +257,7 @@ export async function forEachConnection<T>(
     let value: T | undefined
     try {
       // The visitor, which is what actually calls the provider, runs inside the scope.
-      value = await secrets.use(row.authRef, `${row.provider}: use connection`, (secret) => visit(row, secret))
+      value = await secrets.use(row.encryptedCredentials, `${row.provider}: use connection`, (secret) => visit(row, secret))
     } catch (error) {
       if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
@@ -321,13 +321,3 @@ export const withOwnedConnections = <T>(
  */
 export const ownedExternalItems = (c: Context<AppEnv>, providerId: string): ExternalItemStore =>
   createExternalItemStore(getDb(c.env), ownerId(c), providerId)
-
-export const credentialsFromBody = (body: unknown): ProviderCredentials => {
-  if (!body || typeof body !== 'object') return {}
-  const record = body as Record<string, unknown>
-  if (record.credentials && typeof record.credentials === 'object') {
-    return Object.fromEntries(Object.entries(record.credentials as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
-  }
-  // Accept the legacy token field while clients transition to the provider credential shape.
-  return typeof record.token === 'string' ? { token: record.token } : {}
-}

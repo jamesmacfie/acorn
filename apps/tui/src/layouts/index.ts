@@ -1,5 +1,5 @@
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
-import type { Layout } from '@acorn/client-core/host/layouts/regions.ts'
+import type { Layout } from '@acorn/client-core/host/layouts'
 import { DocumentOverFrame, FrameBesideDocument } from './DocumentSplit'
 import { HeaderBodyFooter } from './HeaderBodyFooter'
 import { ListDetail } from './ListDetail'

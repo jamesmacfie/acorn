@@ -7,7 +7,7 @@ import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles()
 
-describe('workflow v2 files', () => {
+describe('workflow files', () => {
   let root: string
   let repo: string
   let user: string
@@ -26,9 +26,10 @@ describe('workflow v2 files', () => {
   })
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
-  it('loads an exact v2 graph with stable ids and typed inputs', () => {
+  it('loads a baseline-1 graph with stable ids and typed inputs', () => {
     write(repo, 'review', `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 name = "Review"
 
 [[inputs]]
@@ -51,15 +52,16 @@ after = ["read"]
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.errors).toEqual([])
     expect(loaded.workflows[0]).toMatchObject({
-      id: 'review', formatVersion: 2,
+      id: 'review', baseline: 'acorn-1', formatVersion: 1,
       inputs: [{ name: 'issue', schema: { type: 'string' }, required: true }],
       steps: [{ id: 'read', after: [] }, { id: 'approve', after: ['read'] }],
     })
   })
 
-  it('expands v2 sub-workflows and prefixes stable references', () => {
+  it('expands sub-workflows and prefixes stable references', () => {
     write(repo, 'pair', `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 [[steps]]
 id = "left"
 name = "Left"
@@ -70,7 +72,8 @@ name = "Right"
 after = ["left"]
 `)
     write(repo, 'outer', `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 [[steps]]
 id = "build"
 name = "Build"
@@ -93,14 +96,13 @@ prompt = "Build it"
 `)
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.workflows).toEqual([])
-    expect(loaded.errors[0]?.message).toContain('Add format_version = 2')
-    expect(loaded.errors[0]?.message).toContain('stable id')
-    expect(loaded.errors[0]?.message).toContain('typed bindings')
+    expect(loaded.errors[0]?.message).toContain('Set format_version = 1 and baseline = "acorn-1"')
   })
 
   it('refuses retired execution kinds instead of translating them', () => {
     write(repo, 'retired', `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 [[steps]]
 id = "parallel"
 name = "Parallel"
@@ -113,7 +115,8 @@ kind = "fan-out"
 
   it('keeps repository precedence without accepting an old shadow', () => {
     write(repo, 'flow', `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 [[steps]]
 id = "repo"
 name = "Repository"
@@ -125,6 +128,6 @@ name = "Old user copy"
     const loaded = loadWorkflowFiles(repo, user)
     expect(loaded.workflows).toHaveLength(1)
     expect(loaded.workflows[0]?.steps[0]?.id).toBe('repo')
-    expect(loaded.errors).toEqual([expect.objectContaining({ source: 'user:flow', message: expect.stringContaining('format_version = 2') })])
+    expect(loaded.errors).toEqual([expect.objectContaining({ source: 'user:flow', message: expect.stringContaining('baseline = "acorn-1"') })])
   })
 })

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
-import { connectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry } from './connectionProviders/registry'
 import {
   connectProvider,
   disconnectConnection,
@@ -130,8 +130,8 @@ describe('connection-only provider lifecycle', () => {
     })
 
     const [stored] = await testDb.db.select().from(schema.integrations)
-    expect(stored.authRef).not.toContain('first-key')
-    expect(await SECRETS.reveal(stored.authRef, 'test')).toBe('first-key')
+    expect(stored.encryptedCredentials).not.toContain('first-key')
+    expect(await SECRETS.reveal(stored.encryptedCredentials, 'test')).toBe('first-key')
     expect(stored.config).toBe('{"safe":true}')
 
     await expect(connectProvider(
@@ -149,7 +149,7 @@ describe('connection-only provider lifecycle', () => {
       SECRETS,
     )
     const [rotated] = await testDb.db.select().from(schema.integrations)
-    expect(await SECRETS.reveal(rotated.authRef, 'test')).toBe('rotated-key')
+    expect(await SECRETS.reveal(rotated.encryptedCredentials, 'test')).toBe('rotated-key')
 
     await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({
       status: 'connected',

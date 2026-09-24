@@ -14,12 +14,12 @@ const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
 describe('descriptor source scope', () => {
   it('adds an encoded active project while preserving plugin query parameters', () => {
-    expect(scopedSourceItemsPath('/v2/p/board/items', 'project/one'))
-      .toBe('/v2/p/board/items?project=project%2Fone')
-    expect(scopedSourceItemsPath('/v2/p/board/items?status=open', 'project-1'))
-      .toBe('/v2/p/board/items?status=open&project=project-1')
-    expect(scopedSourceItemsPath('/v2/p/board/items', undefined))
-      .toBe('/v2/p/board/items')
+    expect(scopedSourceItemsPath('/v1/p/board/items', 'project/one'))
+      .toBe('/v1/p/board/items?project=project%2Fone')
+    expect(scopedSourceItemsPath('/v1/p/board/items?status=open', 'project-1'))
+      .toBe('/v1/p/board/items?status=open&project=project-1')
+    expect(scopedSourceItemsPath('/v1/p/board/items', undefined))
+      .toBe('/v1/p/board/items')
   })
 })
 

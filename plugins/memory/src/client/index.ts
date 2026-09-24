@@ -17,8 +17,7 @@ export const memoryClientPlugin: ClientPlugin = {
   name: 'memory',
   required: true,
   init: (ctx) => {
-    // Search what this project remembers, and open the proposals waiting for a decision. Both land in
-    // the context pane's memory section, which is what this plugin draws (./commands.ts).
+    // Register Memory search and review commands (./commands.ts).
     for (const contribution of memoryCommands) ctx.commands.register(contribution)
     // Into the section slot the context pane opens, matched on the node-side `memory` section id, which
     // plugins/memory's own node part registers. Both halves key on that id, and neither plugin imports
@@ -26,7 +25,7 @@ export const memoryClientPlugin: ClientPlugin = {
     ctx.extensions.register({
       id: 'memory.section',
       point: 'context:section',
-      label: 'Memory proposals and add form',
+      label: 'Memory review and add form',
       order: 10,
       matches: ['memory'],
       component: MemorySection,
@@ -40,39 +39,13 @@ export const memoryClientPlugin: ClientPlugin = {
       glyph: 'brain',
       label: 'Memory',
       component: MemoryCenter,
-      // The accepted list is per project; the proposals are not, and the page says so by drawing them
-      // in their own section above it.
+      // The page shows accepted memory and canonical review for the selected project.
       projectScoped: true,
     })
     ctx.attentionSources.register({
       id: 'memory.proposals', order: 20,
       fetch: async (nodeId, signal) => {
-        const [proposals, reviews] = await Promise.all([
-          memoryApi().proposals(undefined, { nodeId, signal }),
-          memoryApi().reviewAttention({ nodeId, signal }),
-        ])
-        const legacy = proposals.filter((proposal) => proposal.status === 'pending').map((proposal) => ({
-          id: `memory.proposals:${proposal.id}`,
-          title: `Review memory: ${proposal.name}`,
-          detail: proposal.description,
-          // `info`, not `warn`: nothing is blocked on this. An unreviewed proposal costs the owner a
-          // memory they might have wanted, which is a nudge, not a failure. The glyph carries what it
-          // is instead, since every row from this source is the same kind of thing.
-          severity: 'info' as const,
-          glyph: 'brain',
-          at: proposal.createdAt,
-          // No `taskId`, though the proposal records one. The row used to carry it, which sent a click
-          // to the task and left the reader on whatever pane was open; worse, the task may be archived,
-          // and accepting a proposal falls back to the project folder precisely so that still works
-          // (../server/knowledgeChannel.ts). The proposal's home is the Memory page.
-          //
-          // The project instead, so the inbox routes there first: the page scopes both its lists to
-          // the routed project, so arriving anywhere else would filter this very proposal out of the
-          // page it just opened. An unscoped proposal names none and lands wherever the reader is,
-          // which is where it is visible from (../server/agentTools.ts).
-          ...(proposal.projectId ? { projectId: proposal.projectId } : {}),
-          target: { kind: 'memory-proposal', resourceId: proposal.id },
-        }))
+        const reviews = await memoryApi().reviewAttention({ nodeId, signal })
         const prepared = reviews.map((review) => ({
           id: `memory.findings:${review.id}`,
           title: reviewAttentionTitle(review.readyCount, review.failedCount),
@@ -85,7 +58,7 @@ export const memoryClientPlugin: ClientPlugin = {
           ...(review.scope.kind === 'project' ? { projectId: review.scope.projectId } : {}),
           target: { kind: 'findings-bundle', resourceId: review.id },
         }))
-        return [...prepared, ...legacy]
+        return prepared
       },
     })
   },

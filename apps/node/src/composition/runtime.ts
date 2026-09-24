@@ -1,28 +1,29 @@
 import type { ServerType } from '@hono/node-server'
 import { join } from 'node:path'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
-import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
+import { resolveDeviceToken } from '@acorn/node-core/server/auth'
+import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
-import { beginLoginShellPath } from '@acorn/node-core/server/core/loginShellPath.ts'
-import { disabledPluginsStore } from '@acorn/node-core/server/plugins/disabled.ts'
-import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
+import { beginLoginShellPath } from '@acorn/node-core/server/core'
+import { disabledPluginsStore } from '@acorn/node-core/server/plugins'
+import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost'
 import { buildPluginDeps } from './pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/server/transport/listener.ts'
-import { openDataRoot, type DataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
-import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
+import { openDataRoot, type DataRoot } from '@acorn/node-core/server/storage'
+import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { configureAcornMcp, launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
-import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools'
 import { refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
-import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry/collector.ts'
-import { createLogger, describeError, installPerfSink } from '@acorn/node-core/server/telemetry/logger.ts'
-import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry/scrub.ts'
+import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
+import { createLogger, describeError, installPerfSink } from '@acorn/node-core/server/telemetry'
+import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'
 
 export type ServiceRuntime = {
@@ -203,7 +204,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
     // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
     // `init` and see the boot it was loaded during. The preference is read on the collector's own
-    // timer rather than here: `PUT /v2/core/prefs` writes the table directly and cannot notify, so a
+    // timer rather than here: `PUT /v1/core/prefs` writes the table directly and cannot notify, so a
     // switch flipped in Settings is seen within five seconds (docs/telemetry.md § The switch).
     setTelemetryDataRoot(config.dataDir)
     startTelemetry({
@@ -217,7 +218,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     installPerfSink()
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/pluginHost/host.ts).
-    const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
+    const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, internalEnv, reconciled }))
     // The node's one scheduler (docs/schedules.md § Why the node, and only the node): built and
     // provided before the plugins so a declared schedule has somewhere to land, started after the
     // listener binds because a catch-up run may call this node's own routes.
@@ -281,6 +282,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       previewRules: async (taskId) => (await capabilities.get(PREVIEW_RULES)?.forTask(taskId)) ?? [],
       stop,
       started: {
+        baseline: ACORN_BASELINE,
         state: 'listening',
         nodeId: dataRoot.nodeId,
         endpoint,

@@ -7,11 +7,11 @@
 import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import { git, gitOrThrow, gitText, invalidateWorktreeStatus, worktreeStatusText } from '@acorn/plugin-api/node'
-import type { LocalChange, LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitOptions, HeadCommit, PullOptions, PushOptions } from '../shared/api'
 
 
-export type { LocalChange, LocalStatus } from '@acorn/protocol/terminal.ts'
+export type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 type LocalChangeStatus = LocalChange['status']
 
 export type LocalScope = 'unstaged' | 'staged'

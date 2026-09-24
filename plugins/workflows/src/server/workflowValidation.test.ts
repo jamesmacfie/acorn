@@ -17,7 +17,8 @@ const catalog: WorkflowValidationCatalog = {
 
 const check = (def: WorkflowDef) => validateWorkflow({
   ...def,
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   steps: def.steps.map((step, index) => ({
     id: step.id ?? (/^[A-Za-z0-9][A-Za-z0-9:_-]*$/.test(step.name) ? step.name : `step-${index + 1}`),
     profileId: 'claude-code',
@@ -29,12 +30,12 @@ describe('a draft in progress', () => {
   // The editor creates a definition with no steps and draws what this reports in its footer. Storing
   // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
   it('reports a definition with no steps rather than being a shape the store refuses', () => {
-    expect(check({ name: 'Untitled workflow', steps: [] })).toEqual(['workflow has no steps'])
+    expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] })).toEqual(['workflow has no steps'])
   })
 
-  it('reports the removed definition format with an actionable upgrade', () => {
-    expect(validateWorkflow({ name: 'Old workflow', steps: [{ name: 'work' }] }, catalog))
-      .toContain('Unsupported workflow format. Set formatVersion to 2 and give every step a stable id.')
+  it('reports an obsolete definition format with an actionable diagnostic', () => {
+    expect(validateWorkflow({ baseline: 'acorn-1', formatVersion: 2, name: 'Old workflow', steps: [{ name: 'work' }] } as unknown as WorkflowDef, catalog))
+      .toContain('Incompatible workflow. Set formatVersion to 1 and baseline to acorn-1.')
   })
 })
 
@@ -45,12 +46,12 @@ describe('the derived graph', () => {
   })
 
   it('names the cycle it found', () => {
-    const problems = check({ name: 'loop', steps: [{ name: 'a', after: ['b'] }, { name: 'b', after: ['a'] }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'loop', steps: [{ name: 'a', after: ['b'] }, { name: 'b', after: ['a'] }] })
     expect(problems.join('\n')).toContain('has a cycle: a → b → a')
   })
 
   it('refuses an after that names an unknown step or the step itself', () => {
-    const problems = check({ name: 'w', steps: [{ name: 'a', after: ['ghost'] }, { name: 'b', after: ['b'] }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'a', after: ['ghost'] }, { name: 'b', after: ['b'] }] })
     expect(problems).toContain("step 'a' waits on unknown step 'ghost'")
     expect(problems).toContain("step 'b' waits on itself")
   })
@@ -59,12 +60,12 @@ describe('the derived graph', () => {
 describe('template references follow the graph, not the list', () => {
   it('refuses a reference to a step that is not a predecessor', () => {
     // `later` is declared after `first`, so it can never have run.
-    const problems = check({ name: 'w', steps: [{ name: 'first', prompt: '${steps.later.output}' }, { name: 'later' }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'first', prompt: '${steps.later.output}' }, { name: 'later' }] })
     expect(problems.join('\n')).toContain("references 'later', which is not one of its predecessors")
   })
 
   it('refuses a reference to a parallel sibling', () => {
-    const problems = check({
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'left', after: [] },
@@ -75,7 +76,7 @@ describe('template references follow the graph, not the list', () => {
   })
 
   it('accepts a reference to a predecessor two edges back', () => {
-    expect(check({
+    expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'one', after: [] },
@@ -86,7 +87,7 @@ describe('template references follow the graph, not the list', () => {
   })
 
   it('checks a with table one level deep', () => {
-    const problems = check({
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [{ name: 'call', kind: 'agent', with: { url: '${steps.ghost.output}/x', retries: 3 } }],
     })
@@ -96,18 +97,18 @@ describe('template references follow the graph, not the list', () => {
 
 describe('inputs', () => {
   it('refuses a reference to an input the definition does not declare', () => {
-    const problems = check({ name: 'w', inputs: [{ name: 'issue', schema: { type: 'string' } }], steps: [{ name: 'a', prompt: '${inputs.issue} ${inputs.focus}' }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', inputs: [{ name: 'issue', schema: { type: 'string' } }], steps: [{ name: 'a', prompt: '${inputs.issue} ${inputs.focus}' }] })
     expect(problems).toEqual(["step 'a' references undeclared input 'focus'"])
   })
 
   it('refuses a malformed input name and a malformed reference', () => {
-    const problems = check({ name: 'w', inputs: [{ name: '2bad' }], steps: [{ name: 'a', prompt: '${inputs.}' }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', inputs: [{ name: '2bad' }], steps: [{ name: 'a', prompt: '${inputs.}' }] })
     expect(problems.join('\n')).toContain("input 1 has an invalid name '2bad'")
     expect(problems.join('\n')).toContain("invalid template expression '${inputs.}'")
   })
 
   it('fills a default, keeps a supplied value, and refuses what it cannot resolve', () => {
-    const def: WorkflowDef = {
+    const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       inputs: [{ name: 'issue', required: true }, { name: 'focus', default: 'anything' }],
       steps: [{ name: 'a' }],
@@ -125,7 +126,7 @@ describe('inputs', () => {
 
 describe('runtime child workflow contracts', () => {
   it('accepts a single child and a mapped child whose bindings use declared sources', () => {
-    const definition: WorkflowDef = {
+    const definition: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'parent',
       inputs: [{ name: 'ticket', schema: { type: 'string' } }],
       steps: [
@@ -161,7 +162,7 @@ describe('runtime child workflow contracts', () => {
   })
 
   it('locates unsafe paths, undeclared inputs, and non-predecessor mappings', () => {
-    const problems = check({
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'parent',
       steps: [
         { name: 'source', after: [] },
@@ -204,7 +205,7 @@ describe('runtime child workflow contracts', () => {
     }
     const validate = (def: WorkflowDef) => validateWorkflow(def, scopedCatalog)
 
-    expect(validate({
+    expect(validate({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'parent',
       steps: [{
         name: 'review',
@@ -219,7 +220,7 @@ describe('runtime child workflow contracts', () => {
       "step 'review' needs a binding for child input 'ticket'",
     ]))
 
-    expect(validate({
+    expect(validate({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'parent',
       steps: [{
         name: 'review',
@@ -239,23 +240,23 @@ describe('runtime child workflow contracts', () => {
 
 describe('the agent-only fields', () => {
   it('refuses isolation on a gate', () => {
-    expect(check({ name: 'w', steps: [{ name: 'ok?', kind: 'gate-human', isolation: 'worktree' }] }))
+    expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'ok?', kind: 'gate-human', isolation: 'worktree' }] }))
       .toEqual(["step 'ok?' is a 'gate-human' step, which cannot take isolation"])
   })
 
   it('refuses a step that sets both model and config_options.model', () => {
-    const problems = check({ name: 'w', steps: [{ name: 'a', model: 'opus', configOptions: { model: 'sonnet' } }] })
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'a', model: 'opus', configOptions: { model: 'sonnet' } }] })
     expect(problems.join('\n')).toContain('sets both model and config_options.model')
   })
 
   it('accepts isolation, the inputs mode and config options on an agent step', () => {
-    expect(check({ name: 'w', steps: [{ name: 'a', isolation: 'worktree', inputs: 'none', configOptions: { reasoning: 'high' } }] })).toEqual([])
+    expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'a', isolation: 'worktree', inputs: 'none', configOptions: { reasoning: 'high' } }] })).toEqual([])
   })
 })
 
 describe('decide and join under the graph rule', () => {
   it('accepts the plain list a file written before the graph used', () => {
-    expect(check({
+    expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'route', kind: 'decide', branches: { yes: 'yes', no: 'no' } },
@@ -266,7 +267,7 @@ describe('decide and join under the graph rule', () => {
   })
 
   it('refuses a branch target that does not wait on the decision', () => {
-    const problems = check({
+    const problems = check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'beside', after: [] },

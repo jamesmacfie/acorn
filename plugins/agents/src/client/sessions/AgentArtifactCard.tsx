@@ -1,5 +1,5 @@
 import { createResource, Show } from 'solid-js'
-import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import { saveFile } from '@acorn/plugin-api/client'
 import { Card, Icon, Markdown, Row, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'

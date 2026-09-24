@@ -69,10 +69,7 @@ const EVENT_OF: Record<Edge['kind'], keyof NotificationSettings['events']> = {
 
 // Read after the hold's re-check, so the snapshot is there. A PTY agent's row opens the terminal
 // drawer, a managed one opens the Agent pane; each plugin registers its own handler.
-const targetFor = (edge: Edge): Notice['target'] => ({
-  kind: latest.get(snapshotKey(edge))?.kind === 'pty' ? 'terminal-session' : 'managed-agent',
-  resourceId: edge.sessionId,
-})
+const targetFor = (edge: Edge): Notice['target'] => latest.get(snapshotKey(edge))?.target
 
 /** Fold a fresh set of snapshots in, raise whatever edges they make, and keep the map the hold
  *  re-checks against. One call per adapter, per refresh. */
@@ -80,6 +77,30 @@ export function observeAttention(next: Snapshot[], context: DeliveryContext = de
   const edges = edgesBetween(latest, next)
   for (const snapshot of next) latest.set(snapshotKey(snapshot), snapshot)
   for (const edge of edges) deliver(edge, context)
+}
+
+/** Replace one producer's roster, including sessions that disappeared since its last read. */
+export function replaceAttentionSource(sourceId: string, nodeId: string, next: Snapshot[], context: DeliveryContext = defaultDeliveryContext): void {
+  const present = new Set(next.map(snapshotKey))
+  for (const [key, snapshot] of latest) {
+    if (snapshot.sourceId !== sourceId || snapshot.nodeId !== nodeId || present.has(key)) continue
+    latest.delete(key)
+    const timer = held.get(key)
+    if (timer) clearTimeout(timer)
+    held.delete(key)
+  }
+  observeAttention(next, context)
+}
+
+/** Forget one producer's current state and pending edges when its roster becomes unavailable. */
+export function forgetAttentionSource(sourceId: string, nodeId: string): void {
+  for (const [key, snapshot] of latest) {
+    if (snapshot.sourceId !== sourceId || snapshot.nodeId !== nodeId) continue
+    latest.delete(key)
+    const timer = held.get(key)
+    if (timer) clearTimeout(timer)
+    held.delete(key)
+  }
 }
 
 export function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryContext): void {

@@ -6,7 +6,7 @@ import type { Env } from '../bindings'
 import { makeTestDb } from '../../testkit/db'
 import { testGate } from '../../testkit/auth'
 import type { AppEnv, Principal } from '../middleware/auth'
-import { connectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry } from './connectionProviders/registry'
 import { defaultBudgets, externalIdsFor, publicProvider } from './providerShared'
 import { integrationProviderRegistry } from './registry'
 import { runProviderResource } from './resourceRuntime'
@@ -57,8 +57,8 @@ const register = (id: string, owner: string): void => {
 }
 
 const app = (principal: Principal) => new Hono<AppEnv>()
-  .use('/v2/*', ...testGate(principal))
-  .route('/v2/p', buildIntegrationProviderRoutes())
+  .use('/v1/*', ...testGate(principal))
+  .route('/v1/p', buildIntegrationProviderRoutes())
 
 afterEach(() => {
   integrationProviderRegistry.removeForPlugin(OWNER)
@@ -77,12 +77,12 @@ describe('portable provider routes', () => {
     })
 
     const device = await app({ kind: 'device', userId: USER, deviceId: 'device-1' })
-      .fetch(new Request(`http://acorn.test/v2/p/${PROVIDER}`), {} as Env)
+      .fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}`), {} as Env)
     expect(device.status).toBe(200)
     expect(await device.json()).toEqual({ userId: USER })
 
     const task = await app({ kind: 'internal', userId: USER, scope: 'task', taskId: 'task-1' })
-      .fetch(new Request(`http://acorn.test/v2/p/${PROVIDER}`), {} as Env)
+      .fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}`), {} as Env)
     expect(task.status).toBe(403)
   })
 
@@ -113,14 +113,14 @@ describe('portable provider routes', () => {
     register(PROVIDER, OWNER)
     const testDb = makeTestDb()
     const now = Date.now()
-    const authRef = await SECRETS.seal('secret')
+    const encryptedCredentials = await SECRETS.seal('secret')
     const connectionId = 'connection-1'
     await testDb.db.insert(schema.integrations).values({
       id: connectionId,
       userId: USER,
       provider: PROVIDER,
       label: 'Portable tracker',
-      authRef,
+      encryptedCredentials,
       authKind: 'api-key',
       account: null,
       scopes: '[]',

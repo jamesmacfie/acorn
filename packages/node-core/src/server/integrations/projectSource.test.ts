@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { schema } from '../db'
 import { SecretService } from '../core/secrets'
 import { makeTestDb, type TestDb } from '../../testkit/db'
-import { connectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry } from './connectionProviders/registry'
 import { boundProviderProjects, listConnectionProjects, PROVIDER_PROJECT_LIMITS } from './projectSource'
 import { defaultBudgets, publicConnectionProvider } from './providerShared'
 import { ProviderOperationError, type ProviderProject, type ProviderProjectSource } from './types'
@@ -38,7 +38,7 @@ const register = (id: string, projects?: ProviderProjectSource): void =>
 
 const seedConnection = async (
   testDb: TestDb,
-  options: { id: string; provider: string; status?: string; authRef?: string; config?: string },
+  options: { id: string; provider: string; status?: string; encryptedCredentials?: string; config?: string },
 ): Promise<void> => {
   const now = Date.now()
   await testDb.db.insert(schema.integrations).values({
@@ -46,7 +46,7 @@ const seedConnection = async (
     userId: USER,
     provider: options.provider,
     label: 'Tracker one',
-    authRef: options.authRef ?? (await SECRETS.seal('live-token')),
+    encryptedCredentials: options.encryptedCredentials ?? (await SECRETS.seal('live-token')),
     authKind: 'api-key',
     account: null,
     scopes: '[]',
@@ -192,7 +192,7 @@ describe('listConnectionProjects', () => {
   it('records needs-auth when the credential cannot be read, so Settings agrees with the picker', async () => {
     const testDb = makeTestDb()
     register('tracker-a', { list: () => Promise.resolve([{ id: 'proj-1', label: 'Platform' }]) })
-    await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-a', authRef: 'not-a-sealed-secret' })
+    await seedConnection(testDb, { id: 'connection-1', provider: 'tracker-a', encryptedCredentials: 'not-a-sealed-secret' })
 
     const result = await listConnectionProjects({ db: testDb.db, userId: USER, secrets: SECRETS, connectionId: 'connection-1' })
 

@@ -56,12 +56,12 @@ describe('redactBatch', () => {
   it('keeps the batch fields and cleans every record', () => {
     const batch = {
       node: 'node-1',
-      version: '0.1.0',
+      version: '1.0.0',
       records: [{ kind: 'event', at: 0, name: 'a', attrs: { 'task.id': 't' } }] as TelemetryRecord[],
     }
     expect(redactBatch(batch, { taskIds: false, stacks: true })).toEqual({
       node: 'node-1',
-      version: '0.1.0',
+      version: '1.0.0',
       records: [{ kind: 'event', at: 0, name: 'a', attrs: {} }],
     })
   })

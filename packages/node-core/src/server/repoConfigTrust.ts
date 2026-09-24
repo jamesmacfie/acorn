@@ -61,7 +61,7 @@ function projectRowText(project: ProjectExecutableConfig): string | null {
 // sorting paths makes the hash deterministic across platforms.
 //
 // The row is in here because the gate's original premise — the checkout is untrusted, the database is
-// trusted — only holds while nothing but the owner can write the database. `PUT /v2/core/projects/:id/config`
+// trusted — only holds while nothing but the owner can write the database. `PUT /v1/core/projects/:id/config`
 // is device-only now (server/index.ts), so that premise is true again; this is the belt behind it. A
 // write the owner did not make still changes the hash, and the next thing that asks for trust shows the
 // owner the script rather than running it.

@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import type { CoreServices } from '@acorn/node-core/server/core/index.ts'
 import type { ProjectRef } from '@acorn/node-core/server/projects.ts'
-import type { TaskRef } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
-import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/server/pluginHost/types.ts'
-import type { StoredConnection } from '@acorn/node-core/server/integrations/connections.ts'
-import type { ExternalItemStore } from '@acorn/node-core/server/integrations/itemStore.ts'
+import type { TaskRef } from '@acorn/node-core/server/worktrees'
+import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/server/pluginHost'
+import type { StoredConnection } from '@acorn/node-core/server/integrations'
+import type { ExternalItemStore } from '@acorn/node-core/server/integrations'
 import type { CapabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders'
 import type * as Published from './public.ts'
 import type { DataValue, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
@@ -51,9 +51,9 @@ void [_sourceRegistry, _publishedSourceRegistry]
 // Adding a name to a list below is the deliberate act. It means "acorn no longer promises the shape of
 // this one member", and it should be argued for in review like any other narrowing.
 const HOLES = {
-  context: ['storage', 'providers', 'taskChecks'],
-  tasks: ['runConfig'],
-  projects: ['config', 'setup'],
+  // A loaded worker's synchronous RPC can measure a synchronous callback only. The node's
+  // collector also times Promise settlement for compiled plugins.
+  context: ['storage', 'providers', 'taskChecks', 'telemetry'],
   proc: ['ProcessError'],
   // One member of the batch, because a record's shape lives in `@acorn/protocol/telemetry.ts` and
   // a loaded plugin cannot import protocol. The two `ctx` members beside it are compared in full.
@@ -89,24 +89,30 @@ const _task: Mutual<TaskRef, Published.TaskRef> = [true, true]
 const _project: Mutual<ProjectRef, Published.ProjectRef> = [true, true]
 const _capabilityId: Mutual<CapabilityId<string>, Published.CapabilityId<string>> = [true, true]
 const _capabilities: Mutual<NodePluginContext['capabilities'], Published.PluginCapabilities> = [true, true]
+const _modelAdapter: Mutual<ModelProviderAdapter, Published.ModelProviderAdapter> = [true, true]
+const _modelRegistration: Mutual<NodePluginContext['providers']['model'], Published.PluginProviderRegistry['model']> = [true, true]
 const _fs: Mutual<CoreServices['fs'], Published.CoreServices['fs']> = [true, true]
 const _git: Mutual<WidenNumbers<CoreServices['git']>, WidenNumbers<Published.CoreServices['git']>> = [true, true]
 const _prefs: Mutual<CoreServices['prefs'], Published.CoreServices['prefs']> = [true, true]
 const _data: Mutual<CoreServices['data'], Published.CoreServices['data']> = [true, true]
 const _identity: Mutual<CoreServices['identity'], Published.CoreServices['identity']> = [true, true]
 const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[number]>>, WidenNumbers<Hole<Published.CoreServices['proc'], (typeof HOLES.proc)[number]>>> = [true, true]
-const _tasks: Mutual<Hole<CoreServices['tasks'], (typeof HOLES.tasks)[number]>, Hole<Published.CoreServices['tasks'], (typeof HOLES.tasks)[number]>> = [true, true]
-const _projects: Mutual<Hole<CoreServices['projects'], (typeof HOLES.projects)[number]>, Hole<Published.CoreServices['projects'], (typeof HOLES.projects)[number]>> = [true, true]
+const _tasks: Mutual<CoreServices['tasks'], Published.CoreServices['tasks']> = [true, true]
+const _projects: Mutual<CoreServices['projects'], Published.CoreServices['projects']> = [true, true]
 const _request: Mutual<PluginRequestContext, Published.PluginRequestContext<Real[0], Real[1]>> = [true, true]
 // The sink contract, compared apart from the batch's `records`, whose element type is protocol's
 // and therefore opaque on the published side.
 type BatchOf<T> = T extends { onBatch(sink: (batch: infer B) => void): unknown } ? B : never
 const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'>, Hole<BatchOf<Published.CoreTelemetryService>, 'records'>> = [true, true]
-// One capability whose shape is written out here rather than left opaque, because a plugin outside this
-// repository is the whole reason it exists (`agents.draftAttachments`). The row it hands back is
-// protocol's `AgentAttachment`, so this is what stops the published copy drifting from the real one.
-const _draftAttachment: Mutual<AgentAttachment, Published.DraftAttachment> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs, _data, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _draftAttachment]
+const _telemetry: Mutual<Omit<NodePluginContext['telemetry'], 'measure'>, Omit<Published.PluginTelemetry, 'measure'>> = [true, true]
+void [_context, _task, _project, _capabilityId, _capabilities, _modelAdapter, _modelRegistration, _fs, _git, _prefs, _data, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _telemetry]
+
+const _loadedMeasure = (telemetry: Published.PluginTelemetry): number => {
+  // @ts-expect-error the synchronous worker call cannot time Promise settlement
+  telemetry.measure('async', async () => 42)
+  return telemetry.measure('sync', () => 42)
+}
+void _loadedMeasure
 
 // Public authoring fixture: these are manifest values an out-of-tree package can type without a
 // runtime import or a Zod dependency.
@@ -120,21 +126,21 @@ const _loadedTool = {
     additionalProperties: false,
   },
   risk: 'read',
-  handler: '/v2/p/example/tools/lookup',
+  handler: '/v1/p/example/tools/lookup',
   timeoutMs: 5_000,
   maxOutputBytes: 65_536,
 } satisfies Published.PluginAgentToolDescriptor
 const _loadedContext = {
   id: 'references', label: 'References', order: 60,
-  read: '/v2/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
+  read: '/v1/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
 } satisfies Published.PluginContextSectionDescriptor
 void [_loadedTool, _loadedContext]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
-  expect(HOLES.context).toHaveLength(3)
-  expect(Object.values(HOLES).flat()).toHaveLength(8)
+  expect(HOLES.context).toHaveLength(4)
+  expect(Object.values(HOLES).flat()).toHaveLength(6)
   // Thirteen of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
@@ -142,7 +148,7 @@ it('leaves most of the surface compared, not substituted', () => {
     'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
     'telemetry', 'log',
   ]
-  expect(published.length - HOLES.context.length).toBe(13)
+  expect(published.length - HOLES.context.length).toBe(12)
 })
 
 it('names every capability the first-party plugins publish', () => {
@@ -151,11 +157,11 @@ it('names every capability the first-party plugins publish', () => {
   const ids: Array<keyof Published.CapabilityCatalogue> = [
     'agents.sessionExecute', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
     'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
-    'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
-    'memory.knowledge', 'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
-    'workflows.runner', 'workflows.gates', 'workflows.notices',
+    'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'terminal.reviewInput.v1', 'notes.store', 'notes.seedTask',
+    'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
+    'workflows.runner', 'workflows.reviewInput.v1', 'workflows.gates', 'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(22)
+  expect(new Set(ids).size).toBe(23)
 })
 
 it('declares no runtime, which is what makes it publishable as a .d.ts', () => {

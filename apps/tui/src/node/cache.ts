@@ -16,7 +16,7 @@ import { configDir } from './paths'
 // owns the terminal, and a few hundred kilobytes written synchronously there is a dropped frame.
 
 export function fileCacheStorage(dir: string = join(configDir(), 'cache')): CacheStorage {
-  // Slashes and colons appear in nothing client-core generates — the key is `acorn-cache:<uuid>` —
+  // Slashes and colons appear in nothing client-core generates — the key is `acorn-cache:acorn-1:<uuid>` —
   // but the value comes from a node id, so it is encoded rather than trusted into a path.
   const pathFor = (key: string): string => join(dir, `${encodeURIComponent(key)}.json`)
   return {

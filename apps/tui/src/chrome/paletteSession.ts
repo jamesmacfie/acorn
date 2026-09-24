@@ -1,9 +1,9 @@
 import {
   type CommandExecutionContext,
-} from '@acorn/client-core/host/registries/commands/commands.ts'
+} from '@acorn/client-core/host/registries/commands'
 import {
   createCommandSession, type CommandSession,
-} from '@acorn/client-core/host/registries/commands/session.ts'
+} from '@acorn/client-core/host/registries/commands'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
 import { useNavigate } from '../kit/router'
@@ -14,7 +14,7 @@ import type { ShellModel } from './model'
 // The terminal's half of the palette: which identity a session captures here, and nothing else.
 //
 // The session is client-core's and both hosts run the same one
-// (client-core/host/registries/commands/session.ts). It owns the query, the order, the cursor and the
+// (client-core/host/registries/commands/sessionStore.ts). It owns the query, the order, the cursor and the
 // invocation. What the shell owns is what a terminal answers differently: the overlay stack is where
 // "open" and "closed" live, because there is no window to float a dialog over.
 //

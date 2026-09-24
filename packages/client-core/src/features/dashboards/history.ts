@@ -1,7 +1,7 @@
 import { createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { dashboardHistoryRoute, type DashboardHistoryResponse } from '@acorn/protocol/api.ts'
-import { TREND_DAYS, type MeasureSample } from '@acorn/dashboards-core/trend.ts'
+import { TREND_DAYS, type MeasureSample } from '@acorn/dashboards-core/render'
 import { readJson } from '../../infra/node/apiClient'
 import { activeNodeId } from '../../infra/node/activeNode'
 

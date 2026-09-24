@@ -4,7 +4,7 @@ The HTTP plugin provides an owner-invoked, Bruno-style request workspace. Reques
 Node-owned and encrypted where their values are sensitive.
 
 It is a loaded plugin (`docs/plugins.md` § Two tiers), in neither compiled composition list. Its node
-half serves `/v2/p/http` through the portable fetch carrier. Its client half is one sandboxed frame
+half serves `/v1/p/http` through the portable fetch carrier. Its client half is one sandboxed frame
 bundle drawing three surfaces, and its rail entry is a manifest descriptor the host renders. What
 moved, and what that cost, is in `docs/loaded-plugin-migration.md` § "http has moved".
 
@@ -105,7 +105,7 @@ and memory-only drafts. Node freshness/offline status follows the shared client 
 leaves the request text in the pane.
 
 The rail source lists the project's saved requests and nothing more. The host draws the rows from
-`/v2/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the panel
+`/v1/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the panel
 beside it, so the descriptor vocabulary does not have to grow into a UI framework.
 
 ### From the command palette
@@ -115,9 +115,9 @@ manifest and all served by this plugin's own node half.
 
 | Row | Kind | What it does |
 | --- | --- | --- |
-| Find a saved request | search, project-scoped | `/v2/p/http/palette/requests` answers the routed project's saved rows; picking one navigates to `http-project`, the same address the rail row has |
+| Find a saved request | search, project-scoped | `/v1/p/http/palette/requests` answers the routed project's saved rows; picking one navigates to `http-project`, the same address the rail row has |
 | New request | action | Delivers `new-request` to the `http` pane, where the panel starts a blank draft — the same thing the "+ Request" button does |
-| Import a curl command | input, task-scoped | `/v2/p/http/palette/import-curl` parses the pasted command, saves it encrypted against the task, and opens the pane on it |
+| Import a curl command | input, task-scoped | `/v1/p/http/palette/import-curl` parses the pasted command, saves it encrypted against the task, and opens the pane on it |
 
 Two properties are the point of the pair, and both are structural rather than a filter applied
 afterwards.
@@ -154,7 +154,7 @@ four are the same consequence — the plugin has no document of its own.
   a colour, and the kit has no role that means POST.
 
 Saved requests are attachable to an agent's context, served by the plugin's own
-`/v2/p/http/context-options` and `/v2/p/http/context-capture` routes. Redaction runs on the Node, over
+`/v1/p/http/context-options` and `/v1/p/http/context-capture` routes. Redaction runs on the Node, over
 rows whose ciphertext has just been opened. Method, URL path, query keys, folder, auth mode, body
 mode, and header names survive. Header values, the auth payload, the body, every variable, and every
 literal query value do not. A `{{VAR}}` reference in a URL is kept, because a reference is shape and

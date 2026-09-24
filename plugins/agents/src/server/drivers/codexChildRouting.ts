@@ -22,7 +22,7 @@
 // root is treated as child traffic, registering that thread if it is unknown, rather than passing an
 // unrecognised thread through to the parent. The root thread id is known from `thread/start`, so
 // "not the root" is a complete answer, and it is what makes hazard 2 harmless.
-import type { AgentNormalizedEvent, AgentSubagentUpdate } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentSubagentUpdate } from '../../contract/wire.ts'
 import type { JsonRpcNotification } from './jsonRpcProcess'
 import { asObject, normalizeCodexNotification, stringValue } from './codexNormalizer'
 

@@ -6,7 +6,7 @@ import type {
   AgentSessionKind,
   AgentTurnSource,
   AgentTurnStatus,
-} from '@acorn/protocol/managedAgents.ts'
+} from './wire.ts'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
 export type AgentTurnChangedEvent = {

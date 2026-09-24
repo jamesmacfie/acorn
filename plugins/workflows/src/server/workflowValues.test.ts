@@ -10,7 +10,8 @@ import { writeWorkflowToml } from './workflowToml'
 import { renameNode, newDraft, graphOrder } from '../client/editor/draft'
 
 const def: WorkflowDef = {
-  formatVersion: 2, name: 'Typed workflow',
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const, name: 'Typed workflow',
   inputs: [
     { name: 'record', schema: { type: 'object' }, required: true, default: { nested: [null, { done: false }], number: 7 } },
     { name: 'count', schema: { type: 'number' }, default: 0 },

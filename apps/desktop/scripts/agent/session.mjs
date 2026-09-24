@@ -21,7 +21,7 @@ const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const cargo = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
 
 function parseArgs(argv) {
-  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false }
+  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--') continue
@@ -30,6 +30,7 @@ function parseArgs(argv) {
     else if (arg === '--onboarding') options.onboarding = true
     else if (arg === '--reuse') options.reuse = true
     else if (arg === '--smoke') options.smoke = true
+    else if (arg === '--vite') options.vite = true
     else throw new Error(`Unknown option: ${arg}`)
   }
   if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
@@ -150,12 +151,16 @@ async function main() {
       await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project], desktopRoot)
     }
 
-    const vitePort = await freePort()
-    vite = await createViteServer({
-      configFile: join(desktopRoot, 'vite.config.ts'),
-      server: { host: '127.0.0.1', port: vitePort, strictPort: true },
-    })
-    await vite.listen()
+    let viteUrl = null
+    if (options.vite) {
+      const vitePort = await freePort()
+      vite = await createViteServer({
+        configFile: join(desktopRoot, 'vite.config.ts'),
+        server: { host: '127.0.0.1', port: vitePort, strictPort: true },
+      })
+      await vite.listen()
+      viteUrl = `http://127.0.0.1:${vitePort}`
+    }
 
     const webdriverPort = await freePort()
     const endpoint = `http://127.0.0.1:${webdriverPort}`
@@ -167,7 +172,7 @@ async function main() {
       env: {
         ...process.env,
         ACORN_DATA_DIR: dataDir,
-        ACORN_DEV_SERVER: `http://127.0.0.1:${vitePort}`,
+        ACORN_DEV_SERVER: viteUrl ?? '',
         TAURI_WEBDRIVER_PORT: String(webdriverPort),
       },
     })
@@ -185,7 +190,7 @@ async function main() {
       directory,
       dataDir,
       project: options.onboarding ? null : options.project,
-      viteUrl: `http://127.0.0.1:${vitePort}`,
+      viteUrl,
       webdriverEndpoint: endpoint,
       webdriverSessionId: driver.sessionId,
       startedAt: new Date().toISOString(),

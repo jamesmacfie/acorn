@@ -6,7 +6,7 @@ import { createIssueSourceHandler } from '../server/data/issueSourceHandler'
 
 export const linearPlugin = (): NodePlugin => ({
   name: 'linear',
-  // The routes own this provider's whole namespace, so the mount is /v2/p/linear with no prefix. The
+  // The routes own this provider's whole namespace, so the mount is /v1/p/linear with no prefix. The
   // segment comes from the declared provider id, never from a prefix string. It stays behind
   // `requireProviderAccess` in the projection: a task-scoped internal token may not spend the owner's
   // Linear credential.

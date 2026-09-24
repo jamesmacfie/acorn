@@ -18,7 +18,7 @@ const inFlight = new Map<string, { hash: string; response: Promise<Response> }>(
 const conflict = (c: Parameters<typeof respondError>[0]): Response =>
   respondError(c, 409, 'idempotency_conflict', ['This Idempotency-Key was already used with a different request.'])
 
-// Rebuild a Response from a stored row. Content type is asserted rather than stored: every /v2 route
+// Rebuild a Response from a stored row. Content type is asserted rather than stored: every /v1 route
 // answers JSON or nothing, and a column would need a migration to carry what is currently a constant.
 const replay = (stored: { responseStatus: number; responseBody: string }): Response =>
   new Response(BODILESS.has(stored.responseStatus) ? null : stored.responseBody, {

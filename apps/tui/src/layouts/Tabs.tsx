@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
+import type { LayoutProps } from '@acorn/client-core/host/layouts'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { registerPanel, Tabs as TabStrip } from '../kit/grouping'
 import { bindKeys } from '../keys/install'

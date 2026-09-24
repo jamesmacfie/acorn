@@ -1,5 +1,5 @@
 import { confineExistingFile } from '@acorn/plugin-api/node'
-import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
+import type { AgentInputPart } from '../../contract/wire.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
 export const MAX_AGENT_INPUT_BYTES = 2 * 1024 * 1024

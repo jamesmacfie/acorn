@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { HARNESS_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type {
   AgentConfigOption,
   AgentDeleteResult,
@@ -8,7 +9,7 @@ import type {
   AgentSession,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
 import {
   assertBoundedJson,
@@ -857,7 +858,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
   async exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
     const snapshot = await this.store.exportSnapshot(sessionId)
-    if (format === 'json') return JSON.stringify({ version: 1, exportedAt: Date.now(), ...snapshot }, null, 2)
+    if (format === 'json') return JSON.stringify({ baseline: ACORN_BASELINE, version: 1, exportedAt: Date.now(), ...snapshot }, null, 2)
     const lines = [`# ${snapshot.session.title}`, '', `Provider: ${snapshot.session.providerId}`, '']
     for (const turn of snapshot.turns) {
       lines.push('## User', '', agentTurnInputText(turn), '')

@@ -7,7 +7,7 @@ export const publishedDashboardPanelKey = (nodeId: string, scope: DashboardScope
   ['published-dashboard-panel', nodeId, scope.workspaceId, scope.projectId ?? null, id] as const
 
 export function dashboardClient(nodeId: string, scope: DashboardScope) {
-  const request = <T>(operation: string, body: object = {}, signal?: AbortSignal) => writeJson<T>(`/v2/core/dashboards/${operation}`, {
+  const request = <T>(operation: string, body: object = {}, signal?: AbortSignal) => writeJson<T>(`/v1/core/dashboards/${operation}`, {
     method: 'POST', nodeId, signal,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...body, operation, scope }),

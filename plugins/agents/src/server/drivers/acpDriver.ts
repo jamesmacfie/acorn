@@ -17,7 +17,7 @@ import { Readable, Writable } from 'node:stream'
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
-import type { AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import {
   acpElicitationResponse,
@@ -294,7 +294,7 @@ export class AcpDriver implements AgentDriver {
 
     const initialized = await agent.initialize({
       protocolVersion: 1,
-      clientInfo: { name: 'acorn', version: '0.1.0' },
+      clientInfo: { name: 'acorn', version: '1.0.0' },
       // acorn declines every client capability but one. See docs/managed-agents.md § Harnesses for
       // what each buys and why it is parked.
       //

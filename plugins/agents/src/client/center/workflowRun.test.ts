@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 import { workflowRunOf } from './workflowRun'
 
 // Which rows in Agent Center get a way back to the run.

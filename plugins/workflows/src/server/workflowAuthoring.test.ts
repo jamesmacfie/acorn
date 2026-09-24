@@ -54,7 +54,8 @@ describe('workflow dispatch authoring', () => {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
       def: {
-        formatVersion: 2,
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
         name: 'Review ticket',
         inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
         steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.ticket}.' }],
@@ -75,7 +76,8 @@ describe('workflow dispatch authoring', () => {
       }],
     }
     const generated: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch review',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{

@@ -1,15 +1,16 @@
 # Architecture and legacy reset
 
-Date: 2026-09-21. Status: reviewed proposal; implementation not started.
-Evidence baseline: commit `9727fd85`. No application code or user state changed during this review.
+Date: 2026-09-21. Status: tickets 01–12 implemented; ticket 13 acceptance recorded with host limits on 2026-09-23.
+Evidence baseline: commit `9727fd85`. The original review changed no application code or user state.
 Re-checked on 2026-09-22 against `4bdbf29b`. Findings and Memory work landed in that window and
 narrowed parts of tickets 03 and 04 without starting either. Paragraphs marked "After the baseline"
 in [findings](./findings.md) and [target architecture](./target-architecture.md) say what moved.
 
-Acorn's runtime topology is worth keeping. Its main maintainability problem is uneven ownership:
-some features use the plugin contracts, while others reach through shared client code or application
-composition. Compatibility also survives outside SQLite, and some supposedly legacy stores still
-receive writes. A database reset alone cannot remove those paths safely.
+At the review baseline, Acorn's runtime topology was worth keeping, but ownership was uneven: some
+features used plugin contracts while others reached through shared client code or application
+composition. Compatibility survived outside SQLite, and some retired stores still received writes.
+A database reset alone could not remove those paths safely. Tickets 01–12 addressed those findings;
+[ticket 13](./13-acceptance.md) records the checks and the host gaps that remain.
 
 This programme makes one deliberate breaking transition, then leaves one supported representation
 per contract. It preserves extensibility, containment, desktop and terminal support, and the product
@@ -25,8 +26,8 @@ behaviour described in the owning documentation.
 
 ## Implementation order
 
-Run one ticket at a time. The dependencies below are minimum prerequisites, not permission to ship
-intermediate builds to existing installations. Ship the coordinated baseline only after ticket 13.
+The tickets were implemented in order. The dependencies below are minimum prerequisites, not permission
+to ship intermediate builds to existing installations. Release acceptance is recorded in ticket 13.
 Every ticket links to the shared context; read that before implementing the ticket.
 
 | Ticket | Outcome | Blocked by |
@@ -52,6 +53,7 @@ Avoid mixing unrelated visual redesign or feature additions into these tickets.
 ## Verify before building
 
 - Confirm the baseline commit and recheck cited consumers; line numbers are dated navigation hints.
-- Read the owning reference docs as well as this programme. Proposed behaviour here is not shipped.
+- Read the owning reference docs as well as this programme. This programme retains the original
+  decisions and dated source evidence; the reference docs own current behaviour.
 - Run the acceptance checks in each ticket and record results, including failures and unrun checks.
 - Never run a reset against this checkout's enclosing data root without an explicit target inventory.

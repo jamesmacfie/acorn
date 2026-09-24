@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 import { validateDataValue, type DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import { Alert, Badge, Field, Inline, Input, Picker, Stack, Text } from '@acorn/client-core/features/dataSources/kit.ts'
+import { Alert, Badge, Field, Inline, Input, Picker, Stack, Text } from './kit.ts'
 import {
   bindingCandidates, bindingForCandidate, candidateForBinding,
   type BindingCandidate, type BindingOrigin,

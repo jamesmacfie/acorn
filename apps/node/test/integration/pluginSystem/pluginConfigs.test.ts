@@ -2,14 +2,14 @@ import { existsSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit/manifest.ts'
+import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit'
 
 // Checked against the real manifest schema at `pnpm test` time, for every loadable plugin
 // (docs/plugins.md § The dev loop: "A malformed acorn-plugin.config.mjs no longer waits for a
 // rebuild or a boot to announce itself").
 //
 // The rules it catches are the ones no reviewer checks by eye: a route or rail-items path outside
-// the plugin's own `/v2/p/<id>/` prefix, an `openPane` naming a frame the manifest never declared, a
+// the plugin's own `/v1/p/<id>/` prefix, an `openPane` naming a frame the manifest never declared, a
 // duplicate contribution id, a brand mark that is not a bare path `d`.
 //
 // This lives in apps/node because apps/node owns the builder that reads these files. It walks the

@@ -16,8 +16,8 @@ import {
 import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
 import { encodeIdFrame, type WsClientFrame } from '@acorn/protocol/ws.ts'
-import type { Helper } from '@acorn/custody/index.ts'
-import { toNodeRecord } from '@acorn/custody/broker/fleetStore.ts'
+import type { Helper } from '@acorn/custody/runtime'
+import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { decodeBytes, encodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
 import {
@@ -27,8 +27,8 @@ import {
   NO_DISCLOSURE,
   putSchema,
   type PluginsState,
-} from '@acorn/custody/plugins/pluginRequests.ts'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+} from '@acorn/custody/plugins'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 import { createRendererWatchdog } from './rendererWatchdog'
 
@@ -264,7 +264,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         // The last request that will ever authenticate, and it closes our own socket. A failure must
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await helper.broker
-          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v2/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
+          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v1/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
           .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}: ${describeError(error).message}`, { 'node.id': nodeId }))
       }
       helper.broker.remove(nodeId)

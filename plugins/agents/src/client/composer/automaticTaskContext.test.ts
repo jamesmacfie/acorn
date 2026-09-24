@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
-import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentTurn } from '../../contract/wire.ts'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   automaticTaskContextFor,

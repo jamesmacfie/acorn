@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AGENT_ATTACHMENT_POINT } from '@acorn/protocol/extensionPoints.ts'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 import {
   extensionPointRegistry,
   extensionRegistry,

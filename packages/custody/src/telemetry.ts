@@ -8,8 +8,8 @@ import {
   type TelemetryRecord,
 } from '@acorn/protocol/telemetry.ts'
 import { coreTelemetryRoute, prefsRoute } from '@acorn/protocol/api.ts'
-import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, type Disposable } from '@acorn/node-core/server/telemetry/collector.ts'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, type Disposable } from '@acorn/node-core/server/telemetry'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { helperBootSpans } from './bootMarks'
 

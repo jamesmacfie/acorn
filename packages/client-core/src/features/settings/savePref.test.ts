@@ -79,7 +79,7 @@ describe('savePref', () => {
       await expect(savePref(client, 'theme', 'dark')).resolves.toBe(true)
       expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
       expect(mocks.writeJson).not.toHaveBeenCalled()
-      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:theme', 'dark']])
+      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:acorn-1:theme', 'dark']])
     })
   })
 
@@ -93,7 +93,7 @@ describe('savePref', () => {
       client.setQueryData(prefsKey, { style: 'terminal' })
       // Seed the device tier, which is the point: with localStorage empty the stale read the bug
       // depends on contributes nothing and the assertion below passes either way.
-      localStorage.setItem('acorn-pref:style', 'terminal')
+      localStorage.setItem('acorn-pref:acorn-1:style', 'terminal')
       // The shape every reader actually observes: prefsOptions' select over the raw cache.
       const observer = new QueryObserver<Record<string, string>, Error, Record<string, string>>(client, {
         queryKey: prefsKey, enabled: false, select: mergePrefs,

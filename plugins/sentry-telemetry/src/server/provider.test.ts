@@ -2,7 +2,7 @@ import { ProviderOperationError } from '@acorn/plugin-api/node'
 import { describe, expect, it, vi } from 'vitest'
 import { connectionConfig, createSentryTelemetryProvider } from './provider'
 
-const SDK = { name: 'acorn.sentry-telemetry', version: '0.1.0' }
+const SDK = { name: 'acorn.sentry-telemetry', version: '1.0.0' }
 const DSN = 'https://abc123@o42.ingest.us.sentry.io/1234567'
 
 const provider = (fetchImpl: typeof fetch) =>
@@ -73,7 +73,7 @@ describe('validate', () => {
 describe('normalize', () => {
   it('labels the row by host and project, and never by key', () => {
     const contract = provider(answers(200)).connection
-    const validated = { dsn: { protocol: 'https' as const, publicKey: 'abc123', host: 'o42.ingest.us.sentry.io', path: '', projectId: '1234567' }, environment: 'staging', release: 'acorn@0.1.0' }
+    const validated = { dsn: { protocol: 'https' as const, publicKey: 'abc123', host: 'o42.ingest.us.sentry.io', path: '', projectId: '1234567' }, environment: 'staging', release: 'acorn@1.0.0' }
     const normalized = contract.normalize({ dsn: DSN }, validated)
     expect(normalized.label).toBe('Sentry · o42.ingest.us.sentry.io/1234567')
     expect(normalized.label).not.toContain('abc123')
@@ -82,7 +82,7 @@ describe('normalize', () => {
       host: 'o42.ingest.us.sentry.io',
       projectId: '1234567',
       environment: 'staging',
-      release: 'acorn@0.1.0',
+      release: 'acorn@1.0.0',
     })
   })
 })

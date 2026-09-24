@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TelemetryMetric, TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
 import type { Env } from '../bindings'
-import { registerRoute, removePluginRoutes } from '../routeRegistry'
+import { registerRoute, removePluginRoutes } from '../routes/registry'
 import { openSqlite } from '../storage/sqlite'
 import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../telemetry/collector'
 import { dispatchPluginRoute } from './dispatch'
@@ -43,7 +43,7 @@ describe('a dispatched plugin route', () => {
         return Response.json({ ok: true })
       },
     })
-    return dispatchPluginRoute(ENV, 'rollbar', '/v2/p/rollbar/refresh', { method: 'GET' }, AbortSignal.timeout(5_000))
+    return dispatchPluginRoute(ENV, 'rollbar', '/v1/p/rollbar/refresh', { method: 'GET' }, AbortSignal.timeout(5_000))
   }
 
   it('names the plugin on the SQL its handler runs', async () => {
@@ -64,12 +64,12 @@ describe('a dispatched plugin route', () => {
     await dispatch(() => undefined)
     flushTelemetry()
     const span = seen.find((record): record is TelemetrySpan => record.kind === 'span' && record.name === 'plugin.dispatch')!
-    expect(span.attrs).toMatchObject({ owner: 'rollbar', method: 'GET', path: '/v2/p/rollbar/refresh', status: 200 })
+    expect(span.attrs).toMatchObject({ owner: 'rollbar', method: 'GET', path: '/v1/p/rollbar/refresh', status: 200 })
   })
 
   it('refuses a path outside the plugin namespace before it dispatches anything', async () => {
     registerRoute({ plugin: 'rollbar', prefix: '', fetch: async () => Response.json({}) })
-    await expect(dispatchPluginRoute(ENV, 'rollbar', '/v2/core/tasks', { method: 'GET' }, AbortSignal.timeout(5_000)))
-      .rejects.toThrow('route must be inside /v2/p/rollbar/')
+    await expect(dispatchPluginRoute(ENV, 'rollbar', '/v1/core/tasks', { method: 'GET' }, AbortSignal.timeout(5_000)))
+      .rejects.toThrow('route must be inside /v1/p/rollbar/')
   })
 })

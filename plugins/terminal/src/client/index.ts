@@ -1,8 +1,12 @@
 import { lazy } from 'solid-js'
-import { registerNoticeTargetHandler, rememberActiveTerminal, requestTerminalFocus, setTerminalOpen, type ClientPlugin } from '@acorn/plugin-api/client'
+import { registerNoticeTargetHandler, setTerminalOpen, type ClientPlugin } from '@acorn/plugin-api/client'
 import { terminalAgentContextContribution } from './agentContextContribution'
 import { terminalDrawerContribution } from './drawerContribution'
 import { terminalCommands } from './commands'
+import { initSessions, refreshSessions, rememberActiveTerminal, requestTerminalFocus, sessionNode, sessions } from './sessionStore'
+import { terminalApi } from './terminalClient'
+import { initPtyChannel } from './wsChannel'
+
 
 const TerminalSettings = lazy(() => import('./TerminalSettings'))
 
@@ -22,11 +26,25 @@ export const terminalClientPlugin: ClientPlugin = {
   },
   // "claude needs you" for a PTY agent points at a terminal session, and only this plugin knows
   // that opening one means opening the drawer on its tab.
-  activate: () => {
-    registerNoticeTargetHandler('terminal-session', (taskId, target) => {
+  activate: (ctx) => {
+    const stopPty = initPtyChannel()
+    const stop = initSessions()
+    const stopNotice = registerNoticeTargetHandler('terminal-session', (taskId, target) => {
       setTerminalOpen(taskId, true)
       rememberActiveTerminal(taskId, target.resourceId)
       requestTerminalFocus(taskId, target.resourceId)
+    })
+    ctx.sessionSources.register({
+      summaries: () => sessions().flatMap((session) => sessionNode() === null ? [] : [{
+        nodeId: sessionNode()!, sessionId: session.id, taskId: session.taskId,
+        title: session.title, running: session.status === 'running', createdAt: session.createdAt,
+        agent: session.kind === 'agent', idle: session.idle,
+        settingUp: session.title === 'Setup',
+      }]),
+      send: (id, text, submit) => terminalApi().send(id, text, submit),
+      refresh: refreshSessions,
+      focus: (id, taskId) => { setTerminalOpen(taskId, true); rememberActiveTerminal(taskId, id); requestTerminalFocus(taskId, id) },
+      dispose: () => { stopNotice(); stop(); stopPty() },
     })
   },
 }

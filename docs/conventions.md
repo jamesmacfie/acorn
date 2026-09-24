@@ -37,8 +37,11 @@ Either the stylesheet moves or the importers do.
 ## Exports and barrels
 
 **`index.ts` exists only where an exports map or a build entry demands it, and it is an entrypoint,
-not a re-export list.** This holds in the plugins, where barrels exist only at the documented
-subpaths, and nearly holds in client-core, which has two barrels across 516 files.
+not a re-export list.** Library packages use feature-owned `public.ts` files for named cross-package
+exports. Add a binding there only when an external caller needs it; keep internal imports relative.
+An explicitly mapped leaf entrypoint is appropriate when a host needs one model or adapter and the
+feature barrel would eagerly load a different renderer. Declare that path in the package exports map
+and keep it under the same feature owner; do not import unlisted package internals.
 
 One exception stays: two plugin entrypoints are really vendor clients
 (`plugins/linear/src/server/index.ts`, `plugins/rollbar/src/server/index.ts`). They keep the name for
@@ -46,8 +49,8 @@ the `vi.mock` constraint the arch test records. github's became `server/githubAp
 
 **A published entrypoint is a bare file, not a folder holding one file.**
 
-Not yet everywhere: `packages/plugin-api` spells it both ways. `./ui` is `src/ui/index.ts` and
-`./testkit/client` is a file in a folder, while the other entrypoints are bare files.
+Not yet everywhere: `packages/plugin-api` spells it both ways. `./ui` is `src/ui/index.ts`, and
+the client testkit entries are files under `src/testkit/`, while other entrypoints are bare files.
 
 ## Solid and state
 
@@ -111,12 +114,9 @@ a truer word in one.
 **A folder does not repeat its own name in its files.** `pluginHost/pluginState.ts` is
 `pluginHost/state.ts`. A module that moves into a folder named for its subject drops the prefix.
 
-**A registry is `registry.ts` inside the folder of the thing it registers.** This already holds seven
-times in node-core.
-
-Not yet everywhere: `packages/node-core/src/server/routeRegistry.ts` and
-`packages/node-core/src/server/integrations/connectionRegistry.ts` still carry the prefix. Either the
-file conforms or its folder does.
+**A registry is `registry.ts` inside the folder of the thing it registers.** Node HTTP routes use
+`server/routes/registry.ts`; connection providers use `server/integrations/connectionProviders/registry.ts`.
+The integration provider registry remains separate in `server/integrations/registry.ts`.
 
 **One file is not a folder.** A folder holding one module, with no second one planned, is a file
 instead. The exceptions are the folders an exports map or the arch test names by hand: `node/`,

@@ -59,7 +59,7 @@ describe('mutations against an unreachable node', () => {
     await ready(state)
     // Fail here rather than waiting for the broker's 30s request timeout. Main already holds the socket, so
     // it already knows; without this the user watched a spinner and then read "connect ECONNREFUSED".
-    const error = await writeJson('/v2/core/workspaces', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
+    const error = await writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).code).toBe('node_offline')
     expect((error as ApiError).retryable).toBe(true)
@@ -68,22 +68,22 @@ describe('mutations against an unreachable node', () => {
 
   it('still ATTEMPTS a read, because a stale badge costs less than a blocked pane', async () => {
     await ready('offline')
-    await expect(readJson('/v2/core/workspaces')).resolves.toEqual({ ok: true })
-    expect(attempted).toEqual([{ path: '/v2/core/workspaces', method: 'GET' }])
+    await expect(readJson('/v1/core/workspaces')).resolves.toEqual({ ok: true })
+    expect(attempted).toEqual([{ path: '/v1/core/workspaces', method: 'GET' }])
   })
 
   it.each(['online', 'degraded'] as const)('lets a mutation through when writes can land (%s)', async (state) => {
     // `degraded` is WS-down/HTTP-up: no live events, but a write still commits. Treating it as offline
     // would block every mutation for the whole time a socket is reconnecting.
     await ready(state)
-    await expect(writeJson('/v2/core/workspaces', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true })
-    expect(attempted).toEqual([{ path: '/v2/core/workspaces', method: 'POST' }])
+    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true })
+    expect(attempted).toEqual([{ path: '/v1/core/workspaces', method: 'POST' }])
   })
 
   it('classifies by verb, not by helper: DELETE is a mutation too', async () => {
     await ready('offline')
-    await expect(readJson('/v2/core/workspaces')).resolves.toEqual({ ok: true })
-    await expect(writeJson('/v2/core/devices/d1', { method: 'DELETE' })).rejects.toThrow(/offline/)
+    await expect(readJson('/v1/core/workspaces')).resolves.toEqual({ ok: true })
+    await expect(writeJson('/v1/core/devices/d1', { method: 'DELETE' })).rejects.toThrow(/offline/)
     expect(attempted.map((a) => a.method)).toEqual(['GET'])
   })
 })
@@ -93,11 +93,11 @@ describe('a caller that knows its request is slow', () => {
     // The broker cuts a request off at 30 seconds, which is shorter than one model call is allowed to
     // take. A route that waits on one is unusable on the desktop unless this reaches the broker.
     await ready('online')
-    await readJson('/v2/core/workspaces')
-    await writeJson('/v2/p/workflows/defs/generate', { method: 'POST', body: '{}', timeoutMs: 150_000 })
+    await readJson('/v1/core/workspaces')
+    await writeJson('/v1/p/workflows/defs/generate', { method: 'POST', body: '{}', timeoutMs: 150_000 })
     expect(attempted).toEqual([
-      { path: '/v2/core/workspaces', method: 'GET' },
-      { path: '/v2/p/workflows/defs/generate', method: 'POST', timeoutMs: 150_000 },
+      { path: '/v1/core/workspaces', method: 'GET' },
+      { path: '/v1/p/workflows/defs/generate', method: 'POST', timeoutMs: 150_000 },
     ])
   })
 })
@@ -105,7 +105,7 @@ describe('a caller that knows its request is slow', () => {
 describe('the headers every request carries', () => {
   it('names the request, so a failure a person reports is findable in the node log', async () => {
     await ready('online')
-    await readJson('/v2/core/workspaces')
+    await readJson('/v1/core/workspaces')
     // The node honours a caller-supplied id that matches its grammar
     // (@acorn/protocol/errors.ts § requestIdSchema), and mints one otherwise.
     expect(headers[0]['x-request-id']).toMatch(/^r\d+-\d+$/)
@@ -117,7 +117,7 @@ describe('the headers every request carries', () => {
     setTelemetryEnabled(true)
 
     const interaction = startInteraction('core', { name: 'command' })
-    await readJson('/v2/core/workspaces')
+    await readJson('/v1/core/workspaces')
     const during = parseTraceparent(headers[0].traceparent)
     // The trace is the interaction's, so the click and everything the node did for it read as one
     // thing. The parent is the request's own `api.request` span rather than the interaction, so
@@ -126,7 +126,7 @@ describe('the headers every request carries', () => {
     expect(during?.parentSpanId).not.toBe(interaction.spanId)
     interaction.end()
 
-    await readJson('/v2/core/workspaces')
+    await readJson('/v1/core/workspaces')
     // A request outside an interaction is still a trace, its own. Sending nothing would leave the
     // node's request span with no link back to the renderer that asked for it.
     const after = parseTraceparent(headers[1].traceparent)
@@ -136,18 +136,18 @@ describe('the headers every request carries', () => {
 
   it('sends no traceparent while telemetry is off', async () => {
     await ready('online')
-    await readJson('/v2/core/workspaces')
+    await readJson('/v1/core/workspaces')
     expect(headers[0].traceparent).toBeUndefined()
   })
 })
 
 describe('the route attribute on an api.request span', () => {
   it('is the namespace, not the path, so a hundred tasks read as one row', () => {
-    expect(apiRouteAttr('/v2/core/tasks/abc-123/context')).toBe('/v2/core/tasks')
-    expect(apiRouteAttr('/v2/core/prefs')).toBe('/v2/core/prefs')
+    expect(apiRouteAttr('/v1/core/tasks/abc-123/context')).toBe('/v1/core/tasks')
+    expect(apiRouteAttr('/v1/core/prefs')).toBe('/v1/core/prefs')
     // A plugin keeps one more segment, so two of its routers read apart.
-    expect(apiRouteAttr('/v2/p/agents/sessions/s1/messages')).toBe('/v2/p/agents/sessions')
+    expect(apiRouteAttr('/v1/p/agents/sessions/s1/messages')).toBe('/v1/p/agents/sessions')
     // The query string is not part of the pattern.
-    expect(apiRouteAttr('/v2/core/dashboards/history?panelId=x')).toBe('/v2/core/dashboards')
+    expect(apiRouteAttr('/v1/core/dashboards/history?panelId=x')).toBe('/v1/core/dashboards')
   })
 })

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PrefKeys } from './prefKeys'
-import { drainMigratedPrefs, isDevicePref, mergePrefs, readDevicePrefs, seedDevicePrefs, writeDevicePref } from './devicePrefs'
+import { isDevicePref, mergePrefs, readDevicePrefs, writeDevicePref } from './devicePrefs'
 
 const store = new Map<string, string>()
 const layoutKey = `${PrefKeys.taskLayoutsScoped}:node-a/task-1`
@@ -43,111 +43,62 @@ describe('isDevicePref', () => {
   })
 
   it('leaves the four COMPOSITION kinds on the node whose resources they describe', () => {
-    // A pane layout, an open-file set, a repo's PR filters and a context selection are facts about one
-    // node's tasks and repos, so every client paired with that node should render them and the agent
-    // should be able to read them. They used to be device-local, which is why the keys and their
-    // `<nodeId>/<taskId>` suffixes are checked here rather than assumed.
+    // These keys describe one node's tasks and repos and must not become device preferences.
     for (const key of [PrefKeys.taskLayoutsScoped, PrefKeys.editorOpenFilesScoped, PrefKeys.prFiltersScoped, PrefKeys.contextSelectionScoped]) {
       expect(isDevicePref(key), key).toBe(false)
       expect(isDevicePref(`${key}:node-a/task-1`), key).toBe(false)
     }
-    // …and their pre-scoped aggregates. No slice reads those keys any more (the readers went with
-    // the migration, 2026-08-28), but a device that upgraded across it can still hold one in
-    // localStorage, and `mergePrefs` lets the device win, so a stray one must not be classified as
-    // device-owned and shadow the node's copy forever.
-    for (const key of [PrefKeys.taskLayouts, PrefKeys.taskPanesLegacy, PrefKeys.editorOpenFiles, PrefKeys.prFilters]) {
+    for (const key of [PrefKeys.taskLayouts, PrefKeys.editorOpenFiles, PrefKeys.prFilters, 'pane_shortcuts']) {
       expect(isDevicePref(key), key).toBe(false)
     }
   })
 })
 
 describe('the storage round trip', () => {
-  it('reads back what it wrote, under a namespaced key', () => {
+  it('starts empty and reads back what it wrote, under a namespaced key', () => {
+    expect(readDevicePrefs()).toEqual({})
     writeDevicePref(PrefKeys.theme, 'dark')
     expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
     // Namespaced, so an unrelated localStorage entry isn't mistaken for a pref.
     store.set('http-draft:task-1', '{}')
     expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
   })
-})
-
-describe('seedDevicePrefs', () => {
-  it('copies the node\'s existing values across once, so an upgrade keeps the theme', () => {
-    seedDevicePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.agentToolPermissions]: '{}' })
-    // Only the device keys: a node pref copied into localStorage would be read from two places.
-    expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
+  it('ignores node-scoped and obsolete values without writing them to another node', () => {
+    store.set('acorn-pref:theme', 'legacy')
+    store.set(`acorn-pref:${layoutKey}`, '{"panes":["old"]}')
+    store.set('acorn-pref:pane_shortcuts', '{"pr":"meta+p"}')
+    expect(readDevicePrefs()).toEqual({})
+    expect(mergePrefs({ [layoutKey]: '{"panes":["new"]}' })).toEqual({ [layoutKey]: '{"panes":["new"]}' })
+    expect(store.get(`acorn-pref:${layoutKey}`)).toBe('{"panes":["old"]}')
   })
 
-  it('never overwrites a value the device already has', () => {
-    // The seed runs on every prefs fetch, so this is what stops the node's stale copy from clobbering a
-    // change made since the upgrade.
-    writeDevicePref(PrefKeys.theme, 'light')
-    seedDevicePrefs({ [PrefKeys.theme]: 'dark' })
-    expect(readDevicePrefs()[PrefKeys.theme]).toBe('light')
+  it('returns an empty view when localStorage is unavailable', () => {
+    delete (globalThis as { localStorage?: unknown }).localStorage
+    expect(readDevicePrefs()).toEqual({})
+    writeDevicePref(PrefKeys.theme, 'dark')
+    expect(readDevicePrefs()).toEqual({})
+  })
+
+  it('tolerates storage that exists but refuses access', () => {
+    ;(globalThis as { localStorage?: unknown }).localStorage = {
+      get length() { throw new Error('blocked') },
+      setItem: () => { throw new Error('blocked') },
+    }
+    expect(readDevicePrefs()).toEqual({})
+    expect(() => writeDevicePref(PrefKeys.theme, 'dark')).not.toThrow()
   })
 })
 
 describe('mergePrefs', () => {
-  it('lets the device win, so a stale node copy cannot resurrect itself', () => {
+  it('uses only the owner of each key', () => {
     expect(mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, { [PrefKeys.theme]: 'light' }))
       .toEqual({ [PrefKeys.theme]: 'light', [PrefKeys.onboarded]: 'true' })
+    expect(mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, {}))
+      .toEqual({ [PrefKeys.onboarded]: 'true' })
   })
 
-  it('ignores a leftover under a key that has since moved to the node', () => {
-    // The device-wins rule is why this matters: left visible, a stale local layout would shadow the
-    // node's copy forever and no other client's write would show up.
+  it('keeps node-owned layouts independent of local storage', () => {
     store.set(`acorn-pref:${layoutKey}`, '{"panes":["stale"]}')
     expect(mergePrefs({ [layoutKey]: '{"panes":["fresh"]}' })).toEqual({ [layoutKey]: '{"panes":["fresh"]}' })
-  })
-})
-
-describe('drainMigratedPrefs', () => {
-  it('hands each moved key to the node once, then forgets it locally', async () => {
-    store.set(`acorn-pref:${layoutKey}`, '{"panes":["local"]}')
-    store.set(`acorn-pref:${PrefKeys.taskLayouts}`, '{}')
-    writeDevicePref(PrefKeys.theme, 'dark')
-    const written: [string, string][] = []
-
-    const drained = await drainMigratedPrefs('node-a', {}, async (key, value) => void written.push([key, value]))
-
-    // The pre-scoped aggregate goes too: it names the same fact as the scoped keys beside it, and
-    // leaving it on the device would keep that fact in two places.
-    expect(written).toEqual([[layoutKey, '{"panes":["local"]}'], [PrefKeys.taskLayouts, '{}']])
-    expect(drained).toEqual({ [layoutKey]: '{"panes":["local"]}', [PrefKeys.taskLayouts]: '{}' })
-    expect(store.has(`acorn-pref:${layoutKey}`)).toBe(false)
-    // A device pref is not a straggler.
-    expect(store.get(`acorn-pref:${PrefKeys.theme}`)).toBe('dark')
-  })
-
-  it('leaves another node\'s keys alone, rather than handing them to whichever node is active', async () => {
-    // The failure this prevents is silent and total: node B's layouts PUT to node A and deleted from the
-    // only place they existed.
-    store.set(`acorn-pref:${layoutKey}`, '{"panes":["a"]}')
-    const written: string[] = []
-
-    const drained = await drainMigratedPrefs('node-b', {}, async (key) => void written.push(key))
-
-    expect(written).toEqual([])
-    expect(drained).toEqual({})
-    expect(store.get(`acorn-pref:${layoutKey}`)).toBe('{"panes":["a"]}')
-  })
-
-  it('drops the local copy without a write when the node already agrees', async () => {
-    store.set(`acorn-pref:${layoutKey}`, '{"panes":["same"]}')
-    const written: string[] = []
-
-    await drainMigratedPrefs('node-a', { [layoutKey]: '{"panes":["same"]}' }, async (key) => void written.push(key))
-
-    expect(written).toEqual([])
-    expect(store.has(`acorn-pref:${layoutKey}`)).toBe(false)
-  })
-
-  it('keeps the value when the node refuses it, so the next fetch retries', async () => {
-    store.set(`acorn-pref:${layoutKey}`, '{"panes":["local"]}')
-
-    const drained = await drainMigratedPrefs('node-a', {}, () => Promise.reject(new Error('offline')))
-
-    expect(drained).toEqual({})
-    expect(store.get(`acorn-pref:${layoutKey}`)).toBe('{"panes":["local"]}')
   })
 })

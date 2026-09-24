@@ -1,12 +1,11 @@
 import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
-import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task } from '@acorn/plugin-api/client'
+import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task, type SessionSummary } from '@acorn/plugin-api/client'
 import type { ContextItem, TaskContext } from '@acorn/protocol/api.ts'
 import {
   Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, IconButton, Inline, Meter, Picker,
   Row, Rows, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
-import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { collectionId, pillText, sessionLabel, type ContextModel } from './contextModel'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 
@@ -169,13 +168,13 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
         <CodeBlock size="xs" maxHeight="block" wrap>{model().assembled()?.block}</CodeBlock>
       </Fold>
       <Toolbar ariaLabel="Context sync">
-        <Picker<TerminalSession>
+        <Picker<SessionSummary>
           label={sessionLabel(model().target())}
           placeholder="Filter sessions…"
           emptyText="No running agent session."
           results={(query) => model().sessions(query)}
           rowLabel={(session) => sessionLabel(session)}
-          isActive={(session) => session.id === model().target()?.id}
+          isActive={(session) => session.sourceId === model().target()?.sourceId && session.sessionId === model().target()?.sessionId && session.nodeId === model().target()?.nodeId}
           onSelect={(session) => model().pickTarget(session)}
         />
         <Show when={model().status()}>

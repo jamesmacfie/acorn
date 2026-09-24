@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
   NODE_PROTOCOL_VERSION,
   pairRequestSchema,
@@ -57,6 +58,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       // widen the payload for an authenticated caller without a second credential check.
       const authenticated = c.get('principal') !== null
       const info: NodeInfo = {
+        baseline: ACORN_BASELINE,
         protocolVersion: NODE_PROTOCOL_VERSION,
         // The certificate a client pins against (docs/api-reference.md § Pairing). Reading it over the
         // connection being authenticated proves nothing. It is the value the owner compares against
@@ -77,7 +79,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       if (!parsed.success || !c.env.PAIRING_CODES.consume(parsed.data.code)) return pairingFailed(c)
       const { token, device } = await c.env.DEVICES.issue(parsed.data.deviceName)
       // The only time the raw token exists outside the client. Never logged.
-      return c.json({ deviceToken: token, nodeId: c.env.NODE_ID, device } satisfies PairResult)
+      return c.json({ baseline: ACORN_BASELINE, deviceToken: token, nodeId: c.env.NODE_ID, device } satisfies PairResult)
     })
 
   const core = new Hono<AppEnv>()

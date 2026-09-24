@@ -11,7 +11,8 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '13'
+export const API_VERSION = '1'
+export const BASELINE = 'acorn-1'
 
 /**
  * Where the manifest JSON Schema is published. Same reason as the constant above: this package is
@@ -63,11 +64,12 @@ function manifest(id, name, rectangle = false) {
         $schema: SCHEMA_URL,
         id,
         name,
-        version: '0.1.0',
+        version: '1.0.0',
+        baseline: BASELINE,
         apiVersion: API_VERSION,
         node: './node/index.js',
         client: './client.js',
-        // `api: []` is correct, not an omission: a frame's own `/v2/p/<id>/` namespace needs no scope.
+        // `api: []` is correct, not an omission: a frame's own `/v1/p/<id>/` namespace needs no scope.
         // Add one of the six grantable scopes only when you call a core route. `core: ['tasks']` is
         // here because server/routes.js resolves a task.
         permissions: {
@@ -82,6 +84,10 @@ function manifest(id, name, rectangle = false) {
             frames: [{
               target: 'pane', id, label: name, glyph: 'puzzle', order: 800,
               layout: 'single', regions: { body: 'frame' },
+            }],
+            commands: [{
+              id: 'open', kind: 'action', title: `Open ${name}`, category: 'pane',
+              action: { verb: 'openPane', pane: id },
             }],
           }
           : {
@@ -104,9 +110,13 @@ function manifest(id, name, rectangle = false) {
                 id: `${id}.diff-note`,
                 point: 'changes:diff-line',
                 label: `${name} notes`,
-                items: `/v2/p/${id}/marks`,
+                items: `/v1/p/${id}/marks`,
               },
             ],
+            commands: [{
+              id: 'greeting', kind: 'action', title: `${name}: send greeting`,
+              action: { verb: 'runNodeAction', path: `/v1/p/${id}/greeting` },
+            }],
           },
       },
       null,
@@ -140,7 +150,7 @@ export default {
 
     // The portable carrier. A Hono instance cannot cross a process boundary; a
     // (Request, PluginRequestContext) => Response function can. The host strips the mount, so
-    // /v2/p/${id}/greeting arrives here as /greeting.
+    // /v1/p/${id}/greeting arrives here as /greeting.
     ctx.routes.fetch((request, context) => handle(request, context, ctx.core))
   },
 
@@ -163,7 +173,7 @@ function nodeRoutes() {
 export async function handle(request, context, core) {
   const { pathname, searchParams } = new URL(request.url)
 
-  if (request.method === 'GET' && pathname === '/greeting') {
+  if ((request.method === 'GET' || request.method === 'POST') && pathname === '/greeting') {
     const taskId = searchParams.get('taskId')
     // core.tasks answers with a TaskRef projection: id, title, projectId, branch, worktreePath,
     // pullNumber, never the database row. A column rename in acorn cannot silently break you.
@@ -308,7 +318,7 @@ document.body.append(root)
 connected
   .then(async (context) => {
     const query = context.taskId ? \`?taskId=\${encodeURIComponent(context.taskId)}\` : ''
-    const { text } = await api.get(\`/v2/p/${id}/greeting\${query}\`)
+    const { text } = await api.get(\`/v1/p/${id}/greeting\${query}\`)
 
     const heading = document.createElement('h1')
     heading.textContent = text
@@ -387,7 +397,7 @@ wants its node half in one file.
   palette entry is a descriptor you declare and the host draws, and it stays live when nothing of
   yours is mounted. A pane, a panel body or a settings page is a tree. A frame is for pixels the host
   cannot draw.
-- **Your routes are confined to \`/v2/p/${id}/\`**, at parse time and again at runtime.
+- **Your routes are confined to \`/v1/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
 - **\`apiVersion\` must match the loading node exactly.** A mismatch is a \`failed\` roster row that says so.

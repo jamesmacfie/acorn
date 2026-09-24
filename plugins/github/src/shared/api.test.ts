@@ -31,21 +31,21 @@ import {
 // buster.
 describe('github wire contract', () => {
   it('preserves route strings used by the client fetch layer', () => {
-    expect(reposRoute).toBe('/v2/p/github/repos')
-    expect(reposRefreshRoute).toBe('/v2/p/github/repos/refresh')
-    expect(repoRoute('octo', 'repo', 'actions/123/rerun')).toBe('/v2/p/github/repos/octo/repo/actions/123/rerun')
-    expect(pullsRoute('octo', 'repo', 'open')).toBe('/v2/p/github/repos/octo/repo/pulls?state=open')
-    expect(closedPullsRoute('octo', 'repo', 2)).toBe('/v2/p/github/repos/octo/repo/pulls?state=closed&page=2')
-    expect(repoLabelsRoute('octo', 'repo')).toBe('/v2/p/github/repos/octo/repo/labels')
-    expect(pullRoute('octo', 'repo', '12')).toBe('/v2/p/github/repos/octo/repo/pulls/12')
-    expect(pullRoute('octo', 'repo', '12', 'files')).toBe('/v2/p/github/repos/octo/repo/pulls/12/files')
-    expect(fileSummariesRoute('octo', 'repo', '12')).toBe('/v2/p/github/repos/octo/repo/pulls/12/files?summary=1')
-    expect(filePatchRoute('octo', 'repo', '12', 'src/app file.ts')).toBe('/v2/p/github/repos/octo/repo/pulls/12/files?path=src%2Fapp%20file.ts')
-    expect(filePatchesRoute('octo', 'repo', '12')).toBe('/v2/p/github/repos/octo/repo/pulls/12/files/patches')
+    expect(reposRoute).toBe('/v1/p/github/repos')
+    expect(reposRefreshRoute).toBe('/v1/p/github/repos/refresh')
+    expect(repoRoute('octo', 'repo', 'actions/123/rerun')).toBe('/v1/p/github/repos/octo/repo/actions/123/rerun')
+    expect(pullsRoute('octo', 'repo', 'open')).toBe('/v1/p/github/repos/octo/repo/pulls?state=open')
+    expect(closedPullsRoute('octo', 'repo', 2)).toBe('/v1/p/github/repos/octo/repo/pulls?state=closed&page=2')
+    expect(repoLabelsRoute('octo', 'repo')).toBe('/v1/p/github/repos/octo/repo/labels')
+    expect(pullRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12')
+    expect(pullRoute('octo', 'repo', '12', 'files')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files')
+    expect(fileSummariesRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files?summary=1')
+    expect(filePatchRoute('octo', 'repo', '12', 'src/app file.ts')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files?path=src%2Fapp%20file.ts')
+    expect(filePatchesRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files/patches')
     expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies'))
-      .toBe('/v2/p/github/repos/octo/repo/pulls/12/review-comments/99/replies')
-    expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/v2/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
-    expect(rerunFailedRoute('octo', 'repo', 123)).toBe('/v2/p/github/repos/octo/repo/actions/123/rerun')
+      .toBe('/v1/p/github/repos/octo/repo/pulls/12/review-comments/99/replies')
+    expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/v1/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
+    expect(rerunFailedRoute('octo', 'repo', 123)).toBe('/v1/p/github/repos/octo/repo/actions/123/rerun')
   })
 
   it('preserves query key shapes for cache compatibility', () => {
@@ -63,7 +63,7 @@ describe('github wire contract', () => {
 
   // The same net protocol keeps over its own builders, scoped to this plugin: enumerated from the
   // module rather than listed, so a new route is covered the day it lands. A path outside
-  // /v2/p/github/ escapes this plugin's mount and would 404 into the SPA shell.
+  // /v1/p/github/ escapes this plugin's mount and would 404 into the SPA shell.
   it('namespaces every exported route builder under its own plugin prefix', () => {
     const dummy = ['x']
     const paths = Object.entries(api)
@@ -75,7 +75,7 @@ describe('github wire contract', () => {
     expect(paths.length).toBeGreaterThan(20) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
-      expect(path as string, name).toMatch(/^\/v2\/p\/github\//)
+      expect(path as string, name).toMatch(/^\/v1\/p\/github\//)
     }
   })
 })

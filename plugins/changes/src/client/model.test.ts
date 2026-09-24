@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
   buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
   generateReason, groupChanges, groupSections, isFolderKey, pickSelected, primaryRemote, remoteCounts,

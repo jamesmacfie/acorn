@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import * as schema from '../../node/schema'

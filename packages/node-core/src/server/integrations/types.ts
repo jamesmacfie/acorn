@@ -158,7 +158,7 @@ export type ProviderProjectSource = {
 }
 
 // A provider-owned HTTP router. `prefix` is relative to the provider's own plugin namespace
-// (`/v2/p/<providerId>`), so it is empty for a provider that owns its whole namespace; the namespace
+// (`/v1/p/<providerId>`), so it is empty for a provider that owns its whole namespace; the namespace
 // segment comes from the declared providerId, never from the prefix string.
 export type ProviderRouteContribution = { providerId: string; prefix: '' | `/${string}` } & (
   | { router: Hono<AppEnv>; fetch?: never }
@@ -202,7 +202,7 @@ export type IntegrationProviderContribution = ConnectionProviderContribution & {
   memory: MemoryEvidencePolicy
   conformance?: {
     ref: ExternalRef
-    legacyCache: unknown
+    cachedItem: unknown
     summary: unknown
     detail?: unknown
   }

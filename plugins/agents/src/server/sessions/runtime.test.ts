@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
+import { SecretService } from '@acorn/plugin-api/testkit'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agentProfileRegistry } from '@acorn/plugin-api/node'
-import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
-import { createCoreServices, type CoreServices } from '@acorn/node-core/server/core/index.ts'
+import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
+import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { AgentNormalizedEvent, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import type {
   AgentDriver,
   AgentDriverSession,

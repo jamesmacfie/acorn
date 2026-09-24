@@ -3,9 +3,9 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '../../githubApi'
-import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv, Principal } from '@acorn/plugin-api/testkit'
 import { prCreate } from './prCreate'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()

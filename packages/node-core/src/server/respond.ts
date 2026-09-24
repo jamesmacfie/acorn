@@ -20,7 +20,7 @@ import type { AppEnv } from './middleware/auth'
 // pattern rides as an attribute, so a hundred task ids read as one row rather than a hundred
 // (docs/telemetry.md § The admission rule for a span).
 //
-// The owner comes from the path and never from a header. `/v2/p/<id>` is a plugin's namespace, so a
+// The owner comes from the path and never from a header. `/v1/p/<id>` is a plugin's namespace, so a
 // request under one is that plugin's; anything else is core's. Reading it from the path is what lets
 // a plugin route that 404s before it matches still be attributed, and a header would be attacker
 // input.
@@ -79,7 +79,7 @@ export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
  *  parser, and anything else here is a request for a plugin that does not exist, so it reads as
  *  core's own 404 rather than minting an owner out of the URL. */
 function ownerForPath(path: string): string {
-  const match = /^\/v2\/p\/([a-z0-9][a-z0-9-]{0,63})(?:\/|$)/.exec(path)
+  const match = /^\/v1\/p\/([a-z0-9][a-z0-9-]{0,63})(?:\/|$)/.exec(path)
   return match ? match[1] : 'core'
 }
 

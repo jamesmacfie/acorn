@@ -16,8 +16,8 @@
 // names a source moves the rail to it; choosing a source does not rewrite the path.
 
 import { createEffect, untrack } from 'solid-js'
-import { projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
-import { sourceIdForPath } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { projectPath } from '@acorn/client-core/host/registries/commands'
+import { sourceIdForPath } from '@acorn/client-core/host/registries/sources'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { scheduleSettle } from '../keys/regions'

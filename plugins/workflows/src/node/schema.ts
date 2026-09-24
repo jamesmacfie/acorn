@@ -5,9 +5,6 @@
 // plugins/agents' session table, are plain IDs rather than foreign keys, dereferenced through
 // CoreServices.tasks and the agents capability.
 //
-// The generated `0000` migration for this chain has to produce tables byte-identical to what a
-// populated data root already holds, or an upgrade hits a schema mismatch on first run instead of
-// finding a fresh empty file.
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped
@@ -25,10 +22,7 @@ export const workflowRuns = sqliteTable(
     // The resolved root and child definitions captured by executable preflight. Kept separate from
     // def_json so the definition shown in the run pane remains the definition the owner authored.
     resolvedGraphJson: text('resolved_graph_json'),
-    // Legacy rows are backfilled to their own id by migration 0002. The column remains nullable at
-    // the SQLite boundary because adding a row-derived NOT NULL value requires rebuilding the table.
-    // Every run written after that migration supplies it.
-    rootRunId: text('root_run_id'),
+    rootRunId: text('root_run_id').notNull(),
     parentRunId: text('parent_run_id'),
     parentStepId: text('parent_step_id'),
     depth: integer('depth').notNull().default(0),

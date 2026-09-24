@@ -1,5 +1,5 @@
 import { createComponent, lazy } from 'solid-js'
-import type { NodePluginRow, PluginChromeAction, PluginCommandDescriptor, PluginCommandSelectAction, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
+import type { NodePluginRow, PluginChromeAction, PluginCommandSelectAction, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -155,9 +155,6 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   const surfaces = declaredSurfaces(contributions)
   const taskPanes = surfaces.panes
 
-  // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
-  // existing command-registry pass renders only those whose `palette` flag is true.
-  //
   // Which of the four kinds each one is, whether this device can honour it, and whether its parent is a
   // group of the same plugin's are all ./chromeCommands.ts: the same file builds the contribution, so
   // the check and the thing it lets through cannot drift apart.
@@ -167,15 +164,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     usableAction: (candidate: PluginChromeAction) => contextFreeActionUsable(pluginId, surfaces, candidate),
     usableSelectAction: (candidate: PluginCommandSelectAction) => selectActionUsable(pluginId, surfaces, candidate),
   }
-  const commands = usablePluginCommands(pluginId, [
-    ...(contributions.commands ?? []),
-    ...(contributions.palette ?? []).flatMap((descriptor): PluginCommandDescriptor[] =>
-      // The two verbs a command can't carry, dropped rather than promoted. `createTask` needs a selected
-      // rail row and `navigate` needs a routed project plus a navigator.
-      descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
-        ? []
-        : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
-  ], commandBinding)
+  const commands = usablePluginCommands(pluginId, contributions.commands ?? [], commandBinding)
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
     add('command', descriptor.id, () => own(commandRegistry, pluginCommand(pluginId, descriptor, commandBinding)))

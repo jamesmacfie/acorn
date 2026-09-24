@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/server/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/testkit'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/testkit'
@@ -72,7 +72,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   const DEF: WorkflowDef = {
-    formatVersion: 2,
+    baseline: 'acorn-1', formatVersion: 1,
     name: 'build-review',
     steps: [
       { id: 'build', name: 'build', prompt: 'Build the feature.', schema: { type: 'object' } },
@@ -94,7 +94,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     const runStep = vi.fn(d.runStep)
     const runner = new WorkflowRunner(wf.db, { ...d, runStep })
-    const runId = await runner.start('task1', { formatVersion: 2, name: 'Condition', steps: [
+    const runId = await runner.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'Condition', steps: [
       { id: 'condition', name: 'Condition', kind: 'if', condition: { kind: 'comparison', left: { address: { from: 'literal', value: enabled } }, operator: 'eq', right: { address: { from: 'literal', value: true } } }, branches: { true: 'yes', otherwise: 'no' } },
       { id: 'yes', name: 'Yes', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
       { id: 'no', name: 'No', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
@@ -146,7 +146,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     const runner = new WorkflowRunner(wf.db, d)
     const def: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'gated-ship',
       steps: [
         { id: 'build', name: 'build', prompt: 'Build.' },
@@ -186,7 +186,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'CI red' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'auto',
       posture: 'autonomous',
       tools: { maxRisk: 'read' },
@@ -209,7 +209,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'no-trust',
       steps: [
         { id: 'build', name: 'build', prompt: 'Build.', schema: { type: 'object' } },
@@ -230,7 +230,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     d.failingChecks = vi.fn(async () => (++polls <= 2 ? '- test: failure' : ''))
     const runner = new WorkflowRunner(wf.db, d)
-    const runId = await runner.start('task1', { formatVersion: 2, name: 'ci', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }] })
+    const runId = await runner.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'ci', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }] })
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
     const [step] = await runner.steps(runId)
@@ -240,7 +240,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d2 = deps()
     d2.failingChecks = vi.fn(async () => '- test: failure')
     const runner2 = new WorkflowRunner(wf.db, d2)
-    const runId2 = await runner2.start('task1', { formatVersion: 2, name: 'ci2', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }] })
+    const runId2 = await runner2.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'ci2', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }] })
     const run2 = await waitDone(runner2, runId2)
     expect(run2.status).toBe('safety-rail')
     expect(run2.status).not.toBe('failed')
@@ -285,7 +285,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
     const runner = new WorkflowRunner(wf.db, d)
     const usageRunId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'usage-rail',
       budget: { maxCostUsd: 1, maxInputTokens: 2000 },
       steps: [{ id: 'one', name: 'one' }, { id: 'two', name: 'two' }, { id: 'never', name: 'never' }],
@@ -297,7 +297,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(usageSteps[1].error).toContain('cost budget exceeded')
 
     const timeoutRunId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'timeout-rail',
       steps: [{ id: 'slow', name: 'slow', budget: { maxWallTimeMs: 20 } }],
     })
@@ -370,13 +370,13 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep.FAILCHILD = 'FAIL'
 
     const child = await createPublishedDef(wf.db, { workspaceId: 'workspace', def: {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'Review slice',
       inputs: [{ name: 'title', schema: { type: 'string' }, required: true }],
       steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.title}.', schema: { type: 'object' } }],
     } })
     const mappedDefinition: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'parallel-review',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Split the work.', schema: { type: 'object' } },
@@ -432,7 +432,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.startRunTarget = vi.fn(async () => ({ ok: true, url: 'http://localhost:8080' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'e2e',
       steps: [{ id: 'verify', name: 'verify', prompt: 'Check the login page.', requiresRun: 'dev' }],
     })
@@ -445,7 +445,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d2 = deps()
     d2.startRunTarget = vi.fn(async () => ({ ok: false }))
     const runner2 = new WorkflowRunner(wf.db, d2)
-    const runId2 = await runner2.start('task1', { formatVersion: 2, name: 'e2e2', steps: [{ id: 'verify', name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
+    const runId2 = await runner2.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'e2e2', steps: [{ id: 'verify', name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
     expect((await waitDone(runner2, runId2)).status).toBe('failed')
   })
 
@@ -456,7 +456,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'branch',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Plan.', schema: { type: 'object' } },
@@ -480,7 +480,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { route: '{"verdict":"unknown"}' }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'unmatched',
       steps: [
         { id: 'route', name: 'route', kind: 'decide', prompt: 'Ship or not?', branches: { yes: 'yes' } },
@@ -529,9 +529,9 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runner = new WorkflowRunner(wf.db, d)
     const dispatcher = new WorkflowDispatcher(wf.db, runner, { createChild: d.createChildTask })
     d.dispatchChildWorkflows = (requests, signal) => dispatcher.dispatchMany(requests, signal)
-    const child = await createPublishedDef(wf.db, { workspaceId: 'workspace', def: { formatVersion: 2, name: 'Build', steps: [{ id: 'build', name: 'build', prompt: 'Build it.' }] } })
+    const child = await createPublishedDef(wf.db, { workspaceId: 'workspace', def: { baseline: 'acorn-1', formatVersion: 1, name: 'Build', steps: [{ id: 'build', name: 'build', prompt: 'Build it.' }] } })
     const definition: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'cancel-tree',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Split the work.', schema: { type: 'object' } },
@@ -571,7 +571,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         value: {
           evaluate: async () => [{
             taskId: 'task1',
-            workflow: { formatVersion: 2, name: 'triggered', steps: [{ id: 'custom', name: 'custom', kind: 'src:custom' }, { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' }] },
+            workflow: { baseline: 'acorn-1', formatVersion: 1, name: 'triggered', steps: [{ id: 'custom', name: 'custom', kind: 'src:custom' }, { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' }] },
           }],
         },
       }],
@@ -635,7 +635,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const script = scripted()
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'diamond',
       steps: [
         { id: 'left', name: 'left', after: [] },
@@ -667,7 +667,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { left: '{"found":"a null token"}' }
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'merge',
       steps: [
         { id: 'left', name: 'left', after: [] },
@@ -694,7 +694,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { route: '{"verdict":"fix"}' }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'branch-tree',
       steps: [
         { id: 'route', name: 'route', kind: 'decide', after: [], prompt: 'Ship or fix?', branches: { ship: 'ship', fix: 'fix' } },
@@ -720,7 +720,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it('renders ${inputs.x} into prompts and refuses a start with a required input missing', async () => {
     const runner = new WorkflowRunner(wf.db, deps())
     const def: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'with-inputs',
       inputs: [
         { name: 'issue', schema: { type: 'string' }, required: true },
@@ -747,7 +747,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     script.deps.cancelChildTask = async (taskId) => void cancelled.push(taskId)
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'Fix the bug',
       steps: [
         { id: 'shared', name: 'shared', after: [] },
@@ -769,7 +769,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'retryable',
       steps: [
         { id: 'first', name: 'first', after: [] },
@@ -809,7 +809,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const script = scripted()
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      formatVersion: 2,
+      baseline: 'acorn-1', formatVersion: 1,
       name: 'parallel-restart',
       steps: [{ id: 'left', name: 'left', after: [] }, { id: 'right', name: 'right', after: [] }],
     })

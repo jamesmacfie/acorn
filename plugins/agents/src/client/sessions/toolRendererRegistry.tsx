@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, mergeProps, on, Show, type Component } from 'solid-js'
-import { agentToolTone } from '@acorn/plugin-api/client'
+import { agentToolTone } from '../../contract/toolTone'
 import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'

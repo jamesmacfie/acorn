@@ -14,7 +14,7 @@ import {
   Stack,
   Text,
 } from '@acorn/plugin-api/ui'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type {
   WorkflowCatalog,
   WorkflowDef,

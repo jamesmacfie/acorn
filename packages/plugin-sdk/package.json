@@ -1,7 +1,7 @@
 {
   "name": "acorn-plugin-sdk",
-  "version": "0.1.0",
-  "description": "The frame bridge for acorn plugins: connect, mountFrame, and the typed surface a sandboxed plugin frame talks to the shell through.",
+  "version": "1.0.0",
+  "description": "Client helpers for sandboxed acorn plugin trees and frames.",
   "type": "module",
   "sideEffects": false,
   "exports": {

@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '@acorn/protocol/mcp.ts'
-import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
+import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
@@ -126,7 +126,7 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
   })
 }
 
-// Mounted at /v2/core (server/index.ts): /task-statuses and /tasks/:id/* lifecycle.
+// Mounted at /v1/core (server/index.ts): /task-statuses and /tasks/:id/* lifecycle.
 export const worktree = new Hono<AppEnv>()
   // Live dirty/changed-file status for every active task with a worktree, polled by the rail/footer.
   //

@@ -83,10 +83,12 @@ describe('the remembered pick', () => {
     expect(readGeneratePick(held({ backendId: 'c2' }))).toBe(null)
     expect(readGeneratePick(held({ backendId: 'c2', modelId: 7 }))).toBe(null)
     expect(readGeneratePick(held({ backendId: 7, modelId: 'fast' }))).toBe(null)
+    expect(readGeneratePick(held({ backendId: 'c2', modelId: 'slow' }))).toBe(null)
+    expect(readGeneratePick(held({ backendId: 'connection:   ', modelId: 'slow' }))).toBe(null)
   })
 
   it('reads back a stored pick, including a backend that declares no model', () => {
-    expect(readGeneratePick(held({ backendId: 'c2', modelId: 'slow' }))).toEqual({ backendId: 'c2', modelId: 'slow' })
+    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow' }))).toEqual({ backendId: 'connection:c2', modelId: 'slow' })
     expect(readGeneratePick(held({ backendId: 'harness:codex', modelId: '' })))
       .toEqual({ backendId: 'harness:codex', modelId: '' })
   })
@@ -94,7 +96,7 @@ describe('the remembered pick', () => {
   // Extra keys are dropped rather than refusing the value: a build that remembers a fourth thing
   // beside the pick must not cost this one the pick it can read.
   it('ignores a field it does not know', () => {
-    expect(readGeneratePick(held({ backendId: 'c2', modelId: 'slow', pickedAt: 12 })))
-      .toEqual({ backendId: 'c2', modelId: 'slow' })
+    expect(readGeneratePick(held({ backendId: 'connection:c2', modelId: 'slow', pickedAt: 12 })))
+      .toEqual({ backendId: 'connection:c2', modelId: 'slow' })
   })
 })

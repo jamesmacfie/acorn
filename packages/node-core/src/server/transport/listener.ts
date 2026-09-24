@@ -130,7 +130,7 @@ export function startListener(
     hostname: bindHost,
   })
 
-  // The one authenticated WebSocket (/v2/events) shares this listener via its 'upgrade' event; the hub
+  // The one authenticated WebSocket (/v1/events) shares this listener via its 'upgrade' event; the hub
   // re-checks Host plus a device bearer or the internal token before the handshake, and holds the device
   // service so a revoked device's sockets close immediately. https.Server extends http.Server, so the
   // hub's node:http typing still describes it exactly.
@@ -147,7 +147,7 @@ export function startListener(
   }
   attachWsHub(server as unknown as import('node:http').Server, upgradeDeps)
 
-  // The preview tunnel (/v2/tunnel) shares the same listener and the same upgrade auth, so a remote task's
+  // The preview tunnel (/v1/tunnel) shares the same listener and the same upgrade auth, so a remote task's
   // dev server is reachable from the client without the node exposing anything beyond loopback
   // (server/transport/tunnel.ts explains why this is a dedicated upgrade rather than a multiplexed stream frame).
   attachTunnel(server as unknown as import('node:http').Server, upgradeDeps)

@@ -22,7 +22,7 @@ const routePaths = (): { name: string; path: string }[] =>
       if (typeof value === 'function') return { name, path: (value as (id: string) => string)(ID) }
       return { name, path: '' }
     })
-    .filter((entry) => entry.path.startsWith('/v2/core'))
+    .filter((entry) => entry.path.startsWith('/v1/core'))
 
 describe('the route table covers every core route', () => {
   it('finds routes to sweep at all', () => {
@@ -182,7 +182,7 @@ describe('scope checking', () => {
   })
 
   it('does not let a read on the task collection leak the task’s MCP or preview credentials', () => {
-    // The reason the table names paths instead of globbing `/v2/core/tasks*`.
+    // The reason the table names paths instead of globbing `/v1/core/tasks*`.
     expect(allowApi(board, 'GET', api.taskMcpStarterRoute(ID)).allowed).toBe(false)
     expect(allowApi(board, 'GET', api.taskPreviewUrlRoute(ID)).allowed).toBe(false)
   })
@@ -196,17 +196,17 @@ describe('plugin namespaces', () => {
   const board = { pluginId: 'board', api: [] as string[] }
 
   it('always allows the plugin’s own routes, with no scope declared', () => {
-    expect(allowApi(board, 'GET', '/v2/p/board/cards').allowed).toBe(true)
-    expect(allowApi(board, 'POST', '/v2/p/board').allowed).toBe(true)
+    expect(allowApi(board, 'GET', '/v1/p/board/cards').allowed).toBe(true)
+    expect(allowApi(board, 'POST', '/v1/p/board').allowed).toBe(true)
   })
 
   it('denies another plugin’s namespace', () => {
-    expect(allowApi(board, 'GET', '/v2/p/github/pulls')).toEqual({ allowed: false, reason: 'another plugin’s namespace' })
+    expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({ allowed: false, reason: 'another plugin’s namespace' })
   })
 
   it('does not treat a prefix of its own id as its own', () => {
-    // `/v2/p/board-admin` is a different plugin, not a subpath of `board`.
-    expect(allowApi(board, 'GET', '/v2/p/board-admin/x').allowed).toBe(false)
+    // `/v1/p/board-admin` is a different plugin, not a subpath of `board`.
+    expect(allowApi(board, 'GET', '/v1/p/board-admin/x').allowed).toBe(false)
   })
 })
 
@@ -214,13 +214,13 @@ describe('malformed paths', () => {
   const board = { pluginId: 'board', api: ['core.tasks:read'] }
 
   it('rejects anything that is not an absolute path', () => {
-    for (const path of ['https://evil.test/v2/core/tasks', 'v2/core/tasks', '//evil.test/v2/core/tasks']) {
+    for (const path of ['https://evil.test/v1/core/tasks', 'v2/core/tasks', '//evil.test/v1/core/tasks']) {
       expect(allowApi(board, 'GET', path).allowed).toBe(false)
     }
   })
 
   it('rejects traversal', () => {
-    expect(allowApi(board, 'GET', '/v2/core/tasks/../security').allowed).toBe(false)
+    expect(allowApi(board, 'GET', '/v1/core/tasks/../security').allowed).toBe(false)
   })
 
   it('rejects a method it does not know', () => {

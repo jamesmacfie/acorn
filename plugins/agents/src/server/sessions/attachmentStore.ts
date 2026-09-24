@@ -5,7 +5,7 @@ import { basename, join } from 'node:path'
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 const MAX_TEXT_BYTES = 1024 * 1024

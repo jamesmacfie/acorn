@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { AgentRequest, AgentSession, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRequest, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type {
   AgentLifecyclePublisher,
   AgentReviewInput,

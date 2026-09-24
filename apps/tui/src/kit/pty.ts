@@ -1,5 +1,5 @@
 import { onCleanup } from 'solid-js'
-import type { PtyIo } from '@acorn/client-core/kit/lib/pty.ts'
+import type { PtyIo } from '@acorn/client-core/kit/lib'
 import type { CellTerminal } from './rectangle'
 
 // The terminal host's answer to "fill this `pty` rectangle", and the sibling of

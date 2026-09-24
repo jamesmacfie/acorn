@@ -5,8 +5,8 @@
 //   - the assembler in `agentTools/contextSections.ts`, which walks core's contribution registry and
 //     reads the github, linear, and rollbar mirrors on the way.
 //
-// One caller: plugins/memory's launchInjector (docs/notes-and-memory.md). Which sections to send,
-// how to format them, and whether to send at all stays a policy decision in the plugin.
+// Memory contributes launch text through Terminal's launch-context seam. Which sections to send,
+// how to format them, and whether to send at all stays a policy decision in Memory.
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { assembleContext } from '../agentTools/contextSections'
 import type { AppDatabase } from '../db'

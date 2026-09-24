@@ -1,4 +1,4 @@
-import type { AgentEventRecord, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentUsage } from '../contract/wire.ts'
 
 // One usage line per turn, in one place, because two sides now apply it.
 //

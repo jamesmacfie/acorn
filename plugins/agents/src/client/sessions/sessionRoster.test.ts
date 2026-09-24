@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '../../contract/wire.ts'
 import { agentSessionRoster, delegationSummary } from './sessionRoster'
 
 const session = (id: string, over: Partial<AgentSession> = {}): AgentSession => ({

@@ -10,8 +10,7 @@
 //    always validated against the live list so a killed target falls back to the most-recent
 //    session.
 import { createSignal } from 'solid-js'
-import { agentSessionsFor, onScopeEvicted } from '@acorn/plugin-api/client'
-import type { TerminalSession } from '@acorn/protocol/terminal.ts'
+import { agentSessionsFor, onScopeEvicted, type SessionSummary } from '@acorn/plugin-api/client'
 
 type SyncRecord = { taskId: string; at: number; sections: Record<string, string> }
 const lastSync = new Map<string /* sessionId */, SyncRecord>()
@@ -43,9 +42,9 @@ const targetByTask = new Map<string /* taskId */, string /* sessionId */>()
 export const rememberTarget = (taskId: string, sessionId: string): void => {
   targetByTask.set(taskId, sessionId)
 }
-export function targetSessionFor(taskId: string): TerminalSession | undefined {
+export function targetSessionFor(taskId: string): SessionSummary | undefined {
   const sessions = agentSessionsFor(taskId)
-  return sessions.find((s) => s.id === targetByTask.get(taskId)) ?? sessions[0]
+  return sessions.find((s) => `${s.nodeId}:${s.sourceId}:${s.sessionId}` === targetByTask.get(taskId)) ?? sessions[0]
 }
 
 export function evictSyncState(taskId: string): void {
@@ -57,4 +56,5 @@ export function evictSyncState(taskId: string): void {
 // it are one edit apart (registries/scopeEviction.ts).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictSyncState(e.taskId)
+  if (e.scope === 'node-switched') { targetByTask.clear(); lastSync.clear(); bump(tick() + 1) }
 })

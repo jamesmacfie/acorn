@@ -8,7 +8,7 @@
 // change arriving through the installer against a database that already has rows in it.
 //
 // `id: "http"` (the directory name, which the builder uses as the id) is load-bearing and must never
-// change. It binds `/v2/p/http`, the `http` pane's persisted layout key, and — the one that loses data
+// change. It binds `/v1/p/http`, the `http` pane's persisted layout key, and — the one that loses data
 // rather than just breaking a link — `<dataRoot>/plugins/http.sqlite`. Renaming it orphans every saved
 // request and every project variable on the machine.
 //
@@ -136,7 +136,7 @@ export default {
       order: 50,
       // No `providerId`: nothing backs this with a connected account. Saved requests are local, so the
       // source is always visible — like docker's.
-      items: '/v2/p/http/rail-items',
+      items: '/v1/p/http/rail-items',
       onSelect: { verb: 'navigate', surface: 'http-project' },
       emptyState: { message: 'No saved requests in this project yet. Open the API pane in a task to make one.' },
     }],
@@ -144,12 +144,13 @@ export default {
       id: 'saved-requests',
       label: 'Saved HTTP requests',
       description: 'Capture request shapes with authorization, header values, variables and bodies redacted.',
-      options: '/v2/p/http/context-options',
-      capture: '/v2/p/http/context-capture',
+      options: '/v1/p/http/context-options',
+      capture: '/v1/p/http/context-capture',
     }],
     commands: [
       {
         id: 'open',
+        kind: 'action',
         title: 'API: open request panel',
         category: 'pane',
         // Not in the group below, and not renamed: it is invisible in the palette, so the only place
@@ -189,7 +190,7 @@ export default {
         category: 'navigation',
         kind: 'search',
         scope: 'project',
-        route: '/v2/p/http/palette/requests',
+        route: '/v1/p/http/palette/requests',
         placeholder: 'Find a saved request…',
         onSelect: { verb: 'navigate', surface: 'http-project' },
       },
@@ -198,6 +199,7 @@ export default {
         // a draft in the pane and not a row on the node — the pane's own "+ Request" button does the
         // same thing, and this is that button reachable by name (src/tree/panelModel.ts).
         id: 'new-request',
+        kind: 'action',
         title: 'New request',
         parentId: 'api',
         keywords: ['http', 'api', 'request', 'new'],
@@ -221,7 +223,7 @@ export default {
         category: 'action',
         kind: 'input',
         scope: 'task',
-        route: '/v2/p/http/palette/import-curl',
+        route: '/v1/p/http/palette/import-curl',
         placeholder: 'curl -X POST https://…',
         onSuccess: { verb: 'openPane', pane: 'http' },
       },

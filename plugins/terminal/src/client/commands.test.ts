@@ -22,6 +22,8 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   setTerminalOpen: mocks.setTerminalOpen,
   dispatchLayout: mocks.dispatchLayout,
   clientCapability: vi.fn(() => mocks.previewRecipeSelection),
+}))
+vi.mock('./sessionStore', () => ({
   refreshSessions: mocks.refreshSessions,
   sessions: mocks.sessions,
   rememberActiveTerminal: mocks.rememberActiveTerminal,

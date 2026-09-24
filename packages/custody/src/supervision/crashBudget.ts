@@ -10,7 +10,7 @@
 //
 // It also reports, because a node dying under the helper is a silent event today and the count in
 // the window is the number that decides what happens next (docs/shell.md § What the helper reports).
-import { emitError, emitEvent } from '@acorn/node-core/server/telemetry/collector.ts'
+import { emitError, emitEvent } from '@acorn/node-core/server/telemetry'
 
 // Five backoffs for five permitted crashes: 1s, 2s, 4s, 8s, 16s. The sixth crash inside the window
 // gives up.

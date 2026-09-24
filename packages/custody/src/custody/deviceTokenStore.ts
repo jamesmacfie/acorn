@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('device-token')
 
@@ -39,7 +40,7 @@ export type DeviceTokens = {
 // climb out of the directory is rejected rather than sanitized. A scope this cannot name is a token
 // it does not remember, which is a supported state.
 const tokenPath = (userDataDir: string, scope: string): string | null =>
-  /^[A-Za-z0-9._-]{1,128}$/.test(scope) ? join(userDataDir, `device-token-${scope}`) : null
+  /^[A-Za-z0-9._-]{1,128}$/.test(scope) ? join(userDataDir, `${ACORN_BASELINE}-device-token-${scope}`) : null
 
 export function deviceTokens(userDataDir: string, cipher: TokenCipher): DeviceTokens {
   return {

@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
@@ -70,7 +71,12 @@ export const setWorkflowDefsBridge = (bridge: WorkflowDefsBridge | null): void =
 
 // Structural only, as the start body is: a name and a list of steps. The rest is the catalog's
 // answer, and the bridge runs the real validator before it writes.
-const defSchema = z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough()
+const defSchema = z.object({
+  baseline: z.literal(ACORN_BASELINE),
+  formatVersion: z.literal(1),
+  name: z.string().min(1),
+  steps: z.array(z.unknown()),
+}).passthrough()
 // Edit mode reads every current step before the model is called, so its input needs the same minimum
 // shape the editor's JSON Apply accepts. Empty stays valid: asking AI to fill an empty saved draft is
 // a useful edit.

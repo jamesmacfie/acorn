@@ -1,4 +1,4 @@
-import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
+import type { AgentInputPart } from '../../contract/wire.ts'
 
 export const DEFAULT_SESSION_TITLE = 'New agent session'
 export const SESSION_TITLE_SYSTEM_PROMPT = `Generate a title that helps the user recognize this coding session later.

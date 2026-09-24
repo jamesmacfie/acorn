@@ -56,7 +56,8 @@ describe('the project-scoped workflow catalog', () => {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
       def: {
-        formatVersion: 2,
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
         name: 'Review one ticket',
         inputs: [{ name: 'ticket', schema: { type: 'string' }, description: 'Ticket number', required: true, default: 'SECRET-42' }],
         outputs: [{
@@ -78,18 +79,19 @@ describe('the project-scoped workflow catalog', () => {
     await createDef(store.db, {
       workspaceId: 'workspace-1',
       projectId: 'project-2',
-      def: { formatVersion: 2, name: 'Other project', steps: [{ id: 'work', name: 'work', prompt: 'Work.' }] },
+      def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Other project', steps: [{ id: 'work', name: 'work', prompt: 'Work.' }] },
     })
     await createDef(store.db, {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
-      def: { name: 'Invalid draft', steps: [] },
+      def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Invalid draft', steps: [] },
     })
     await createDef(store.db, {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
       def: {
-        formatVersion: 2, name: 'Parent workflow',
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const, name: 'Parent workflow',
         steps: [{
           id: 'child',
           name: 'child',
@@ -98,8 +100,8 @@ describe('the project-scoped workflow catalog', () => {
         }],
       },
     })
-    writeFileSync(join(repoDir, '.acorn', 'workflows', 'repo-review.toml'), 'format_version = 2\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
-    writeFileSync(join(userDir, '.acorn', 'workflows', 'personal.toml'), 'format_version = 2\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeFileSync(join(repoDir, '.acorn', 'workflows', 'repo-review.toml'), 'format_version = 1\nbaseline = "acorn-1"\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeFileSync(join(userDir, '.acorn', 'workflows', 'personal.toml'), 'format_version = 1\nbaseline = "acorn-1"\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
 
     const catalog = await scopedWorkflowCatalog({
       db: store.db,
@@ -140,7 +142,8 @@ describe('the project-scoped workflow catalog', () => {
       workspaceId: 'workspace-1',
       projectId: 'project-1',
       def: {
-        formatVersion: 2,
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
         name: 'New record reviewer',
         inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
         steps: [],

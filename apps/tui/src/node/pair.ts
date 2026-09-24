@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { probeNode, pairWithNode } from '@acorn/custody/broker/nodePairing.ts'
-import type { FleetNode, FleetStore } from '@acorn/custody/broker/fleetStore.ts'
+import type { FleetNode, FleetStore } from '@acorn/custody/broker'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 
 // Pairing from a terminal: the desktop's three steps, drawn as three lines of text.

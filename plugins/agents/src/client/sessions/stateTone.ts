@@ -3,7 +3,7 @@
 // StatusDot takes a semantic tone, not a domain state, because the shared component has no business
 // knowing what "reconnecting" means. See docs/ui-design.md § The closed kit.
 
-import type { AgentSubagentStatus } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSubagentStatus } from '../../contract/wire.ts'
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted' | 'accent'
 
@@ -45,8 +45,7 @@ const RUNTIME_ICON: Record<string, string> = {
 
 export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'circle-dashed'
 
-/* A tool call's dot lives elsewhere: its status is a protocol type the changes plugin also renders,
-   so `agentToolTone` sits beside the renderer contract in client-core instead. */
+// The tool call tone shared with Changes lives in Agents' portable contract.
 
 /** A subagent's status, in its transcript card and its sidebar row. `idle` is settled rather than
  *  in flight: a Codex child rests resumable when it is done, and an accent mark on a resting subagent

@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { isRecord, parsePanelDefinition, parsePanels } from '@acorn/dashboards-core/definition.ts'
+import { isRecord, parsePanelDefinition, parsePanels } from '@acorn/dashboards-core/contract'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from '../../infra/persistence/persistedState'
 import { COLS, firstFit, normalize, readingOrder, sizeFor, type PanelLayout, type Rect } from './layout'
@@ -8,7 +8,7 @@ import type { PanelDefinition, PanelId } from './model'
 export { parsePanelDefinition }
 
 // The persisted dashboard model (docs/dashboards.md § Persistence): node prefs, not device storage,
-// written through `savePref` to `/v2/core/prefs`; panel definitions persist independently of any
+// written through `savePref` to `/v1/core/prefs`; panel definitions persist independently of any
 // surface, with placements referencing them by id; and an unresolved id survives as inert rather
 // than being dropped.
 
@@ -44,7 +44,7 @@ export const placementScopeKey = (scope: PlacementScope): string => {
 }
 
 export type DashboardState = {
-  version: 2
+  version: 1
   panels: Record<PanelId, PanelDefinition>
   /** Placement scope key → the panels placed there, in render order. */
   placements: Record<string, PanelId[]>
@@ -72,7 +72,7 @@ export type DashboardState = {
  *  `workspaceId` absent is the pre-workspace board (`adoptLegacyHome`). */
 export type DashboardTab = { id: string; name: string; workspaceId?: string }
 
-export const emptyDashboards = (): DashboardState => ({ version: 2, panels: {}, placements: {}, layouts: {} })
+export const emptyDashboards = (): DashboardState => ({ version: 1, panels: {}, placements: {}, layouts: {} })
 
 // The geometry codec (docs/dashboards.md § Persistence): a malformed rect is dropped rather than
 // repaired, a placed panel with no rect is auto-placed at render (layout.ts § firstFit), and an
@@ -156,7 +156,7 @@ export function homeTabs(state: DashboardState, workspaceId?: string): Dashboard
 
 export function parseDashboards(raw: unknown): DashboardState {
   const value = parseJson(raw)
-  if (!isRecord(value) || value.version !== 2) return emptyDashboards()
+  if (!isRecord(value) || value.version !== 1) return emptyDashboards()
   // Definitions and placements come from the shared codec, which the node's measure sampler also
   // calls (@acorn/dashboards-core/definition.ts). Two parsers over one blob is how a client and a
   // node come to disagree about what a panel is. Geometry stays here; a rect is a rendering concern.
@@ -174,7 +174,7 @@ export function parseDashboards(raw: unknown): DashboardState {
     }
   }
   const tabs = parseTabs(value.tabs)
-  return { version: 2, panels, placements, layouts, ...(tabs.length ? { tabs } : {}) }
+  return { version: 1, panels, placements, layouts, ...(tabs.length ? { tabs } : {}) }
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────────────────────
@@ -361,7 +361,7 @@ export const dashboardsSlice: PersistedStateSlice<DashboardState> = {
   // every surface that draws one. The precedent is `agentTools.perms`.
   scope: 'app',
   restore: 'view',
-  version: 2,
+  version: 1,
   codec: { parse: parseDashboards, serialize: (value) => value },
   empty: emptyDashboards,
   unknownIds: 'retain-inert',

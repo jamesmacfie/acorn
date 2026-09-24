@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { parseArgs } from 'node:util'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { bootMark, heldLines, holdLine, printBootMarks } from './boot'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
@@ -54,7 +54,7 @@ const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-co
 const { fileCacheStorage } = await import('./node/cache')
 const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
 const { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
-const { setNodeStarting } = await import('./chrome/nodeState')
+const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
 const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
@@ -199,9 +199,13 @@ async function fillIn(): Promise<void> {
   // is when those are worth asking again. The desktop's composition root holds the same effect for the
   // same reason (apps/desktop/src/client/index.tsx).
   createRoot(() => {
+    let refresh = 0
     createEffect(() => {
+      const current = ++refresh
       if (nodeState(opened.nodeId) === 'offline') return
-      void client.invalidateQueries({ refetchType: 'active' })
+      void client.invalidateQueries({ refetchType: 'active' }).then(() => {
+        if (current === refresh && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
+      })
     })
   })
 

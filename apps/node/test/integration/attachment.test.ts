@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeAttachmentState } from '@acorn/protocol/api.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
-import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
-import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { openDataRoot, readNodeAttachment, recordNodeAttachment, type DataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { deviceService } from '@acorn/node-core/server/auth'
+import { idempotencyStore } from '@acorn/node-core/server/auth'
+import { mintInternalToken } from '@acorn/node-core/server/auth'
+import { pairingCodes } from '@acorn/node-core/server/auth'
+import { openDataRoot, readNodeAttachment, recordNodeAttachment, type DataRoot } from '@acorn/node-core/server/storage'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
@@ -63,12 +63,12 @@ describe('the attachment record over HTTP', () => {
   })
 
   it('says a node nobody provisioned is attached to nothing', async () => {
-    const response = await call('/v2/core/attachment', asOwner())
+    const response = await call('/v1/core/attachment', asOwner())
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ attachment: null, error: null } satisfies NodeAttachmentState)
     // Nothing to detach, and 404 rather than a silent 204: an owner clicking Detach on a node with no
     // attachment has misread something, and a cheerful success would confirm it.
-    expect((await call('/v2/core/attachment', asOwner('DELETE'))).status).toBe(404)
+    expect((await call('/v1/core/attachment', asOwner('DELETE'))).status).toBe(404)
   })
 
   it('shows a hand-written record, then drops it and revokes the credential', async () => {
@@ -80,10 +80,10 @@ describe('the attachment record over HTTP', () => {
       deviceId: controlPlaneDevice.device.id,
     })
 
-    const shown = (await (await call('/v2/core/attachment', asOwner())).json()) as NodeAttachmentState
+    const shown = (await (await call('/v1/core/attachment', asOwner())).json()) as NodeAttachmentState
     expect(shown.attachment).toMatchObject({ controlPlaneUrl: 'https://control.example/', enrollmentTokenId: 'abc123abc123' })
 
-    expect((await call('/v2/core/attachment', asOwner('DELETE'))).status).toBe(204)
+    expect((await call('/v1/core/attachment', asOwner('DELETE'))).status).toBe(204)
     // The credential the control plane held stops working immediately. This is the difference between
     // detaching and forgetting.
     expect(await env.DEVICES.authenticate(controlPlaneDevice.token)).toBeNull()
@@ -92,7 +92,7 @@ describe('the attachment record over HTTP', () => {
     // And the node still is what it was. "A detached node keeps working" is the promise the whole
     // enrollment design rests on, so it is asserted rather than assumed.
     expect(root!.nodeId).toBe(env.NODE_ID)
-    expect((await call('/v2/core/attachment', asOwner())).status).toBe(200)
+    expect((await call('/v1/core/attachment', asOwner())).status).toBe(200)
 
     const trail = await core.db.select().from(schema.audit)
     expect(trail.map((row) => row.action)).toContain('node.detached')
@@ -106,12 +106,12 @@ describe('the attachment record over HTTP', () => {
       deviceId: 'device-1',
     })
     const asAgent: RequestInit = { headers: { 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) } }
-    const read = await call('/v2/core/attachment', asAgent)
+    const read = await call('/v1/core/attachment', asAgent)
     expect(read.status).toBe(403)
     // It names a control plane and a device row, which is reconnaissance, and the delete would revoke a
     // credential the owner set up.
     expect(await read.text()).not.toContain('control.example')
-    expect((await call('/v2/core/attachment', { ...asAgent, method: 'DELETE' })).status).toBe(403)
+    expect((await call('/v1/core/attachment', { ...asAgent, method: 'DELETE' })).status).toBe(403)
     expect(readNodeAttachment(dir).attachment).toBeDefined()
   })
 })

@@ -2,9 +2,9 @@
 import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { TEXT_NODE, isKitNode } from '@acorn/protocol/tree/nodes.ts'
-import { kitComponent } from '@acorn/client-core/host/tree/kitEntry.ts'
-import { createTreeState } from '@acorn/client-core/host/tree/treeState.ts'
-import type { TreeHostProps } from '@acorn/client-core/host/tree/TreeHost.tsx'
+import { kitComponent } from '@acorn/client-core/host/tree'
+import { createTreeState } from '@acorn/client-core/host/tree'
+import type { TreeHostProps } from '@acorn/client-core/host/tree'
 import { KIT_COMPONENTS } from '../kit/components'
 import { nextTick } from '../kit/tick'
 

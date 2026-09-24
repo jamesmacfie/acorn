@@ -130,7 +130,7 @@ const SCHEDULE_SPAN = 'schedule.run'
 // meaningful span is present in this batch; otherwise retain only slow and failed request
 // exemplars. Acorn's collector still holds the full stream for local and other sinks.
 const REQUEST_SPANS = new Set(['api.request', 'http.request'])
-const SENTRY_INTERNAL_ROUTES = new Set(['/v2/core/telemetry', '/v2/core/prefs'])
+const SENTRY_INTERNAL_ROUTES = new Set(['/v1/core/telemetry', '/v1/core/prefs'])
 const slowRequestMs = (span: Span): number => span.name === 'api.request' ? 1_000 : 250
 
 export function sentrySpans(spans: Span[]): Span[] {

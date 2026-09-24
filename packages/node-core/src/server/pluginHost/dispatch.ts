@@ -15,7 +15,7 @@
 // task, and not a device, because nobody is here.
 import type { Env } from '../bindings'
 import type { Principal } from '../middleware/auth'
-import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routeRegistry'
+import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routes/registry'
 import { buildPluginRequestContext, type PluginConnectionScope } from './requestContext'
 import { runWithTelemetry, startSpan } from '../telemetry/collector'
 

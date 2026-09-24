@@ -1,11 +1,19 @@
 {
   "name": "@acorn/dashboards-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Pure dashboard shaping both runtimes read: layout, series, trends, and formatting, with no I/O.",
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    "./chart.ts": "./src/chart.ts",
+    "./contract": "./src/contract/public.ts",
+    "./format.ts": "./src/format.ts",
+    "./layout.ts": "./src/layout.ts",
+    "./mapping.ts": "./src/mapping.ts",
+    "./model.ts": "./src/model.ts",
+    "./projection": "./src/projection/public.ts",
+    "./render": "./src/render/public.ts",
+    "./shaping.ts": "./src/shaping.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

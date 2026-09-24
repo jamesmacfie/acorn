@@ -10,7 +10,7 @@ import {
   wsOnReconnect, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent,
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import type { WorkflowRunRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowRunRow } from '../../contract/wire.ts'
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'

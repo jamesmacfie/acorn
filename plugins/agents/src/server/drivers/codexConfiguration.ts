@@ -1,4 +1,4 @@
-import type { AgentConfigOption, AgentSkillDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption, AgentSkillDescriptor } from '../../contract/wire.ts'
 import { asObject } from './codexNormalizer'
 
 const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null

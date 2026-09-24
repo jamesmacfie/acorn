@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ACORN_BASELINE } from './baseline.ts'
 
 // The node-to-control-plane enrollment protocol. See docs/node-enrollment.md for the written
 // version, the JSON schema, and the trust argument.
@@ -17,6 +18,7 @@ export const ENROLLMENT_PROTOCOL_VERSION = 1
 // to it. Nothing about what the node is doing, and nothing that would grow into it — a field
 // describing tasks, repositories or runs fails review by inspection.
 export const enrollmentRequestSchema = z.strictObject({
+  baseline: z.literal(ACORN_BASELINE),
   protocolVersion: z.literal(ENROLLMENT_PROTOCOL_VERSION),
   nodeId: z.string().uuid(),
   // Where a client should reach this node. Whatever the node would print in its own banner, so a
@@ -32,7 +34,7 @@ export const enrollmentRequestSchema = z.strictObject({
 })
 export type EnrollmentRequest = z.infer<typeof enrollmentRequestSchema>
 
-// The acknowledgement. Loose, for the same reason GET /v2/node is the most tolerant surface in the
+// The acknowledgement. Loose, for the same reason GET /v1/node is the most tolerant surface in the
 // system: a node that refuses an otherwise-successful enrollment because the answer grew a field is
 // a node no control plane can ever extend.
 //

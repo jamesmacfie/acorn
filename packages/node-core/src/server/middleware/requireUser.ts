@@ -3,8 +3,8 @@ import { createMiddleware } from 'hono/factory'
 import { respondError } from '../respond'
 import type { AppEnv, Principal } from './auth'
 
-// The single authentication gate for /v2 routes (docs/security.md § Transport and auth). Mounted once
-// in createApp() over `/v2/*`, after authMiddleware. Either credential kind passes, so internal-token
+// The single authentication gate for /v1 routes (docs/security.md § Transport and auth). Mounted once
+// in createApp() over `/v1/*`, after authMiddleware. Either credential kind passes, so internal-token
 // callers work as device callers do.
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
@@ -47,7 +47,7 @@ export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
 // Is this principal confined to a single task? The companion to mayActOnTask, for the two things the
 // per-task boolean cannot express on its own:
 //
-//   - Filtering a list. `GET /v2/p/terminal/sessions` returns every PTY on the node, so a confined
+//   - Filtering a list. `GET /v1/p/terminal/sessions` returns every PTY on the node, so a confined
 //     caller has to be handed a filtered roster rather than a yes/no about the whole call.
 //   - Deciding whether to resolve at all. The opaque-id routes (a PTY session, an agent session, a
 //     workflow run) must look the owning task up before they can check it, and an unconfined caller

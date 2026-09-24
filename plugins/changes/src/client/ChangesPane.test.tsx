@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { emptyLocalStatus } from '../shared/api'
 import { ChangesFooter, ChangesHeader, ChangesList } from './ChangesPane'

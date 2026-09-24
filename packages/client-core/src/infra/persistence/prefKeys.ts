@@ -19,12 +19,10 @@ export const PrefKeys = {
   // `localStorage`, so a device key would be written nowhere and read back as nothing.
   lastWorkspace: 'last_workspace',
   taskLayouts: 'task_layouts',
-  taskPanesLegacy: 'task_panes',
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',
   prFilters: 'pr_filters',
   keybindings: 'keybindings',
-  paneShortcuts: 'pane_shortcuts',
   diffView: 'diff_view',
   railOrder: 'rail_order',
   terminalRailDefault: 'term_rail_default',

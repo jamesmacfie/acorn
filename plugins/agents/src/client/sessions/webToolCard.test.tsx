@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, expect, it } from 'vitest'
-import type { AgentWebActivity } from '@acorn/protocol/managedAgents.ts'
+import type { AgentWebActivity } from '../../contract/wire.ts'
 import { WebToolBody, safeWebUrl, webSummary } from './webToolCard'
 
 // The one card both providers land on. Every case here is written against a normalized payload and

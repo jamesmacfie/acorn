@@ -94,7 +94,7 @@ export type NodePlugin = {
 /** Everything the host hands a loaded plugin, and nothing it does not.
  *
  * This is the loaded tier's projection. A compiled plugin's context has six more members —
- * `routes.register`, `tools`, `contextSections`, `providers.model`, `events.channel` and
+ * `routes.register`, `tools`, `contextSections`, `events.channel` and
  * `events.streams` — each either a live object that cannot survive a message-passing boundary or a
  * live object that cannot survive the message-passing boundary. Agent tools and context sections
  * have manifest descriptor types above; they deliberately do not become live `ctx` registries.
@@ -137,7 +137,7 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
 
 export type PluginRouteOptions = {
   /** Inside this plugin's own namespace: '' owns the whole of it, '/tasks' a sub-resource. The mount
-   *  is `/v2/p/<pluginId><prefix>`, and the host strips it before your handler sees the path. */
+   *  is `/v1/p/<pluginId><prefix>`, and the host strips it before your handler sees the path. */
   prefix?: string
   note?: string
 }
@@ -257,10 +257,33 @@ export type PluginProviderRegistry = {
     route?: PluginFetchHandler<never, never>,
   ): void
   connection(provider: HostOwned<'node-core/server/integrations/types.ConnectionProviderContribution'>): void
+  model(adapter: ModelProviderAdapter): void
   /** A provider that knows about nodes, and optionally can make and remove them
    *  (docs/plugins.md § Node providers). */
   nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
   withConnection<T>(userId: string, providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T | undefined>
+}
+
+export type GenerateTextInput = {
+  system: string
+  prompt: string
+  modelId?: string
+  maxOutputTokens: number
+  signal?: AbortSignal
+}
+
+export type GenerateTextUsage = { inputTokens?: number; outputTokens?: number }
+
+export type ModelProviderAdapterResult = {
+  text: string
+  modelId: string
+  usage?: GenerateTextUsage
+}
+
+export type ModelProviderAdapter = {
+  providerId: string
+  recommendedModelId: string
+  generateText(args: { secret: string; config: unknown; input: GenerateTextInput }): Promise<ModelProviderAdapterResult>
 }
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────────────────────
@@ -674,6 +697,26 @@ export type TaskPullRelation = AttachTaskPullInput & {
   provenance: 'agent'
 }
 
+export type RunTarget = {
+  id: string
+  command: string
+  stop?: string
+  restart?: string
+  url?: string
+  urlCommand?: string
+  icon?: string
+  default?: boolean
+}
+export type LayoutRecipe = {
+  id: string
+  panes: string[]
+  terminal?: string
+  browser?: string
+}
+export type TaskRunConfig =
+  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] }
+  | { error: string }
+
 export type CoreTaskService = {
   load(taskId: string): Promise<TaskRef | undefined>
   /** The task's worktree root, creating it lazily. `null` when no checkout is mapped, the task is
@@ -683,7 +726,7 @@ export type CoreTaskService = {
     task: TaskRef | undefined,
     baseCheckout: string | undefined,
   ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
-  runConfig(taskId: string): Promise<HostOwned<'node-core/server/core/tasks/service.TaskRunConfig'>>
+  runConfig(taskId: string): Promise<TaskRunConfig>
   active(): Promise<TaskRef[]>
   /** Throws when the task or its workspace membership is missing. */
   workspaceId(taskId: string): Promise<string>
@@ -720,6 +763,35 @@ export type ProjectUpdateRefInput = {
   githubRepoId?: number | null
 }
 
+export type SetupTrigger = 'off' | 'created' | 'terminal'
+export type PreviewMode = 'url' | 'port' | 'script'
+export type DbSchemaMode = 'auto' | 'script' | 'file'
+export type BrowserRule = {
+  id: string
+  enabled: boolean
+  urlPattern: string
+  trigger: 'load'
+  action: { type: 'fill'; selector: string; value: string }
+}
+export type ProjectConfig = {
+  runTargets: string | null
+  editorCommand: string | null
+  setupScript: string | null
+  setupScriptTrigger: SetupTrigger | null
+  devScript: string | null
+  devRestartScript: string | null
+  teardownScript: string | null
+  dbUrlScript: string | null
+  dbSchemaMode: DbSchemaMode | null
+  dbSchemaValue: string | null
+  dbSchemaNotes: string | null
+  previewMode: PreviewMode | null
+  previewValue: string | null
+  browserRules: BrowserRule[]
+  branchPrefix: string | null
+}
+export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
+
 export type CoreProjectService = {
   byId(id: string): Promise<ProjectRef | null>
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
@@ -736,9 +808,9 @@ export type CoreProjectService = {
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
   /** The project's build, dev and database scripts: commands acorn executes, behind their own grant. */
-  config(id: string): Promise<HostOwned<'protocol/api.ProjectConfigResponse'> | null>
+  config(id: string): Promise<ProjectConfigResponse | null>
   assertConfigTrusted(taskId: string): Promise<void>
-  setup(id: string): Promise<{ script: string | null; trigger: HostOwned<'protocol/api.SetupTrigger'> }>
+  setup(id: string): Promise<{ script: string | null; trigger: SetupTrigger }>
 }
 
 export type CoreContextService = {
@@ -874,9 +946,8 @@ export type PluginTelemetry = {
   count(name: string, value?: number, attrs?: TelemetryAttrs): void
   gauge(name: string, value: number, attrs?: TelemetryAttrs): void
   error(error: TelemetryErrorInput): void
-  /** Times one call and hands back its own result untouched. Promise-aware, and timed to
-   *  settlement rather than to the call that started it. */
-  measure<T>(name: string, run: () => T, attrs?: TelemetryAttrs): T
+  /** Times synchronous work and returns its result. Use startSpan for asynchronous work. */
+  measure<R extends () => unknown>(name: string, run: R & (ReturnType<R> extends PromiseLike<unknown> ? never : unknown), attrs?: TelemetryAttrs): ReturnType<R>
   startSpan(name: string, options?: { attrs?: TelemetryAttrs; traceId?: string; parentSpanId?: string }): TelemetrySpanHandle
 }
 
@@ -951,12 +1022,12 @@ export type CapabilityCatalogue = {
   'terminal.sendToAgent': HostOwned<'plugins/terminal/contract/sendToAgent.TerminalSendToAgent'>
   /** Start, stop and inspect a task's run targets. */
   'terminal.runTargets': HostOwned<'plugins/terminal/contract/runTargets.TerminalRunTargets'>
+  /** Read the short-lived bounded input captured when an agent PTY exits. */
+  'terminal.reviewInput.v1': HostOwned<'plugins/terminal/contract/reviewInput.TerminalReviewInputCapability'>
   /** Read and write task, workspace and global notes. */
   'notes.store': HostOwned<'plugins/notes/contract/store.NotesStoreCapability'>
   /** Seed a new task's notes from its linked external items. */
   'notes.seedTask': HostOwned<'plugins/notes/contract/store.SeedTaskNotes'>
-  /** The memory index and its launch-context hooks. */
-  'memory.knowledge': HostOwned<'plugins/memory/contract/knowledge.MemoryLaunchHooks'>
   /** Read the project or private memory library without exposing file paths or recall bookkeeping. */
   'memory.library': HostOwned<'plugins/memory/contract/library.MemoryLibraryCapability'>
   /** Read ordered metadata for one task's retained browser captures. */
@@ -969,6 +1040,8 @@ export type CapabilityCatalogue = {
   'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
   /** Ask the workflow runner to reconcile after a restart. */
   'workflows.runner': { reconcile(): Promise<void> }
+  /** Read persisted, bounded completion handoffs for workflow runs. */
+  'workflows.reviewInput.v1': HostOwned<'plugins/workflows/contract/reviewInput.WorkflowReviewInputCapability'>
   /** Rebuild a task's pending workflow approval inbox. */
   'workflows.gates': HostOwned<'plugins/workflows/contract/events.WorkflowGatesCapability'>
   /** The per-step event stream behind the run panel. For a bell row, use `events.notice`, which is

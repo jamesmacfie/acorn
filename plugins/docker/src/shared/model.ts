@@ -102,20 +102,20 @@ export type DockerTaskSummary = {
   projects: string[] // distinct compose projects among the matched containers
 }
 
-// Route helpers (loopback HTTP; mounted at /v2/p/docker in app/server/routes.ts).
-export const dockerInfoRoute = (): string => '/v2/p/docker/info'
-export const dockerContainersRoute = (): string => '/v2/p/docker/containers'
-export const dockerContainerInspectRoute = (ref: string): string => `/v2/p/docker/containers/${encodeURIComponent(ref)}/inspect`
-export const dockerContainerActionRoute = (ref: string): string => `/v2/p/docker/containers/${encodeURIComponent(ref)}/action`
-export const dockerContainerRemoveRoute = (ref: string): string => `/v2/p/docker/containers/${encodeURIComponent(ref)}/remove`
-export const dockerImagesRoute = (): string => '/v2/p/docker/images'
-export const dockerImageRemoveRoute = (ref: string): string => `/v2/p/docker/images/${encodeURIComponent(ref)}/remove`
-export const dockerVolumesRoute = (): string => '/v2/p/docker/volumes'
-export const dockerVolumeRemoveRoute = (name: string): string => `/v2/p/docker/volumes/${encodeURIComponent(name)}/remove`
-export const dockerNetworksRoute = (): string => '/v2/p/docker/networks'
-export const dockerNetworkRemoveRoute = (ref: string): string => `/v2/p/docker/networks/${encodeURIComponent(ref)}/remove`
-export const dockerPruneRoute = (): string => '/v2/p/docker/prune'
-export const dockerComposeActionRoute = (): string => '/v2/p/docker/compose/action'
-export const dockerTaskSummaryRoute = (): string => '/v2/p/docker/task-summary'
-export const dockerTaskContainersRoute = (taskId: string): string => `/v2/p/docker/tasks/${encodeURIComponent(taskId)}/containers`
-export const dockerTaskTeardownRoute = (taskId: string): string => `/v2/p/docker/tasks/${encodeURIComponent(taskId)}/teardown`
+// Route helpers (loopback HTTP; mounted at /v1/p/docker in app/server/routes.ts).
+export const dockerInfoRoute = (): string => '/v1/p/docker/info'
+export const dockerContainersRoute = (): string => '/v1/p/docker/containers'
+export const dockerContainerInspectRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/inspect`
+export const dockerContainerActionRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/action`
+export const dockerContainerRemoveRoute = (ref: string): string => `/v1/p/docker/containers/${encodeURIComponent(ref)}/remove`
+export const dockerImagesRoute = (): string => '/v1/p/docker/images'
+export const dockerImageRemoveRoute = (ref: string): string => `/v1/p/docker/images/${encodeURIComponent(ref)}/remove`
+export const dockerVolumesRoute = (): string => '/v1/p/docker/volumes'
+export const dockerVolumeRemoveRoute = (name: string): string => `/v1/p/docker/volumes/${encodeURIComponent(name)}/remove`
+export const dockerNetworksRoute = (): string => '/v1/p/docker/networks'
+export const dockerNetworkRemoveRoute = (ref: string): string => `/v1/p/docker/networks/${encodeURIComponent(ref)}/remove`
+export const dockerPruneRoute = (): string => '/v1/p/docker/prune'
+export const dockerComposeActionRoute = (): string => '/v1/p/docker/compose/action'
+export const dockerTaskSummaryRoute = (): string => '/v1/p/docker/task-summary'
+export const dockerTaskContainersRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/containers`
+export const dockerTaskTeardownRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/teardown`

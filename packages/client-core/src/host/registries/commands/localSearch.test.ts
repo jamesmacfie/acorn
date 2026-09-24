@@ -49,4 +49,13 @@ describe('a local search', () => {
     await search.query('', { ...CONTEXT, taskId: 't-2' }, signal())
     expect(loads).toBe(3)
   })
+
+  it('reads a changing local roster again when caching is disabled', async () => {
+    let rows = [item('first')]
+    const search = localSearch(() => rows, { cache: false })
+
+    expect((await search.query('', CONTEXT, signal())).map((row) => row.id)).toEqual(['first'])
+    rows = [item('second')]
+    expect((await search.query('', CONTEXT, signal())).map((row) => row.id)).toEqual(['second'])
+  })
 })

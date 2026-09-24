@@ -16,7 +16,8 @@ const result = (structuredOutput: unknown = null) => ({
   stderrTail: '',
 })
 const leaf: WorkflowDef = {
-  formatVersion: 2, name: 'Analyze',
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const, name: 'Analyze',
   inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
   steps: [{ id: 'analyze', name: 'Analyze', prompt: 'Analyze the record.', schema: { type: 'object' } }],
   outputs: [{ name: 'answer', schema: { type: 'object' }, binding: { address: { from: 'step', stepId: 'analyze', pointer: '' } } }],
@@ -26,7 +27,8 @@ const childStep = (id: string) => ({
   childWorkflow: { ref: { source: 'database' as const, id }, inputs: { record: { address: { from: 'input' as const, name: 'record', pointer: '' } } } },
 })
 const rootDefinition = (id: string): WorkflowDef => ({
-  formatVersion: 2, name: 'Batch',
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const, name: 'Batch',
   steps: [
     { id: 'plan', name: 'Plan', prompt: 'Select records.', schema: { type: 'object' } },
     { id: 'each', name: 'For each', kind: 'workflow-map', items: { step: 'plan', pointer: '/items' }, itemKey: '/id',

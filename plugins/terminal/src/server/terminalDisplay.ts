@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import type { ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 
 // Keep this binding distinct from the `require` shim the bundler (Rolldown) generates when it
 // flattens the service graph. A source-level `require` binding makes the production service bundle

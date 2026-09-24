@@ -14,7 +14,7 @@ import { disabledNodePlugins } from './nodePlugins'
 //                      that need something only a shell can do (a native folder dialog). A closed
 //                      question with one answer, so it stays a bare word.
 // - `{ plugin: id }`   does the node run that plugin. Answered by the node's plugin roster, because
-//                      the terminal drawer, agents, run targets and workflows are ordinary `/v2` plus
+//                      the terminal drawer, agents, run targets and workflows are ordinary `/v1` plus
 //                      WebSocket surfaces that work from any client.
 // - `{ seam: group }`  did this host install that group of the platform seam. Answered by the seam's
 //                      own probe (../platform/contract.ts), so the question the rail asks and the

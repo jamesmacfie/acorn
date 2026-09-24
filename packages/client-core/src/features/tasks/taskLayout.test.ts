@@ -58,10 +58,9 @@ describe('pane layout persistence', () => {
     })).toEqual(layout({ panes: ['pr', 'future.pane'], pinned: ['future.pane'], weights: { pr: 1.5, 'future.pane': 4 } }))
   })
 
-  it('normalizes legacy shapes without persisting maximize state', () => {
+  it('requires canonical panes and ignores malformed optional fields', () => {
     expect(normalizeLayout({ panes: ['editor', 'pr'], pinned: 'pr', ratio: 0.6 })).toEqual(layout({ panes: ['editor', 'pr'] }))
-    expect(normalizeLayout({ active: 'pr', pinned: ['changes', 'future.pane'] })).toEqual(
-      layout({ panes: ['pr', 'changes', 'future.pane'], pinned: ['changes', 'future.pane'] }),
-    )
+    expect(normalizeLayout({ active: 'pr', pinned: ['changes', 'future.pane'] })).toBeNull()
+    expect(normalizeLayout({ panes: [] })).toBeNull()
   })
 })

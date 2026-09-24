@@ -79,7 +79,7 @@ describe('workflow data and condition steps', () => {
   })
   it('round trips data step configuration in repository files', () => {
     const errors: { source: string; message: string }[] = []
-    expect(parseWorkflowToml(writeWorkflowToml({ formatVersion: 2, name: 'Data', steps: [step] }), 'test', 'repo', errors)).toMatchObject({ steps: [step] })
+    expect(parseWorkflowToml(writeWorkflowToml({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Data', steps: [step] }), 'test', 'repo', errors)).toMatchObject({ steps: [step] })
     expect(errors).toEqual([])
   })
 })

@@ -11,8 +11,8 @@ import {
   type NodeRecord,
   type NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import { emitEvent, measure, telemetryEnabled } from '@acorn/node-core/server/telemetry/collector.ts'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { emitEvent, measure, telemetryEnabled } from '@acorn/node-core/server/telemetry'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 // What the broker reports, and it is health rather than traffic (docs/shell.md § What the helper
 // reports). `broker.request` is a histogram because a renderer's reads run far past ten a second;
@@ -135,9 +135,9 @@ export class NodeBroker {
   // machinery answer.
   private async openConnection(connection: Connection): Promise<void> {
     if (connection.closed) return
-    const major = await this.probeProtocol(connection)
+    const compatible = await this.probeProtocol(connection)
     if (connection.closed) return
-    if (major !== null && major !== NODE_PROTOCOL_VERSION) {
+    if (compatible === false) {
       // Sticky, like `revoked`. Retrying cannot fix a version, and `downState` refuses to downgrade
       // either state. Only an upsert clears it, which is when the answer could have changed.
       this.setState(connection, 'incompatible', { code: 'protocol_mismatch' })
@@ -147,17 +147,17 @@ export class NodeBroker {
     this.openSocket(connection)
   }
 
-  // The node's own claim, over the pinned agent. Unauthenticated `GET /v2/node`, because asking for a
+  // The node's own claim, over the pinned agent. Unauthenticated `GET /v1/node`, because asking for a
   // token here would confuse "your device was revoked" with "we disagree about the protocol".
   //
   // Returns null for anything that is not a clear answer: unreachable, non-JSON, or a body without a
   // numeric protocol. The schema is additive-forever, so a newer node still parses. If it does not,
   // the raw field is read anyway, because a client that refuses to learn a version from a partly
   // parsed response cannot explain itself.
-  private async probeProtocol(connection: Connection): Promise<number | null> {
+  private async probeProtocol(connection: Connection): Promise<boolean | null> {
     try {
       const response = await nodeRequest({
-        url: new URL('/v2/node', connection.node.endpoint),
+        url: new URL('/v1/node', connection.node.endpoint),
         method: 'GET',
         // No authorization header. This is the pre-auth identity route, and sending the bearer would
         // let a revoked device read "unauthorized" as a version disagreement.
@@ -168,9 +168,10 @@ export class NodeBroker {
       if (response.status !== 200) return null
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
       const parsed = nodeInfoSchema.safeParse(payload)
-      if (parsed.success) return parsed.data.protocolVersion
+      if (parsed.success) return parsed.data.protocolVersion === NODE_PROTOCOL_VERSION
       const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
-      return typeof claimed === 'number' ? claimed : null
+      // A parseable Acorn claim without the baseline is a definite incompatibility, not an offline node.
+      return typeof claimed === 'number' ? false : null
     } catch {
       return null
     }

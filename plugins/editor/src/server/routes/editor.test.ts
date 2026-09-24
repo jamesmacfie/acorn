@@ -6,12 +6,12 @@ import { Hono } from 'hono'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { editorBridge } from '../editor'
 import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import * as coreFs from '@acorn/node-core/server/core/fs.ts'
-import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
+import { requireUser } from '@acorn/plugin-api/testkit'
+import * as coreFs from '@acorn/plugin-api/testkit'
+import { createTaskService } from '@acorn/plugin-api/testkit'
 import { editor, setEditorBridge } from './editor'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 // Editor reads and writes inside the worktree, so this runs against a real one and exercises the
 // filesystem-containment contract end to end: path traversal, symlink escape, missing worktree.

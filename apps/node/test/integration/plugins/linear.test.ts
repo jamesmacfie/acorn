@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
+import { testSecretEnv } from '@acorn/node-core/testkit'
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,8 +11,8 @@ import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { createLinearFetch } from '@acorn/plugin-linear/testkit'
-import { servePluginFetch } from '@acorn/node-core/server/pluginHost/fetchRoute.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { servePluginFetch } from '@acorn/node-core/server/pluginHost'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -64,11 +64,11 @@ describe('Linear provider parity', () => {
     await t.db.insert(schema.integrations).values([
       {
         id: 'linear-a', userId: 'james', provider: 'linear', label: 'Linear A',
-        authRef: await encryptSecret('token-a', ENC_KEY), createdAt: 1, updatedAt: 1,
+        encryptedCredentials: await encryptSecret('token-a', ENC_KEY), createdAt: 1, updatedAt: 1,
       },
       {
         id: 'linear-b', userId: 'james', provider: 'linear', label: 'Linear B',
-        authRef: await encryptSecret('token-b', ENC_KEY), createdAt: 2, updatedAt: 2,
+        encryptedCredentials: await encryptSecret('token-b', ENC_KEY), createdAt: 2, updatedAt: 2,
       },
     ])
   })

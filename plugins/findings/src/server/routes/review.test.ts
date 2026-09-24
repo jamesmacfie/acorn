@@ -23,22 +23,23 @@ describe('findings review device routes', () => {
     await capture.record({ scope: { kind: 'task', taskId: 'task' }, origin: { kind: 'device', deviceId: 'device' }, producerId: 'test', input: { sourceKey: 'one', kind: 'findings:observation', kindVersion: 1, title: 'Keep boundaries', body: 'Use the owner boundary.', claimStatus: 'observed', evidence: [] } })
     await capture.record({ scope: { kind: 'task', taskId: 'task' }, origin: { kind: 'device', deviceId: 'device' }, producerId: 'test', input: { sourceKey: 'two', kind: 'findings:observation', kindVersion: 1, title: 'Keep boundaries', body: 'Use the owner boundary.', claimStatus: 'observed', evidence: [] } })
     runtime = new FindingsRuntime({ capture, emit: () => {}, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: target }], review: new FindingsReviewStore(ctx.storage.open()), core: ctx.core })
+    runtime.connectTargets()
   })
   afterEach(() => ctx.cleanup())
   const request = (principal: Principal, path: string, init?: RequestInit) => portableFetch(findingsReviewRoutes(runtime, {
-    prepareTask: (taskId, boundaryKey) => runtime.startPrepareTask(taskId, { boundaryKey }),
+    prepareTask: (taskId, boundaryKey, targetId) => runtime.startPrepareTask(taskId, { boundaryKey, targetId }),
   }))(
     new Request(`http://acorn.test${path}`, init),
     { userId: principal.userId, principal, providers: {} } as PluginRequestContext,
   )
 
   it('refuses task credentials and prepares, edits, dismisses, undoes, snoozes, and lists history for a device', async () => {
-    const body = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ boundaryKey: 'manual:task:1' }) }
+    const body = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ boundaryKey: 'manual:task:1', targetId: 'memory:change' }) }
     expect((await request({ kind: 'internal', userId: 'owner', scope: 'task', taskId: 'task', sessionId: 'session' }, '/tasks/task/review/prepare', body)).status).toBe(403)
     const device: Principal = { kind: 'device', userId: 'owner', deviceId: 'device' }
     expect((await request(device, '/tasks/task/review/prepare', {
       ...body,
-      body: JSON.stringify({ boundaryKey: 'manual:task:1', backendId: 'client-selected' }),
+      body: JSON.stringify({ boundaryKey: 'manual:task:1', targetId: 'memory:change', backendId: 'client-selected' }),
     })).status).toBe(400)
     const prepared = await request(device, '/tasks/task/review/prepare', body)
     expect(prepared.status).toBe(200)

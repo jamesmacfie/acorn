@@ -84,17 +84,17 @@ export type RollbarItemsResponse = {
   failures: Array<{ integrationId: string; code: string }>
   cappedIntegrationIds: string[]
 }
-export const rollbarItemsRoute = '/v2/p/rollbar/items'
+export const rollbarItemsRoute = '/v1/p/rollbar/items'
 export const rollbarItemsForConnectionsRoute = (integrationIds: readonly string[]) =>
   `${rollbarItemsRoute}?integrations=${encodeURIComponent([...new Set(integrationIds)].sort().join(','))}`
 export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemMetadataRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrenceRoute = (integrationId: string, identifier: string, occurrenceId: string, refresh = false) =>
-  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = (integrationIds: readonly string[]) =>
   ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
 export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const

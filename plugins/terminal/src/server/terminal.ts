@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import { acornMcp, buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, interactiveProfile, invalidateWorktreeStatus, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
-import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import type { SendSubmit } from '../shared/send'
 import { AgentSender } from './agentSend'
 import {
@@ -27,6 +27,8 @@ import {
 import { fileURLToPath } from 'node:url'
 import type { RunSessionGlue } from './runChannel'
 import { TerminalDisplay } from './terminalDisplay'
+import { TerminalReviewSnapshots, trailingUtf8 } from './reviewSnapshots'
+import type { TerminalCompletedEvent } from '../contract/reviewInput'
 
 // This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
 // rather than bound by the host (docs/plugin-authoring.md § Telemetry and logging).
@@ -42,7 +44,7 @@ const log = createLogger('terminal', 'terminal')
 // Terminal output is never persisted (docs/terminal-and-agents.md).
 //
 // This module is the session engine. HTTP bridges and WebSocket handlers are installed at the bottom;
-// cross-feature wiring stays in the app composition root.
+// plugin contributions and capabilities supply launch context and review snapshots.
 
 type Session = {
   meta: TerminalSession
@@ -64,7 +66,7 @@ const sessions = new Map<string, Session>()
 // What this engine needs from core, now that it can't read core's tables: resolve a taskId to a row and
 // to the cwd its commands run in, and read the project's setup script. `proc` and
 // `projects.assertConfigTrusted` are for the run-target service built over this engine (runChannel.ts).
-export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc'>
+export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc' | 'git'>
 
 // This engine is a process singleton by construction (one PTY table, one idle watch, one session map
 // per node), so its database handle and core services live in module state rather than being threaded
@@ -113,10 +115,10 @@ export const sessionControl = {
   list: async (): Promise<TerminalSession[]> => [...sessions.values()].map((s) => s.meta),
 }
 
-let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
-let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
-let reviewBoundary: ((input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>) | null = null
-let archiveReviewBoundary: ((input: { taskId: string; transcriptTail: string | null }) => Promise<void>) | null = null
+let launchContext: ((taskId: string, sessionId: string) => Promise<void>) | null = null
+let completed: ((event: TerminalCompletedEvent) => void) | null = null
+let archiveReview: ((input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>) | null = null
+export const reviewSnapshots = new TerminalReviewSnapshots()
 let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
@@ -296,6 +298,8 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
   })
   pty.onExit(({ exitCode, signal }) => {
+    // A PTY from a disposed engine may exit after the next boot has installed a new store.
+    if (sessions.get(s.meta.id) !== s) return
     s.meta.status = 'exited'
     s.meta.idle = false
     s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
@@ -307,9 +311,10 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     for (const listener of runSessionExitListeners) listener(s.meta.id, exitCode)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') {
-      const transcriptTail = s.ring.tail(16_000)
-      if (reviewBoundary) void reviewBoundary({ taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, transcriptTail }).catch(() => undefined)
-      else void memoryReviewTrigger?.(s.meta.taskId, transcriptTail)
+      const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
+      reviewSnapshots.capture(event, s.ring.tail(16_000))
+      try { completed?.(event) }
+      catch (error) { log.warn(`terminal completion event failed: ${describeError(error).message}`) }
     }
     statusBroadcast()
   })
@@ -445,7 +450,10 @@ async function spawnOne(
   // A fresh agent session gets the combined task-context and repo-memory block queued for its idle edge
   // (docs/notes-and-memory.md), unless the profile was launched with a pull instruction, in which case
   // it fetches the same material itself and a racing push would duplicate it.
-  if (profile.kind === 'agent' && !launchArgs.length) void launchInjector?.(opts.taskId, id)
+  if (profile.kind === 'agent' && !launchArgs.length) {
+    void launchContext?.(opts.taskId, id).catch((error: unknown) =>
+      log.warn(`launch context for session ${id} failed: ${describeError(error).message}`))
+  }
   return meta
 }
 
@@ -547,10 +555,9 @@ export function terminalRunGlue(): RunSessionGlue {
 
 export type TerminalChannelDeps = {
   internalEnv: InternalEnvFactory
-  launchInjector: (taskId: string, sessionId: string) => Promise<void>
-  memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
-  reviewBoundary?: (input: { taskId: string; sessionId: string; exitCode: number | null; transcriptTail: string }) => Promise<void>
-  archiveReviewBoundary?: (input: { taskId: string; transcriptTail: string | null }) => Promise<void>
+  launchContext: (taskId: string, sessionId: string) => Promise<void>
+  completed: (event: TerminalCompletedEvent) => void
+  archiveReview: (input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>
   seedTaskNotes: (task: TaskRef) => Promise<void>
   // Resolves when the composition root's post-window reconcile pass is done, including on failure.
   // Mutating surfaces that read the sessions map await it.
@@ -589,10 +596,10 @@ export function disposeTerminal(): void {
   store = null
   core = null
   internalEnv = () => ({})
-  launchInjector = null
-  memoryReviewTrigger = null
-  reviewBoundary = null
-  archiveReviewBoundary = null
+  launchContext = null
+  completed = null
+  archiveReview = null
+  reviewSnapshots.clear()
   seedNotes = null
   bootReconciled = Promise.resolve()
   statusBroadcast = () => {}
@@ -611,10 +618,9 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   store = pluginDb
   core = coreServices
   internalEnv = deps.internalEnv
-  launchInjector = deps.launchInjector
-  memoryReviewTrigger = deps.memoryReviewTrigger
-  reviewBoundary = deps.reviewBoundary ?? null
-  archiveReviewBoundary = deps.archiveReviewBoundary ?? null
+  launchContext = deps.launchContext
+  completed = deps.completed
+  archiveReview = deps.archiveReview
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
   statusBroadcast = deps.status ?? (() => {})
@@ -664,6 +670,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       if (s.meta.status === 'running') killSession(s)
       s.display.dispose()
       sessions.delete(id)
+      reviewSnapshots.forget(id)
       if (s.meta.backend === 'tmux') await deleteRow(id)
       return true
     },
@@ -688,13 +695,19 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     // The reconcile gate the route awaits before the running-session guard.
     ready: () => bootReconciled,
     captureArchiveReviewInput: async (taskId) => {
-      const output = [...sessions.values()]
+      const reviewSessions = [...sessions.values()]
         .filter((session) => session.meta.taskId === taskId && session.meta.title !== 'Teardown')
+      const output = reviewSessions
         .map((session) => session.ring.tail(4_000))
         .filter(Boolean)
         .join('\n\n')
         .slice(-16_000)
-      await archiveReviewBoundary?.({ taskId, transcriptTail: output || null })
+      const cwd = await services().tasks.root(taskId).catch(() => null)
+      const diff = cwd
+        ? await services().git.gitText(['diff', 'HEAD'], { cwd, timeoutMs: 15_000, maxOutputBytes: 12_000 }).catch(() => null)
+        : null
+      await archiveReview?.({ taskId, sessionIds: reviewSessions.slice(-64).map((session) => session.meta.id),
+        terminalOutput: trailingUtf8(output), diff: trailingUtf8(diff ?? '', 12_000) })
     },
     runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
     killRunning: (taskId) => {
@@ -706,6 +719,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
         if (s.meta.taskId === taskId) {
           s.display.dispose()
           sessions.delete(sid)
+          reviewSnapshots.forget(sid)
           if (s.meta.backend === 'tmux') await deleteRow(sid)
         }
       }

@@ -3,7 +3,7 @@ import type {
   AgentEventRecord,
   AgentSession,
   AgentSessionSnapshot,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const session = (lastEventSeq: number): AgentSession => ({

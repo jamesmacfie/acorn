@@ -33,7 +33,7 @@ it('binds provider callbacks to exactly one owned connection and refuses deletio
       name: pluginId,
       init(ctx) {
         ctx.providers.connection(provider)
-        ctx.dataSources.register({ sourceId: 'records', name: 'Records', singular: 'Record', plural: 'Records', identityScope: 'Connection and ID', handler: `/v2/p/${pluginId}/source`, providerId: provider.id })
+        ctx.dataSources.register({ sourceId: 'records', name: 'Records', singular: 'Record', plural: 'Records', identityScope: 'Connection and ID', handler: `/v1/p/${pluginId}/source`, providerId: provider.id })
         ctx.routes.fetch(async (request, context) => {
           const input = dataSourceRequestSchema.parse(await request.json())
           if (input.operation === 'describe') return Response.json({ schema: { type: 'string' }, fields: [], parameters: { type: 'object' }, parameterFields: [], operations: { query: true, options: false, details: false, incremental: false, groups: [] }, revision: '1', consistency: 'Live' })
@@ -45,7 +45,7 @@ it('binds provider callbacks to exactly one owned connection and refuses deletio
       },
     }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets, activeIdentity: identity }) })
     for (const [id, userId, providerId] of [['selected', 'owner', provider.id], ['other', 'owner', provider.id], ['foreign-user', 'stranger', provider.id], ['foreign-provider', 'owner', 'another']]) {
-      await db.db.insert(schema.integrations).values({ id: id!, userId: userId!, provider: providerId!, label: 'Tracker', authRef: await secrets.seal(`${id}-token`), authKind: 'api-key', status: 'connected', createdAt: 1, updatedAt: 1 })
+      await db.db.insert(schema.integrations).values({ id: id!, userId: userId!, provider: providerId!, label: 'Tracker', encryptedCredentials: await secrets.seal(`${id}-token`), authKind: 'api-key', status: 'connected', createdAt: 1, updatedAt: 1 })
     }
     const request = (connectionId?: string) => ({ operation: 'query' as const, query: { source: { pluginId, sourceId: 'records' }, scope: { parameters: {}, connectionId }, sort: [] }, mode: 'execution' as const, pageSize: 25, evaluationTime: 1 })
     const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId: 'owner' }, signal: new AbortController().signal }

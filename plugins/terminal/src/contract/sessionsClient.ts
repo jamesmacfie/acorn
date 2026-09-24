@@ -13,8 +13,8 @@
 // Only `create` and `list`. Streams, input, teardown and profile enumeration stay terminal's own: a
 // plugin that needs those is describing a slot, not a capability.
 import { terminalSessionsRoute } from '../shared/api'
-import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { readJson, writeJson } from '@acorn/plugin-api/client'
+import type { CreateOpts, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
+import { activeNodeId, readJson, writeJson } from '@acorn/plugin-api/client'
 
 export type TerminalSessionsClient = {
   // Spawns the PTY. The engine re-derives cwd from `taskId`, creating the task's worktree on first use,
@@ -25,12 +25,24 @@ export type TerminalSessionsClient = {
   list(): Promise<TerminalSession[]>
 }
 
+// A created session can be shown before the next roster ping. The listener belongs to Terminal's
+// activated client store and is removed when that client plugin is disposed.
+const createdListeners = new Set<(session: TerminalSession, nodeId: string) => void>()
+export function onTerminalSessionCreated(listener: (session: TerminalSession, nodeId: string) => void): () => void {
+  createdListeners.add(listener)
+  return () => { createdListeners.delete(listener) }
+}
+
 export const terminalSessions: TerminalSessionsClient = {
-  create: (opts) =>
-    writeJson<TerminalSession>(terminalSessionsRoute, {
+  create: async (opts) => {
+    const nodeId = activeNodeId() ?? ''
+    const session = await writeJson<TerminalSession>(terminalSessionsRoute, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(opts),
-    }),
+    })
+    for (const listener of createdListeners) listener(session, nodeId)
+    return session
+  },
   list: () => readJson<TerminalSession[]>(terminalSessionsRoute),
 }

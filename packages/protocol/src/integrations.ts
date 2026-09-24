@@ -108,7 +108,7 @@ export type PublicIntegrationProvider = {
   }
   capabilities: ProviderCapabilities
   // Whether this provider can enumerate a connection's projects, so core's workspace picker knows
-  // which connections it may ask (`GET /v2/core/integrations/:id/projects`). Absent means no, and a
+  // which connections it may ask (`GET /v1/core/integrations/:id/projects`). Absent means no, and a
   // provider with nothing to enumerate is meant to be absent from the picker rather than present and
   // empty. Not in `capabilities`: that map describes what a connection was granted after validation,
   // this is a fact about the provider's contribution.

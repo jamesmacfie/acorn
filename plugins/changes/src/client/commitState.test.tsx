@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { groupChanges } from './model'
 import { createCommitState, DRAFT_PREFIX, type CommitDeps } from './commitState'
 

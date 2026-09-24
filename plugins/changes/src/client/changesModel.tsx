@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
-  sendReferenceToAgent, taskBridge, taskStatusRevision, type Task,
+  sendReferenceToAgent, sendToSession, taskStatusRevision, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
@@ -37,7 +37,6 @@ const CHANGES_ROUTE_KEY = 'changes'
 export type ChangesModel = ReturnType<typeof createChangesModel>
 
 export function createChangesModel(task: Task) {
-  const api = taskBridge()
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
@@ -299,7 +298,7 @@ export function createChangesModel(task: Task) {
     if (!list.length) return
     const target = agentSessionsFor(task.id)[0]
     if (!target) return setSendMsg('No running agent session.')
-    const res = await api.sendToAgent(target.id, formatReviewPrompt(list), 'after-ready')
+    const res = await sendToSession(target, formatReviewPrompt(list), 'after-ready')
     if (!res.ok) return setSendMsg(res.reason ?? 'Send failed.')
     await markReviewNotesSent(task.id, list.map((n) => n.id))
     await refetchNotes()

@@ -9,9 +9,9 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.
 
 import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
-import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowRunProjection, WorkflowStepProjection, WorkflowTaskGroup } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
@@ -32,27 +32,27 @@ import type {
  *  which one model call already outlives. */
 const GENERATE_TIMEOUT_MS = 240_000
 
-export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+export type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
 
 // Task-scoped defs/start/runs and run-scoped steps/gates.
-export const workflowTaskDefsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
-export const workflowStartRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
-export const workflowRunsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows/runs`
-export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/steps`
-export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
-export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
-export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
-export const workflowRetryRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/retry`
-export const workflowRecordsRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/records`
+export const workflowTaskDefsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+export const workflowStartRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows`
+export const workflowRunsRoute = (taskId: string) => `/v1/p/workflows/tasks/${taskId}/workflows/runs`
+export const workflowStepsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/steps`
+export const workflowGateRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/gate`
+export const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/cancel`
+export const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
+export const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
+export const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
 export const workflowRecordRoute = (runId: string, recordId: string) => `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
 // Which run a managed agent session belongs to, for the agent pane's chip.
-export const workflowSessionRunRoute = (sessionId: string) => `/v2/p/workflows/sessions/${sessionId}/run`
+export const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
 // Every run on this node, the same route core's merged run list reads.
-export const workflowAllRunsRoute = '/v2/p/workflows/runs'
-export const workflowTaskNavigationRoute = '/v2/p/workflows/workflows/task-navigation'
+export const workflowAllRunsRoute = '/v1/p/workflows/runs'
+export const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
 // Definitions stored as rows (docs/workflows.md § Database definitions). Device-only on the node, so
 // these answer 403 to anything but the app.
-export const workflowDefsRoute = '/v2/p/workflows/defs'
+export const workflowDefsRoute = '/v1/p/workflows/defs'
 export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 // A whole definition written from a description or edited from the current graph
@@ -65,13 +65,13 @@ export const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connection
 export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
-export const workflowCatalogRoute = '/v2/p/workflows/catalog'
-export const workflowSchedulesRoute = '/v2/p/workflows/workflows/schedules'
+export const workflowCatalogRoute = '/v1/p/workflows/catalog'
+export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
 export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
 // rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
 // agent pane offers (docs/managed-agents.md § Providers).
-export const agentProvidersRoute = '/v2/p/agents/providers'
+export const agentProvidersRoute = '/v1/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 

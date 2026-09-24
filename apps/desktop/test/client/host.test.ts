@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { HOST } from '@acorn/client-core/kit/tokens/support.ts'
+import { HOST } from '@acorn/client-core/kit/tokens'
 
 // `HOST` is supplied per host package at build time now (client-core kit/tokens/support.ts): the
 // desktop's Vite config defines it as `dom` and apps/tui's as `tui`, and `Only` and `Fallback` are

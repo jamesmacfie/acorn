@@ -6,17 +6,17 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeAdoptResult, NodeProvidersResponse } from '@acorn/protocol/nodeProviders.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
-import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
-import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { loadExternalPlugins } from '@acorn/node-core/server/plugins/loader.ts'
+import { deviceService } from '@acorn/node-core/server/auth'
+import { idempotencyStore } from '@acorn/node-core/server/auth'
+import { mintInternalToken } from '@acorn/node-core/server/auth'
+import { pairingCodes } from '@acorn/node-core/server/auth'
+import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { nodeProviders } from '@acorn/node-core/server/nodeProviders/registry.ts'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The node-provider seam end to end, against the reference provider loaded off disk
@@ -25,7 +25,7 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 // Loaded, not imported. The acceptance criterion for the whole phase is that the first-party cloud
 // plugin will be a loaded plugin built only from published seams, and the way to know that is true is
 // to make the reference provider one and drive it through the real routes. So this builds the package,
-// loads it the way boot does, and asks `/v2/core/nodes` the way a client does.
+// loads it the way boot does, and asks `/v1/core/nodes` the way a client does.
 //
 // The single most important assertion here is negative: the list route does not carry the device token
 // the provider handed it. That token is the whole trust story, and the projection is a field list
@@ -136,7 +136,7 @@ describe('a loaded plugin that contributes a node provider', () => {
 
   it('answers the list route without the credential the provider handed it', async () => {
     await boot()
-    const response = await call('/v2/core/nodes', asOwner())
+    const response = await call('/v1/core/nodes', asOwner())
     expect(response.status).toBe(200)
     const body = (await response.json()) as NodeProvidersResponse
     expect(body.providers).toEqual([{ id: 'nodes-file:file', label: 'Nodes from a file', verbs: ['create', 'destroy', 'start', 'stop'] }])
@@ -156,9 +156,9 @@ describe('a loaded plugin that contributes a node provider', () => {
     await boot()
     // Belt on the assertion above: the token appears nowhere in the list response at all, whatever the
     // shape of the projection.
-    expect(await (await call('/v2/core/nodes', asOwner())).text()).not.toContain('acorn_dt_pretend')
+    expect(await (await call('/v1/core/nodes', asOwner())).text()).not.toContain('acorn_dt_pretend')
 
-    const response = await call('/v2/core/nodes/adopt', asOwner({ providerId: 'nodes-file:file', providerNodeId: 'cloud-1' }))
+    const response = await call('/v1/core/nodes/adopt', asOwner({ providerId: 'nodes-file:file', providerNodeId: 'cloud-1' }))
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       nodeId: CLOUD_NODE_ID,
@@ -172,7 +172,7 @@ describe('a loaded plugin that contributes a node provider', () => {
   it('refuses to adopt a node that has nothing to connect to yet', async () => {
     await boot()
     writeFileSync(nodesFile, JSON.stringify({ nodes: [{ providerNodeId: 'cloud-2', label: 'Half-built', state: 'provisioning' }] }))
-    const response = await call('/v2/core/nodes/adopt', asOwner({ providerId: 'nodes-file:file', providerNodeId: 'cloud-2' }))
+    const response = await call('/v1/core/nodes/adopt', asOwner({ providerId: 'nodes-file:file', providerNodeId: 'cloud-2' }))
     // 409, not 500: the node is fine, it is simply not finished, and the client shows it as building.
     expect(response.status).toBe(409)
     expect(await response.text()).toContain('provisioning')
@@ -180,22 +180,22 @@ describe('a loaded plugin that contributes a node provider', () => {
 
   it('creates and destroys a node through the provider', async () => {
     await boot()
-    const created = await call('/v2/core/nodes/create', asOwner({ providerId: 'nodes-file:file', label: 'New one', options: {} }))
+    const created = await call('/v1/core/nodes/create', asOwner({ providerId: 'nodes-file:file', label: 'New one', options: {} }))
     expect(created.status, await created.clone().text()).toBe(200)
     const row = (await created.json()) as { providerNodeId: string; state: string }
     expect(row.state).toBe('provisioning')
 
-    const listed = (await (await call('/v2/core/nodes', asOwner())).json()) as NodeProvidersResponse
+    const listed = (await (await call('/v1/core/nodes', asOwner())).json()) as NodeProvidersResponse
     expect(listed.nodes.map((node) => node.label)).toEqual(['Big box', 'New one'])
 
-    expect((await call('/v2/core/nodes/destroy', asOwner({ providerId: 'nodes-file:file', providerNodeId: row.providerNodeId }))).status).toBe(204)
-    const after = (await (await call('/v2/core/nodes', asOwner())).json()) as NodeProvidersResponse
+    expect((await call('/v1/core/nodes/destroy', asOwner({ providerId: 'nodes-file:file', providerNodeId: row.providerNodeId }))).status).toBe(204)
+    const after = (await (await call('/v1/core/nodes', asOwner())).json()) as NodeProvidersResponse
     expect(after.nodes.map((node) => node.label)).toEqual(['Big box'])
   })
 
   it('names a verb the provider does not have as unknown rather than failing quietly', async () => {
     await boot()
-    const response = await call('/v2/core/nodes/start', asOwner({ providerId: 'nodes-file:nope', providerNodeId: 'cloud-1' }))
+    const response = await call('/v1/core/nodes/start', asOwner({ providerId: 'nodes-file:nope', providerNodeId: 'cloud-1' }))
     expect(response.status).toBe(404)
   })
 
@@ -206,10 +206,10 @@ describe('a loaded plugin that contributes a node provider', () => {
     }
     // The list enumerates the owner's infrastructure, adopt hands over a credential for another
     // machine, and create spends money. None of the three is a question an agent gets to ask.
-    const list = await call('/v2/core/nodes', asAgent)
+    const list = await call('/v1/core/nodes', asAgent)
     expect(list.status).toBe(403)
     expect(await list.text()).not.toContain('big.example')
-    for (const path of ['/v2/core/nodes/adopt', '/v2/core/nodes/create', '/v2/core/nodes/destroy']) {
+    for (const path of ['/v1/core/nodes/adopt', '/v1/core/nodes/create', '/v1/core/nodes/destroy']) {
       const response = await call(path, { ...asAgent, method: 'POST', body: JSON.stringify({ providerId: 'nodes-file:file', providerNodeId: 'cloud-1', label: 'x' }) })
       expect(response.status).toBe(403)
     }

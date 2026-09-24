@@ -19,7 +19,39 @@
 // did not declare simply has nothing delivered into it. See docs/plugins.md § Cooperative extension
 // points and § There is no uncooperative extension.
 
-import type { AgentToolCall, AgentUsage } from './managedAgents'
+// These host extension props are small portable projections. The full agent event and usage models
+// belong to Agents; Protocol must not import a plugin contract.
+export type AgentToolCardCall = {
+  id: string
+  parentId?: string
+  title: string
+  kind?: string
+  status?: 'pending' | 'running' | 'completed' | 'failed'
+  input?: string
+  output?: string
+  outputAppend?: boolean
+  paths?: string[]
+  subagentId?: string
+  web?: {
+    action?:
+      | { type: 'search'; queries: string[]; allowedDomains?: string[]; blockedDomains?: string[] }
+      | { type: 'open_page'; url?: string }
+      | { type: 'find_in_page'; url?: string; pattern?: string }
+      | { type: 'fetch_page'; url?: string; prompt?: string }
+      | { type: 'other' }
+    results?: { url: string; title?: string; domain?: string; snippet?: string }[]
+  }
+}
+
+export type AgentHeaderUsage = {
+  inputTokens?: number
+  outputTokens?: number
+  cachedInputTokens?: number
+  cacheWriteInputTokens?: number
+  contextUsed?: number
+  contextSize?: number
+  cost?: { amount: number; currency: string }
+}
 
 /**
  * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
@@ -301,7 +333,7 @@ export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
  *  That is why there is no "the reader toggled me" callback here: `defaultOpen` seeds the disclosure
  *  and the owner's own card is the one that teaches the setting. */
 export type AgentToolCardProps = {
-  tool: AgentToolCall
+  tool: AgentToolCardCall
   taskId: string
   /** Whether this card's disclosure should start open, resolved from the reader's setting. Seed a
    *  signal with it and leave it alone: read reactively, it would shut a card the moment its call
@@ -329,7 +361,7 @@ export type AgentSessionTokenPrice = {
 export type AgentSessionHeaderTurn = {
   turnId: string
   model: string | null
-  usage: AgentUsage
+  usage: AgentHeaderUsage
   /** The owner's configured USD price per million tokens for this turn's model. `null` keeps an
    *  unknown or privately-priced model explicit instead of turning it into a plausible zero. */
   price: AgentSessionTokenPrice | null

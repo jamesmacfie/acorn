@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import {
   extensionPointRegistry,
   extensionRegistry,

@@ -1,6 +1,6 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption } from '../../contract/wire.ts'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import { Alert, Checkbox, Field, Section, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import {

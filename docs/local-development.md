@@ -59,13 +59,17 @@ normal development profile or signing in to GitHub:
 pnpm dev:agent -- --session my-change
 ```
 
-The launcher builds an automation-only debug binary, chooses unused loopback ports for Vite and the
-embedded WebDriver server, and keeps the Node data, logs, screenshots, and session manifest under
+The launcher builds an automation-only debug binary and the staged renderer, chooses an unused
+loopback port for the embedded WebDriver server, and keeps the Node data, logs, screenshots, and session manifest under
 `.acorn/agent-dev/my-change/`. It does not share the normal development data root or participate in
 the production shell's single-instance lock, so it can run beside another Acorn checkout. By default
 it adds the current checkout as a local project before launch. Pass `--project /absolute/path` to add
 a different folder, or `--onboarding` to start with an empty profile and exercise the first-run flow.
 Git and GitHub remain optional in either case.
+
+The agent window serves the staged renderer through the same app-scheme file path as a packaged
+build. This avoids Vite's cold module burst during automated startup. Pass `--vite` to run the live
+Vite renderer when checking hot reload; `pnpm dev` remains the normal live development loop.
 
 Once the launcher prints `ready`, use its small command-line driver from another terminal:
 
@@ -133,32 +137,44 @@ pnpm db:migrate
 The launch path applies pending migrations automatically. `pnpm db:locate` prints the active core
 database path.
 
-To go back to a first run, quit the app and delete the databases:
+To inspect a disposable installation before a reset, name its actual roots:
 
 ```sh
-pnpm db:reset          # lists what it will delete, then asks
-pnpm db:reset --yes    # non-interactive
+pnpm db:reset -- --node-root /absolute/node/root --tui-root /absolute/tui/config
 ```
 
-It removes `core.sqlite` and every `plugins/*.sqlite` (WAL and SHM sidecars included) from the dev
-data root, or from `ACORN_DATA_DIR` when that is set. Node identity, the listener key, and the
-internal token stay. The device row goes with the core database, so the desktop pairs again on the
-next launch. That is the intended fresh-install path, since there is no upgrade path from an older
-database.
-
-For an existing development root crossing to workflow v2, do not use the broad reset. Stop the Node,
-copy the root for rehearsal, then run the one-time targeted transition with explicit paths:
+This prints a JSON inventory and changes nothing. The root arguments are always required; the command
+never selects a development or home directory from the environment. Stop the Node and terminal client,
+then choose a new external recovery directory to execute the selected filesystem reset:
 
 ```sh
-pnpm db:transition:workflow-v2 -- --data-dir /path/to/copied-data --export-dir /path/outside/copied-data/workflow-v2-recovery
+pnpm db:reset -- --execute --node-root /absolute/node/root --tui-root /absolute/tui/config --recovery-dir /absolute/recovery
 ```
 
-The command acquires an immediate SQLite writer lock, refuses active workflow runs, dispatches, or
-occurrences, writes private JSON exports plus a SHA-256 manifest outside the data root, and only then
-removes workflow/query/dashboard development state. It preserves tasks and lineage, worktrees,
-notes, managed sessions, credentials, connections, pairings, other schedules, and arbitrary files.
-It writes a version marker and refuses a second run. Validate the copied root and manifest before
-running the same explicit command on a stopped development Node.
+It checks Node locks and open files, exports each listed file to a private directory, verifies SHA-256
+digests, and records each removal in `manifest.json`. Repeating the same command with the same recovery
+directory resumes an interrupted reset. Repository files, worktrees, `.env`, arbitrary files, and
+external databases are outside the inventory. Restore the snapshot only into an isolated directory
+with the old Acorn binary. Retained worktrees are detached until explicitly re-added.
+
+For a desktop installation, first make an empty private recovery directory and run the desktop
+binary's host stage after quitting the normal app:
+
+```sh
+mkdir -m 700 /absolute/recovery
+acorn-desktop --reset-stage --desktop-root /absolute/desktop/custody --recovery-dir /absolute/recovery
+pnpm db:reset -- --execute --node-root /absolute/node/root --desktop-root /absolute/desktop/custody --recovery-dir /absolute/recovery
+```
+
+The desktop binary opens a dedicated `app://acorn` window without starting its helper or Node. It
+exports that origin's local storage and query cache to `desktop-origin.json`, exports the active
+`acorn/data-key` keychain or private-file key to `desktop-key.txt` when present, clears the origin and
+keychain entry, then writes `desktop-stage.json`. The filesystem command checks that stage's hashes,
+private permissions, and exact custody root before removing custody files. A stage failure leaves the
+filesystem reset blocked. This checkout's development custody is normally `<node-root>/shell`;
+packaged custody uses the application-data directory. Name the private memory root with
+`--memory-root` when resetting accepted memory. Never point a reset at the checkout's enclosing data
+root without reviewing the inventory.
 
 ## Timing a cold start
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentNormalizedEvent, AgentRequest } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentRequest } from '../../contract/wire.ts'
 import { askedQuestions } from './requestAnswers'
 
 const asked = (questions: Extract<AgentNormalizedEvent, { type: 'request' }>['questions']) => ({

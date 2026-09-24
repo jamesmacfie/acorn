@@ -3,7 +3,7 @@
 // Shared by the list and the detail so the two cannot disagree about what "running" looks like.
 // Each map is one line, because the icon census reads a line for a literal only when that line
 // mentions an icon (client-core scripts/icon-census.mjs).
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '../../contract/wire.ts'
 import type { WorkflowUsageSummary } from '../../shared/api'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 
@@ -37,9 +37,6 @@ export function stepElapsed(step: WorkflowStepRow | undefined, now: number): str
   const end = step.status === 'running' || step.status === 'waiting-gate' ? now : step.updatedAt
   return formatDuration(end - step.createdAt)
 }
-
-export const runCost = (steps: readonly WorkflowStepRow[]): number =>
-  steps.reduce((total, step) => total + (step.costUsd ?? 0), 0)
 
 export const formatCost = (usd: number): string => (usd > 0 ? `$${usd.toFixed(2)}` : '')
 

@@ -70,7 +70,7 @@ It does not persist a second container inventory.
 
 All Docker commands use fixed argument arrays through CoreServices' process broker. The Node caps
 output and operation time, reports each teardown failure, and does not claim a multi-resource action
-succeeded when one part failed. Events and log/stat streams use `/v2/events` with reconnect/refetch
+succeeded when one part failed. Events and log/stat streams use `/v1/events` with reconnect/refetch
 behavior.
 
 Compose files and commands that execute developer code pass the repository configuration trust gate.

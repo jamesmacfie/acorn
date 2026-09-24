@@ -20,6 +20,7 @@ import WorkflowEditor from './editor/WorkflowEditor'
 import ScheduleDialogHost from './schedules/ScheduleDialog'
 import { requestWorkflowSchedule } from './schedules/scheduleRequest'
 import { scheduleStateLabel } from './schedules/scheduleModel'
+import { rememberWorkflowRun } from './runs/runStore'
 import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
 import { workflowApi } from './workflowsClient'
 
@@ -146,6 +147,7 @@ export function WorkflowsBrowseList() {
     const run = recent().find((entry) => entry.id === runId)
     const task = (tasks.data ?? []).find((entry) => entry.id === run?.taskId)
     if (!task) return
+    rememberWorkflowRun(task.id)
     navigate(`${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(runId)}`)
   }
 

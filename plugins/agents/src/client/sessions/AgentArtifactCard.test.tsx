@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 
 const artifactContent = vi.fn()
 const saveFile = vi.fn()

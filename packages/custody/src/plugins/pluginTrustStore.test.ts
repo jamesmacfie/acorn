@@ -89,7 +89,7 @@ describe('acknowledging a bundle', () => {
   // whole file. Re-deciding the same bundle the same way is not a decision.
   it('does not rewrite the file when the stored decision is the same', () => {
     store().record(ack())
-    const path = join(dir, 'plugin-trust.json')
+    const path = join(dir, 'acorn-1-plugin-trust.json')
     const before = statSync(path, { bigint: true }).mtimeNs
 
     // A fresh store, because a launch is a fresh process. The later `decidedAt` is deliberate: the
@@ -116,11 +116,11 @@ describe('custody', () => {
 
   it('writes the file 0600', () => {
     store().record(ack())
-    expect(statSync(join(dir, 'plugin-trust.json')).mode & 0o777).toBe(0o600)
+    expect(statSync(join(dir, 'acorn-1-plugin-trust.json')).mode & 0o777).toBe(0o600)
   })
 
   it('fails closed on a file it cannot parse', () => {
-    writeFileSync(join(dir, 'plugin-trust.json'), '{ not json')
+    writeFileSync(join(dir, 'acorn-1-plugin-trust.json'), '{ not json')
     // Every plugin re-prompts, which is an annoyance. Guessing at a half-parsed row would mean
     // running code on the strength of it.
     expect(store().list()).toEqual([])
@@ -128,7 +128,7 @@ describe('custody', () => {
 
   it('reads pre-webview version-1 acknowledgements as having no webview grants', () => {
     const { webviews: _webviews, keyClaims: _keyClaims, navigationDestinations: _navigationDestinations, ...legacy } = ack()
-    writeFileSync(join(dir, 'plugin-trust.json'), JSON.stringify({ version: 1, acks: [legacy] }))
+    writeFileSync(join(dir, 'acorn-1-plugin-trust.json'), JSON.stringify({ version: 1, acks: [legacy] }))
     expect(store().list()[0]?.webviews).toEqual([])
     expect(store().list()[0]?.keyClaims).toEqual([])
     expect(store().list()[0]?.navigationDestinations).toEqual([])
@@ -144,7 +144,7 @@ describe('custody', () => {
     const good = ack({ hash: HASH_A })
     const alsoGood = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
-      join(dir, 'plugin-trust.json'),
+      join(dir, 'acorn-1-plugin-trust.json'),
       JSON.stringify({ version: 1, acks: [good, { pluginId: 'future', hash: 12, whatever: true }, alsoGood] }),
     )
     const kept = store().list()
@@ -154,7 +154,7 @@ describe('custody', () => {
   it('does not erase every decision on the next write when one row was unreadable', () => {
     const remembered = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
-      join(dir, 'plugin-trust.json'),
+      join(dir, 'acorn-1-plugin-trust.json'),
       JSON.stringify({ version: 1, acks: [remembered, { pluginId: 'future', hash: 12 }] }),
     )
     // A rejection is the one that hurts most to lose: forget it and the plugin the owner turned away
@@ -165,7 +165,7 @@ describe('custody', () => {
   })
 
   it('sets an unrecognisable file aside instead of letting the next write destroy it', () => {
-    const path = join(dir, 'plugin-trust.json')
+    const path = join(dir, 'acorn-1-plugin-trust.json')
     writeFileSync(path, '{ not json')
     const trust = store()
     expect(trust.list()).toEqual([])

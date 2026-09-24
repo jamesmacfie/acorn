@@ -6,6 +6,7 @@ import { DEV_BUILD_MARKER, reconcileBundledPlugins } from './bundled'
 import { markPluginUserManaged, readBundledPluginState } from './bundledState'
 import { installPlugin, pluginDir, uninstallPlugin } from './installer'
 import { PLUGIN_API_MAJOR } from './manifest'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { pluginDbPath } from './storage'
 import { openDb } from '../bindings'
 import { schema } from '../db'
@@ -18,7 +19,7 @@ const packageAt = (parent: string, version: string, marker = version): string =>
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(join(dir, 'dist'), { recursive: true })
   writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id: 'rollbar', name: 'Rollbar', version, apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+    id: 'rollbar', name: 'Rollbar', version, baseline: ACORN_BASELINE, apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
   }))
   writeFileSync(join(dir, 'dist/node.js'), `export default ${JSON.stringify(marker)}\n`)
   return dir
@@ -49,7 +50,7 @@ describe('bundled plugin reconciliation', () => {
     await db.insert(schema.workspaces).values({ id: 'workspace', name: 'Work', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await db.insert(schema.projects).values({ id: 'project', name: 'App', workspaceId: 'workspace', createdAt: now, updatedAt: now })
     await db.insert(schema.integrations).values({
-      id: 'rollbar-connection', userId: 'owner', provider: 'rollbar', label: 'Production', authRef: 'encrypted-secret',
+      id: 'rollbar-connection', userId: 'owner', provider: 'rollbar', label: 'Production', encryptedCredentials: 'encrypted-secret',
       createdAt: now, updatedAt: now,
     })
     await db.insert(schema.tasks).values({
@@ -70,8 +71,8 @@ describe('bundled plugin reconciliation', () => {
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('2.0.0')
     expect(readFileSync(pluginDbPath(root, 'rollbar'), 'utf8')).toBe('plugin data')
     const reopened = openDb(join(root, 'core.sqlite'))
-    expect(await reopened.select({ provider: schema.integrations.provider, authRef: schema.integrations.authRef }).from(schema.integrations))
-      .toEqual([{ provider: 'rollbar', authRef: 'encrypted-secret' }])
+    expect(await reopened.select({ provider: schema.integrations.provider, encryptedCredentials: schema.integrations.encryptedCredentials }).from(schema.integrations))
+      .toEqual([{ provider: 'rollbar', encryptedCredentials: 'encrypted-secret' }])
     expect(await reopened.select({ origin: schema.tasks.origin }).from(schema.tasks)).toEqual([{ origin: 'rollbar' }])
     expect(await reopened.select({ provider: schema.taskLinks.provider, identifier: schema.taskLinks.identifier }).from(schema.taskLinks))
       .toEqual([{ provider: 'rollbar', identifier: '142' }])

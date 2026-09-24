@@ -17,19 +17,19 @@ describe('atomic workflow processing selection', () => {
   const runner = { start: vi.fn(async (_task: string, _def: unknown, options: { intendedRunId?: string } = {}) => options.intendedRunId!) }
   const parent = (runId: string, scope = 'schedule-1', epoch = '1', name = 'Loop') => {
     database.db.insert(schema.workflowRuns).values({ id: runId, taskId: `task-${runId}`, name: 'Parent', status: 'running', rootRunId: runId,
-      defJson: JSON.stringify({ formatVersion: 2, name: 'Parent', steps: [{ id: 'stable-loop', name, kind: 'workflow-map' }] }), createdAt: 1, updatedAt: 1 }).run()
+      defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', steps: [{ id: 'stable-loop', name, kind: 'workflow-map' }] }), createdAt: 1, updatedAt: 1 }).run()
     database.db.insert(schema.workflowSteps).values({ id: `step-${runId}`, runId, name, idx: 0, kind: 'workflow-map', status: 'running', createdAt: 1, updatedAt: 1 }).run()
     if (scope) bindWorkflowProcessingScope(database.db, runId, { scopeId: scope, epoch })
   }
   const request = (runId: string, state = 'A', overrides: Partial<WorkflowSelectionRequest> = {}): WorkflowSelectionRequest => ({
     invocationKey: `selection-${runId}`, runId, stepId: `step-${runId}`, policy: { mode: 'changed', fields: ['/state'] },
     records: [{ key: 'record-1', snapshot: { state }, dispatch: { callerKey: `dispatch-${runId}`, parentRunId: runId, parentStepId: `step-${runId}`,
-      itemKey: 'record-1', task: { title: 'Review record', branch: 'review' }, workflow: { name: 'Review', steps: [{ name: 'Gate', kind: 'gate-human' }] } } }], ...overrides,
+      itemKey: 'record-1', task: { title: 'Review record', branch: 'review' }, workflow: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', steps: [{ name: 'Gate', kind: 'gate-human' }] } } }], ...overrides,
   })
   const settle = (selectionId: string, status = 'failed') => {
     const attempt = database.db.select().from(schema.workflowRecordAttempts).where(eq(schema.workflowRecordAttempts.selectionId, selectionId)).get()!
     const dispatch = database.db.select().from(schema.workflowDispatches).where(eq(schema.workflowDispatches.id, attempt.dispatchId)).get()!
-    database.db.insert(schema.workflowRuns).values({ id: dispatch.runId, taskId: dispatch.taskId, name: 'Review', status,
+    database.db.insert(schema.workflowRuns).values({ id: dispatch.runId, taskId: dispatch.taskId, rootRunId: dispatch.rootRunId, name: 'Review', status,
       defJson: '{}', createdAt: 1, updatedAt: 1 }).run()
     database.db.update(schema.workflowDispatches).set({ state: 'terminal' }).where(eq(schema.workflowDispatches.id, dispatch.id)).run()
   }
@@ -81,7 +81,7 @@ describe('atomic workflow processing selection', () => {
   it('rolls back all selection rows and checkpoint when any child binding or limit fails', () => {
     parent('one')
     const invalid = request('one')
-    invalid.records.push({ ...invalid.records[0], key: 'record-2', dispatch: { ...invalid.records[0].dispatch, callerKey: 'second', workflow: {
+    invalid.records.push({ ...invalid.records[0], key: 'record-2', dispatch: { ...invalid.records[0].dispatch, callerKey: 'second', workflow: { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Required', inputs: [{ name: 'required', required: true, schema: { type: 'string' } }], steps: [{ name: 'Gate', kind: 'gate-human' }],
     } } })
     invalid.checkpoint = { queryFingerprint: 'q', boundary: 2 }
@@ -90,7 +90,7 @@ describe('atomic workflow processing selection', () => {
       expect(database.db.select().from(table).all()).toHaveLength(0)
     }
     expect(tasks.createChild).not.toHaveBeenCalled()
-    database.db.update(schema.workflowRuns).set({ defJson: JSON.stringify({ name: 'Parent', maxDescendants: 1, steps: [{ id: 'stable-loop', name: 'Loop' }] }) }).run()
+    database.db.update(schema.workflowRuns).set({ defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', maxDescendants: 1, steps: [{ id: 'stable-loop', name: 'Loop' }] }) }).run()
     invalid.records[1].dispatch.workflow = invalid.records[0].dispatch.workflow
     expect(() => store.reserve(invalid)).toThrow('descendant limit')
     expect(database.db.select().from(schema.workflowSelections).all()).toHaveLength(0)
@@ -162,7 +162,7 @@ describe('atomic workflow processing selection', () => {
     parent('scheduled')
     const dispatched = store.reserve(request('scheduled')).dispatches[0]
     database.db.insert(schema.workflowRuns).values({ id: dispatched.runId, taskId: dispatched.taskId, parentRunId: 'scheduled', parentStepId: 'step-scheduled', rootRunId: 'scheduled',
-      name: 'Child', status: 'running', defJson: JSON.stringify({ name: 'Child', steps: [{ id: 'nested', name: 'Renamed nested' }] }), createdAt: 1, updatedAt: 1 }).run()
+      name: 'Child', status: 'running', defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', steps: [{ id: 'nested', name: 'Renamed nested' }] }), createdAt: 1, updatedAt: 1 }).run()
     database.db.insert(schema.workflowSteps).values({ id: 'nested-row', runId: dispatched.runId, idx: 0, name: 'Renamed nested', status: 'running', createdAt: 1, updatedAt: 1 }).run()
     expect(JSON.parse(workflowProcessingScopeKey(database.db, dispatched.runId, 'nested-row'))).toEqual(['schedule-1', '1', [['stable-loop', 'record-1'], 'nested']])
   })
@@ -213,7 +213,7 @@ describe('atomic workflow processing selection', () => {
 
   it('resolves only a declared single tracked checkpoint consumer', () => {
     parent('one')
-    const def = { name: 'Parent', steps: [{ id: 'find', name: 'Find', kind: 'find-records' }, { id: 'stable-loop', name: 'Loop', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' } }] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', steps: [{ id: 'find', name: 'Find', kind: 'find-records' }, { id: 'stable-loop', name: 'Loop', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' } }] }
     database.db.update(schema.workflowRuns).set({ defJson: JSON.stringify(def) }).run()
     database.db.update(schema.workflowSteps).set({ idx: 1 }).run()
     database.db.insert(schema.workflowSteps).values({ id: 'query', runId: 'one', idx: 0, name: 'Find', status: 'done', createdAt: 1, updatedAt: 1 }).run()
@@ -229,7 +229,7 @@ describe('atomic workflow processing selection', () => {
     parent('outer')
     const outer = store.reserve(request('outer')).dispatches[0]
     database.db.insert(schema.workflowRuns).values({ id: outer.runId, taskId: outer.taskId, parentRunId: 'outer', parentStepId: 'step-outer', rootRunId: 'outer', depth: 1,
-      name: 'Nested', status: 'running', defJson: JSON.stringify({ name: 'Nested', steps: [{ id: 'nested-loop', name: 'Nested loop', kind: 'workflow-map' }] }), createdAt: 1, updatedAt: 1 }).run()
+      name: 'Nested', status: 'running', defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Nested', steps: [{ id: 'nested-loop', name: 'Nested loop', kind: 'workflow-map' }] }), createdAt: 1, updatedAt: 1 }).run()
     database.db.insert(schema.workflowSteps).values({ id: `step-${outer.runId}`, runId: outer.runId, idx: 0, name: 'Nested loop', status: 'running', createdAt: 1, updatedAt: 1 }).run()
     const selected = store.reserve(request(outer.runId)); settle(selected.selectionId)
     const row = workflowSelectionPage(database.db, outer.runId).records[0]
@@ -251,7 +251,7 @@ describe('atomic workflow processing selection', () => {
   })
 
   it('allows conditions after the checkpoint consumer but rejects conditional admission', () => {
-    const def: WorkflowDef = { name: 'Check records', steps: [
+    const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Check records', steps: [
       { id: 'find', name: 'Find', kind: 'find-records' },
       { id: 'loop', name: 'Loop', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' } },
       { id: 'condition', name: 'Report?', kind: 'if', branches: { true: 'report', otherwise: 'finish' } },

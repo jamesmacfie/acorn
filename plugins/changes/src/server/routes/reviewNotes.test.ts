@@ -2,10 +2,10 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReviewNote } from '../../shared/api'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { createTaskService } from '@acorn/plugin-api/testkit'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { reviewNotesRoutes } from './reviewNotes'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 const jsonReq = (url: string, method: string, body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

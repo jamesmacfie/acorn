@@ -50,8 +50,8 @@ describe('the endpoint and the header', () => {
   })
 
   it('authenticates with protocol version 7 and the public key', () => {
-    expect(authHeader(dsn, 'acorn.sentry-telemetry/0.1.0'))
-      .toBe('Sentry sentry_version=7, sentry_client=acorn.sentry-telemetry/0.1.0, sentry_key=abc123')
+    expect(authHeader(dsn, 'acorn.sentry-telemetry/1.0.0'))
+      .toBe('Sentry sentry_version=7, sentry_client=acorn.sentry-telemetry/1.0.0, sentry_key=abc123')
   })
 
   it('describes a connection by host and project, never by key', () => {

@@ -33,6 +33,17 @@ afterEach(() => {
 const mode = (path: string) => statSync(path).mode & 0o777
 
 describe('openDataRoot', () => {
+  it('leaves an unmarked root byte-for-byte untouched', () => {
+    const dir = freshDir()
+    const path = join(dir, 'node.json')
+    const original = JSON.stringify({ nodeId: '11111111-1111-4111-8111-111111111111', createdAt: 1 })
+    writeFileSync(path, original)
+    expect(() => openDataRoot(dir)).toThrow(/baseline/)
+    expect(readFileSync(path, 'utf8')).toBe(original)
+    expect(existsSync(join(dir, 'logs'))).toBe(false)
+    expect(existsSync(join(dir, 'node.lock'))).toBe(false)
+  })
+
   it('mints a stable identity and reuses it across reopen', () => {
     const dir = freshDir()
     const first = openTracked(dir)
@@ -47,7 +58,7 @@ describe('openDataRoot', () => {
     expect(identity.createdAt).toBeGreaterThan(0)
     // Deliberately absent. It was written once here and read by nothing, and it went stale the moment the
     // binary serving this root moved on (docs/api-reference.md § Versioning). The live answer is the
-    // running binary's NODE_PROTOCOL_VERSION, reported at GET /v2/node.
+    // running binary's NODE_PROTOCOL_VERSION, reported at GET /v1/node.
     expect(identity).not.toHaveProperty('protocolVersion')
   })
 
@@ -106,7 +117,7 @@ describe('openDataRoot', () => {
   it('refuses a V1 data root', () => {
     const dir = freshDir()
     writeFileSync(join(dir, 'acorn.sqlite'), Buffer.alloc(0))
-    expect(() => openDataRoot(dir)).toThrow(/V1 acorn database/)
+    expect(() => openDataRoot(dir)).toThrow(/older Acorn database/)
     expect(existsSync(join(dir, 'node.json'))).toBe(false)
   })
 
@@ -114,7 +125,7 @@ describe('openDataRoot', () => {
     const dir = freshDir()
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'node.json'), '{ "nodeId": 42 }')
-    expect(() => openDataRoot(dir)).toThrow(/unreadable or malformed/)
+    expect(() => openDataRoot(dir)).toThrow(/unreadable or has no matching acorn-1 baseline/)
   })
 
   it('leaves no lock behind when the open fails', () => {

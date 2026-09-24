@@ -147,7 +147,7 @@ export async function readCodexRateLimitsViaRpc(
   }
 
   try {
-    await request('initialize', { clientInfo: { name: 'acorn', version: '0.1.0' } })
+    await request('initialize', { clientInfo: { name: 'acorn', version: '1.0.0' } })
     process.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`)
     return await request('account/rateLimits/read')
   } finally {

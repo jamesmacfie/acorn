@@ -5,7 +5,7 @@
 // a table test rather than something only a live provider can show. The git calls and the
 // `core.models` call are next door in ./localGit.ts, and the route that spends a key is in
 // ./routes/localGit.ts.
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { COMMIT_MESSAGE_MAX_PROMPT_CHARS } from '../shared/api'
 
 /** Which diff a generated message should describe.

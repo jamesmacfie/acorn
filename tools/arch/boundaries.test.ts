@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 
 // Architecture boundary enforcement. Every rule below is stated, with the failure it prevents, in
 // docs/architecture-overview.md § Package boundaries. Read that first, then this for the mechanics.
@@ -45,6 +47,30 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
 
 const byName = new Map(PACKAGES.map((p) => [p.name, p]))
 const pkgOf = (file: string): Pkg | undefined => PACKAGES.find((p) => file.startsWith(p.dir + '/'))
+
+const packageExports = new Map(PACKAGES.map((pkg) => {
+  const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
+    exports?: Record<string, string>
+  }
+  return [pkg.name, manifest.exports ?? {}] as const
+}))
+
+function exportedFile(pkg: Pkg, subpath: string): string | null {
+  const exports = packageExports.get(pkg.name)!
+  const key = `./${subpath}`
+  const exact = exports[key]
+  if (exact) return resolveFile(join(pkg.dir, exact))
+  for (const [pattern, target] of Object.entries(exports)) {
+    const star = pattern.indexOf('*')
+    if (star < 0) continue
+    const prefix = pattern.slice(0, star)
+    const suffix = pattern.slice(star + 1)
+    if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue
+    const matched = key.slice(prefix.length, key.length - suffix.length)
+    return resolveFile(join(pkg.dir, target.replace('*', matched)))
+  }
+  return null
+}
 
 // Every import form, including side-effect `import '…'` and the vi.mock family: a mock path is a real
 // dependency edge, and missing them is how the database -> editor edge went undeclared.
@@ -90,7 +116,7 @@ function resolveSpec(from: string, spec: string): Target {
     const [scope, name, ...rest] = fileSpec.split('/')
     const pkg = byName.get(`${scope}/${name}`)
     if (!pkg) return { file: null, external: null, pkg: undefined }
-    const file = resolveFile(join(pkg.src, rest.join('/')))
+    const file = exportedFile(pkg, rest.join('/'))
     return { file, external: null, pkg }
   }
   return { file: null, external: spec.split('/')[0].startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0], pkg: undefined }
@@ -163,11 +189,11 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/protocol') return 'shared'
   // The facade carries both halves, so it's classified per entrypoint. Otherwise `node/` falls through
   // to 'shared' and a renderer importing @acorn/plugin-api/node drags node code into the bundle with no
-  // rule firing. `testkit` counts as node; `testkit/client.ts` is the client seam and counts as client.
+  // rule firing. Testkit files count as node unless their name marks a client-only seam.
   if (pkg.name === '@acorn/plugin-api') {
     // Bare entrypoint files (`node.ts`, `client.ts`, `testkit.ts`) classify like the folders they replaced.
     const seg = segment(pkg, file).replace(/\.ts$/, '')
-    if (seg === 'testkit') return file.endsWith('/client.ts') ? 'client' : 'node'
+    if (seg === 'testkit') return file.endsWith('/client.ts') || file.endsWith('.client.ts') ? 'client' : 'node'
     return seg === 'node' ? 'node' : 'client'
   }
   const seg = relative(pkg.src, file).split('/')[0]
@@ -473,43 +499,12 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
-  it('plugin TESTS reach core through @acorn/plugin-api/testkit (shrinking baseline)', () => {
-    // Shrinking baseline (docs/architecture-overview.md § Package boundaries). Migrate a test as you
-    // touch it; never add a root. Lower MAX_DEEP_IMPORTS below when you migrate a file.
-    const TESTKIT_BASELINE = [
-      '@acorn/client-core/infra/node',
-      '@acorn/client-core/host/registries',
-      '@acorn/client-core/features/settings',
-      '@acorn/client-core/kit/tokens',
-      '@acorn/node-core/server',
-      '@acorn/node-core/server/core',
-      '@acorn/node-core/server/integrations',
-      '@acorn/node-core/server/middleware',
-      '@acorn/node-core/server/plugins',
-      '@acorn/node-core/server/routes',
-      '@acorn/node-core/server/worktrees',
-    ]
-    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven moved;
-    // 110 across 36 once the three roots the facade already re-exported were swapped for it
-    // (docs/future/phased-review-steps/phase-3-plugin-api-integrity.md item 3.11). Two whole roots left
-    // the list in that batch, which is the shape the exit condition wants: a root disappears, it does
-    // not shrink. `kit/lib` and `features/tasks` went the same way on 2026-09-03: the two `paletteRows`
-    // tests were the last readers of the first, and the plugin command suites that replaced them mock
-    // the `@acorn/plugin-api/client` barrel rather than the core modules behind it.
-    const MAX_DEEP_IMPORTS = 105
-    const rootOf = (spec: string): string => {
-      const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
-      const parts = spec.slice(pkg.length).split('/')
-      if (parts.length === 1) return spec
-      return pkg + (parts.length > 2 ? `${parts[0]}/${parts[1]}` : parts[0])
-    }
+  it('plugin tests reach core through the facade testkits', () => {
     const deep = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile))
       .filter((e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'))
-    expect([...new Set(deep.map((e) => rootOf(e.spec)))].sort()).toEqual([...TESTKIT_BASELINE].sort())
-    expect(deep.length).toBeLessThanOrEqual(MAX_DEEP_IMPORTS)
-    // Anti-vacuity: the seam has to be carrying traffic, or this rule is measuring a migration that
-    // never started.
+    expect(deep.map((e) => `${rel(e.fromFile)}: ${e.spec}`)).toEqual([])
     expect(EDGES.filter((e) => e.spec === '@acorn/plugin-api/testkit').length).toBeGreaterThan(4)
+    expect(EDGES.filter((e) => e.spec === '@acorn/plugin-api/testkit/client').length).toBeGreaterThan(2)
   })
 
   it('the testkit is imported only by tests', () => {
@@ -573,26 +568,49 @@ describe('architecture boundaries', () => {
     expect(entrypoints.length).toBeGreaterThan(40)
   })
 
-  it('protocol declares an enumerated exports map, not a wildcard', () => {
-    // The first of the five library packages to close (docs/future/phased-review-steps/README.md item
-    // 5). `node-core`, `client-core`, `dashboards-core` and `custody` still declare
-    // `"./*": "./src/*"`, and until they close the rule above is what stands in for the module system.
-    //
-    // Enumerated rather than generated from the directory, because "should this be public" is the
-    // decision the map exists to record. So this checks the two things a human cannot: that no target
-    // has moved out from under its entry, and that no test file is reachable from another package.
-    const proto = byName.get('@acorn/protocol')!
-    const manifest = JSON.parse(readFileSync(join(proto.dir, 'package.json'), 'utf8')) as { exports?: Record<string, string> }
-    const exports = manifest.exports ?? {}
+  it('libraries publish only enumerated, existing source entrypoints', () => {
+    const limits: Record<string, number> = {
+      '@acorn/protocol': 80,
+      '@acorn/client-core': 150,
+      '@acorn/node-core': 65,
+      '@acorn/custody': 10,
+      '@acorn/dashboards-core': 10,
+    }
     const problems: string[] = []
-    for (const [subpath, target] of Object.entries(exports)) {
-      if (subpath.includes('*')) problems.push(`${subpath} is a wildcard`)
-      if (subpath.includes('.test.')) problems.push(`${subpath} is a test file`)
-      if (!existsSync(join(proto.dir, target))) problems.push(`${subpath} -> ${target} does not exist`)
+    for (const [name, limit] of Object.entries(limits)) {
+      const pkg = byName.get(name)!
+      const exports = packageExports.get(name)!
+      if (!Object.keys(exports).length || Object.keys(exports).length > limit) {
+        problems.push(`${name}: expected 1–${limit} entrypoints, found ${Object.keys(exports).length}`)
+      }
+      for (const [subpath, target] of Object.entries(exports)) {
+        if (subpath.includes('*') || target.includes('*')) problems.push(`${name}: ${subpath} is a wildcard`)
+        if (/\.test\.[cm]?[jt]sx?$/.test(subpath) || /\.test\.[cm]?[jt]sx?$/.test(target)) {
+          problems.push(`${name}: ${subpath} exports a test file`)
+        }
+        if (!target.startsWith('./src/') || !existsSync(join(pkg.dir, target)) || !statSync(join(pkg.dir, target)).isFile()) {
+          problems.push(`${name}: ${subpath} -> ${target} is missing or outside src`)
+        }
+        if (target.includes('/testkit/') && !subpath.startsWith('./testkit')) {
+          problems.push(`${name}: ${subpath} publishes testkit through a production path`)
+        }
+      }
     }
     expect(problems.sort()).toEqual([])
-    // Anti-vacuity: an empty map would satisfy every check above, and the repo does import through this.
-    expect(Object.keys(exports).length).toBeGreaterThan(30)
+  })
+
+  it('the module resolver refuses private library modules', () => {
+    for (const name of ['@acorn/client-core', '@acorn/node-core', '@acorn/custody', '@acorn/dashboards-core']) {
+      const pkg = byName.get(name)!
+      const targets = new Set(Object.values(packageExports.get(name)!))
+      const privateFile = walk(pkg.src).find((file) => /\.tsx?$/.test(file)
+        && !/\.test\.tsx?$/.test(file)
+        && !targets.has(`./${relative(pkg.dir, file)}`))
+      expect(privateFile, `${name} needs a private module to test`).toBeDefined()
+      const spec = `${name}/${relative(pkg.src, privateFile!).replace(/\\/g, '/')}`
+      const resolver = createRequire(join(pkg.dir, 'package.json'))
+      expect(() => resolver.resolve(spec), spec).toThrow()
+    }
   })
 
   it('protocol declares no plugin route', () => {
@@ -603,8 +621,31 @@ describe('architecture boundaries', () => {
     // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
     // that returned nothing would satisfy the assertion below.
     expect(files.length).toBeGreaterThan(15)
-    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v2/p/')).map((f) => relative(proto.src, f))
+    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
     expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
+  it('shared runtime code does not execute a named plugin route', () => {
+    // Parse literals instead of scanning prose. Namespace builders such as `/v1/p/${pluginId}` are
+    // allowed; a concrete plugin name in a library route sends a request around its owner.
+    const offenders: string[] = []
+    let scanned = 0
+    for (const pkg of PACKAGES.filter((item) => item.kind === 'lib')) {
+      for (const file of walk(pkg.src)) {
+        if (isTestCode(file) || file.includes('/testkit/') || !/\.[cm]?[jt]sx?$/.test(file)) continue
+        scanned++
+        const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+        const visit = (node: ts.Node): void => {
+          if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+            if (/\/v1\/p\/[a-z][a-z0-9-]*(?:\/|$)/.test(node.text)) offenders.push(`${rel(file)}: ${node.text}`)
+          }
+          ts.forEachChild(node, visit)
+        }
+        visit(source)
+      }
+    }
+    expect(scanned).toBeGreaterThan(300)
+    expect(offenders.sort()).toEqual([])
   })
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
@@ -621,15 +662,8 @@ describe('architecture boundaries', () => {
   it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
     // The routes are gone, but a plugin's types can still accumulate here. Each survivor has a reason:
     const PLUGIN_NAMED_BASELINE = [
-      // Both sides consume it, and `ServerMsg` is the terminal WS transport core's own hub speaks.
-      'terminal.ts',
       // `NoteLocation` addresses a task, workspace or global scope, which is core's own scheme.
       'notes.ts',
-      // The workflow row types are read by client-core's notification pipeline as well as the plugin.
-      'workflow.ts',
-      // Blocked, not kept: client-core/host/registries/agentToolRenderers.ts imports it, so it can't move
-      // until the shell stops naming agents.
-      'managedAgents.ts',
     ]
     // Not in the baseline, because a baseline means "still to fix" and these aren't. All three are
     // name collisions rather than dependencies: two with core vocabulary, and `browserRules.ts` with
@@ -679,10 +713,8 @@ describe('architecture boundaries', () => {
       // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
       // and not the roster id. Any plugin that starts a session emits it and the shell hears it
       // (@acorn/protocol/nodeEvents.ts).
-      ['packages/client-core/src/infra/node/wsClient.ts', "the 'terminal:sessions-changed' channel prefix"],
       ['packages/protocol/src/plugin/contract.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
-      ['packages/protocol/src/managedAgents.ts', "'terminal' the agent controller, 'context' the input part"],
       ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
@@ -690,14 +722,12 @@ describe('architecture boundaries', () => {
       ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.
-      ['packages/protocol/src/workflow.ts', "'database' the workflow definition layer"],
       // Where a task's terminals live is a node question, asked of the roster
       // (infra/node/hostCapabilities.ts). Sanctioned permanently: "does this host have that plugin"
       // is the host's own question, and the probe is what lets a compiled plugin's absence degrade
       // cleanly rather than crash. What moved out of core on 2026-08-31 is each decision that used
       // the answer, not the asking.
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
-      ['packages/client-core/src/features/tasks/agentSessions.ts', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the
       // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
       ['packages/client-core/src/features/settings/PluginsSettings.tsx', "'github' the install source kind"],
@@ -710,7 +740,6 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
-      ['packages/node-core/src/server/agentTools/contextSections.ts', "'notes' and 'memory', the TaskContext compatibility keys"],
       ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
       ['packages/protocol/src/mcp.ts', "'http' the MCP transport"],
     ])
@@ -1041,7 +1070,7 @@ describe('architecture boundaries', () => {
   // (docs/command-palette-and-shortcuts.md). Each one was true of the code before it was written
   // down; what these stop is the drift back, which is cheap and quiet in every direction.
 
-  const SESSION = 'packages/client-core/src/host/registries/commands/session.ts'
+  const SESSION = 'packages/client-core/src/host/registries/commands/sessionStore.ts'
   // Each host in two files: the one that builds the session and captures the identity, and the one
   // that draws the rows.
   const HOST_ADAPTERS = ['packages/client-core/src/host/palette/paletteView.ts', 'apps/tui/src/chrome/paletteSession.ts']
@@ -1063,7 +1092,9 @@ describe('architecture boundaries', () => {
     // And both hosts reach it. Named rather than derived, because "no host has its own" is only half
     // the property: a host that stopped importing it would pass a count check by drawing nothing.
     for (const host of HOST_ADAPTERS) {
-      const edges = EDGES.filter((e) => rel(e.fromFile) === host && e.target.file && rel(e.target.file) === SESSION)
+      const edges = EDGES.filter((e) => rel(e.fromFile) === host && e.target.file
+        && (rel(e.target.file) === SESSION
+          || readFileSync(e.target.file, 'utf8').includes("createCommandSession } from './sessionStore.ts'")))
       expect(`${host} builds a session: ${edges.length > 0}`).toBe(`${host} builds a session: true`)
     }
   })

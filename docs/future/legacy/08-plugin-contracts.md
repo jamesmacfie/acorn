@@ -1,6 +1,6 @@
 # Ticket 08: Explicit plugin contracts
 
-Date: 2026-09-21. Status: not started. Prerequisites: 06, 07.
+Date: 2026-09-21. Status: implemented on 2026-09-23. Prerequisites: 06, 07.
 Read [context](./context.md), F08 in [findings](./findings.md), and
 [protocol/type decisions](./target-architecture.md#protocol-placement-and-public-types).
 
@@ -39,3 +39,31 @@ surface tests, and loaded-plugin integration tests. Update snapshots intentional
 
 Read the parity holes and RPC encoder/decoder before widening types. A declaration change alone does
 not prove worker semantics, and removing a schema property alone does not reject an obsolete field.
+
+## Implementation evidence
+
+- Manifests use explicit command kinds. The parser names missing kinds and rejects the removed
+  `contributions.palette` key before it checks other unknown fields. Built-in packages, scaffolds,
+  examples, and the generated schema use the same command form. The scaffold test loads its output
+  through the external loader.
+- `hostCallModes.ts` lists the loaded context methods and checks that list against
+  `NodePluginContext` and `CoreServices` at compile time. An unknown context path throws. A real
+  worker fixture checks synchronous registration and disposal, event callbacks, asynchronous core
+  calls, and the asynchronous model adapter callback.
+- Loaded workers receive only the scoped `NodePluginContext` methods. The worker fixture checks that
+  `ctx.tools` and the other compiled-only methods are absent. The model adapter is part of the loaded
+  contract: its request and result are data, and its callback is asynchronous. The host checks that
+  an adapter belongs to the plugin that registered its connection provider. RPC forwards a later
+  `AbortSignal` abort to a running callback and cleans up signal listeners after the call.
+- Published task run and project config/setup types are structural. The type contract checks both
+  assignability directions. Loaded `telemetry.measure` accepts a synchronous callback; compiled
+  plugins can also measure Promise settlement. The published type and worker fixture check that
+  difference.
+
+Verification on 2026-09-23: `pnpm lint` passed all 34 package tasks. The Node plugin, plugin host,
+and model registry suites passed 408 tests. Loaded plugin integrations passed 52 tests across eight
+files. Plugin types passed four tests, the SDK passed two, the plugin API facade passed 12, client
+command registration passed 40, and the scaffold passed 11. An isolated desktop service booted with
+`model-providers` initialized and reached `ready`. The Tauri renderer stopped at the existing Vite
+module import error (`Acorn could not start: Importing a module script failed`), so a window-level
+command palette check remains unverified.

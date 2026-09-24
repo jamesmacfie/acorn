@@ -8,7 +8,7 @@ import { dataSourceFor } from '../core/data'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
-import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 
 // What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
 // disclosure line in the trust prompt). `byWorkspace` is the scope-validation half used by a loaded
@@ -34,6 +34,7 @@ const SIMPLE_FACETS = {
   context: 'context',
   models: 'models',
   identity: 'identity',
+  'agent-tool-provenance': 'agentToolProvenance',
   // The one read-everything grant. A sink sees every record from every owner, which is why it is a
   // token at all and why the trust prompt draws it high
   // (../core/telemetry.ts, docs/security.md § Telemetry sinks). Writing telemetry needs nothing:

@@ -1,11 +1,11 @@
-import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins/installer.ts'
-import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/server/plugins/loader.ts'
-import { createPluginReloader } from '@acorn/node-core/server/plugins/reload.ts'
+import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins'
+import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/server/plugins'
+import { createPluginReloader } from '@acorn/node-core/server/plugins'
 import { cascadeDeletePluginData } from '@acorn/node-core/server/db/cascade.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import type { PluginsBridge } from '@acorn/node-core/server/pluginHost/state.ts'
+import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
-import type { PluginLoadFailure } from '@acorn/node-core/server/plugins/loader.ts'
+import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { nodePluginNames } from './composition'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §

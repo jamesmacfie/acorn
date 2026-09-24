@@ -95,9 +95,9 @@ mint route would remove the step and does not exist.
 ### Remote nodes
 
 `acorn --node https://host:4317` runs the desktop's three steps in a terminal
-(`packages/custody/src/broker/nodePairing.ts`): an unverified probe of `GET /v2/node` that cross-checks
+(`packages/custody/src/broker/nodePairing.ts`): an unverified probe of `GET /v1/node` that cross-checks
 the socket's fingerprint against the body's, the six words printed for the reader to compare against
-what the node printed at its own boot, and `POST /v2/pair` over a pinned agent with the code. Both run
+what the node printed at its own boot, and `POST /v1/pair` over a pinned agent with the code. Both run
 before the renderer starts, because pairing asks a question on stdin and has nothing to draw.
 
 `acorn` remembers what it pairs with, so the second time is `acorn --node <name>`. The list is the
@@ -1405,7 +1405,7 @@ in would put a second Solid renderer in the graph to render one child. The arbit
 client-plugins programme gives each a contract.
 
 The palette is a `Modal` over the same session the desktop's runs on
-(`client-core/host/registries/commands/session.ts`). The query, the order, the cursor, the frame stack
+(`client-core/host/registries/commands/sessionStore.ts`). The query, the order, the cursor, the frame stack
 and what Enter does are that object's; this host binds keys to it, draws its rows and prints its
 breadcrumb, and fetches and invokes nothing itself. The session is built in `chrome/Shell.tsx` rather
 than in `chrome/Palette.tsx`, because the component is mounted only while the overlay is up and a
@@ -1602,6 +1602,11 @@ onboarding's first-run screen is the one `overlay` that is really a screen. The 
 `drawer` and docker takes `task.footer`. The terminal's overlays are a fixed set the shell draws and
 its drawer is the rail, so giving a plugin those places is a contract for both hosts rather than a
 component for this one.
+
+Terminal still registers its node-scoped session source on this host. Shared code can list sessions
+and dispatch its send action with the selected node and session identity, but this shell has no
+Terminal session panel to select or type into. The editor's file PTY is a separate surface and does
+not stand in for Terminal's drawer.
 
 What that costs a reader here is small and named: github's changed-file and pull-request searches and
 agents' two settings are desktop-only, because the registrations that mint them are not mounted. The

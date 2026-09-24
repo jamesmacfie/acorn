@@ -5,7 +5,7 @@ import { parseRateLimits, postEnvelope } from './transport'
 
 const NOW = 1_700_000_000_000
 const DSN = parseDsn('https://abc123@o42.ingest.us.sentry.io/1234567')!
-const SDK = { name: 'acorn.sentry-telemetry', version: '0.1.0' }
+const SDK = { name: 'acorn.sentry-telemetry', version: '1.0.0' }
 
 const answer = (status: number, headers: Record<string, string> = {}) =>
   vi.fn(async () => new Response(null, { status, headers }))

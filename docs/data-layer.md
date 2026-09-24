@@ -55,6 +55,10 @@ material, which lives in `tls/`, and no protocol version. It used to carry one, 
 binary serving the root moved on. See versioning in [the API reference](./api-reference.md). Its
 schema ignores unknown keys so a field can be retired without stranding roots that still have it.
 
+The recoverable reset command is documented in [local development](./local-development.md). It names
+each selected root explicitly and inventories owned files. It never removes `worktrees/` or a whole
+data root.
+
 `openDataRoot` creates the identity, takes the lock, and refuses an incompatible root. Refusing
 rather than falling back to a fresh identity matters because a root that already has paired devices
 must not have those pairings silently orphaned by a new random ID. Database upgrades are applied by
@@ -121,7 +125,8 @@ These plugins own SQLite files and migrations:
 | `plugins/agents.sqlite` | managed sessions, turns, event ledger, delegation spawn ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
-| `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, notification receipts, and legacy import mappings |
+| `plugins/browser.sqlite` | browser captures and screenshot bytes |
+| `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, and notification receipts |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
@@ -161,7 +166,8 @@ there is no cross-file transaction.
 `workflow_runs` stores explicit root run, parent run, parent step, and depth fields. It also keeps the
 resolved definition graph, effective authority, absolute deadline, and optional invocation identity
 used for recovery. These are execution records, not response fields: task run reads project them into
-parent and root task links without exposing the frozen internal authority.
+parent and root task links without exposing the frozen internal authority. Every new run has a
+non-null `root_run_id`, including a root run, which points to itself.
 
 `workflow_dispatches` is the replay ledger for child workflow tasks. A unique caller key and payload
 fingerprint reserve stable task and run IDs before either cross-database effect. The row progresses
@@ -224,12 +230,12 @@ it holds whatever the reader is working on.
 Two of the pane's rows are also **palette commands**, under a Database group
 (`docs/command-palette-and-shortcuts.md`). Both are task-scoped, and the reason is the boundary above:
 saved queries are project-owned, but every route in this plugin reaches them through the task, because
-the task is what core resolves a project from. `/v2/p/database/palette/queries` answers that project's
+the task is what core resolves a project from. `/v1/p/database/palette/queries` answers that project's
 rows in the pane's own order, narrowed by what was typed and matching the name, the note and the SQL —
 the SQL because a table name lives nowhere else. Picking one loads it into the editor through the same
 path the pane's picker uses; running it is the reader's next keystroke and never the pick's own effect.
 
-`/v2/p/database/palette/generate` is the Generate SQL modal with every choice already made: the first
+`/v1/p/database/palette/generate` is the Generate SQL modal with every choice already made: the first
 connected model connection, that provider's own default model, and no worked examples. It validates
 the prompt against the modal's own bound, refuses a task-scoped agent token the way the modal's route
 does, loads the live schema, generates, **writes the scratch document, and only then answers**. That
@@ -272,7 +278,7 @@ running on this machine".
 The answer is a registry, not a table. A plugin
 declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
 with no client attached, parses the answer, stamps who answered, and merges
-(`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v2/core/runs` is the merged
+(`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v1/core/runs` is the merged
 read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
 other exists. A task-confined caller uses this merged route and receives only its task's rows. The
 workflow source route is a node-internal aggregation seam and rejects a direct task-confined read.
@@ -327,9 +333,10 @@ plugin migration directories beside the bundled Node artifact, except for a load
 chain is staged inside its own package by `apps/node/scripts/build-plugin.mjs` and read from there,
 because the package is the only copy the loader looks at. http is the one plugin on that path.
 
-Every chain starts from a single baseline migration that creates the schema. The pre-project
-`(owner, name)` model and its one-way data migrations were squashed away with it, so a database
-written before that baseline cannot be upgraded. Start from a fresh data root.
+Each of the 11 table-owning chains starts with one initial migration. The previous SQL histories and
+their one-way data transformations are not an upgrade path into this baseline. Use the recoverable
+reset in [local development](./local-development.md) before starting a Node with an older data root.
+The reset preserves a private recovery copy and never removes repositories or worktrees.
 
 Native SQLite access is centralized, and both plugin tiers reach it through `ctx.storage.open()`.
 The filename is bound to the plugin id. A loaded plugin opens that handle inside its isolated worker,
@@ -361,11 +368,12 @@ happens when a loaded plugin's chain grows between versions, where the update ap
 boot against a database that already has rows, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.
 
-Before applying anything, the loaded-plugin path compares every row already recorded in
+Before applying anything, core and plugin database paths compare every row already recorded in
 `__drizzle_migrations` with the corresponding journal entry: its timestamp, its position, and the
 SHA-256 of the SQL file. Editing applied SQL, reordering the journal, or removing an applied entry
-fails the plugin with an error that says to restore the original chain and add a new migration. The
-comparison happens on the same handle before Drizzle migrates, so the database is preserved unchanged.
+fails with a recoverable-reset instruction. Existing tables without an applied history fail the same
+way. The comparison happens on the same handle before Drizzle migrates, so the database is preserved
+unchanged. Once on this baseline, ordinary future migrations still append to each owner's chain.
 
 Drizzle-kit cannot model a virtual table, so a plugin that wants FTS5 search
 (`plugins/agents.sqlite`'s `agent_events_fts`, `plugins/memory.sqlite`'s `memories_fts`) writes the
@@ -378,14 +386,17 @@ schema, because the trigger body is plain SQL text with no type checker over it
 
 ## Backup and import
 
-`POST /v2/core/backup` snapshots core and plugin SQLite databases with SQLite's online-backup API.
+`POST /v1/core/backup` snapshots core and plugin SQLite databases with SQLite's online-backup API.
 `GET` on the same route returns the suggested destination path. The archive excludes blobs and
 worktrees and scrubs credentials, device rows, and other token material. Restore is a manual
-operation into a fresh data root.
+operation into a fresh, initialized data root. Before copying archive members, run
+`pnpm backup:verify <backup.tar.gz> <target-root>`. It reads the archive manifest without extracting
+files and refuses a missing or different `acorn-1` baseline on either the backup or target root.
+The archive itself carries `baseline: "acorn-1"` beside its format version.
 
 The archive holds `core.sqlite` and every `plugins/*.sqlite`: the workspace and task model, repo
 configuration, agent transcripts, notes, memories, and the HTTP client's saved requests. Secrets are
-blanked rather than removed, so an `integrations` row survives with an empty `access_token`. A
+blanked rather than removed, so an `integrations` row survives with empty `encrypted_credentials`. A
 restored node still shows that a connection existed and needs re-entering, and a deleted row would
 have silently lost the workspace links that point at it. Device rows are deleted outright, because a
 device row is a credential's public half and a restored node must re-pair rather than show a list of

@@ -34,7 +34,7 @@ describe('running an agent from a terminal', () => {
       expect(posts()).toEqual([])
 
       await screen.press('RETURN', { ctrl: true })
-      expect(posts()).toEqual(['/v2/p/agents/sessions/session-1/turns'])
+      expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/turns'])
     } finally {
       screen.done()
     }
@@ -75,7 +75,7 @@ describe('running an agent from a terminal', () => {
       expect(posts()).toEqual([])
 
       await screen.press('RETURN')
-      expect(posts()).toEqual(['/v2/p/agents/sessions/session-1/turns'])
+      expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/turns'])
     } finally {
       screen.done()
     }
@@ -88,7 +88,7 @@ describe('running an agent from a terminal', () => {
       await enterDetail(screen)
       await stopSaying(screen, 'Allow')
       await screen.press('RETURN')
-      expect(posts()).toEqual(['/v2/p/agents/sessions/session-1/requests/request-1/resolve'])
+      expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/requests/request-1/resolve'])
     } finally {
       screen.done()
     }
@@ -113,7 +113,7 @@ describe('running an agent from a terminal', () => {
 
       await stopSaying(screen, 'Claude Code')
       await screen.press('RETURN')
-      expect(posts()).toEqual(['/v2/p/agents/sessions'])
+      expect(posts()).toEqual(['/v1/p/agents/sessions'])
     } finally {
       screen.done()
     }

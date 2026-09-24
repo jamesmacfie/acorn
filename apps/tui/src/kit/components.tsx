@@ -1,4 +1,4 @@
-import type { KitTable } from '@acorn/client-core/host/tree/kitEntry.ts'
+import type { KitTable } from '@acorn/client-core/host/tree'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,

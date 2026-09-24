@@ -17,7 +17,7 @@ export async function seedProviderConnection(
     userId,
     provider: providerId,
     label: userId,
-    authRef: await new SecretService(encryptionKey).seal(token),
+    encryptedCredentials: await new SecretService(encryptionKey).seal(token),
     authKind,
     createdAt: now,
     updatedAt: now,

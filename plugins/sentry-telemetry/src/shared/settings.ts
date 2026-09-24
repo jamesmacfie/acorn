@@ -75,4 +75,4 @@ export const PROVIDER_ID = 'sentry-telemetry'
 /** What every envelope reports itself as. A bundle cannot read a `package.json` that is not inside
  *  it, so the version is written here and `settings.test.ts` holds the two in step. */
 export const SDK_NAME = 'acorn.sentry-telemetry'
-export const SDK_VERSION = '0.1.0'
+export const SDK_VERSION = '1.0.0'

@@ -9,7 +9,7 @@ import {
   makeTestPluginDb,
   type TestDb,
   type TestPluginDb,
-} from '@acorn/node-core/testkit/db.ts'
+} from '@acorn/node-core/testkit'
 import { schema as coreSchema } from '@acorn/node-core/server/db/index.ts'
 import {
   catalogValidation,
@@ -43,7 +43,7 @@ const succeeded = (result: string, structuredOutput: unknown) => ({
 })
 
 const ticketMap = (childId: string): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1', formatVersion: 1,
   name: 'Review selected tickets',
   steps: [
     { id: 'select', name: 'select', after: [], prompt: 'Select tickets.', schema: { type: 'object' } },
@@ -100,7 +100,7 @@ describe('workflow task acceptance', () => {
     const child = await createPublishedDef(workflows.db, {
       workspaceId: 'workspace-one', projectId: 'project-one',
       def: {
-        formatVersion: 2,
+        baseline: 'acorn-1', formatVersion: 1,
         name: 'Review ticket', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
         steps: [
           { id: 'approve', name: 'approve', kind: 'gate-human' },
@@ -132,7 +132,8 @@ describe('workflow task acceptance', () => {
 
     mkdirSync(join(dir, '.acorn', 'workflows'), { recursive: true })
     writeFileSync(join(dir, '.acorn', 'workflows', 'ticket-map.toml'), `
-format_version = 2
+baseline = "acorn-1"
+format_version = 1
 name = "Review selected tickets"
 [[steps]]
 id = "select"

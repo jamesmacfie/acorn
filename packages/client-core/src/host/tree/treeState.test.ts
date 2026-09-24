@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { createTreeState } from './treeState'
 
@@ -49,15 +49,27 @@ describe('a batch costs its own ops, not the tree', () => {
     expect(Object.keys(state.nodes)).toHaveLength(size)
 
     const removes: TreeMutation[] = Array.from({ length: 4_000 }, (_, i) => ({ op: 'remove', id: `leaf-${i}` }))
-    const started = performance.now()
-    state._apply(removes)
-    const elapsed = performance.now() - started
+    const originalIterator = Map.prototype[Symbol.iterator]
+    let mapVisits = 0
+    const iteratorSpy = vi.spyOn(Map.prototype, Symbol.iterator).mockImplementation(function (this: Map<unknown, unknown>) {
+      const iterator = originalIterator.call(this)
+      const next = iterator.next.bind(iterator)
+      iterator.next = () => {
+        const result = next()
+        if (!result.done) mapVisits++
+        return result
+      }
+      return iterator
+    })
+    try {
+      state._apply(removes)
+    } finally {
+      iteratorSpy.mockRestore()
+    }
 
     expect(Object.keys(state.nodes)).toHaveLength(size - 4_000)
-    // A wall-clock bound rather than a counter, because the cost this guards is a nested walk and
-    // there is nothing else to count. It is deliberately loose: the same batch took 1,104 ms when the
-    // pre-flight scanned every live node per `remove`, and a few tens of milliseconds now, so a
-    // machine four times slower than this one still passes and a return to the old shape still fails.
-    expect(elapsed).toBeLessThan(400)
+    // The pre-flight builds its child index with one scan of the projected tree. The old path
+    // scanned the whole projected map for every remove, visiting millions of entries here.
+    expect(mapVisits).toBeLessThan(size * 4)
   })
 })

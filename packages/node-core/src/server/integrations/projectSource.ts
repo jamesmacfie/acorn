@@ -8,7 +8,7 @@ import { schema } from '../db'
 import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import type { RouteFailure, RouteResult } from '../sync/engine'
 import { providerRequestScheduler } from './budgetRuntime'
-import { connectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry } from './connectionProviders/registry'
 import { getConnection } from './connections'
 import { isProviderOperationError, type ProviderProject } from './types'
 import { broadcastConnectionChanged } from '../notify'
@@ -78,7 +78,7 @@ export async function listConnectionProjects(args: {
 
   try {
     const claimed = await args.secrets.use(
-      connection.authRef,
+      connection.encryptedCredentials,
       `${connection.provider}: list projects`,
       (secret) => providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
         source.list({ connection, secret })),

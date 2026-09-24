@@ -1,18 +1,18 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch, type JSX } from 'solid-js'
+import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
-import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
+import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
-import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
-import { initSessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import { Dynamic } from '../tree/renderer'
 import { Line } from '../kit/cells'
 import { EmptyState, keyedRows, Row, Rows } from '../kit/showing'
@@ -58,6 +58,18 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
   const palette = createShellPalette(model)
+  // A navigation search opened during node startup may see an empty roster. Refresh only that
+  // frame when its local source changes; the shared session still owns its query and selection.
+  createEffect(on(
+    () => [model.ready(), model.workspaces(), model.allTasks(), nodes()],
+    () => {
+      const frame = untrack(palette.frame)
+      if (untrack(palette.open) && frame?.kind === 'search' && frame.commandId?.startsWith('core.goto.')) {
+        palette.retry()
+      }
+    },
+    { defer: true },
+  ))
   const prefs = createQuery(() => prefsOptions(true))
   let root: Renderable | undefined
   const [strip, setStrip] = createSignal<Renderable | undefined>()
@@ -118,13 +130,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // What is waiting, and the three things that feed it. The desktop's `App.tsx` mounts the same three
   // and this is the same place in the same order.
   //
-  // `initSessions` asks its own capability question — a node without the terminal plugin has no PTY
-  // sessions to watch and it returns a no-op — so there is no guard to repeat here. `initWorkflowNotices`
-  // is outside that question on purpose: main broadcasts gate and run-done events over `/v2/events`,
+  // Terminal's activated session source watches PTY sessions. `initWorkflowNotices`
+  // is outside that question on purpose: main broadcasts gate and run-done events over `/v1/events`,
   // and a node with no terminal still runs workflows. `initSystemNotices` is the channel this host
   // answers with an escape sequence rather than an OS banner (../platform.ts, ../kit/notify.ts).
   onMount(() => {
-    onCleanup(initSessions())
     onCleanup(initWorkflowNotices())
     onCleanup(initSystemNotices())
   })
@@ -138,7 +148,6 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       installCommandLayer(engine, {
         prefs: () => ({
           ...(prefs.data?.[PrefKeys.keybindings] ? { keybindings: prefs.data[PrefKeys.keybindings] } : {}),
-          ...(prefs.data?.[PrefKeys.paneShortcuts] ? { pane_shortcuts: prefs.data[PrefKeys.paneShortcuts] } : {}),
         }),
         taskActive: () => !!model.task(),
         // Always undefined, so a `pane`-scoped binding never fires here. The scope means "the keys are
@@ -246,7 +255,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                   (client-core/host/registries/sources/sources.ts § regions). */}
               <Match when={source()?.regions?.detail}>{(detail) => <SourceRegion><Dynamic component={detail()} /></SourceRegion>}</Match>
               <Match when={source()?.component}>{(component) => <SourceRegion><Dynamic component={component()} /></SourceRegion>}</Match>
-              <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
+              <Match when={model.task()}>{(task) => <PaneBody task={task()} nodeId={props.nodeId} />}</Match>
             </Switch>
           </PanelBody>
         </box>

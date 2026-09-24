@@ -233,7 +233,7 @@ An entry is `{ id, location, label, icon?, order?, when?, action }`:
         "label": "Open the board card",
         "icon": "kanban",
         "when": { "origin": "board" },
-        "action": { "verb": "runNodeAction", "path": "/v2/p/board/open" }
+        "action": { "verb": "runNodeAction", "path": "/v1/p/board/open" }
       }]
     }
   }

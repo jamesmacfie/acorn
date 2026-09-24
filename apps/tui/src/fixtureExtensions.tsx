@@ -1,8 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
+import type { Disposable } from '@acorn/client-core/kit/lib'
 import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-import { commandRegistry } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { keybindingRegistry } from '@acorn/client-core/host/registries/commands/keybindings.ts'
+import { commandRegistry } from '@acorn/client-core/host/registries/commands'
+import { keybindingRegistry } from '@acorn/client-core/host/registries/commands'
 import { Button } from './kit/asking'
 import { Text } from './kit/showing'
 
