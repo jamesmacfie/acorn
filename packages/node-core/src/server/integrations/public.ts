@@ -12,6 +12,6 @@ export { providerError } from './respondProvider.ts'
 export { ProviderOperationError, isProviderOperationError } from './types.ts'
 export type {
   CachedExternalItem, CachedItemCodec, CodecResult, MirroredResourceContribution,
-  ProviderDetailContext, ProviderItemDetail, ProviderProjectSource, ProviderResourceContext,
-  ProviderResourceRefreshContext,
+  ProviderDetailContext, ProviderItemComment, ProviderItemDetail, ProviderItemImage,
+  ProviderProjectSource, ProviderResourceContext, ProviderResourceRefreshContext, ProviderWriteContext,
 } from './types.ts'

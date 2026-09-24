@@ -64,9 +64,11 @@ describe('the full agent-tool manifest', () => {
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
-    // Core owns the stable cross-provider tool; the provider-specific read belongs to whichever
-    // integration answers (docs/agent-tools.md § issue_detail).
+    // Core owns the stable cross-provider tools; the provider-specific call belongs to whichever
+    // integration answers (docs/agent-tools.md § issue_detail, § issue_comment and issue_image).
     'issue_detail',
+    'issue_comment',
+    'issue_image',
   ]
   // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
   const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']

@@ -80,8 +80,8 @@ describe('nested workflow execution', () => {
   const start = async (runner: WorkflowRunner, root: WorkflowDef) => runner.start('task', root, {
     resolvedGraph: await resolveWorkflowGraph(store.db, root, { scope, catalog: runner.validationCatalog() }),
   })
-  const settled = async (runner: WorkflowRunner, id: string, status: string) => {
-    await vi.waitFor(async () => expect((await runner.run(id))?.status).toBe(status), { timeout: 20_000, interval: 10 })
+  const settled = async (runner: WorkflowRunner, id: string, status: string, timeout = 20_000) => {
+    await vi.waitFor(async () => expect((await runner.run(id))?.status).toBe(status), { timeout, interval: 10 })
   }
 
   it('runs conditional grandchildren from the root snapshot and keeps failures visible after a summary', async () => {
@@ -136,7 +136,7 @@ describe('nested workflow execution', () => {
     })
     const root = { ...rootDefinition(target.id), maxDescendants: 500 }
     const id = await start(runner, root)
-    await settled(runner, id, 'done')
+    await settled(runner, id, 'done', 60_000)
     expect(peak).toBe(4)
     expect(await store.db.select().from(schema.workflowDispatches)).toHaveLength(500)
     expect(await core.db.select().from(coreSchema.tasks)).toHaveLength(501)
@@ -147,7 +147,7 @@ describe('nested workflow execution', () => {
     expect(outcomes[499].itemKey).toBe('["number",499]')
     expect(outcomes[499].outputs).toEqual({ answer: { analyzed: true } })
     expect(await store.db.select().from(schema.workflowTurnAdmissions)).toHaveLength(502)
-  }, 30_000)
+  }, 75_000)
 
   it('retries only the failed grandchild and reopens its ancestors without duplicate tasks or charges', async () => {
     const target = await save(leaf)

@@ -13,6 +13,7 @@ import { providerRefusal } from '../../integrations/respondProvider'
 import { isProviderOperationError, ProviderOperationError } from '../../integrations/types'
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
+import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
@@ -191,6 +192,7 @@ export const tasks = new Hono<AppEnv>()
         .insert(schema.taskLinks)
         .values(links.map((l) => ({ taskId: id, integrationId: l.connectionId, provider: l.providerId, identifier: l.identifier, refJson: l.ref ? JSON.stringify(l.ref) : null, createdAt: now })))
         .onConflictDoNothing()
+      warmItemDetails({ db, secrets: c.env.SECRETS }, uid, links)
     }
     // Every write on this router announces itself (server/notify.ts § broadcastTasksChanged). The task
     // list is what the rail draws, so a second window that missed a create used to sit on a stale list
@@ -258,7 +260,10 @@ export const tasks = new Hono<AppEnv>()
       .values({ taskId: id, integrationId: link.connectionId, provider: link.providerId, identifier: link.identifier, refJson: link.ref ? JSON.stringify(link.ref) : null, createdAt: Date.now() })
       .onConflictDoNothing()
       .returning({ taskId: schema.taskLinks.taskId })
-    if (inserted) broadcastTasksChanged({ taskId: id })
+    if (inserted) {
+      warmItemDetails({ db, secrets: c.env.SECRETS }, ownerId(c), [link])
+      broadcastTasksChanged({ taskId: id })
+    }
     return c.json({ ok: true })
   })
   .delete('/:id/links', async (c) => {

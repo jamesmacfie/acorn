@@ -2,6 +2,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
+  fetchLinearUpload,
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
   type LinearNode,
@@ -12,6 +13,7 @@ import {
   linearData,
   linearError,
   linearFetch,
+  linearUploadTarget,
 } from '..'
 import {
   type AppEnv,
@@ -31,6 +33,7 @@ import {
 } from '@acorn/plugin-api/node'
 import { connectionName } from '@acorn/protocol/integrations.ts'
 import {
+  createLinearComment,
   LINEAR_ISSUES_RESOURCE,
   linearNodeToDetail,
   linearProvider,
@@ -62,22 +65,9 @@ const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) sa
 const commentBody = z.object({ body: z.string(), parentId: z.string().optional() })
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === LINEAR_ISSUES_RESOURCE)!.ttlMs
 
-// The only host /uploads will spend a credential against: docs/integrations.md § Linear. Exported and
-// pure so a branch carrying the owner's Linear key can be checked without standing up a request context.
-const UPLOAD_HOST = 'uploads.linear.app'
-export const linearUploadTarget = (raw: string | undefined): URL | null => {
-  let url: URL
-  try {
-    url = new URL(raw ?? '')
-  } catch {
-    return null
-  }
-  return url.protocol === 'https:' && url.hostname === UPLOAD_HOST ? url : null
-}
 // Generous size for a ticket screenshot. The upload crosses as base64 inside a JSON body over a
 // MessagePort into an iframe, so a large video attachment would stall the frame rather than draw inline.
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
-const UPLOAD_TIMEOUT_MS = 30_000
 
 // The portable carrier: docs/plugins.md § Loaded plugins. Linear ships loaded, so these routes run on
 // the one tier a loaded plugin gets, and the identity-bound runtime rides in through `c.env`.
@@ -422,12 +412,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     // the connection was granted; the descriptor is only its default.
     if (!connectionHasCapability(resolved.row, 'comments')) return respondError(c, 403, 'provider_missing_scope')
 
-    const input: Record<string, unknown> = { issueId, body: body.trim() }
-    if (parentId) input.parentId = parentId
     try {
-      const mutation = linearProvider.mutations!.find((item) => item.id === 'linear.comment')!
       await providerRequestScheduler.run(PROVIDER, resolved.row.id, linearProvider.budgets, () =>
-        mutation.run!({ secret: resolved.key, input }),
+        createLinearComment(resolved.key, { issueId, body: body.trim(), ...(parentId ? { parentId } : {}) }),
       )
     } catch (error) {
       if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
@@ -449,8 +436,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     // Same shape as the detail route above: without ?integration, which workspace owns this file is
     // exactly what is unknown, so ask each in turn and take the first that answers.
     for (const { key } of candidates) {
-      // Longer than an API call because this is a download, still bounded because it is a fetch.
-      const res = await fetch(target, { headers: { Authorization: key }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(() => null)
+      const res = await fetchLinearUpload(key, target)
       if (!res?.ok) continue
       // Images only. Anything else is either a document the reader should open in Linear, or a content
       // type this route has no business turning into a `data:` URL.

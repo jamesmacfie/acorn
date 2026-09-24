@@ -239,8 +239,29 @@ export const ISSUE_DETAIL_QUERY = `query($filter: IssueFilter) {
 // Resolve just the issue UUID (needed for commentCreate, which keys off the internal id).
 export const ISSUE_ID_QUERY = `query($filter: IssueFilter) { issues(filter: $filter, first: 1) { nodes { id } } }`
 
-// Create a comment (optionally a threaded reply via parentId). Returns the new comment id.
-export const COMMENT_CREATE = `mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success comment { id } } }`
+// Create a comment (optionally a threaded reply via parentId). Linear also takes a client-chosen UUID
+// as `id`, so a retried request with the same one fails instead of posting twice.
+export const COMMENT_CREATE = `mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success comment { id url } } }`
+
+// The only host this plugin will spend a credential downloading from: docs/integrations.md § Linear.
+// Pure, so a branch carrying the owner's Linear key can be checked without a request context.
+const UPLOAD_HOST = 'uploads.linear.app'
+export const linearUploadTarget = (raw: string | undefined): URL | null => {
+  let url: URL
+  try {
+    url = new URL(raw ?? '')
+  } catch {
+    return null
+  }
+  return url.protocol === 'https:' && url.hostname === UPLOAD_HOST ? url : null
+}
+
+// Longer than an API call because this is a download, still bounded because it is a fetch.
+const UPLOAD_TIMEOUT_MS = 30_000
+
+/** One private upload, fetched with the key that can read it. Null when the fetch fails outright. */
+export const fetchLinearUpload = (apiKey: string, target: URL): Promise<Response | null> =>
+  fetch(target, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(() => null)
 
 // "ENG-123" → { key: 'ENG', number: 123 }; null if it isn't a valid identifier.
 export function parseIdentifier(id: string): { key: string; number: number } | null {

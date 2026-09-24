@@ -33,9 +33,8 @@ describe('integration provider conformance', () => {
       })
 
       it('fulfills every declared capability obligation', () => {
-        if (provider.capabilities.comments === 'write') {
-          expect(provider.mutations?.some((mutation) => mutation.capability === 'comments' && mutation.invalidates.length > 0)).toBe(true)
-        }
+        if (provider.capabilities.comments === 'write') expect(provider.comment).toBeTypeOf('function')
+        if (provider.image) expect(provider.detail).toBeTypeOf('function')
         if (provider.capabilities.contextFormat) {
           expect(provider.codec).toBeDefined()
           expect(provider.taskContext).toBeDefined()

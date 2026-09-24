@@ -15,9 +15,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [legacy/](./legacy/README.md) | Architecture review, plugin ownership, compatibility removal, and a coordinated version-1 reset. Evidence, target contracts, and 13 implementation tickets. | Tickets 01–12 implemented; ticket 13 acceptance recorded with host limits, 2026-09-23. |
-| [workflow_tasks/](./workflow_tasks/README.md) | The shipped child-task workflow programme and links to its owning documentation. | Shipped, 2026-09-13. |
-| [workflow_v2/](./workflow_v2/README.md) | Shared plugin data, typed workflows, simple authoring, dashboards, AI discovery, and scheduling. Twenty implementation slices with contracts and UX flows. | Implementation complete, 2026-09-20. Connected-provider and model, native desktop keyboard, and full-suite evidence remain. |
-| [scheduled_workflows/](./scheduled_workflows/README.md) | Historical scheduling proposal retained for background. Follow workflow v2 instead. | Superseded, 2026-09-13. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
