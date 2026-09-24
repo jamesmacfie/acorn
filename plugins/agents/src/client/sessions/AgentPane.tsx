@@ -134,7 +134,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               )}
             >
               {(menu) => (
-                <For each={model.sessionActions()}>
+                <For each={model.sessionActions().filter((item) => props.task.status === 'active' || READS_STORED_SESSION.has(item.id))}>
                   {(item) => (
                     <Menu.Item
                       context={menu}
@@ -152,6 +152,8 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         )}}
       </Show>
       <AgentUsageIndicator />
+      {/* An archived task has no worktree to start a session in (docs/panes.md § Contributions). */}
+      <Show when={props.task.status === 'active'}>
       <Picker<AgentProviderDescriptor>
         label="New"
         ariaLabel="New session"
@@ -177,9 +179,14 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           />
         }
       />
+      </Show>
     </Toolbar>
   )
 }
+
+// The session actions an archived task keeps, because they only read or relabel what is stored. Fork,
+// retry, compact and the terminal hand-offs all start a harness, and the task has no worktree for one.
+const READS_STORED_SESSION: ReadonlySet<string> = new Set(['regenerate-title', 'rename', 'export-markdown', 'export-json', 'archive'])
 
 /** Nothing open yet: one card per harness this node can run. */
 function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
@@ -261,8 +268,10 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
 
 export default function AgentPaneDetail(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
+  const archived = () => props.task.status !== 'active'
   // The header's ••• menu, in the palette too, for as long as this region is mounted (../commands.ts).
-  registerSessionActionCommands(model)
+  // Not for an archived task: most of those actions start work, and the preview has nowhere to run it.
+  if (!archived()) registerSessionActionCommands(model)
   return (
     <>
       <AgentDetailHeader task={props.task} model={model} />
@@ -271,9 +280,23 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
           (./AgentConversation.tsx). The run pane draws the same three through a capability, so a
           session reads the same way wherever you found it. `autoFocus` is this pane's: a session
           started here is one you are about to type into. */}
-      <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} model={model} />}>
+      {/* An archived task opens read-only in the archive page's preview. Its transcripts are all still
+          here, but it has no worktree to start or continue a session in, so there is nothing to type
+          into and no new session to offer. */}
+      <Show
+        when={model.selected()}
+        fallback={archived()
+          ? <EmptyState title="This task is archived">Pick a session to read it. Restore the task to start a new one.</EmptyState>
+          : <AgentProviderCards task={props.task} model={model} />}
+      >
         {(narrowed) => (
-          <AgentConversation sessionId={narrowed().id} viewKeyPrefix="agents" autoFocus />
+          <AgentConversation
+            sessionId={narrowed().id}
+            viewKeyPrefix="agents"
+            autoFocus={!archived()}
+            composerDisabled={archived()}
+            note={archived() ? 'This task is archived. Restore it to send a message.' : undefined}
+          />
         )}
       </Show>
       <AgentSessionDialogs task={props.task} model={model} />

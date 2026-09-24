@@ -6,8 +6,8 @@ import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
-import { archiveTask, runTeardownProcess, type ArchiveDeps } from './archive'
-import { computeTaskStatuses, taskRoot } from '../worktrees/taskWorktree'
+import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
+import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
 
 // Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
 // parallel run. Matches the other git-backed suites (plugins/changes/main/localGitService.test.ts).
@@ -252,5 +252,46 @@ describe('archiveTask teardown ordering', () => {
     const [row] = await t.db.select().from(schema.tasks)
     expect(row.status).toBe('archived')
     expect(row.worktreePath).toBeNull()
+  })
+
+  describe('restoreTask', () => {
+    const archived = async () => {
+      setWorktreesRoot(join(dir, 'worktrees'))
+      writeFileSync(join(worktree, 'kept.txt'), 'committed')
+      git(worktree, 'add', '.')
+      git(worktree, 'commit', '-q', '-m', 'work')
+      expect(await archiveTask(t.db, 'task1', {}, deps())).toEqual({ ok: true })
+    }
+    const row = async () => (await t.db.select().from(schema.tasks))[0]!
+
+    it('rebuilds the worktree on the same branch, with its committed work', async () => {
+      await archived()
+      expect(await restoreTask(t.db, 'task1')).toEqual({ ok: true })
+      const restored = await row()
+      expect(restored.status).toBe('active')
+      expect(restored.archivedAt).toBeNull()
+      expect(readFileSync(join(restored.worktreePath!, 'kept.txt'), 'utf8')).toBe('committed')
+    })
+
+    it('asks before restoring onto a branch that no longer exists', async () => {
+      await archived()
+      git(checkout, 'branch', '-D', 'feat/x')
+      const refused = await restoreTask(t.db, 'task1')
+      expect(refused).toMatchObject({ ok: false, branchMissing: true })
+      expect((await row()).status).toBe('archived')
+      expect(await restoreTask(t.db, 'task1', { newBranch: true })).toEqual({ ok: true })
+      expect((await row()).status).toBe('active')
+    })
+
+    it('stays archived when the branch is checked out somewhere else', async () => {
+      await archived()
+      git(checkout, 'worktree', 'add', '-q', join(dir, 'elsewhere'), 'feat/x')
+      const refused = await restoreTask(t.db, 'task1')
+      expect(refused.ok).toBe(false)
+      const kept = await row()
+      expect(kept.status).toBe('archived')
+      expect(kept.archivedAt).not.toBeNull()
+      expect(kept.worktreePath).toBeNull()
+    })
   })
 })

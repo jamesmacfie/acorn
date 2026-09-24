@@ -73,6 +73,7 @@ Run by the node, with or without a client attached.
 | Typed data sources | Both | `ctx.dataSources.register` / `contributions.dataSources` | Bounded typed record reads |
 | Source discovery | Both | `ctx.dataSources.discover` / `contributions.dataSourceDiscoveries` | Scoped dynamic source catalogues |
 | Task checks | Both | `ctx.taskChecks` / `contributions.taskChecks` | The archive gate |
+| Search providers | Compiled | `ctx.search` | The grouped search the archive page draws (docs/plugins.md § Search providers). **Direction: gains a manifest twin** when a loaded plugin wants to be searchable. A provider answers a query with plain-data hits, so the twin is a route the host calls, the same shape task checks already use. |
 | Runs | Both | `ctx.runs` | The merged run list at Settings → Runs. A pointer at a route that lists this plugin's runs |
 | Audit actions | Both | `ctx.audit` / `contributions.auditActions` | The owner-readable trail, qualified `<pluginId>:<actionId>` (docs/security.md § Audit) |
 | Extension points | Both | `ctx.extensionPoints` (`declare` / `handle` / `handlers`) | The node's many-to-many seam for typed values: one plugin declares a point, any number fill it |

@@ -257,7 +257,7 @@ For more information, see model providers in [the integrations doc](./integratio
 | `PATCH` | `/v2/core/projects/:id` | Update project identity, colour, folder, or visibility |
 | `GET` | `/v2/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
 | `PUT` | `/v2/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
-| `GET` | `/v2/core/tasks` | List active tasks on this Node |
+| `GET` | `/v2/core/tasks` | List active tasks on this Node, or archived ones newest first with `?status=archived` |
 | `POST` | `/v2/core/tasks` | Create a task |
 | `PATCH` | `/v2/core/tasks/:id` | Update task metadata or archive/activate a task |
 | `POST` | `/v2/core/tasks/:id/links` | Add an external item link |
@@ -266,6 +266,7 @@ For more information, see model providers in [the integrations doc](./integratio
 | `GET` | `/v2/core/tasks/:id/tools` | List task agent tools |
 | `POST` | `/v2/core/tasks/:id/tools/:name` | Invoke an authorized task tool |
 | `GET` | `/v2/core/agent-tools` | Catalog tools for Settings |
+| `GET` | `/v2/core/search` | Search core and every plugin's search provider, grouped (`?q=`, `?archived=1`, `?workspaceId=`). Device-only |
 
 Task-addressed routes are guarded by the `taskId` in a task-scoped internal token. Task lifecycle,
 worktree, run-target, and repo-config authority remains in core.
@@ -278,7 +279,7 @@ The core worktree router covers project configuration and task lifecycle surface
 /v2/core/task-statuses
 /v2/core/projects/:id/run-targets
 /v2/core/projects/:id/config
-/v2/core/tasks/:id/{preview-url,on-created,archive}
+/v2/core/tasks/:id/{preview-url,on-created,archive,restore}
 /v2/core/tasks/:id/{mcp,mcp/starter}
 /v2/core/tasks/:id/config-trust
 /v2/core/tasks/:id/run/*

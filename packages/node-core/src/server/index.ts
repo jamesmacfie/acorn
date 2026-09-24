@@ -7,6 +7,7 @@ import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/security/audit'
 import { runs } from './routes/runs'
+import { search } from './routes/search'
 import { backup } from './routes/security/backup'
 import { security } from './routes/security/security'
 import { attachment } from './routes/attachment'
@@ -125,6 +126,10 @@ export function createApp() {
     // roster of what this machine can spend, and no task-scoped child has any use for it.
     .use(`${CORE_NAMESPACE}/models`, requireDevice)
     .use(`${CORE_NAMESPACE}/models/*`, requireDevice)
+    // Search reaches every task's history across every plugin, archived or not. The archive page is
+    // the only caller and it is a device surface, so no task-scoped child gets a door onto the rest.
+    .use(`${CORE_NAMESPACE}/search`, requireDevice)
+    .use(`${CORE_NAMESPACE}/search/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/authoring`, requireDevice)
     .use(`${CORE_NAMESPACE}/authoring/*`, requireDevice)
     // Telemetry another runtime collected. Device-only for a different reason from the rest of this
@@ -145,6 +150,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/data-sources`, dataSources)
     .route(`${CORE_NAMESPACE}/queries`, queries)
     .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Runs: every plugin's runs, merged (@acorn/protocol/runs.ts)
+    .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins.md § Search providers)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer.md § Backup: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/projects`, projects)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)

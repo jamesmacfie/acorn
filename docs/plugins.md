@@ -180,6 +180,11 @@ in the frame — with a complete worked example.
 
 [Task checks](plugins/client-authoring-and-the-ui-kit.md#task-checks)
 
+## Search providers
+
+
+[Search providers](plugins/client-authoring-and-the-ui-kit.md#search-providers)
+
 ## Harnesses
 
 

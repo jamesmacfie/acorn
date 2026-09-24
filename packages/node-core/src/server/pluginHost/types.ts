@@ -15,6 +15,7 @@ import type { Extension, ExtensionPointId } from './extensionPoints'
 import type { PluginContextSection } from '../agentTools/contextSections'
 import type { PluginHarnessRegistry } from './harnesses'
 import type { TaskCheck } from './taskChecks'
+import type { SearchProvider } from './search'
 import type { AppEnv, Principal } from '../middleware/auth'
 import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../transport/wsHub'
@@ -149,6 +150,13 @@ export type PluginSchedule = {
 // binds the owner, qualifies every concern id, bounds the call and ties removal to teardown.
 export type PluginTaskCheckRegistry = {
   register(check: TaskCheck): void
+}
+
+// What this plugin can find for a search, and how a hit opens (./search.ts). See docs/plugins.md §
+// Search providers. The host binds the owner, bounds the call, sanitises the hits and ties removal to
+// teardown.
+export type PluginSearchRegistry = {
+  register(provider: SearchProvider): void
 }
 
 /**
@@ -454,6 +462,9 @@ export type CompiledNodePluginContext = NodePluginContext & {
   contextSections: PluginContextSectionRegistry
   providers: CompiledPluginProviderRegistry
   events: CompiledPluginBroadcast
+  // Compiled only for now: no loaded plugin has asked to be searchable. Its twin would be a manifest
+  // route the host calls with the query, the way task checks work (docs/contribution-kinds.md).
+  search: PluginSearchRegistry
 }
 
 // The two seams the host fills in on a plugin's behalf, kept off the authoring types above.

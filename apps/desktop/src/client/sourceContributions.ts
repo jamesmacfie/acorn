@@ -5,6 +5,7 @@ import { CREATE_TASK_ROUTE, PROJECT_ROUTE } from '@acorn/client-core/host/regist
 
 const Home = lazy(() => import('@acorn/client-core/features/workspaces/Home.tsx'))
 const FleetHome = lazy(() => import('@acorn/client-core/features/fleet/FleetHome.tsx'))
+const ArchivePage = lazy(() => import('@acorn/client-core/features/archive/ArchivePage.tsx'))
 
 export const coreSourceContributions: SourceContribution[] = [
   {
@@ -26,5 +27,14 @@ export const coreSourceContributions: SourceContribution[] = [
     label: 'Fleet',
     when: () => nodes().length > 1,
     component: FleetHome,
+  },
+  // Last in the rail: somewhere to look for finished work, not somewhere to work
+  // (docs/workspaces-and-tasks.md § Restoring a task).
+  {
+    id: 'archive',
+    order: 90,
+    glyph: 'archive',
+    label: 'Archive',
+    component: ArchivePage,
   },
 ]

@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { and, eq, inArray, max } from 'drizzle-orm'
+import { and, desc, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { broadcastTasksChanged } from '../../notify'
 import { Hono } from 'hono'
-import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
+import { ICON_NAME_RE, type ArchivedTask, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../../integrations/connections'
 import { providerRefusal } from '../../integrations/respondProvider'
@@ -122,9 +122,16 @@ export const tasks = new Hono<AppEnv>()
   // title, branch and absolute worktree path, so the unfiltered list hands an agent the shape of every
   // other piece of work on the machine. Its own row still comes back, because the renderer surfaces a
   // frame draws are entitled to it.
+  //
+  // `?status=archived` is the archive page's list instead: archived tasks, newest first, each with its
+  // `archivedAt` (docs/workspaces-and-tasks.md § Restoring a task). Unbounded, like the active list. A
+  // few hundred rows is a small scan; page it if a node ever holds thousands.
   .get('/', async (c) => {
     const db = getDb(c.env)
-    const all = await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
+    const archived = c.req.query('status') === 'archived'
+    const all = archived
+      ? await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'archived')).orderBy(desc(schema.tasks.archivedAt))
+      : await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
     const rows = isTaskConfined(c) ? all.filter((row) => mayActOnTask(c, row.id)) : all
     if (!rows.length) return c.json([] as Task[])
     const ids = rows.map((r) => r.id)
@@ -146,7 +153,12 @@ export const tasks = new Hono<AppEnv>()
         projects.set(project.id, project)
       }
     }
-    return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? projects.get(r.projectId) ?? null : null)).filter((task): task is Task => task !== null))
+    const list = rows.flatMap((r) => {
+      const task = rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? projects.get(r.projectId) ?? null : null)
+      if (!task) return []
+      return [archived ? { ...task, archivedAt: r.archivedAt ?? r.updatedAt } satisfies ArchivedTask : task]
+    })
+    return c.json(list)
   })
   .post('/', async (c) => {
     const parsedSeed = taskSeedBody.safeParse(await c.req.json().catch(() => null))

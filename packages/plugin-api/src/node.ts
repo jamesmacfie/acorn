@@ -29,6 +29,9 @@ export type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acor
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
 // an inline literal, and a function needs a return type to name (server/pluginHost/taskChecks.ts).
 export type { TaskConcern } from '@acorn/node-core/server/pluginHost/taskChecks.ts'
+// What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
+export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost/search.ts'
+export type { SearchHit } from '@acorn/protocol/search.ts'
 // The major this build of the API speaks. docs/plugins.md § The plugin API covers what it guards, and
 // why it is the one name kept without a consumer.
 //

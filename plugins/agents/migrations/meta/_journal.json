@@ -36,6 +36,13 @@
       "when": 1789202450404,
       "tag": "0004_lazy_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790237336466,
+      "tag": "0005_agent_events_fts_messages",
+      "breakpoints": true
     }
   ]
 }

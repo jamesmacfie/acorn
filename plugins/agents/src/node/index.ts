@@ -235,6 +235,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
       // pointer at the route above; nothing here knows workflows is on the same list.
       ctx.runs.register({ runs: '/v2/p/agents/runs' })
+      // Transcripts for the archive page's search (docs/plugins.md § Search providers).
+      ctx.search.register({
+        id: 'sessions',
+        label: 'Agent sessions',
+        search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
+      })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).

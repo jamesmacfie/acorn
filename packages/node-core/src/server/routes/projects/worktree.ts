@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '@acorn/protocol/mcp.ts'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
-import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
+import { archiveTask, restoreTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
@@ -54,6 +54,7 @@ const archiveBody = z.object({
   // ceiling and no dialog has ever drawn thirty-two rows.
   applyChecks: z.array(z.string().min(1).max(200)).max(32).optional(),
 })
+const restoreBody = z.object({ newBranch: z.boolean().optional() })
 
 async function capturePreviewUrl(
   db: ReturnType<typeof getDb>,
@@ -178,6 +179,11 @@ export const worktree = new Hono<AppEnv>()
     const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, TASK_SESSIONS, (sessions) => archive(getDb(c.env), c.req.param('id'), parsed.data, sessions))
+  })
+  .post('/tasks/:id/restore', async (c) => {
+    const parsed = restoreBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return c.json(await restoreTask(getDb(c.env), c.req.param('id'), parsed.data))
   })
   .get('/tasks/:id/mcp', async (c) => c.json(await inspectTaskMcp(getDb(c.env), c.req.param('id'))))
   .post('/tasks/:id/mcp/starter', async (c) => {

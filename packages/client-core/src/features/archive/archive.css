@@ -1,0 +1,6 @@
+/* The archive page's preview (./ArchivePage.tsx): a header over the ordinary pane host. The pane
+   switcher is fixed to the window's right edge, as it is in a task view, so the preview reserves that
+   edge the same way .workspace-wrap does (../tasks/task-view.css). */
+.archive-preview { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; padding-right: var(--tabrail-w); }
+.archive-preview-head { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--pane-pad); border-bottom: var(--chrome-divider); }
+.archive-preview-panes { flex: 1; display: flex; min-width: 0; min-height: 0; }

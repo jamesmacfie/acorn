@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, like, ne, or, sql } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lte, ne, or, sql } from 'drizzle-orm'
+import type { CoreServices, PluginDatabase, SearchHit } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
   AgentEventRecord,
@@ -16,6 +16,7 @@ import type { RemovedArtifactObject } from './artifactStore'
 import { eventSubagentId, foldSubagentRoster, projectAgentEvent, touchSubagentRoster } from './stateMachine'
 import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
 import { AgentLifecycle } from './lifecycle'
+import { continuesStream, isAppendDelta } from './durableEventBuffer'
 import { normalizeStoredSessionTitle } from './sessionTitle'
 
 const now = (): number => Date.now()
@@ -35,6 +36,15 @@ const parseSubagents = (value: string | null): AgentSubagent[] => {
 // `undefined` in, `undefined` out, because the column is only written when something changed.
 const jsonOrUndefined = (roster: AgentSubagent[] | undefined): string | undefined =>
   roster ? JSON.stringify(roster) : undefined
+
+// Every word as a quoted FTS5 term, so punctuation in a query is text and never query syntax. The terms
+// are ANDed: a row matches when it holds all of them.
+const ftsTerms = (query: string): string => query
+  .split(/\s+/)
+  .map((term) => term.replace(/"/g, ''))
+  .filter(Boolean)
+  .map((term) => `"${term}"`)
+  .join(' ')
 
 type SessionSearchFilter = {
   taskId?: string
@@ -144,7 +154,7 @@ export class AgentSessionRepository {
         seq,
         schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
         eventJson: JSON.stringify(event),
-        searchText: agentEventSearchText(event),
+        searchText: this.appendToStreamHead(tx, sessionId, current.lastEventSeq, turnId, event) ? null : agentEventSearchText(event),
         createdAt: timestamp,
       }
       tx.insert(schema.agentEvents).values(values).run()
@@ -159,6 +169,48 @@ export class AgentSessionRepository {
       await this.lifecycle.announceRequest(sessionId, event.requestId)
     }
     return mapAgentEvent(committed.row)
+  }
+
+  // A reply streams in as many small `append` events, and indexing each one on its own meant a search
+  // for two words only matched when both landed in the same fragment. So a fragment that continues the
+  // previous event's stream adds its text to the stream's first event and is not indexed itself. The
+  // first event is the latest one in the session that has search text, because every event after it is
+  // a continuation with none (migrations/0005 applied the same rule to existing rows).
+  //
+  // Each fragment rewrites the message's search row, so a message costs its length times its fragment
+  // count to index. Fine for replies of a few kilobytes. Index on stream close if very long replies
+  // make writes slow.
+  private appendToStreamHead(
+    tx: Parameters<Parameters<PluginDatabase['transaction']>[0]>[0],
+    sessionId: string,
+    previousSeq: number,
+    turnId: string | null,
+    event: AgentNormalizedEvent,
+  ): boolean {
+    if (!isAppendDelta(event) || previousSeq < 1) return false
+    const previous = tx
+      .select({ turnId: schema.agentEvents.turnId, eventJson: schema.agentEvents.eventJson })
+      .from(schema.agentEvents)
+      .where(and(eq(schema.agentEvents.sessionId, sessionId), eq(schema.agentEvents.seq, previousSeq)))
+      .get()
+    if (!previous || !continuesStream({ turnId: previous.turnId, event: JSON.parse(previous.eventJson) as AgentNormalizedEvent }, { turnId, event })) return false
+    const head = tx
+      .select({ id: schema.agentEvents.id })
+      .from(schema.agentEvents)
+      .where(and(
+        eq(schema.agentEvents.sessionId, sessionId),
+        lte(schema.agentEvents.seq, previousSeq),
+        isNotNull(schema.agentEvents.searchText),
+      ))
+      .orderBy(desc(schema.agentEvents.seq))
+      .limit(1)
+      .get()
+    if (!head) return false
+    tx.update(schema.agentEvents)
+      .set({ searchText: sql`${schema.agentEvents.searchText} || ${event.text}` })
+      .where(eq(schema.agentEvents.id, head.id))
+      .run()
+    return true
   }
 
   private applyEventProjection(
@@ -474,12 +526,7 @@ export class AgentSessionRepository {
 
   async searchSessions(query: string, filter: SessionSearchFilter = {}): Promise<AgentSession[]> {
     const bounded = Math.min(Math.max(filter.limit ?? 50, 1), 100)
-    const terms = query
-      .split(/\s+/)
-      .map((term) => term.replace(/"/g, ''))
-      .filter(Boolean)
-      .map((term) => `"${term}"`)
-      .join(' ')
+    const terms = ftsTerms(query)
     if (!terms) return []
     const escapedLike = `%${query.replace(/[%_]/g, '\\$&')}%`
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
@@ -562,6 +609,63 @@ export class AgentSessionRepository {
       })
       .slice(0, bounded)
       .map(mapAgentSession)
+  }
+
+  // The search provider's answer (server/pluginHost/search.ts in node-core): one hit per session in the
+  // given tasks, best match first, with an excerpt of the event that matched. Archived sessions and
+  // sessions retired with their task count, because the caller already chose the tasks.
+  //
+  // Three reads rather than one grouped query, because FTS5 cannot compute `snippet()` inside an
+  // aggregate. The ranked read is capped, and excerpts are built only for the rows that become hits.
+  async searchTaskSessions(query: string, taskIds: readonly string[], limit: number): Promise<SearchHit[]> {
+    const terms = ftsTerms(query)
+    if (!terms || !taskIds.length) return []
+    const inTasks = sql.join(taskIds.map((id) => sql`${id}`), sql`, `)
+    const ranked = await this.db.all<{ rowid: number; sessionId: string }>(sql`
+      SELECT rowid, session_id AS sessionId
+      FROM agent_events_fts
+      WHERE agent_events_fts MATCH ${terms}
+        AND session_id IN (SELECT id FROM agent_sessions WHERE task_id IN (${inTasks}))
+      ORDER BY rank
+      LIMIT 200
+    `)
+    const best = new Map<string, number>()
+    for (const row of ranked) if (!best.has(row.sessionId) && best.size < limit) best.set(row.sessionId, row.rowid)
+    const escapedLike = `%${query.replace(/[%_]/g, '\\$&')}%`
+    const titled = await this.db
+      .select({ id: schema.agentSessions.id })
+      .from(schema.agentSessions)
+      .where(and(inArray(schema.agentSessions.taskId, [...taskIds]), like(schema.agentSessions.title, escapedLike)))
+      .limit(limit)
+    const ids = [...new Set([...best.keys(), ...titled.map((row) => row.id)])].slice(0, limit)
+    if (!ids.length) return []
+    const rowids = [...best.values()]
+    const [excerpts, sessions] = await Promise.all([
+      rowids.length
+        ? this.db.all<{ rowid: number; preview: string }>(sql`
+            SELECT rowid, snippet(agent_events_fts, -1, '', '', '…', 16) AS preview
+            FROM agent_events_fts
+            WHERE agent_events_fts MATCH ${terms} AND rowid IN (${sql.join(rowids.map((id) => sql`${id}`), sql`, `)})
+          `)
+        : Promise.resolve([]),
+      this.db
+        .select({ id: schema.agentSessions.id, taskId: schema.agentSessions.taskId, title: schema.agentSessions.title })
+        .from(schema.agentSessions)
+        .where(inArray(schema.agentSessions.id, ids)),
+    ])
+    const previewByRow = new Map(excerpts.map((row) => [row.rowid, row.preview]))
+    const sessionById = new Map(sessions.map((row) => [row.id, row]))
+    return ids.flatMap((id) => {
+      const session = sessionById.get(id)
+      if (!session) return []
+      const rowid = best.get(id)
+      return [{
+        taskId: session.taskId,
+        title: session.title,
+        preview: rowid === undefined ? '' : previewByRow.get(rowid) ?? '',
+        target: { kind: 'managed-agent', resourceId: session.id },
+      }]
+    })
   }
 
   async activeTurn(sessionId: string): Promise<AgentTurn | null> {

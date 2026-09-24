@@ -26,4 +26,6 @@ export const prPaneContribution: PaneLayoutContribution = {
   minWidth: 520,
   layout: 'single',
   regions: { body: PrPane },
+  // The pull request is GitHub's and the mirror's, not the worktree's, so it reads the same archived.
+  readsArchived: true,
 }

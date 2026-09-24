@@ -429,6 +429,9 @@ node: RouteFailure
 node: RouteResult
 node: RunTarget
 node: ScheduleSkipped
+node: SearchHit
+node: SearchProvider
+node: SearchQuery
 node: SecretService
 node: SecretUnavailableError
 node: SessionTaskInfo
