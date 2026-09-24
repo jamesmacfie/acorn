@@ -30,6 +30,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
 | [security.md](./security.md) | The threat model, the trust boundaries, the containment ladder, and the audit trail. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
+| [security/node-plugin-security.md](./security/node-plugin-security.md) | The threat model and containment rules for loaded Node plugin code. |
 
 ## The renderer
 
@@ -42,6 +43,8 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [diff-rendering.md](./diff-rendering.md) | The diff model, the virtualizer, hydration, and the find pass. |
 | [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
 | [notifications.md](./notifications.md) | What an agent is doing, which changes are worth interrupting for, and the gate every channel hangs off. |
+| [ui-design/appearance.md](./ui-design/appearance.md) | Themes, style packs, and the appearance token axes. |
+| [ui-design/closed-kit.md](./ui-design/closed-kit.md) | The closed component kit and its extension rules. |
 
 ## Features
 
@@ -50,6 +53,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [features.md](./features.md) | The shipped product surfaces, one line each. |
 | [workspaces-and-tasks.md](./workspaces-and-tasks.md) | The product model: workspaces, projects, tasks, and worktrees. |
 | [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, managed delegation, approvals, artifacts, and usage. |
+| [managed-agents/client-surfaces.md](./managed-agents/client-surfaces.md) | Agent Center, task panes, transcript storage, and search. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
 | [findings.md](./findings.md) | Quiet task evidence, provenance, capture authority, history, and plugin collaboration contracts. |
@@ -59,6 +63,8 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
+| [workflows/execution.md](./workflows/execution.md) | Workflow graph execution, retries, recovery, and child tasks. |
+| [workflows/authoring.md](./workflows/authoring.md) | Workflow editor, scheduling, generation, drafts, and publication. |
 | [notes-and-memory.md](./notes-and-memory.md) | Task notes and the memory proposals loop. |
 | [http-client.md](./http-client.md) | The HTTP request pane and the outbound-request gap. |
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |
@@ -89,6 +95,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [telemetry.md](./telemetry.md) | The five record kinds, the switch, the collector, the scrubber, and what a sink can see. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
+| [tui/interaction.md](./tui/interaction.md) | Terminal key handling, focus, scrolling, and interaction telemetry. |
+| [tui/chrome-and-plugins.md](./tui/chrome-and-plugins.md) | Terminal chrome, loaded plugins, and their host fallbacks. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

@@ -89,7 +89,7 @@ Worth stating, because the hard parts are the ones that went well:
 
 ## http has moved, and the storage path is proven
 
-http is in neither compiled composition list; `id: "http"` is preserved so `/v2/p/http`, the pane's
+http is in neither compiled composition list; `id: "http"` is preserved so `/v1/p/http`, the pane's
 persisted layout key and `<dataRoot>/plugins/http.sqlite` all carry over. It was chosen because it
 owns tables, and that reason held: the manifest carrier, `ctx.storage.open()` and the loader's
 confinement all existed, but **`build-plugin.mjs` never staged the migrations directory into the
@@ -196,7 +196,7 @@ findings, and three are about the tier:
   against the same registry a frame's forwarded chords go through. The document is flushed before the
   command is posted, and that ordering is the contract rather than an implementation detail.
 - **A frame cannot see core's model connections, and no scope should let it.** The Generate button needs
-  to know whether a provider is connected; `/v2/core/integrations` has no bridge scope, and minting one
+  to know whether a provider is connected; `/v1/core/integrations` has no bridge scope, and minting one
   would hand every installed plugin the whole connection roster — every provider kind, not just model
   ones — to serve one dropdown. The answer was the read half of a seam this plugin already had:
   `CoreServices.models.available(userId)` beside `generateText`, projected through the plugin's own
