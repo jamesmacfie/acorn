@@ -11,6 +11,8 @@ export default defineConfig({
   build: {
     outDir: 'dist/bridge',
     emptyOutDir: true,
+    // public/ is the renderer's (startup-guard.js), and this build shares its root.
+    copyPublicDir: false,
     // The oldest engine any target ships. Nothing here is exotic; this only stops a downlevel
     // transform adding a helper the IIFE would then need to import.
     target: 'safari15',

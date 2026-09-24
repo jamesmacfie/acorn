@@ -13,6 +13,8 @@ export default defineConfig({
     // and the node finds its migrations chain by the walk-up in node-core's bindings.ts.
     outDir: 'dist/helper',
     emptyOutDir: false,
+    // public/ is the renderer's (startup-guard.js), and this build shares its root.
+    copyPublicDir: false,
     target: 'node24',
     ssr: true,
     rollupOptions: {
