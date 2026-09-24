@@ -376,9 +376,17 @@ Both clients have a build check over what they load before they draw, and both f
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and `modulepreload` the built `index.html` names: 1,250,000 B for scripts,
-  200,000 B for styles. It also prints how deep the static import chain from the entry goes, and how
-  many more chunks one dynamic import away would fetch, neither of which is counted.
+  `build`, sums every script and stylesheet a cold window loads: 1,250,000 B for scripts, 200,000 B
+  for styles. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
+  client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
+  chunk plus the modules in the script's `STARTUP_IMPORTS` list. Those are modules the page imports
+  dynamically but always loads before it draws, which is the one `src/client/bootstrap.ts`
+  imports. Every other dynamic import is lazy and is not counted. The count has a floor too. Under
+  100,000 B of scripts the check is reading the wrong graph, and it fails rather than passes. That is
+  how it went blind on 2026-09-24, when the entry became a 9.6 KB guard and the check reported 9.6 KB
+  while the window loaded 870 KB. The script also prints `hops`, the fetches that run one after
+  another before the app can start, and how much more one dynamic import away would fetch. Neither
+  of those is counted.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything

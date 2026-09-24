@@ -1,4 +1,5 @@
-import { resolve } from 'node:path'
+import { renameSync, rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 
@@ -18,6 +19,20 @@ export default defineConfig({
     // app://acorn/assets/x.js, and the emitted HTML keeps the /assets/... literals
     // scripts/check-renderer-budget.mjs parses.
     { name: 'acorn:absolute-base', config: () => ({ base: '/' }) },
+    // The chunk graph scripts/check-renderer-budget.mjs walks to find what a cold window loads. Vite
+    // writes its manifest inside the output, and the output ships whole, so it is moved beside the
+    // output once the bundle is written. It cannot be emitted there: Vite refuses a manifest path
+    // outside outDir.
+    {
+      name: 'acorn:renderer-graph',
+      apply: 'build',
+      config: () => ({ build: { manifest: true } }),
+      writeBundle({ dir }) {
+        if (!dir) return
+        renameSync(join(dir, '.vite/manifest.json'), join(dir, '../renderer-manifest.json'))
+        rmSync(join(dir, '.vite'), { recursive: true })
+      },
+    },
   ],
   // Which host the kit draws to (client-core kit/tokens/support.ts). Stated rather than left to the
   // default, so the two host packages read the same way and a bundle that lands on the wrong one is a
