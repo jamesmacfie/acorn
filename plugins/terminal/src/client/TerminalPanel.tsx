@@ -12,6 +12,8 @@ import {
 import { Drawer } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
 
+const PROFILES_STALE_MS = 5 * 60_000
+
 // Bottom drawer of persistent local sessions. The "+" opens a profile menu; the node resolves the
 // active project folder/worktree from the task id on a durable tmux backend. Sessions are scoped to
 // the active task, not the URL; switching tasks swaps the visible terminals.
@@ -68,7 +70,11 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     const def = prefs.data?.[PrefKeys.terminalRailDefault]
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
-    setProfiles(await api.profiles())
+    // Cached for a few minutes. The node answers by running `which` for tmux and every agent profile,
+    // about 18 ms of its loop, and the drawer remounts on every return to a task that has it open. The
+    // list changes when a harness lands on PATH, which nothing reports, so a short stale time is the
+    // refresh.
+    setProfiles(await queryClient.fetchQuery({ queryKey: ['terminal', 'profiles'], queryFn: () => api.profiles(), staleTime: PROFILES_STALE_MS }))
     // The shared store (init'd in App) owns the onStatus subscription; just ensure we're populated.
     await refreshSessions()
     if (willAutoLaunch && visibleSessions().length === 0) {
