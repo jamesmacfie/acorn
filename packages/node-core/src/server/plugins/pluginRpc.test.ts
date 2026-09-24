@@ -80,6 +80,32 @@ describe('plugin RPC synchronous replies', () => {
   })
 })
 
+// Each synchronous call used to allocate a 4 MiB reply buffer, which only the collectors of both
+// threads could free, so an idle node held hundreds of megabytes of them.
+describe('plugin RPC synchronous reply buffers', () => {
+  it('reuses one reply buffer for calls made one after another', async () => {
+    const { port1, port2 } = new MessageChannel()
+    const worker = new Worker(new URL('./__fixtures__/rpcWorker.ts', import.meta.url), {
+      workerData: { port: port2 },
+      transferList: [port2],
+    })
+    const replies = new Set<unknown>()
+    const post = port1.postMessage.bind(port1)
+    port1.postMessage = (message: { __acornRpc?: string; reply?: unknown }) => {
+      if (message?.__acornRpc === 'sync-call') replies.add(message.reply)
+      post(message)
+    }
+    const host = new PluginRpcEndpoint(port1, () => 'async')
+    try {
+      const plugin = host.decode(await new Promise((resolve) => port1.once('message', resolve)), 'plugin') as { pure(): string }
+      expect([plugin.pure(), plugin.pure(), plugin.pure()]).toEqual(['pure', 'pure', 'pure'])
+      expect(replies.size).toBe(1)
+    } finally {
+      await worker.terminate()
+    }
+  })
+})
+
 // The same plugin, two unrelated routes. Calls used to run one at a time, so a route waiting on a
 // slow provider stopped every other route on that plugin, and the fan-out's retries queued behind the
 // request that had already timed out.
