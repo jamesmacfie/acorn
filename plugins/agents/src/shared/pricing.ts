@@ -46,13 +46,6 @@ const matches = (pattern: RegExp) => (model: string) => pattern.test(model)
 const OPUS_CURRENT = { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 }
 const PREMIUM_FIVE = { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }
 
-function sonnetFivePrice(at: number): AgentModelPrice {
-  const standardStarts = new Date(2026, 8, 1).getTime()
-  return at < standardStarts
-    ? { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }
-    : { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }
-}
-
 // Standard global API prices per million tokens. The catalog entries are agent-plugin data: the client
 // renders them in settings and the node's collector resolves local Claude JSONL model ids through
 // the same definitions.
@@ -70,6 +63,14 @@ export const claudePriceCatalog: readonly AgentPriceCatalogEntry[] = [
     models: 'claude-mythos-5',
     matches: matches(/^(?:claude-)?mythos-?5(?:-|$)/i),
     defaultPrice: fixedPrice(PREMIUM_FIVE),
+  },
+  // Opus 5.5 sits before Opus 5 because the Opus 5 pattern also matches claude-opus-5-5.
+  {
+    id: 'opus-5-5',
+    label: 'Claude Opus 5.5',
+    models: 'claude-opus-5-5',
+    matches: matches(/^(?:claude-)?opus-?5[-.]5(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 }),
   },
   {
     id: 'opus-5',
@@ -97,7 +98,7 @@ export const claudePriceCatalog: readonly AgentPriceCatalogEntry[] = [
     label: 'Claude Sonnet 5',
     models: 'claude-sonnet-5',
     matches: matches(/^(?:claude-)?sonnet-?5(?:-|$)/i),
-    defaultPrice: sonnetFivePrice,
+    defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }),
   },
   {
     id: 'sonnet-4',
@@ -139,6 +140,20 @@ export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
     models: 'gpt-6-astra',
     matches: matches(/^gpt-6-astra(?:-|$)/i),
     defaultPrice: fixedPrice({ input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }),
+  },
+  {
+    id: 'gpt-6-sol',
+    label: 'GPT-6 Sol',
+    models: 'gpt-6-sol',
+    matches: matches(/^gpt-6-sol(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }),
+  },
+  {
+    id: 'gpt-6-luna',
+    label: 'GPT-6 Luna',
+    models: 'gpt-6-luna',
+    matches: matches(/^gpt-6-luna(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 0.1, output: 0.5, cacheWrite: 0.125, cacheRead: 0.01 }),
   },
   {
     id: 'gpt-5-6-terra',
