@@ -16,7 +16,6 @@ export function memorySection(source: ContextMemorySource): PluginContextSection
       const memories = task.projectId ? await source(task.id, task.projectId) : []
       return {
         items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
-        compatibility: { memory: memories },
       }
     },
     format(items, omitted) {

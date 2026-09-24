@@ -34,7 +34,7 @@ import type { ExternalItemStore } from '../integrations/itemStore'
 
 export type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
-  // task-scoped sub-resources. The effective mount is /v2/p/<plugin><prefix>.
+  // task-scoped sub-resources. The effective mount is /v1/p/<plugin><prefix>.
   prefix?: string
   note?: string
 }
@@ -273,12 +273,15 @@ export type PluginContextSectionRegistry = {
 // Connection, integration and model-provider descriptors are registered by the plugin that owns them.
 // The host validates provider ids and projects provider routes under the provider namespace.
 export type PluginProviderRegistry = {
-  // `route` is a built-in Hono router or a portable fetch handler, mounted at /v2/p/<provider.id>
+  // `route` is a built-in Hono router or a portable fetch handler, mounted at /v1/p/<provider.id>
   // through buildIntegrationProviderRoutes(). Both stay behind `requireProviderAccess`; loaded plugins
   // must use the fetch carrier.
   integration(provider: IntegrationProviderContribution, route?: Hono<AppEnv> | PluginFetchHandler): void
   // A provider that owns credentials but contributes no mirrored resources (the model providers).
   connection(provider: ConnectionProviderContribution): void
+  // The adapter's async generateText callback crosses the loaded-worker RPC boundary. Its input and
+  // result are portable values, so loaded and compiled providers use the same registration seam.
+  model(adapter: ModelProviderAdapter): void
   // A provider that knows about nodes, and optionally can make and remove them
   // (../nodeProviders/registry.ts, docs/plugins.md § Node providers). Host-qualified id, disposal on
   // unload, and `create` obliging `destroy`, validated at registration.
@@ -294,14 +297,6 @@ export type PluginProviderRegistry = {
     providerId: string,
     visit: PluginProviderConnectionVisitor<T>,
   ): Promise<T | undefined>
-}
-
-export type CompiledPluginProviderRegistry = PluginProviderRegistry & {
-  // A text-generation adapter for an already-registered connection provider. Register the connection
-  // first; the registry refuses an adapter naming an unknown one. An adapter is a set of live functions
-  // the host calls turn by turn, which is why it is compiled-only where `integration` is not
-  // (docs/contribution-kinds.md § Providers).
-  model(adapter: ModelProviderAdapter): void
 }
 
 // The client-notification surface, and the only one there is.
@@ -452,7 +447,6 @@ export type CompiledNodePluginContext = NodePluginContext & {
   routes: CompiledPluginRouteRegistry
   tools: PluginToolRegistry
   contextSections: PluginContextSectionRegistry
-  providers: CompiledPluginProviderRegistry
   events: CompiledPluginBroadcast
 }
 

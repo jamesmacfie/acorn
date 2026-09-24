@@ -24,7 +24,8 @@ const ok = {
 
 const v2 = (def: Omit<WorkflowDef, 'formatVersion'>): WorkflowDef => ({
   ...def,
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
 })
 
@@ -49,7 +50,7 @@ describe('which harness a step runs on', () => {
         notify: () => {},
       }, noExtensions)
       // No harness named, which is what the editor's "The workflow default" leaves behind.
-      await runner.start('task-1', v2({ name: 'W', steps: [{ name: 'look', kind: 'agent', prompt: 'go' }] }))
+      await runner.start('task-1', v2({ baseline: 'acorn-1' as const, name: 'W', steps: [{ name: 'look', kind: 'agent', prompt: 'go' }] }))
 
       // Not `undefined`. The managed path reads this to find a driver, and answers "no driver" for a
       // profile it cannot name — which used to send every default-harness step to a bare CLI process
@@ -89,7 +90,7 @@ describe('a step running in a managed session', () => {
 
     try {
       const runner = new WorkflowRunner(testDb.db, deps, noExtensions)
-      const runId = await runner.start('task-1', v2({
+      const runId = await runner.start('task-1', v2({ baseline: 'acorn-1' as const,
         name: 'Investigate',
         steps: [{ name: 'look', kind: 'agent', prompt: 'have a look' }],
       }))
@@ -144,7 +145,7 @@ describe('what a step that runs an agent is given', () => {
         failingChecks: async () => '',
         notify: () => {},
       }, noExtensions)
-      await runner.start('task-1', v2({
+      await runner.start('task-1', v2({ baseline: 'acorn-1' as const,
         name: 'W',
         steps: [
           { name: 'analyze', kind: 'agent', prompt: 'analyse it' },

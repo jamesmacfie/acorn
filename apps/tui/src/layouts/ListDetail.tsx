@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
+import type { LayoutProps } from '@acorn/client-core/host/layouts'
 import { Panel } from '../panel'
 import { ScrollViewport } from '../kit/scrolling'
 import { bindKeys } from '../keys/install'

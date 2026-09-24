@@ -14,30 +14,30 @@ import {
 
 describe('resolveDocumentRoute', () => {
   it('substitutes only the two parameters the host holds', () => {
-    expect(resolveDocumentRoute('/v2/p/db/tasks/:taskId/scratch', { taskId: 't1' }))
-      .toBe('/v2/p/db/tasks/t1/scratch')
-    expect(resolveDocumentRoute('/v2/p/db/projects/:projectId/doc', { projectId: 'p1' }))
-      .toBe('/v2/p/db/projects/p1/doc')
+    expect(resolveDocumentRoute('/v1/p/db/tasks/:taskId/scratch', { taskId: 't1' }))
+      .toBe('/v1/p/db/tasks/t1/scratch')
+    expect(resolveDocumentRoute('/v1/p/db/projects/:projectId/doc', { projectId: 'p1' }))
+      .toBe('/v1/p/db/projects/p1/doc')
     // Anything else in the path is the plugin's own business and is left alone.
-    expect(resolveDocumentRoute('/v2/p/db/:sheet/rows', { taskId: 't1' })).toBe('/v2/p/db/:sheet/rows')
+    expect(resolveDocumentRoute('/v1/p/db/:sheet/rows', { taskId: 't1' })).toBe('/v1/p/db/:sheet/rows')
   })
 
   it('refuses rather than fetching a URL with a literal :taskId in it', () => {
-    expect(resolveDocumentRoute('/v2/p/db/tasks/:taskId/scratch', { projectId: 'p1' })).toBeNull()
-    expect(resolveDocumentRoute('/v2/p/db/projects/:projectId/doc', { taskId: 't1' })).toBeNull()
+    expect(resolveDocumentRoute('/v1/p/db/tasks/:taskId/scratch', { projectId: 'p1' })).toBeNull()
+    expect(resolveDocumentRoute('/v1/p/db/projects/:projectId/doc', { taskId: 't1' })).toBeNull()
   })
 
   it('encodes the value, so a substitution cannot walk out of the plugin namespace', () => {
     // This is what keeps the parse-time confinement check true at runtime.
-    expect(resolveDocumentRoute('/v2/p/db/tasks/:taskId/doc', { taskId: '../../core/tasks' }))
-      .toBe('/v2/p/db/tasks/..%2F..%2Fcore%2Ftasks/doc')
-    expect(resolveDocumentRoute('/v2/p/db/tasks/:taskId/doc', { taskId: '$&' }))
-      .toBe('/v2/p/db/tasks/%24%26/doc')
+    expect(resolveDocumentRoute('/v1/p/db/tasks/:taskId/doc', { taskId: '../../core/tasks' }))
+      .toBe('/v1/p/db/tasks/..%2F..%2Fcore%2Ftasks/doc')
+    expect(resolveDocumentRoute('/v1/p/db/tasks/:taskId/doc', { taskId: '$&' }))
+      .toBe('/v1/p/db/tasks/%24%26/doc')
   })
 
   it('does not match a longer parameter that merely starts the same way', () => {
-    expect(resolveDocumentRoute('/v2/p/db/:taskIdentifier/doc', { taskId: 't1' }))
-      .toBe('/v2/p/db/:taskIdentifier/doc')
+    expect(resolveDocumentRoute('/v1/p/db/:taskIdentifier/doc', { taskId: 't1' }))
+      .toBe('/v1/p/db/:taskIdentifier/doc')
   })
 })
 

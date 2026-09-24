@@ -1,1 +1,0 @@
-ALTER TABLE `agent_sessions` ADD `queued_turns` integer DEFAULT 0 NOT NULL;

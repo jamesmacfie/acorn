@@ -5,10 +5,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
-import { parsePluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { parsePluginManifest } from '@acorn/node-core/server/plugins'
+import { loadExternalPlugins, pluginInstallDir } from '@acorn/node-core/server/plugins'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
-import { API_VERSION, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'
+import { API_VERSION, BASELINE, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PACKAGES = join(HERE, '..')
@@ -57,6 +59,10 @@ it('writes the api major this node actually demands', () => {
   expect(API_VERSION).toBe(PLUGIN_API_MAJOR)
 })
 
+it('writes the baseline this node admits', () => {
+  expect(BASELINE).toBe(ACORN_BASELINE)
+})
+
 it('points $schema at the schema this repository actually publishes', () => {
   // The other hardcoded copy, for the same reason as API_VERSION. A stale URL is worse than none: the
   // author's editor validates against a contract that is no longer the host's and says nothing.
@@ -78,6 +84,10 @@ it('emits a tree plugin by default, filling a slot and an annotation point', () 
   const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
   expect(manifest.contributions.frames).toBeUndefined()
+  expect(manifest.contributions.commands).toEqual([{
+    id: 'greeting', kind: 'action', title: 'My widget: send greeting',
+    action: { verb: 'runNodeAction', path: '/v1/p/my-widget/greeting' },
+  }])
   expect(manifest.contributions.extensions).toEqual([
     {
       id: 'my-widget.tool-card',
@@ -90,7 +100,7 @@ it('emits a tree plugin by default, filling a slot and an annotation point', () 
       id: 'my-widget.diff-note',
       point: 'changes:diff-line',
       label: 'My widget notes',
-      items: '/v2/p/my-widget/marks',
+      items: '/v1/p/my-widget/marks',
     },
   ])
   // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
@@ -111,11 +121,16 @@ it('emits a rectangle plugin under --rectangle, as a layout with a frame region'
       layout: 'single', regions: { body: 'frame' },
     },
   ])
+  expect(manifest.contributions.commands).toEqual([{
+    id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
+    action: { verb: 'openPane', pane: 'my-widget' },
+  }])
   expect(parsePluginManifest(manifest).ok).toBe(true)
 })
 
 it('emits a node half that loads and satisfies the structural plugin check', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'scaffold-'))
+  const dataRoot = mkdtempSync(join(tmpdir(), 'scaffold-'))
+  const dir = join(pluginInstallDir(dataRoot), 'my-widget')
   try {
     const files = scaffoldFiles('my-widget') as Record<string, string>
     for (const [path, contents] of Object.entries(files)) {
@@ -131,13 +146,21 @@ it('emits a node half that loads and satisfies the structural plugin check', asy
     expect(plugin.default.name).toBe('my-widget')
     expect(typeof plugin.default.init).toBe('function')
 
+    const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded.map((entry) => entry.manifest.contributions.commands[0])).toMatchObject([{
+      id: 'greeting', kind: 'action', title: 'My widget: send greeting',
+      action: { verb: 'runNodeAction', path: '/v1/p/my-widget/greeting' },
+    }])
+    await loaded[0]?.plugin.dispose?.()
+
     // The client half can't be imported here: it reaches for `document` at module scope. Parse it
     // instead, since a syntax error in the generated bridge is otherwise a blank rectangle in
     // someone else's app.
     writeFileSync(join(dir, 'client.mjs'), files['client.js'])
     execFileSync(process.execPath, ['--check', join(dir, 'client.mjs')])
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   }
 })
 

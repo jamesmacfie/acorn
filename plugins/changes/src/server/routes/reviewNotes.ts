@@ -7,7 +7,7 @@ import { type AppEnv, type CoreServices, type PluginDatabase, respondError } fro
 import { reviewNotes as reviewNotesTable } from '../../node/schema'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
-// CRUD over this plugin's review_notes table, mounted under /v2/p/changes/tasks. The send loop:
+// CRUD over this plugin's review_notes table, mounted under /v1/p/changes/tasks. The send loop:
 // create as unsent, deliver via sendToAgent, POST /sent stamps sentAt, and an edit clears it again,
 // so the UI always shows sent/unsent truthfully.
 //

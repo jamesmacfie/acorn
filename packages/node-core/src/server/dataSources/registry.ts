@@ -22,7 +22,7 @@ export function registerDataSource(pluginId: string, input: DataSourceRegistrati
 
 /** Core-owned data uses the same runtime without pretending core is a plugin route namespace. */
 export function registerCoreDataSource(input: Omit<DataSourceRegistration, 'handler'>, handler: CoreDataSourceHandler): void {
-  const source = dataSourceRegistrationSchema.parse({ ...input, handler: '/v2/core/data-sources/internal' })
+  const source = dataSourceRegistrationSchema.parse({ ...input, handler: '/v1/core/data-sources/internal' })
   sources.set(key('core', source.sourceId), { ...source, pluginId: 'core', coreHandler: handler })
 }
 

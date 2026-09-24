@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { ENROLLMENT_PATH, ENROLLMENT_PROTOCOL_VERSION, enrollmentResponseSchema, type EnrollmentRequest } from '@acorn/protocol/enrollment.ts'
 import type { AppDatabase } from './db'
 import type { DeviceService } from './auth/deviceTokens'
@@ -23,7 +24,7 @@ const log = createLogger('enrollment')
 //   before it reads a file, so an existing install is byte-for-byte unchanged.
 //
 //   A failure is recorded and visible, never a boot that hangs. Bounded attempts, a per-attempt
-//   timeout, and the reason written where GET /v2/core/attachment can show it.
+//   timeout, and the reason written where GET /v1/core/attachment can show it.
 
 // Three attempts inside roughly fifteen seconds. Enough to ride out a control plane still coming up
 // beside a freshly provisioned node, short enough that nobody would call it a hang. A node that fails
@@ -138,6 +139,7 @@ export async function enrollNode(deps: EnrollmentDeps): Promise<EnrollmentOutcom
   // names the control plane as a paired device like any other.
   const device = await deps.devices.issue(`Control plane (${checked.url.host})`)
   const body: EnrollmentRequest = {
+    baseline: ACORN_BASELINE,
     protocolVersion: ENROLLMENT_PROTOCOL_VERSION,
     nodeId: deps.nodeId,
     endpoint: deps.endpoint,

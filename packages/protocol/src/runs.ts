@@ -60,5 +60,5 @@ export type RunRow = RunRowInput & {
 
 export type RunsResponse = { runs: RunRow[] }
 
-export const coreRunsRoute = '/v2/core/runs'
+export const coreRunsRoute = '/v1/core/runs'
 export const runsKey = ['runs'] as const

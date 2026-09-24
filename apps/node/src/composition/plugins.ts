@@ -1,7 +1,7 @@
 // The Node activation list (docs/plugins.md § Activation). The host supplies routes, capabilities,
 // CoreServices, tools, providers, context sections, storage, and lifecycle hooks through
 // NodePluginContext.
-import type { NodePlugin } from '@acorn/node-core/server/pluginHost/types.ts'
+import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { browserPlugin } from '@acorn/plugin-browser/node/index.ts'
 import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
@@ -13,6 +13,7 @@ import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin } from '@acorn/plugin-preview/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
 import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflows/node/index.ts'
+import type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 
 // Composition-only dependencies are adapters owned by the composition root: active identity, child
 // process environments, and runtime engines that must be shared without a plugin importing another
@@ -20,7 +21,7 @@ import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflo
 // capability and provider registries; this bag is for runtime seams that are not domain contracts.
 export type NodePluginDeps = {
   agents: AgentsPluginDeps
-  notes: { internalEnv: import('@acorn/node-core/server/auth/internalTokens.ts').InternalEnvFactory }
+  notes: { internalEnv: InternalEnvFactory }
   terminal: TerminalPluginDeps
   workflows: WorkflowsPluginDeps
 }
@@ -37,7 +38,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   dockerPlugin(),
   editorPlugin(),
   githubPlugin(),
-  memoryPlugin(dataDir),
+  memoryPlugin(),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(),
   terminalPlugin(deps.terminal),

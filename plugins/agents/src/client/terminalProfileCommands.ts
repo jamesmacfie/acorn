@@ -5,15 +5,14 @@
 // The shell keeps `task.terminal.toggle` and `task.terminal.new-shell`: a drawer and a plain shell
 // are the terminal's, not any harness's.
 import {
-  activeTaskId, addSession, requestTerminalFocus, setTerminalOpen, type CommandContribution,
+  activeTaskId, requestTerminalFocusIntent, setTerminalOpen, type CommandContribution,
 } from '@acorn/plugin-api/client'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 
 async function openProfile(taskId: string, profileId: string): Promise<void> {
   const session = await terminalSessions.create({ taskId, profileId })
   setTerminalOpen(taskId, true)
-  addSession(session) // create returns the session, so there is no list round trip before focusing it
-  requestTerminalFocus(taskId, session.id)
+  requestTerminalFocusIntent(taskId, session.id)
 }
 
 const command = (id: string, title: string, hint: string, profileId: string): CommandContribution => ({

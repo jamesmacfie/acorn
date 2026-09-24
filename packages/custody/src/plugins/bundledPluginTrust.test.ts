@@ -28,7 +28,7 @@ describe('bundled plugin client trust', () => {
     const bytes = new TextEncoder().encode('export default function activate() {}\n')
     writeFileSync(join(plugin, 'dist/client.js'), bytes)
     writeFileSync(join(plugin, 'acorn-plugin.json'), JSON.stringify({
-      id: 'rollbar', name: 'Rollbar', version: '1.2.3', apiVersion: PLUGIN_API_MAJOR,
+      id: 'rollbar', name: 'Rollbar', version: '1.2.3', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
       client: './dist/client.js',
       permissions: { api: ['core.tasks:read'], events: [], node: {} },
       contributions: {
@@ -44,12 +44,12 @@ describe('bundled plugin client trust', () => {
     const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
     const trust = new PluginTrustStore(userData)
 
-    expect(trustBundledClientPlugins(resources, '0.1.0', cache, trust)).toEqual(['rollbar'])
+    expect(trustBundledClientPlugins(resources, '1.0.0', cache, trust)).toEqual(['rollbar'])
 
     const hash = createHash('sha256').update(bytes).digest('hex')
     expect(cache.has(hash)).toBe(true)
     expect(trust.decisionFor('rollbar', hash)).toMatchObject({
-      pluginId: 'rollbar', version: '1.2.3', decision: 'accepted', nodeId: 'bundled:acorn-0.1.0',
+      pluginId: 'rollbar', version: '1.2.3', decision: 'accepted', nodeId: 'bundled:acorn-1.0.0',
       extensions: [{
         kind: 'extends', pointKind: 'remote', target: 'agents:session-header', label: 'Session cost',
       }],
@@ -68,7 +68,7 @@ describe('bundled plugin client trust', () => {
       mkdirSync(join(dir, 'dist'), { recursive: true })
       writeFileSync(join(dir, 'dist/client.js'), `export default function activate() { return '${id}' }\n`)
       writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-        id, name: id, version: '1.2.3', apiVersion: PLUGIN_API_MAJOR,
+        id, name: id, version: '1.2.3', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
         client: './dist/client.js',
         permissions: { api: [], events: [], node: {} },
       }))
@@ -77,17 +77,17 @@ describe('bundled plugin client trust', () => {
       const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
       cache.sweep()
       const trust = new PluginTrustStore(userData)
-      return trustBundledClientPlugins(resources, '0.1.0', cache, trust)
+      return trustBundledClientPlugins(resources, '1.0.0', cache, trust)
     }
     expect(launch()).toEqual(['linear', 'rollbar'])
 
     // Nanoseconds, so two writes inside one millisecond cannot compare equal.
     const stamps = (): Record<string, bigint> => {
       const out: Record<string, bigint> = {}
-      for (const file of readdirSync(join(userData, 'plugin-cache'))) {
-        out[file] = statSync(join(userData, 'plugin-cache', file), { bigint: true }).mtimeNs
+      for (const file of readdirSync(join(userData, 'acorn-1-plugin-cache'))) {
+        out[file] = statSync(join(userData, 'acorn-1-plugin-cache', file), { bigint: true }).mtimeNs
       }
-      out['plugin-trust.json'] = statSync(join(userData, 'plugin-trust.json'), { bigint: true }).mtimeNs
+      out['acorn-1-plugin-trust.json'] = statSync(join(userData, 'acorn-1-plugin-trust.json'), { bigint: true }).mtimeNs
       return out
     }
     const before = stamps()
@@ -102,12 +102,12 @@ describe('bundled plugin client trust', () => {
     const userData = temporary('acorn-bundled-trust-user-')
     mkdirSync(join(resources, 'rollbar'), { recursive: true })
     writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
-      id: 'linear', name: 'Wrong', version: '1', apiVersion: PLUGIN_API_MAJOR,
+      id: 'linear', name: 'Wrong', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
     }))
 
     const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
     const trust = new PluginTrustStore(userData)
-    expect(trustBundledClientPlugins(resources, '0.1.0', cache, trust)).toEqual([])
+    expect(trustBundledClientPlugins(resources, '1.0.0', cache, trust)).toEqual([])
     expect(trust.list()).toEqual([])
   })
 })

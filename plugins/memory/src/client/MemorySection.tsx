@@ -1,34 +1,23 @@
-import { createEffect, createResource, createSignal, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
-import ProposalList from './ProposalList'
-import { Alert, Button, Card, Field, Inline, Input, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, Field, Inline, Input, Select, Stack, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import FindingsBundleReview from './FindingsBundleReview'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
 // The memory surfaces of the Context pane (docs/agent-tools.md), kept in the memory plugin so it owns
-// every memoryApi() call. Two things: the human gate over auto-generated proposals, where accept (with
-// an optional description edit) writes the file and index and reject leaves no trace, and the manual
-// "+ memory" form. Both scopes write under ~/.acorn/memory and never into the repo, so the choice is
+// every memoryApi() call. It shows canonical Findings review and the manual "+ memory" form.
+// Both scopes write under ~/.acorn/memory and never into the repo, so the choice is
 // about reach: project scope applies to this project alone, private scope everywhere.
 //
 // This is a contribution to `context:section`, so context does not import it and memory does not import
 // context's pane: the host carries the props and draws whichever of the two render paths this happens
 // to be on. `onChanged` lets the owner refresh its assembled-context view after a write;
-// `onPendingChange` surfaces the pending-proposal count on the section's own header.
 export default function MemorySection(props: {
   task: Task
   onChanged: () => void
-  onPendingChange?: (count: number) => void
 }) {
-  const [proposals, { refetch: refetchProposals }] = createResource(
-    () => props.task.id,
-    async (id) => (memoryApi() ? await memoryApi()!.proposals(id) : []),
-    { initialValue: [] },
-  )
-  createEffect(() => props.onPendingChange?.((proposals() ?? []).length))
-
   const [memFormOpen, setMemFormOpen] = createSignal(false)
   const [memName, setMemName] = createSignal('')
   const [memDesc, setMemDesc] = createSignal('')
@@ -63,18 +52,6 @@ export default function MemorySection(props: {
     <Stack gap="row">
       <Show when={props.task.projectId}>
         {(projectId) => <FindingsBundleReview compact scope={{ kind: 'project', projectId: projectId() }} onChanged={props.onChanged} />}
-      </Show>
-      <Show when={(proposals() ?? []).length}>
-        <Stack gap="row">
-          <Text emphasis="muted">Memory proposals for this task. Every pending proposal is on the Memory page.</Text>
-          <ProposalList
-            proposals={proposals() ?? []}
-            onResolved={() => {
-              void refetchProposals()
-              props.onChanged()
-            }}
-          />
-        </Stack>
       </Show>
       <Show when={memoryApi()}>
         <Toolbar variant="actions" size="sm">

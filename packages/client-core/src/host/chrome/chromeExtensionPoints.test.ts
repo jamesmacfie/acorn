@@ -55,8 +55,8 @@ const GUEST_PLUGIN: Partial<PluginContributions> = {
     point: 'board:card-links',
     label: 'Linear issues',
     order: 500,
-    items: '/v2/p/tracker/board-issues',
-    onSelect: { verb: 'runNodeAction', path: '/v2/p/tracker/open' },
+    items: '/v1/p/tracker/board-issues',
+    onSelect: { verb: 'runNodeAction', path: '/v1/p/tracker/open' },
   }],
 }
 
@@ -106,7 +106,7 @@ describe('cooperative extension points', () => {
     })
 
     const items = await extensionDeliveries('board:card-links')[0]!.fetch!(new AbortController().signal)
-    expect(readJson).toHaveBeenCalledWith('/v2/p/tracker/board-issues', expect.objectContaining({ nodeId: 'node-a' }))
+    expect(readJson).toHaveBeenCalledWith('/v1/p/tracker/board-issues', expect.objectContaining({ nodeId: 'node-a' }))
     expect(items).toEqual([{ id: 'ACO-1', title: 'Fix the thing', subtitle: 'in review', badge: '3' }])
   })
 
@@ -171,7 +171,7 @@ describe('cooperative extension points', () => {
         order: 500,
         // The point owner's namespace. This is the shape of "read another plugin's routes", and it is
         // refused by the same confinement every descriptor route gets.
-        items: '/v2/p/board/cards',
+        items: '/v1/p/board/cards',
       }],
     })]]])
     syncChromeContributions()
@@ -181,7 +181,7 @@ describe('cooperative extension points', () => {
 
   it('refuses a contribution whose point reference is not a reference', () => {
     _seedPluginDistribution([['node-a', [row('board', HOST_PLUGIN), row('tracker', {
-      extensions: [{ id: 'loose', point: 'card-links', label: 'Loose', order: 500, items: '/v2/p/tracker/x' }],
+      extensions: [{ id: 'loose', point: 'card-links', label: 'Loose', order: 500, items: '/v1/p/tracker/x' }],
     })]]])
     syncChromeContributions()
     expect(extensionIds()).toEqual([])
@@ -214,9 +214,9 @@ describe('cooperative extension points', () => {
         point: 'board:card-links',
         label: 'Linear issues',
         order: 500,
-        items: '/v2/p/tracker/board-issues',
+        items: '/v1/p/tracker/board-issues',
         // Another plugin's route behind the verb.
-        onSelect: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+        onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
       }],
     })]]])
     syncChromeContributions()
@@ -226,8 +226,8 @@ describe('cooperative extension points', () => {
   it('orders deliveries by order then id, never by which plugin registered first', () => {
     _seedPluginDistribution([['node-a', [
       row('board', HOST_PLUGIN),
-      row('zeta', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Zeta', order: 10, items: '/v2/p/zeta/i' }] }),
-      row('alpha', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Alpha', order: 20, items: '/v2/p/alpha/i' }] }),
+      row('zeta', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Zeta', order: 10, items: '/v1/p/zeta/i' }] }),
+      row('alpha', { extensions: [{ id: 'a', point: 'board:card-links', label: 'Alpha', order: 20, items: '/v1/p/alpha/i' }] }),
     ]]])
     syncChromeContributions()
     expect(extensionDeliveries('board:card-links').map((entry) => entry.pluginId)).toEqual(['zeta', 'alpha'])
@@ -256,11 +256,11 @@ describe('cooperative extension points', () => {
     const GUEST: Partial<PluginContributions> = {
       frames: [{ target: 'inline', id: 'preview', label: 'Preview', glyph: 'eye', order: 800, formFactor: ['desktop'] }],
       extensions: [
-        { id: 'links', point: 'sink:card-links', label: 'Guest links', order: 500, items: '/v2/p/guest/links' },
-        { id: 'notes', point: 'sink:row-note', label: 'Guest notes', order: 500, items: '/v2/p/guest/marks' },
+        { id: 'links', point: 'sink:card-links', label: 'Guest links', order: 500, items: '/v1/p/guest/links' },
+        { id: 'notes', point: 'sink:row-note', label: 'Guest notes', order: 500, items: '/v1/p/guest/marks' },
         { id: 'card', point: 'sink:beside-row', label: 'Guest card', order: 500, remote: 'card' },
         { id: 'box', point: 'sink:beside-pane', label: 'Guest box', order: 500, frame: 'preview' },
-        { id: 'scan', point: 'sink:before-flush', label: 'Guest scan', order: 500, route: '/v2/p/guest/scan' },
+        { id: 'scan', point: 'sink:before-flush', label: 'Guest scan', order: 500, route: '/v1/p/guest/scan' },
       ],
     }
     const guestRow = row('guest', GUEST)

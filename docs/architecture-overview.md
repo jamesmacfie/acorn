@@ -33,7 +33,7 @@ desktop helper (Node): the process the Rust shell spawns and supervises
        └──────────────► paired Node
 
 Node
-  Hono /v2 server + /v2/events
+  Hono /v1 server + /v1/events
   core.sqlite + plugin SQLite files + blobs
   Git, worktrees, PTYs, agents, workflows, Docker, provider clients
 ```
@@ -89,7 +89,7 @@ arch rule refuses an import of custody from anything in `apps/tui` that draws a 
 window, no webview and no keychain, so the affordances those gate are absent through the platform seam
 rather than stubbed. See [the terminal client doc](./tui.md).
 
-Only serializable values cross a boundary. Product requests and streams use the broker and `/v2`.
+Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
 The service protocol is reserved for lifecycle messages.
 
 ## Package boundaries
@@ -103,14 +103,23 @@ naming at most five subpaths, so a deep import into a plugin is a `tsc` error at
 rather than a boundary-test failure somewhere else in the repo.
 
 `@acorn/protocol` is closed too, and it closed differently: it has no entrypoint to funnel through, so
-its map enumerates its 40 modules one per line. That buys two things over the wildcard. A test file is
+its map enumerates its public modules one per line. That buys two things over the wildcard. A test file is
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
-The other four library packages, `client-core`, `node-core`, `dashboards-core`, and `custody`,
-still export `"./*": "./src/*"`, which gives the module system no encapsulation, and their boundaries
-stay tests. Closing them is a bigger job than closing the plugins was, because every production import
-into a plugin already went through an entrypoint and the same is not true one level up.
+The other four libraries also publish enumerated subpaths. Their boundary map is:
+
+| Library | Public paths | Keep private |
+| --- | --- | --- |
+| `client-core` | Feature, registry, kit, and infrastructure entrypoints; narrow component paths for lazy UI | Feature stores, registry implementations, and test helpers outside `testkit/` |
+| `node-core` | Server service and composition seams; `testkit` for fixtures | Runtime implementations not named by the map |
+| `custody` | Broker, plugin custody, device, and startup seams | Store and supervision internals |
+| `dashboards-core` | Contract, projection, and rendering math | Individual pipeline modules not named by the map |
+
+Direct paths remain where a lazy component import, a side-effect stylesheet, a mock target, a
+composition entrypoint, or two same-named exports need their own loading boundary. Public files
+re-export only the bindings used across packages. A caller cannot reach any other source path through
+package resolution. `tools/arch/boundaries.test.ts` checks the maps and refuses private imports.
 
 **The UI kit is closed as well**, and by a third mechanism again: by type. Every component a plugin
 may draw with is one row in `packages/client-core/src/kit/tokens/support.ts`, a node's props are role
@@ -118,9 +127,8 @@ tokens rather than DOM attributes, and a type-level test refuses `class`, `class
 any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
 ships a stylesheet, and no plugin mounts a Solid root of its own.
 
-Test files follow the same rules as production files unless a rule names an exception, and several
-rules carry a **shrinking baseline**: a list of survivors that may only get shorter. Adding to one is a
-decision someone has to write down.
+Test files follow the same rules as production files unless a rule names an exception. Remaining
+shrinking baselines are named at their own tests; plugin tests have no direct core-library imports.
 
 **Graph shape.** No cycles. `packages/*` never imports `plugins/*`. That inversion made client-core
 cyclic, and acyclicity alone does not catch it, because a plugin whose only upstream is
@@ -152,20 +160,13 @@ the code under test imports and both plugins' routes import their own `../index`
 arch test holds that list at two.
 
 What the compiler cannot see is a map going back to `"./*": "./src/*"`, which would reopen every path
-and break no build, so `tools/arch/boundaries.test.ts` checks the maps themselves: the subpaths are
-from the set above, and every declared target exists. Protocol's map gets its own check, for the two
-things a reader cannot verify by eye: no wildcard, no test file, and nothing pointing at a module that
-has moved.
+and break no build. `tools/arch/boundaries.test.ts` checks every package map for wildcards, missing
+targets, test-file exports, and unintended private imports.
 
 **Test scaffolding stays out of production.** No production file imports any package's `testkit/`,
-which is how a temp-directory SQLite factory ends up shipped. That rule now covers fourteen plugin
-testkits rather than one. Deep imports past `@acorn/plugin-api/testkit` are a shrinking baseline;
-migrate a test as you touch it, and widen the testkit rather than adding a root. It was 167 across 48
-files before the testkit existed, 147 once the first eleven moved, and 110 once the three roots the
-facade already re-exported — `testkit/db.ts`, `testkit/auth.ts`, `server/db/index.ts` — were swapped for
-it. Two whole roots left the list in that batch, which is the shape the exit condition wants: a root
-disappears rather than shrinking. The exit is a plugin whose suite compiles against published surfaces
-only, which is also the condition for moving that plugin out of the repository.
+which is how a temp-directory SQLite factory ends up shipped. Plugin tests reach core fixtures through
+`@acorn/plugin-api/testkit` and its client test subpaths. The architecture test rejects a plugin test
+that imports `client-core` or `node-core` directly, and rejects any production import of testkit.
 
 **Folder names are part of the boundary.** A plugin's `src/` children come from seven names — `node`,
 `server`, `client`, `tree`, `contract`, `shared`, `testkit` — and nothing else, including loose files.
@@ -221,8 +222,10 @@ core's `db` module. Every child process goes through the process broker, with a 
 considered exceptions: a PTY, a long-lived agent driver, a `docker logs -f` stream, and a pg client
 are none of the things the broker models.
 
-**`@acorn/protocol` owns no plugin's wire surface.** Every plugin route lives under `/v2/p/<plugin>/`
-and core's under `/v2/core/`, so one literal catches a route builder protocol does not own. api.ts was
+**`@acorn/protocol` owns no plugin's wire surface.** Workflow rows and inputs live in Workflows'
+`contract/wire.ts`; managed agent sessions and events live in Agents' `contract/wire.ts`. Core tool
+ceilings live in `toolPolicy.ts`, and the small attention snapshot lives in `attention.ts`. Every plugin route lives under `/v1/p/<plugin>/`
+and core's under `/v1/core/`, so one literal catches a route builder protocol does not own. api.ts was
 701 lines of nine plugins' route builders, so no plugin could define its own wire surface without
 editing core. The plugin-named type modules that remain are an explicit list, each with a stated
 reason.
@@ -255,14 +258,14 @@ outside that plugin, or a pane silently loses its styling when an unrelated plug
 
 The Node exposes one Hono application:
 
-- `/v2/node` and `/v2/pair` are the two pre-auth pairing routes.
-- `/v2/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
+- `/v1/node` and `/v1/pair` are the two pre-auth pairing routes.
+- `/v1/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
   security, backup, audit, schedule, agent-tool, and task-context routes.
-- `/v2/p/<plugin>/*` contains plugin-contributed routes. A built-in's router is mounted when the app
+- `/v1/p/<plugin>/*` contains plugin-contributed routes. A built-in's router is mounted when the app
   is built. A loaded plugin's fetch handler is resolved from the route registry per request, so a
   plugin reloaded in place serves its new handler without a restart. See the dev loop in
   [the plugins doc](./plugins.md).
-- `/v2/events` is the authenticated WebSocket for invalidation events, PTY and process streams,
+- `/v1/events` is the authenticated WebSocket for invalidation events, PTY and process streams,
   Docker streams, workflow notices, agent events, and preview tunnels.
 
 `packages/protocol` holds what is genuinely shared: the error envelope, node identity, pairing, the
@@ -270,7 +273,7 @@ broker and service protocols, the WebSocket envelope, and the core resource type
 devices, audit, backup). A plugin owns its own wire surface. Route builders, request and response
 types, and query keys live in that plugin's `shared/`, or in its `contract/` when another plugin
 reads them. Copy `plugins/docker/src/shared/model.ts`. Two boundary rules in
-`tools/arch/boundaries.test.ts` enforce it: protocol may declare no `/v2/p/` route, and the set of
+`tools/arch/boundaries.test.ts` enforce it: protocol may declare no `/v1/p/` route, and the set of
 protocol modules named for a plugin is an enumerated, shrinking list. That lets a plugin define its
 wire contract without editing core, which is the precondition for third-party plugins.
 
@@ -475,7 +478,7 @@ inspection.
 
 Holding that line is what keeps three things true. The control plane stays replaceable, because
 nothing depends on it having seen your work. The trust story stays one sentence
-([the security doc](./security.md) § The control plane). And every `/v2` route and the WebSocket are
+([the security doc](./security.md) § The control plane). And every `/v1` route and the WebSocket are
 untouched, so a Node with no account and no control plane is the fully usable default rather than a
 degraded mode.
 

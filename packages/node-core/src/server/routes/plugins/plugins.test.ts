@@ -25,7 +25,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
   emits: [],
-  contributions: { frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
+  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -93,29 +93,29 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
 const KEY = { 'idempotency-key': '11111111-2222-3333-4444-555555555555' }
 
 const request = (method: string, body?: unknown, headers: Record<string, string> = {}) =>
-  new Request('http://acorn.test/v2/core/plugins', {
+  new Request('http://acorn.test/v1/core/plugins', {
     method,
     headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
 const at = (path: string, method: string, body?: unknown, headers: Record<string, string> = {}) =>
-  new Request(`http://acorn.test/v2/core/plugins${path}`, {
+  new Request(`http://acorn.test/v1/core/plugins${path}`, {
     method,
     headers: { 'content-type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
 const bundleRequest = (id: string, headers?: Record<string, string>) =>
-  new Request(`http://acorn.test/v2/core/plugins/${id}/client.js`, { headers })
+  new Request(`http://acorn.test/v1/core/plugins/${id}/client.js`, { headers })
 
 const app = (principal: AppEnv['Variables']['principal']) => {
   const hono = new Hono<AppEnv>()
-  hono.use('/v2/*', async (c, next) => {
+  hono.use('/v1/*', async (c, next) => {
     c.set('principal', principal)
     await next()
   })
-  return hono.route('/v2/core/plugins', plugins)
+  return hono.route('/v1/core/plugins', plugins)
 }
 
 const asDevice = () => app({ kind: 'device', userId: 'james', deviceId: 'd1' })
@@ -123,7 +123,7 @@ const asTaskAgent = () => app({ kind: 'internal', userId: 'james', scope: 'task'
 
 afterEach(() => setRouteTestCapability(PLUGIN_STATE, null))
 
-describe('GET /v2/core/plugins', () => {
+describe('GET /v1/core/plugins', () => {
   it('503s with no bridge, so an unwired node says so instead of answering an empty roster', async () => {
     setRouteTestCapability(PLUGIN_STATE, null)
     const res = await asDevice().fetch(request('GET'))
@@ -224,7 +224,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       emits: [],
       // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
       // neither reads nor renders it.
-      contributions: { frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
+      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -251,7 +251,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
         emits: [],
-        contributions: { frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
+        contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -271,7 +271,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
   })
 })
 
-describe('GET /v2/core/plugins/:id/client.js', () => {
+describe('GET /v1/core/plugins/:id/client.js', () => {
   it('serves the bytes with the hash as its ETag', async () => {
     wire([], { installed: [installedEntry('sparkline')], bundles: { sparkline: 'export default {}' } })
     const res = await asDevice().fetch(bundleRequest('sparkline'))
@@ -300,7 +300,7 @@ describe('GET /v2/core/plugins/:id/client.js', () => {
   })
 })
 
-describe('PUT /v2/core/plugins', () => {
+describe('PUT /v1/core/plugins', () => {
   it('persists the list and answers the new state', async () => {
     const saved = wire([])
     const res = await asDevice().fetch(request('PUT', { disabled: ['docker'] }))
@@ -355,21 +355,21 @@ describe('PUT /v2/core/plugins', () => {
   })
 })
 
-describe('the device gate over /v2/core/plugins', () => {
-  // The gate is mounted in server/index.ts (`.use('/v2/core/plugins', requireDevice)`), so this asserts
+describe('the device gate over /v1/core/plugins', () => {
+  // The gate is mounted in server/index.ts (`.use('/v1/core/plugins', requireDevice)`), so this asserts
   // the middleware's verdict on this path rather than re-mounting the router. An agent-spawned child
   // must not enumerate the node's surface, nor disable the plugin whose gate it stands behind.
   const gated = (principal: AppEnv['Variables']['principal']) => {
     const hono = new Hono<AppEnv>()
-    hono.use('/v2/*', async (c, next) => {
+    hono.use('/v1/*', async (c, next) => {
       c.set('principal', principal)
       await next()
     })
-    hono.use('/v2/core/plugins', requireDevice)
+    hono.use('/v1/core/plugins', requireDevice)
     // The second form, as server/index.ts mounts it. It keeps a route added under the prefix, such as
     // the bundle route below, from arriving ungated.
-    hono.use('/v2/core/plugins/*', requireDevice)
-    return hono.route('/v2/core/plugins', plugins)
+    hono.use('/v1/core/plugins/*', requireDevice)
+    return hono.route('/v1/core/plugins', plugins)
   }
 
   it('403s a task-scoped agent on both verbs', async () => {

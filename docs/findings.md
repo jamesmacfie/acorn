@@ -12,7 +12,7 @@ in the command palette; it does not occupy the task pane switcher.
 Each boundary key is idempotent and leased. Only one unexpired job can run for a scope. The job
 freezes ordered input membership and publishes each completed bounded chunk into the same bundle.
 Cancellation and failure retain those candidates and outcomes. A bundle-ID retry resumes only inputs
-without an outcome; the preparation job durably retains its source task, boundary, backend, and model,
+without an outcome; the preparation job retains its source task, boundary, target, backend, and model,
 so manual, terminal, workflow, and archive preparations resume without reconstructing a boundary key.
 Publication stores stable bundle order, candidate membership, and an outcome for each observation. Exact normalized payloads
 are checked against accepted memory, every outstanding candidate state, and active suppressions.
@@ -22,10 +22,10 @@ similarity grouping. A preparation that yields no candidate is a valid, inspecta
 The device routes do not expose the deterministic path. Manual and archive preparation both resolve
 the backend and model from the owner's saved review settings. Without a configured backend, findings
 keeps recording evidence but reports that preparation is unavailable instead of converting every
-observation into a candidate. The lower-level deterministic path remains for migration and isolated
+observation into a candidate. The lower-level deterministic path remains for isolated
 store tests.
 
-Model preparation receives target-owned instructions and a bounded snapshot of accepted memory. It
+Model preparation receives target-owned instructions and a bounded snapshot of accepted content. It
 must account for every source once, may combine related sources, and should omit completed-task
 narration, raw logs, and other temporary detail. Findings rejects unknown, duplicate, or unaccounted
 source IDs, invalid target payloads, and oversized output. The job and bundle projection record the
@@ -43,8 +43,14 @@ bundle is ready** setting additionally emits one informational notice per publis
 Changing the configured review model emits `plugin:findings:settings-changed`, so an open Memory page
 can refresh its setup state without knowing anything about the settings modal.
 
-`findings:review-target` binds validation and a revocable completion callback to the plugin that owns
-the destination. The public `findings.review.v1` capability is read-only: it lists bundles, reads
+`findings:review-target` binds a display label, validation, and a revocable controller to the plugin that owns the
+destination. Its `submitProposal` operation creates an observation, candidate, and bundle in one
+transaction and returns their IDs. The bound controller stamps plugin origin and cannot claim an
+agent session. A repeated source key returns the same review; changed content conflicts. Memory's
+compiled agent tool uses a separate host-only adapter. The signed tool route mints a proof bound to
+the task, session, and tool name; Findings verifies it and checks session membership through the
+Agents roster before stamping agent origin. A stale controller stops accepting submissions after
+its target unloads. The public `findings.review.v1` capability is read-only: it lists bundles, reads
 exact candidate revisions, and resolves source observations. It cannot approve or write a memory.
 
 Findings is an app-bundled loaded plugin with Node and remote-tree client halves. The Node imports it
@@ -66,51 +72,34 @@ inputs rather than ordinary findings. They remain available as provenance but ar
 task context agents receive. Workflow-managed turns record an unavailable checkpoint because the
 top-level workflow owns their handoff. Review-purpose turns are excluded.
 
-Terminal exit and top-level workflow completion remain evidence boundaries. A task archive is the
-automatic preparation boundary. Terminal and archive bodies are capped at 16 KiB. Archive capture
-runs before the teardown script, session removal, and worktree removal, then queues preparation in
-the background. The task does not wait for model generation. If output or a worktree diff cannot be
-read, the checkpoint records why the input is unavailable; earlier task observations can still be
-prepared. Model preparation does not control terminal, workflow, or archive success. If the archive
-handoff itself fails, core still archives the task and reports that memory review could not be queued.
+Terminal emits `plugin:terminal:completed` with identifiers and exit status only. It snapshots at
+most 256 agent completions for 60 seconds, each capped at 16 KiB. Findings reads through
+`terminal.reviewInput.v1` when it handles the event. An expired, evicted, removed, or pre-restart
+snapshot is unavailable evidence, not a completed observation. Workflows emits
+`plugin:workflows:completed` and supplies persisted handoff notes through
+`workflows.reviewInput.v1`; each read is capped at 16 KiB. Findings rechecks completed workflows on
+startup. These capabilities are resolved on each call, so disabling or reloading Findings does not
+leave a producer with a stale callback.
 
-Selecting a backend in Findings settings enables automatic review at archive. The shared picker
-retains both the backend and model. Clearing or omitting the backend leaves capture active and review
-disabled. The retained `automaticPreparation` preference field is compatibility data for older
-clients; archive review is now governed by whether a backend is configured.
+A task archive is the automatic preparation boundary. Core awaits Terminal's archive bridge before
+teardown, session removal, and worktree removal. Terminal collects bounded PTY tails and a bounded Git
+diff while both still exist, then runs `terminal:archive-review`. Findings handles that hook and owns
+the observation format. The task does not wait for model generation. If neither source is readable,
+the checkpoint records unavailable input; earlier task observations can still be prepared. A failed
+capture does not stop archive and is reported as `reviewCaptureFailed`.
 
-## Legacy proposal migration
-
-At startup, memory reads its legacy proposal files and contributes their names and contents through
-`findings:legacy-source`. Findings never receives Memory's directory or raw filesystem access. It
-keeps an import manifest in its own database. Each row records the migration version, source filename, SHA-256 hash, legacy ID,
-destination IDs, source status, mapping shape, and any error. An unchanged retry creates no duplicate.
-A changed source or malformed file blocks cutover and remains on disk.
-
-Pending proposals become ready candidates. Accepted and rejected proposals become historical applied
-or dismissed outcomes without writing memory again. A missing project falls back to private reach,
-so a deleted project does not discard its history. Memory keeps the compatibility routes. An
-unchanged one-to-one mapping can still accept or reject through its legacy ID, while an edited or
-grouped successor requires the Findings preview.
-
-For a mapped legacy decision, the Findings outcome is completed first and the retained proposal JSON
-is then atomically marked accepted or rejected. A retry uses the findings promotion receipt or
-idempotent dismissal to repair only an interrupted JSON status link; it never repeats the memory-file
-write. Disabling findings after a mapped decision therefore cannot expose that proposal as pending
-again.
-
-After every source is accounted for, memory hides mapped legacy rows from its page and attention
-provider. If findings is disabled or the report is not safe for cutover, the legacy generator and
-queue remain authoritative. Re-enabling findings imports those fallback files by ID and hash. The
-first release does not delete legacy files.
+Selecting a backend and target in Findings settings enables automatic review at archive. The shared
+picker retains the backend and model. Clearing the backend leaves capture active and review disabled.
+If the selected target unloads, preparation reports it as unavailable. A running job and its retry
+keep their selected target. The retained `automaticPreparation` preference field is compatibility
+data for older clients; archive review is governed by the configured backend and target.
 
 ## Records
 
 An observation is immutable after insertion. It contains:
 
 - A task, project, workspace, or private scope, plus display-label snapshots.
-- A host-derived origin for an agent session, workflow run, schedule run, device, plugin producer,
-  or imported legacy proposal.
+- A host-derived origin for an agent session, workflow run, schedule run, device, or plugin producer.
 - A qualified, versioned kind and the kind label captured at write time.
 - A title, Markdown body, claim status, source key, and structured evidence references.
 - An optional link to the observation that this record corrects.
@@ -228,27 +217,27 @@ The owner-facing routes are device-only:
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| `GET` | `/v2/p/findings/tasks/:id/observations` | Lists task history. Accepts `cursor`, `limit`, and `state`. |
-| `GET` | `/v2/p/findings/tasks/:id/observations/:observationId` | Reads one task observation. |
-| `POST` | `/v2/p/findings/tasks/:id/observations` | Records one explicit device-authored observation. |
-| `POST` | `/v2/p/findings/tasks/:id/observations/batch` | Records one atomic device-authored batch. |
-| `POST` | `/v2/p/findings/tasks/:id/observations/:observationId/withdraw` | Withdraws one observation. |
-| `POST` | `/v2/p/findings/observations` | Records a device-authored observation at any validated scope. |
-| `POST` | `/v2/p/findings/observations/batch` | Records one atomic device-authored batch at any validated scope. |
-| `POST` | `/v2/p/findings/tasks/:id/review/prepare` | Prepares an idempotent manual review boundary, optionally with a selected model and backend. |
-| `GET` | `/v2/p/findings/review/bundles` | Lists active or historical bundles for a discriminated scope. |
-| `GET` | `/v2/p/findings/review/candidates/:id` | Reads a full candidate and its source observations. |
-| `POST` | `/v2/p/findings/review/bundles/:id/cancel` | Cancels an in-flight preparation and ignores later synthesis output. |
-| `POST` | `/v2/p/findings/review/bundles/:id/retry` | Resumes the bundle from its durable source task, boundary, backend, model, and frozen inputs. |
-| `POST` | `/v2/p/findings/review/bundles/:id/outcomes/:observationId/restore` | Restores an omitted observation to a selected candidate. |
-| `POST` | `/v2/p/findings/review/candidates/:id/edit` | Creates a validated candidate revision. |
-| `POST` | `/v2/p/findings/review/candidates/:id/decision` | Dismisses, undoes dismissal, or snoozes an exact revision. |
-| `POST` | `/v2/p/findings/review/candidates/:id/split` | Separates some source observations into a new candidate. |
-| `GET` | `/v2/p/findings/review/candidates/:id/history` | Reads append-only review history. |
-| `GET` | `/v2/p/findings/settings` | Reads completion preparation and notification settings. |
-| `PUT` | `/v2/p/findings/settings` | Replaces the validated settings object. |
-| `GET` | `/v2/p/findings/migration/report` | Reports source counts, mappings, hash conflicts, and cutover readiness. |
-| `GET` | `/v2/p/findings/export` | Exports observations, checkpoints, candidates, revisions, links, and review history. |
+| `GET` | `/v1/p/findings/tasks/:id/observations` | Lists task history. Accepts `cursor`, `limit`, and `state`. |
+| `GET` | `/v1/p/findings/tasks/:id/observations/:observationId` | Reads one task observation. |
+| `POST` | `/v1/p/findings/tasks/:id/observations` | Records one explicit device-authored observation. |
+| `POST` | `/v1/p/findings/tasks/:id/observations/batch` | Records one atomic device-authored batch. |
+| `POST` | `/v1/p/findings/tasks/:id/observations/:observationId/withdraw` | Withdraws one observation. |
+| `POST` | `/v1/p/findings/observations` | Records a device-authored observation at any validated scope. |
+| `POST` | `/v1/p/findings/observations/batch` | Records one atomic device-authored batch at any validated scope. |
+| `POST` | `/v1/p/findings/tasks/:id/review/prepare` | Prepares an idempotent manual review boundary for an explicit target, optionally with a selected model and backend. |
+| `GET` | `/v1/p/findings/review/targets` | Lists available review targets. |
+| `GET` | `/v1/p/findings/review/bundles` | Lists active or historical bundles for a discriminated scope. |
+| `GET` | `/v1/p/findings/review/candidates/:id` | Reads a full candidate and its source observations. |
+| `POST` | `/v1/p/findings/review/bundles/:id/cancel` | Cancels an in-flight preparation and ignores later synthesis output. |
+| `POST` | `/v1/p/findings/review/bundles/:id/retry` | Resumes the bundle from its durable source task, boundary, backend, model, and frozen inputs. |
+| `POST` | `/v1/p/findings/review/bundles/:id/outcomes/:observationId/restore` | Restores an omitted observation to a selected candidate. |
+| `POST` | `/v1/p/findings/review/candidates/:id/edit` | Creates a validated candidate revision. |
+| `POST` | `/v1/p/findings/review/candidates/:id/decision` | Dismisses, undoes dismissal, or snoozes an exact revision. |
+| `POST` | `/v1/p/findings/review/candidates/:id/split` | Separates some source observations into a new candidate. |
+| `GET` | `/v1/p/findings/review/candidates/:id/history` | Reads append-only review history. |
+| `GET` | `/v1/p/findings/settings` | Reads completion preparation and notification settings. |
+| `PUT` | `/v1/p/findings/settings` | Replaces the validated settings object. |
+| `GET` | `/v1/p/findings/export` | Exports observations, checkpoints, candidates, revisions, links, and review history as JSON with `version: 1` and `baseline: "acorn-1"`. |
 
 All routes use `ctx.routes.fetch` and the host-supplied request context. Route bodies contain record data only. They cannot override the URL task or paired-device origin.
 Task-confined internal credentials use the agent tools and receive `403` from these routes.
@@ -272,7 +261,7 @@ The host qualifies `architecture` from plugin `architecture-review` as
 and stops accepting calls after the contribution or Findings unloads. The working standalone fixture
 is `apps/node/test/__fixtures__/findings-producer`.
 
-Findings does not receive `memory.knowledge`, a Memory route grant, or a Memory approval tool. The
+Findings does not receive a Memory route grant or approval tool. The
 pane opens review through its manifest-declared `memory-review` destination. The frame broker maps
 that local ID to the `findings-candidate` target kind and accepts only a bounded candidate ID. Memory
 still owns the target handler, preview, device gate, durable receipt, and write.
@@ -289,16 +278,15 @@ lookup to plugins. This restriction avoids adding a core API for an unsupported 
 - `observation_withdrawals` stores the optional withdrawal history.
 - `finding_scope_revisions` stores the monotonic invalidation revision per scope.
 - Candidate/revision/source-link tables store immutable proposals and provenance.
-- Bundle, membership, grouping-outcome, preparation-input, and preparation-job tables store durable publication state and the exact source task/backend/model needed to resume.
+- Bundle, membership, grouping-outcome, preparation-input, and preparation-job tables store durable publication state and the exact source task, target, backend, and model needed to resume.
 - Review-action and suppression tables retain decisions without rewriting observations.
 - Lifecycle checkpoint and bundle-notice tables retain completion and delivery idempotency.
-- The legacy import manifest retains source hashes, destination mappings, and migration failures.
 
 The database has its own migration chain. It has no cross-database foreign keys and resolves task,
 project, and workspace IDs through `CoreServices` before writing.
 
 The loaded package retains plugin ID `findings`, so the host opens the same
 `plugins/findings.sqlite` file that the compiled build used. Installed-package tests populate the
-compiled database, preserve observation IDs, candidate revisions, dismissal actions, and legacy
-mappings across cutover, then cover update, disable and re-enable, uninstall and reinstall without
+compiled database, preserve observation IDs, candidate revisions, and dismissal actions across
+cutover, then cover update, disable and re-enable, uninstall and reinstall without
 purge, and a contained failed migration.

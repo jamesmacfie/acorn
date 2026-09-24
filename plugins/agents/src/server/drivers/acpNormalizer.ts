@@ -17,7 +17,7 @@ import type {
   AgentWebAction,
   AgentWebActivity,
   AgentWebResult,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 import { webToolTitle } from './webActivity'
 
@@ -196,7 +196,7 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
 // Claude Code's two web tools, read into the provider-neutral shape
-// (@acorn/protocol/managedAgents.ts § AgentWebActivity) so a search reads the same here as it does
+// (@acorn/plugin-agents/contract/wire § AgentWebActivity) so a search reads the same here as it does
 // on the Codex path. Held to `_meta.claudeCode.toolName` and `rawInput`, never to ACP's `kind`:
 // WebSearch and WebFetch both arrive as `fetch`, and another harness may well call a repository grep
 // `search`. A harness whose tool identity this file does not know keeps the generic card.

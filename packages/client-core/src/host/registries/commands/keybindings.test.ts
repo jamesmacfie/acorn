@@ -26,10 +26,12 @@ describe('resolveKeybindings', () => {
     expect(task[2].conflict).toBe('one')
   })
 
-  it('applies generalized overrides and legacy pane overrides without dropping explicit unbound state', () => {
-    const bindings = [binding({ id: 'pane.pr', defaultChord: 'meta+r', legacyPaneAction: 'pr' })]
-    expect(resolveKeybindings(bindings, { pane_shortcuts: '{"pr":"meta+p"}' })[0].chord).toBe('meta+p')
-    expect(resolveKeybindings(bindings, { keybindings: '{"pane.pr":null}', pane_shortcuts: '{"pr":"meta+p"}' })[0].chord).toBeNull()
+  it('uses canonical overrides and retains explicit unbound state', () => {
+    const bindings = [binding({ id: 'pane.pr', defaultChord: 'meta+r' })]
+    expect(resolveKeybindings(bindings, { keybindings: '{"pane.pr":"meta+p"}' })[0].chord).toBe('meta+p')
+    expect(resolveKeybindings(bindings, { keybindings: '{"pane.pr":null}' })[0].chord).toBeNull()
+    expect(resolveKeybindings(bindings, { keybindings: '{"pane.pr":""}' })[0].chord).toBeNull()
+    expect(resolveKeybindings(bindings, { keybindings: '{"pr":"meta+p"}' })[0].chord).toBe('meta+r')
   })
 
   it('puts first-party defaults ahead of plugin defaults and plugins in stable install order', () => {

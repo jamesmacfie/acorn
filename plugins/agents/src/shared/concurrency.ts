@@ -4,7 +4,7 @@
 // against one agent CLI, so it is what keeps a single provider account from being driven by six turns
 // at once. `workspace` is counted across all providers in one workspace, so it is what stops one
 // workspace taking the machine. A session still runs one turn at a time regardless of both.
-export const agentConcurrencyRoute = '/v2/p/agents/concurrency'
+export const agentConcurrencyRoute = '/v1/p/agents/concurrency'
 export const agentConcurrencyPreferenceKey = 'agents:concurrency:v1'
 
 export type AgentConcurrencyLimits = {

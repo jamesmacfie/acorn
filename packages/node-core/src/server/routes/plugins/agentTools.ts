@@ -15,9 +15,10 @@ import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
+import { issueAgentToolProvenance } from '../../agentTools/provenance'
 import { runHook } from '../../pluginHost/hooks'
 import { startSpan } from '../../telemetry/collector'
-import { isToolWithinCeiling } from '@acorn/protocol/workflow.ts'
+import { isToolWithinCeiling } from '@acorn/protocol/toolPolicy.ts'
 
 const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500 | 504> = {
   not_found: 404,
@@ -116,6 +117,9 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // decision this hook exists for is about the verb.
   const verdict = await runHook('core:before-tool-call', { taskId: ctx.taskId, tool: tool.name, sessionId: ctx.sessionId ?? '' })
   if (!verdict.ok) return respondError(c, STATUS['needs-trust'], 'needs-trust', [`${verdict.by}: ${verdict.reason}`])
+  if (tool.requiresSession && ctx.sessionId) {
+    ctx.provenanceProof = issueAgentToolProvenance(ctx.taskId, ctx.sessionId, tool.name)
+  }
   // Started after every gate, so the span measures the tool and not the permission check in front
   // of it, and named for the plugin that contributed the tool rather than the one whose route this
   // is: an agent tool is arbitrary work an agent asked for, and the question is whose work was slow.

@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { agentProfileRegistry } from '@acorn/node-core/server/agentProfiles/index.ts'
-import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
-import { markPluginUserManaged } from '@acorn/node-core/server/plugins/bundledState.ts'
-import { pluginDir } from '@acorn/node-core/server/plugins/installer.ts'
-import { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins/manifest.ts'
-import { makeTestDb } from '@acorn/node-core/testkit/db.ts'
-import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
+import { agentToolContributions } from '@acorn/node-core/server/agentTools'
+import { markPluginUserManaged } from '@acorn/node-core/server/plugins'
+import { pluginDir } from '@acorn/node-core/server/plugins'
+import { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins'
+import { makeTestDb } from '@acorn/node-core/testkit'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools'
 import { NODE_DRAIN_ORDER, assembleNodeGraph, nodePluginNames, reconcileBundledPackages } from '../../../src/composition/composition'
 import { effectiveDisabled } from '../../../src/composition/pluginState'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
@@ -49,7 +49,7 @@ describe('plugin-state parity', () => {
     try {
       mkdirSync(join(resources, 'rollbar', 'dist'), { recursive: true })
       writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
-        id: 'rollbar', name: 'Rollbar', version: '1.0.0', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+        id: 'rollbar', name: 'Rollbar', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
       }))
       writeFileSync(join(resources, 'rollbar/dist/node.js'), 'export default {}\n')
 

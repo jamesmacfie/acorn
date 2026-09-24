@@ -1,4 +1,4 @@
-// Routes for the Database pane, mounted at /v2/p/database by this plugin's init (node/index.ts):
+// Routes for the Database pane, mounted at /v1/p/database by this plugin's init (node/index.ts):
 // per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
 // table/column completions.
 //
@@ -342,7 +342,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
-    // machine. The frame cannot ask core directly: `/v2/core/integrations` has no bridge scope, and
+    // machine. The frame cannot ask core directly: `/v1/core/integrations` has no bridge scope, and
     // minting one would hand every installed plugin the whole roster to serve one dropdown. This
     // answers ids and labels. The key stays on the node and is resolved inside `models.generateText`.
     .get('/tasks/:taskId/model-connections', async (c) => {

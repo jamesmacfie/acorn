@@ -15,7 +15,8 @@ const query = {
 
 const graph = (twoLoops = false): ResolvedWorkflowGraph => {
   const definition: WorkflowDef = {
-    formatVersion: 2,
+    baseline: 'acorn-1' as const,
+    formatVersion: 1 as const,
     name: 'Triage',
     steps: [
       { id: 'find', name: 'Find issues', kind: 'find-records', query },

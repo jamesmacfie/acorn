@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { toolCeilingSchema } from '@acorn/protocol/workflow.ts'
+import { toolCeilingSchema } from '@acorn/protocol/toolPolicy.ts'
 
 const resultSchema = z.record(z.string(), z.unknown())
 

@@ -31,9 +31,9 @@
 import { createSignal, type Accessor } from 'solid-js'
 import {
   CREATE_TASK_ROUTE, PROJECT_ROUTE, TASK_ROUTE,
-} from '@acorn/client-core/host/registries/commands/corePaths.ts'
-import { matchRoute, sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
-import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
+} from '@acorn/client-core/host/registries/commands'
+import { matchRoute, sourceRouteContributions } from '@acorn/client-core/host/registries/sources'
+import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
 
 /** The DOM router's options object, so a caller's type still resolves. Nothing reads it. */
 export type NavigateOptions = {

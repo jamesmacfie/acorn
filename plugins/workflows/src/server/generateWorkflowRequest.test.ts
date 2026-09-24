@@ -32,7 +32,8 @@ const validation: WorkflowValidationCatalog = {
 }
 
 const clean: WorkflowDef = {
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Investigate',
   steps: [
     { id: 'look', name: 'look', after: [], prompt: 'Read the issue and say what is wrong.' },
@@ -81,13 +82,13 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('asks for an edit with the current graph and restores protected settings in the answer', async () => {
-    const current: WorkflowDef = {
+    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Investigate',
       trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['pnpm test'] },
       steps: [{ ...clean.steps[0]!, model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]!],
     }
-    const changed: WorkflowDef = {
+    const changed: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Investigate',
       tools: { maxRisk: 'read' },
       steps: [{ ...clean.steps[0]!, prompt: 'Inspect the issue from two angles.' }, clean.steps[1]!],
@@ -137,7 +138,8 @@ describe('generateWorkflowRequest', () => {
 
   it('repairs a missing required child input binding', async () => {
     const missing: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [
@@ -176,7 +178,7 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('does not silently restore a changed child target during an AI edit', async () => {
-    const current: WorkflowDef = {
+    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Dispatch',
       inputs: [{ name: 'ticket', required: true }],
       steps: [{
@@ -188,7 +190,7 @@ describe('generateWorkflowRequest', () => {
         },
       }],
     }
-    const broken: WorkflowDef = {
+    const broken: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Dispatch',
       inputs: current.inputs,
       steps: [{
@@ -235,7 +237,8 @@ describe('generateWorkflowRequest', () => {
 
   it('caps the problems it sends and says how many it left out', async () => {
     const many: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Crowd',
       steps: Array.from({ length: 60 }, () => ({ id: 'look', name: 'look', prompt: 'Look.' })),
     }
@@ -256,7 +259,7 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('keeps the first answer when the repair is not JSON, or has no steps', async () => {
-    for (const bad of ['I could not do that.', reply({ name: 'Empty', steps: [] })]) {
+    for (const bad of ['I could not do that.', reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] })]) {
       const generateText = answers(reply(duplicated), bad)
       const result = await run(generateText)
       expect(generateText).toHaveBeenCalledTimes(2)
@@ -295,7 +298,7 @@ describe('generateWorkflowRequest', () => {
   // The one budget promise this makes to a person waiting on it, so it is a property over every
   // shape of reply rather than one case.
   it('never calls a third time, whatever comes back', async () => {
-    const replies = ['', 'sorry', '{}', '[]', reply({ name: 'Empty', steps: [] }), reply(clean), reply(duplicated), `\`\`\`json\n${reply(duplicated)}\n\`\`\``]
+    const replies = ['', 'sorry', '{}', '[]', reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] }), reply(clean), reply(duplicated), `\`\`\`json\n${reply(duplicated)}\n\`\`\``]
     for (const first of replies) {
       for (const second of replies) {
         const generateText = answers(first, second)

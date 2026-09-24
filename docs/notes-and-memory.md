@@ -12,10 +12,10 @@ reserved workspace key), so an owner can read or edit one by hand. Writes are at
 rename, so a crash never leaves a partial note. Notes has no SQLite file; autosave sends an expected
 revision and surfaces a conflict rather than overwriting a newer edit.
 
-The HTTP surface is `/v2/p/notes/tasks/:id/notes` and
-`/v2/p/notes/workspaces/:wsId/notes` (including their read/write, title, inclusion, and delete
-subroutes). `/v2/p/memory/.../notes` remains as a one-release compatibility alias for saved agent
-prompts and older clients; it uses the notes capability and does not own a second store.
+The HTTP surface is `/v1/p/notes/tasks/:id/notes` and
+`/v1/p/notes/workspaces/:wsId/notes` (including their read/write, title, inclusion, and delete
+subroutes). Workspace and global notes require a device principal; a task-scoped agent credential
+can reach only its own task notes.
 
 The Notes pane provides a task-first scratchpad, scope navigation, include-in-context controls,
 debounced saves, conflict recovery, and Markdown import/export. A task's scratchpad starts virtual,
@@ -50,13 +50,15 @@ directory the reviewer did not ask for.
 Reconciliation still reads two more places, and only reads them: `.acorn/memory/` in each active task
 worktree and in each primary checkout. That is what lets a team commit shared memory into its own
 repo, and it keeps entries written before the store moved. The memory plugin owns file
-reconciliation, hash deduplication, supersession, proposals, an FTS index, and recall metadata. Plain
+reconciliation, hash deduplication, supersession, an FTS index, and recall metadata. Plain
 folders are supported: they use project scope without Git revision/diff anchoring.
 
-Agents can search and propose memory entries but cannot write accepted knowledge directly. A proposal
-carries the project it was made under, so acceptance no longer depends on the task worktree surviving;
-a proposal that names no project is accepted into the private root rather than discarded.
-The index is rebuildable; the Markdown files remain the durable content.
+Agents can search memory and submit proposed changes, but cannot write accepted knowledge directly.
+`memory_write` sends its validated payload to Findings immediately. Findings creates one observation,
+candidate, and review bundle, then returns their IDs to the tool. The host derives agent provenance
+from the signed task session and checks that the session belongs to the task. If Findings is disabled,
+the tool returns an explicit unavailable result and creates no local queue. The index is rebuildable;
+the Markdown files remain the durable content.
 
 After a manual write or accepted proposal, the plugin first reconciles the file and derived index,
 then publishes `plugin:memory:memories-changed`. Its payload is only the affected project scope, or
@@ -70,91 +72,28 @@ stats survive reconciliation because rows are keyed by a content-hash id.
 
 ### The Memory page
 
-Memory has a rail source of its own, `plugins/memory/src/client/MemoryCenter.tsx`: the pending
-proposals at the top, then what has already been accepted, filtered on the device. It draws one
-full-width column, so the contribution declares `component` rather than `regions`.
+Memory has a project-scoped rail page in `plugins/memory/src/client/MemoryCenter.tsx`. It shows
+Findings review bundles above accepted memories. The memory list includes entries for the routed
+project and private entries, which apply everywhere. The page filters the fetched list by name or
+description. The task Context pane shows the same canonical review beside the manual add-memory form.
 
-Both lists are scoped to the routed project, which is why the source declares `projectScoped`. The
-memories half is the node's own rule: `listMemories` returns the project's rows plus the private
-ones, since a private memory in `~/.acorn/memory` applies wherever you are. The proposals half
-applies the same rule on the device, in `proposalsForProject`: this project's, plus the ones that
-name no project at all. That second half matters. An agent whose task will not resolve proposes with
-a null project on purpose, so that a reviewer still sees it rather than losing what it learned
-(`plugins/memory/src/server/agentTools.ts`), and scoping those away would leave them with nowhere to
-be reviewed from. A page opened from a surface that routes no project shows everything, because
-there is no scope to apply.
+The review shows preparing, failed, ready, and empty bundles. Ready suggestions stay in the project's
+attention list after the source task is archived. Each candidate has an exact preview before approval.
+The owner can edit the proposed name, type, description, body, and project or private reach; an edit
+creates a new candidate revision. Dismissal, undo, snooze, source evidence, and review history remain
+attached to the canonical candidate. An omitted observation can be restored, and a grouped source can
+be split into its own candidate.
 
-It exists because a proposal is not task-scoped, however much its record looks it. Acceptance
-resolves the task's worktree and falls back to the project folder
-(`plugins/memory/src/server/knowledgeChannel.ts`), and archiving a task nulls its worktree path, so a
-proposal is still acceptable after the task that raised it is gone. Before the page, the only review
-surface was a fold inside a task's Context pane, which meant those proposals were reachable by the
-API and unreachable by hand.
+Approval uses `/v1/p/memory/memory/findings/:candidateId/approve` and requires a paired device. The
+request names the exact candidate revision, payload hash, and idempotency key. Memory persists a
+prepared receipt before the atomic Markdown write. The receipt binds the payload, scope, target,
+accepted-memory version hash, and device identity. A retry reconciles an already-written file and
+finishes Findings linkage without writing twice. A stale revision or changed update base conflicts.
+Manual owner-authored memory remains available when Findings is disabled.
 
-The Context pane's section stays, drawing this task's proposals where the reader is already working.
-Both surfaces render the same card, `ProposalList.tsx`, so accept and reject cannot drift apart.
-
-The "Review memory" row in the notification bell lands on the proposal it named, not on the top of
-the page: the card takes the kit's `focus`, which scrolls it into view and puts the reader on it, and
-the highlight is cleared when the page unmounts so a later visit does not re-scroll to a proposal
-already dealt with. The row carries the proposal's project, so the inbox routes there before it opens
-the page — without that step the page would scope this very proposal out of the view it just opened.
-It carries no task id. It used to, which sent the click to the task and left the reader on whatever
-pane happened to be open. The row draws with the memory mark rather than the generic nudge glyph,
-since every row this source raises is the same kind of thing. See
-[notifications.md](./notifications.md) § What a row points at.
-
-Accept and reject report their own failures, on the card that was pressed. There are two, and both
-used to be silent. A refusal answers 200 with `ok: false` — most often a worktree removed since the
-proposal was raised — and a route that is gated, unreachable, or 500s throws out of the client
-instead of answering. Neither put anything on screen, so the button read as dead. A page can hold a
-dozen proposals from a dozen tasks, which is why the message sits on the card rather than in a banner
-above the list.
-
-Accepting also refetches the memories below it. Without that the proposal vanishes from the top of
-the page and nothing takes its place, which reads as though the accept did nothing.
-
-Memory stays a first-party plugin. The loaded tier contributes a declarative source descriptor
-(`packages/protocol/src/plugin/contract.ts`), a data-driven list and detail, which cannot draw this
-page; and memory is the human gate on knowledge an agent proposes writing into your repository, which
-is the wrong thing to move behind the sandbox.
-
-Findings-backed suggestions appear above legacy proposals. The Memory page shows preparing, failed,
-ready, and empty-review states. Ready suggestions are persistent attention items grouped by project,
-so they remain discoverable after their source task is archived. Three stable summaries appear before
-**Show all**, with an exact full-body preview before approval. An older bundle prepared without a
-model offers one action to dismiss the whole unfiltered bundle. Updates show their accepted base as a
-unified before/after diff.
-Editing covers the name for additions and the type, description, body, and project/private reach for
-all candidates, then creates a new revision before **Approve changes** is available. Update names are
-stable file identities and are not renamed in place. Dismiss, post-action optional reason hints, undo,
-a selected snooze date, source task labels, observation origins, capture times, evidence, and review
-history remain attached to the candidate.
-Omitted outcomes retain their preparation reason and can be restored to the open change. A source
-inside an incorrectly grouped change can be separated into its own candidate before editing.
-
-Approval stays under `/v2/p/memory/memory/findings/:candidateId/approve` and requires a paired device.
-The request names the exact candidate revision, payload hash, and idempotency key. Memory persists a
-prepared receipt in its own database before the atomic Markdown write. The receipt binds the payload,
-scope, target identity, full accepted-memory version hash, and device identity without storing a
-token. One receipt can own a candidate revision. A retry reconciles an already-written file and
-finishes findings linkage without writing twice. A stale
-revision or changed update base becomes a conflict and never overwrites the current memory.
-
-Legacy JSON proposals remain authoritative while findings is disabled or its import report contains
-an unreadable, malformed, or changed source. Their card requires **View change** and shows and edits
-the full body, metadata, and scope before approval.
-
-When every source hash has a one-to-one mapping, findings becomes the proposal authority. Memory
-hides mapped legacy rows from the page and its per-proposal attention source, so one suggestion does
-not appear twice. Compatibility requests through a legacy ID can approve or reject only the exact
-candidate revision imported from that file. After the Findings operation succeeds, memory atomically
-mirrors the verdict into the retained proposal JSON. If that status link is interrupted, replay uses
-the durable promotion receipt or idempotent dismissal and repairs the JSON without writing the memory
-file again. This keeps the fallback queue resolved if findings is later disabled.
-An edited or grouped successor returns a review-required result and opens the Memory
-page through the retained ID mapping. Legacy files remain in `memory-proposals/` for the compatibility
-period.
+The optional ready-bundle notice opens the Memory review through a `findings-bundle` destination.
+A candidate destination names its canonical candidate ID. The Memory page clears a one-time candidate
+highlight when it unmounts.
 
 ## Context integration
 
@@ -163,16 +102,19 @@ and Rollbar contributions under a deterministic byte/token budget. Section failu
 reported independently. The context pane previews the exact snapshot and can send it to a selected
 managed agent session.
 
-Memory also draws in the pane. Its proposal queue and its add-memory form are a component registered
+Memory also draws in the pane. Its canonical review and add-memory form are a component registered
 against the `context:section` extension point with `matches: ['memory']`, which the context plugin
 opens and the host mints. For more information, see the cooperative extension points in
-[the plugins doc](./plugins.md). Context draws its own rows for the section and memory's card joins
+[the plugins doc](./plugins.md). Context draws its own rows for the section and memory's review joins
 them, because the point stacks. Neither plugin imports the other, and disabling memory leaves the
 section drawing its rows.
 
 A fresh agent session can receive that snapshot two ways. The _push_ queues the assembled block for
 the session's first idle edge. It is delivered `'after-ready'`, so if the CLI is still busy when the
 user types, the block lands after the first ask, as reference material for work already underway. A
+Memory contribution supplies the bounded launch text through `terminal:launch-context`; Terminal
+orders the contributors and sends their text. The separate `terminal.sendToAgent` action remains for
+explicit sends. A
 profile that can carry a standing instruction avoids the race by _pulling_ instead. It sets
 `launchArgs` on its `AgentProfileContribution` (Claude Code uses `--append-system-prompt`, telling it
 to call `task_context`, `notes_read`, or `memory_search` before starting), and `spawnOne` skips the
@@ -208,7 +150,7 @@ memory** goes through the existing full-text path, so the ordering is that index
 device does not re-rank it, and a row reveals by the memory's name rather than its id, because the
 name is what the context section keys its rows by. It is task-scoped even though the query is about
 the project: the query carries the captured project, but the surface a hit opens in belongs to a task,
-and a row that cannot be opened is not worth offering. **Review memory proposals** goes to the Memory
+and a row that cannot be opened is not worth offering. **Review memory suggestions** goes to the Memory
 page instead, and so is offered with no task in hand.
 **Review learnings** is task-scoped and explicitly prepares findings from that task, then routes to
 the owning project's Memory page. The Node resolves the same saved backend and model used by archive
@@ -226,13 +168,10 @@ name, a type, a scope, and a body, which is four fields rather than one line.
 
 ## Lifecycle hooks
 
-When findings is active and its migration report permits cutover, managed-agent completion updates
-findings checkpoints instead of running the legacy per-turn generator. Ordinary turns do not create
-review cards or notices. Terminal exit and top-level workflow completion contribute evidence. Task
-archive freezes the task's evidence and queues one project-scoped review when a backend is configured.
-Workflow handoff notes remain notes and are read only as bounded input for the workflow boundary.
-
-If findings is disabled or cutover is unsafe, the legacy hook remains available. It runs on the first
-installed agent profile with a headless mode, in a fixed order of Claude Code then Codex. It still
-creates proposals but cannot bypass the human acceptance gate. Re-enabling findings imports those
-files and resumes their mappings.
+Managed-agent completion records Findings checkpoints when Findings is active. Ordinary turns do
+not create review cards or notices. Terminal exit and top-level workflow completion contribute
+evidence through their own completion events and bounded read capabilities. Task archive freezes the
+task's evidence through an awaited pre-teardown hook and queues one project-scoped review when a backend
+and target are configured. Workflow handoff notes remain notes and are read only as bounded input for
+the workflow boundary. If Findings is disabled, task completion and manual Memory editing continue;
+proposals require Findings and return unavailable when it is disabled.

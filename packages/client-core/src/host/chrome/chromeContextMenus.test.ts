@@ -32,7 +32,7 @@ const descriptor = (over: Partial<PluginContextMenuDescriptor> = {}): PluginCont
   location: 'task.row',
   label: 'Open the board card',
   order: 500,
-  action: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   ...over,
 })
 
@@ -101,7 +101,7 @@ describe('what the host binds', () => {
     const entry = pluginContextMenuItem('board', descriptor(), binding())
     entry.run(target({ id: 'task-42' }))
     await Promise.resolve()
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/board/open', expect.objectContaining({
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/open', expect.objectContaining({
       method: 'POST',
       nodeId: 'node-a',
       body: JSON.stringify({ item: 'task-42' }),

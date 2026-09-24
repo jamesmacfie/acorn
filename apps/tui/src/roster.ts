@@ -10,7 +10,7 @@ import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts
 import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
 import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
 import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
-import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
 // because that is where a pane comes from on the desktop too. It is the same twelve the desktop

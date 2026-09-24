@@ -182,7 +182,7 @@ export async function reconcileMemories(db: PluginDatabase, sources: MemorySourc
   }
 }
 
-// One row of the derived index. Named because the contract (contract/knowledge.ts) states it and a
+// One row of the derived index. Named because the Memory read model states it and a
 // bare `typeof memories.$inferSelect` there would import the schema into a type-only file.
 export type MemoryRow = typeof memories.$inferSelect
 

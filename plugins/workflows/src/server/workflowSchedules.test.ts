@@ -9,8 +9,8 @@ import type { WorkflowStartService } from './workflowStartService'
 import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 
 const graph = (prompt = 'Review it'): ResolvedWorkflowGraph => {
-  const definition = {
-    formatVersion: 2 as const,
+  const definition = { baseline: 'acorn-1' as const,
+    formatVersion: 1 as const,
     name: 'Scheduled review',
     inputs: [{ name: 'count', schema: { type: 'number' as const }, required: true }],
     steps: [{ id: 'review', name: 'Review', prompt }],

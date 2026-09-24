@@ -397,7 +397,7 @@ export const linearProvider = publicProvider({
   memory: { linkedItems: true, mutations: ['linear.comment'], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
   conformance: {
     ref: refForIdentifier('linear-test', 'ENG-42', 'https://linear.app/acme/issue/ENG-42'),
-    legacyCache: {
+    cachedItem: {
       id: 'issue-uuid', identifier: 'ENG-42', title: 'Detailed issue', url: 'https://linear.app/acme/issue/ENG-42',
       state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
       description: 'Keep this description', comments: [], activity: [],

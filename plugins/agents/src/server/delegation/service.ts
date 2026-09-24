@@ -5,8 +5,8 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
-import type { TerminalSession } from '@acorn/protocol/terminal.ts'
+} from '../../contract/wire.ts'
+import type { TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import type {
   AgentCancelInput,
   AgentPromptInput,

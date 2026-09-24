@@ -8,7 +8,7 @@
 //
 // Its own module rather than a helper inside the card, so it can be tested: the plugin's tests run in
 // node with no Solid plugin, so nothing exported from a `.tsx` is reachable from a test.
-import type { AgentSubagentStatus, AgentSubagentUpdate } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSubagentStatus, AgentSubagentUpdate } from '../../contract/wire.ts'
 
 /** A subagent's status as a word. */
 export const subagentStatusLabel = (status: AgentSubagentStatus | undefined): string => {

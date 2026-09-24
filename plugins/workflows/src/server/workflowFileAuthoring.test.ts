@@ -17,7 +17,7 @@ import { validateWorkflowDestination } from './workflowDestination'
 import type { WorkflowValidationCatalog } from './workflowValidation'
 
 const catalog: WorkflowValidationCatalog = { stepKinds: new Set(['agent', 'workflow', 'find-records']), policies: new Set(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']) }
-const def = (name = 'Example'): WorkflowDef => ({ formatVersion: 2, name, steps: [{ id: 'one', name: 'One', kind: 'agent', prompt: 'Work' }] })
+const def = (name = 'Example'): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'one', name: 'One', kind: 'agent', prompt: 'Work' }] })
 const target = { projectId: 'project', source: 'repo' as const, path: '.acorn/workflows/example.toml' }
 const query: QueryContent = { name: 'Selected records', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {}, query: {
   source: { pluginId: 'linear', sourceId: 'issues' }, scope: { workspaceId: 'origin-workspace', projectId: 'project', connectionId: 'private-connection-id', parameters: { projectId: 'provider-project-id', stateId: 'provider-state-id' } }, sort: [],
@@ -45,7 +45,7 @@ describe('file drafts and portable export', () => {
     const external = def(); external.steps[0]!.prompt = 'External prompt'; write(external)
     expect((await service()({ action: 'open', target })).draft!.def.name).toBe('Local name')
     const review = await service()({ action: 'review', target, revision: saved.revision })
-    expect(review.draft!.def).toMatchObject({ name: 'Local name', steps: [{ prompt: 'External prompt' }] })
+    expect(review.draft!.def).toMatchObject({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Local name', steps: [{ prompt: 'External prompt' }] })
     const published = await service()({ action: 'publish', id: review.operation!.id })
     expect(published.operation!.state).toBe('complete')
     expect(readFileSync(join(root, target.path), 'utf8')).toContain('Local name')

@@ -26,9 +26,9 @@ import type { Renderable } from '../tree/compat'
 import type { Renderer } from '../renderer'
 import type { KeyEvent } from '../keyEvent'
 import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
-import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
+import type { Intent } from '@acorn/client-core/kit/keys'
+import { BARE_KEYS } from '@acorn/client-core/kit/keys'
+import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import {
   crossParent, focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,

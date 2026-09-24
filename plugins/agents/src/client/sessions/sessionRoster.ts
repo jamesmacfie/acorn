@@ -2,7 +2,7 @@ import type {
   AgentSession,
   AgentSessionDelegation,
   AgentSubagent,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 export type AgentSessionRosterRow =
   | {

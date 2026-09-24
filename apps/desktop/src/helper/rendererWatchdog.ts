@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry/collector.ts'
+import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 
 const pulseSchema = z.object({
   active: z.boolean(),

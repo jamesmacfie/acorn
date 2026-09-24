@@ -2,7 +2,7 @@
 // that feeds a local patch into the shared diff pipeline (DiffFile shape, diff.ts).
 import type { DiffFile } from '@acorn/plugin-api/ui/diff'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import type { LocalChange, LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 
 /** The three groups the list draws, top to bottom. Conflicts, tracked edits and untracked files are
  *  three different situations for the reader, and only the middle one is a staging question. */

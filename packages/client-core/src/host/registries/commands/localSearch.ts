@@ -37,8 +37,13 @@ const matches = (query: string, item: CommandSearchItem): number | null => {
  *   ...localSearch((context, signal) => readTargets(context.taskId, signal)),
  *   select: (item) => launch(item.ref!) }
  * ```
+ * Pass `cache: false` for a local roster that can change while the frame is open. The host then
+ * retries the current query when that roster changes.
  */
-export function localSearch(load: LocalSearchLoad): Pick<SearchCommand, 'minQueryLength' | 'debounceMs' | 'query'> {
+export function localSearch(
+  load: LocalSearchLoad,
+  options: { cache?: boolean } = {},
+): Pick<SearchCommand, 'minQueryLength' | 'debounceMs' | 'query'> {
   // One cache per provider, keyed on the captured context, which is one object per open session: a
   // session that opens over a different task loads again, a frame re-entered inside one session does
   // not, and two local searches in the same session do not read each other's rows. Weak, so a closed
@@ -48,10 +53,10 @@ export function localSearch(load: LocalSearchLoad): Pick<SearchCommand, 'minQuer
     minQueryLength: 0,
     debounceMs: 0,
     query: async (text, context, signal) => {
-      let rows = loaded.get(context)
+      let rows = options.cache === false ? undefined : loaded.get(context)
       if (!rows) {
         rows = Promise.resolve(load(context, signal))
-        loaded.set(context, rows)
+        if (options.cache !== false) loaded.set(context, rows)
       }
       let items: readonly CommandSearchItem[]
       try {

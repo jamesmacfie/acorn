@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from 'solid-js'
-import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '../../contract/wire.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'

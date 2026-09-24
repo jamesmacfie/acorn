@@ -1,9 +1,10 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeTerminal, addSession, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, refreshSessions, registerCommands, rememberActiveTerminal, savePref, sessions, type Task, termFontSize } from '@acorn/plugin-api/client'
+import { activeNodeId, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
+import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, sessions } from './sessionStore'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
-import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import {
   Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
@@ -202,8 +203,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     setBusy(true)
     setPendingTitle(title)
     try {
+      const createdNode = activeNodeId() ?? ''
       const s = await api.create({ taskId, profileId, title })
-      addSession(s) // create returns the session — no list round trip before the tab renders
+      addSession(s, createdNode) // create returns the session — no list round trip before the tab renders
       setActiveId(s.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start the session.')

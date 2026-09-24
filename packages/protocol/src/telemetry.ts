@@ -17,6 +17,13 @@ import { z } from 'zod'
 /** The one node preference that turns collection on. Off unless the row says `'1'`. */
 export const TELEMETRY_PREF_KEY = 'telemetry.enabled'
 
+/** Group API telemetry by route family without recording resource identifiers or query values. */
+export function apiRouteNamespace(path: string): string {
+  const segments = path.split('?')[0].split('/').filter(Boolean)
+  const keep = segments[0] === 'v1' && segments[1] === 'p' ? 4 : 3
+  return `/${segments.slice(0, keep).join('/')}`
+}
+
 // The caps. The collector truncates rather than dropping, and counts each truncation, so a seam that
 // keeps hitting one of these is visible as a metric instead of quietly losing its tail.
 export const ATTR_KEY_MAX = 64
@@ -137,7 +144,7 @@ export type TelemetryRuntime = (typeof TELEMETRY_RUNTIMES)[number]
 export const POSTED_TELEMETRY_RUNTIMES = ['renderer', 'helper', 'tui', 'shell'] as const
 export type PostedTelemetryRuntime = (typeof POSTED_TELEMETRY_RUNTIMES)[number]
 
-/** The body of `POST /v2/core/telemetry`: which runtime built these records, and the records.
+/** The body of `POST /v1/core/telemetry`: which runtime built these records, and the records.
  *
  *  No `node` and no `version`, unlike the batch a sink is handed below. The node the batch reached
  *  is the node that will hold it, and it stamps its own id and build onto the batch it flushes, so

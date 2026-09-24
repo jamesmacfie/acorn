@@ -1,14 +1,14 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED, registerCommands, type CommandOutcome,
-} from '@acorn/client-core/host/registries/commands/commands.ts'
-import { CORE_GO_TO_GROUP, goToGroup } from '@acorn/client-core/host/registries/commands/coreCommands.ts'
-import { localSearch } from '@acorn/client-core/host/registries/commands/localSearch.ts'
+} from '@acorn/client-core/host/registries/commands'
+import { CORE_GO_TO_GROUP, goToGroup } from '@acorn/client-core/host/registries/commands'
+import { localSearch } from '@acorn/client-core/host/registries/commands'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { previousWorkspaceId } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
-import type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
+import { previousWorkspaceId } from '@acorn/client-core/features/workspaces'
+import type { Disposable } from '@acorn/client-core/kit/lib'
 import { chooseProject } from './routing'
 import type { ShellModel } from './model'
 
@@ -24,8 +24,8 @@ import type { ShellModel } from './model'
 // palette's special cases: a task and a workspace were their own kind of item, composed into the root
 // by hand (docs/command-palette-and-shortcuts.md).
 //
-// Each loads once when its frame opens and filters locally after that
-// (client-core/host/registries/commands/localSearch.ts): every row is already in this process.
+// These rosters can arrive after the palette opens, so the shell retries the current search when
+// they change. Each query still filters locally (client-core/host/registries/commands/localSearch.ts).
 
 export function registerNavigationCommands(model: ShellModel): Disposable {
   return registerCommands([
@@ -46,7 +46,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
           title: task.title,
           subtitle: task.branch ?? task.projectId,
           taskId: task.id,
-        }))),
+        })), { cache: false }),
       select: (item): CommandOutcome => {
         const task = model.allTasks().find((candidate) => candidate.id === item.id)
         if (!task) throw new Error('that task is no longer here')
@@ -70,7 +70,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
           title: workspace.name,
           subtitle: `${workspace.projects.length} projects`,
           workspaceId: workspace.id,
-        }))),
+        })), { cache: false }),
       select: (item): CommandOutcome => {
         // `chooseWorkspace` clears the open task and source and then restores whatever the
         // destination was left on, so there is nothing to do to the rail here. Clearing the source
@@ -110,7 +110,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       // The open workspace's projects, which is the same list the shell's own project overlay draws:
       // a project outside it belongs to a workspace this shell is not showing.
       ...localSearch(() => (model.workspace()?.projects ?? [])
-        .map((project): CommandSearchItem => ({ id: project.id, title: project.name, projectId: project.id }))),
+        .map((project): CommandSearchItem => ({ id: project.id, title: project.name, projectId: project.id })), { cache: false }),
       select: (item): CommandOutcome => {
         chooseProject(item.id)
         return COMMAND_CLOSED
@@ -130,7 +130,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       when: () => nodes().length > 1,
       ...localSearch(() => nodes()
         .filter((node) => node.nodeId !== activeNodeId())
-        .map((node): CommandSearchItem => ({ id: node.nodeId, title: node.label }))),
+        .map((node): CommandSearchItem => ({ id: node.nodeId, title: node.label })), { cache: false }),
       select: (item): CommandOutcome => {
         setActiveNode(item.id)
         return COMMAND_CLOSED

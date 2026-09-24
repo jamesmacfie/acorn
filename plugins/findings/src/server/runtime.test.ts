@@ -112,25 +112,101 @@ describe('findings runtime', () => {
       acceptedFingerprints: async () => [],
       validate: async ({ payload }) => ({ payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: 'subject', warnings: [] }),
     })
+    const targetEntries = [
+      { id: 'memory:change', pluginId: 'memory', value: reviewTarget('memory:change') },
+      { id: 'other:change', pluginId: 'other', value: reviewTarget('other:change') },
+    ]
     const reviewRuntime = new FindingsRuntime({
       capture,
       emit,
       producerEntries: () => [],
-      targetEntries: () => [
-        { id: 'memory:change', pluginId: 'memory', value: reviewTarget('memory:change') },
-        { id: 'other:change', pluginId: 'other', value: reviewTarget('other:change') },
-      ],
+      targetEntries: () => targetEntries,
       review: new FindingsReviewStore(ctx.storage.open()),
       core: ctx.core,
     })
     reviewRuntime.connectTargets()
-    const bundle = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:owner-bound' })
+    const bundle = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:owner-bound', targetId: 'memory:change' })
     const candidate = bundle.candidates[0]!
 
     await expect(controllers.get('other:change')!.applying(candidate.candidateId, candidate.revision, 'other-operation'))
       .rejects.toMatchObject({ kind: 'forbidden' })
     await expect(controllers.get('memory:change')!.applying(candidate.candidateId, candidate.revision, 'memory-operation'))
       .resolves.toMatchObject({ status: 'applying' })
+    await capture.record({
+      scope: { kind: 'task', taskId: 'task' }, origin: { kind: 'device', deviceId: 'device' }, producerId: 'test',
+      input: { sourceKey: 'other-target', kind: 'findings:observation', kindVersion: 1, title: 'Other target', body: 'Selected for the other target.', claimStatus: 'observed', evidence: [] },
+    })
+    const other = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:other-target', targetId: 'other:change' })
+    expect(other.candidates[0]?.targetKind).toBe('other:change')
+    await expect(reviewRuntime.prepareTask('task', { boundaryKey: 'manual:other-target', targetId: 'memory:change' }))
+      .rejects.toMatchObject({ kind: 'conflict' })
+    targetEntries.pop()
+    reviewRuntime.refreshContributors()
+    await expect(reviewRuntime.retryPreparation(other.id)).rejects.toMatchObject({ kind: 'unavailable' })
+    targetEntries.push({ id: 'other:change', pluginId: 'other', value: reviewTarget('other:change') })
+    reviewRuntime.refreshContributors()
+    expect((await reviewRuntime.retryPreparation(other.id)).id).toBe(other.id)
+  })
+
+  it('submits one atomic, idempotent proposal and stamps plugin origin on the public controller', async () => {
+    const db = ctx.storage.open()
+    const capture = new FindingCapture({ db, core: ctx.core, kinds: () => [{ id: 'findings:observation', descriptor: { version: 1, label: 'Observation' } }] })
+    const review = new FindingsReviewStore(db)
+    let controller!: FindingTargetController
+    const target: FindingReviewTargetContribution = {
+      version: 1, connect: (bound) => { controller = bound }, acceptedFingerprints: async () => [],
+      validate: async ({ payload }) => ({ payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: 'subject', warnings: [] }),
+    }
+    const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: target }], review, core: ctx.core })
+    reviewRuntime.connectTargets()
+    reviewRuntime.onBundlePublished(() => { throw new Error('notice transport failed') })
+    const input = { taskId: 'task', sourceKey: 'tool-call-1', title: 'Keep boundaries', body: 'Use the owner boundary.', payload: { name: 'keep-boundaries' } }
+    const first = await controller.submitProposal({ ...input, sessionId: 'forged-agent' } as typeof input)
+    expect(await controller.submitProposal(input)).toEqual(first)
+    expect(reviewRuntime.candidate(first.candidateId)).toMatchObject({ status: 'ready', targetKind: 'memory:change' })
+    expect(reviewRuntime.bundles({ kind: 'project', projectId: 'project' }, true)).toHaveLength(1)
+    expect((await reviewRuntime.listTask('task')).items).toMatchObject([{ origin: { kind: 'plugin', pluginId: 'memory', invocationId: 'tool-call-1' } }])
+
+    const insert = vi.spyOn(review, 'submitProposal').mockImplementationOnce(() => { throw new Error('review insert failed') })
+    await expect(controller.submitProposal({ ...input, sourceKey: 'tool-call-2' })).rejects.toThrow('review insert failed')
+    expect((await reviewRuntime.listTask('task')).items).toHaveLength(1)
+    insert.mockRestore()
+    await expect(controller.submitProposal({ ...input, sourceKey: 'tool-call-1', payload: { name: 'different' } }))
+      .rejects.toMatchObject({ kind: 'conflict' })
+  })
+
+  it('verifies agent provenance and revokes a target before an in-flight submission commits', async () => {
+    const db = ctx.storage.open()
+    const capture = new FindingCapture({ db, core: ctx.core, kinds: () => [{ id: 'findings:observation', descriptor: { version: 1, label: 'Observation' } }] })
+    let controller!: FindingTargetController
+    let release!: () => void
+    let delayed = false
+    const target: FindingReviewTargetContribution = {
+      version: 1, connect: (bound) => { controller = bound }, acceptedFingerprints: async () => [],
+      validate: async ({ payload }) => {
+        if (delayed) await new Promise<void>((resolve) => { release = resolve })
+        return { payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: 'subject', warnings: [] }
+      },
+    }
+    let targets = [{ id: 'memory:change', pluginId: 'memory', value: target }]
+    const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => targets, review: new FindingsReviewStore(db), core: ctx.core })
+    reviewRuntime.connectTargets()
+    const input = { taskId: 'task', sessionId: 'session-1', proof: 'host-proof', sourceKey: 'agent-1', title: 'Agent proposal', body: 'Review this.', payload: { name: 'agent-proposal' } }
+    await expect(reviewRuntime.submitAgentProposal(input, async () => false)).rejects.toMatchObject({ kind: 'forbidden' })
+    await expect(reviewRuntime.submitAgentProposal({ ...input, taskId: 'other-task' }, async (taskId, sessionId) => taskId === 'task' && sessionId === 'session-1'))
+      .rejects.toMatchObject({ kind: 'forbidden' })
+    const accepted = await reviewRuntime.submitAgentProposal(input, async (taskId, sessionId, proof) => taskId === 'task' && sessionId === 'session-1' && proof === 'host-proof')
+    expect(reviewRuntime.candidate(accepted.candidateId)?.status).toBe('ready')
+    expect((await reviewRuntime.listTask('task')).items[0]?.origin).toMatchObject({ kind: 'agent', sessionId: 'session-1' })
+
+    delayed = true
+    const pending = controller.submitProposal({ taskId: 'task', sourceKey: 'plugin-delayed', title: 'Delayed', body: 'Review this.', payload: { name: 'delayed' } })
+    for (let attempt = 0; !release && attempt < 20; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 1))
+    targets = []
+    reviewRuntime.refreshContributors()
+    release()
+    await expect(pending).rejects.toMatchObject({ kind: 'unavailable' })
+    expect((await reviewRuntime.listTask('task')).items).toHaveLength(1)
   })
 
   it('uses only the explicitly selected backend and rejects unaccounted source IDs', async () => {
@@ -158,7 +234,8 @@ describe('findings runtime', () => {
       validate: async ({ payload }) => ({ payload, payloadHash: JSON.stringify(payload), fingerprint: JSON.stringify(payload), subjectKey: 'subject', warnings: [] }),
     }
     const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: { tasks: ctx.core.tasks, identity: ctx.core.identity, models: { ...ctx.core.models, generateText } } })
-    const failed = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:model', backendId: 'connection:model-1', modelId: 'fixture-model' })
+    reviewRuntime.connectTargets()
+    const failed = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:model', targetId: 'memory:change', backendId: 'connection:model-1', modelId: 'fixture-model' })
     expect(failed).toMatchObject({ state: 'failed', error: expect.stringContaining('exactly once') })
     expect(generateText).toHaveBeenCalledTimes(2)
     expect(generateText.mock.calls[0]?.[0]).toMatchObject({
@@ -175,6 +252,7 @@ describe('findings runtime', () => {
     expect(failed).toMatchObject({ backendId: 'connection:model-1', modelId: 'fixture-model' })
     capture.withdrawTask({ taskId: 'task', observationId: recorded.id, actor: { kind: 'device', id: 'device-1' } })
     const restarted = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: { tasks: ctx.core.tasks, identity: ctx.core.identity, models: { ...ctx.core.models, generateText } } })
+    restarted.connectTargets()
     expect(await restarted.retryPreparation(failed.id)).toMatchObject({ id: failed.id, state: 'preparing', backendId: 'connection:model-1', modelId: 'fixture-model' })
     for (let attempt = 0; attempt < 20 && generateText.mock.calls.length < 3; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
     expect(generateText.mock.calls[2]?.[0]).toMatchObject({
@@ -202,7 +280,8 @@ describe('findings runtime', () => {
     }
     const reviewRuntime = new FindingsRuntime({ capture, emit, producerEntries: () => [], targetEntries: () => [{ id: 'memory:change', pluginId: 'memory', value: reviewTarget }], review: new FindingsReviewStore(ctx.storage.open()), core: ctx.core })
     reviewRuntime.onBundlePublished(async () => { throw new Error('optional notification unavailable') })
-    const bundle = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:all-pages' })
+    reviewRuntime.connectTargets()
+    const bundle = await reviewRuntime.prepareTask('task', { boundaryKey: 'manual:all-pages', targetId: 'memory:change' })
     expect(bundle).toMatchObject({ state: 'ready', inputCount: 101, pendingCount: 0 })
     expect(bundle.outcomes).toHaveLength(101)
   })

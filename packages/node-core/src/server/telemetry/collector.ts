@@ -12,7 +12,7 @@ import { startRuntimePressure } from './runtimePressure'
 //
 // **Off costs one boolean read.** `enabled` is `PERF || (sinks.size > 0 && prefEnabled)`. With no
 // sink subscribed there is no flush timer and no SELECT, and every emit verb returns before it
-// allocates anything. The preference is re-read once per flush tick because `PUT /v2/core/prefs`
+// allocates anything. The preference is re-read once per flush tick because `PUT /v1/core/prefs`
 // writes the table directly and has no way to tell this module, so a switch flipped in Settings is
 // seen within five seconds.
 //
@@ -220,7 +220,7 @@ export const newSpanId = (): string => hex(8)
 // ── Ambient attribution ───────────────────────────────────────────────────────────────────────────
 //
 // Every verb takes the owner as its first argument. Where the caller has nothing better to say than
-// `'core'`, the store answers instead: a request under `/v2/p/rollbar` entered it with
+// `'core'`, the store answers instead: a request under `/v1/p/rollbar` entered it with
 // `owner: 'rollbar'`, so the git spawn eleven frames down reports as rollbar's without git.ts ever
 // learning who called it (./context.ts, docs/telemetry.md § Ambient attribution).
 //
@@ -577,7 +577,7 @@ export function flushTelemetry(): void {
 }
 
 function tick(): void {
-  // The preference is re-read here rather than watched: `PUT /v2/core/prefs` writes the table
+  // The preference is re-read here rather than watched: `PUT /v1/core/prefs` writes the table
   // directly and has nothing to notify. One SELECT every five seconds, and only while a sink is
   // subscribed.
   const read = state.readPref

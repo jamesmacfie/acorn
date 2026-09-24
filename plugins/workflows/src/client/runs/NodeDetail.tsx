@@ -3,14 +3,14 @@ import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useSearchParams } from '@solidjs/router'
 import {
-  clientCapability, openPane, pathForTask, refreshSessions, requestTerminalFocus, setTerminalOpen,
+  clientCapability, openPane, pathForTask, refreshSessionSources, requestTerminalFocusIntent, setTerminalOpen,
   type Task, tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, CodeBlock, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal, Stack,
   Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '../../contract/wire.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { WorkflowStepProjection } from '../../shared/api'
@@ -101,7 +101,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
 
   const openTerminal = (sessionId: string): void => {
     setTerminalOpen(props.task.id, true)
-    requestTerminalFocus(props.task.id, sessionId)
+    requestTerminalFocusIntent(props.task.id, sessionId)
   }
 
   const openTaskTarget = (taskId: string, runId?: string, record?: { rootRunId: string; recordId: string }): void => {
@@ -138,7 +138,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
         command,
         title: `⏎ ${name}`,
       })
-      await refreshSessions()
+      await refreshSessionSources()
       openTerminal(terminal.id)
     } catch (caught) {
       model.setError(caught instanceof Error ? caught.message : 'That session could not be opened in a terminal.')

@@ -78,7 +78,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
         // The provider call runs inside the secret scope (docs/integrations.md § Provider
         // boundaries), so a credential echoed back in an error body is scrubbed before this failure
         // is logged or surfaced.
-        const refreshed = await args.secrets.use(connection.authRef, `${connection.provider}: read ${resource.id}`, (secret) =>
+        const refreshed = await args.secrets.use(connection.encryptedCredentials, `${connection.provider}: read ${resource.id}`, (secret) =>
           providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
             resource.refresh({ ...context(), secret }, args.input),
           ),

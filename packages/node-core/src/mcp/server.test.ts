@@ -156,12 +156,12 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
             req.socket.destroy()
             return
           }
-          if (url.endsWith('/tools/task_current')) return json({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813, links: [{ provider: 'linear' }] })
+          if (url.endsWith('/tools/task_current')) return json({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813, links: [{ id: 'linear:ENG-42', kind: 'linear', label: 'ENG-42', details: ['In Progress'] }] })
           json({ ok: true })
         })
         return
       }
-      if (url.startsWith('/v2/core/tasks/t1/tools')) return json(MANIFEST)
+      if (url.startsWith('/v1/core/tasks/t1/tools')) return json(MANIFEST)
       res.statusCode = 404
       res.end('{}')
     }

@@ -1,14 +1,15 @@
+import type { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // The two row types come from this plugin's schema (node/schema.ts), not core's. `$inferSelect`
 // against the local tables keeps every handler, the bridge, and the client's row shape in step with
 // one migration chain.
 import type * as schema from '../node/schema'
-import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
-export type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
+export type { ToolCeiling, ToolRisk } from '@acorn/protocol/toolPolicy.ts'
 
 export type WorkflowBudget = {
   maxWallTimeMs?: number
@@ -22,7 +23,7 @@ export type WorkflowBudget = {
 // prompt, and any string inside `with` (docs/workflows.md § Execution model). A run freezes the
 // values it started with into its own copy of the definition, so `default` on a frozen run reads as
 // "what this run was given".
-export type WorkflowInput = import('@acorn/protocol/workflow.ts').WorkflowInput
+export type WorkflowInput = import('../contract/wire').WorkflowInput
 
 export type WorkflowDefinitionRef =
   | { source: 'database'; id: string }
@@ -98,9 +99,10 @@ export type WorkflowStepDef = {
 }
 
 export type WorkflowDef = {
+  baseline: typeof ACORN_BASELINE
   maxDescendants?: number
   maxConcurrency?: number
-  formatVersion?: 2
+  formatVersion: 1
   name: string
   posture?: WorkflowPosture
   trigger?: string

@@ -55,25 +55,25 @@ const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<
 })
 
 const CHROME: Partial<PluginContributions> = {
-  sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v2/p/board/rail-items' }],
+  sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
   slots: [
-    { id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' },
-    { id: 'board-status', slot: 'topbar', data: '/v2/p/board/status' },
+    { id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge' },
+    { id: 'board-status', slot: 'topbar', data: '/v1/p/board/status' },
   ],
   contextMenus: [{
     id: 'board-open', location: 'task.row', label: 'Open the board card', order: 500,
-    action: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+    action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   }],
-  palette: [{ id: 'board.new', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v2/p/board/new' } }],
-  attention: [{ id: 'board-stuck', order: 500, items: '/v2/p/board/attention' }],
-  nodeStats: [{ id: 'board-count', order: 500, label: ['card stuck', 'cards stuck'], data: '/v2/p/board/stat' }],
+  commands: [{ id: 'board.new', kind: 'action', title: 'Board: new card', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v1/p/board/new' } }],
+  attention: [{ id: 'board-stuck', order: 500, items: '/v1/p/board/attention' }],
+  nodeStats: [{ id: 'board-count', order: 500, label: ['card stuck', 'cards stuck'], data: '/v1/p/board/stat' }],
   agentContexts: [{
     id: 'board-context',
     label: 'Board cards',
-    options: '/v2/p/board/context-options',
-    capture: '/v2/p/board/context-capture',
+    options: '/v1/p/board/context-options',
+    capture: '/v1/p/board/context-capture',
   }],
-  refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v2/p/board/refs' }],
+  refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v1/p/board/refs' }],
 }
 
 const ids = () => ({
@@ -135,7 +135,7 @@ describe('syncChromeContributions', () => {
     }
 
     // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
-    expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v2/p/other/go' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v1/p/other/go' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'ghost' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'openUrl', url: 'http://example.com' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'createTask' } as never))).toEqual({ message })
@@ -143,7 +143,7 @@ describe('syncChromeContributions', () => {
     expect(usableEmptyState('board', panes, authored({ verb: 'openOverlay', overlay: 'board' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'board-picker' }))).toEqual({ message })
 
-    const usable = authored({ verb: 'runNodeAction', path: '/v2/p/board/link' })
+    const usable = authored({ verb: 'runNodeAction', path: '/v1/p/board/link' })
     expect(usableEmptyState('board', panes, usable)).toBe(usable)
     const picker = authored({ verb: 'openOverlay', overlay: 'board-picker' })
     expect(usableEmptyState('board', panes, picker)).toBe(picker)
@@ -155,7 +155,7 @@ describe('syncChromeContributions', () => {
     const promotable: Partial<PluginContributions> = {
       sources: [{
         id: 'board', label: 'Board', glyph: 'kanban', order: 60,
-        items: '/v2/p/board/rail-items', onSelect: { verb: 'createTask' },
+        items: '/v1/p/board/rail-items', onSelect: { verb: 'createTask' },
       }],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
@@ -168,7 +168,7 @@ describe('syncChromeContributions', () => {
       frames: [{ target: 'pane', id: 'board-pane', label: 'Board', glyph: 'kanban', order: 60, formFactor: ['desktop'] }],
       sources: [{
         id: 'board', label: 'Board', glyph: 'kanban', order: 60,
-        items: '/v2/p/board/rail-items', onSelect: { verb: 'openPane', pane: 'board-pane' },
+        items: '/v1/p/board/rail-items', onSelect: { verb: 'openPane', pane: 'board-pane' },
       }],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
@@ -248,9 +248,9 @@ describe('syncChromeContributions', () => {
     // name from a newer schema is dropped rather than defaulted into whichever registry is handy.
     const slots: Partial<PluginContributions> = {
       slots: [
-        { id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' },
-        { id: 'board-status', slot: 'topbar', data: '/v2/p/board/status' },
-        { id: 'board-drawer', slot: 'drawer' as never, data: '/v2/p/board/drawer' },
+        { id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge' },
+        { id: 'board-status', slot: 'topbar', data: '/v1/p/board/status' },
+        { id: 'board-drawer', slot: 'drawer' as never, data: '/v1/p/board/drawer' },
       ],
     }
     _seedPluginDistribution([['node-a', [row('board', {}, slots)]]])
@@ -301,8 +301,8 @@ describe('syncChromeContributions', () => {
       const bad: Partial<PluginContributions> = {
         ...CHROME,
         contextMenus: [
-          { id: 'from-the-future', location: 'file.row', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v2/p/board/open' } },
-          { id: 'bad-when', location: 'task.row', label: 'Open', order: 500, when: { branch: 'main' }, action: { verb: 'runNodeAction', path: '/v2/p/board/open' } },
+          { id: 'from-the-future', location: 'file.row', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
+          { id: 'bad-when', location: 'task.row', label: 'Open', order: 500, when: { branch: 'main' }, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
         ],
       }
       _seedPluginDistribution([['node-a', [row('board', {}, bad)]]])
@@ -381,7 +381,7 @@ describe('syncChromeContributions', () => {
   })
 
   it('refuses to read a route outside the plugin’s own namespace', async () => {
-    const hostile: Partial<PluginContributions> = { attention: [{ id: 'a', order: 500, items: '/v2/core/tasks' }] }
+    const hostile: Partial<PluginContributions> = { attention: [{ id: 'a', order: 500, items: '/v1/core/tasks' }] }
     _seedPluginDistribution([['node-a', [row('board', {}, hostile)]]])
     syncChromeContributions()
     // The node's parser already rejected this, but the manifest reaches the device as a roster row,
@@ -390,14 +390,14 @@ describe('syncChromeContributions', () => {
     expect(readJson).not.toHaveBeenCalled()
   })
 
-  it('promotes the palette alias to one command and gates it on the active node', async () => {
+  it('registers a declared command and gates it on the active node', async () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
     syncChromeContributions()
     const command = commandRegistry.get('plugin.board.board.new')!
     expect(command.palette).toBe(true)
     expect(commandAvailable(command)).toBe(true)
     await executeCommand(command.id)
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/board/new', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/new', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
     setActiveNode('node-b')
     expect(commandAvailable(command)).toBe(false)
   })
@@ -405,7 +405,7 @@ describe('syncChromeContributions', () => {
   it('registers commands and keybindings with host-qualified ids and preserves them while disabled', () => {
     const declared: Partial<PluginContributions> = {
       commands: [
-        { id: 'search', title: 'Board: search', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } },
+        { id: 'search', title: 'Board: search', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v1/p/board/search' } },
         { id: 'quiet', title: 'Board: quiet action', category: 'action', palette: false, action: { verb: 'openUrl', url: 'https://example.com' } },
       ],
       keybindings: [{ command: 'search', defaultChord: 'meta+shift+f', when: 'task' }],
@@ -430,17 +430,17 @@ describe('syncChromeContributions', () => {
         { id: 'issues', title: 'Board: issues', category: 'navigation', palette: true, kind: 'group' },
         {
           id: 'find', title: 'Board: find a card', category: 'action', palette: true, kind: 'search',
-          scope: 'task', route: '/v2/p/board/search', parentId: 'issues',
-          onSelect: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+          scope: 'task', route: '/v1/p/board/search', parentId: 'issues',
+          onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
         },
         {
           id: 'ask', title: 'Board: new card', category: 'action', palette: true, kind: 'input',
-          scope: 'project', route: '/v2/p/board/new-card',
-          onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+          scope: 'project', route: '/v1/p/board/new-card',
+          onSuccess: { verb: 'runNodeAction', path: '/v1/p/board/open' },
         },
         {
           id: 'theme', title: 'Board: theme', category: 'action', palette: true, kind: 'setting',
-          scope: 'project', readRoute: '/v2/p/board/theme', writeRoute: '/v2/p/board/theme',
+          scope: 'project', readRoute: '/v1/p/board/theme', writeRoute: '/v1/p/board/theme',
           options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
         },
         // A kind a newer node knows about. Skipped rather than coerced into an action.
@@ -448,7 +448,7 @@ describe('syncChromeContributions', () => {
         // A route outside the plugin's own namespace, refused here as well as at parse time.
         {
           id: 'core', title: 'Board: core search', category: 'action', palette: true, kind: 'search',
-          scope: 'none', route: '/v2/tasks', onSelect: { verb: 'openTask' },
+          scope: 'none', route: '/v1/tasks', onSelect: { verb: 'openTask' },
         },
       ] as PluginContributions['commands'],
     }
@@ -477,12 +477,12 @@ describe('syncChromeContributions', () => {
       commands: [
         {
           id: 'find', title: 'Board: find a card', category: 'navigation', palette: true, kind: 'search',
-          scope: 'project', route: '/v2/p/board/search',
+          scope: 'project', route: '/v1/p/board/search',
           onSelect: { verb: 'navigate', surface: 'board-card' },
         },
         {
           id: 'stray', title: 'Board: find a stray', category: 'navigation', palette: true, kind: 'search',
-          scope: 'project', route: '/v2/p/board/search',
+          scope: 'project', route: '/v1/p/board/search',
           onSelect: { verb: 'navigate', surface: 'not-declared' },
         },
       ] as PluginContributions['commands'],
@@ -507,7 +507,7 @@ describe('syncChromeContributions', () => {
         {
           target: 'pane', id: 'notes', label: 'Notes', glyph: 'puzzle', order: 500, formFactor: ['desktop'],
           scope: 'task', layout: 'single',
-          regions: { body: { kind: 'document', languageId: 'plaintext', read: '/v2/p/board/doc' } },
+          regions: { body: { kind: 'document', languageId: 'plaintext', read: '/v1/p/board/doc' } },
         },
       ] as PluginContributions['frames'],
       commands: [
@@ -533,7 +533,7 @@ describe('syncChromeContributions', () => {
     const declared: Partial<PluginContributions> = {
       commands: [{
         id: 'grouping', title: 'Board: group cards by', category: 'action', palette: true, kind: 'setting',
-        scope: 'project', readRoute: '/v2/p/board/prefs/grouping', writeRoute: '/v2/p/board/prefs/grouping',
+        scope: 'project', readRoute: '/v1/p/board/prefs/grouping', writeRoute: '/v1/p/board/prefs/grouping',
         options: [{ value: 'status', label: 'Status' }, { value: 'assignee', label: 'Assignee' }],
       }] as PluginContributions['commands'],
     }
@@ -554,13 +554,13 @@ describe('syncChromeContributions', () => {
       expect(await setting().read(context, new AbortController().signal)).toBe('assignee')
       // The project the session captured rides along, and the task it also captured does not: the
       // descriptor declared project scope, and the host sends that scope's identifier and no other.
-      expect(readJson).toHaveBeenCalledWith('/v2/p/board/prefs/grouping?projectId=p-1', expect.objectContaining({ nodeId: 'node-a' }))
+      expect(readJson).toHaveBeenCalledWith('/v1/p/board/prefs/grouping?projectId=p-1', expect.objectContaining({ nodeId: 'node-a' }))
     })
 
     it('writes the chosen value and takes the canonical one the route answers with', async () => {
       writeJson.mockResolvedValueOnce({ value: 'status' })
       expect(await setting().write('status', context, new AbortController().signal)).toBe('status')
-      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/prefs/grouping', expect.objectContaining({
+      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/prefs/grouping', expect.objectContaining({
         method: 'PUT',
         nodeId: 'node-a',
         body: JSON.stringify({ value: 'status', projectId: 'p-1' }),
@@ -635,7 +635,7 @@ describe('syncChromeContributions', () => {
       readJson.mockResolvedValue([{ id: 'card-1', label: 'Card 1' }])
       const options = await agentContextRegistry.get('board-context')!.options(scope)
       expect(options).toEqual([{ id: 'card-1', label: 'Card 1' }])
-      expect(readJson).toHaveBeenCalledWith('/v2/p/board/context-options?taskId=task-1', expect.objectContaining({ nodeId: 'node-a' }))
+      expect(readJson).toHaveBeenCalledWith('/v1/p/board/context-options?taskId=task-1', expect.objectContaining({ nodeId: 'node-a' }))
     })
 
     it('captures over POST and binds source, capture time and byte size host-side', async () => {
@@ -652,7 +652,7 @@ describe('syncChromeContributions', () => {
         sensitivity: 'private',
       })])
       const captured = await agentContextRegistry.get('board-context')!.capture(scope, ['card-1'])
-      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/context-capture', expect.objectContaining({
+      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/context-capture', expect.objectContaining({
         method: 'POST',
         nodeId: 'node-a',
         body: JSON.stringify({ taskId: 'task-1', optionIds: ['card-1'] }),
@@ -708,7 +708,7 @@ describe('syncChromeContributions', () => {
       // resolver naming another provider is how its rows would end up behind that provider's panel.
       writeJson.mockResolvedValue([{ ...row1, providerId: 'linear', url: 'https://board.example/c/ENG-1' }])
       const resolved = await refResolverRegistry.get('board-refs')!.resolve(['ENG-1'])
-      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/refs', expect.objectContaining({
+      expect(writeJson).toHaveBeenCalledWith('/v1/p/board/refs', expect.objectContaining({
         method: 'POST',
         nodeId: 'node-a',
         body: JSON.stringify({ identifiers: ['ENG-1'] }),
@@ -736,7 +736,7 @@ describe('syncChromeContributions', () => {
 
   it('takes all of a plugin’s chrome away when it stops being offered', () => {
     const shortcutChrome: Partial<PluginContributions> = {
-      commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } }],
+      commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v1/p/board/search' } }],
       keybindings: [{ command: 'search', defaultChord: 'meta+alt+b', when: 'global' }],
     }
     const overrideId = 'plugin.board.search'

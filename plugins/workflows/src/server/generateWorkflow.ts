@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // The prompt behind Generate in the workflow editor (docs/workflows.md § Authoring): what a model
 // that has never heard of acorn has to be told before it can write a definition.
 //
@@ -91,7 +92,7 @@ const SECTION_ROLE = [
   '',
   'Answer with one JSON object and nothing else. No code fence, no prose in front of it, no prose',
   'after it, no comments, no trailing commas. The whole reply has to pass JSON.parse.',
-  'Write formatVersion: 2. Each step has a stable id separate from its human name. Keep IDs when editing.',
+  `Write baseline: "${ACORN_BASELINE}" and formatVersion: 1. Each step has a stable id separate from its human name. Keep IDs when editing.`,
   'All after entries, branch targets, step template references and bindings use IDs. Reordering or renaming must preserve these references.',
   'Inputs declare schema (string, number, integer, boolean, null, object or array), optional typed default, label and required.',
   'Declare named outputs as {name, schema, binding}; bindings use {address: {from, ...}, fallback?, conversion?}.',
@@ -111,7 +112,8 @@ const SECTION_CONCEPTS = [
   '### The shape',
   '',
   '{',
-  '  "formatVersion": 2,',
+  `  "baseline": "${ACORN_BASELINE}",`,
+  '  "formatVersion": 1,',
   '  "name": "Investigate an issue",',
   '  "posture": "gated",',
   '  "tools": { "maxRisk": "write" },',
@@ -579,7 +581,8 @@ const SECTION_RULES = [
   'so this is a three-step chain:',
   '',
   '{',
-  '  "formatVersion": 2,',
+  `  "baseline": "${ACORN_BASELINE}",`,
+  '  "formatVersion": 1,',
   '  "name": "Investigate",',
   '  "steps": [',
   '    { "id": "check-the-logs", "name": "Check the logs", "prompt": "Read the logs for this failure and say what they show." },',
@@ -592,7 +595,8 @@ const SECTION_RULES = [
   '`inputs` defaults to `append`:',
   '',
   '{',
-  '  "formatVersion": 2,',
+  `  "baseline": "${ACORN_BASELINE}",`,
+  '  "formatVersion": 1,',
   '  "name": "Investigate",',
   '  "steps": [',
   '    { "id": "check-the-logs", "name": "Check the logs", "after": [], "prompt": "Read the logs for this failure and say what they show." },',
@@ -616,7 +620,8 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
       '`append`. Nothing leaves the machine until a person presses approve.',
     ].join(' '),
     def: {
-      formatVersion: 2,
+      baseline: ACORN_BASELINE,
+      formatVersion: 1,
       name: 'Investigate an issue from two angles',
       posture: 'gated',
       tools: { maxRisk: 'execute' },
@@ -659,7 +664,8 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
   {
     note: 'A structured plan can return zero items. Select a published child workflow, then add For each using /items and the stable /id key. Do not infer identity from array position.',
     def: {
-      formatVersion: 2,
+      baseline: ACORN_BASELINE,
+      formatVersion: 1,
       name: 'Plan package updates',
       steps: [{
         id: 'plan', name: 'Plan package updates', kind: 'agent',

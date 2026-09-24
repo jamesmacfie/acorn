@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 import { sameAgentConfigOptions, sessionModelLabel, sessionModelSummary } from './agentConfigOptions'
 
 const options = (): AgentConfigOption[] => [{

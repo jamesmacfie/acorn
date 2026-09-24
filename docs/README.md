@@ -23,7 +23,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | --- | --- |
 | [architecture-overview.md](./architecture-overview.md) | Runtime topology, process ownership, package boundaries, and the product model. The one to read first. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
-| [api-reference.md](./api-reference.md) | Overview of `/v2` routes, authentication, errors, and transport. |
+| [api-reference.md](./api-reference.md) | Overview of `/v1` routes, authentication, errors, and transport. |
 | [data-layer.md](./data-layer.md) | The data root, the core database, plugin databases, migrations, backup, and retention. |
 | [state-ownership.md](./state-ownership.md) | Which state the node owns, which the device owns, and what is disposable. |
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
@@ -157,7 +157,9 @@ evidence.
 
 ## Architecture and legacy reset programme
 
-Reviewed proposal, 2026-09-21. These files describe future work, not shipped contracts.
+Tickets 01–12 implemented, 2026-09-23. Ticket 13 records the final acceptance evidence and the
+real-host checks still outstanding; it does not declare a production release.
+The owning reference pages describe current contracts.
 
 - [Programme and implementation order](./future/legacy/README.md)
 - [Context, coverage, and evidence](./future/legacy/context.md)

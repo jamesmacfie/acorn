@@ -22,13 +22,6 @@ export type FindingProducerContribution = {
   connect(writer: FindingWriter): void | (() => void)
 }
 
-/** A legacy owner can lend findings its source bytes without exposing a filesystem path. This is a
- * migration-only read seam: findings parses, hashes, and records the durable mapping in its database. */
-export type FindingLegacySource = { filename: string; source: string | null }
-export type FindingLegacySourceContribution = {
-  version: 1
-  list(): Promise<readonly FindingLegacySource[]>
-}
 
 export type FindingReviewValidation = {
   payload: unknown
@@ -50,6 +43,8 @@ export type FindingReviewSynthesisContext = {
  * Findings can prepare review state through this seam, but never receives target write authority. */
 export type FindingReviewTargetContribution = {
   version: number
+  /** Human-readable name for target selection. Falls back to the qualified ID. */
+  label?: string
   /** Must be side-effect free. Findings may call validation while correcting generated payloads and
    * calls it again before persisting a candidate. */
   validate(input: { scope: FindingScope; payload: unknown }): Promise<FindingReviewValidation>
@@ -61,4 +56,3 @@ export type FindingReviewTargetContribution = {
 export const FINDINGS_KIND = extensionPointId<FindingKindDescriptor>('findings:kind')
 export const FINDINGS_PRODUCER = extensionPointId<FindingProducerContribution>('findings:producer')
 export const FINDINGS_REVIEW_TARGET = extensionPointId<FindingReviewTargetContribution>('findings:review-target')
-export const FINDINGS_LEGACY_SOURCE = extensionPointId<FindingLegacySourceContribution>('findings:legacy-source')

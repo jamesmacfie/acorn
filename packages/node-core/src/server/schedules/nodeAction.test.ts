@@ -92,7 +92,7 @@ const declare = (risk?: 'read' | 'write' | 'execute') =>
     ctx.nodeActions.register({
       actionId: 'prune-merged',
       name: 'Prune merged worktrees',
-      path: `/v2/p/${PLUGIN}/actions/prune`,
+      path: `/v1/p/${PLUGIN}/actions/prune`,
       ...(risk ? { risk } : {}),
     })
 
@@ -112,7 +112,7 @@ describe('what the picker may offer', () => {
   it('synthesises a LOADED plugin’s runNodeAction commands from its manifest', async () => {
     const core = makeTestDb()
     const commands: PluginCommandDescriptor[] = [
-      { id: 'prune', title: 'Prune merged worktrees', category: 'action', palette: true, action: { verb: 'runNodeAction', path: `/v2/p/${PLUGIN}/actions/prune` } },
+      { id: 'prune', title: 'Prune merged worktrees', category: 'action', palette: true, action: { verb: 'runNodeAction', path: `/v1/p/${PLUGIN}/actions/prune` } },
       // Every other verb needs a surface, and a schedule has none.
       { id: 'show', title: 'Show the pane', category: 'action', palette: true, action: { verb: 'openOverlay', overlay: 'thing' } },
     ]
@@ -193,7 +193,7 @@ describe('creating and running one', () => {
       name: PLUGIN,
       init: (ctx) => {
         ctx.routes.fetch(() => { fired += 1; return new Response(null, { status: 204 }) }, { prefix: '/actions' })
-        ;(ctx as HostPluginContext).nodeActions.register({ actionId: 'prune-merged', name: 'Prune merged worktrees', path: `/v2/p/${PLUGIN}/actions/prune`, risk })
+        ;(ctx as HostPluginContext).nodeActions.register({ actionId: 'prune-merged', name: 'Prune merged worktrees', path: `/v1/p/${PLUGIN}/actions/prune`, risk })
       },
     })
     try {

@@ -5,7 +5,7 @@
 ## Installing a hand-written package
 
 The install route is unchanged and deliberately unreachable from plugin code:
-`POST /v2/core/plugins/install`, owner or device principal, `Idempotency-Key` header required,
+`POST /v1/core/plugins/install`, owner or device principal, `Idempotency-Key` header required,
 audited. For a hand-written directory the source form is a local path:
 
 ```json
@@ -59,8 +59,9 @@ default scaffold, which inlines the tree protocol.
 {
   "id": "hello-acorn",
   "name": "Hello Acorn",
-  "version": "0.1.0",
-  "apiVersion": "12",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "1",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {
@@ -95,7 +96,7 @@ export default {
   name: 'hello-acorn',
   /** @param {import('acorn-plugin-types').NodePluginContext} ctx */
   init(ctx) {
-    // The portable carrier. The mount is stripped, so `/v2/p/hello-acorn/greeting`
+    // The portable carrier. The mount is stripped, so `/v1/p/hello-acorn/greeting`
     // arrives here as `/greeting`.
     ctx.routes.fetch((request, context) => handle(request, context, ctx.core))
   },
@@ -190,7 +191,7 @@ document.body.append(root)
 
 connected.then(async (context) => {
   const query = context.taskId ? `?taskId=${encodeURIComponent(context.taskId)}` : ''
-  const { text } = await get(`/v2/p/hello-acorn/greeting${query}`)
+  const { text } = await get(`/v1/p/hello-acorn/greeting${query}`)
 
   const heading = document.createElement('h1')
   heading.textContent = text

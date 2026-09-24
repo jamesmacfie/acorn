@@ -11,7 +11,6 @@ import {
   keybindingConflict,
   keybindingRegistry,
   readKeybindingOverrides,
-  readLegacyPaneOverrides,
   resolveKeybindings,
   type KeybindingContribution,
   type ResolvedKeybinding,
@@ -89,13 +88,8 @@ export default function ShortcutsSettings() {
 
   const resetBindings = async (bindings: readonly KeybindingContribution[]) => {
     const ids = bindings.map((binding) => binding.id)
-    const legacyIds = new Set(bindings.flatMap((binding) => binding.legacyPaneAction ?? []))
-    const legacy = readLegacyPaneOverrides(prefs.data?.[PrefKeys.paneShortcuts])
     setError('')
-    await Promise.all([
-      saveOverrides(removeOverrideIds(overrides(), ids)),
-      saveJsonPref(queryClient, PrefKeys.paneShortcuts, removeOverrideIds(legacy, legacyIds)),
-    ])
+    await saveOverrides(removeOverrideIds(overrides(), ids))
   }
 
   const captureKey = (binding: KeybindingContribution, event: KeyboardEvent) => {

@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1786176958246,
-      "tag": "0000_sleepy_scourge",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1786914018613,
-      "tag": "0001_futuristic_johnny_storm",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1786919635128,
-      "tag": "0002_known_wolfsbane",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1787695190315,
-      "tag": "0003_cynical_karma",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1787712234035,
-      "tag": "0004_real_centennial",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1787900000000,
-      "tag": "0005_bright_moondragon",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1789435874773,
-      "tag": "0006_superb_medusa",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1789897674270,
-      "tag": "0007_short_molten_man",
+      "when": 1790137402522,
+      "tag": "0000_wandering_the_phantom",
       "breakpoints": true
     }
   ]

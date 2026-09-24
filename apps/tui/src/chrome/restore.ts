@@ -16,11 +16,11 @@
 
 import { createEffect } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { currentWorkspaceId } from '@acorn/client-core/features/workspaces/lastWorkspace.ts'
-import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
-import { appStateBinding, type PersistedStateSlice } from '@acorn/client-core/infra/persistence/persistedState.ts'
-import { workspaceViewSlice } from '@acorn/client-core/infra/persistence/stateSlices.ts'
-import { createStartupRestore } from '@acorn/client-core/infra/persistence/startupRestore.ts'
+import { currentWorkspaceId } from '@acorn/client-core/features/workspaces'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
+import { appStateBinding, type PersistedStateSlice } from '@acorn/client-core/infra/persistence'
+import { workspaceViewSlice } from '@acorn/client-core/infra/persistence'
+import { createStartupRestore } from '@acorn/client-core/infra/persistence'
 import { chosenWorkspace, setPlaceRestored } from './state'
 import type { ShellModel } from './model'
 

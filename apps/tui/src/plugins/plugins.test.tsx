@@ -147,7 +147,7 @@ addEventListener('message', (event) => {
 test('a descriptor source keeps its region identity across chrome refreshes', async () => {
   const { sourcePanel } = await import('./SourcePanel')
   const descriptor = {
-    id: 'identity', label: 'Issues', glyph: 'circle', order: 10, items: '/v2/p/probe/items',
+    id: 'identity', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
   } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
   const first = sourcePanel({ pluginId: 'identity-probe', descriptor })
   const refreshed = sourcePanel({
@@ -166,7 +166,7 @@ test('a descriptor source draws its list and its detail in cells', async () => {
   // instead of drawing anything. Both regions render, which is the whole claim.
   const { sourcePanel } = await import('./SourcePanel')
   const descriptor = {
-    id: 'issues', label: 'Issues', glyph: 'circle', order: 10, items: '/v2/p/probe/items',
+    id: 'issues', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
   } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
   const panel = sourcePanel({ pluginId: 'probe', descriptor })
   expect(panel.regions).toBeDefined()

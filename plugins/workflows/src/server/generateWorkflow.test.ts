@@ -59,13 +59,15 @@ const validation = (over: Partial<WorkflowCatalog> = {}): WorkflowValidationCata
 const prompt = (over: Partial<WorkflowCatalog> = {}) => buildGenerateSystemPrompt({ catalog: catalog(over) })
 
 const chain = (name: string, steps = 3): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name,
   steps: Array.from({ length: steps }, (_, index) => ({ id: `step-${index + 1}`, name: `Step ${index + 1}`, prompt: 'Do the thing.' })),
 })
 
 const fanIn = (name: string): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name,
   steps: [
     { id: 'left', name: 'Left', after: [], prompt: 'Look from the left.' },
@@ -322,7 +324,8 @@ describe('the workspace examples', () => {
     id,
     def: {
       ...def,
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
     },
   })
@@ -335,9 +338,9 @@ describe('the workspace examples', () => {
   })
 
   it('leaves out the definition being edited, a one-step definition, and anything that fails the checker', () => {
-    const broken: WorkflowDef = { name: 'broken', steps: [{ name: 'a', after: ['ghost'] }, { name: 'b' }] }
+    const broken: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'broken', steps: [{ name: 'a', after: ['ghost'] }, { name: 'b' }] }
     const { include, omit } = select(
-      [example('self', fanIn('being edited')), example('tiny', { name: 'tiny', steps: [{ name: 'only' }] }), example('broken', broken), example('keep', chain('keeper'))],
+      [example('self', fanIn('being edited')), example('tiny', { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'tiny', steps: [{ name: 'only' }] }), example('broken', broken), example('keep', chain('keeper'))],
       { excludeId: 'self' },
     )
     expect(include.map((entry) => entry.id)).toEqual(['keep'])
@@ -345,7 +348,7 @@ describe('the workspace examples', () => {
   })
 
   it('leaves parent workflows out because their protected target is not model-visible', () => {
-    const parent: WorkflowDef = {
+    const parent: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'parent',
       steps: [
         {
@@ -370,7 +373,7 @@ describe('the workspace examples', () => {
   })
 
   it('drops a whole example rather than cutting one in half', () => {
-    const huge: WorkflowDef = { name: 'enormous', steps: [{ name: 'a', prompt: 'x'.repeat(GENERATE_MAX_EXAMPLE_SIZE) }, { name: 'b', prompt: 'go' }] }
+    const huge: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'enormous', steps: [{ name: 'a', prompt: 'x'.repeat(GENERATE_MAX_EXAMPLE_SIZE) }, { name: 'b', prompt: 'go' }] }
     const examples = [example('huge', huge), example('small', fanIn('small'))]
     const text = buildGenerateSystemPrompt({ catalog: catalog(), examples, validation: validation() })
     expect(text).not.toContain('x'.repeat(200))
@@ -378,7 +381,7 @@ describe('the workspace examples', () => {
   })
 
   it('strips credentials and the loader bookkeeping from an example', () => {
-    const def = {
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       id: 'repo:thing',
       source: 'repo',
       name: 'calls out',
@@ -427,7 +430,7 @@ describe('the user prompt', () => {
   })
 
   it('gives edit mode the current graph, preservation rules, and no protected values', () => {
-    const current: WorkflowDef = {
+    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Deploy',
       trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['deploy'] },

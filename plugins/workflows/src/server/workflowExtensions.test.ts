@@ -92,7 +92,7 @@ describe('the kind catalog', () => {
     const validate = vi.fn(() => ['the kind said no'])
     withKinds([{ id: 'other:bell', pluginId: 'other', order: 0, value: described({ validate }) }], (runner) => {
       const problems = validateWorkflow(
-        { formatVersion: 2, name: 'w', steps: [{ id: 'ring', name: 'ring', kind: 'other:bell', with: { volume: 99 } }] },
+        { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ id: 'ring', name: 'ring', kind: 'other:bell', with: { volume: 99 } }] },
         runner.validationCatalog(),
       )
       expect(problems).toEqual(["step 'ring' needs bell", "step 'ring' volume must be between 1 and 10"])
@@ -109,9 +109,9 @@ describe('the kind catalog', () => {
       const catalog = runner.validationCatalog()
       // Only the isolation rule is under test: no agent profile is registered in this process, so the
       // profile check has something to say about both steps.
-      expect(validateWorkflow({ formatVersion: 2, name: 'w', steps: [{ id: 'a', name: 'a', kind: 'other:think', isolation: 'worktree' }] }, catalog))
+      expect(validateWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ id: 'a', name: 'a', kind: 'other:think', isolation: 'worktree' }] }, catalog))
         .not.toContain("step 'a' is a 'other:think' step, which cannot take isolation")
-      expect(validateWorkflow({ formatVersion: 2, name: 'w', steps: [{ id: 'a', name: 'a', kind: 'other:bell', isolation: 'worktree' }] }, catalog))
+      expect(validateWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ id: 'a', name: 'a', kind: 'other:bell', isolation: 'worktree' }] }, catalog))
         .toEqual(["step 'a' is a 'other:bell' step, which cannot take isolation"])
     })
   })

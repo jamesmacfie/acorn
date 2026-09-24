@@ -10,7 +10,7 @@ import { fileCacheStorage } from './cache'
 
 describe('fileCacheStorage', () => {
   let dir: string
-  const KEY = 'acorn-cache:11111111-2222-4333-8444-555555555555'
+  const KEY = 'acorn-cache:acorn-1:11111111-2222-4333-8444-555555555555'
   const file = (): string => join(dir, `${encodeURIComponent(KEY)}.json`)
 
   beforeEach(() => { dir = join(mkdtempSync(join(tmpdir(), 'acorn-cache-')), 'cache') })

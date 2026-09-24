@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
+import { requireUser } from '@acorn/plugin-api/testkit'
 import { ProviderOperationError } from '@acorn/plugin-api/node'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
@@ -96,7 +96,7 @@ describe('workflow routes', () => {
   it('refuses inline definitions instead of executing an unpublished draft', async () => {
     let seen: unknown = null
     setWorkflowBridge(fake({ start: async (_t, def) => ((seen = def), { runId: 'run1' }) }))
-    const res = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { def: { name: 'W', steps: [{ name: 's1' }] } }), {} as Env)
+    const res = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'W', steps: [{ name: 's1' }] } }), {} as Env)
     expect(res.status).toBe(400)
     expect(seen).toBeNull()
   })
@@ -166,7 +166,7 @@ describe('workflow routes', () => {
     const res = await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship', inputs: { issue: 'x' } }), {} as Env)
     expect(res.status).toBe(200)
     expect(seen).toEqual({ defId: 'repo:ship', inputs: { issue: 'x' } })
-    const def = { name: 'W', steps: [{ name: 's1' }] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'W', steps: [{ name: 's1' }] }
     expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, defId: 'repo:ship' }), {} as Env)).status).toBe(400)
   })
 
@@ -188,7 +188,7 @@ describe('workflow routes', () => {
       allowed.push(allowDatabaseDefinitions)
       return { runId: 'run1' }
     } }))
-    const parent = {
+    const parent = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Parent',
       steps: [{
         name: 'child',
@@ -274,7 +274,7 @@ describe('a task-scoped credential is confined to its own runs', () => {
 describe('workflow definition routes', () => {
   afterEach(() => setWorkflowDefsBridge(null))
 
-  const row = { id: 'def1', workspaceId: 'w1', projectId: null, name: 'Ship it', revision: 1, createdAt: 1, updatedAt: 1, def: { name: 'Ship it', steps: [] } }
+  const row = { id: 'def1', workspaceId: 'w1', projectId: null, name: 'Ship it', revision: 1, createdAt: 1, updatedAt: 1, def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Ship it', steps: [] } }
 
   const fakeDefs = (over: Partial<WorkflowDefsBridge> = {}): WorkflowDefsBridge => ({
     list: async () => ({ workflows: [], errors: [] }),
@@ -308,7 +308,7 @@ describe('workflow definition routes', () => {
       remove: async (id) => (calls.push(`remove:${id}`), { ok: true }),
     }))
     const app = asDevice()
-    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Ship it', steps: [{ name: 's1' }] }
     expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 3 }), {} as Env)).status).toBe(200)
@@ -316,11 +316,27 @@ describe('workflow definition routes', () => {
     expect(calls).toEqual(['list:w1', 'create:w1', 'update:def1:3', 'remove:def1'])
   })
 
+  it('admits a JSON definition only with the current baseline before calling the bridge', async () => {
+    const received: unknown[] = []
+    setWorkflowDefsBridge(fakeDefs({ create: async input => (received.push(input.def), { row }) }))
+    const app = asDevice()
+    const current = { baseline: 'acorn-1', formatVersion: 1, name: 'Current', steps: [] }
+    const historical = { formatVersion: 1, name: 'Historical', steps: [] }
+    const wrong = { ...current, baseline: 'other' }
+    for (const def of [historical, wrong]) {
+      expect((await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)).status).toBe(400)
+      expect((await app.fetch(req('/api/defs/files', 'POST', { action: 'save', target: { projectId: 'p1', source: 'repo', path: '.acorn/workflows/example.toml' }, revision: 1, def }), {} as Env)).status).toBe(400)
+    }
+    expect(received).toEqual([])
+    expect((await app.fetch(req('/api/defs', 'POST', JSON.parse(JSON.stringify({ workspaceId: 'w1', def: current }))), {} as Env)).status).toBe(200)
+    expect(received).toEqual([current])
+  })
+
   it('refuses every route to a task-confined caller', async () => {
     const calls: string[] = []
     setWorkflowDefsBridge(fakeDefs({ list: async () => (calls.push('list'), { workflows: [], errors: [] }) }))
     const app = defsApp({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
-    const def = { name: 'Ship it', steps: [{ name: 's1' }] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Ship it', steps: [{ name: 's1' }] }
     for (const call of [
       req('/api/defs?workspaceId=w1'),
       req('/api/defs', 'POST', { workspaceId: 'w1', def }),
@@ -346,7 +362,7 @@ describe('workflow definition routes', () => {
       get: async () => null,
     }))
     const app = asDevice()
-    const def = { name: 'Untitled workflow', steps: [] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] }
     const created = await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def }), {} as Env)
     expect(created.status).toBe(200)
     const stale = await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 1 }), {} as Env)
@@ -360,7 +376,7 @@ describe('workflow definition routes', () => {
     const app = asDevice()
     expect((await app.fetch(req('/api/defs'), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/defs', 'POST', { workspaceId: 'w1', def: { name: 'x' } }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/defs/def1', 'PUT', { def: { name: 'x', steps: [] } }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/defs/def1', 'PUT', { def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'x', steps: [] } }), {} as Env)).status).toBe(400)
     setWorkflowDefsBridge(null)
     expect((await app.fetch(req('/api/defs?workspaceId=w1'), {} as Env)).status).toBe(503)
   })
@@ -423,7 +439,7 @@ describe('workflow definition routes', () => {
       const app = asDevice()
       const withoutCurrent = { ...body, mode: 'edit' }
       expect((await app.fetch(req('/api/defs/generate', 'POST', withoutCurrent), {} as Env)).status).toBe(400)
-      expect((await app.fetch(req('/api/defs/generate', 'POST', { ...withoutCurrent, currentDef: { name: 'Broken', steps: [null] } }), {} as Env)).status).toBe(400)
+      expect((await app.fetch(req('/api/defs/generate', 'POST', { ...withoutCurrent, currentDef: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Broken', steps: [null] } }), {} as Env)).status).toBe(400)
       expect((await app.fetch(req('/api/defs/generate', 'POST', { ...withoutCurrent, currentDef: row.def }), {} as Env)).status).toBe(200)
     })
 

@@ -5,7 +5,7 @@ import { Line } from './kit/cells'
 import { boxBorder, spaceLines } from './kit/roles'
 import { ScrollViewport } from './kit/scrolling'
 import { focusWithin } from './keys/regions'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('pane')
 

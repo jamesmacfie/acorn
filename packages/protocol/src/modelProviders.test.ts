@@ -110,12 +110,11 @@ describe('the connection projection', () => {
 })
 
 describe('parseBackendId', () => {
-  it('resolves a bare uuid and its prefixed form to the same connection', () => {
-    // The compatibility rule the whole id scheme rests on: a saved workflow step and a device pref
-    // both hold a bare uuid from before core minted these ids, and neither is rewritten.
-    const bare = parseBackendId('7c9e6679-7425-40de-944b-e07fc1f90ae7')
-    expect(bare).toEqual({ kind: 'connection', id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' })
-    expect(parseBackendId('connection:7c9e6679-7425-40de-944b-e07fc1f90ae7')).toEqual(bare)
+  it('requires a supported prefix and a nonempty id', () => {
+    expect(parseBackendId('connection:7c9e6679-7425-40de-944b-e07fc1f90ae7')).toEqual({ kind: 'connection', id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' })
+    for (const id of ['7c9e6679-7425-40de-944b-e07fc1f90ae7', 'connection:', 'connection:   ', 'harness:', 'harness:   ', 'unknown:item', '']) {
+      expect(() => parseBackendId(id)).toThrow('Backend ID must be connection:<id> or harness:<id>.')
+    }
   })
 
   it('round-trips the id the connection projection mints', () => {

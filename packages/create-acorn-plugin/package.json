@@ -1,7 +1,7 @@
 {
   "name": "create-acorn-plugin",
-  "version": "0.1.0",
-  "description": "Scaffold an acorn plugin: manifest, node half, sandboxed client frame. No build step.",
+  "version": "1.0.0",
+  "description": "Scaffold an acorn plugin with a manifest, Node runtime, and sandboxed client tree.",
   "type": "module",
   "bin": {
     "create-acorn-plugin": "./index.mjs"

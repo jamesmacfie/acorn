@@ -67,7 +67,7 @@ export default {
       glyph: 'brand:rollbar',
       order: 30,
       providerId: 'rollbar',
-      items: '/v2/p/rollbar/rail-items',
+      items: '/v1/p/rollbar/rail-items',
       // The rail route reads `?project=` (src/server/routes/rollbar.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
@@ -77,6 +77,7 @@ export default {
     }],
     commands: [{
       id: 'open',
+      kind: 'action',
       title: 'Rollbar: open linked items',
       category: 'pane',
       palette: false,
@@ -100,7 +101,7 @@ export default {
       category: 'navigation',
       kind: 'search',
       scope: 'project',
-      route: '/v2/p/rollbar/palette/issues',
+      route: '/v1/p/rollbar/palette/issues',
       placeholder: 'Find a Rollbar item…',
       onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],

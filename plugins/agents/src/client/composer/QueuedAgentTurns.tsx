@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import type { AgentRuntimeState, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRuntimeState, AgentTurn } from '../../contract/wire.ts'
 import { Button, Card, IconButton, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import { clientEvents } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from '../settings/concurrencyClient'

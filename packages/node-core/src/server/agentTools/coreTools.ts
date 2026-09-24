@@ -115,7 +115,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       risk: 'read',
       handler: async (_a, ctx) => {
         const c = await assemble(deps, ctx, new Set(['issues']))
-        return { ...c.task, links: c.issues }
+        return { ...c.task, links: c.sections.find((section) => section.id === 'issues')?.items ?? [] }
       },
     },
     {
@@ -132,7 +132,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       input: empty,
       scope: 'task',
       risk: 'read',
-      handler: async (_a, ctx) => (await assemble(deps, ctx, new Set(['pr']))).pr ?? { status: 'no-pr', hint: 'This task has no linked pull request yet.' },
+      handler: async (_a, ctx) => (await assemble(deps, ctx, new Set(['pr']))).sections.find((section) => section.id === 'pr')?.items[0] ?? { status: 'no-pr', hint: 'This task has no linked pull request yet.' },
     },
     {
       name: 'pr_changed_files',
@@ -140,7 +140,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       input: empty,
       scope: 'task',
       risk: 'read',
-      handler: async (_a, ctx) => (await assemble(deps, ctx, new Set(['pr']))).pr?.changedFiles ?? [],
+      handler: async (_a, ctx) => (await assemble(deps, ctx, new Set(['pr']))).sections.find((section) => section.id === 'pr')?.items[0]?.details ?? [],
     },
     {
       name: 'linked_issues',
@@ -149,9 +149,9 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
-        const issues = (await assemble(deps, ctx, new Set(['issues']))).issues
+        const issues = (await assemble(deps, ctx, new Set(['issues']))).sections.find((section) => section.id === 'issues')?.items ?? []
         const provider = (a as { provider?: string }).provider
-        return provider ? issues.filter((i) => i.provider === provider) : issues
+        return provider ? issues.filter((item) => item.providerId === provider) : issues
       },
     },
     {

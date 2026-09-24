@@ -1,4 +1,4 @@
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 
 // Which runtime states count as "this agent is doing something". Shared by Agent Center's `active`
 // filter and header count and by the Fleet home stat below, which is why it moved out of the component:

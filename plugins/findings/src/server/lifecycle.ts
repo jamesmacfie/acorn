@@ -1,6 +1,8 @@
 import { eq } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentReviewInputCapability, AgentReviewInputRef } from '@acorn/plugin-agents/contract/lifecycle.ts'
+import type { TerminalCompletedEvent, TerminalReviewInputCapability } from '@acorn/plugin-terminal/contract/reviewInput.ts'
+import type { WorkflowCompletedEvent, WorkflowReviewInputCapability } from '@acorn/plugin-workflows/contract/reviewInput.ts'
 import type {
   FindingsBoundaryInput,
   FindingsLifecycleCheckpoint,
@@ -35,6 +37,7 @@ const readSettingsValue = (raw: string | null): FindingsReviewSettings => {
       notifyWhenReady: value.notifyWhenReady === true,
       backendId: typeof value.backendId === 'string' && value.backendId ? value.backendId : null,
       modelId: typeof value.modelId === 'string' && value.modelId ? value.modelId : null,
+      targetId: typeof value.targetId === 'string' && value.targetId ? value.targetId : null,
     }
   } catch {
     return DEFAULT_FINDINGS_SETTINGS
@@ -47,6 +50,8 @@ export class FindingsLifecycle {
     runtime: FindingsRuntime
     core: Pick<CoreServices, 'identity' | 'prefs' | 'tasks'>
     agents(): AgentReviewInputCapability | undefined
+    terminal?(): TerminalReviewInputCapability | undefined
+    workflows?(): WorkflowReviewInputCapability | undefined
     notice(input: { taskId?: string; title: string; detail?: string; kind?: string; target?: { kind: string; resourceId: string } }): void
     settingsChanged(): void
     now?: () => number
@@ -57,11 +62,13 @@ export class FindingsLifecycle {
   }
 
   async setSettings(userId: string, settings: FindingsReviewSettings): Promise<FindingsReviewSettings> {
+    if (settings.targetId && !this.options.runtime.hasReviewTarget(settings.targetId)) throw new FindingCaptureError('unavailable', 'review target is unavailable')
     const normalized: FindingsReviewSettings = {
       automaticPreparation: true,
       notifyWhenReady: settings.notifyWhenReady === true,
       backendId: typeof settings.backendId === 'string' && settings.backendId ? settings.backendId : null,
       modelId: typeof settings.modelId === 'string' && settings.modelId ? settings.modelId : null,
+      targetId: typeof settings.targetId === 'string' && settings.targetId ? settings.targetId : null,
     }
     await this.options.core.prefs.write(userId, FINDINGS_SETTINGS_KEY, JSON.stringify(normalized))
     this.options.settingsChanged()
@@ -88,7 +95,7 @@ export class FindingsLifecycle {
     let observationId: string | null = null
     if (input.availability === 'available' && input.body?.trim()) {
       const origin: FindingOrigin = input.sourceKind === 'workflow'
-        ? { kind: 'workflow', runId: input.sourceVersion }
+        ? { kind: 'workflow', runId: /^workflow:([^:]+):terminal$/.exec(input.boundaryKey)?.[1] ?? input.sourceVersion }
         : input.sourceKind === 'agent'
           ? this.agentOrigin(input)
           : { kind: 'plugin', pluginId: input.sourceKind === 'terminal' ? 'terminal' : 'findings', invocationId: input.boundaryKey }
@@ -138,11 +145,51 @@ export class FindingsLifecycle {
       if (checkpoint.sourceKind !== 'task-archive' || checkpoint.preparedBundleId) continue
       await this.schedule(this.toCheckpoint(checkpoint)).catch(() => undefined)
     }
-    const agents = this.options.agents()
-    if (!agents) return
     for (const task of await this.options.core.tasks.active()) {
-      for (const ref of await agents.listCompleted(task.id)) await this.reconcileAgent(ref, agents)
+      const agents = this.options.agents()
+      if (agents) for (const ref of await agents.listCompleted(task.id)) await this.reconcileAgent(ref, agents)
+      const workflows = this.options.workflows?.()
+      if (workflows) for (const ref of await workflows.listCompleted(task.id)) await this.workflowCompleted(ref)
     }
+  }
+
+  async terminalCompleted(event: TerminalCompletedEvent): Promise<void> {
+    const input = await this.options.terminal?.()?.read(event.taskId, event.sessionId)
+    const body = input?.availability === 'available' ? input.output?.trim() ?? '' : ''
+    await this.boundary({
+      taskId: event.taskId, boundaryKey: `terminal:${event.sessionId}:exit`, sourceKind: 'terminal',
+      sourceVersion: `exit:${event.exitCode ?? 'unknown'}`, title: `Agent terminal exited (${event.exitCode ?? 'unknown'})`,
+      body: body || null, availability: body ? 'available' : 'unavailable',
+      ...(body ? {} : { unavailableReason: input?.unavailableReason ?? 'Retained terminal output is unavailable.' }),
+      completedAt: event.completedAt,
+    })
+  }
+
+  async workflowCompleted(event: WorkflowCompletedEvent): Promise<void> {
+    const input = await this.options.workflows?.()?.read(event.taskId, event.runId)
+    const body = input?.availability === 'available' ? input.handoff?.trim() ?? '' : ''
+    await this.boundary({
+      taskId: event.taskId, boundaryKey: `workflow:${event.runId}:terminal`, sourceKind: 'workflow',
+      sourceVersion: `terminal:${event.status}`, title: `Workflow ${event.status}`,
+      body: body || null, availability: body ? 'available' : 'unavailable',
+      ...(body ? {} : { unavailableReason: input?.unavailableReason ?? `The ${event.status} workflow produced no handoff note.` }),
+      completedAt: event.completedAt,
+    })
+  }
+
+  async archiveReview(input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }): Promise<void> {
+    const evidence = [input.terminalOutput.trim(), input.diff.trim() ? `Uncommitted diff:\n${input.diff.trim()}` : null]
+      .filter(Boolean).join('\n\n')
+    const body = evidence
+      ? [evidence, input.sessionIds.length ? `Terminal sessions: ${input.sessionIds.join(', ')}` : null].filter(Boolean).join('\n\n')
+      : null
+    await this.boundary({
+      taskId: input.taskId, boundaryKey: `task:${input.taskId}:archive`, sourceKind: 'task-archive',
+      sourceVersion: '1', title: 'Task archive requested', body,
+      availability: body ? 'available' : 'unavailable',
+      ...(body ? {} : { unavailableReason: 'No retained terminal output or readable worktree diff was available before teardown.' }),
+      completedAt: this.options.now?.() ?? Date.now(),
+    })
   }
 
   async bundlePublished(bundle: { id: string; boundaryKey: string; scope: { kind: string }; candidates: unknown[]; state: string }): Promise<void> {
@@ -157,8 +204,8 @@ export class FindingsLifecycle {
     try {
       this.options.notice({
         ...(taskId ? { taskId } : {}),
-        title: `${bundle.candidates.length} memory suggestion${bundle.candidates.length === 1 ? '' : 's'} ready`,
-        kind: 'memory-proposal',
+        title: `${bundle.candidates.length} review suggestion${bundle.candidates.length === 1 ? '' : 's'} ready`,
+        kind: 'findings-review',
         target: { kind: 'findings-bundle', resourceId: bundle.id },
       })
     } catch (error) {
@@ -167,13 +214,14 @@ export class FindingsLifecycle {
     }
   }
 
-  async prepareTask(taskId: string, boundaryKey: string): Promise<FindingBundle> {
+  async prepareTask(taskId: string, boundaryKey: string, targetId: string): Promise<FindingBundle> {
     const userId = this.options.core.identity.active()
-    if (!userId) throw new FindingCaptureError('forbidden', 'an active owner is required for memory review')
+    if (!userId) throw new FindingCaptureError('forbidden', 'an active owner is required for review')
     const settings = await this.settings(userId)
-    if (!settings.backendId) throw new FindingCaptureError('unavailable', 'Choose a memory review model in Settings before preparing suggestions.')
+    if (!settings.backendId) throw new FindingCaptureError('unavailable', 'Choose a review model in Settings before preparing suggestions.')
     return this.options.runtime.startPrepareTask(taskId, {
       boundaryKey,
+      targetId,
       backendId: settings.backendId,
       ...(settings.modelId ? { modelId: settings.modelId } : {}),
     })
@@ -206,9 +254,10 @@ export class FindingsLifecycle {
     const userId = this.options.core.identity.active()
     if (!userId) return
     const settings = await this.settings(userId)
-    if (!settings.backendId) return
+    if (!settings.backendId || !settings.targetId || !this.options.runtime.hasReviewTarget(settings.targetId)) return
     const bundle = await this.options.runtime.startPrepareTask(input.taskId, {
       boundaryKey: input.boundaryKey,
+      targetId: settings.targetId,
       backendId: settings.backendId,
       ...(settings.modelId ? { modelId: settings.modelId } : {}),
     })

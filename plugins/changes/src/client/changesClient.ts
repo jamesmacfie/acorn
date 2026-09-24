@@ -7,7 +7,7 @@ import {
 } from '../shared/api'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
-import type { LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 
 type ActionResult = { ok: boolean; reason?: string }
 const post = <T>(url: string, body?: unknown) =>

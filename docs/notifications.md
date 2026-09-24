@@ -39,8 +39,9 @@ Both come from the same reading of a session.
 
 ## Five states
 
-`packages/client-core/src/features/notifications/attention.ts` collapses every agent session,
-managed or PTY, onto one of five states:
+Agents and Terminal map their own sessions to a small snapshot in
+`packages/protocol/src/attention.ts`. The delivery gate in
+`packages/client-core/src/features/notifications/attention.ts` reads five states:
 
 | State | Meaning |
 | --- | --- |
@@ -50,12 +51,12 @@ managed or PTY, onto one of five states:
 | `error` | The session failed or the process exited non-zero. |
 | `idle` | Nothing is running and there is nothing to report. |
 
-A snapshot is `{ nodeId, sessionId, taskId, title, state, kind }`, where `kind` is `interactive`,
-`workflow`, `imported`, or `pty`. The key is node plus session, because session ids are node-minted
-and two nodes may hold the same one.
+A snapshot carries node, source, and session IDs; task, title, and state; a notice target; and whether
+completion should notify. The key includes node and source, so sessions from different producers
+cannot collide.
 
-**The managed adapter** reads `AgentSession` rows as `agent:session` frames upsert them
-(`plugins/agents/src/client/sessions/managedStore.ts`). Attention wins over runtime state: the node
+**The managed adapter** in `plugins/agents/src/contract/attention.ts` reads `AgentSession` rows as
+`agent:session` frames upsert them (`plugins/agents/src/client/sessions/managedStore.ts`). Attention wins over runtime state: the node
 sets `attention` from the driver's own events, and a session asking for a permission is blocked
 whatever its process is doing ([managed-agents.md](./managed-agents.md) owns that projection).
 
@@ -68,9 +69,10 @@ whatever its process is doing ([managed-agents.md](./managed-agents.md) owns tha
 | `none`, `unread` | `ready`, `stopped`, `archived` | `idle` |
 | `none`, `unread` | `failed` | `error` |
 
-**The PTY adapter** reads `TerminalSession` snapshots as `refreshSessions` produces them
-(`packages/client-core/src/features/tasks/agentSessions.ts`), for sessions with `kind: 'agent'`
-only. A plain shell exiting is not an agent needing you.
+**The PTY adapter** in `plugins/terminal/src/client/attention.ts` reads `TerminalSession` rows when
+Terminal refreshes its roster. It maps sessions with `kind: 'agent'` only. Terminal replaces its
+attention snapshots with each successful roster, including an empty one, and forgets them after a
+failed refresh or disposal. A plain shell exiting is not an agent needing you.
 
 | `status` | `agentState` | `idle` | `exitCode` | State |
 | --- | --- | --- | --- | --- |
@@ -94,7 +96,8 @@ Everything else is silence. `blocked` to `working` means you answered, `finished
 you spoke, and a first snapshot with no predecessor describes a session that was already in that
 state before the app opened.
 
-`working` to `finished` is news only when `kind` is `interactive` or `pty`. A workflow or automation
+`working` to `finished` is news only when the producer marks the session as one that should notify.
+Agents marks interactive sessions, and Terminal marks PTY agent sessions. A workflow or automation
 turn is one step of a run, and the workflows plugin sends `run-done` for the run
 ([workflows.md](./workflows.md)). Ten steps used to mean ten "finished" rows.
 
@@ -198,9 +201,8 @@ used by the Memory and Context surfaces. It does not create one notice per propo
 enables **Notify me when a prepared review bundle is ready**, findings emits one informational notice
 for that bundle and records its bundle ID before delivery so a retry does not emit another.
 
-After migration cutover, memory filters mapped legacy proposals from its per-proposal attention
-source. If findings is disabled or migration is unsafe, that source and the legacy aggregate notice
-remain available. The two producers therefore do not announce the same suggestion at once.
+Memory's attention source reads canonical Findings review bundles. Disabling Findings removes that
+source's review rows; it does not start a separate proposal queue.
 
 ## Archiving a task takes its notices with it
 

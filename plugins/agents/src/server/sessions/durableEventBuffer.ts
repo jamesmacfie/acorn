@@ -1,4 +1,4 @@
-import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 
 export type PendingAgentEvent = {
   sessionId: string

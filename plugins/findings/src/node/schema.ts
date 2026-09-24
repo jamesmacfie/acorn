@@ -93,7 +93,7 @@ export const findingGroupingOutcomes = sqliteTable('finding_grouping_outcomes', 
 export const findingPreparationJobs = sqliteTable('finding_preparation_jobs', {
   id: text('id').primaryKey(), boundaryKey: text('boundary_key').notNull(), scopeKey: text('scope_key').notNull(), inputHighWaterMark: integer('input_high_water_mark').notNull(),
   state: text('state').notNull(), leaseOwner: text('lease_owner'), leaseExpiresAt: integer('lease_expires_at'), attempt: integer('attempt').notNull(),
-  sourceTaskId: text('source_task_id'), backendId: text('backend_id'), modelId: text('model_id'), usageJson: text('usage_json'), inputCount: integer('input_count').notNull(), outputCount: integer('output_count').notNull(), error: text('error'),
+  sourceTaskId: text('source_task_id'), targetKind: text('target_kind').notNull().default('memory:change'), backendId: text('backend_id'), modelId: text('model_id'), usageJson: text('usage_json'), inputCount: integer('input_count').notNull(), outputCount: integer('output_count').notNull(), error: text('error'),
   bundleId: text('bundle_id'), createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(),
 }, (table) => [uniqueIndex('finding_preparation_job_boundary_unique').on(table.scopeKey, table.boundaryKey)])
 
@@ -125,22 +125,6 @@ export const findingLifecycleCheckpoints = sqliteTable('finding_lifecycle_checkp
   preparedBundleId: text('prepared_bundle_id'),
   updatedAt: integer('updated_at').notNull(),
 }, (table) => [index('finding_lifecycle_task_completed_idx').on(table.taskId, table.completedAt)])
-
-export const findingLegacyImports = sqliteTable('finding_legacy_imports', {
-  legacyId: text('legacy_id').primaryKey(),
-  migrationVersion: integer('migration_version').notNull().default(1),
-  sourceFilename: text('source_filename').notNull(),
-  sourceHash: text('source_hash').notNull(),
-  status: text('status').notNull(),
-  observationId: text('observation_id'),
-  candidateId: text('candidate_id'),
-  candidateRevision: integer('candidate_revision'),
-  candidatePayloadHash: text('candidate_payload_hash'),
-  oneToOne: integer('one_to_one', { mode: 'boolean' }).notNull().default(false),
-  error: text('error'),
-  importedAt: integer('imported_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
-})
 
 export const findingBundleNotices = sqliteTable('finding_bundle_notices', {
   bundleId: text('bundle_id').primaryKey(),

@@ -1,11 +1,11 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys/collectionIntents.ts'
-import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys'
+import type { Intent } from '@acorn/client-core/kit/keys'
+import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
+import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 import { isCompact, slotColor } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { GLYPHS } from './glyphs'
@@ -18,9 +18,9 @@ import {
 import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport, type Viewport } from './scrolling'
-import type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
-import type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
-import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
+import type { TimelineControls } from '@acorn/client-core/kit/components/content'
+import type { ReadingPlace } from '@acorn/client-core/kit/lib'
+import type { KitSection } from '@acorn/client-core/kit/components/layout'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
 // docs/ui-design.md § Every node at 80 by 24 and no further.

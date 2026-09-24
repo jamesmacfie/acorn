@@ -2,6 +2,7 @@ import { createRoot } from 'solid-js'
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prefsKey } from '@acorn/protocol/api.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { Disposable } from '../../../kit/lib/registry'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
@@ -86,7 +87,7 @@ describe('the appearance settings', () => {
     // Following the OS: a light theme and a dark theme.
     expect(available()).toEqual(['core.appearance.theme-light', 'core.appearance.theme-dark'])
 
-    localStorage.setItem(`acorn-pref:${PrefKeys.themeFollowSystem}`, 'false')
+    localStorage.setItem(`acorn-pref:${ACORN_BASELINE}:${PrefKeys.themeFollowSystem}`, 'false')
     expect(available()).toEqual(['core.appearance.theme'])
   })
 })

@@ -4,17 +4,17 @@ import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
-import type { PromoteWorkflowStep } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
-import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
+import type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
-import { createFleetQuery } from '@acorn/client-core/infra/node/fanout.ts'
+import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
   extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome/chromeData.ts'
-import { resolveSlot, slotChoiceFor, slotChoices } from '@acorn/client-core/host/tree/arbitration.ts'
-import type { OverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'
+import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
+import { resolveSlot, slotChoiceFor, slotChoices } from '@acorn/client-core/host/tree'
+import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { RemoteTree } from '../plugins/RemoteTree'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
@@ -35,12 +35,12 @@ import { Modal, ModalBody, SectionHeader } from './grouping'
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
-export { registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
+export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 // From the model rather than from `willPhase.tsx`, which is the DOM's confirmation dialog and would
 // bring a `<div>` with it. The registration and the concern type are the model's own.
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
-export { slotFills } from '@acorn/client-core/host/tree/arbitration.ts'
+export { slotFills } from '@acorn/client-core/host/tree'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
 export { RemoteTree } from '../plugins/RemoteTree'
@@ -151,7 +151,7 @@ export function PromoteToTaskModal(_props: {
   headerLabel: string
   attachTasks: Task[]
   existingBranches: string[]
-  workflow?: PromoteWorkflowStep
+  action?: PromoteTaskAction
   onClose: () => void
   onCreated: (task: Task) => void
   onAttached: (task: Task) => void
@@ -159,7 +159,7 @@ export function PromoteToTaskModal(_props: {
   return <Line role="muted">Making a task from this row is not drawn here.</Line>
 }
 // Type-only, so the DOM component this names is erased rather than imported.
-export type { PromoteWorkflowStep } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
+export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
 
 /** "Is there a task for this thing, and if not, start one".
  *

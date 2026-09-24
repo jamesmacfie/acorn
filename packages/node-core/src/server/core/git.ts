@@ -65,7 +65,7 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
 //
 // `'core'` is what this file can honestly say: it is reached from every route, every schedule and
 // every plugin and knows nothing about its caller. The ambient context knows, and `measure` reads
-// it, so a spawn under `/v2/p/github` reports as github's without a signature here changing
+// it, so a spawn under `/v1/p/github` reports as github's without a signature here changing
 // (../telemetry/context.ts, docs/telemetry.md § Ambient attribution).
 const seam = (args: readonly string[]) => `git.${args[0] ?? 'unknown'}`
 

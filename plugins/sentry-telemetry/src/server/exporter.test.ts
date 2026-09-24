@@ -13,7 +13,7 @@ const failure = (name: string): TelemetryRecord => ({
 const line = (body: string): TelemetryRecord => ({
   kind: 'log', at: NOW, level: 'info', logger: 'server', body, attrs: { owner: 'core' },
 })
-const batch = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '0.1.0', records })
+const batch = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '1.0.0', records })
 
 const logger = (): Logger => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
 const telemetry = (): PluginTelemetry => ({
@@ -36,7 +36,7 @@ function harness(over: Partial<ExporterDeps> = {}): Harness {
     log: logger(),
     telemetry: telemetry(),
     client: 'acorn/1',
-    sdk: { name: 'acorn.sentry-telemetry', version: '0.1.0' },
+    sdk: { name: 'acorn.sentry-telemetry', version: '1.0.0' },
     sleep: async (ms) => { slept.push(ms) },
     ...over,
   }

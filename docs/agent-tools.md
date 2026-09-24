@@ -63,8 +63,8 @@ not generate notices or attention items. For the data and limits, see [Findings]
 
 ## issue_detail
 
-`linked_issues` answers "what is attached to this task" from the cached summary: an identifier, a
-title, a URL and a state. An agent asked to implement a ticket needs the description and the
+`linked_issues` answers "what is attached to this task" with the bounded items from the `issues`
+context section: provider, label, and cached status detail. An agent asked to implement a ticket needs the description and the
 comments, and an agent asked to fix an error needs the trace. Neither is in a summary, and neither is
 in the task-context prompt, which is why an agent used to fall back to its own Linear connector and
 fail.
@@ -120,7 +120,7 @@ compiled plugins:
       },
       "risk": "read",
       "scope": "task",
-      "handler": "/v2/p/example/tools/lookup",
+      "handler": "/v1/p/example/tools/lookup",
       "timeoutMs": 5000,
       "maxOutputBytes": 65536
     }],
@@ -129,7 +129,7 @@ compiled plugins:
       "label": "Example references",
       "scope": "task",
       "order": 60,
-      "read": "/v2/p/example/context/references",
+      "read": "/v1/p/example/context/references",
       "defaultIncluded": false,
       "timeoutMs": 5000,
       "maxBytes": 32768,
@@ -193,8 +193,8 @@ restores the prior set; successful update and unload cannot leave a stale tool o
 
 The same registry is projected into:
 
-1. `GET /v2/core/agent-tools` for the Settings → Agent tools catalog.
-2. `/v2/core/tasks/:id/tools` and `/v2/core/tasks/:id/tools/:name` for the renderer.
+1. `GET /v1/core/agent-tools` for the Settings → Agent tools catalog.
+2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name` for the renderer.
 3. The stdio MCP server for a spawned agent.
 
 Renderer calls require a device principal. MCP calls require an internal principal whose token is
@@ -289,11 +289,9 @@ the client assemble the exact context block a send will produce from a single `i
 by filtering `ctx.sections` and calling `formatContextBlock`, with no second curated fetch. A section
 that reads sibling-inclusion state into its own `compact` breaks byte-exactness silently.
 
-`sections` is the canonical context representation for the renderer and the MCP context formatter.
-The response also keeps the top-level `pr`, `issues`, `notes`, and `memory` fields as a bounded
-compatibility projection for older task-context clients and agent tools. Both views come from the
-same contribution and are budgeted in one pass. A protocol-version migration can drop the projection
-once those consumers move to `sections`.
+The task-context response contains the task projection and ordered `sections` only. The renderer,
+launch formatter, agent tools, and MCP consumers read section IDs and items. Core budgets each section's
+items and compact text once, then reports omitted items and unavailable sources with that section.
 
 ### Drawing inside a section
 
@@ -302,9 +300,9 @@ the pane answers it with an extension point rather than a private registry: `con
 `remote` point that stacks, keyed by the section id. For more information, see the cooperative
 extension points in [the plugins doc](./plugins.md).
 
-Memory is the one contributor. Its proposal queue and its add-memory form are a component registered
+Memory is the one contributor. Its canonical Findings review and add-memory form are a component registered
 against `context:section` with `matches: ['memory']`, so context draws its own rows for the section and
-memory's card joins them. Neither plugin imports the other. Disable memory and the section still draws
+memory's review joins them. Neither plugin imports the other. Disable memory and the section still draws
 its rows.
 
 A compiled plugin contributes a component and the host mounts it. A loaded plugin contributes a bundle
@@ -346,7 +344,7 @@ namespace, a picker over rows. `contextSections` already has the one dial this n
 
 Neither door is a new route. The tool call and the context section both resolve inside the Node
 process, so nothing was added to the frame allowlist (`client-core/host/frames/scopes.ts`). The
-one place a frame can reach this text is `GET /v2/core/tasks/:id/context` with an explicit
+one place a frame can reach this text is `GET /v1/core/tasks/:id/context` with an explicit
 `include=plugin-authoring`, a read of acorn's own published contract under a scope the task owner
 already granted.
 
@@ -365,7 +363,7 @@ only tool whose subject is which code the node runs.
 It installs nothing. It writes a row in an in-memory queue, broadcasts a content-free notice, and
 throws `needs-trust` (409) with a sentence telling the agent to call again with the same arguments to
 collect the owner's answer. The owner answers in the shell, and the device then performs the install
-over the device-gated `/v2/core/plugins/*` routes with its own principal. Prompt injection is a named
+over the device-gated `/v1/core/plugins/*` routes with its own principal. Prompt injection is a named
 threat, so an agent must never hold a credential that can install code. The defence is structural:
 that module imports no installer, no data root, and no filesystem, and a test pins its import list so
 a convenience import fails the build rather than the boundary.

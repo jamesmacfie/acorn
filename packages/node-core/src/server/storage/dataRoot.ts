@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
 
 const IDENTITY_FILE = 'node.json'
@@ -167,7 +168,7 @@ export function recordNodeAttachment(dir: string, attachment: NodeIdentity['atta
   updateIdentity(identityPathOf(dir), { attachment, enrollmentError: undefined })
 }
 
-/** Record that enrollment was attempted and failed. Visible at GET /v2/core/attachment, because the
+/** Record that enrollment was attempted and failed. Visible at GET /v1/core/attachment, because the
  *  alternative — a provisioned node that boots normally and is attached to nothing — is the failure
  *  nobody notices. */
 export function recordEnrollmentFailure(dir: string, reason: string): void {
@@ -180,8 +181,17 @@ export function recordEnrollmentFailure(dir: string, reason: string): void {
 export function openDataRoot(dir: string): DataRoot {
   if (existsSync(join(dir, V1_DATABASE))) {
     throw new Error(
-      `${dir} holds a V1 acorn database (${V1_DATABASE}). vNext never migrates V1 data, so point it at a fresh data root. V1's files stay untouched.`,
+      `${dir} holds an older Acorn database (${V1_DATABASE}). Reset this root before opening the acorn-1 baseline.`,
     )
+  }
+
+  // An old root without node.json must not acquire a fresh baseline marker over existing state.
+  if (existsSync(dir) && !existsSync(join(dir, IDENTITY_FILE)) && readdirSync(dir).some((name) => name !== LOCK_FILE)) {
+    throw new Error(`${dir} contains unmarked state. Reset it before opening the acorn-1 baseline.`)
+  }
+  const identityPath = join(dir, IDENTITY_FILE)
+  if (existsSync(identityPath) && !readIdentity(identityPath)) {
+    throw new Error(`${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`)
   }
 
   mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -190,14 +200,13 @@ export function openDataRoot(dir: string): DataRoot {
 
   const release = acquireLock(dir)
   try {
-    const identityPath = join(dir, IDENTITY_FILE)
     const existed = existsSync(identityPath)
     const existing = existed ? readIdentity(identityPath) : null
     if (existed && !existing) {
-      throw new Error(`${identityPath} is unreadable or malformed. Fix or remove it. Minting a second identity for this root would orphan the first.`)
+      throw new Error(`${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`)
     }
     // No `protocolVersion` field (docs/data-layer.md § Data root, docs/api-reference.md § Versioning).
-    let identity: NodeIdentity = existing ?? { nodeId: randomUUID(), createdAt: Date.now() }
+    let identity: NodeIdentity = existing ?? { baseline: ACORN_BASELINE, nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)
 

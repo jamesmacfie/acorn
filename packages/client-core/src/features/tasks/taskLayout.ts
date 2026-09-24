@@ -104,14 +104,8 @@ export function applyLayoutAction(layout: TaskLayout, action: LayoutAction): Tas
 export function normalizeLayout(value: unknown): TaskLayout | null {
   if (!value || typeof value !== 'object') return null
   const raw = value as Record<string, unknown>
-  const legacyActive = isPaneId(raw.active) ? raw.active : null
-  const rawPanes = Array.isArray(raw.panes)
-    ? raw.panes
-    : legacyActive
-      ? [legacyActive, ...(Array.isArray(raw.pinned) ? raw.pinned : [])]
-      : null
-  if (!rawPanes) return null
-  const panes = [...new Set(rawPanes.filter(isPaneId))]
+  if (!Array.isArray(raw.panes)) return null
+  const panes = [...new Set(raw.panes.filter(isPaneId))]
   if (!panes.length) return null
 
   const pinned = Array.isArray(raw.pinned) ? [...new Set(raw.pinned.filter(isPaneId))] : []

@@ -3,8 +3,8 @@ import { editorOpen, openFiles } from '@acorn/plugin-editor/testkit/client'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/testkit/client'
 import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/testkit/client'
 import { prFilterFor, setPrFilter } from '@acorn/plugin-github/testkit/client'
-import { diffScroll, rememberDiffScroll } from '@acorn/client-core/features/diff/viewState.ts'
-import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
+import { diffScroll, rememberDiffScroll } from '@acorn/client-core/features/diff'
+import { activeTerminal, initSessions, rememberActiveTerminal, sessions } from '@acorn/plugin-terminal/testkit/client'
 import { managedAgentStore } from '@acorn/plugin-agents/testkit/client'
 import {
   dispatchLayout,
@@ -22,13 +22,14 @@ import {
   setTerminalOpen,
   workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
-import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
+import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/host/registries/commands'
 import { activateScopedStateEviction } from './scopedEviction'
-import { completeTaskArchive } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
+import { completeTaskArchive } from '@acorn/client-core/features/tasks'
 
 describe('scoped lifecycle eviction', () => {
   it('clears every task-owned keyed collection on archive', () => {
     const off = activateScopedStateEviction()
+    const stopSessions = initSessions()
     const taskId = 'evict-task'
     dispatchLayout(taskId, { type: 'add', pane: 'editor' })
     setRecipeBrowserUrl(taskId, 'http://localhost:3000')
@@ -68,6 +69,7 @@ describe('scoped lifecycle eviction', () => {
     expect(consumePaneIntent(taskId, 'editor')).toBeUndefined()
     expect(consumeTerminalFocusIntent(taskId)).toBeUndefined()
     expect(editorViewState(taskId, 'src/a.ts')).toBeUndefined()
+    stopSessions()
     off()
   })
 
@@ -76,6 +78,7 @@ describe('scoped lifecycle eviction', () => {
     // module-level signals, so before this they carried node A's data into node B's shell, against ids
     // two nodes may hold in common by construction.
     const off = activateScopedStateEviction()
+    const stopSessions = initSessions()
     rememberActiveTerminal('task-on-a', 'session-1')
     managedAgentStore.upsertSession({
       id: 'agent-1', taskId: 'task-on-a', provider: 'claude', title: 'On node A',
@@ -88,6 +91,7 @@ describe('scoped lifecycle eviction', () => {
     expect(managedAgentStore.sessions()).toEqual([])
     expect(activeTerminal('task-on-a')).toBeUndefined()
     expect(sessions()).toEqual([])
+    stopSessions()
     off()
   })
 
@@ -95,9 +99,11 @@ describe('scoped lifecycle eviction', () => {
     // `runtime:node-removed` drops that node's cache; it must not also wipe the active node's live
     // rosters, which is what a single shared handler would have done.
     const off = activateScopedStateEviction()
+    const stopSessions = initSessions()
     rememberActiveTerminal('task-on-a', 'session-1')
     clientEvents.emit('runtime:node-removed', { nodeId: 'some-other-node' })
     expect(activeTerminal('task-on-a')).toBe('session-1')
+    stopSessions()
     off()
   })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEventRecord, AgentRequest } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({

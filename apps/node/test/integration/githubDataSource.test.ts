@@ -5,8 +5,8 @@ import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { clearRegistrations, initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { invokeDataSource } from '@acorn/node-core/server/dataSources/runtime.ts'
-import { makeTestDb, testEnv } from '@acorn/node-core/testkit/db.ts'
+import { invokeDataSource } from '@acorn/node-core/server/dataSources'
+import { makeTestDb, testEnv } from '@acorn/node-core/testkit'
 
 afterEach(() => { clearRegistrations('github'); vi.unstubAllGlobals() })
 
@@ -21,7 +21,7 @@ it('executes the GitHub source with exact connection provenance and a stable bou
       ctx.dataSources.register(pullSource)
     } }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets: db.secrets, activeIdentity: identity }) })
     await db.db.insert(schema.integrations).values({ id: 'selected', userId: 'owner', provider: 'github', label: 'GitHub',
-      authRef: await db.secrets.seal('selected-token'), authKind: 'oauth', status: 'connected', createdAt: 1, updatedAt: 1 })
+      encryptedCredentials: await db.secrets.seal('selected-token'), authKind: 'oauth', status: 'connected', createdAt: 1, updatedAt: 1 })
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
       expect(init.headers).toMatchObject({ Authorization: 'Bearer selected-token' })
       return Response.json({ data: { search: { issueCount: 3, pageInfo: { hasNextPage: false, endCursor: null },

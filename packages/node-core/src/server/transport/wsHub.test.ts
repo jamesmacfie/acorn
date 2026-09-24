@@ -4,9 +4,9 @@ import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DeviceService } from '../auth/deviceTokens'
-import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
+type TestStreamMsg = Parameters<StreamSink>[0]
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
 // upgrade auth (device bearer / internal-token / host), per-connection seq,
@@ -281,12 +281,12 @@ describe('wsHub streaming', () => {
     // Load-bearing: LIVE must be pushed only after ready and SCREEN have been delivered, or the
     // ordering assertion below proves nothing.
     await waitFor(() => got.length >= 1 && bin.length >= 1, 'ready + initial screen')
-    liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
+    liveSink!({ type: 'output', data: 'LIVE' } satisfies TestStreamMsg)
     await waitFor(() => bin.length >= 2, 'the live frame')
     // `ready` carries a session object, so it is still JSON. Spelled out rather than Extract<>'d: the
     // frame envelope is open now, so there is no union left to discriminate. The shape asserted here
     // is terminal's, and this is a terminal test.
-    const outs = got.filter((f) => f.channel === 'term:out') as unknown as { channel: 'term:out'; id: string; msg: ServerMsg }[]
+    const outs = got.filter((f) => f.channel === 'term:out') as unknown as { channel: 'term:out'; id: string; msg: TestStreamMsg }[]
     expect(outs.map((f) => f.msg.type)).toEqual(['ready'])
     // …and the output is bytes, tagged with the session, in order: live strictly after the restore.
     expect(bin.map(decodeText)).toEqual([
@@ -321,7 +321,7 @@ describe('wsHub streaming', () => {
 
     // One ServerMsg handed to every sink, which is what the engine does on its coalescing tick, so the
     // frame is built once and both sockets get that same frame.
-    const msg: ServerMsg = { type: 'output', data: 'ünïcøde 🌰 "quoted"\r\n' }
+    const msg: TestStreamMsg = { type: 'output', data: 'ünïcøde 🌰 "quoted"\r\n' }
     for (const sink of sinks) sink(msg)
     await waitFor(() => firstBin.length >= 1 && secondBin.length >= 1, 'both sockets to receive the frame')
 

@@ -44,7 +44,7 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 
 | Group | Purpose |
 | --- | --- |
-| `routes.fetch` | Register a portable request handler under `/v2/p/<id>/` |
+| `routes.fetch` | Register a portable request handler under `/v1/p/<id>/` |
 | `storage.open` | Open the plugin's host-migrated SQLite database |
 | `core` | Access granted core services and entity projections |
 | `capabilities` | Provide or resolve a named plugin API |
@@ -54,7 +54,7 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 | `extensionPoints`, `hooks` | Accept contributions and run declared hooks |
 | `audit`, `telemetry`, `log` | Record actions and operational diagnostics |
 
-Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `providers.model`,
+Loaded plugins do not receive `routes.register`, `tools`, `contextSections`,
 `events.channel`, or `events.streams`. Those members belong to the compiled context.
 Loaded packages declare task-scoped tools and bounded context through `contributions.agentTools` and
 `contributions.contextSections` instead. The host adapts those descriptors into the same registries;

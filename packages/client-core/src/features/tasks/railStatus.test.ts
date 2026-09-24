@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { railStatusMarkers, type RailStatusInputs } from './railStatus'
 import { resolveRailMarkers } from '../tabs/railMarkers'
-import type { TaskStatus } from '@acorn/protocol/terminal.ts'
+import type { TaskStatus } from '@acorn/protocol/task.ts'
 
 const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, branch: null, head: null, ...p })
 

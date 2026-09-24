@@ -40,7 +40,7 @@ const panel = (id: string, over: Partial<PanelDefinition> = {}): PanelDefinition
 // Most cases below exercise one field inside the current persisted envelope. Version refusal has
 // its own explicit case, so the fixture helper keeps those unrelated cases terse.
 const parseDashboards = (value: unknown) => parsePersistedDashboards(
-  value && typeof value === 'object' && !Array.isArray(value) ? { version: 2, ...value } : value,
+  value && typeof value === 'object' && !Array.isArray(value) ? { version: 1, ...value } : value,
 )
 
 describe('placement scope keys', () => {
@@ -57,7 +57,7 @@ describe('placement scope keys', () => {
 describe('codec', () => {
   it('round-trips a panel through the persisted form', () => {
     const state = {
-      version: 2 as const,
+      version: 1 as const,
       panels: {
         p1: panel('p1', {
           view: { kind: 'stat', aggregate: 'count' },
@@ -152,7 +152,7 @@ describe('the geometry codec', () => {
 
 describe('the arranged layout', () => {
   it('auto-places every panel of an old blob, in order', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: {},
@@ -163,7 +163,7 @@ describe('the arranged layout', () => {
   })
 
   it('sizes a panel by its view kind, so a board arrives full width', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a', { view: { kind: 'board' } }) },
       placements: { home: ['a'] },
       layouts: {},
@@ -172,7 +172,7 @@ describe('the arranged layout', () => {
   })
 
   it('auto-places only the panel that has no rect', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: { home: { a: { x: 0, y: 0, w: 8, h: 3 } } },
@@ -183,7 +183,7 @@ describe('the arranged layout', () => {
   })
 
   it('ignores a retained rect whose panel is not placed here', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 }, ghost: { x: 4, y: 0, w: 8, h: 4 } } },
@@ -193,7 +193,7 @@ describe('the arranged layout', () => {
 
   it('reading it never rewrites the stored blob', () => {
     const stored = { home: { a: { x: 3, y: 9, w: 4, h: 4 } } }
-    hydrateDashboards({ version: 2, panels: { a: panel('a') }, placements: { home: ['a'] }, layouts: stored })
+    hydrateDashboards({ version: 1, panels: { a: panel('a') }, placements: { home: ['a'] }, layouts: stored })
     // Gravity moved it for the render; nothing was written back. A client that only looks at a board
     // must not be the one that changes it for every other client paired with the node.
     expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 3, y: 0, w: 4, h: 4 })
@@ -203,7 +203,7 @@ describe('the arranged layout', () => {
 
 describe('committing a gesture', () => {
   it('writes the rects and rewrites the placement to reading order', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: {},
@@ -219,7 +219,7 @@ describe('committing a gesture', () => {
   })
 
   it('leaves the geometry of every other scope alone', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'], 'pane/pr': ['a'] },
       layouts: { 'pane/pr': { a: { x: 0, y: 0, w: 4, h: 8 } } },
@@ -229,7 +229,7 @@ describe('committing a gesture', () => {
   })
 
   it('places a wizard commit at its preset size, first-fitted beside what is there', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
@@ -252,7 +252,7 @@ describe('committing a gesture', () => {
   })
 
   it('deleting a panel takes its geometry with it', () => {
-    hydrateDashboards({ version: 2,
+    hydrateDashboards({ version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 6, h: 4 } } },
@@ -265,7 +265,7 @@ describe('committing a gesture', () => {
 describe('the slice descriptor', () => {
   it('declares the durability the persisted-state machinery needs', () => {
     expect(dashboardsSlice.id).toBe('core.dashboards')
-    expect(dashboardsSlice.version).toBe(2)
+    expect(dashboardsSlice.version).toBe(1)
     expect(dashboardsSlice.unknownIds).toBe('retain-inert')
     expect(dashboardsSlice.scope).toBe('app')
     expect(dashboardsSlice.maxBytes).toBeGreaterThan(0)

@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import { Field, SegmentedControl, Select, Stack } from '@acorn/plugin-api/ui'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { WorkflowCatalog, WorkflowStepDef } from '../../shared/workflowContracts'
 
 // The fields every agent-running kind takes, whoever contributed it: the harness, whatever options
@@ -10,7 +10,7 @@ import type { WorkflowCatalog, WorkflowStepDef } from '../../shared/workflowCont
 // They are not in any kind's `describe`, on purpose. A plugin contributing a kind that runs an agent
 // should not have to restate the model list, and the model list is not the plugin's to state: each
 // provider advertises its own options and the editor reads them from
-// `GET /v2/p/agents/providers`, the same list the agent pane offers.
+// `GET /v1/p/agents/providers`, the same list the agent pane offers.
 
 const OPTION_ORDER: Record<string, number> = { model: 0, reasoning: 1, mode: 2, permission: 3, other: 4 }
 

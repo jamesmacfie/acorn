@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
+import { requireUser } from '@acorn/plugin-api/testkit'
 import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -54,7 +54,7 @@ describe('terminal control routes', () => {
     }))
     const app = authed()
     // De-doubled paths: /sessions, not /terminal/sessions. Under the plugin namespace this is
-    // /v2/p/terminal/sessions (docs/api-reference.md § Plugin routes).
+    // /v1/p/terminal/sessions (docs/api-reference.md § Plugin routes).
     expect((await app.fetch(req('/api/sessions'), {} as Env)).status).toBe(200)
     await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1', profileId: 'shell' }), {} as Env)
     await app.fetch(req('/api/sessions/s1/resize', 'POST', { cols: 100, rows: 40 }), {} as Env)

@@ -49,7 +49,7 @@ const row = (): NodePluginRow => ({
   state: 'active',
   installed: {
     version: '1.0.0',
-    apiVersion: PLUGIN_API_MAJOR,
+    baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
     permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     client: { hash: HASH, bytes: 12 },
     contributions: {
@@ -64,7 +64,7 @@ const row = (): NodePluginRow => ({
         claimsKeys: [],
         layout: 'document-over-frame',
         regions: {
-          document: { kind: 'document', languageId: 'sql', read: '/v2/p/database/tasks/:taskId/scratch' },
+          document: { kind: 'document', languageId: 'sql', read: '/v1/p/database/tasks/:taskId/scratch' },
           frame: { kind: 'remote', entry: 'panel' },
         },
       }],

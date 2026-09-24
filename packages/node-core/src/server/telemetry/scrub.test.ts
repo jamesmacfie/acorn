@@ -23,8 +23,8 @@ describe('scrub', () => {
 
   it('leaves a route pattern and a channel name alone', () => {
     // The reason there is no generic path shortener: these are the strings most records carry.
-    expect(scrub('/v2/core/tasks/:id')).toBe('/v2/core/tasks/:id')
-    expect(scrub('no route serves /v2/p/rollbar/issues')).toBe('no route serves /v2/p/rollbar/issues')
+    expect(scrub('/v1/core/tasks/:id')).toBe('/v1/core/tasks/:id')
+    expect(scrub('no route serves /v1/p/rollbar/issues')).toBe('no route serves /v1/p/rollbar/issues')
   })
 
   it('strips control characters so a record cannot rewrite a terminal', () => {

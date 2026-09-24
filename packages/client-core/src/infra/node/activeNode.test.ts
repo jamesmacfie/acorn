@@ -62,7 +62,7 @@ describe('the remembered node', () => {
     await selectActiveNode()
     expect(activeCacheId()).toBe('node-remembered')
     expect(clientFor(activeCacheId())).toBe(guessed)
-    expect(cacheKeyFor(activeCacheId())).toBe('acorn-cache:node-remembered')
+    expect(cacheKeyFor(activeCacheId())).toBe('acorn-cache:acorn-1:node-remembered')
     // The failure this is here to catch: without the memory it would have been the origin partition,
     // and the shell would have remounted onto a different cache.
     expect(cacheKeyFor(activeCacheId())).not.toBe(cacheKeyFor(ORIGIN_NODE_ID))

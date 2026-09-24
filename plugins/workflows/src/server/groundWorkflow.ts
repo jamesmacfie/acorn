@@ -7,8 +7,7 @@
 // The order is fixed. Strip, extract, parse, ground, and only then validate. Grounding runs before
 // the checker so the repair pass sees the problems of the definition we would actually apply.
 //
-// Grounding touches three things and nothing else: an identifier the catalog can refute, a key
-// outside the vocabulary of the four types, and a reference token that cannot resolve. A decide with
+// Grounding touches catalog identifiers and keys outside the workflow vocabulary. A decide with
 // no branches, a widened budget, a duplicate step ID and a cycle are all left where they are. The
 // checker already says something better about each of them than this file could invent, and the
 // repair pass sends those messages back verbatim (./workflowValidation.ts).
@@ -33,7 +32,6 @@ import type {
 } from '../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generateWorkflow'
 import { groundWorkflowDispatch } from './groundWorkflowDispatch'
-import { workflowEdges } from './workflowValidation'
 
 export type GroundedWorkflow = { def: WorkflowDef; notes: WorkflowGenerateNote[] }
 
@@ -44,7 +42,7 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
  *  model writes is a key acorn never reads, so it is dropped rather than carried around looking
  *  meaningful. The forbidden ones stay in these lists and are caught by the set below, so this
  *  reads as the type it mirrors. */
-const DEF_KEYS = ['maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
+const DEF_KEYS = ['baseline', 'maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
 const STEP_KEYS = [
   'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
   'schema', 'policy', 'maxIterations', 'requiresRun', 'childWorkflow', 'items', 'itemKey',
@@ -60,12 +58,6 @@ const FORBIDDEN_TOP_KEYS = new Set<string>(FORBIDDEN_KEYS.filter((key) => !key.i
  *  nothing else, and reading it from the list rather than writing it out here is what stops a sixth
  *  forbidden key being added in one file and missed in this one. */
 const FORBIDDEN_TOOL_KEYS = FORBIDDEN_KEYS.filter((key) => key.startsWith('tools.')).map((key) => key.slice('tools.'.length))
-
-// The same tokens the checker matches, so grounding removes exactly what it would refuse.
-const STEP_TOKEN_RE = /\$\{steps\.[^}]*\}/g
-const INPUT_TOKEN_RE = /\$\{inputs\.[^}]*\}/g
-const STEP_REFERENCE_RE = /^\$\{steps\.([^}]+)\.output\}$/
-const INPUT_REFERENCE_RE = /^\$\{inputs\.([^}]+)\}$/
 
 /** How many objects to try before giving up on a reply. A preamble mentioning `${inputs.issue}`
  *  holds a balanced pair of braces, so the first object a brace count finds is not always the
@@ -321,97 +313,6 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
   return steps.some((step, index) => step !== next.steps[index]) ? { ...next, steps } : next
 }
 
-/** Every reference that cannot resolve, in the three places a reference works.
- *
- *  The two halves are deliberately asymmetric. A reference to a real step this one does not wait for
- *  adds the edge, because that is what the model meant and what the checker would demand. A
- *  reference to a step that does not exist loses the token, because a step cannot be conjured from a
- *  sentence, while an input declaration is recoverable from a reference in full. */
-function groundReferences(def: WorkflowDef, notes: Notes): WorkflowDef {
-  if (def.formatVersion === 2) return def // Keep invalid references visible for the validation/repair pass.
-  const steps = [...def.steps]
-  const names = new Set(steps.map((step) => step.name))
-  const declared = new Set((def.inputs ?? []).map((input) => input?.name).filter((name): name is string => typeof name === 'string'))
-  const fresh: WorkflowInput[] = []
-
-  const precedes = (candidate: string, target: string): boolean => {
-    const edges = workflowEdges(steps)
-    const seen = new Set<string>()
-    const stack = [...(edges.get(target) ?? [])]
-    while (stack.length) {
-      const current = stack.pop()!
-      if (current === candidate) return true
-      if (seen.has(current)) continue
-      seen.add(current)
-      stack.push(...(edges.get(current) ?? []))
-    }
-    return false
-  }
-
-  const addEdge = (target: string, parent: string): void => {
-    const index = steps.findIndex((step) => step.name === target)
-    if (index < 0) return
-    const after = [...(workflowEdges(steps).get(target) ?? [])]
-    steps[index] = { ...steps[index]!, after: [...after, parent] }
-  }
-
-  const rewrite = (owner: string, text: string): string => {
-    let out = text
-    for (const token of new Set(text.match(STEP_TOKEN_RE) ?? [])) {
-      const reference = STEP_REFERENCE_RE.exec(token)?.[1]
-      if (reference === undefined) {
-        add(notes, 'malformed-reference', `Step '${owner}' wrote '${token}', which is not a reference acorn reads, so it was removed.`, owner)
-      } else if (!names.has(reference)) {
-        add(notes, 'unknown-step-reference', `Step '${owner}' referenced the step '${reference}', which is not in this workflow, so the reference was removed.`, owner)
-      } else if (precedes(reference, owner)) continue
-      else if (reference !== owner && !precedes(owner, reference)) {
-        addEdge(owner, reference)
-        add(notes, 'added-edge', `Step '${owner}' referenced '${reference}' without waiting for it, so it now waits for '${reference}'.`, owner)
-        continue
-      } else {
-        add(notes, 'cyclic-reference', `Step '${owner}' referenced '${reference}', which cannot run before it, so the reference was removed.`, owner)
-      }
-      out = out.split(token).join('')
-    }
-    for (const token of new Set(out.match(INPUT_TOKEN_RE) ?? [])) {
-      const reference = INPUT_REFERENCE_RE.exec(token)?.[1]
-      if (reference === undefined) {
-        add(notes, 'malformed-reference', `Step '${owner}' wrote '${token}', which is not a reference acorn reads, so it was removed.`, owner)
-        out = out.split(token).join('')
-        continue
-      }
-      if (declared.has(reference)) continue
-      declared.add(reference)
-      fresh.push({ name: reference })
-      add(notes, 'declared-input', `Step '${owner}' referenced the input '${reference}', which nothing declared, so the workflow now asks for it.`, owner)
-    }
-    return out
-  }
-
-  for (let index = 0; index < steps.length; index += 1) {
-    const before = steps[index]!
-    const owner = before.name
-    const prompt = typeof before.prompt === 'string' ? rewrite(owner, before.prompt) : undefined
-    const table = isRecord(before.with)
-      ? Object.fromEntries(Object.entries(before.with).map(([key, value]) => [key, typeof value === 'string' ? rewrite(owner, value) : value]))
-      : undefined
-    // Read the step back: rewriting may have given it an edge to a step one of its own references
-    // named, and that write must not be lost under the rewritten strings.
-    let next = steps[index]!
-    if (prompt !== undefined && prompt !== next.prompt) next = { ...next, prompt }
-    if (table && Object.entries(table).some(([key, value]) => value !== next.with?.[key])) next = { ...next, with: table }
-    steps[index] = next
-  }
-
-  const changed = steps.some((step, index) => step !== def.steps[index])
-  if (!changed && !fresh.length) return def
-  return {
-    ...def,
-    ...(fresh.length ? { inputs: [...(def.inputs ?? []), ...fresh] } : {}),
-    steps,
-  }
-}
-
 /**
  * The definition as this node can run it, and everything that had to change to get there.
  *
@@ -422,12 +323,11 @@ export function groundWorkflow(def: WorkflowDef, catalog: WorkflowCatalog): Grou
   const notes: Notes = []
   const kinds = new Map(catalog.kinds.map((kind) => [kind.id, kind]))
   // Names first, so every note below names a step by the name the reader will see in the editor,
-  // and so the reference pass reads tokens the rename has already rewritten.
+  // before step-specific checks run.
   let next = def
   next = groundKeys(next, notes)
   const steps = next.steps.map((step) => groundStep(step, catalog, kinds, notes))
   if (steps.some((step, index) => step !== next.steps[index])) next = { ...next, steps }
-  next = groundReferences(next, notes)
   next = groundWorkflowDispatch(next, catalog, notes)
   return { def: next, notes }
 }

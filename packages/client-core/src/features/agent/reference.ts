@@ -1,7 +1,6 @@
 // "Add file/line to agent" quick path (docs/panes.md): format a path[:line[–line]] reference and
 // drop it into the task's agent composer as a draft (the user finishes the thought and submits).
-import { agentSessionsFor } from '../tasks/agentSessions'
-import { taskBridge } from '../tasks/taskBridge'
+import { agentSessionsFor, sendToSession } from '../tasks/agentSessions'
 
 type ReferenceResult = { ok: boolean; reason?: string }
 type ManagedReferenceHandler = (taskId: string, ref: string) => Promise<ReferenceResult | null>
@@ -25,5 +24,5 @@ export async function sendReferenceToAgent(taskId: string, ref: string): Promise
   if (managed) return managed
   const target = agentSessionsFor(taskId)[0]
   if (!target) return { ok: false, reason: 'No running agent session for this task.' }
-  return taskBridge().sendToAgent(target.id, ref, 'draft')
+  return sendToSession(target, ref, 'draft')
 }

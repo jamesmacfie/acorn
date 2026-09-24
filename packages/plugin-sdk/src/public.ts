@@ -47,7 +47,7 @@ export type AcornBridge = {
   /** What this frame was opened to look at. Throws if read before `connect()` resolves. */
   readonly context: PluginFrameContext
   /** Five JSON methods and two byte methods, matching what the host's route table accepts. Your own
-   * `/v2/p/<id>/` namespace is always allowed; anything else needs a scope your manifest declared, and
+   * `/v1/p/<id>/` namespace is always allowed; anything else needs a scope your manifest declared, and
    * another plugin's namespace is always denied, byte call or not. */
   readonly api: {
     get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>

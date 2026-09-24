@@ -26,23 +26,23 @@ export {
 export { Fallback, Only, Rectangle } from './pixels'
 // The canvas, as the indented list. Its own file because it reaches into two of the three above.
 export { Graph } from './graph'
-export type { GraphCard } from '@acorn/client-core/kit/components/content/Graph.tsx'
-export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib/graphLayout.ts'
+export type { GraphCard } from '@acorn/client-core/kit/components/content'
+export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The other half of a `pty` rectangle: the caller says what the channel is and the host draws the
 // emulator. On the DOM that is an xterm on an element; here it is OpenTUI's, already drawn
 // (./pty.ts, client-core/features/terminal/attachPty.ts).
 export { attachPty } from './pty'
-export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib/pty.ts'
+export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
 export type { ItemProps } from '../keys/collection'
 // The prop-shape types a pane names in its own signatures. Types only, from the kit's own
 // declarations, so the two hosts cannot disagree about what a node takes.
 export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-export type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
-export type { TimelineControls } from '@acorn/client-core/kit/components/content/Timeline.tsx'
+export type { KitSection } from '@acorn/client-core/kit/components/layout'
+export type { TimelineControls } from '@acorn/client-core/kit/components/content'
 // The reading place is the DOM timeline's contract and a plain value, so both hosts hand back the
 // same type even though this one never restores one (./grouping.tsx).
-export type { ReadingPlace } from '@acorn/client-core/kit/lib/readingPlace.ts'
+export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 export type {
   MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
@@ -51,20 +51,20 @@ export type {
 // here holds in cells: arming a button to confirm is a decision the reader makes twice, markdown to
 // HTML is the shell's one policy (./markdown.ts draws what it decided), and a row height is a number
 // a virtualiser needs on any host. Re-exported from the kit's own library, which is host-neutral.
-export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
-import type { SplitDrag, SplitDragOptions } from '@acorn/client-core/kit/lib/split.ts'
-export type { SplitDrag } from '@acorn/client-core/kit/lib/split.ts'
-export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
-export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib/deviceStorage.ts'
-export type { MarkdownOptions } from '@acorn/client-core/kit/lib/markdown.ts'
-export { defaultModelIdFor } from '@acorn/client-core/features/settings/models/defaultModel.ts'
+export { createArmedConfirm } from '@acorn/client-core/kit/lib'
+import type { SplitDrag, SplitDragOptions } from '@acorn/client-core/kit/lib'
+export type { SplitDrag } from '@acorn/client-core/kit/lib'
+export { renderMarkdown } from '@acorn/client-core/kit/lib'
+export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib'
+export type { MarkdownOptions } from '@acorn/client-core/kit/lib'
+export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // The collapsed-sidebar signal, re-exported as it stands rather than stubbed. It reads device
 // storage, which this host does not have (client-core/kit/lib/deviceStorage.ts), so it answers
 // `false` for every sidebar and every pane that shares its code draws the full column. Nothing here
 // can set it either: `ListDetail` ignores `collapseKey` and never draws the toggle. A stub returning
 // `false` would be the same answer with a second implementation to keep in step.
-export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from '@acorn/client-core/kit/lib/collapseState.ts'
+export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from '@acorn/client-core/kit/lib'
 
 /**
  * Drag-to-resize, with nothing to drag.

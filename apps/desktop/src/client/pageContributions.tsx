@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { SettingsContribution } from '@acorn/client-core/host/registries/shell/settings.ts'
+import type { SettingsContribution } from '@acorn/client-core/host/registries/shell'
 
 const WorkspaceProjectAssignments = lazy(() => import('@acorn/client-core/features/workspaces/WorkspaceProjectAssignments.tsx'))
 const IntegrationsSettings = lazy(() => import('@acorn/client-core/features/settings/IntegrationsSettings.tsx'))

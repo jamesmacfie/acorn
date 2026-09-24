@@ -9,7 +9,7 @@ import { rollbarItemsForConnectionsRoute, rollbarItemsKey } from './api'
 describe('rollbar wire contract', () => {
   it('sorts and dedupes the connection set in the list route', () => {
     expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toBe('/v2/p/rollbar/items?integrations=rollbar-a%2Crollbar-b')
+      .toBe('/v1/p/rollbar/items?integrations=rollbar-a%2Crollbar-b')
   })
 
   it('preserves the query key shape for cache compatibility', () => {
@@ -19,7 +19,7 @@ describe('rollbar wire contract', () => {
 
   // The same net protocol's api.test.ts keeps over its own builders, now scoped to this plugin:
   // enumerated from the module rather than listed, so a new route is covered the day it lands. A path
-  // outside /v2/p/rollbar/ escapes this plugin's mount and would 404 into the SPA shell.
+  // outside /v1/p/rollbar/ escapes this plugin's mount and would 404 into the SPA shell.
   it('namespaces every exported route builder under its own plugin prefix', () => {
     const dummy = ['x']
     const paths = Object.entries(api)
@@ -31,7 +31,7 @@ describe('rollbar wire contract', () => {
     expect(paths.length).toBe(6) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
-      expect(path as string, name).toMatch(/^\/v2\/p\/rollbar\//)
+      expect(path as string, name).toMatch(/^\/v1\/p\/rollbar\//)
     }
   })
 })

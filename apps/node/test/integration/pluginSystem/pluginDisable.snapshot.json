@@ -71,7 +71,8 @@
       "pr",
       "issues",
       "notes",
-      "memory"
+      "memory",
+      "plugin-authoring"
     ],
     "connectionProviders": [
       "github"
@@ -100,13 +101,13 @@
       "editor.route",
       "editor.searchRoute",
       "github.mirror",
-      "memory.knowledge",
       "memory.knowledgeRoute",
       "memory.library",
       "notes.seedTask",
       "notes.store",
       "preview.rules",
       "preview.urls",
+      "terminal.reviewInput.v1",
       "terminal.route",
       "terminal.runRoute",
       "terminal.runTargets",
@@ -117,6 +118,7 @@
       "workflows.defs",
       "workflows.gates",
       "workflows.notices",
+      "workflows.reviewInput.v1",
       "workflows.route",
       "workflows.runner",
       "workflows.schedules.route"
@@ -246,6 +248,7 @@
         "workflows.defs",
         "workflows.gates",
         "workflows.notices",
+        "workflows.reviewInput.v1",
         "workflows.route",
         "workflows.runner",
         "workflows.schedules.route"

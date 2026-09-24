@@ -22,6 +22,7 @@ import { projectImporterRegistry, type ProjectImporterContribution } from '../so
 // From ./slots, not ./uiSlots. The slot hosts contain JSX, which makes this file unimportable in a
 // bare-Node vitest run (docs/frontend.md § Registries and plugins).
 import { uiSlotRegistry, type UiSlotContribution } from './slots'
+import { registerSessionSource, type SessionSource } from '../sessions/sessionSources'
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
 // (docs/plugins.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
@@ -91,6 +92,9 @@ export type ClientPluginContext = {
 // docs/contribution-kinds.md marks compiled-only on the client. An intersection rather than a second
 // literal, for the same reason as the node's CompiledNodePluginContext.
 export type CompiledClientPluginContext = ClientPluginContext & {
+  // Live, node-scoped summaries for host navigation and send pickers. The compiled owner keeps its
+  // complete records and the registration is disposed with its other contributions.
+  sessionSources: { register(source: SessionSource): void }
   // The same word the node uses for the same idea, and deliberately not the same shape
   // (registries/schedules.ts).
   schedules: ClientContributionPoint<ClientScheduleContribution>
@@ -204,6 +208,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   }
   return {
     name,
+    sessionSources: { register: (source) => record(registerSessionSource(name, source)) },
     panes: own<PaneRegistration>(paneRegistry),
     // The registry is heterogeneous by construction, so widening the item type here is the erasure
     // rather than a hole. Nothing downstream reads a promotion without selecting the source by id.

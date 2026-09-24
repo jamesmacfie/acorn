@@ -19,7 +19,7 @@ type PrComposite = {
 type LinearDetail = { identifier: string; title?: string; description?: string | null }
 
 export const linearIssueSeedUrl = (base: string, link: { integrationId: string; identifier: string }) =>
-  `${base}/v2/p/linear/issues/${encodeURIComponent(link.identifier)}?refresh=1&integration=${encodeURIComponent(link.integrationId)}`
+  `${base}/v1/p/linear/issues/${encodeURIComponent(link.identifier)}?refresh=1&integration=${encodeURIComponent(link.integrationId)}`
 
 const byCreated = (a: PrComment, b: PrComment) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
 
@@ -76,7 +76,7 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
   const project = await core.projects.byId(task.projectId)
   if (task.pullNumber != null && project?.github) {
     // pullDetail refreshes the mirror on staleness before returning the composite (serve-then-revalidate).
-    const pr = await fetchJson<PrComposite>(`${base}/v2/p/github/repos/${project.github.owner}/${project.github.name}/pulls/${task.pullNumber}`, token)
+    const pr = await fetchJson<PrComposite>(`${base}/v1/p/github/repos/${project.github.owner}/${project.github.name}/pulls/${task.pullNumber}`, token)
     if (pr?.pull) {
       await seed(`PR #${pr.pull.number}: ${pr.pull.title}`, pr.pull.body?.trim() || '_(no description)_')
       const comments = buildCommentsBody(pr)

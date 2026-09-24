@@ -13,7 +13,7 @@ vi.mock('../../infra/node/wsClient', () => ({
 }))
 
 import {
-  HOLD_MS, defaultDeliveryContext, deliverNotice, initWorkflowNotices, observeAttention,
+  HOLD_MS, defaultDeliveryContext, deliverNotice, forgetAttentionSource, initWorkflowNotices, observeAttention, replaceAttentionSource,
   registerNoticeSink, resetDelivery, setHostFocused, systemSink, type DeliveryContext,
   type NoticeSink,
 } from './deliver'
@@ -25,7 +25,7 @@ import type { AttentionState, Snapshot } from './attention'
 import { _resetNotices, notices, type Notice } from './notifications'
 
 const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot =>
-  ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, kind: 'interactive', ...over })
+  ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, sourceId: 'agents', notifyOnFinish: true, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
 
 let focused = false
 let settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS
@@ -63,6 +63,29 @@ afterEach(() => {
 const settle = () => vi.advanceTimersByTime(HOLD_MS)
 
 describe('the hold', () => {
+  it('forgets disappeared rows and pending edges for one source only', () => {
+    const terminal = (state: AttentionState) => snap(state, { sourceId: 'terminal', sessionId: 'pty' })
+    observeAttention([snap('working')], context)
+    replaceAttentionSource('terminal', 'n1', [terminal('working')], context)
+    replaceAttentionSource('terminal', 'n1', [terminal('blocked')], context)
+    observeAttention([snap('blocked')], context)
+    replaceAttentionSource('terminal', 'n1', [], context)
+    settle()
+    expect(notices().map((item) => item.title)).toEqual(['claude needs you'])
+    replaceAttentionSource('terminal', 'n1', [terminal('blocked')], context)
+    settle()
+    expect(notices()).toHaveLength(1)
+  })
+
+  it('forgets a failed producer without clearing other producers', () => {
+    const terminal = snap('working', { sourceId: 'terminal', sessionId: 'pty' })
+    observeAttention([snap('working'), terminal], context)
+    forgetAttentionSource('terminal', 'n1')
+    observeAttention([snap('blocked')], context)
+    observeAttention([{ ...terminal, state: 'blocked' }], context)
+    settle()
+    expect(notices()).toHaveLength(1)
+  })
   it('waits a second before anything lands', () => {
     observeAttention([snap('working')], context)
     observeAttention([snap('blocked')], context)
@@ -159,8 +182,8 @@ it('a disabled event produces no row and no channel', () => {
 })
 
 it('points a PTY row at the terminal session and a managed row at the agent pane', () => {
-  observeAttention([snap('working'), snap('working', { sessionId: 's2', kind: 'pty' })], context)
-  observeAttention([snap('blocked'), snap('blocked', { sessionId: 's2', kind: 'pty' })], context)
+  observeAttention([snap('working'), snap('working', { sessionId: 's2', sourceId: 'terminal', target: { kind: 'terminal-session', resourceId: 's2' } })], context)
+  observeAttention([snap('blocked'), snap('blocked', { sessionId: 's2', sourceId: 'terminal', target: { kind: 'terminal-session', resourceId: 's2' } })], context)
   settle()
   expect(notices().map((n) => n.target?.kind).sort()).toEqual(['managed-agent', 'terminal-session'])
 })
@@ -278,9 +301,9 @@ describe('a plugin notice', () => {
 
   it('carries the target its raiser named', () => {
     const stop = initWorkflowNotices()
-    onNotice?.(frame({ taskId: 't1', kind: 'memory-proposal', target: { kind: 'source', resourceId: 'memory' } }))
+    onNotice?.(frame({ taskId: 't1', kind: 'findings-review', target: { kind: 'source', resourceId: 'memory' } }))
     expect(notices()[0].target).toEqual({ kind: 'source', resourceId: 'memory' })
-    expect(notices()[0].kind).toBe('memory-proposal')
+    expect(notices()[0].kind).toBe('findings-review')
     stop()
   })
 

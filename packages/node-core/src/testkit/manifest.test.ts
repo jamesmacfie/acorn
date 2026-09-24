@@ -46,16 +46,16 @@ describe('validatePluginConfig', () => {
   })
 
   it('catches a route a plugin does not own, which is the rule nobody can check by eye', async () => {
-    // The cross-field refinement: a client route may address this plugin's own `/v2/p/<id>/` prefix and
+    // The cross-field refinement: a client route may address this plugin's own `/v1/p/<id>/` prefix and
     // nothing else. Getting it wrong is a package that installs and then cannot open its own surface.
     const root = pkg('probe', `export default {
       name: 'Probe',
-      contributions: { sources: [{ id: 's', label: 'S', glyph: 'list', order: 10, items: '/v2/p/github/rail-items' }] },
+      contributions: { sources: [{ id: 's', label: 'S', glyph: 'list', order: 10, items: '/v1/p/github/rail-items' }] },
     }\n`)
     const result = await validatePluginConfig(root)
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.reason).toMatch(/\/v2\/p\/probe\//)
+    expect(result.reason).toMatch(/\/v1\/p\/probe\//)
   })
 
   it('reports a config it cannot even import, rather than throwing', async () => {

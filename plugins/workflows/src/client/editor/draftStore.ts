@@ -189,7 +189,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const rename = (from: string, to: string): void => {
     apply((current) => renameNode(current, from, to))
     const current = ref()
-    if (current && draft().def.formatVersion !== 2) renameInLayout(defRefKey(current), from, to)
+    if (current && draft().def.formatVersion !== 1) renameInLayout(defRefKey(current), from, to)
   }
 
   const [problems, setProblems] = createSignal<string[]>([])

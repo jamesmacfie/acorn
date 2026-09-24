@@ -12,7 +12,7 @@ import SourceQueryEditor from '../dataSources/SourceQueryEditor'
 import AuthoringConversation from '../dataSources/AuthoringConversation'
 import { mergeAuthoringCandidate } from '../dataSources/authoringMerge'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
-import { projectDashboardPanel, suggestStateCategoryMapping, type DashboardQueryProjection } from '@acorn/dashboards-core/typedProjection.ts'
+import { projectDashboardPanel, suggestStateCategoryMapping, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { Alert, Badge, Button, Checkbox, EmptyState, Field, Input, Select } from '../../kit/components/primitives'
 import { Fold } from '../../kit/components/layout/Fold'
@@ -247,7 +247,7 @@ export default function DashboardEditor(props: {
           </Inline>
           <Show when={problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
           <AuthoringConversation
-            endpoint="/v2/core/authoring/turn"
+            endpoint="/v1/core/authoring/turn"
             target="dashboard"
             targetId={draft()?.id ?? recoveryId}
             scope={scope}

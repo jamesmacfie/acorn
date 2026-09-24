@@ -12,7 +12,7 @@ const reference = (): Extract<QueryReference, { kind: 'inline' }> => ({ kind: 'i
     predicate: { kind: 'comparison', operator: 'eq', left: { address: { from: 'item', pointer: '/title' } }, right: { address: { from: 'input', name: 'title', pointer: '' } } },
   } } })
 const graph = (query: QueryReference): ResolvedWorkflowGraph => {
-  const definition: WorkflowDef = { name: 'Portable', inputs: [{ name: 'connection_1', schema: { type: 'string' }, default: 'destination', connection: { source: { pluginId: 'linear', sourceId: 'issues' } } }], steps: [{ id: 'find', name: 'Find', query }] }
+  const definition: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Portable', inputs: [{ name: 'connection_1', schema: { type: 'string' }, default: 'destination', connection: { source: { pluginId: 'linear', sourceId: 'issues' } } }], steps: [{ id: 'find', name: 'Find', query }] }
   return { root: definition, nodes: [{ definition, path: ['$'], depth: 0, provenance: { source: 'repo', path: '.acorn/workflows/portable.toml' }, defaultInputs: {}, fingerprint: 'test' }], fingerprint: 'test', requiresRepoTrust: true }
 }
 

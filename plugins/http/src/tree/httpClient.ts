@@ -1,4 +1,4 @@
-// Typed wrapper over the /v2/p/http routes, over the frame bridge rather than core's fetch helpers.
+// Typed wrapper over the /v1/p/http routes, over the frame bridge rather than core's fetch helpers.
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope.
 // Every call is a message on the one MessagePort, and the host checks the path against this plugin's

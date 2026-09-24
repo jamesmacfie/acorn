@@ -11,7 +11,7 @@ export type TunnelDeps = WsAuthDeps & {
   declaredPorts(taskId: string): Promise<readonly number[]>
 }
 
-export const TUNNEL_PATH = '/v2/tunnel'
+export const TUNNEL_PATH = '/v1/tunnel'
 
 // 127.0.0.1 only, never the hostname (docs/api-reference.md § WebSocket, on why there is no general
 // SOCKS proxy here).
@@ -116,7 +116,7 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
     // Parsing only; authorizeWsUpgrade below is what checks the Host against the allowlist.
     const host = req.headers.host ?? 'placeholder.invalid'
     const target = parseTarget(req.url, host)
-    // Claim only our own path, leaving `/v2/events` and anything later to its own handler, the same
+    // Claim only our own path, leaving `/v1/events` and anything later to its own handler, the same
     // contract wsHub's handler keeps.
     if (!target) return
     // Synchronously, because the sweeper in server/transport/upgradeClaim.ts cannot await our auth.

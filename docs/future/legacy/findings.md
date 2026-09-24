@@ -1,6 +1,7 @@
 # Findings
 
-Date: 2026-09-21. Status: source-backed analysis; recommendations not implemented.
+Date: 2026-09-21. Status: historical source-backed analysis. See [ticket 13](./13-acceptance.md)
+for F01–F12 dispositions and acceptance evidence; the owning reference docs describe current behaviour.
 Read [context](./context.md) and [target architecture](./target-architecture.md).
 Source locations refer to `9727fd85`; line numbers are navigation hints.
 
@@ -125,7 +126,7 @@ Priority: legacy removal. Confidence: confirmed.
 `packages/custody/src/custody/legacyCustody.ts:55` adopts Electron state; desktop helper handshake and
 Rust keychain/helper code still support it. `packages/client-core/src/infra/persistence/devicePrefs.ts:87`
 seeds device preferences from Node, and its drain moves the opposite set back. Query setup calls both.
-`packages/client-core/src/infra/persistence/legacyStorage.ts` purges retired namespaces on startup.
+The retired client storage sweep purged old namespaces on startup.
 
 `packages/client-core/src/host/registries/commands/keybindings.ts:77` reads legacy pane shortcuts;
 desktop task view supplies `legacyPaneAction`. Task layout parsing accepts the former active/pinned

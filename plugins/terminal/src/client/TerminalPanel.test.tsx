@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import type { ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import type { Task } from '@acorn/plugin-api/client'
 
 // What a terminal tab switch costs, in jsdom. This is the tier the drawer never had, and phase 6 of
@@ -48,6 +48,7 @@ const attaches: string[] = []
 const detaches: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
+    list: async () => roster,
     profiles: async () => [],
     resize: async () => true,
     write: () => {},
@@ -70,7 +71,7 @@ globalThis.ResizeObserver ??= class {
 } as unknown as typeof ResizeObserver
 
 const { default: TerminalPanel } = await import('./TerminalPanel')
-const { refreshSessions } = await import('@acorn/plugin-api/client')
+const { refreshSessions } = await import('./sessionStore')
 
 const A = '11111111-2222-3333-4444-555555555555'
 const B = '99999999-8888-7777-6666-555555555555'

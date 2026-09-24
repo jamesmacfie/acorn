@@ -1,4 +1,5 @@
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema, pairResultSchema, type PairResult } from '@acorn/protocol/node.ts'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
@@ -29,7 +30,7 @@ const PROBE_TIMEOUT_MS = 8_000
 //
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
 export async function probeNode(endpoint: string): Promise<NodeProbeResult & { certPem: string }> {
-  const url = new URL('/v2/node', endpoint)
+  const url = new URL('/v1/node', endpoint)
   if (url.protocol !== 'https:') throw new Error('A node endpoint must be https — the pin is the identity.')
 
   const { body, certPem, fingerprint } = await unverifiedGet(url)
@@ -45,6 +46,8 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
     // where the schema does not fit what came back.
     const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
     if (typeof claimed === 'number') {
+      const baseline = (payload as { baseline?: unknown } | null)?.baseline
+      if (baseline !== ACORN_BASELINE) throw new Error(`${endpoint} has no matching ${ACORN_BASELINE} baseline. Reset or rebuild the node before pairing.`)
       throw new Error(`${endpoint} speaks acorn protocol ${claimed}; this app speaks ${NODE_PROTOCOL_VERSION}. Upgrade whichever is older.`)
     }
     throw new Error(`${endpoint} did not answer like an acorn node.`)
@@ -59,6 +62,7 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
     endpoint: url.origin,
     fingerprint,
     protocolVersion: info.protocolVersion,
+    baseline: info.baseline,
     compatible: info.protocolVersion === NODE_PROTOCOL_VERSION,
     certPem,
   }
@@ -67,13 +71,14 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
 // Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.
 export async function pairWithNode(
-  probe: { endpoint: string; fingerprint: string; certPem: string },
+  probe: { endpoint: string; fingerprint: string; certPem: string; baseline?: string | null; compatible?: boolean },
   request: { code: string; deviceName: string },
 ): Promise<PairResult> {
+  if (probe.baseline !== ACORN_BASELINE || probe.compatible === false) throw new Error(`Node baseline or protocol does not match ${ACORN_BASELINE}; pairing was refused.`)
   const agent = new HttpsAgent(pinnedTlsOptions(probe.fingerprint, probe.certPem))
   try {
     const response = await nodeRequest({
-      url: new URL('/v2/pair', probe.endpoint),
+      url: new URL('/v1/pair', probe.endpoint),
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify(request)) },
@@ -105,7 +110,7 @@ function unverifiedGet(url: URL): Promise<{ body: string; certPem: string; finge
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => chunks.push(chunk))
       res.on('end', () => {
-        if (res.statusCode !== 200) return reject(new Error(`${url.origin} answered ${res.statusCode} at /v2/node.`))
+        if (res.statusCode !== 200) return reject(new Error(`${url.origin} answered ${res.statusCode} at /v1/node.`))
         resolve({
           body: Buffer.concat(chunks).toString('utf8'),
           certPem: toPem(cert.raw),

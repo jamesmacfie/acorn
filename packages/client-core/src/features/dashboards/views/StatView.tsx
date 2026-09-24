@@ -6,7 +6,7 @@ import {
   SPARK_BOX,
   sparkline,
   trendDelta,
-} from '@acorn/dashboards-core/trend.ts'
+} from '@acorn/dashboards-core/render'
 import { cellText, formatCell } from '../format'
 import { createMeasureHistory } from '../history'
 import { aggregateRows } from '../shaping'

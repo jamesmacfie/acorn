@@ -37,7 +37,7 @@ const find = (): SearchCommand => at('memory.search') as SearchCommand
 describe('the memory plugin catalogue', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('includes explicit learning preparation, search, and the legacy proposal page', () => {
+  it('includes explicit learning preparation, search, and the review page', () => {
     expect(memoryCommands.map((command) => command.id)).toEqual(['memory.learnings.review', 'memory.search', 'memory.proposals.open'])
     for (const command of memoryCommands) {
       expect(command.palette, command.id).toBe(true)

@@ -6,10 +6,8 @@
   // is why allowImportingTsExtensions + noEmit are load-bearing: cross-package specifiers carry their
   // real extension (@acorn/protocol/api.ts).
   //
-  // Library packages export "./*": "./src/*", so the module system gives them no encapsulation and
-  // their boundaries are arch tests. Plugin packages name their subpaths, so moduleResolution
-  // "bundler" refuses a deep import into one at the import site (docs/architecture-overview.md §
-  // Package boundaries).
+  // Library and plugin packages name their public subpaths. moduleResolution "bundler" refuses a
+  // private import at the import site (docs/architecture-overview.md § Package boundaries).
   //
   // Deliberately no "types" here. Each package declares its own (protocol: none; node packages:
   // node; client packages: vite/client + DOM), so a package cannot accidentally rely on globals it

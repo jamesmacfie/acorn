@@ -2,7 +2,7 @@ import { Show, createSignal } from 'solid-js'
 import { Button, Chip, Icon } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { AGENT_ATTACHMENT_POINT } from '@acorn/protocol/extensionPoints.ts'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 
 // One attachment on an unsent turn, and the room another plugin has to draw it instead
 // (docs/plugins.md § Cooperative extension points, the `remote` kind).

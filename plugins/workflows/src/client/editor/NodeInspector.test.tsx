@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { newDraft, type WorkflowDraft } from './draft'
 
@@ -90,7 +90,7 @@ describe('a contributed kind draws its own form', () => {
   }
 
   it('renders one control per field, of the type the description named', () => {
-    mount({ name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
     expect(labels('textarea')).toContain('Command')
     const number = host.querySelector('input[type="number"]')
     expect(number?.getAttribute('aria-label')).toBe('Timeout')
@@ -99,12 +99,12 @@ describe('a contributed kind draws its own form', () => {
   })
 
   it('marks a required field that is empty', () => {
-    mount({ name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('has to be filled in')
   })
 
   it('does not mark it once it has a value', () => {
-    mount({ name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [], with: { command: 'ls' } }] }, [kind], 'run')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [], with: { command: 'ls' } }] }, [kind], 'run')
     expect(host.querySelector('[role="alert"]')).toBeNull()
   })
 })
@@ -115,20 +115,20 @@ describe('a select with an options route', () => {
     pluginId: 'terminal',
     describe: {
       label: 'Start a run target',
-      fields: [{ id: 'target', label: 'Run target', type: 'select', optionsRoute: '/v2/p/terminal/tasks/{taskId}/run-targets' }],
+      fields: [{ id: 'target', label: 'Run target', type: 'select', optionsRoute: '/v1/p/terminal/tasks/{taskId}/run-targets' }],
     },
   }
 
   it('substitutes the placeholder and offers what the route answered', async () => {
-    mount({ name: 'w', steps: [{ name: 'serve', kind: 'terminal:run-target', after: [] }] }, [kind], 'serve')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'serve', kind: 'terminal:run-target', after: [] }] }, [kind], 'serve')
     await settle()
-    expect(fieldOptions).toHaveBeenCalledWith('/v2/p/terminal/tasks/task-1/run-targets')
+    expect(fieldOptions).toHaveBeenCalledWith('/v1/p/terminal/tasks/task-1/run-targets')
     expect([...host.querySelectorAll('option')].map((option) => option.textContent)).toContain('Dev server')
   })
 
   it('refuses a route outside the contributing plugin, and asks for the value by hand instead', async () => {
-    const stolen = { ...kind, describe: { ...kind.describe!, fields: [{ ...kind.describe!.fields[0], optionsRoute: '/v2/p/agents/providers' }] } }
-    mount({ name: 'w', steps: [{ name: 'serve', kind: 'terminal:run-target', after: [] }] }, [stolen], 'serve')
+    const stolen = { ...kind, describe: { ...kind.describe!, fields: [{ ...kind.describe!.fields[0], optionsRoute: '/v1/p/agents/providers' }] } }
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'serve', kind: 'terminal:run-target', after: [] }] }, [stolen], 'serve')
     await settle()
     expect(fieldOptions).not.toHaveBeenCalled()
     expect(labels('input[type="text"]')).toContain('Run target')
@@ -143,7 +143,7 @@ describe('a kind that runs an agent', () => {
   }
 
   it('draws the harness, every option that harness advertises, and where it runs', () => {
-    mount({ name: 'w', steps: [{ name: 'ask', after: [], profileId: 'claude-code' }] }, [kind], 'ask')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'ask', after: [], profileId: 'claude-code' }] }, [kind], 'ask')
     const named = labels('button.ui-select')
     expect(named).toContain('Harness')
     expect(named).toContain('Model')
@@ -153,7 +153,7 @@ describe('a kind that runs an agent', () => {
   })
 
   it('offers a reference chip for each declared input and each step that runs first', () => {
-    const def: WorkflowDef = {
+    const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       inputs: [{ name: 'issue' }],
       steps: [{ name: 'first', after: [] }, { name: 'ask', after: ['first'], profileId: 'claude-code' }],
@@ -166,7 +166,7 @@ describe('a kind that runs an agent', () => {
 
   it('does not draw agent fields for a kind that does not run one', () => {
     const gate: WorkflowCatalog['kinds'][number] = { id: 'gate-human', pluginId: null, describe: { label: 'Wait for a person', fields: [] } }
-    mount({ name: 'w', steps: [{ name: 'review', kind: 'gate-human', after: [] }] }, [gate], 'review')
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'review', kind: 'gate-human', after: [] }] }, [gate], 'review')
     expect(labels('button.ui-select')).not.toContain('Harness')
   })
 })
@@ -178,7 +178,7 @@ describe('runtime workflow fields', () => {
   ]
 
   it('offers the scoped child target and its declared required input', () => {
-    mount({
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       inputs: [{ name: 'ticket' }],
       steps: [{
@@ -195,7 +195,7 @@ describe('runtime workflow fields', () => {
   })
 
   it('keeps an unavailable target visible and names the invalid draft', () => {
-    mount({
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [{
         name: 'review',
@@ -209,7 +209,7 @@ describe('runtime workflow fields', () => {
   })
 
   it('offers structured predecessors through the shared records picker without requiring a pointer field', async () => {
-    mount({
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'plain', after: [], prompt: 'Write prose.' },
@@ -233,7 +233,7 @@ describe('runtime workflow fields', () => {
 
 describe('typed data fields', () => {
   it('edits structured agent output as fields instead of raw schema JSON', () => {
-    mount({ formatVersion: 2, name: 'w', steps: [{ id: 'agent', name: 'Analyse', after: [], schema: {
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ id: 'agent', name: 'Analyse', after: [], schema: {
       type: 'object', properties: { severity: { type: 'string' } }, required: ['severity'],
     } }] }, [], 'agent')
     expect(host.textContent).toContain('Describe the fields the agent returns')
@@ -242,7 +242,7 @@ describe('typed data fields', () => {
   })
 
   it('edits an If condition with the shared typed field picker', () => {
-    mount({ formatVersion: 2, name: 'w', inputs: [{ name: 'severity', schema: { type: 'string' } }], steps: [{
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', inputs: [{ name: 'severity', schema: { type: 'string' } }], steps: [{
       id: 'if', name: 'Urgent?', kind: 'if', after: [],
       condition: { kind: 'comparison', left: { address: { from: 'input', name: 'severity', pointer: '' } }, operator: 'eq', right: { address: { from: 'literal', value: 'urgent' } } },
     }] }, [], 'if')
@@ -252,7 +252,7 @@ describe('typed data fields', () => {
   })
 
   it('uses the shared binding picker for a record and offers compatible workflow inputs', async () => {
-    mount({
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',
       inputs: [{ name: 'record', description: 'Selected record', schema: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } }],
       steps: [{ name: 'details', kind: 'get-record-details', after: [], record: { address: { from: 'input', name: 'record', pointer: '/ref' } } }],

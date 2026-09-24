@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '../../contract/wire.ts'
 
 // A gate is a state, not an event: the inbox fetches, so the row for one gate has to come back with
 // the same id every time until somebody answers it (client-core registries/rail/attention.ts).

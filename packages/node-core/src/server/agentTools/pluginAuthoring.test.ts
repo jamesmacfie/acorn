@@ -43,8 +43,8 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.contextMenuLocations).toEqual([...CONTEXT_MENU_LOCATIONS])
     const withSlot = (slot: string) => pluginManifestShape.safeParse({
-      id: 'pp', name: 'P', version: '1', apiVersion: PLUGIN_API_MAJOR,
-      contributions: { slots: [{ id: 's', slot, data: '/v2/p/pp/badge' }] },
+      id: 'pp', name: 'P', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+      contributions: { slots: [{ id: 's', slot, data: '/v1/p/pp/badge' }] },
     }).success
     expect(v.manifest.slots.length).toBeGreaterThan(1)
     for (const slot of v.manifest.slots) expect(withSlot(slot), slot).toBe(true)
@@ -74,10 +74,10 @@ describe('the derived vocabulary tracks the manifest schema', () => {
   it('carries every contribution key with the cap the schema enforces', () => {
     const v = pluginAuthoringVocabulary()
     for (const [key, cap] of Object.entries(v.manifest.contributionCaps)) {
-      const one = { id: 'x', label: 'x', title: 'x', order: 1, items: '/v2/p/p/x', data: '/v2/p/p/x' }
+      const one = { id: 'x', label: 'x', title: 'x', order: 1, items: '/v1/p/p/x', data: '/v1/p/p/x' }
       const overflowing = Array.from({ length: cap + 1 }, () => one)
       const parsed = pluginManifestShape.safeParse({
-        id: 'p', name: 'P', version: '1', apiVersion: PLUGIN_API_MAJOR, contributions: { [key]: overflowing },
+        id: 'p', name: 'P', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, contributions: { [key]: overflowing },
       })
       // Specifically the cap, not the entries' shape. The placeholder above is not a valid descriptor
       // for most of these keys, so "it failed" alone proves nothing about the number.
@@ -103,15 +103,15 @@ describe('the derived vocabulary tracks the manifest schema', () => {
 
   it('reads the two action-verb unions off the descriptors that carry them', () => {
     type Member = { properties?: Record<string, { oneOf?: { properties: { verb: { const: string } } }[] }> }
-    type Items = Member & { anyOf?: Member[] }
+    type Items = Member & { anyOf?: Member[]; oneOf?: Member[] }
     const json = z.toJSONSchema(pluginManifestShape, { target: 'draft-7', io: 'input', unrepresentable: 'any' }) as {
       properties: Record<string, { properties: Record<string, { items: Items }> }>
     }
-    // A command is four shapes, so the field is looked for across the union's members the way the
+    // A command has several shapes, so the field is looked for across the union's members the way the
     // vocabulary itself looks for it.
     const union = (descriptor: string, field: string) => {
       const items = json.properties.contributions.properties[descriptor].items
-      const carrier = items.properties?.[field] ?? items.anyOf?.map((member) => member.properties?.[field]).find(Boolean)
+      const carrier = items.properties?.[field] ?? (items.anyOf ?? items.oneOf ?? []).map((member) => member.properties?.[field]).find(Boolean)
       return (carrier?.oneOf ?? []).map((option) => option.properties.verb.const).sort()
     }
     const v = pluginAuthoringVocabulary()

@@ -1,13 +1,13 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { For, onCleanup, Show } from 'solid-js'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { createAttentionInbox, type AttentionInbox } from '@acorn/client-core/features/notifications/attentionInbox.ts'
-import { trackBadge } from '@acorn/client-core/features/notifications/badge.ts'
+import { createAttentionInbox, type AttentionInbox } from '@acorn/client-core/features/notifications'
+import { trackBadge } from '@acorn/client-core/features/notifications'
 import {
   markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount,
-} from '@acorn/client-core/features/notifications/notifications.ts'
+} from '@acorn/client-core/features/notifications'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
-import { projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
+import { projectPath } from '@acorn/client-core/host/registries/commands'
 import { useNavigate } from '@solidjs/router'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { Line } from '../kit/cells'

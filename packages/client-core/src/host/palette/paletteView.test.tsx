@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Alert } from '../../kit/components/primitives'
 import type { Disposable } from '../../kit/lib/registry'
 import { commandRegistry, type CommandContribution, type CommandExecutionContext } from '../registries/commands/commands'
-import type { CommandSession } from '../registries/commands/session'
+import type { CommandSession } from '../registries/commands/sessionStore'
 import { createCommandPaletteView } from './paletteView'
 import { PaletteSurface } from './PaletteSurface'
 
 // The desktop half of the palette, over the shared session.
 //
-// The transitions themselves are `../registries/commands/session.test.tsx` and are not repeated here.
+// The transitions themselves are `../registries/commands/sessionStore.test.tsx` and are not repeated here.
 // What this file asks is the part only a DOM can answer: does the dialog say what it is to a screen
 // reader, does the field name the row the arrows are on, does the keyboard reach the same operations,
 // and does focus come back to where it was — on the final close, and not on the way back up.

@@ -3,17 +3,17 @@ import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
+import { TERMINAL_LAUNCH_CONTEXT } from '../contract/launchContext'
+import { TERMINAL_REVIEW_INPUT } from '../contract/reviewInput'
+import { deliverLaunchContext } from '../server/launchContext'
 import { runAgentTools } from '../server/agentTools'
 import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
 import { commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
-import { disposeTerminal, registerTerminalChannel, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
+import { disposeTerminal, registerTerminalChannel, reviewSnapshots, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
-// The four hooks this plugin cannot resolve for itself. TerminalChannelDeps in server/terminal.ts states each
-// one's blocker: one closes over the listener origin and the internal signing key, neither of which
-// exists at init, and three belong to plugins/memory, whose capability id is not in a contract/.
-export type TerminalPluginDeps = Omit<TerminalChannelDeps, 'seedTaskNotes'>
+export type TerminalPluginDeps = Pick<TerminalChannelDeps, 'internalEnv' | 'reconciled'>
 
 export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -21,6 +21,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   return {
     name: 'terminal',
     required: true,
+    emits: [{ verb: 'completed', description: 'A task agent terminal exited with bounded input available for a short read window' }],
     // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
     // open/migrate/close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
@@ -29,11 +30,26 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // the engine and fills the route's bridge in the same call, so no request and no PTY spawn can
       // reach an unmigrated database.
       const db = ctx.storage.open()
+      ctx.extensionPoints.declare(TERMINAL_LAUNCH_CONTEXT, 'Agent launch context')
+      ctx.hooks.declare({
+        id: 'archive-review', label: 'capture task evidence before archive',
+        payload: { taskId: 'string', sessionIds: 'string[]', terminalOutput: 'string', diff: 'string', captureStatus: 'string' },
+        allows: ['transform'], timeoutMs: 5_000,
+      })
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
       // guard in server/transport/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
       const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
+        launchContext: async (taskId, sessionId) => {
+          await deliverLaunchContext(taskId, sessionId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT),
+            (id, text) => sendToAgent(id, text, 'after-ready'), (message) => ctx.log.warn(message))
+        },
+        completed: (event) => ctx.events.send({ channel: 'plugin:terminal:completed', ...event }),
+        archiveReview: async ({ taskId, sessionIds, terminalOutput, diff }) => {
+          const result = await ctx.hooks.run('archive-review', { taskId, sessionIds, terminalOutput, diff, captureStatus: 'pending' })
+          if (result.payload.captureStatus === 'failed') throw new Error('Findings archive capture failed')
+        },
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
         // `terminal:sessions-changed`, not `ctx.events.status`. This fires on every idle-to-working
         // edge, which is machine speed, and the old ping had six subscribers
@@ -48,6 +64,9 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TERMINAL_ROUTE, registrations.terminal),
         ctx.capabilities.provide(TASK_SESSIONS, registrations.taskSessions),
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
+        ctx.capabilities.provide(TERMINAL_REVIEW_INPUT, {
+          read: async (taskId, sessionId) => reviewSnapshots.read(taskId, sessionId),
+        }),
       ]
       // The repo's setup script, as a handler on core's `core:worktree-created` hook rather than the
       // single slot it used to fill (docs/plugins.md § Hooks). `transform` and not `observe` because
@@ -118,9 +137,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // The five run_* agent tools, over the service built two lines up. The capability stays published
       // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
       for (const tool of runAgentTools(runTargetService, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
-      // terminal.sendToAgent (contract/sendToAgent.ts): the PTY delivery primitive plugins/memory's
-      // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
-      // call time and degrades to a no-op when this plugin is absent.
+      // terminal.sendToAgent (contract/sendToAgent.ts): PTY delivery for explicit actions such as
+      // Memory's send-to-agent command. Consumers resolve it at call time.
       ctx.capabilities.provide(TERMINAL_SEND_TO_AGENT, sendToAgent)
       // terminal.sessions (contract/sessions.ts): spawn and enumerate, for plugins/agents' terminal
       // handoff. Published as a capability so agents resolves it directly instead of reaching through

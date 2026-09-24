@@ -157,7 +157,7 @@ export class BrowserPool {
       const session = await this.#session(taskId)
       const bytes = await session.page.screenshot({ type: 'png' })
       const { id } = await this.captures.put({ taskId, mime: 'image/png', bytes })
-      return { captureId: id, url: `/v2/p/browser/captures/${id}`, bytes: bytes.byteLength }
+      return { captureId: id, url: `/v1/p/browser/captures/${id}`, bytes: bytes.byteLength }
     } catch (error) {
       return { error: reason(error) }
     }

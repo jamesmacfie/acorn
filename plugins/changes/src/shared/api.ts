@@ -5,7 +5,7 @@
 // byte-identical to the one in @acorn/protocol/api.ts, because changing it orphans a user's
 // IndexedDB (docs/caching.md).
 
-import type { LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 
 // Inline annotations on uncommitted changes, owned by this plugin rather than mirrored from GitHub.
 export type ReviewNote = {
@@ -22,28 +22,28 @@ export type ReviewNote = {
 }
 export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
 
-export const reviewNotesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes`
-export const reviewNoteRoute = (taskId: string, noteId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/${noteId}`
-export const reviewNotesSentRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/sent`
+export const reviewNotesRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/review-notes`
+export const reviewNoteRoute = (taskId: string, noteId: string) => `/v1/p/changes/tasks/${taskId}/review-notes/${noteId}`
+export const reviewNotesSentRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/review-notes/sent`
 export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 
 // Local-changes review: working-tree status, diff and blob reads, plus the staging, commit, discard
 // and remote actions.
-export const localStatusRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/status`
+export const localStatusRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/status`
 /** A clean tree with nothing known about the branch: what a task with no worktree yet looks like, and
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
 export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
-  `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
+  `/v1/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
 // The new side of a file's diff, for filling a gap the reader expands. Scoped like the diff itself:
 // the index for a staged diff, the working tree for an unstaged one.
 export const localNewSideRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
-  `/v2/p/changes/tasks/${taskId}/local/new-side?path=${encodeURIComponent(path)}&scope=${scope}`
+  `/v1/p/changes/tasks/${taskId}/local/new-side?path=${encodeURIComponent(path)}&scope=${scope}`
 export const localActionRoute = (
   taskId: string,
   action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'fetch' | 'pull' | 'push' | 'abort',
-) => `/v2/p/changes/tasks/${taskId}/local/${action}`
+) => `/v1/p/changes/tasks/${taskId}/local/${action}`
 /** What the commit menu offers, as the body a commit POST carries.
  *
  *  `all` is the client's answer to "nothing is staged": `git commit -a` stages every tracked
@@ -67,7 +67,7 @@ export type PushOptions = { force?: boolean }
 // HEAD's hash and message. Read on demand rather than carried on the status record: the only thing
 // that wants it is an amend, which is a menu item nobody presses on most visits, and a message body
 // on every poll is bytes the panel never draws.
-export const localHeadCommitRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/head-commit`
+export const localHeadCommitRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/head-commit`
 
 // --- the generated commit message ---
 
@@ -97,13 +97,13 @@ export type CommitMessageRequest = { backendId: string; modelId?: string }
  *  the reader, so a message that came out wrong can be traced to the model that wrote it. */
 export type GeneratedCommitMessage = { message: string; providerId: string; modelId: string }
 
-export const localCommitMessageRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/commit-message`
+export const localCommitMessageRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/commit-message`
 /** Which backends this owner could generate with — a stored key, or an agent CLI installed on this
  *  machine — ids and labels only.
  *
- *  This plugin's own route rather than a read of core's roster: `/v2/core/integrations` has no bridge
+ *  This plugin's own route rather than a read of core's roster: `/v1/core/integrations` has no bridge
  *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
  *  (docs/integrations.md § Model providers). The path still says `model-connections` after the rename:
  *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
  *  side of it. */
-export const localModelBackendsRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/model-connections`
+export const localModelBackendsRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/model-connections`

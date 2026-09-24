@@ -1,5 +1,5 @@
 import { runDefaultUrlRoute, runStartRoute, runStatusRoute, runStopRoute, runTargetsRoute } from '@acorn/protocol/api.ts'
-import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'
+import type { RunStatus, RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { ApiError, readJson, writeJson } from '../../infra/node/apiClient'
 import { openRepoConfigTrust } from '../settings/trust/configTrust'
 

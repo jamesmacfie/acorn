@@ -4,7 +4,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
   AgentUsage,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import type { AgentSessionHeaderProps } from '@acorn/protocol/extensionPoints.ts'
 import { agentModelPrice, type AgentPricingPreferences } from '../../shared/pricing'
 import { mergeAgentUsage } from '../../shared/usageFold'

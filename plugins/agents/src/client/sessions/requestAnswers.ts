@@ -1,4 +1,4 @@
-import type { AgentNormalizedEvent, AgentRequest } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentRequest } from '../../contract/wire.ts'
 
 // What the agent asked and what it was told, for the card that keeps the exchange in the thread
 // (./AgentEventCard.tsx). Two sources on purpose: the event is what was asked, and it never changes,

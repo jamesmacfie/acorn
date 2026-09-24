@@ -1,7 +1,7 @@
 import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
-import type { AgentSession, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 
 const original = {
   id: 'regenerate-session',

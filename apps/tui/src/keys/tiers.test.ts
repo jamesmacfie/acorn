@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { toast } from '@acorn/client-core/features/notifications/toast.ts'
+import { toast } from '@acorn/client-core/features/notifications'
 import { renderFixture } from '../harness'
 import { focusedRegion } from './regions'
 import {

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/solid-query'
 import { persistQueryClient, persistQueryClientRestore } from '@tanstack/query-persist-client-core'
-import { lockedBy } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { lockedBy } from '@acorn/node-core/server/storage'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { cacheKeyFor, clientFor, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
@@ -17,7 +17,7 @@ import { installPlatform, type Platform } from '../platform'
 //
 // It runs the real thing — a real standalone node against a fresh data root, the real fleet store and
 // device-token files in a fresh config directory, the real broker over pinned TLS — and then asks the
-// first questions the renderer asks: is there a node, can a `/v2` request reach it, and did the event
+// first questions the renderer asks: is there a node, can a `/v1` request reach it, and did the event
 // socket authenticate. It draws nothing, so unlike the rest of this package's suite it needs no FFI
 // and never skips.
 //
@@ -71,12 +71,12 @@ describe('acorn against a node it started', () => {
     expect(local).toHaveLength(1)
     expect(local[0].nodeId).toBe(opened.nodeId)
     expect(opened.fleet.tokenFor(opened.nodeId)).toMatch(/^acorn_dt_/)
-    const mode = statSync(join(root, 'config', `device-token-${LOCAL_TOKEN_SCOPE}`)).mode & 0o777
+    const mode = statSync(join(root, 'config', `acorn-1-device-token-${LOCAL_TOKEN_SCOPE}`)).mode & 0o777
     expect(mode).toBe(0o600)
   })
 
-  it('carries a /v2 request through the broker to the node', async () => {
-    const response = await platform.broker.fetch(opened.nodeId, { requestId: 'boot-test', path: '/v2/node', method: 'GET', headers: {} })
+  it('carries a /v1 request through the broker to the node', async () => {
+    const response = await platform.broker.fetch(opened.nodeId, { requestId: 'boot-test', path: '/v1/node', method: 'GET', headers: {} })
     // 200 means the pinned TLS connection came up and the device token authenticated, which is the
     // whole custody stack end to end.
     expect(response.status).toBe(200)

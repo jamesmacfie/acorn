@@ -1,13 +1,13 @@
 // The client's memory surface (docs/notes-and-memory.md). Was the `window.acorn.memory` preload
 // bridge, now loopback HTTP. Backed by the node's memory index, so it 503s in dev:node.
-import { memoryAddRoute, memoryApproveFindingRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '../shared/api'
+import { memoryAddRoute, memoryApproveFindingRoute, memoryListRoute, memorySearchRoute } from '../shared/api'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   findingsBundlesRoute, findingsCancelPreparationRoute, findingsCandidateDecisionRoute, findingsCandidateEditRoute, findingsCandidateHistoryRoute,
   findingsCandidateRoute, findingsDismissBundleRoute, findingsPrepareRoute, findingsRestoreObservationRoute, findingsRetryPreparationRoute, findingsReviewAttentionRoute, findingsSplitCandidateRoute, type FindingBundle, type FindingCandidateRevision, type FindingReviewAttention, type FindingReviewHistory,
 } from '@acorn/plugin-findings/contract/review.ts'
 import type { FindingObservation, FindingScope } from '@acorn/plugin-findings/contract/records.ts'
-import { findingsMigrationReportRoute, findingsSettingsRoute, type FindingsMigrationReport, type FindingsReviewSettings } from '@acorn/plugin-findings/contract/lifecycle.ts'
+import { findingsSettingsRoute, type FindingsReviewSettings } from '@acorn/plugin-findings/contract/lifecycle.ts'
 import type { MemoryChangePayload } from '../contract/findingsReview'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
@@ -28,34 +28,12 @@ export type MemoryRow = {
   updatedAt: number
 }
 
-export type MemoryProposalRow = {
-  id: string
-  taskId: string
-  projectId: string | null
-  name: string
-  type: MemoryType
-  description: string
-  body: string
-  // Verification flags from the auto-generation verify pass, such as "contradicts the existing '<name>'
-  // - accepting supersedes it". Structural, rendered as badges beside the description and never folded
-  // into it. Defaulted to [] by main for proposals written before the field existed.
-  flags: string[]
-  status: 'pending' | 'accepted' | 'rejected'
-  createdAt: number
-}
-
 export type MemoryApi = {
   list(projectId?: string): Promise<MemoryRow[] | { error: string }>
   search(query: string, projectId?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
   add(p: { taskId: string; scope: 'project' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
-  // `options` is the fleet escape hatch (client-core's node/fanout.ts): the attention inbox asks every
-  // paired node for its pending proposals, so this one read has to be addressable. Everything else here
-  // stays on the ambient active node.
-  proposals(taskId?: string, options?: { nodeId?: string; signal?: AbortSignal }): Promise<MemoryProposalRow[]>
-  resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
   bundles(scope: FindingScope, history?: boolean): Promise<FindingBundle[]>
   reviewAttention(options?: { nodeId?: string; signal?: AbortSignal }): Promise<FindingReviewAttention[]>
-  findingsMigrationReport(): Promise<FindingsMigrationReport>
   reviewSettings(): Promise<FindingsReviewSettings>
   finding(id: string): Promise<FindingCandidateRevision & { observations: FindingObservation[] }>
   prepare(taskId: string, boundaryKey: string): Promise<FindingBundle>
@@ -77,14 +55,11 @@ const api: MemoryApi = {
   list: (projectId) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(projectId)),
   search: (query, projectId, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, projectId, type)),
   add: (p) => post<{ path: string } | { error: string }>(memoryAddRoute(p.taskId), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),
-  proposals: (taskId, options) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId), options ?? {}),
-  resolveProposal: (id, approved, edited) => post<{ ok: boolean; reason?: string }>(memoryResolveProposalRoute(id), { approved, edited }),
   bundles: (scope, history) => readJson<FindingBundle[]>(findingsBundlesRoute(scope, history)),
   reviewAttention: (options) => readJson<FindingReviewAttention[]>(findingsReviewAttentionRoute, options ?? {}),
-  findingsMigrationReport: () => readJson<FindingsMigrationReport>(findingsMigrationReportRoute),
   reviewSettings: () => readJson<FindingsReviewSettings>(findingsSettingsRoute),
   finding: (id) => readJson<FindingCandidateRevision & { observations: FindingObservation[] }>(findingsCandidateRoute(id)),
-  prepare: (taskId, boundaryKey) => post<FindingBundle>(findingsPrepareRoute(taskId), { boundaryKey }),
+  prepare: (taskId, boundaryKey) => post<FindingBundle>(findingsPrepareRoute(taskId), { boundaryKey, targetId: 'memory:change' }),
   editFinding: (id, expectedRevision, payload, idempotencyKey) => post<FindingCandidateRevision>(findingsCandidateEditRoute(id), { expectedRevision, payload, idempotencyKey }),
   decideFinding: (id, input) => post<FindingCandidateRevision>(findingsCandidateDecisionRoute(id), input),
   findingHistory: (id) => readJson<{ items: FindingReviewHistory[] }>(findingsCandidateHistoryRoute(id)),

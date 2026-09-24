@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import type { WorkflowDefRow, WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
+import type { WorkflowDefRow, WorkflowDefSummary } from '../contract/wire.ts'
 import { workflowDefs, workflowDependencies } from '../node/schema'
 import { publicationStore } from './workflowPublicationStore'
 import type { WorkflowDef } from '../shared/workflowContracts'
@@ -47,6 +47,7 @@ const toRow = (row: Row): StoredWorkflowDef => ({
 })
 
 const summariseDef = (id: string, source: WorkflowDefSummary['source'], def: WorkflowDef, extra: Partial<WorkflowDefSummary> = {}): WorkflowDefSummary => ({
+  baseline: def.baseline,
   formatVersion: def.formatVersion,
   id,
   name: def.name,

@@ -739,7 +739,7 @@ export class WorkflowRunner {
       await this.setStep(step.id, { status: 'waiting-children' })
       return
     }
-    if (['done', 'completed-with-failures'].includes(outcome.status) && JSON.parse(run.defJson).formatVersion === 2 && 'structured' in outcome) {
+    if (['done', 'completed-with-failures'].includes(outcome.status) && JSON.parse(run.defJson).formatVersion === 1 && 'structured' in outcome) {
       try {
         const outputSchema = def.schema ?? this.#stepKind(def.kind ?? 'agent')?.describe?.output?.schema
         if (outputSchema) validateDataValue(outcome.structured, outputSchema as import('@acorn/protocol/dataSchemas.ts').DataSchema, WORKFLOW_VALUE_BYTES)

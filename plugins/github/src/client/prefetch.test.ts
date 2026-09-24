@@ -64,8 +64,8 @@ describe('open PR warmup', () => {
 
     await prefetchOpenPulls(queryClient, 'acorn', 'web', signal)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v1/p/github/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       // `objectContaining`, because `apiClient.send()` names every request with an
       // `x-request-id` header now (docs/telemetry.md § The renderer).
@@ -87,7 +87,7 @@ describe('open PR warmup', () => {
 
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, signal)
 
-    expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       // `objectContaining`, because `apiClient.send()` names every request with an
       // `x-request-id` header now (docs/telemetry.md § The renderer).

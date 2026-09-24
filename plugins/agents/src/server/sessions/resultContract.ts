@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord } from '../../contract/wire.ts'
 
 /** Reject a malformed or unsupported contract before durable work is accepted. */
 export function validResultSchema(schema: object): boolean {

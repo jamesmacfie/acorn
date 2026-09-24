@@ -1,4 +1,4 @@
-import type { ArchiveOpts, ArchiveResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/terminal.ts'
+import type { ArchiveOpts, ArchiveResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
@@ -14,11 +14,6 @@ import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('tasks')
 
-// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
-// here as literals because client-core is a shared library and may not import a plugin, which the
-// arch suite enforces. Two duplicated strings beat inventing a capability seam for a GET.
-const terminalSessionActionRoute = (sid: string, action: 'send') => `/v2/p/terminal/sessions/${encodeURIComponent(sid)}/${action}`
-
 export type TaskBridge = {
   project: {
     get(id: string): Promise<ProjectConfigResponse | null>
@@ -27,8 +22,6 @@ export type TaskBridge = {
   }
   // Run a repo's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
-  // Bracketed-paste delivery into an agent PTY: one block, three submit modes.
-  sendToAgent(sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft'): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   task: {
     archive(id: string, opts?: ArchiveOpts): Promise<ArchiveResult>
     // Every plugin's answer about archiving this task, asked once when the dialog opens. Never
@@ -44,7 +37,7 @@ const post = <T>(url: string, body?: unknown) =>
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-// Every route below is ordinary `/v2` against the node, so this is available wherever a node is
+// Every route below is ordinary `/v1` against the node, so this is available wherever a node is
 // and there is nothing to probe for. The folder picker lives on the platform seam as
 // `pickFolder()`, so this is a plain accessor.
 export const taskBridge = (): TaskBridge => {
@@ -55,7 +48,6 @@ export const taskBridge = (): TaskBridge => {
       config: (id, patch) => put<ProjectConfigResponse>(projectConfigRoute(id), { patch }),
     },
     previewUrl: (taskId, script) => post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
-    sendToAgent: (sessionId, text, submit) => post<{ ok: boolean; queued?: boolean; reason?: string }>(terminalSessionActionRoute(sessionId, 'send'), { text, submit }),
     task: {
       archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}),
       archiveConcerns: (id) => readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))

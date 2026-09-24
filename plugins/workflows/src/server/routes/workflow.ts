@@ -18,7 +18,7 @@ export type WorkflowBridge = {
   prepareReprocess?(runId: string, recordId: string): Promise<unknown>
   reprocess?(runId: string, recordId: string, digest: string, requestId: string): Promise<unknown>
   // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names no
-  // task, so the mount over /v2/p/:plugin/tasks/:id never sees it. A workflow step executes an agent
+  // task, so the mount over /v1/p/:plugin/tasks/:id never sees it. A workflow step executes an agent
   // CLI in a worktree, so approving another task's gate or killing its step acts on that task.
   // `null` means no such run, and the guard treats that as "not yours" so run ids cannot be
   // enumerated.
@@ -194,7 +194,7 @@ export const workflow = new Hono<AppEnv>()
     isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.runForSession(c.req.param('sessionId'))))
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Read by the node with no
   // client and no request in sight, through the plugin dispatcher, so it takes no params and answers
-  // node-wide. A task-confined caller uses `/v2/core/runs`, which filters the merged answer.
+  // node-wide. A task-confined caller uses `/v1/core/runs`, which filters the merged answer.
   .get('/runs', (c) => isTaskConfined(c)
     ? respondError(c, 403, 'forbidden')
     : viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()))

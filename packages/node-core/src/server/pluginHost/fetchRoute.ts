@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
-import { resolvePluginFetch } from '../routeRegistry'
+import { resolvePluginFetch } from '../routes/registry'
 import { pluginRequestContext } from './requestContext'
 import type { PluginFetchHandler } from './types'
 
@@ -26,13 +26,13 @@ export async function servePluginFetch(
   return args.fetch(forwarded, pluginRequestContext(c, args.pluginId))
 }
 
-/** The one handler createApp mounts over `/v2/p/:plugin` and `/v2/p/:plugin/*` for every fetch-shaped
+/** The one handler createApp mounts over `/v1/p/:plugin` and `/v1/p/:plugin/*` for every fetch-shaped
  * contribution there will ever be.
  *
  * A handler rather than a mount per contribution, because a reload replaces a plugin's entries in the
  * route registry while the app's mount table stays as it was built at boot: closing over
  * `contribution.fetch` made every request reach the previous instance
- * (routeRegistry.ts § resolvePluginFetch).
+ * (routes/registry.ts § resolvePluginFetch).
  *
  * Falls through with `next()` when no plugin claims the path, which is what makes it invisible: built-in
  * routers and the provider routes are registered earlier and answer first, and an unclaimed path reaches

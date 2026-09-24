@@ -1,4 +1,4 @@
-import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
+import type { Slot } from '@acorn/client-core/kit/tokens'
 import type { Color } from './colour'
 
 // Appearance in a terminal: which colour a slot is, and which of the style axes survive.

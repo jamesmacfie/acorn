@@ -166,10 +166,10 @@ describe('navigate', () => {
 // (docs/plugins.md § Command kinds).
 describe('the answer a verb gives back', () => {
   it('waits for the node before saying an action worked', async () => {
-    const answered = runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+    const answered = runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
       pluginId: 'database', nodeId: 'node-a', item,
     })
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/database/run', expect.objectContaining({
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/database/run', expect.objectContaining({
       method: 'POST', nodeId: 'node-a', body: JSON.stringify({ item: 'conn-1:ENG-42' }),
     }))
     expect(await answered).toEqual({ ok: true })
@@ -178,7 +178,7 @@ describe('the answer a verb gives back', () => {
 
   it('carries the node’s own failure back, and still toasts it where the click was', async () => {
     sendRaw.mockResolvedValueOnce({ ok: false, status: 409, error: { code: 'busy', message: 'a query is already running' } })
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
       pluginId: 'database', nodeId: 'node-a',
     })
     expect(result).toEqual({ ok: false, message: 'action failed: a query is already running' })
@@ -188,14 +188,14 @@ describe('the answer a verb gives back', () => {
 
   it('carries a thrown transport failure back too', async () => {
     sendRaw.mockRejectedValueOnce(new Error('This node is offline, so nothing was sent.'))
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
       pluginId: 'database', nodeId: 'node-a',
     })
     expect(result).toEqual({ ok: false, message: 'action failed: This node is offline, so nothing was sent.' })
   })
 
   it('refuses a path outside the plugin’s namespace without asking the node', async () => {
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/tasks' }, {
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/tasks' }, {
       pluginId: 'database', nodeId: 'node-a',
     })
     expect(sendRaw).not.toHaveBeenCalled()

@@ -8,7 +8,7 @@ import {
   findingCandidates, findingGroupingOutcomes, findingPreparationInputs, findingPreparationJobs, findingReviewActions, findingSuppressions,
 } from '../node/schema'
 import type { FindingReviewTargetContribution, FindingReviewValidation } from '../contract/extensions'
-import { FindingCaptureError } from './capture'
+import { FindingCaptureError, type FindingWriteTransaction } from './capture'
 
 export const reviewScopeKey = (scope: FindingScope): string => scope.kind === 'private' ? 'private'
   : scope.kind === 'task' ? `task:${scope.taskId}` : scope.kind === 'project' ? `project:${scope.projectId}` : `workspace:${scope.workspaceId}`
@@ -28,84 +28,40 @@ export type FindingSynthesisResult = { groups: Array<{ payload: unknown; sourceI
 export class FindingsReviewStore {
   constructor(private readonly db: PluginDatabase, private readonly now: () => number = Date.now, private readonly uuid: () => string = randomUUID) {}
 
-  importLegacy(args: {
-    legacyId: string
-    scope: FindingScope
-    observationId: string
-    targetKind: string
-    targetVersion: number
-    validation: FindingReviewValidation
-    status: 'pending' | 'accepted' | 'rejected'
-    createdAt: number
-  }): { candidateId: string; revision: number; payloadHash: string } {
-    const candidateId = `legacy-${hash(args.legacyId).slice(0, 32)}`
-    const bundleId = `legacy-bundle-${hash(args.legacyId).slice(0, 32)}`
-    const existing = this.candidate(candidateId)
-    const status = args.status === 'pending' ? 'ready' : args.status === 'accepted' ? 'applied' : 'dismissed'
-    const scope = args.scope
+  submitProposal(args: { scope: FindingScope; observationId: string; targetKind: string; targetVersion: number; validation: FindingReviewValidation }, transaction: FindingWriteTransaction): { candidateId: string; bundleId: string; revision: number; payloadHash: string } {
+    const boundaryKey = `proposal:${args.observationId}`
+    const existing = this.db.select().from(findingBundles).where(and(
+      eq(findingBundles.scopeKind, args.scope.kind), eq(findingBundles.boundaryKey, boundaryKey),
+    )).get()
     if (existing) {
-      const exact = existing.revision === 1
-        && existing.payloadHash === args.validation.payloadHash
-        && reviewScopeKey(existing.scope) === reviewScopeKey(scope)
-        && JSON.stringify(existing.warnings) === JSON.stringify(args.validation.warnings)
-        && existing.sourceObservationIds.length === 1
-        && existing.sourceObservationIds[0] === args.observationId
-      if (!exact) throw new FindingCaptureError('conflict', 'legacy proposal changed after its findings import')
-      if (existing.status !== status) {
-        if (existing.status !== 'ready' || status === 'ready') throw new FindingCaptureError('conflict', 'legacy proposal lifecycle changed incompatibly after import')
-        this.db.transaction((tx) => {
-          tx.update(findingCandidates).set({ status, updatedAt: this.now() }).where(eq(findingCandidates.id, candidateId)).run()
-          this.action(tx, candidateId, 1, 'legacy-import', status === 'applied' ? 'applied' : 'dismiss', status === 'applied' ? 'Legacy proposal was accepted while Findings was disabled.' : 'Legacy proposal was rejected while Findings was disabled.', `legacy:${args.legacyId}:${status}`, this.now())
-        })
+      const member = this.db.select().from(findingBundleCandidates).where(eq(findingBundleCandidates.bundleId, existing.id)).get()
+      const candidate = member ? this.candidate(member.candidateId, 1) : null
+      if (!candidate || candidate.targetKind !== args.targetKind || candidate.payloadHash !== args.validation.payloadHash) {
+        throw new FindingCaptureError('conflict', 'proposal source key already belongs to different content')
       }
-      return { candidateId, revision: existing.revision, payloadHash: existing.payloadHash }
+      return { candidateId: candidate.candidateId, bundleId: existing.id, revision: candidate.revision, payloadHash: candidate.payloadHash }
     }
-    this.db.transaction((tx) => {
+    const candidateId = this.uuid(), bundleId = this.uuid(), at = this.now(), scope = args.scope
+    const tx = transaction
       tx.insert(findingCandidates).values({
-        id: candidateId,
-        targetKind: args.targetKind,
-        targetVersion: args.targetVersion,
-        scopeKind: scope.kind,
-        taskId: scope.kind === 'task' ? scope.taskId : null,
+        id: candidateId, targetKind: args.targetKind, targetVersion: args.targetVersion,
+        scopeKind: scope.kind, taskId: scope.kind === 'task' ? scope.taskId : null,
         projectId: scope.kind === 'project' ? scope.projectId : null,
         workspaceId: scope.kind === 'workspace' ? scope.workspaceId : null,
-        currentRevision: 1,
-        status,
-        fingerprint: args.validation.fingerprint,
-        subjectKey: args.validation.subjectKey,
-        groupingExplanation: 'Imported unchanged from the legacy memory proposal queue.',
+        currentRevision: 1, status: 'ready', fingerprint: args.validation.fingerprint,
+        subjectKey: args.validation.subjectKey, groupingExplanation: 'Submitted for review.',
         warningsJson: JSON.stringify(args.validation.warnings),
         baseTargetId: args.validation.base?.targetId ?? null,
         baseHash: args.validation.base?.hash ?? null,
         basePayloadJson: args.validation.base ? JSON.stringify(args.validation.base.payload) : null,
-        snoozedUntil: null,
-        createdAt: args.createdAt,
-        updatedAt: args.createdAt,
+        snoozedUntil: null, createdAt: at, updatedAt: at,
       }).run()
-      tx.insert(findingCandidateRevisions).values({ candidateId, revision: 1, payloadJson: JSON.stringify(args.validation.payload), payloadHash: args.validation.payloadHash, createdAt: args.createdAt }).run()
+      tx.insert(findingCandidateRevisions).values({ candidateId, revision: 1, payloadJson: JSON.stringify(args.validation.payload), payloadHash: args.validation.payloadHash, createdAt: at }).run()
       tx.insert(findingCandidateObservations).values({ candidateId, observationId: args.observationId, ordinal: 0 }).run()
-      tx.insert(findingBundles).values({
-        id: bundleId,
-        scopeKind: scope.kind,
-        taskId: scope.kind === 'task' ? scope.taskId : null,
-        projectId: scope.kind === 'project' ? scope.projectId : null,
-        workspaceId: scope.kind === 'workspace' ? scope.workspaceId : null,
-        boundaryKey: `legacy:${args.legacyId}`,
-        revision: 1,
-        state: 'ready',
-        inputCount: 1,
-        pendingCount: 0,
-        error: null,
-        createdAt: args.createdAt,
-        updatedAt: args.createdAt,
-      }).run()
+      tx.insert(findingBundles).values({ id: bundleId, scopeKind: scope.kind, taskId: scope.kind === 'task' ? scope.taskId : null, projectId: scope.kind === 'project' ? scope.projectId : null, workspaceId: scope.kind === 'workspace' ? scope.workspaceId : null, boundaryKey, revision: 1, state: 'ready', inputCount: 1, pendingCount: 0, error: null, createdAt: at, updatedAt: at }).run()
       tx.insert(findingBundleCandidates).values({ bundleId, candidateId, ordinal: 0 }).run()
-      tx.insert(findingGroupingOutcomes).values({ bundleId, observationId: args.observationId, outcome: 'candidate', candidateId, explanation: 'Imported unchanged from the legacy queue.' }).run()
-      if (status === 'applied' || status === 'dismissed') {
-        this.action(tx, candidateId, 1, 'legacy-import', status === 'applied' ? 'applied' : 'dismiss', status === 'applied' ? 'Legacy proposal was already accepted.' : 'Legacy rejection.', `legacy:${args.legacyId}:${status}`, args.createdAt)
-      }
-    })
-    return { candidateId, revision: 1, payloadHash: args.validation.payloadHash }
+      tx.insert(findingGroupingOutcomes).values({ bundleId, observationId: args.observationId, outcome: 'candidate', candidateId, explanation: 'Submitted for review.' }).run()
+    return { candidateId, bundleId, revision: 1, payloadHash: args.validation.payloadHash }
   }
 
   candidate(candidateId: string, revision?: number): FindingCandidateRevision | null {
@@ -197,6 +153,7 @@ export class FindingsReviewStore {
   async prepare(args: { scope: FindingScope; sourceTaskId?: string; boundaryKey: string; backendId?: string; modelId?: string; targetKind: string; target: FindingReviewTargetContribution; synthesize?: (observations: FindingObservation[]) => Promise<FindingSynthesisResult>; observations: FindingObservation[] }): Promise<FindingBundle> {
     const at = this.now(), scopeKey = reviewScopeKey(args.scope)
     const existingJob = this.db.select().from(findingPreparationJobs).where(and(eq(findingPreparationJobs.scopeKey, scopeKey), eq(findingPreparationJobs.boundaryKey, args.boundaryKey))).get()
+    if (existingJob && existingJob.targetKind !== args.targetKind) throw new FindingCaptureError('conflict', 'preparation target changed after capture')
     if (existingJob?.bundleId && existingJob.state === 'complete') return this.requireBundle(args.scope, existingJob.bundleId)
     const running = this.db.select().from(findingPreparationJobs).where(and(eq(findingPreparationJobs.scopeKey, scopeKey), eq(findingPreparationJobs.state, 'running'))).get()
     if (running?.leaseExpiresAt && running.leaseExpiresAt > at) {
@@ -220,7 +177,7 @@ export class FindingsReviewStore {
     const remaining = frozen.filter((observation) => !processed.has(observation.id))
     const priorOutputCount = existingJob?.outputCount ?? 0
     this.db.transaction((tx) => {
-      tx.insert(findingPreparationJobs).values({ id: jobId, boundaryKey: args.boundaryKey, scopeKey, inputHighWaterMark: Math.max(0, ...frozen.map((observation) => observation.createdAt)), state: 'running', leaseOwner: `${process.pid}`, leaseExpiresAt: at + 60_000, attempt: (existingJob?.attempt ?? 0) + 1, sourceTaskId, backendId, modelId, usageJson: existingJob?.usageJson ?? null, inputCount: frozen.length, outputCount: priorOutputCount, error: null, bundleId, createdAt: existingJob?.createdAt ?? at, updatedAt: at }).onConflictDoUpdate({ target: findingPreparationJobs.id, set: { state: 'running', leaseOwner: `${process.pid}`, leaseExpiresAt: at + 60_000, attempt: (existingJob?.attempt ?? 0) + 1, sourceTaskId, backendId, modelId, error: null, updatedAt: at } }).run()
+      tx.insert(findingPreparationJobs).values({ id: jobId, boundaryKey: args.boundaryKey, scopeKey, inputHighWaterMark: Math.max(0, ...frozen.map((observation) => observation.createdAt)), state: 'running', leaseOwner: `${process.pid}`, leaseExpiresAt: at + 60_000, attempt: (existingJob?.attempt ?? 0) + 1, sourceTaskId, targetKind: args.targetKind, backendId, modelId, usageJson: existingJob?.usageJson ?? null, inputCount: frozen.length, outputCount: priorOutputCount, error: null, bundleId, createdAt: existingJob?.createdAt ?? at, updatedAt: at }).onConflictDoUpdate({ target: findingPreparationJobs.id, set: { state: 'running', leaseOwner: `${process.pid}`, leaseExpiresAt: at + 60_000, attempt: (existingJob?.attempt ?? 0) + 1, sourceTaskId, backendId, modelId, error: null, updatedAt: at } }).run()
       tx.insert(findingBundles).values({ id: bundleId, scopeKind: args.scope.kind, taskId: args.scope.kind === 'task' ? args.scope.taskId : null, projectId: args.scope.kind === 'project' ? args.scope.projectId : null, workspaceId: args.scope.kind === 'workspace' ? args.scope.workspaceId : null, boundaryKey: args.boundaryKey, revision: 1, state: 'preparing', inputCount: frozen.length, pendingCount: remaining.length, error: null, createdAt: at, updatedAt: at }).onConflictDoUpdate({ target: findingBundles.id, set: { state: 'preparing', pendingCount: remaining.length, error: null, updatedAt: at } }).run()
       if (!inputRows.length) frozen.forEach((observation, ordinal) => tx.insert(findingPreparationInputs).values({ jobId, observationId: observation.id, ordinal }).run())
     })
@@ -261,18 +218,18 @@ export class FindingsReviewStore {
     return this.requireBundle(args.scope, bundleId)
   }
 
-  preparationSource(bundleId: string): { taskId: string; boundaryKey: string; backendId: string | null; modelId: string | null } {
+  preparationSource(bundleId: string): { taskId: string; boundaryKey: string; targetKind: string; backendId: string | null; modelId: string | null } {
     const job = this.db.select().from(findingPreparationJobs).where(eq(findingPreparationJobs.bundleId, bundleId)).get()
     if (!job) throw new FindingCaptureError('not-found', 'preparation job not found')
     if (!job.sourceTaskId) throw new FindingCaptureError('unavailable', 'preparation source task is unavailable')
-    return { taskId: job.sourceTaskId, boundaryKey: job.boundaryKey, backendId: job.backendId, modelId: job.modelId }
+    return { taskId: job.sourceTaskId, boundaryKey: job.boundaryKey, targetKind: job.targetKind, backendId: job.backendId, modelId: job.modelId }
   }
 
-  preparationSourceForBoundary(scope: FindingScope, boundaryKey: string): { taskId: string; boundaryKey: string; backendId: string | null; modelId: string | null } | null {
+  preparationSourceForBoundary(scope: FindingScope, boundaryKey: string): { taskId: string; boundaryKey: string; targetKind: string; backendId: string | null; modelId: string | null } | null {
     const job = this.db.select().from(findingPreparationJobs).where(and(eq(findingPreparationJobs.scopeKey, reviewScopeKey(scope)), eq(findingPreparationJobs.boundaryKey, boundaryKey))).get()
     if (!job) return null
     if (!job.sourceTaskId) throw new FindingCaptureError('unavailable', 'preparation source task is unavailable')
-    return { taskId: job.sourceTaskId, boundaryKey: job.boundaryKey, backendId: job.backendId, modelId: job.modelId }
+    return { taskId: job.sourceTaskId, boundaryKey: job.boundaryKey, targetKind: job.targetKind, backendId: job.backendId, modelId: job.modelId }
   }
 
   preparationInputIdsForBoundary(scope: FindingScope, boundaryKey: string): string[] | null {

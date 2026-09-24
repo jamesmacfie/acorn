@@ -4,14 +4,15 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
-import { pluginInstallRoot } from '@acorn/node-core/server/plugins/installer.ts'
+import { pluginInstallRoot } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { agentDriverRegistry } from '@acorn/plugin-agents/testkit'
 import { assembleNodeGraph } from '../../src/composition/composition'
+import type { NodePluginDeps } from '../../src/composition/plugins'
 
 // The acceptance test for harness contributions (docs/managed-agents.md § Harnesses). The opencode
 // plugin from docs/plugin-authoring.md § Harnesses goes on disk, through the real composition root,
@@ -22,8 +23,8 @@ import { assembleNodeGraph } from '../../src/composition/composition'
 const OPENCODE = {
   id: 'opencode',
   name: 'OpenCode',
-  version: '0.1.0',
-  apiVersion: PLUGIN_API_MAJOR,
+  version: '1.0.0',
+  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
   icon: { d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z' },
   contributions: {
     harnesses: [
@@ -39,22 +40,18 @@ const OPENCODE = {
   },
 }
 
-const deps = () => ({
-  agents: { internalEnv: () => ({}), memoryReviewTrigger: async () => undefined },
+const deps = (): NodePluginDeps => ({
+  agents: { internalEnv: () => ({}), reconciled: Promise.resolve() },
   notes: { internalEnv: () => ({}) },
   terminal: {
     internalEnv: () => ({}),
-    launchInjector: async () => undefined,
-    memoryReviewTrigger: async () => undefined,
     reconciled: Promise.resolve(),
   },
   workflows: {
     internalEnv: () => ({}),
     reconciled: Promise.resolve(),
-    memoryReviewTrigger: async () => undefined,
-    failingChecks: async () => null,
   },
-}) as never
+})
 
 describe('a data-only harness plugin', () => {
   let dataRoot = ''

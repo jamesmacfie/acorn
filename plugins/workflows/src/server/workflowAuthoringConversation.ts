@@ -26,7 +26,7 @@ const sameScope = (turn: AuthoringTurnRequest, scope: DataSourceQuery['scope']) 
 
 function systemPrompt(catalog: WorkflowCatalog): string {
   const instructions = [
-    'The candidate must be one formatVersion 2 WorkflowDef and keep stable step ids.',
+    'The candidate must be one WorkflowDef with baseline acorn-1, formatVersion 1, and stable step ids.',
     'Use metadata to discover sources, fields, dynamic option ids, and compatible child workflows.',
     'Changing a child target is allowed only when the proposal summary calls it out for review.',
     renderStepKinds(catalog, 18_000),

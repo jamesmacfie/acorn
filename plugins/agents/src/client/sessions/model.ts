@@ -4,7 +4,7 @@
 // The roster that merged PTY sessions with workflow steps went with the sidebar section that drew it
 // (docs/workflows.md § What workflows refuses): a run's steps are the run pane's, and a PTY session
 // is the terminal drawer's.
-import type { AgentState } from '@acorn/protocol/terminal.ts'
+import type { AgentState } from '@acorn/protocol/sessionActivity.ts'
 
 export type StreamEvent = Record<string, unknown> & { type?: string }
 

@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentTurn } from '../../contract/wire.ts'
 
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({

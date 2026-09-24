@@ -23,7 +23,7 @@ const content: DashboardPanelContent = {
 }
 
 const blob = (dashboardId: string) => ({
-  version: 2,
+  version: 1,
   panels: { p1: { id: 'p1', title: content.title, sources: [], shaping: {}, view: content.display.view, publication: { dashboardId } } },
   placements: { home: ['p1'] }, layouts: {},
 })
@@ -46,7 +46,7 @@ describe('dashboard measure sampler', () => {
     const prefs = blob('dashboard-1')
     expect(panelsToSample(prefs).map(panel => panel.id)).toEqual(['p1'])
     expect([...definedPanelIds(prefs)]).toEqual(['p1'])
-    expect(panelsToSample({ ...prefs, version: 1 })).toEqual([])
+    expect(panelsToSample({ ...prefs, version: 2 })).toEqual([])
   })
 
   it('resolves the immutable dashboard and shared Node source with no client attached', async () => {

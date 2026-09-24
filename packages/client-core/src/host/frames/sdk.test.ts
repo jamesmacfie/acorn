@@ -183,8 +183,8 @@ describe('api calls', () => {
   it('correlates the reply to the request', async () => {
     host((message) => (message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: { tasks: [] } } : undefined))
     const acorn = await handshake()
-    await expect(acorn.api.get('/v2/core/tasks')).resolves.toEqual({ tasks: [] })
-    expect(sent.at(-1)).toMatchObject({ kind: 'api', method: 'GET', path: '/v2/core/tasks' })
+    await expect(acorn.api.get('/v1/core/tasks')).resolves.toEqual({ tasks: [] })
+    expect(sent.at(-1)).toMatchObject({ kind: 'api', method: 'GET', path: '/v1/core/tasks' })
   })
 
   it('answers two overlapping calls in the right order', async () => {
@@ -209,7 +209,7 @@ describe('api calls', () => {
         : undefined,
     )
     const acorn = await handshake()
-    const error = await acorn.api.get('/v2/core/tasks').catch((e: unknown) => e)
+    const error = await acorn.api.get('/v1/core/tasks').catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AcornBridgeError)
     expect(error).toMatchObject({ code: 'plugin_scope_denied', retryable: false, message: 'missing scope core.tasks:read' })
   })
@@ -217,9 +217,9 @@ describe('api calls', () => {
   it('sends a body only when there is one', async () => {
     host((message) => (message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: null } : undefined))
     const acorn = await handshake()
-    await acorn.api.post('/v2/p/board/cards')
+    await acorn.api.post('/v1/p/board/cards')
     expect(sent.at(-1)).not.toHaveProperty('body')
-    await acorn.api.post('/v2/p/board/cards', { title: 'x' })
+    await acorn.api.post('/v1/p/board/cards', { title: 'x' })
     expect(sent.at(-1)).toMatchObject({ body: { title: 'x' } })
   })
 
@@ -227,7 +227,7 @@ describe('api calls', () => {
     host(() => undefined) // never answers
     const acorn = await handshake()
     const controller = new AbortController()
-    const call = acorn.api.get('/v2/core/tasks', { signal: controller.signal })
+    const call = acorn.api.get('/v1/core/tasks', { signal: controller.signal })
     controller.abort()
     await expect(call).rejects.toBeDefined()
     await new Promise((r) => setTimeout(r, 5))
@@ -587,11 +587,10 @@ describe('telemetry and log', () => {
     const pending = acorn.telemetry.measure('fetch', () => new Promise<string>((resolve) => (release = () => resolve('done'))))
     // Nothing is sent while the promise is open: a span that reported before its work finished
     // would be timing the call rather than the work.
-    await new Promise((r) => setTimeout(r, 0))
-    expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(1)
+    await vi.waitFor(() => expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(1))
     release()
     expect(await pending).toBe('done')
-    await new Promise((r) => setTimeout(r, 0))
+    await vi.waitFor(() => expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(2))
 
     const spans = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record as { type: string; name: string; status: string })
     expect(spans.map((span) => [span.type, span.name, span.status])).toEqual([['span', 'add', 'ok'], ['span', 'fetch', 'ok']])
@@ -627,7 +626,7 @@ describe('telemetry and log', () => {
       const acorn = await handshake()
       acorn.log.warn('upstream is slow', { retryAfter: 30 })
       expect(warn).toHaveBeenCalledWith('upstream is slow retryAfter=30')
-      await new Promise((r) => setTimeout(r, 0))
+      await vi.waitFor(() => expect(sent.some((message) => message.kind === 'telemetry')).toBe(true))
       expect(sent.find((message) => message.kind === 'telemetry')?.record).toEqual({
         type: 'log', level: 'warn', message: 'upstream is slow', attrs: { retryAfter: 30 },
       })

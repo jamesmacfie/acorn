@@ -5,7 +5,7 @@ import {
   AGENT_SESSION_HEADER_POINT,
   type AgentSessionHeaderProps,
 } from '@acorn/protocol/extensionPoints.ts'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, IconButton, Inline, Input, Menu, Modal,
   Picker, Stack, Text, Toolbar,

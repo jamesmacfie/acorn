@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { requireProviderAccess } from '../middleware/requireUser'
 import { integrationProviderRegistry } from './registry'
-import { PLUGIN_NAMESPACE } from '../routeRegistry'
+import { PLUGIN_NAMESPACE } from '../routes/registry'
 import { servePluginFetch } from '../pluginHost/fetchRoute'
 
 // One core projection for every provider-owned HTTP router, mounted at PLUGIN_NAMESPACE under each

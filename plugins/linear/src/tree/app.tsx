@@ -145,7 +145,7 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
         return setPage({ kind: 'empty', message: 'Pick an issue from the list.' })
       }
       try {
-        const tasks = await props.bridge.api.get<Task[]>('/v2/core/tasks')
+        const tasks = await props.bridge.api.get<Task[]>('/v1/core/tasks')
         const targets = taskLinearTargets(tasks.find((task) => task.id === props.taskId))
         setLinked(targets)
         const first = targets[0]

@@ -1,4 +1,4 @@
-// GitHub's wire contract: the mirrored PR/repo/check types, the /v2/p/github route builders, and the
+// GitHub's wire contract: the mirrored PR/repo/check types, the /v1/p/github route builders, and the
 // TanStack query keys that address them.
 //
 // In shared/ because both halves of this plugin read it and no other package does; contract/ is
@@ -114,19 +114,19 @@ export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareComm
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
-export const repoRoute = (owner: string, repo: string, child = '') => `/v2/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
+export const repoRoute = (owner: string, repo: string, child = '') => `/v1/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
 
-export const reposRoute = '/v2/p/github/repos'
-export const reposRefreshRoute = '/v2/p/github/repos/refresh'
-export const githubImportRoute = '/v2/p/github/import'
+export const reposRoute = '/v1/p/github/repos'
+export const reposRefreshRoute = '/v1/p/github/repos/refresh'
+export const githubImportRoute = '/v1/p/github/import'
 
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
-export const taskPullsRoute = (taskId: string) => `/v2/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
+export const taskPullsRoute = (taskId: string) => `/v1/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
 export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
 export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
 export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
@@ -148,7 +148,7 @@ export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoR
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/v2/p/github/pins'
+export const pinsRoute = '/v1/p/github/pins'
 
 export const reposKey = ['repos'] as const
 export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const

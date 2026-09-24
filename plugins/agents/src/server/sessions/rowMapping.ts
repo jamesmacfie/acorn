@@ -8,7 +8,7 @@ import type {
   AgentSubagent,
   AgentTurn,
   AgentUsage,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 const parseJson = <T>(value: string | null, fallback: T): T => {
   if (value == null) return fallback

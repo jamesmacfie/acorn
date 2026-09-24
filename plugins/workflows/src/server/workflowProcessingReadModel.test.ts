@@ -54,8 +54,8 @@ describe('workflow processing history read model', () => {
       { id: 'running-attempt', stateId: 'running-state', selectionId: 'selection', dispatchId: 'running-dispatch', previousAttemptId: null, createdAt: 2 },
     ]).run()
     database.db.insert(schema.workflowRuns).values([
-      { id: 'settled-run', taskId: 'settled-task', name: 'Settled', status: 'failed', error: 'failed earlier', defJson: JSON.stringify({ name: 'Settled', steps: [] }), createdAt: 1, updatedAt: 1 },
-      { id: 'running-run', taskId: 'running-task', name: 'Running', status: 'running', error: null, defJson: JSON.stringify({ name: 'Running', steps: [] }), createdAt: 2, updatedAt: 2 },
+      { id: 'settled-run', taskId: 'settled-task', rootRunId: 'root', name: 'Settled', status: 'failed', error: 'failed earlier', defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Settled', steps: [] }), createdAt: 1, updatedAt: 1 },
+      { id: 'running-run', taskId: 'running-task', rootRunId: 'root', name: 'Running', status: 'running', error: null, defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Running', steps: [] }), createdAt: 2, updatedAt: 2 },
     ]).run()
 
     const page = workflowSelectionPage(database.db, 'root')
@@ -78,8 +78,8 @@ describe('workflow processing history read model', () => {
       state: 'terminal', error: null, createdAt: 1, updatedAt: 1 }).run()
     database.db.insert(schema.workflowRecordAttempts).values({ id: 'attempt', stateId: 'state', selectionId: 'selection',
       dispatchId: 'dispatch', previousAttemptId: null, createdAt: 1 }).run()
-    database.db.insert(schema.workflowRuns).values({ id: 'child-run', taskId: 'child-task', name: 'Review', status: 'failed',
-      error: large, defJson: JSON.stringify({ name: 'Review', outputs: [{ name: 'summary', schema: { type: 'string' },
+    database.db.insert(schema.workflowRuns).values({ id: 'child-run', taskId: 'child-task', rootRunId: 'root', name: 'Review', status: 'failed',
+      error: large, defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', outputs: [{ name: 'summary', schema: { type: 'string' },
         binding: { address: { from: 'step', stepId: 'answer', pointer: '' } } }], steps: [{ id: 'answer', name: 'Answer' }] }),
       createdAt: 1, updatedAt: 1 }).run()
     database.db.insert(schema.workflowSteps).values({ id: 'answer-row', runId: 'child-run', idx: 0, name: 'Answer',

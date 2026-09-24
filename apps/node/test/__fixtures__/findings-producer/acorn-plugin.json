@@ -2,9 +2,19 @@
   "id": "architecture-review",
   "name": "Architecture review producer",
   "version": "1.0.0",
-  "apiVersion": "13",
+  "apiVersion": "1",
   "node": "./node.js",
-  "requires": { "plugins": [{ "id": "findings", "version": "0" }] },
-  "permissions": { "node": {} },
-  "contributions": {}
+  "requires": {
+    "plugins": [
+      {
+        "id": "findings",
+        "version": "1"
+      }
+    ]
+  },
+  "permissions": {
+    "node": {}
+  },
+  "contributions": {},
+  "baseline": "acorn-1"
 }

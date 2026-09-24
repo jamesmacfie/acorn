@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from './activeNode'
-import { encodeIdFrame } from '@acorn/protocol/ws.ts'
 import { registerWsChannel } from './wsChannels'
 
 // The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the
@@ -72,67 +71,6 @@ afterEach(() => {
 const framesSent = () => bridge.sent.map((s) => s.frame)
 
 describe('wsClient', () => {
-  it('attaches on the first local subscriber and dispatches output to it', () => {
-    const output: unknown[] = []
-    const off = client.wsAttach('s1', (m) => output.push(m))
-    expect(framesSent()).toContainEqual({ channel: 'term:attach', id: 's1' })
-
-    bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'ring' } })
-    expect(output).toEqual([{ type: 'output', data: 'ring' }])
-    off()
-  })
-
-  // Phase 6 of the performance programme: output arrives as bytes and reaches the same subscriber
-  // (docs/performance.md § 2026-09-03 — phase 6).
-  it('routes a binary frame to the session it names, decoded', () => {
-    const session = '11111111-2222-3333-4444-555555555555'
-    const output: unknown[] = []
-    const off = client.wsAttach(session, (m) => output.push(m))
-
-    bridge.emitBytes(encodeIdFrame(session, new TextEncoder().encode('ünïcøde 🌰\r\n'))!)
-    // …and one for a session nothing is subscribed to, which is dropped rather than thrown.
-    bridge.emitBytes(encodeIdFrame('99999999-8888-7777-6666-555555555555', new TextEncoder().encode('elsewhere'))!)
-    // …and a frame too short to hold an id at all.
-    bridge.emitBytes(new Uint8Array([1, 2, 3]))
-
-    expect(output).toEqual([{ type: 'output', data: 'ünïcøde 🌰\r\n' }])
-    off()
-  })
-
-  it('drops a binary frame from a node this client is not looking at', () => {
-    const session = '11111111-2222-3333-4444-555555555555'
-    const output: unknown[] = []
-    const off = client.wsAttach(session, (m) => output.push(m))
-
-    bridge.emitBytes(encodeIdFrame(session, new TextEncoder().encode('from n2'))!, 'n2')
-
-    expect(output).toEqual([])
-    off()
-  })
-
-  // The contract the node depends on: one attach per session per connection, one detach at the end.
-  it('attaches once for many subscribers and detaches on the last unsubscribe', () => {
-    const offA = client.wsAttach('s1', () => {})
-    const offB = client.wsAttach('s1', () => {})
-    expect(framesSent().filter((f) => (f as { channel: string }).channel === 'term:attach')).toHaveLength(1)
-
-    offA()
-    expect(framesSent()).not.toContainEqual({ channel: 'term:detach', id: 's1' })
-    offB()
-    expect(framesSent()).toContainEqual({ channel: 'term:detach', id: 's1' })
-  })
-
-  it('sends every frame to the active node', () => {
-    client.wsWrite('s1', 'echo ok\n')
-    expect(bridge.sent.at(-1)).toEqual({ nodeId: 'n1', frame: { channel: 'term:input', id: 's1', data: 'echo ok\n' } })
-  })
-
-  it('drops frames when no node is active rather than throwing', () => {
-    setActiveNode(null)
-    expect(() => client.wsWrite('s1', 'x')).not.toThrow()
-    expect(bridge.sent).toHaveLength(0)
-  })
-
   it('fans status, notice, step and agent frames to their subscribers', () => {
     const statuses: number[] = []
     const notices: string[] = []
@@ -159,16 +97,12 @@ describe('wsClient', () => {
     expect(named).toEqual(['board', undefined, undefined])
   })
 
-  it('routes the two events the status ping was split into', () => {
-    const sessions: number[] = []
+  it('routes core worktree invalidation', () => {
     const worktrees: (string | null)[] = []
-    client.wsOnNodeEvent('terminal:sessions-changed', () => sessions.push(1))
     client.wsOnNodeEvent('worktree:status-changed', (event) => worktrees.push(event.taskId))
 
-    bridge.emitFrame({ channel: 'terminal:sessions-changed' })
     bridge.emitFrame({ channel: 'worktree:status-changed', taskId: 't1' })
 
-    expect(sessions).toEqual([1])
     expect(worktrees).toEqual(['t1'])
   })
 
@@ -214,112 +148,41 @@ describe('wsClient', () => {
     expect(statuses).toEqual([])
   })
 
-  // The first online transition is a connect, not a reconnect: re-attaching there would duplicate
-  // the attach the subscriber already sent, and refetching would fire on every cold start.
-  it('does not treat the first online transition as a reconnect', () => {
-    const reconnects: number[] = []
-    client.wsOnReconnect(() => reconnects.push(1))
-    client.wsAttach('s1', () => {})
-    const before = framesSent().length
-
-    bridge.emitStatus('online')
-    expect(reconnects).toEqual([])
-    expect(framesSent()).toHaveLength(before)
+  it('sends frames only to the active node', () => {
+    client.wsSend({ channel: 'probe:input', id: 's1' })
+    expect(bridge.sent.at(-1)).toEqual({ nodeId: 'n1', frame: { channel: 'probe:input', id: 's1' } })
+    setActiveNode(null)
+    client.wsSend({ channel: 'probe:input', id: 's1' })
+    expect(bridge.sent).toHaveLength(1)
   })
 
-  it('re-attaches live subscriptions and announces a refetch on a genuine reconnect', () => {
-    const reconnects: number[] = []
-    client.wsOnReconnect(() => reconnects.push(1))
-    client.wsAttach('s1', () => {})
-    bridge.emitStatus('online') // first connect
-    bridge.sent.length = 0
+  it('routes JSON and binary envelopes only from the active node', () => {
+    const frames: unknown[] = []
+    const bytes: Uint8Array[] = []
+    const channel = registerWsChannel('probe', (frame) => frames.push(frame))
+    const binary = client.registerWsBinaryHandler((frame) => bytes.push(frame))
+    client.wsConnect()
+    bridge.emitFrame({ channel: 'probe:thing' }, 'n2')
+    bridge.emitFrame({ channel: 'probe:thing' })
+    bridge.emitBytes(new Uint8Array([1]), 'n2')
+    bridge.emitBytes(new Uint8Array([2]))
+    expect(frames).toEqual([{ channel: 'probe:thing' }])
+    expect(bytes).toEqual([new Uint8Array([2])])
+    binary.dispose()
+    channel.dispose()
+  })
 
+  it('replays each channel owner only on a genuine reconnect of the active node', () => {
+    const reconnects: number[] = []
+    const owner = registerWsChannel('probe', () => {}, () => [{ channel: 'probe:attach', id: 's1' }])
+    client.wsOnReconnect(() => reconnects.push(1))
+    bridge.emitStatus('online')
+    bridge.emitStatus('online', 'n2')
+    expect(framesSent()).toEqual([])
     bridge.emitStatus('offline')
     bridge.emitStatus('online')
-
-    expect(framesSent()).toContainEqual({ channel: 'term:attach', id: 's1' })
+    expect(framesSent()).toEqual([{ channel: 'probe:attach', id: 's1' }])
     expect(reconnects).toEqual([1])
-  })
-
-  it('does not re-attach on a non-online transition', () => {
-    client.wsAttach('s1', () => {})
-    bridge.emitStatus('online')
-    bridge.sent.length = 0
-    for (const state of ['degraded', 'offline', 'revoked', 'incompatible'] as const) bridge.emitStatus(state)
-    expect(bridge.sent).toHaveLength(0)
-  })
-
-
-  // Main holds a socket to every paired node and pushes every frame here, while the subscription
-  // maps below are keyed on session/container/exec ids alone. Two nodes may coincidentally hold
-  // the same UUID (docs/architecture-overview.md § Client state and fleet behavior), and that must
-  // never collide in the client.
-  describe('frames from a node that is not the active one', () => {
-    it('does not reach a terminal subscriber, even for the same session id', () => {
-      const output: unknown[] = []
-      client.wsAttach('s1', (m) => output.push(m))
-      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'from-b' } }, 'n2')
-      expect(output).toEqual([])
-      // …and the identical frame from the active node does, so the filter is the reason and not the shape.
-      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'from-a' } })
-      expect(output).toEqual([{ type: 'output', data: 'from-a' }])
-    })
-
-    // Asserted through a channel this test registers rather than a real plugin's: the filter is core's,
-    // and naming a plugin here would make a core test depend on a feature that may not be installed.
-    it('does not reach a registered channel owner', () => {
-      const frames: unknown[] = []
-      const registration = registerWsChannel('probe', (frame) => frames.push(frame))
-      // Registering a channel does not open the socket; the subscribe helpers do. Say so explicitly.
-      client.wsConnect()
-      try {
-        bridge.emitFrame({ channel: 'probe:thing', id: 'a1' }, 'n2')
-        expect(frames).toEqual([])
-        bridge.emitFrame({ channel: 'probe:thing', id: 'a1' })
-        expect(frames).toEqual([{ channel: 'probe:thing', id: 'a1' }])
-      } finally {
-        registration.dispose()
-      }
-    })
-
-    it('follows the active node when it changes', () => {
-      const output: unknown[] = []
-      client.wsAttach('s1', (m) => output.push(m))
-      setActiveNode('n2')
-      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'now-b' } }, 'n2')
-      expect(output).toEqual([{ type: 'output', data: 'now-b' }])
-    })
-  })
-
-  describe('reconnect bookkeeping is per node', () => {
-    it('treats a second node\'s FIRST connect as a first connect, not a reconnect', () => {
-      // A single `everOnline` boolean was set by whichever node connected first, so node B's very first
-      // online status re-attached every one of node A's PTY subscriptions and told the shell to refetch.
-      const reconnects: number[] = []
-      client.wsOnReconnect(() => reconnects.push(1))
-      client.wsAttach('s1', () => {})
-      bridge.emitStatus('online') // n1's first connect
-      bridge.sent.length = 0
-      bridge.emitStatus('online', 'n2') // n2's first connect
-      expect(reconnects).toEqual([])
-      expect(bridge.sent).toHaveLength(0)
-    })
-
-    it('ignores a reconnect of a node that is not active', () => {
-      const reconnects: number[] = []
-      client.wsOnReconnect(() => reconnects.push(1))
-      client.wsAttach('s1', () => {})
-      bridge.emitStatus('online', 'n2')
-      bridge.emitStatus('offline', 'n2')
-      bridge.sent.length = 0
-      bridge.emitStatus('online', 'n2') // n2's genuine reconnect — nothing to do with n1's queries
-      expect(reconnects).toEqual([])
-      expect(bridge.sent).toHaveLength(0)
-      // The active node's own reconnect still works, so the guard is not simply switched off.
-      bridge.emitStatus('online')
-      bridge.emitStatus('online')
-      expect(reconnects).toEqual([1])
-      expect(framesSent()).toContainEqual({ channel: 'term:attach', id: 's1' })
-    })
+    owner.dispose()
   })
 })

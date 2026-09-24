@@ -1,5 +1,5 @@
 import type { Integration } from '@acorn/protocol/api.ts'
-import { connectionProviderRegistry, type ConnectionProviderRegistry } from './connectionRegistry'
+import { connectionProviderRegistry, type ConnectionProviderRegistry } from './connectionProviders/registry'
 
 export type CapabilityConnection = {
   provider: string

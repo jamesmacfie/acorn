@@ -31,7 +31,7 @@ run holds a database handle.
 | --- | --- | --- |
 | **core** | `scheduler.register(...)` in `server/schedules/index.ts` | `core:<id>` |
 | **plugin** | `schedules` in its manifest, or `ctx.schedules.register(...)` node-side | `<pluginId>:<scheduleId>` |
-| **user** | `POST /v2/core/schedules`, against a registered target kind | `user:<uuid>` |
+| **user** | `POST /v1/core/schedules`, against a registered target kind | `user:<uuid>` |
 
 Declared schedules are _registry-truth_: the code is the definition, and the database stores only the
 owner's overrides and the run state. Disabling a plugin removes its schedules the way it removes its
@@ -70,7 +70,7 @@ Two feeders, one registry, indistinguishable downstream: the standard contributi
 
 A loaded plugin declares it in its manifest, because a manifest is also what the owner is shown at
 install (`docs/plugins.md § Descriptors`). It carries an id, a name, a `run` route confined to the
-plugin's own `/v2/p/<id>/` namespace, a cadence, and an optional timeout in seconds. The node POSTs
+plugin's own `/v1/p/<id>/` namespace, a cadence, and an optional timeout in seconds. The node POSTs
 `{ scheduleId }` to that route on the cadence, in process, as its own `'service'` principal, in the
 same request context an HTTP-served route gets and built from the same function. It ignores the
 answer beyond ok or error. A non-2xx is a failed run, which means backoff and a visible error, not a
@@ -289,15 +289,15 @@ unattended, so declaring one is node administration and a task-scoped agent must
 
 | Route | What |
 | --- | --- |
-| `GET /v2/core/schedules` | the merged view plus the global pause flag |
-| `PATCH /v2/core/schedules` | the global pause switch |
-| `GET /v2/core/schedules/targets` | what this node can run, for the creation picker |
-| `POST /v2/core/schedules` | create a user schedule |
-| `POST /v2/core/schedules/:key/confirm` | re-take consent after a target's tier rose |
-| `PATCH /v2/core/schedules/:key` | pause/resume, retune cadence (clamped), rename (user rows only) |
-| `DELETE /v2/core/schedules/:key` | user rows only — declared schedules are paused, not deleted |
-| `POST /v2/core/schedules/:key/run` | run now (subject to serialization and the cap, not to backoff); `Idempotency-Key` identifies a manual workflow occurrence |
-| `GET /v2/core/schedules/:key/runs` | the ring, newest first |
+| `GET /v1/core/schedules` | the merged view plus the global pause flag |
+| `PATCH /v1/core/schedules` | the global pause switch |
+| `GET /v1/core/schedules/targets` | what this node can run, for the creation picker |
+| `POST /v1/core/schedules` | create a user schedule |
+| `POST /v1/core/schedules/:key/confirm` | re-take consent after a target's tier rose |
+| `PATCH /v1/core/schedules/:key` | pause/resume, retune cadence (clamped), rename (user rows only) |
+| `DELETE /v1/core/schedules/:key` | user rows only — declared schedules are paused, not deleted |
+| `POST /v1/core/schedules/:key/run` | run now (subject to serialization and the cap, not to backoff); `Idempotency-Key` identifies a manual workflow occurrence |
+| `GET /v1/core/schedules/:key/runs` | the ring, newest first |
 
 Creating is the one non-tolerant edge: a create names a target that must resolve **now**, and the risk
 tier is read off that target and stamped onto the row. That stamp is the consent record — consent is

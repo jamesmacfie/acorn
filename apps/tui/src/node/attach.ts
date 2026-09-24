@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { lockedBy } from '@acorn/node-core/server/storage/dataRoot.ts'
-import { certificateFingerprint } from '@acorn/node-core/server/transport/tls.ts'
+import { lockedBy } from '@acorn/node-core/server/storage'
+import { certificateFingerprint } from '@acorn/node-core/server/transport'
 import { nodeIdentitySchema } from '@acorn/protocol/node.ts'
 
 // Reading a running node off its data root, without opening it.

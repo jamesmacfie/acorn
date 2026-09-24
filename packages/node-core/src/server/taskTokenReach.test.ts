@@ -30,7 +30,7 @@ const env = () => ({
   INTERNAL_TOKEN: KEY,
   // A paired device, so the renderer's half of each case below travels the real bearer path rather than
   // a seeded principal. Seeding one outside createApp() does not work: the app's own authMiddleware
-  // runs over /v2/* and resolves the principal again, so a seeded value is replaced by null and every
+  // runs over /v1/* and resolves the principal again, so a seeded value is replaced by null and every
   // "the renderer is unaffected" assertion passes on a 401 it never meant to allow.
   DEVICES: { authenticate: async () => ({ deviceId: 'device-1' }) },
   ACTIVE_IDENTITY: { get: () => 'james', set: vi.fn(), clear: vi.fn() },
@@ -77,18 +77,18 @@ describe("what a task-scoped agent token can reach", () => {
   it.each([
     // The self-unlock. `agentTools.perms` is a preference key, so this write was the agent turning its
     // own execute tier back on.
-    ['PUT', '/v2/core/prefs'],
+    ['PUT', '/v1/core/prefs'],
     // Project writes. Each of these lands `setup_script`, `dev_script`, `teardown_script`,
     // `db_url_script` or `run_targets` — commands this node runs on the next task — and none of them is
     // task-addressed, so the write went against any project id, not the token's own.
-    ['POST', '/v2/core/projects'],
-    ['PATCH', '/v2/core/projects/other-project'],
-    ['PUT', '/v2/core/projects/other-project/config'],
-    ['PUT', '/v2/core/projects/other-project/run-targets'],
-    ['DELETE', '/v2/core/projects/other-project'],
+    ['POST', '/v1/core/projects'],
+    ['PATCH', '/v1/core/projects/other-project'],
+    ['PUT', '/v1/core/projects/other-project/config'],
+    ['PUT', '/v1/core/projects/other-project/run-targets'],
+    ['DELETE', '/v1/core/projects/other-project'],
     // Workspaces: destructive rather than code execution, and equally not task-addressed.
-    ['POST', '/v2/core/workspaces'],
-    ['DELETE', '/v2/core/workspaces/other-workspace'],
+    ['POST', '/v1/core/workspaces'],
+    ['DELETE', '/v1/core/workspaces/other-workspace'],
   ])('answers 403 to %s %s', async (method, path) => {
     expect((await call(app, method, path, headers)).status).toBe(403)
   })
@@ -96,10 +96,10 @@ describe("what a task-scoped agent token can reach", () => {
   // Reads are gated too, not only writes: the config GET hands back the same scripts, and the project
   // list is the layout of every codebase on the machine.
   it.each([
-    ['GET', '/v2/core/prefs'],
-    ['GET', '/v2/core/projects'],
-    ['GET', '/v2/core/projects/other-project/config'],
-    ['GET', '/v2/core/workspaces'],
+    ['GET', '/v1/core/prefs'],
+    ['GET', '/v1/core/projects'],
+    ['GET', '/v1/core/projects/other-project/config'],
+    ['GET', '/v1/core/workspaces'],
   ])('answers 403 to %s %s', async (method, path) => {
     expect((await call(app, method, path, headers)).status).toBe(403)
   })
@@ -108,11 +108,11 @@ describe("what a task-scoped agent token can reach", () => {
   // about its own task should get an answer rather than a refusal. What it must not get is every other
   // task's title, branch and absolute worktree path.
   it('narrows the task list to the caller\'s own task instead of refusing it', async () => {
-    const response = await call(app, 'GET', '/v2/core/tasks', headers)
+    const response = await call(app, 'GET', '/v1/core/tasks', headers)
     expect(response.status).toBe(200)
     expect(((await response.json()) as { id: string }[]).map((task) => task.id)).toEqual(['task-1'])
     // Both rows are really there, so the narrow answer above is the filter and not an empty fixture.
-    const asDevice = await call(app, 'GET', '/v2/core/tasks', AS_DEVICE)
+    const asDevice = await call(app, 'GET', '/v1/core/tasks', AS_DEVICE)
     expect(asDevice.status).toBe(200)
     expect(((await asDevice.json()) as { id: string }[]).map((task) => task.id).sort()).toEqual(['task-1', 'task-2'])
   })
@@ -120,21 +120,21 @@ describe("what a task-scoped agent token can reach", () => {
   // Not 401: the caller authenticated fine, it just is not the owner at a keyboard. A 401 would invite
   // a retry loop instead of stopping one (§ Transport and auth).
   it('says the caller is authenticated but not entitled', async () => {
-    const response = await call(app, 'PUT', '/v2/core/prefs', headers)
+    const response = await call(app, 'PUT', '/v1/core/prefs', headers)
     expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
   })
 
   // The gate is confinement, not a blanket refusal: the same token still reaches its own task, or the
   // agent surfaces it exists to serve would all be dead.
   it('still reaches its own task and is refused another', async () => {
-    expect((await call(app, 'GET', '/v2/core/tasks/task-1/context', headers)).status).not.toBe(403)
-    expect((await call(app, 'GET', '/v2/core/tasks/task-2/context', headers)).status).toBe(404)
+    expect((await call(app, 'GET', '/v1/core/tasks/task-1/context', headers)).status).not.toBe(403)
+    expect((await call(app, 'GET', '/v1/core/tasks/task-2/context', headers)).status).toBe(404)
   })
 
   // The renderer is unaffected by all of the above, which is the reason a device gate is the right
   // instrument here: every one of these surfaces is a settings form.
   it('leaves a device principal alone', async () => {
-    for (const path of ['/v2/core/prefs', '/v2/core/projects', '/v2/core/workspaces']) {
+    for (const path of ['/v1/core/prefs', '/v1/core/projects', '/v1/core/workspaces']) {
       expect((await call(app, 'GET', path, AS_DEVICE)).status, path).toBe(200)
     }
   })

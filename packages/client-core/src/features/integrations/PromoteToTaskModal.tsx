@@ -1,33 +1,22 @@
-import { createMemo, createResource, createSignal, For, onMount, Show } from 'solid-js'
+import { createResource, createSignal, onMount, Show, type JSX } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
-import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
-import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { projectsOptions } from '../../infra/queries'
 import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { createDismissable } from '../../kit/lib/dismissable'
-import { Alert, Button, Field, Input, Select } from '../../kit/components/primitives'
+import { Alert, Button, Select } from '../../kit/components/primitives'
 import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
 
-/**
- * The workflow step, drawn above the tabs when the caller wants one (docs/workflows.md § Starting a
- * run). The modal knows how to pick a definition and collect its inputs; what a definition is and how
- * a run starts stay with the workflows plugin, which passes `onStart`.
- */
-export type PromoteWorkflowStep = {
-  /** Everything the workspace can run, in the order it should be offered. */
-  definitions: readonly WorkflowDefSummary[]
-  /** The definition selected when the modal opens. */
-  initial?: string
-  /** Values the item already supplies, by input name. Editable. */
-  prefill?: Readonly<Record<string, DataValue>>
-  /** Runs after the task exists. A rejection keeps the modal open with the message. */
-  onStart: (taskId: string, defId: string, inputs: Record<string, DataValue>) => Promise<void>
+/** A feature-owned action rendered and run after the source has made or attached a task. */
+export type PromoteTaskAction = {
+  content: JSX.Element
+  ready: () => boolean
+  label: string
+  onTaskReady: (task: Task) => Promise<void>
 }
 
 // Shared "+ Task" flow for the integration browses. Promoting an external item (a Rollbar error, a
@@ -42,9 +31,8 @@ export function PromoteToTaskModal(props: {
   headerLabel: string
   attachTasks: Task[] // active tasks in scope, eligible to attach to
   existingBranches: string[]
-  /** Pick a workflow and fill its inputs above the tabs, then run it on the task this modal made or
-   *  attached to. Absent for the plain "+ Task" flow. */
-  workflow?: PromoteWorkflowStep
+  /** Optional owner action after the task is created or attached. */
+  action?: PromoteTaskAction
   onClose: () => void
   onCreated: (task: Task) => void
   onAttached: (task: Task) => void
@@ -75,53 +63,14 @@ export function PromoteToTaskModal(props: {
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
 
-  // ── The workflow step ───────────────────────────────────────────────────────────────────────────
-  // Held here rather than in a child, because the primary button's label and its disabled state are
-  // the tabs' and the answer depends on both halves.
-  const [defId, setDefId] = createSignal(props.workflow?.initial ?? props.workflow?.definitions[0]?.id ?? '')
-  const chosen = createMemo(() => props.workflow?.definitions.find((entry) => entry.id === defId()))
-  const workflowInputs = () => chosen()?.inputs ?? []
-  const [values, setValues] = createSignal<Record<string, string>>({})
-  // What was typed, over what the item and the definition supply. Held by input name, so switching
-  // definitions keeps an answer the next one also asks for and re-seeds everything else.
-  const seeded = createMemo(() => ({
-    ...Object.fromEntries(workflowInputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
-    ...Object.fromEntries(workflowInputs()
-      .filter((input) => props.workflow?.prefill?.[input.name] !== undefined)
-      .map((input) => [input.name, props.workflow!.prefill![input.name]])),
-  }))
-  const valueOf = (name: string): string => {
-    if (values()[name] !== undefined) return values()[name]
-    const value = seeded()[name]
-    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
-  }
-  const setValue = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }))
-  const filled = (): Record<string, DataValue> => Object.fromEntries(workflowInputs().flatMap(input => {
-    const raw = valueOf(input.name)
-    if (raw === '') return []
-    const value = !input.schema || input.schema.type === 'string' ? raw : JSON.parse(raw)
-    if (input.schema) validateDataValue(value, input.schema)
-    return [[input.name, value]]
-  }))
-  const workflowReady = () => {
-    if (!props.workflow) return true
-    if (!defId() || workflowInputs().some(input => input.required && !valueOf(input.name).trim())) return false
-    try { filled(); return true } catch { return false }
-  }
+  // A failed follow-up action keeps the task here, so retry cannot create or attach it twice.
+  const [prepared, setPrepared] = createSignal<{ mode: 'new' | 'attach'; task: Task; linked: boolean } | null>(null)
 
-  // The task a failed start left behind. A refusal keeps the modal open, and without this the next
-  // press would make a second task for the same item rather than retrying the run on the first.
-  const [made, setMade] = createSignal<Task | null>(null)
-
-  /** The run, once there is a task to run it on. A refusal keeps the modal open and says why. */
-  const startWorkflow = async (task: Task, done: (task: Task) => void): Promise<void> => {
-    const step = props.workflow
-    if (!step) return done(task)
+  const finish = async (task: Task, done: (task: Task) => void): Promise<void> => {
     try {
-      await step.onStart(task.id, defId(), filled())
+      await props.action?.onTaskReady(task)
     } catch (err) {
-      setMade(task)
-      setError(err instanceof Error ? err.message : 'The task was made, but the workflow did not start.')
+      setError(err instanceof Error ? err.message : 'The task is ready, but the action failed.')
       setBusy(false)
       return
     }
@@ -161,20 +110,29 @@ export function PromoteToTaskModal(props: {
     const projectId = params.projectId
     const isGitProject = project()?.vcs === 'git'
     const b = effectiveBranch()
-    if (!projectId || !title().trim() || (isGitProject && !b) || !workflowReady()) return
+    if (!projectId || (props.action && !props.action.ready())) return
+    const retry = prepared()
+    if ((!retry && (!title().trim() || (isGitProject && !b))) || (retry && retry.mode !== 'new')) return
     setBusy(true)
     setError('')
-    const retry = made()
-    if (retry) return startWorkflow(retry, props.onCreated)
     try {
       const context = { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: isGitProject ? b : undefined, existingBranches: props.existingBranches }
-      const base = await Promise.resolve(promotion().prepare(props.item, context))
-      const seed: TaskSeed = isGitProject
-        ? { ...base, title: title().trim(), branch: b }
-        : { ...base, title: title().trim(), branch: undefined }
-      const task = await promotion().create(seed)
-      await promotion().afterCreate?.(task, props.item, context)
-      await startWorkflow(task, props.onCreated)
+      let current = retry
+      if (!current) {
+        const base = await Promise.resolve(promotion().prepare(props.item, context))
+        const seed: TaskSeed = isGitProject
+          ? { ...base, title: title().trim(), branch: b }
+          : { ...base, title: title().trim(), branch: undefined }
+        const task = await promotion().create(seed)
+        current = { mode: 'new', task, linked: false }
+        setPrepared(current)
+      }
+      if (!current.linked) {
+        await promotion().afterCreate?.(current.task, props.item, context)
+        current = { ...current, linked: true }
+        setPrepared(current)
+      }
+      await finish(current.task, props.onCreated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the task.')
       setBusy(false)
@@ -185,12 +143,17 @@ export function PromoteToTaskModal(props: {
     e.preventDefault()
     const attach = promotion().attachToCurrentTask
     const task = props.attachTasks.find((t) => t.id === attachId())
-    if (!attach || !task || !workflowReady()) return
+    if (props.action && !props.action.ready()) return
+    const retry = prepared()
+    if ((!retry && (!attach || !task)) || (retry && retry.mode !== 'attach')) return
     setBusy(true)
     setError('')
     try {
-      await attach(task.id, props.item)
-      await startWorkflow(task, props.onAttached)
+      if (!retry) {
+        await attach!(task!.id, props.item)
+        setPrepared({ mode: 'attach', task: task!, linked: true })
+      }
+      await finish((retry?.task ?? task)!, props.onAttached)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not attach to the task.')
       setBusy(false)
@@ -206,39 +169,8 @@ export function PromoteToTaskModal(props: {
     <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div ref={dialog} class="overlay" role="dialog" aria-modal="true" onClick={dismiss.onContainerClick} onKeyDown={dismiss.onKeyDown}>
         <div class="overlay-title">{props.headerLabel}</div>
-        {/* Above the tabs, because which workflow to run is a question about the item and the tabs
-            are a question about where it lands (docs/workflows.md § Starting a run). */}
-        <Show when={props.workflow}>
-          {(step) => (
-            <div class="overlay-body">
-              <Field label="Workflow" group>
-                <Select
-                  size="sm"
-                  label="Workflow"
-                  value={defId()}
-                  options={step().definitions.map((entry) => ({ value: entry.id, label: entry.name }))}
-                  onChange={setDefId}
-                />
-              </Field>
-              {/* `<For>` over a list that only changes when the definition does, so no row is
-                  rebuilt under the caret while somebody is typing in it. */}
-              <For each={workflowInputs()}>
-                {(input) => (
-                  <Field label={input.required ? `${input.name} *` : input.name} hint={input.description} group>
-                    <Input
-                      size="sm"
-                      label={input.name}
-                      value={valueOf(input.name)}
-                      invalid={!!input.required && !valueOf(input.name).trim()}
-                      onInput={(value) => setValue(input.name, value)}
-                    />
-                  </Field>
-                )}
-              </For>
-            </div>
-          )}
-        </Show>
-        <Show when={canAttach()}>
+        <Show when={props.action}>{(action) => <div class="overlay-body">{action().content}</div>}</Show>
+        <Show when={canAttach() && !prepared()}>
           <Tabs
             tabs={[{ id: 'new', label: 'New task' }, { id: 'attach', label: 'Attach to task', count: props.attachTasks.length }]}
             active={mode()}
@@ -254,7 +186,7 @@ export function PromoteToTaskModal(props: {
           <Show when={mode() === 'new'}>
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
-              <input class="ui-input" type="text" placeholder="Task title" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
+              <input class="ui-input" type="text" placeholder="Task title" value={title()} disabled={!!prepared()} onInput={(e) => setTitle(e.currentTarget.value)} />
               <Show when={project()?.vcs === 'git'}>
                 <input
                   class="ui-input"
@@ -262,6 +194,7 @@ export function PromoteToTaskModal(props: {
                   placeholder="branch (from title)"
                   title="Branch name — defaults to a slug of the title"
                   value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
+                  disabled={!!prepared()}
                   onInput={(e) => {
                     // Read and store the edit before switching the value expression to the touched
                     // branch. Solid updates synchronously, so flipping the flag first would restore
@@ -274,8 +207,8 @@ export function PromoteToTaskModal(props: {
               </Show>
               <div class="close-actions">
                 <Button onPress={props.onClose}>Cancel</Button>
-                <Button submit disabled={busy() || !workflowReady() || !title().trim() || (project()?.vcs === 'git' && !effectiveBranch())}>
-                  {props.workflow ? 'Create & run' : 'Create task'}
+                <Button submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && (!title().trim() || (project()?.vcs === 'git' && !effectiveBranch())))}>
+                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Create & ${props.action.label}` : 'Create task'}
                 </Button>
               </div>
             </form>
@@ -291,8 +224,8 @@ export function PromoteToTaskModal(props: {
               />
               <div class="close-actions">
                 <Button onPress={props.onClose}>Cancel</Button>
-                <Button submit disabled={busy() || !workflowReady() || !attachId()}>
-                  {props.workflow ? 'Attach & run' : 'Attach'}
+                <Button submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && !attachId())}>
+                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Attach & ${props.action.label}` : 'Attach'}
                 </Button>
               </div>
             </form>

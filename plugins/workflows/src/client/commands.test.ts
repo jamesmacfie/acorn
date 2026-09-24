@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
+import type { WorkflowDefSummary } from '../contract/wire.ts'
 import type { CommandExecutionContext, CommandOutcome, SearchCommand } from '@acorn/plugin-api/client'
 
 const mocks = vi.hoisted(() => ({
@@ -37,7 +37,7 @@ const context = (taskId: string): CommandExecutionContext => ({
 })
 const signal = (): AbortSignal => new AbortController().signal
 
-const def = (id: string, steps = 2): WorkflowDefSummary => ({
+const def = (id: string, steps = 2): WorkflowDefSummary => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
   id,
   name: id.toUpperCase(),
   source: 'repo',
@@ -123,7 +123,7 @@ describe('the workflows plugin catalogue', () => {
   it('creates a row and opens it, for "New workflow"', async () => {
     mocks.createDef.mockResolvedValue({ id: 'row-1' })
     expect(await create.run(context('task-1'))).toEqual({ effect: 'close' })
-    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { formatVersion: 2, name: 'Untitled workflow', steps: [] } })
+    expect(mocks.createDef).toHaveBeenCalledWith({ workspaceId: 'w-1', projectId: 'p-1', def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Untitled workflow', steps: [] } })
     expect(navigate).toHaveBeenCalledWith('/p/p-1/x/workflows/db%3Arow-1')
   })
 

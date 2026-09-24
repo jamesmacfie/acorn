@@ -2,13 +2,12 @@
 import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import type { Wheel } from '../tree/hit'
-import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
-} from '@acorn/client-core/kit/keys/collectionIntents.ts'
-import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
-import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
+} from '@acorn/client-core/kit/keys'
+import type { Intent } from '@acorn/client-core/kit/keys'
+import { buildDiffRows, plainTokenize, type CodeRow, type DiffFile, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { annotationsFor, requestAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'

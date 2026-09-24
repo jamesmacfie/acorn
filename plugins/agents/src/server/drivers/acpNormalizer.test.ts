@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
 import { acpElicitationResponse, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
 import { foldSubagentRoster } from '../sessions/stateMachine'
-import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
 import webCapture from './__fixtures__/claudeWebSearchWire.json' with { type: 'json' }
 import { buildConversationItems } from '../../client/sessions/conversationItems'
-import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord } from '../../contract/wire.ts'
 
 const toolEvent = (update: SessionUpdate) => {
   const [event] = normalizeAcpUpdate(update, 'Claude Code')
@@ -180,7 +180,7 @@ describe('a backgrounded subagent, as the wire reports it', () => {
   } as unknown as SessionUpdate
 
   const rosterFrom = (updates: SessionUpdate[]) => {
-    let roster: import('@acorn/protocol/managedAgents.ts').AgentSubagent[] = []
+    let roster: import('../../contract/wire.ts').AgentSubagent[] = []
     for (const update of updates) {
       for (const event of normalizeAcpUpdate(update, 'Claude Code')) {
         if (event.type === 'subagent') roster = foldSubagentRoster(roster, event.subagent, 'turn-1', 1)

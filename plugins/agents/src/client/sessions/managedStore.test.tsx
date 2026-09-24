@@ -7,7 +7,7 @@
 // `toolFoldPrefs` already uses, and the reason its two files sit beside each other.
 import { describe, expect, it, vi } from 'vitest'
 import { createEffect, createRoot, createSignal } from 'solid-js'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
 

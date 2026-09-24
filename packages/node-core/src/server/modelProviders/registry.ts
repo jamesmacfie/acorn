@@ -1,7 +1,7 @@
 import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,
-} from '../integrations/connectionRegistry'
+} from '../integrations/connectionProviders/registry'
 import type { ModelProviderAdapter } from './types'
 
 export class ModelProviderRegistry {
@@ -20,6 +20,7 @@ export class ModelProviderRegistry {
     if (!connectionProvider) {
       throw new Error(`Model adapter names unregistered connection provider '${adapter.providerId}'.`)
     }
+    if (owner) this.connectionProviders.assertOwnedBy(adapter.providerId, owner)
     if (connectionProvider.capabilities.textGeneration !== true) {
       throw new Error(`Model provider '${adapter.providerId}' does not declare text generation.`)
     }

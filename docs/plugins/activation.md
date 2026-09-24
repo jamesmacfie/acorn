@@ -54,7 +54,7 @@ All of them have, so all of them are torn down rather than the ones declared bef
 
 A plugin can register:
 
-- routes under `/v2/p/<plugin>/...`;
+- routes under `/v1/p/<plugin>/...`;
 - typed capabilities;
 - client broadcasts through `ctx.events`;
 - agent tools and task-context sections;
@@ -107,7 +107,7 @@ disposal are identical, and order is no more load-bearing for them than for a bu
 
 Three things differ, and all three follow from the code not being ours:
 
-- **They get there through the installer.** `POST /v2/core/plugins/install` (owner/device principal,
+- **They get there through the installer.** `POST /v1/core/plugins/install` (owner/device principal,
   `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or a
   local folder; validates the manifest; and places the package atomically with a hash-pinned lockfile
   beside it — except for a folder, which is symlinked and therefore pins nothing
@@ -115,7 +115,7 @@ Three things differ, and all three follow from the code not being ours:
   docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
   Nothing in that family starts a plugin — each answers "the disk now says this". The one exception is
-  `POST /v2/core/plugins/:id/reload`, which swaps a loaded plugin's node half in the running process;
+  `POST /v1/core/plugins/:id/reload`, which swaps a loaded plugin's node half in the running process;
   see § The dev loop for its semantics and its four limits.
 - **Failures are contained, and every failure names itself.** A built-in throwing from `init` still
   fails the boot — it is first-party code in the same binary, and a node that cannot assemble should say
@@ -240,7 +240,7 @@ contributions resolve once per session, so the client has to re-ask.
 
 ### Reloading one plugin without a restart
 
-`POST /v2/core/plugins/:id/reload` (owner/device principal, `Idempotency-Key` required, audited) swaps
+`POST /v1/core/plugins/:id/reload` (owner/device principal, `Idempotency-Key` required, audited) swaps
 one **loaded** plugin's node half in the running process. Built-ins are refused with a 400: they are
 compiled into the binary, so there is no second copy on disk to swap in, and their restart-required flow
 already works.
@@ -328,13 +328,13 @@ telling it to call again with the same arguments to collect the answer.
 
 The owner sees the notice in the bell, which opens the approval dialog in the **shell's** overlay slot —
 chrome a plugin frame cannot draw over. On approval **the device performs the install**, over the same
-`/v2/core/plugins/*` routes Settings → Plugins uses, with its own principal. The agent never holds a
+`/v1/core/plugins/*` routes Settings → Plugins uses, with its own principal. The agent never holds a
 credential that can install code; a prompt-injected agent can produce a row in a queue and nothing else.
 
 Four properties worth stating because they are easy to lose:
 
-- **The queue rides the roster.** `GET /v2/core/plugins` carries `requests`, so there is no second route
-  to remember to gate. `POST /v2/core/plugins/requests/:requestId` records the answer, is device-only by
+- **The queue rides the roster.** `GET /v1/core/plugins` carries `requests`, so there is no second route
+  to remember to gate. `POST /v1/core/plugins/requests/:requestId` records the answer, is device-only by
   the same mount, and is permanently unmappable from a frame
   (`client-core/host/frames/scopes.ts`) — a frame that could post an approval would answer the very
   question that exists because an agent must not install.
@@ -441,7 +441,7 @@ seam is honest about the case where there is no agent session to draft into.
 ## The client half of a loaded plugin
 
 A loaded plugin's UI is not registered by its own code. The Node hands each device the plugin's
-manifest and the hash of its client bundle in the roster (`GET /v2/core/plugins`); the device
+manifest and the hash of its client bundle in the roster (`GET /v1/core/plugins`); the device
 decides what to render from that, and the plugin's JavaScript never touches a shell registry.
 
 Five kinds of contribution come out of that one manifest, and each has its own section below:

@@ -6,7 +6,7 @@ import type { ModelCatalogEntry } from './integrations'
  *
  * Flat, and deliberately narrow. A connection's auth kind, scopes, account and timestamps do not
  * cross: no consumer reads them, and a harness has none of them. A caller that wants the connection
- * row itself still has `/v2/core/integrations`.
+ * row itself still has `/v1/core/integrations`.
  */
 export type ModelBackend = {
   /**
@@ -33,17 +33,19 @@ export const HARNESS_BACKEND_PREFIX = 'harness:'
 export type ParsedBackendId = { kind: ModelBackend['kind']; id: string }
 
 /**
- * Which store a backend id names, and the bare id inside it.
- *
- * A prefix-less string is a connection uuid. Two stores hold one from before core minted these ids —
- * the `connectionId` of a saved `database:generate` workflow step, and the changes plugin's device
- * pref — and neither is rewritten, so the unprefixed form has to keep resolving forever.
+ * Which store a backend id names, and the id inside it.
  */
 export const parseBackendId = (backendId: string): ParsedBackendId => {
-  const id = backendId.trim()
-  if (id.startsWith(HARNESS_BACKEND_PREFIX)) return { kind: 'harness', id: id.slice(HARNESS_BACKEND_PREFIX.length) }
-  if (id.startsWith(CONNECTION_BACKEND_PREFIX)) return { kind: 'connection', id: id.slice(CONNECTION_BACKEND_PREFIX.length) }
-  return { kind: 'connection', id }
+  const value = backendId.trim()
+  if (value.startsWith(HARNESS_BACKEND_PREFIX)) {
+    const id = value.slice(HARNESS_BACKEND_PREFIX.length).trim()
+    if (id) return { kind: 'harness', id }
+  }
+  if (value.startsWith(CONNECTION_BACKEND_PREFIX)) {
+    const id = value.slice(CONNECTION_BACKEND_PREFIX.length).trim()
+    if (id) return { kind: 'connection', id }
+  }
+  throw new Error('Backend ID must be connection:<id> or harness:<id>.')
 }
 
 /**
@@ -95,7 +97,7 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
 export const defaultModelIdFor = (backend: ModelBackend | undefined): string =>
   backend?.defaultModelId || backend?.models[0]?.id || ''
 
-/** What `GET /v2/core/models/backends` answers. */
+/** What `GET /v1/core/models/backends` answers. */
 export type ModelBackendsResponse = {
   backends: ModelBackend[]
   /**

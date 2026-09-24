@@ -1,13 +1,13 @@
 import { testSecretEnv } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '../../syncPolicy'
 import { readComposite, readFiles } from '../mirror/prMirror'
 import { pullsBatch } from './pullsBatch'
 import { resolveRepoForUser } from '../mirror/repoMirror'
-import type { Env } from '@acorn/node-core/server/bindings.ts'
-import type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
+import type { Env } from '@acorn/plugin-api/testkit'
+import type { PluginDatabase } from '@acorn/plugin-api/testkit'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()

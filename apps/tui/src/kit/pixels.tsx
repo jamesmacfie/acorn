@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show, type JSX } from 'solid-js'
-import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens/support.ts'
+import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens'
 import { Line, slot } from './cells'
 import { boxBorder } from './roles'
 import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'

@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRequest } from '../../contract/wire.ts'
 
 // A question that takes more than one answer. The control is a column of checkboxes rather than the
 // dropdown a single-choice question gets, and what it posts has to stay an array all the way to the

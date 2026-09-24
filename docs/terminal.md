@@ -20,7 +20,7 @@ callback is shared between boots.
 Terminal metadata is stored in `plugins/terminal.sqlite`; PTY output and screen state are runtime
 data. Sessions can be ephemeral PTYs or durable tmux-backed sessions. The Node reconciles tmux at
 startup, keeps a bounded replay tail, and exposes attach/detach/input/resize/kill over the authenticated
-`/v2/events` socket and terminal routes.
+`/v1/events` socket and terminal routes.
 
 Reattach order is reset/framebuffer, buffered output produced during serialization, then live output.
 Raw output is not replayed as screen history. A lost stream does not imply the process died.
@@ -28,6 +28,12 @@ Raw output is not replayed as screen history. A lost stream does not imply the p
 The Node batches PTY output before it goes over the wire: buffered bytes flush as one `output` frame
 roughly every 16 milliseconds (about one frame at 60 frames per second) instead of one frame per PTY
 chunk, so a busy TUI does not send a frame for every keystroke echo.
+
+An agent PTY exit emits `plugin:terminal:completed` with task and session IDs, exit code, and time.
+Output stays behind `terminal.reviewInput.v1`: at most 256 snapshots of 16 KiB are retained for
+60 seconds. A removed, expired, evicted, or pre-restart snapshot reads as unavailable. Task archive
+uses a separate awaited hook. Terminal gathers bounded PTY output and Git diff before teardown, then
+runs `terminal:archive-review` with task and session identities; Findings formats the observation.
 
 ## The screen, and who pays for it
 
@@ -68,8 +74,15 @@ scheme still works. A binary frame carries no `seq` and consumes none, because s
 to the invalidation channel and output has never been part of it. `ready`, `exit` and `error` carry a
 session object rather than bytes and stay JSON.
 
+The client-core socket owns node filtering and WebSocket envelope dispatch. Terminal registers the
+`term:out` and binary PTY handlers, validates JSON payloads, and owns attach, detach, and input for
+the active Node. Its session store fetches the roster and registers a small summary and action source
+with the compiled client host. The host's send picker, task rail, and quit prompt use those summaries;
+the drawer keeps the full rows and active tab. `term:status` remains a generic chrome invalidation
+handled by client-core.
+
 Every session, terminal or managed, reports its state from one shared vocabulary, `AgentState`
-(`packages/protocol/src/terminal.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
+(`packages/protocol/src/sessionActivity.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
 agent surface reuses it verbatim, so no other module redeclares it. A transport reports only the
 subset it can detect. A plain PTY session emits `working`, `idle`, `blocked`, or `unknown`, since a
 shell has no notion of `starting` or `waiting`. A managed or headless agent driver controls the
@@ -88,6 +101,10 @@ context (notes, PR, memory; see `docs/notes-and-memory.md` § Context integratio
 heuristic would only delay the first prompt. A booting CLI reaches its input prompt in roughly 1 to 2
 seconds, so 3 seconds of silence is a safe "boot settled" signal without waiting out the longer
 mid-session window.
+
+Terminal reads `terminal:launch-context` contributions in their registered order and applies one
+16 KiB byte budget across them before queuing text. Memory contributes the task and memory block
+through that point.
 
 A separate "blocked" status looks for a prompt the agent is waiting on. It scans the last 12 lines of
 recent output, with ANSI codes and spinner frames stripped, for known confirmation patterns (`(y/n)`,
@@ -174,7 +191,7 @@ and a headless node with nobody attached would still have to hold the terminal o
 
 **`terminal:run-target`** starts one of the project's declared run targets as a step of its own, so a
 later step can wait on it. Its fields are `target`, whose choices come from
-`GET /v2/p/terminal/tasks/:taskId/run-targets`, and `waitForUrl`, which is on by default and gives
+`GET /v1/p/terminal/tasks/:taskId/run-targets`, and `waitForUrl`, which is on by default and gives
 the target 60 seconds to report a URL. The output is `{ targetId, sessionId, url }`. The same
 repo-config trust gate applies, because it is `RuntimeService.start` underneath.
 

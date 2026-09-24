@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Env } from '../bindings'
-import { registerRoute, removePluginRoutes } from '../routeRegistry'
+import { registerRoute, removePluginRoutes } from '../routes/registry'
 import { clearRunSources, readRuns, registerRunSource } from './registry'
 
 // The merged run list, driven through the real dispatcher: two plugins each serve a `/runs` route and
@@ -16,7 +16,7 @@ const serve = (pluginId: string, body: () => unknown): void => {
     prefix: '',
     fetch: () => Promise.resolve(new Response(JSON.stringify(body()), { headers: { 'content-type': 'application/json' } })),
   })
-  registerRunSource({ pluginId, runs: `/v2/p/${pluginId}/runs` })
+  registerRunSource({ pluginId, runs: `/v1/p/${pluginId}/runs` })
 }
 
 const run = (id: string, over: Record<string, unknown> = {}) =>

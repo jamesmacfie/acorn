@@ -4,7 +4,7 @@ import type {
   AgentSession,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { mergeAgentUsage } from '../../shared/usageFold'
 
 const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {

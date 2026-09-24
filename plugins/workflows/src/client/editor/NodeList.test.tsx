@@ -9,7 +9,7 @@ import NodeList from './NodeList'
 // keyboard's — so this list was arrow-keys-only and nothing happened when anybody clicked it
 // (client-core kit/components/primitives.tsx § Row).
 
-const def: WorkflowDef = {
+const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
   name: 'PR review',
   steps: [
     { name: 'understand-pr', kind: 'agent', with: { prompt: 'read it' } },

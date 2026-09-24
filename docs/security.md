@@ -29,7 +29,7 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
-- The bearer rides the `/v2/events` upgrade request's headers, which a browser cannot set. On the
+- The bearer rides the `/v1/events` upgrade request's headers, which a browser cannot set. On the
   desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
   (`docs/tui.md`) is one process running under Node, so it sets the header itself: equal to
   the desktop, easier than a browser. What the desktop holds as a process boundary the terminal holds
@@ -37,10 +37,10 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
   import custody.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
-- `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
+- `/v1/node` and `/v1/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
   security, backup, schedules, preferences, projects, and workspaces are device-only.
-- `/v2/events` authenticates the upgrade and rechecks device activity for long-lived streams.
-- Revoking a device (`DELETE /v2/core/devices/:id`) closes that device's live sockets immediately and
+- `/v1/events` authenticates the upgrade and rechecks device activity for long-lived streams.
+- Revoking a device (`DELETE /v1/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
   itself.
 - A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token,
@@ -53,13 +53,13 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
   device is a revoke this process never saw. `isActive`, which that sweep reads, is never cached.
 - There is no cookie or ambient browser credential, so CSRF middleware is not part of the protocol.
 
-`requireUser` is the single gate mounted over `/v2/*`. It accepts either credential kind, device or
+`requireUser` is the single gate mounted over `/v1/*`. It accepts either credential kind, device or
 internal, because product routes such as the MCP server and agent sessions legitimately read and
 write task data as the owner. `requireDevice` is narrower and sits in front of surfaces an
 agent-spawned child must never reach: pairing, device management, plugin administration, audit,
 security, backup, and schedules. Before `requireDevice` existed, the internal token injected into
 every PTY and agent session environment was a complete privilege escalation: a prompt-injected agent
-could call `POST /v2/core/pair/start`, read the pairing code back out of the response body, pair
+could call `POST /v1/core/pair/start`, read the pairing code back out of the response body, pair
 itself a device, and walk away with a permanent owner-authority token. `requireDevice` answers 403
 rather than 401 for this case: the caller authenticated fine, it just is not the owner at a keyboard,
 and a 401 would invite a retry loop instead of stopping it.
@@ -72,11 +72,11 @@ project row holds `setup_script`, `dev_script`, `dev_restart_script`, `teardown_
 `db_url_script` and `run_targets`, all commands this node runs later, so a write there is code
 execution with a delay on it. Workspaces are lower stakes and destructive: none of those routes is
 task-addressed, so nothing narrowed a delete to the caller's own work. If an agent tool ever needs to
-read its own project's configuration, that is a task-addressed route under `/v2/core/tasks/:id/...`,
+read its own project's configuration, that is a task-addressed route under `/v1/core/tasks/:id/...`,
 not a widening of this gate.
 
 `server/mountCoverage.test.ts` is what keeps the list from drifting again. It builds the app, reads
-every route under `/v2/core` off it the way a request does, and fails unless each one is covered by a
+every route under `/v1/core` off it the way a request does, and fails unless each one is covered by a
 gate mount or named in an allowlist with the reason it is open to a task token. Three route reviews in
 a row found the same shape of hole — a route that should have been device-only was mounted at
 `requireUser` because nobody wrote the line, and nothing failed when they didn't. Adding a route under
@@ -86,7 +86,7 @@ is written in both forms: the Hono this repo pins does match the bare path, that
 between versions, and a gate that is correct only on today's version rots quietly.
 
 Two core lists are filtered rather than gated, the same answer terminal's session roster gives:
-`GET /v2/core/tasks` and `GET /v2/core/task-statuses`. A task-scoped caller has a legitimate reason to
+`GET /v1/core/tasks` and `GET /v1/core/task-statuses`. A task-scoped caller has a legitimate reason to
 ask about its own task and no reason to be handed every other active task's title, branch, absolute
 worktree path and dirty count. `task-statuses` filters before it runs any Git, so a confined caller
 polling it cannot make the node do work for tasks it may not see. The `task-statuses` filter closes a
@@ -98,13 +98,13 @@ task-scoped token could open a device window, show the owner a code for an accou
 and end up with that account's token stored as the owner's GitHub connection — a confused deputy, with
 every later GitHub call made on the attacker's behalf. Both are `requireDevice` now: connecting an
 account is always a person at a keyboard. Notes' workspace routes are the same shape and the same
-answer, in `plugins/notes` and in the compatibility alias `plugins/memory` keeps for the old paths.
+answer, in `plugins/notes`.
 
 Both gates, and the task-scope and provider-access gates below them, are applied to a router's mount
 path in `server/index.ts` rather than inside each handler. A route added later under an already-gated
 prefix inherits the gate automatically instead of depending on someone remembering to add a check to
 it. An adversarial review found the per-route form of this check applied at exactly one call site out
-of six for task scope, leaving `/v2/core/tasks/<other>/preview-url` reachable by another task's
+of six for task scope, leaving `/v1/core/tasks/<other>/preview-url` reachable by another task's
 credential for arbitrary shell execution in that task's worktree; mounting the gate is what keeps a
 newly added route safe by default instead of by memory.
 
@@ -261,7 +261,7 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   files, and URL scripts) **and the project row's script columns**. The exact snapshot must be
   acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
 - A workflow definition stored as a `workflow_defs` row is executable configuration with no committed
-  bytes, so it is owner-typed instead of hashed. Every route under `/v2/p/workflows/defs` is
+  bytes, so it is owner-typed instead of hashed. Every route under `/v1/p/workflows/defs` is
   device-only, and a start by id refuses a row to a task-confined caller while still allowing a
   committed file, which the snapshot does cover. Save to repo turns the row into a file and hands it
   back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
@@ -294,7 +294,7 @@ subcommand chosen over HTTP is one the panel cannot vouch for.
 The untrusted input the trust gate hashes is the repo config **and the project row**
 (`server/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
 database is trusted, and that premise only holds while nothing but the owner can write the database.
-`PUT /v2/core/projects/:id/config` is device-only now, so it holds again; the row is in the snapshot as
+`PUT /v1/core/projects/:id/config` is device-only now, so it holds again; the row is in the snapshot as
 the belt behind that gate. A write the owner did not make changes the hash, and the next thing that
 asks for trust shows the owner the script instead of running it. `run_targets` is hashed with the five
 script columns: what that JSON holds is `command`, `stop` and `restart` strings the run pane executes,
@@ -404,7 +404,7 @@ A plugin installed on a Node is distributed by that Node: its client bundle trav
 broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
 gated twice — once on content, once on consent.
 
-**Trust binds to bytes, not to claims.** The hash a Node advertises in `/v2/core/plugins` is
+**Trust binds to bytes, not to claims.** The hash a Node advertises in `/v1/core/plugins` is
 untrusted input. The helper fetches the bundle itself (the bytes never pass through the renderer),
 hashes what arrived, and stores it content-addressed under that hash. A mismatch against the
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
@@ -489,13 +489,13 @@ The threats this closes, and the ones it does not:
   `docs/security.md` holds the full model and the remaining OS-isolation ceiling.
 
 The only way a package reaches a Node's install directory is the owner-authenticated install route
-(`POST /v2/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
+(`POST /v1/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
 until a Node's owner has installed it, and nothing runs on a device until that device has separately
 acknowledged the exact bundle bytes.
 
 **An agent can ask for an install; it cannot perform one.** The `plugin_request` agent tool raises a
 request and rings the owner's bell. It holds no credential that can install code — a task-scoped internal
-token is refused by every route in the `/v2/core/plugins/*` family, and the module implementing the tool
+token is refused by every route in the `/v1/core/plugins/*` family, and the module implementing the tool
 imports no installer, no data root and no filesystem, which a test pins so a later convenience import
 fails the build rather than the boundary. On approval **the device** performs the install with its own
 principal. The owner decides in the shell's own chrome, which a plugin frame cannot draw over, and the
@@ -738,7 +738,7 @@ is throttled to one a second, so a modal stays a person's act rather than someth
 **Binary bridge calls change no permission.** `api.bytes` is a second wire kind beside `api`, added so
 a plugin moving a file does not have to base64 it through a JSON envelope. It runs the identical
 `allowApi` decision at the identical point — before the body is touched at all — so your own
-`/v2/p/<id>/` namespace is reachable and another plugin's is refused whichever kind asks. The desktop
+`/v1/p/<id>/` namespace is reachable and another plugin's is refused whichever kind asks. The desktop
 end-to-end suite pins that by spying at the broker: a denied path must produce no request, not merely
 a discarded response. Both directions are capped at 12 MiB, and `type` and `filename` are advisory,
 because a sandbox saying what its bytes are decides nothing downstream.
@@ -838,7 +838,7 @@ records they are rather than "read telemetry".
 Three things bound what a sink can learn ([telemetry.md](./telemetry.md) § What never leaves the
 machine). Attributes are allowlisted scalars chosen at each seam, so there is no field a body, a
 diff or a query could arrive in. Names are patterns and ids ride as attributes, so a route reads as
-`/v2/core/tasks/:id`. And every message passes a scrubber that strips control characters, collapses
+`/v1/core/tasks/:id`. And every message passes a scrubber that strips control characters, collapses
 the owner's home directory and the data root, and replaces credential-shaped runs. A boundary that
 already withholds a message keeps withholding it: `onServerError` sends a name and a code because
 drivers embed bound values in `err.message`, and its record carries the same and no more.
@@ -944,7 +944,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 ### Tokens, routes, and agents
 
 - **Plugin routes vs task-scoped tokens.** Decide explicitly, default no: task-scoped internal
-  tokens (agents, PTY children, the MCP child) cannot reach `/v2/p/<third-party>/*`. Otherwise a
+  tokens (agents, PTY children, the MCP child) cannot reach `/v1/p/<third-party>/*`. Otherwise a
   prompt-injected agent can drive a malicious plugin's routes with the task's authority. Opt-in
   per route via explicit metadata when a plugin genuinely serves task-scoped consumers, surfaced
   in the permission prompt.
@@ -1141,7 +1141,7 @@ rather than a selector, so a page cannot substitute a different element between 
 read and the value it writes. The tools expose no arbitrary JavaScript evaluation.
 
 Screenshots are rows in the plugin's own database, keyed to the task, served back only through
-`/v2/p/browser/captures/:id` behind the same auth as every other node route. The newest twenty per
+`/v1/p/browser/captures/:id` behind the same auth as every other node route. The newest twenty per
 task are kept.
 
 ## Untrusted provider data

@@ -1,7 +1,7 @@
 // The loadable-package declaration for this plugin. apps/node/scripts/build-plugin.mjs reads it to
 // build the bundles and generate `acorn-plugin.json`.
 //
-// `id: "linear"` comes from the directory name and must never change. It binds `/v2/p/linear`, the
+// `id: "linear"` comes from the directory name and must never change. It binds `/v1/p/linear`, the
 // provider id on every `integrations` row, the `providerId` on every `task_links` row, and the
 // `linear` task origin. Renaming it orphans user data.
 //
@@ -16,7 +16,7 @@
 //   net. uploads.linear.app is not the API. A ticket body can point at a private upload, and a frame
 //     can neither reach the network nor hold a credential, so the node half fetches the file and
 //     hands the frame a `data:` URL (src/server/routes/linear.ts § /uploads).
-//   api: ['core.tasks:read']. The pane frame reads `/v2/core/tasks` to find which tickets this task
+//   api: ['core.tasks:read']. The pane frame reads `/v1/core/tasks` to find which tickets this task
 //     links. The ref-panel frame needs none of it; one list covers both surfaces.
 export default {
   name: 'Linear',
@@ -102,7 +102,7 @@ export default {
       glyph: 'brand:linear',
       order: 20,
       providerId: 'linear',
-      items: '/v2/p/linear/rail-items',
+      items: '/v1/p/linear/rail-items',
       // The rail route reads `?project=` (src/server/routes/linear.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
@@ -139,9 +139,10 @@ export default {
     ],
     // The enrichment half of the same relationship, and why github no longer depends on this package.
     // Resolves a set of identifiers across every connected workspace, with a ten-minute cache.
-    refResolvers: [{ id: 'linear-refs', kind: 'linear.issue', resolve: '/v2/p/linear/issues' }],
+    refResolvers: [{ id: 'linear-refs', kind: 'linear.issue', resolve: '/v1/p/linear/issues' }],
     commands: [{
       id: 'open',
+      kind: 'action',
       title: 'Linear: open linked issues',
       category: 'pane',
       palette: false,
@@ -164,7 +165,7 @@ export default {
       category: 'navigation',
       kind: 'search',
       scope: 'project',
-      route: '/v2/p/linear/palette/issues',
+      route: '/v1/p/linear/palette/issues',
       placeholder: 'Find a Linear issue…',
       onSelect: { verb: 'navigate', surface: 'linear-issue' },
     }],

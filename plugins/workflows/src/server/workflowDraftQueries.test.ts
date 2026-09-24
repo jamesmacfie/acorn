@@ -10,7 +10,7 @@ import { publishFixtureDef } from '../testkit/publishedDefinition'
 let store: TestPluginDb
 beforeEach(() => { store = makeTestPluginDb('workflows') })
 afterEach(() => store.cleanup())
-const def = (...queryIds: string[]): WorkflowDef => ({ formatVersion: 2, name: 'Draft', steps: queryIds.map((queryId, i) => ({ id: `find-${i}`, name: `Find ${i}`, kind: 'find-records', query: { kind: 'saved', queryId, bindings: {} } })) })
+const def = (...queryIds: string[]): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Draft', steps: queryIds.map((queryId, i) => ({ id: `find-${i}`, name: `Find ${i}`, kind: 'find-records', query: { kind: 'saved', queryId, bindings: {} } })) })
 const input = (...ids: string[]) => ({ workspaceId: 'workspace', projectId: 'project', def: def(...ids) })
 
 it('protects draft references before saving and removes stale references without touching published consumers', async () => {

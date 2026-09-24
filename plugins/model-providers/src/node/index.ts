@@ -3,7 +3,7 @@
 // § Model providers.
 //
 // This ships as a loaded package, so a grep of apps/node/src/server/plugins.ts will not find it. The
-// manifest row is in apps/node/scripts/build-plugin.mjs and the distribution roster is in
+// manifest declaration is in plugins/model-providers/acorn-plugin.config.mjs and the distribution roster is in
 // apps/desktop/scripts/build-bundled-plugins.mjs. Nothing below changes across that boundary:
 // ctx.providers.connection and ctx.providers.model are identical for both tiers. There is no client
 // bundle, so no device holds interface code of ours.

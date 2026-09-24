@@ -2,23 +2,19 @@
 // desktop main's connection broker does, because the device token rides the upgrade request's headers
 // and a browser cannot set those (docs/architecture-overview.md § Node API and client flow).
 //
-// What stays here is the subscription registries, the first-attach/last-detach contract, and the
-// re-attach-on-reconnect behaviour. The broker owns the URL, the socket lifecycle, the outbox, and the
-// reconnect backoff.
+// What stays here is node filtering, envelope dispatch and reconnect signaling. The broker owns
+// the URL, socket lifecycle, outbox and reconnect backoff. Stream owners manage their payloads.
 //
-// Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
-// `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
-// `docker:` and `agent:` are registered by the plugins that own them.
+// Dispatch is a prefix registry (wsChannels.ts). Core handles the generic `term:status` chrome
+// invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
-import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { decodeIdFrame, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
+import { type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
 import { measure } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
-import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
+import { registerWsChannel, routeWsFrame, wsReattachFrames } from './wsChannels'
 
-type OutputCb = (m: ServerMsg) => void
 // `term:status` carries the id of the plugin whose chrome moved, or nothing when core itself pinged and
 // every plugin's descriptors are suspect (node-core/server/notify.ts).
 type StatusCb = (pluginId?: string) => void
@@ -34,7 +30,6 @@ type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 type StepChangedCb = (event: { runId: string; stepId: string; status: string }) => void
 
-const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
 const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
@@ -49,8 +44,6 @@ type NodeEventMap = {
   'project:changed': ProjectChangedEvent
   'workspace:changed': WorkspaceChangedEvent
   'workspace-projects:changed': WorkspaceProjectsChangedEvent
-  // Content-free: a session was created, exited, or flipped between working and idle.
-  'terminal:sessions-changed': Record<string, never>
   'worktree:status-changed': WorktreeStatusChangedEvent
 }
 const nodeEventSubs = new Map<keyof NodeEventMap, Set<(event: never) => void>>()
@@ -59,7 +52,16 @@ const stepEventSubs = new Set<StepEventCb>()
 const stepChangedSubs = new Set<StepChangedCb>()
 const reconnectSubs = new Set<() => void>()
 
-const decoder = new TextDecoder()
+type BinaryHandler = (frame: Uint8Array) => void
+let binaryHandler: BinaryHandler | null = null
+
+/** The active stream owner receives bytes only after the broker's node filter. */
+export function registerWsBinaryHandler(handler: BinaryHandler): { dispose(): void } {
+  if (binaryHandler) throw new Error('binary stream handler already registered')
+  binaryHandler = handler
+  connect()
+  return { dispose: () => { if (binaryHandler === handler) binaryHandler = null } }
+}
 
 let bridged = false
 // Which nodes' sockets have been up at least once. A later transition to online is a reconnect, which
@@ -92,8 +94,7 @@ function connect(): void {
   bridged = true
 
   // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes every
-  // frame here, while the subscriber maps below are keyed on session and exec ids alone. Without the
-  // filter, node B's `term:out` for a colliding session id feeds node A's xterm
+  // frame here. Without the filter, node B's output for a colliding stream id feeds node A's reader
   // (docs/architecture-overview.md § Client state and fleet behavior).
   //
   // Dropping rather than routing works because only the active node's surfaces are subscribed. A
@@ -102,20 +103,10 @@ function connect(): void {
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
   })
-  // Terminal output, which does not arrive as a frame at all: it is bytes, tagged with the session
-  // they belong to (@acorn/protocol/ws.ts § The one binary frame). One decode instead of a JSON parse
-  // on the way in, and the same node filter as above, for the same reason.
+  // Binary stream output has the same node filter. Its owner decodes the payload.
   transport.onBytes((nodeId, frame) => {
     if (nodeId !== activeNodeId()) return
-    const tagged = decodeIdFrame(frame)
-    if (!tagged) return
-    const subs = outputSubs.get(tagged.id)
-    if (!subs) return
-    // Decoded here rather than at each subscriber: `ServerMsg` output is text, which is what xterm and
-    // the terminal client's emulator both take. One frame is one complete flush from the node, so a
-    // plain decode is exact — there is no character split across two of them to carry over.
-    const msg: ServerMsg = { type: 'output', data: decoder.decode(tagged.payload) }
-    subs.forEach((cb) => cb(msg))
+    binaryHandler?.(frame)
   })
   transport.onStatus((status) => {
     if (status.state !== 'online') return
@@ -147,27 +138,15 @@ function dispatch(raw: unknown): void {
   measure('core', `ws.inbound.${frame.channel.split(':')[0]}`, () => {
     // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
     // narrows the rest.
-    routeWsFrame(frame)
+    if (frame.channel === 'term:status') {
+      const { pluginId } = frame as { pluginId?: unknown }
+      statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
+    } else routeWsFrame(frame)
   })
 }
 
-// This file's own two prefixes (docs/api-reference.md § WebSocket). `term:` frames carry a per-session
-// ServerMsg, `workflow:` carries the notification bell's notices and step events.
-registerWsChannel(
-  'term',
-  (frame) => {
-    if (frame.channel === 'term:status') {
-      const { pluginId } = frame as { pluginId?: unknown }
-      return statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
-    }
-    if (frame.channel !== 'term:out') return
-    const { id, msg } = frame as { id?: unknown; msg?: unknown }
-    if (typeof id !== 'string') return
-    outputSubs.get(id)?.forEach((cb) => cb(msg as ServerMsg))
-  },
-  () => [...outputSubs.keys()].map((id) => ({ channel: 'term:attach', id })),
-)
-
+// Core handles only the generic `term:status` chrome invalidation. Terminal registers the PTY
+// payload handler for this prefix through the ordinary channel registry.
 registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:notice') return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
   if (frame.channel === 'workflow:step:event') return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
@@ -209,7 +188,7 @@ registerWsChannel('connection', (frame) => {
 // colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'terminal', 'worktree']) {
+for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'worktree']) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
@@ -242,7 +221,7 @@ export function _resetWsClient(): void {
   // Not _resetWsChannels(). This module registers its prefixes at import time, so clearing the map
   // leaves the socket mute for every later test in the file.
   everOnline.clear()
-  outputSubs.clear()
+  binaryHandler = null
   statusSubs.clear()
   pluginsSubs.clear()
   tasksSubs.clear()
@@ -251,34 +230,6 @@ export function _resetWsClient(): void {
   noticeSubs.clear()
   stepEventSubs.clear()
   reconnectSubs.clear()
-}
-
-// Subscribe to one session's output. Detaching keeps the PTY running. Only the first local subscriber
-// per session sends the attach frame, because the server restores one display snapshot per connection,
-// and the last unsubscribe detaches.
-export function wsAttach(id: string, on: OutputCb): () => void {
-  let set = outputSubs.get(id)
-  const first = !set
-  if (!set) {
-    set = new Set()
-    outputSubs.set(id, set)
-  }
-  set.add(on)
-  connect()
-  if (first) rawSend({ channel: 'term:attach', id })
-  return () => {
-    const s = outputSubs.get(id)
-    if (!s) return
-    s.delete(on)
-    if (s.size === 0) {
-      outputSubs.delete(id)
-      rawSend({ channel: 'term:detach', id })
-    }
-  }
-}
-
-export function wsWrite(id: string, data: string): void {
-  rawSend({ channel: 'term:input', id, data })
 }
 
 // "Re-read a plugin's chrome descriptors." One subscriber, `host/chrome/chromeData.ts`, and the

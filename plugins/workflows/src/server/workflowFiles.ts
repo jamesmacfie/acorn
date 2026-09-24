@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // Workflow files: declarative, committed `.acorn/workflows/*.toml`. Layering and sub-workflow
 // expansion are covered in docs/workflows.md § Execution model.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
@@ -37,9 +38,10 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
 type RawWorkflow = {
+  baseline: typeof ACORN_BASELINE
   maxDescendants?: number
   maxConcurrency?: number
-  formatVersion: 2
+  formatVersion: 1
   outputs?: WorkflowDef['outputs']
   id: string
   name: string
@@ -158,7 +160,7 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const name = str(o.name) ?? (workflowRef ? `→ ${workflowRef}` : `step-${i + 1}`)
   const stepId = str(o.id)
   if (!stepId) {
-    errors.push({ source, message: `${id}: step '${name}' needs an id. Add format_version = 2 and a stable id to every [[steps]] table.` })
+    errors.push({ source, message: `${id}: step '${name}' needs an id. Add format_version = 1 and a stable id to every [[steps]] table.` })
     return null
   }
   let schema: object | undefined
@@ -226,8 +228,8 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
   }
   try {
   const rawSteps = Array.isArray(doc.steps) ? doc.steps : []
-  if (doc.format_version !== 2) {
-    errors.push({ source: `${source}:${id}`, message: 'Unsupported workflow format. Add format_version = 2, a stable id to every [[steps]] table, and typed bindings before loading this workflow.' })
+  if (doc.format_version !== 1 || doc.baseline !== ACORN_BASELINE) {
+    errors.push({ source: `${source}:${id}`, message: `Incompatible workflow. Set format_version = 1 and baseline = "${ACORN_BASELINE}" before loading it.` })
     return null
   }
   if (!rawSteps.length) {
@@ -238,7 +240,8 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
   if (steps.length !== rawSteps.length) return null
   const posture = str(doc.posture)
   return {
-    formatVersion: 2,
+    baseline: ACORN_BASELINE,
+    formatVersion: 1,
     maxDescendants: doc.max_descendants as number | undefined,
     maxConcurrency: doc.max_concurrency as number | undefined,
     outputs: typeof doc.outputs_json === 'string' ? JSON.parse(doc.outputs_json) : undefined,
@@ -321,6 +324,7 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
     const steps = expand(w, [w.id])
     if (steps) {
       const workflow = {
+        baseline: w.baseline,
         formatVersion: w.formatVersion,
         maxDescendants: w.maxDescendants,
         maxConcurrency: w.maxConcurrency,

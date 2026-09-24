@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
-import { canPickFolder, pickFolder } from '@acorn/client-core/infra/platform/index.ts'
-import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
+import { hasHostCapability } from '@acorn/client-core/infra/node'
+import { canPickFolder, pickFolder } from '@acorn/client-core/infra/platform'
+import { taskBridge } from '@acorn/client-core/features/tasks'
 import { terminalApi } from '@acorn/plugin-terminal/testkit/client'
 
 // The probe split (git history: docs/future/node-first/platform-seam.md § The fix, item 3).
@@ -9,7 +9,7 @@ import { terminalApi } from '@acorn/plugin-terminal/testkit/client'
 // This file used to assert the opposite: that `window.acorn.terminal`, a preload key whose entire
 // contents were a native folder dialog, was "the single probe behind both typed accessors and core's
 // capability map", and it pinned all three together so they could not drift. They agreed, and they
-// were all wrong. The terminal drawer, agents, run targets and workflows are `/v2` + WebSocket
+// were all wrong. The terminal drawer, agents, run targets and workflows are `/v1` + WebSocket
 // surfaces against the node; gating them on an Electron dialog hid them from every other host and left
 // them visible on a desktop whose node had the terminal plugin turned off.
 //
@@ -54,14 +54,13 @@ describe('the folder picker is a desktop extra, not a feature gate', () => {
 })
 
 describe('taskBridge', () => {
-  it('exposes the task-lifecycle and agent-delivery surface core consumers need', () => {
+  it('exposes core task and project operations', () => {
     setHost(undefined)
     const api = taskBridge()
     expect(typeof api.task.archive).toBe('function')
     expect(typeof api.task.onCreated).toBe('function')
     expect(typeof api.project.get).toBe('function')
     expect(typeof api.task.statuses).toBe('function')
-    expect(typeof api.sendToAgent).toBe('function')
     expect(typeof api.previewUrl).toBe('function')
   })
 

@@ -21,6 +21,7 @@ const CORE = {
   data: marker('data'),
   prefs: marker('prefs'),
   identity: marker('identity'),
+  agentToolProvenance: marker('agentToolProvenance'),
   telemetry: marker('telemetry'),
   projects: {
     byId: marker('byId'), byGithub: marker('byGithub'), byWorkspace: marker('byWorkspace'), checkouts: marker('checkouts'), externalProjects,
@@ -32,7 +33,7 @@ const CORE = {
 // Through the schema rather than hand-built, so the defaults under test are the ones a real manifest
 // would produce.
 const permissions = (node: Record<string, unknown> = {}): NodePermissions =>
-  pluginManifestSchema.parse({ id: 'demo', name: 'demo', version: '1', apiVersion: '1', permissions: { node } }).permissions.node
+  pluginManifestSchema.parse({ id: 'demo', name: 'demo', version: '1', baseline: 'acorn-1', apiVersion: '1', permissions: { node } }).permissions.node
 
 const scoped = (node: Record<string, unknown> = {}, core: CoreServices = CORE): CoreServices =>
   scopeCore(core, permissions(node), 'demo', { idsForOwner: (owner) => owner === 'demo' ? ['demo-provider'] : [] })
@@ -53,11 +54,16 @@ describe('scopeCore', () => {
     // TypeError the first time they run it rather than a silent no-op in production.
     expect(services.fs).toBeUndefined()
     expect(services.models).toBeUndefined()
+    expect(services.agentToolProvenance).toBeUndefined()
+  })
+
+  it('grants provenance verification only when declared', () => {
+    expect(scoped({ core: ['agent-tool-provenance'] }).agentToolProvenance).toBe(CORE.agentToolProvenance)
   })
 
   it('covers every simple facet name', () => {
-    const all = ['fs', 'git', 'tasks', 'context', 'models', 'data:query', 'prefs', 'identity', 'telemetry']
-    expect(keys(scoped({ core: all }))).toEqual(['context', 'data', 'fs', 'git', 'identity', 'models', 'prefs', 'tasks', 'telemetry'])
+    const all = ['fs', 'git', 'tasks', 'context', 'models', 'data:query', 'prefs', 'identity', 'telemetry', 'agent-tool-provenance']
+    expect(keys(scoped({ core: all }))).toEqual(['agentToolProvenance', 'context', 'data', 'fs', 'git', 'identity', 'models', 'prefs', 'tasks', 'telemetry'])
   })
 
   it('keeps writes behind data:write while data:query stays read-only', async () => {

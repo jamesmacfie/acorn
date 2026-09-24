@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createApp } from './index'
 import { requireDevice, requireProviderAccess, requireTaskScope } from './middleware/requireUser'
-import { CORE_NAMESPACE } from './routeRegistry'
+import { CORE_NAMESPACE } from './routes/registry'
 
 // Every core route is reachable by a task-scoped agent token unless something says otherwise, because
 // `requireUser` accepts either credential kind. Three route reviews in a row found the same shape of
@@ -9,7 +9,7 @@ import { CORE_NAMESPACE } from './routeRegistry'
 // the line, and nothing failed when they didn't.
 //
 // This test is that failure. It reads the mount table the way a request does — off the built app, not
-// out of the source text — and asserts every route under /v2/core is either covered by a gate mount or
+// out of the source text — and asserts every route under /v1/core is either covered by a gate mount or
 // named below with the reason it is open. Adding a route under an already-gated prefix stays free;
 // adding one anywhere else is now a decision someone has to write down.
 //
@@ -22,31 +22,31 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // Filtered rather than gated, in the handler: a confined caller is answered with its own task and
   // nothing else. Gating these would break the agent surfaces that legitimately ask about their own
   // task; leaving them unfiltered handed over every other task's title, branch and worktree path.
-  'GET /v2/core/tasks': 'routes/tasks.ts filters the list by mayActOnTask',
-  'GET /v2/core/task-statuses': 'routes/worktree.ts filters the roster by mayActOnTask',
+  'GET /v1/core/tasks': 'routes/tasks.ts filters the list by mayActOnTask',
+  'GET /v1/core/task-statuses': 'routes/worktree.ts filters the roster by mayActOnTask',
 
   // A task row is inert. It records intent — a title, a project, a branch name — and nothing on it
   // runs until a person opens it, at which point the worktree and setup paths apply their own gates.
-  // Same reasoning as `POST /v2/core/projects/:id/detect` in the frame scope table.
-  'POST /v2/core/tasks': 'creates an inert row; every executable path off it is separately gated',
+  // Same reasoning as `POST /v1/core/projects/:id/detect` in the frame scope table.
+  'POST /v1/core/tasks': 'creates an inert row; every executable path off it is separately gated',
 
   // The static tool catalog: names, descriptions and risk tiers, no task data and no owner data. An
   // agent already sees the tools it may call at /tasks/:id/tools, which this cannot widen.
-  'GET /v2/core/agent-tools': 'static catalog, no task or owner data',
+  'GET /v1/core/agent-tools': 'static catalog, no task or owner data',
 
   // Read-only panel data, argued at the route itself (routes/dashboards.ts). An agent rendering a
   // dashboard is a legitimate reader, and there is no write route to reach.
-  'GET /v2/core/dashboards/history': 'read-only measure series; see the comment on the route',
+  'GET /v1/core/dashboards/history': 'read-only measure series; see the comment on the route',
 
   // The library shares the dashboards router with the history read above, so it cannot use a
   // prefix gate without closing the task-readable history route. Its handler rejects every
   // principal except a device before reading or changing dashboard state.
-  'POST /v2/core/dashboards/:operation': 'routes/dashboards.ts requires a device principal in the handler',
+  'POST /v1/core/dashboards/:operation': 'routes/dashboards.ts requires a device principal in the handler',
 
   // Filtered rather than gated, like the two task reads above and for the same reason: "what is
   // running for me" is a fair question for an agent about its own task, and the unfiltered answer
   // enumerates every task on the machine. A run with no task is never shown to a confined caller.
-  'GET /v2/core/runs': 'routes/runs.ts filters the merged list by mayActOnTask',
+  'GET /v1/core/runs': 'routes/runs.ts filters the merged list by mayActOnTask',
 }
 
 const GATES = new Map<unknown, string>([
@@ -73,7 +73,7 @@ export function mountCovers(mount: string, route: string): boolean {
 
 describe('core mount coverage', () => {
   const routes = createApp().routes
-  // `.use()` registers as ALL; nothing under /v2/core is registered with `app.all`, so the two are the
+  // `.use()` registers as ALL; nothing under /v1/core is registered with `app.all`, so the two are the
   // same set here.
   const gateMounts = routes.filter((r) => r.method === 'ALL' && GATES.has(r.handler))
   const coreRoutes = routes.filter((r) => r.method !== 'ALL' && r.path.startsWith(`${CORE_NAMESPACE}/`))
@@ -84,12 +84,12 @@ describe('core mount coverage', () => {
   }
 
   it('mountCovers reads a mount path the way Hono does', () => {
-    expect(mountCovers('/v2/core/prefs', '/v2/core/prefs')).toBe(true)
-    expect(mountCovers('/v2/core/prefs', '/v2/core/prefs/x')).toBe(false)
-    expect(mountCovers('/v2/core/prefs/*', '/v2/core/prefs')).toBe(false)
-    expect(mountCovers('/v2/core/prefs/*', '/v2/core/prefs/x/y')).toBe(true)
-    expect(mountCovers('/v2/core/tasks/:id/*', '/v2/core/tasks/:id/run/:target/start')).toBe(true)
-    expect(mountCovers('/v2/core/tasks/:id', '/v2/core/tasks')).toBe(false)
+    expect(mountCovers('/v1/core/prefs', '/v1/core/prefs')).toBe(true)
+    expect(mountCovers('/v1/core/prefs', '/v1/core/prefs/x')).toBe(false)
+    expect(mountCovers('/v1/core/prefs/*', '/v1/core/prefs')).toBe(false)
+    expect(mountCovers('/v1/core/prefs/*', '/v1/core/prefs/x/y')).toBe(true)
+    expect(mountCovers('/v1/core/tasks/:id/*', '/v1/core/tasks/:id/run/:target/start')).toBe(true)
+    expect(mountCovers('/v1/core/tasks/:id', '/v1/core/tasks')).toBe(false)
   })
 
   it('the app really is mounted, so an empty pass cannot look like a green one', () => {

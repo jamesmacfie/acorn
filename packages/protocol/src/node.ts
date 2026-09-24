@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { ACORN_BASELINE } from './baseline.ts'
 
 // The current wire protocol version, and the whole of the client to node compatibility contract. See
 // docs/api-reference.md § Versioning.
-export const NODE_PROTOCOL_VERSION = 2
+export const NODE_PROTOCOL_VERSION = 1
 
 // The attachment record: who this node enrolled with, when, and under which enrollment token. One
 // optional object on `node.json`, and the only thing a control plane leaves behind on a node
@@ -30,6 +31,7 @@ export type NodeAttachment = z.infer<typeof nodeAttachmentSchema>
 // docs/data-layer.md § Data root for why its schema tolerates unknown keys and no longer carries a
 // protocol version.
 export const nodeIdentitySchema = z.object({
+  baseline: z.literal(ACORN_BASELINE),
   nodeId: z.string().uuid(),
   createdAt: z.number().int().positive(),
   // Absent until the first successful bind. 0 is never persisted: it means "pick an ephemeral port".
@@ -51,7 +53,7 @@ export const nodeIdentitySchema = z.object({
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 
-// GET /v2/node. See docs/api-reference.md § Versioning for why this is the most tolerant surface in
+// GET /v1/node. See docs/api-reference.md § Versioning for why this is the most tolerant surface in
 // the system and stays additive-forever.
 //
 // `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex) and is always
@@ -59,6 +61,7 @@ export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 // one. `nodeId` appears only for an authenticated caller, because anything that can reach the port
 // can read the unauthenticated form.
 export const nodeInfoSchema = z.object({
+  baseline: z.literal(ACORN_BASELINE),
   protocolVersion: z.number().int().positive(),
   fingerprint: z.string().min(1),
   nodeId: z.string().optional(),
@@ -66,7 +69,7 @@ export const nodeInfoSchema = z.object({
 
 export type NodeInfo = z.infer<typeof nodeInfoSchema>
 
-// POST /v2/pair. Validated with zod rather than hand-checked because this is the one route an
+// POST /v1/pair. Validated with zod rather than hand-checked because this is the one route an
 // unpaired caller can reach: unknown fields are rejected (strictObject) and the lengths are bounded
 // before the code ever reaches the pairing window.
 export const pairRequestSchema = z.strictObject({
@@ -93,11 +96,12 @@ export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 // client that pairs successfully and then refuses the answer because it grew a field is a client that
 // cannot be upgraded past.
 export const pairResultSchema = z.object({
+  baseline: z.literal(ACORN_BASELINE),
   deviceToken: z.string().min(1),
   nodeId: z.string().min(1),
   device: pairedDeviceSchema,
 })
 export type PairResult = z.infer<typeof pairResultSchema>
 export type DevicesResponse = { devices: PairedDevice[] }
-// POST /v2/core/pair/start: the code the node displays (QR + text) and how long it lives.
+// POST /v1/core/pair/start: the code the node displays (QR + text) and how long it lives.
 export type PairingWindow = { code: string; expiresInMs: number }

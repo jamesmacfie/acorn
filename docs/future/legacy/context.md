@@ -1,6 +1,7 @@
 # Context and coverage
 
-Date: 2026-09-21. Status: analysis complete; proposed changes not implemented.
+Date: 2026-09-21. Status: historical pre-implementation analysis. Tickets 01–12 implemented;
+[ticket 13](./13-acceptance.md) records acceptance. The owning reference docs describe current behaviour.
 Evidence baseline: `9727fd85`. Start with the [programme](./README.md).
 
 ## Goal and constraints

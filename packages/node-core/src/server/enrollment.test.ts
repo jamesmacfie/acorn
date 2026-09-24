@@ -53,7 +53,7 @@ describe('enrollNode', () => {
     expect(outcome).toEqual({ kind: 'skipped', reason: 'unconfigured' })
     // Byte-for-byte: the file the data root wrote at open, untouched. This is the promise every
     // existing install depends on.
-    expect(JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))).toEqual({ nodeId: root!.nodeId, createdAt: expect.any(Number) })
+    expect(JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))).toEqual({ baseline: 'acorn-1', nodeId: root!.nodeId, createdAt: expect.any(Number) })
     expect(await deviceService(core.db).list()).toEqual([])
   })
 
@@ -64,6 +64,7 @@ describe('enrollNode', () => {
 
     const [enrolled] = stub.inventory()
     expect(enrolled).toEqual({
+      baseline: 'acorn-1',
       protocolVersion: 1,
       nodeId: root!.nodeId,
       endpoint: 'https://node.example:4317',

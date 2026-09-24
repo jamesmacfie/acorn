@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, afterEach, describe, expect, it } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { AgentStore } from './store'
 
 const PROVIDER: AgentProviderDescriptor = {

@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { CommandExecutionContext, ContributedCommand } from '@acorn/plugin-api/client'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 import type { AgentPaneModel, SessionAction } from './agentPaneModel'
 
 // The header's chip: a session a workflow started says which one, and pressing it opens the run

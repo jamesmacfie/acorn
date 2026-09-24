@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { defaultBudgets, publicProvider } from '../integrations/providerShared'
-import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { schema } from '../db'
 import { ToolError } from './registry'
@@ -29,7 +29,7 @@ const ctx = { taskId: 'task-1', userLogin: 'owner' }
 
 async function connect(db: TestDb, id: string, provider: string, status = 'connected'): Promise<void> {
   await db.db.insert(schema.integrations).values({
-    id, userId: 'owner', provider, status, authRef: `secret:${id}`, label: id, createdAt: 1, updatedAt: 1,
+    id, userId: 'owner', provider, status, encryptedCredentials: `secret:${id}`, label: id, createdAt: 1, updatedAt: 1,
   } as never)
 }
 

@@ -1,11 +1,15 @@
 {
   "name": "@acorn/custody",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "What a host needs around the service: the request broker, credential custody, the plugin cache, and child supervision.",
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    "./broker": "./src/broker/public.ts",
+    "./broker/nodePairing.ts": "./src/broker/nodePairing.ts",
+    "./custody/deviceTokenStore.ts": "./src/custody/deviceTokenStore.ts",
+    "./plugins": "./src/plugins/public.ts",
+    "./runtime": "./src/runtime/public.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

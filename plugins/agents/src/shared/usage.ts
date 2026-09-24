@@ -1,8 +1,8 @@
-export const agentUsageRoute = '/v2/p/agents/usage'
-export const agentUsageRefreshRoute = '/v2/p/agents/usage/refresh'
+export const agentUsageRoute = '/v1/p/agents/usage'
+export const agentUsageRefreshRoute = '/v1/p/agents/usage/refresh'
 
 // A harness id, not a member of a closed set, because harnesses are a contribution point
-// (docs/managed-agents.md § Harnesses). The durable model in @acorn/protocol/managedAgents.ts already
+// (docs/managed-agents.md § Harnesses). The durable model in @acorn/plugin-agents/contract/wire already
 // keeps `providerId` a plain string.
 export type AgentUsageProviderId = string
 export type AgentUsageHealth = 'healthy' | 'warning' | 'critical' | 'depleted' | 'unknown'

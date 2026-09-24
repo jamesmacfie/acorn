@@ -4,8 +4,7 @@ import type { NoteKind, NoteLocation } from '@acorn/protocol/notes.ts'
 import { NOTES_STORE } from '../../contract/store'
 import { type AppEnv, requireDevice, respondError, viaBridge } from '@acorn/plugin-api/node'
 
-// Notes owns this route surface. The memory plugin keeps the old /v2/p/memory/* note paths as a
-// compatibility alias for clients and agent prompts that may have retained them.
+// Notes owns this route surface.
 const createBody = z.object({ title: z.string(), kind: z.enum(['scratch', 'plan', 'finding', 'handoff']).optional() })
 const writeBody = z.object({ body: z.string() })
 const includedBody = z.object({ included: z.boolean() })

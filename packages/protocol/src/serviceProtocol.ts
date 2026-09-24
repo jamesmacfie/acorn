@@ -1,8 +1,8 @@
 import { z } from 'zod'
+import { ACORN_BASELINE } from './baseline.ts'
 
-// Version 3: the parent may hand the service a read-only directory of app-bundled plugin packages to
-// reconcile before plugin discovery. A version bump is a hard break; parent and child ship together.
-export const SERVICE_PROTOCOL_VERSION = 3
+// Parent and child ship together. A version bump is a hard break.
+export const SERVICE_PROTOCOL_VERSION = 1
 
 export const serviceStateSchema = z.enum([
   'starting',
@@ -21,6 +21,7 @@ export const serviceStateEventSchema = z.strictObject({
 })
 
 export const serviceStartConfigSchema = z.strictObject({
+  baseline: z.literal(ACORN_BASELINE),
   dataDir: z.string().min(1),
   // No clientDir: the node serves no web assets (docs/architecture-overview.md). The renderer ships with
   // the desktop app and loads from app://acorn, so there is nothing about the renderer's layout the
@@ -51,6 +52,7 @@ export const serviceEndpointSchema = z.strictObject({
 export type ServiceEndpoint = z.infer<typeof serviceEndpointSchema>
 
 export const serviceStartResultSchema = z.strictObject({
+  baseline: z.literal(ACORN_BASELINE),
   state: serviceStateSchema,
   nodeId: z.string().uuid(),
   endpoint: serviceEndpointSchema,

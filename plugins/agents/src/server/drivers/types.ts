@@ -6,7 +6,7 @@ import type {
   AgentProviderDescriptor,
   AgentSession,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 /**
  * Binary output from a provider before Acorn takes custody of it. This type never crosses the wire

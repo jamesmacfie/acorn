@@ -2,7 +2,7 @@
 
 Keyboard commands are registered by the shell and feature contributions.
 
-**One session draws both palettes.** `client-core/host/registries/commands/session.ts` owns what is
+**One session draws both palettes.** `client-core/host/registries/commands/sessionStore.ts` owns what is
 open, where in the command tree it is, what is under the cursor, and what pressing Enter does. The
 desktop's `CommandPalette.tsx` and the terminal's `chrome/Palette.tsx` render it and bind keys to it;
 neither fetches a row or invokes one. Until 2026-09-03 each host did all of that itself, twice, which
@@ -130,7 +130,7 @@ the Agent Center, a session search, the two harness terminals and two settings; 
 and one search over containers, images, volumes and networks; terminal a run-target search, a layout
 search and a session search; workflows a definition search, a run search and a create action; database and http their groups of saved
 rows and one submitted input each; linear and rollbar an issue search each; memory a search, explicit
-**Review learnings** preparation, and the legacy proposals view; notes a three-scope finder and a create-a-note input; changes, context and preview one
+**Review learnings** preparation, and the canonical review page; notes a three-scope finder and a create-a-note input; changes, context and preview one
 open action each; and onboarding none. Each plugin's own document has the whole of its share under
 "From the command palette". What is *not* there is the point: stopping an agent, removing a container, deleting a
 note, merging a pull request and approving a workflow gate all need context and a confirmation that a
@@ -182,8 +182,8 @@ Run targets, layout recipes and workflow definitions come from the Node's task c
 once when their frame opens and filtered on the device after that. Pane and source commands are
 registered by their owning plugin. A loaded plugin's manifest `commands` descriptors are
 promoted into the same command registry: one command supplies both its optional palette row and any
-keybinding target. The older manifest `palette` array is a compatibility alias for a command with
-`palette: true`; it is rewritten into one at registration and never produces a second row.
+keybinding target. Every manifest command states its `kind`; its `palette` flag controls whether it
+appears in the palette.
 
 A manifest may declare an action, a group, a search, an input or a setting
 (`docs/plugins.md § Command kinds`).
@@ -228,6 +228,9 @@ Core's own row actions register there too, which is what keeps the contract hone
 User-configured shortcuts outrank defaults. Among defaults, first-party bindings win, then loaded
 plugins in lockfile installation order with plugin id as the stable tiebreak. A losing binding is
 unbound and named as a conflict; no fallback chord is invented.
+Settings store overrides by command id in the device-owned `keybindings` preference. A `null` or
+empty override unbinds a command; resetting it restores the default. The old pane-specific shortcut
+map is not read.
 
 ## What the palette refuses
 

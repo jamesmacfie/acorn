@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
+import type { LayoutProps } from '@acorn/client-core/host/layouts'
 import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 

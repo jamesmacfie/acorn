@@ -30,15 +30,15 @@ describe('CoreServices.projects', () => {
     ])
     await testDb.db.insert(schema.integrations).values([
       {
-        id: 'rollbar-a', userId: 'owner', provider: 'rollbar', label: 'Rollbar A', authRef: 'secret',
+        id: 'rollbar-a', userId: 'owner', provider: 'rollbar', label: 'Rollbar A', encryptedCredentials: 'secret',
         createdAt: now, updatedAt: now,
       },
       {
-        id: 'rollbar-b', userId: 'owner', provider: 'rollbar', label: 'Rollbar B', authRef: 'secret',
+        id: 'rollbar-b', userId: 'owner', provider: 'rollbar', label: 'Rollbar B', encryptedCredentials: 'secret',
         createdAt: now, updatedAt: now,
       },
       {
-        id: 'linear-a', userId: 'owner', provider: 'linear', label: 'Linear A', authRef: 'secret',
+        id: 'linear-a', userId: 'owner', provider: 'linear', label: 'Linear A', encryptedCredentials: 'secret',
         createdAt: now, updatedAt: now,
       },
     ])

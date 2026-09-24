@@ -2,3 +2,4 @@
 //
 //   apps/desktop/test/integration/taskBridge.test.ts   terminalApi
 export { terminalApi } from '../client/terminalClient'
+export { activeTerminal, initSessions, rememberActiveTerminal, sessions } from '../client/sessionStore'

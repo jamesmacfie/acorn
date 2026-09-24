@@ -49,7 +49,7 @@ At first boot, given both variables, the node (`packages/node-core/src/server/en
 1. mints its TLS certificate exactly as it always does,
 2. issues itself a device token — a device row of its own, separate from the launcher's, so detaching
    later revokes one thing,
-3. posts `{protocolVersion, nodeId, endpoint, fingerprint, deviceToken}` to
+3. posts `{baseline, protocolVersion, nodeId, endpoint, fingerprint, deviceToken}` to
    `${ACORN_CONTROL_PLANE_URL}/enroll`, authenticated by the enrollment token as a bearer,
 4. records the attachment in `node.json` and writes a `node.enrolled` audit row.
 
@@ -78,6 +78,7 @@ Version 1. The schema is `packages/protocol/src/enrollment.ts` and the published
 
 ```json
 {
+  "baseline": "acorn-1",
   "protocolVersion": 1,
   "nodeId": "7f3c9c1e-5b2a-4d1e-9f77-2a5c8d0b1e44",
   "endpoint": "https://node-17.example:4317",
@@ -101,7 +102,7 @@ inspection ([architecture-overview.md](./architecture-overview.md) § The three 
 
 The reply is an acknowledgement. A 2xx *is* the acknowledgement; the body may carry
 `{"controlPlaneName": "…"}`, which the node stores and shows its owner. The response is parsed
-tolerantly, for the same reason `GET /v2/node` is the most tolerant surface in the system: a node that
+tolerantly, for the same reason `GET /v1/node` is the most tolerant surface in the system: a node that
 refuses an otherwise-successful enrollment because the answer grew a field is a node no control plane
 can ever extend.
 
@@ -133,7 +134,7 @@ Not a table, and not a second identity. Two things now write `node.json` — thi
 the detach route, in a later process — so every write is a read-modify-write against the file rather
 than a serialisation of a cached copy. A writer that forgot would silently drop the other's field.
 
-`GET /v2/core/attachment` reads it and `DELETE /v2/core/attachment` detaches. Both are device-only, like
+`GET /v1/core/attachment` reads it and `DELETE /v1/core/attachment` detaches. Both are device-only, like
 devices and plugins: the read names a control plane and a device row, and the delete revokes a
 credential. There is deliberately **no attach route**. Attaching happens once, at first boot, from the
 environment the provisioner set; an HTTP attach would be a way to hand a stranger a durable credential

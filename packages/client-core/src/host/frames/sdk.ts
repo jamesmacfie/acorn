@@ -67,7 +67,7 @@ export type AcornBridgeApi = {
    * `JSON.parse`. Base64 over that would add a third to the wire, two copies in memory, and a decode on
    * each side, for a file the host was already carrying as bytes.
    *
-   * The same permission decision as `get`, made at the same point: your own `/v2/p/<your id>/` namespace
+   * The same permission decision as `get`, made at the same point: your own `/v1/p/<your id>/` namespace
    * and nothing else. Capped at 12 MiB either way.
    */
   getBytes(path: string, options?: { signal?: AbortSignal }): Promise<PluginByteResponse>

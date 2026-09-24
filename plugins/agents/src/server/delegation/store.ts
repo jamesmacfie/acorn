@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
-import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
+import type { AgentSession } from '../../contract/wire.ts'
+import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import * as schema from '../../node/schema'
 
 export type AgentSpawnState = 'creating' | 'provisioned' | 'failed'

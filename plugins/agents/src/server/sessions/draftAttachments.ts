@@ -3,7 +3,7 @@ import type {
   DraftAttachmentBytes,
   DraftAttachmentsCapability,
 } from '../../contract/draftAttachments'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 import { imageEditKind, type AgentAttachmentStore } from './attachmentStore'
 
 // The `agents.draftAttachments` capability over the attachment store (../../contract/draftAttachments.ts).

@@ -5,7 +5,7 @@
 // session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
-import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSessionSnapshot } from '../../contract/wire.ts'
 import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'

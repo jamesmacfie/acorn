@@ -22,9 +22,6 @@ const context: TaskContext = {
     compact: '## Linked issues\n- ENG-1 Fix it',
     omitted: 0,
   }],
-  issues: [{ provider: 'linear', identifier: 'ENG-1', title: 'Fix it', detail: 'Open', cache: 'present' }],
-  notes: [],
-  memory: [],
 }
 
 afterEach(() => {
@@ -42,7 +39,7 @@ describe('task agent context contribution', () => {
 
     const snapshots = await taskContextAgentContribution.capture({ taskId: 'task-1' })
 
-    expect(fetch).toHaveBeenCalledWith('/v2/core/tasks/task-1/context', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenCalledWith('/v1/core/tasks/task-1/context', expect.objectContaining({ signal: undefined }))
     expect(snapshots).toHaveLength(1)
     expect(snapshots[0]).toMatchObject({
       label: 'Task context',
@@ -62,7 +59,7 @@ describe('task agent context contribution', () => {
 
     await taskContextAgentContribution.capture({ taskId: 'task-1' })
 
-    expect(fetch).toHaveBeenCalledWith('/v2/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenCalledWith('/v1/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
   })
 
   it('lists selectable sections and captures the modal selection', async () => {
@@ -80,7 +77,7 @@ describe('task agent context contribution', () => {
     }])
     await taskContextAgentContribution.capture({ taskId: 'task-1' }, ['issues'])
 
-    expect(fetch).toHaveBeenNthCalledWith(1, '/v2/core/tasks/task-1/context?include=*', expect.objectContaining({ signal: undefined }))
-    expect(fetch).toHaveBeenNthCalledWith(2, '/v2/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenNthCalledWith(1, '/v1/core/tasks/task-1/context?include=*', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenNthCalledWith(2, '/v1/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
   })
 })

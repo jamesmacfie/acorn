@@ -9,12 +9,12 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "backup:verify": "node scripts/verify-backup.mjs",
     "db:check": "node scripts/db.mjs check",
     "db:generate": "node scripts/db.mjs generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
     "db:reset": "node scripts/db-reset.mjs",
-    "db:transition:workflow-v2": "node scripts/workflow-v2-transition.mjs",
     "dev": "turbo run dev",
     "dev:agent": "pnpm --filter @acorn/desktop dev:agent",
     "dev:agent:smoke": "pnpm --filter @acorn/desktop dev:agent:smoke",

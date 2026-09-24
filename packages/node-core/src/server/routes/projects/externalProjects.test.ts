@@ -4,7 +4,7 @@ import type { IntegrationMapping, IntegrationMappingsResponse, IntegrationProjec
 import { getDb, schema } from '../../db'
 import { SecretService } from '../../core/secrets'
 import type { AppEnv } from '../../middleware/auth'
-import { connectionProviderRegistry } from '../../integrations/connectionRegistry'
+import { connectionProviderRegistry } from '../../integrations/connectionProviders/registry'
 import { defaultBudgets, publicConnectionProvider } from '../../integrations/providerShared'
 import type { ProviderProjectSource } from '../../integrations/types'
 import { integrations } from '../integrations'
@@ -96,14 +96,14 @@ describe('workspace external projects, end to end', () => {
     }), OWNER)
 
     const now = Date.now()
-    const authRef = await SECRETS.seal('live-token')
+    const encryptedCredentials = await SECRETS.seal('live-token')
     for (const [id, providerId] of [['tracker-1', 'tracker'], ['errors-1', 'errors'], ['broken-1', 'broken']]) {
       await t.db.insert(schema.integrations).values({
         id: id!,
         userId: USER,
         provider: providerId!,
         label: `${providerId} one`,
-        authRef,
+        encryptedCredentials,
         authKind: 'api-key',
         account: null,
         scopes: '[]',

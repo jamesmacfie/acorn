@@ -19,6 +19,7 @@ import type {
   WorkflowScheduleView,
 } from '../../shared/workflowSchedules'
 import TypedValueField from '../editor/TypedValueField'
+import { rememberWorkflowRun } from '../runs/runStore'
 import { workflowsSurfacePath } from '../surfacePath'
 import { workflowApi } from '../workflowsClient'
 import { closeWorkflowSchedule, scheduleRequest, type ScheduleRequest } from './scheduleRequest'
@@ -168,6 +169,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     const latest = schedule()?.latest
     const task = (tasks.data ?? []).find(candidate => candidate.id === latest?.taskId)
     if (!latest || !task) return
+    rememberWorkflowRun(task.id)
     closeWorkflowSchedule()
     navigate(`${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(latest.runId)}`)
   }

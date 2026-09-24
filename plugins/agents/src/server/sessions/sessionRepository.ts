@@ -9,8 +9,8 @@ import type {
   AgentSession,
   AgentSubagent,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
-import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
+import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '../../contract/wire.ts'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
 import { eventSubagentId, foldSubagentRoster, projectAgentEvent, touchSubagentRoster } from './stateMachine'

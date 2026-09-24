@@ -16,8 +16,8 @@ supervises the helper, and opens the window. `setup` blocks on the helper and no
 renderer's first act is to ask which nodes there are, the fleet is a file on the helper's disk, and a
 window that opened before the helper existed could not ask.
 
-**The ready line means "the helper is listening", not "the node is up.**" `boot()` in
-`apps/desktop/src/helper/helperMain.ts` adopts any legacy custody, loads the env files, builds the
+**The ready line means "the helper is listening", not "the node is up."** `boot()` in
+`apps/desktop/src/helper/helperMain.ts` loads the env files, builds the
 helper, binds the WebSocket server, and prints the ready line. Only then does it start the node, with
 `helper.startInBackground()`. So the window opens on a helper that can answer the fleet question, and
 the Node's own boot happens behind the startup loader. Its first `node-status` push releases the
@@ -57,7 +57,7 @@ The writable app-data root, holding the SQLite databases, blobs, worktrees, and 
 uses the OS application-data path. The shell's own custody root is a separate directory: `fleet.json`
 and the encrypted device tokens belong to this application, not to the node. Packaged, that is the
 application-data directory itself with the node's root beneath it; in a checkout it is
-`apps/node/.acorn/shell`.
+`apps/node/.acorn-shell` (or `<ACORN_DATA_DIR>-shell` when that override is set).
 
 Secrets load from `.env` in two places, in order: the build's own file, then a user-provided `.env`
 inside the data directory, which wins. `SESSION_ENC_KEY` falls through to the node's own generated
@@ -80,7 +80,7 @@ shell, which is not mounted while the recovery gate is showing.
 
 Rust holds one secret: a 32-byte data key in the OS keychain, under service `acorn` and account
 `data-key`. It reaches the helper in the stdin handshake and is never written to disk on that side.
-Device tokens are encrypted under it with AES-256-GCM, which is what `safeStorage` used to do.
+Device tokens are encrypted under it with AES-256-GCM.
 
 One key rather than one per token: per-token keychain items mean a prompt per node and ACL churn on
 every rebuild. The file fallback, a `0600` file beside the fleet, is not an edge case on macOS. A
@@ -89,10 +89,8 @@ either re-prompts or loses access. A dev build skips the keychain entirely and u
 the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius as the node's own
 `session.key`.
 
-A packaged build's first launch adopts an Electron-era custody root if it finds one:
-`packages/custody/src/custody/legacyCustody.ts` copies `fleet.json`, the trust store, and the
-content-addressed plugin cache, and re-encrypts the device tokens from Chromium's `os_crypt` under
-the data key. Rust reads the old keychain item and passes both in the handshake.
+The helper opens only this installation's custody root. Its handshake carries the current data key
+and paths; it does not read credentials from another application root.
 
 ## Node child
 
@@ -222,7 +220,7 @@ The traversal guard runs after percent-decoding, because `..` arrives encoded an
 decode does. It refuses any `..` component outright rather than normalising, since a normaliser that
 agrees with the filesystem about symlinks is a much harder thing to be sure of than a refusal.
 
-A request for `/v2/` or `/api/` gets a 404 in the wire's own JSON envelope rather than the shell's
+A request for `/v1/` or `/api/` gets a 404 in the wire's own JSON envelope rather than the shell's
 HTML. Nothing legitimate asks this origin for a node route, but the renderer's HTTP client falls back
 to a same-origin fetch when it has no active node yet, and a 200 full of markup that the caller
 parses as JSON is the worst answer available.
@@ -426,7 +424,7 @@ That surface is the implementation of the platform seam, and the renderer never 
 key fails a test instead of quietly nulling a group. Presence of a key is therefore never a product
 capability. The folder picker in particular is a folder picker. It used to sit under a `terminal` key
 whose presence gated the whole terminal, agents, run-targets, and workflows block, which are ordinary
-`/v2` and WebSocket surfaces.
+`/v1` and WebSocket surfaces.
 
 ## The plugin frame origin
 
@@ -471,7 +469,7 @@ else. It fires for subframes as well as the main frame, which is the one guard c
 Electron needed two events for: a plugin origin can never become the whole window, and a plugin frame
 cannot navigate itself off its own document. Returning false leaves the frame where it was, verified
 in phase 0. There is no OAuth exception: GitHub connects by device flow against the node
-(`POST /v2/p/github/auth/device/start`), so no window ever has to navigate to github.com.
+(`POST /v1/p/github/auth/device/start`), so no window ever has to navigate to github.com.
 `on_new_window` denies `window.open` from anywhere, plugin frames included.
 
 A frame's rendered content therefore reaches the outside world only by asking, over the bridge.
@@ -558,7 +556,7 @@ produced can be adopted, and the helper's `node-adopt` handler is the whole of i
 ([plugins.md](./plugins.md) § Node providers).
 
 It is narrower than "a second door" sounds. The renderer names a source node, a provider id and a
-provider node id — nothing else. The helper then asks that node's `POST /v2/core/nodes/adopt` for the
+provider node id — nothing else. The helper then asks that node's `POST /v1/core/nodes/adopt` for the
 endpoint, the fingerprint and the device token, probes the endpoint itself, and refuses a certificate
 whose fingerprint is not the one the provider vouched for. So the renderer cannot introduce a node of
 its own invention, and no device token crosses the bridge in either direction, which is the same
@@ -605,7 +603,7 @@ which runs Playwright against a browser of the node's own, so an agent on a head
 
 The preview home is nevertheless node-owned. `preview.urls` resolves, in order, a layout recipe's
 selected target URL, the running default target, and the project's URL, port, or script setting;
-script discovery runs on the node in the task worktree. The pane reads `/v2/p/preview/tasks/:id/url`
+script discovery runs on the node in the task worktree. The pane reads `/v1/p/preview/tasks/:id/url`
 and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url` and `source` are
 `null` when the last preview disappears, so a headless node and every
 connected client agree on the answer. The terminal recipe picker reaches preview through the
@@ -646,7 +644,7 @@ in the helper.
 `packages/protocol/src/serviceProtocol.ts` defines the versioned lifecycle messages between the
 helper and the node it supervises: `service.start`, `service.stop`, and `service.preview-rules`. Both
 endpoints validate messages with Zod, and pending calls reject on timeout or peer exit. Product
-requests do not use this RPC; they use `/v2` over the broker.
+requests do not use this RPC; they use `/v1` over the broker.
 
 The peer is symmetric, but every method is one the helper calls on the node. The other direction had
 one user, the Electron preview pane's `desktop.preview-*` handlers, and it went with that shell: the

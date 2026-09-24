@@ -1,5 +1,6 @@
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { contextSnapshot, refreshSessions, sessions } from '@acorn/plugin-api/client'
+import { contextSnapshot } from '@acorn/plugin-api/client'
+import { refreshSessions, sessions } from './sessionStore'
 
 export const terminalAgentContextContribution: AgentContextContribution = {
   id: 'acorn-terminals',

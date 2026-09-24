@@ -4,9 +4,10 @@ Workflows are durable Node orchestration. A definition is either a committed
 `.acorn/workflows/*.toml` file or a `workflow_defs` row the owner typed in the app, and the two are
 read as one list. SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.
 
-## Version 2 values
+## Version 1 values
 
-Definitions use `formatVersion: 2` (`format_version = 2` in TOML). Each step has a stable `id`
+Definitions require `baseline: "acorn-1"` and `formatVersion: 1` (`baseline = "acorn-1"` and
+`format_version = 1` in TOML). Each step has a stable `id`
 and a separate human-readable `name`. Edges, branches, bindings, prompt references, and device layout
 positions use the ID. Renaming changes the label; the frozen run maps persisted row indices to its
 own frozen definition IDs. An omitted `after` still means the preceding step, and explicit edges
@@ -27,7 +28,7 @@ enter a handler's `predecessorValues`; a completed sibling cannot supply a bindi
 Named definition `outputs` declare `{ name, schema, binding, required? }`. Output bindings select
 completed step values. A child step exposes these as `outputs`, alongside its task/run/status summary;
 consumers do not need to inspect the last transcript message. The Node validates structural step
-outputs before completing a v2 step and validates declared workflow outputs before completing a run.
+outputs before completing a step and validates declared workflow outputs before completing a run.
 Workflow values are bounded by the shared 16 MiB selection limit; provider record/detail limits remain
 separate. Prompt/title rendering serializes objects deterministically without truncation.
 
@@ -38,7 +39,7 @@ the JSON tab exposes the complete schema and binding contract.
 
 Unversioned definitions, missing stable IDs, old binding tables, and unknown versions are refused
 with a file-located upgrade diagnostic. There is no read-normalization or execution adapter. The
-development-state transition exports then removes old database definitions before v2 is admitted.
+development-state transition exports then removes old database definitions before this baseline is admitted.
 
 ## Execution model
 
@@ -141,7 +142,7 @@ siblings. Two investigators reading the same checkout can share a task; child wo
 
 ### Retry
 
-`POST /v2/p/workflows/workflows/runs/:runId/retry` takes a `stepId` and an optional `prompt`. The run
+`POST /v1/p/workflows/workflows/runs/:runId/retry` takes a `stepId` and an optional `prompt`. The run
 must be `failed` or at a safety rail, and so must the step. The step goes back to `pending` with its
 error cleared and its iteration count kept, every skipped step that only the retried step could reach
 comes back with it, and the run returns to `running`. A step with a managed session reuses it, so a
@@ -236,34 +237,34 @@ A definition does not have to be a file. `workflow_defs`, in this plugin's own S
 the owner typed in the app: a workspace id, an optional project id, the definition as JSON, and a
 `revision` that a save checks. A row bound to no project can run on any task in its workspace.
 
-**Two stores, one read.** `GET /v2/p/workflows/defs?workspaceId=` folds three layers into one list:
+**Two stores, one read.** `GET /v1/p/workflows/defs?workspaceId=` folds three layers into one list:
 this workspace's rows, every project's committed files, and `~/.acorn/workflows`. A repo id beats a
 user id beats a row id, so a definition somebody can review in a pull request always wins. Each entry
 says which layer it came from and which project it belongs to. The task-scoped
-`GET /v2/p/workflows/tasks/:id/workflows` answers the same three layers for one task, which is what
+`GET /v1/p/workflows/tasks/:id/workflows` answers the same three layers for one task, which is what
 the palette searches.
 
 **Two trust stories.** A committed file is executable configuration somebody put in the repository,
 so starting a run from one hashes the snapshot and asks for an acknowledgement. A row was typed by
 the node's owner in this app, behind the device gate, so there are no committed bytes to hash and the
-snapshot check does not apply. That is the whole reason every route under `/v2/p/workflows/defs` is
+snapshot check does not apply. That is the whole reason every route under `/v1/p/workflows/defs` is
 device-only, and the reason a start by id refuses a row to a task-confined caller: an agent inside a
 run may start a file, because the snapshot covers it, and may not start a row.
 
-**Starting by id.** `POST /v2/p/workflows/tasks/:id/workflows` takes `{ defId }` and optional typed
+**Starting by id.** `POST /v1/p/workflows/tasks/:id/workflows` takes `{ defId }` and optional typed
 inputs. Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
 
 **A row is a draft.** Neither write validates, because a workflow being built is invalid for most of
 the time somebody is building it: it has no steps the moment it is created, and a step has no prompt
-until one is typed. `POST /v2/p/workflows/defs/validate` reports, the editor draws what it says in
+until one is typed. `POST /v1/p/workflows/defs/validate` reports, the editor draws what it says in
 its footer. Run resolves an immutable published revision, never the editable row. A file layer is different: a definition that does not
 validate is listed with its problems rather than hidden.
 
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step
 runs, not when the row is saved. The node holding a definition may not have the repository at all, so
-`POST /v2/p/workflows/defs/validate` answers the loader's own problem list and leaves the
+`POST /v1/p/workflows/defs/validate` answers the loader's own problem list and leaves the
 project-specific names to the step handlers.
 
 ### Draft recovery and publication
@@ -305,7 +306,7 @@ holds, even when the query has no consumers.
 
 ### File drafts and portable export
 
-`POST /v2/p/workflows/defs/files` accepts `open`, `save`, `review`, `export`, `publish`, `discard`,
+`POST /v1/p/workflows/defs/files` accepts `open`, `save`, `review`, `export`, `publish`, `discard`,
 and `list` operations. Device authentication protects this authoring route. File targets identify a
 project, a repository or user layer, and a confined `.acorn/workflows/<id>.toml` path.
 `workflow_file_drafts` retains the original text/hash, edited definition, and compare-and-swap
@@ -415,7 +416,7 @@ run again. Pause stops future checks, **Run now** still works while paused, an a
 surface for cancellation, and deletion retains run and processing history.
 
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
-select per option that harness advertises through `GET /v2/p/agents/providers`, then where the step
+select per option that harness advertises through `GET /v1/p/agents/providers`, then where the step
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
 never restates the model list.
 
@@ -504,7 +505,7 @@ The editor preserves unavailable targets, unsupported bindings, and malformed po
 draft, then reports each problem beside the field and in validation. Saving the draft does not make
 it runnable. The start path validates and resolves every child before it creates a task.
 
-Renaming a v2 step preserves map sources, structured bindings, graph edges, and prompt references.
+Renaming a step preserves map sources, structured bindings, graph edges, and prompt references.
 The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
 child workflow contract.
 
@@ -540,7 +541,7 @@ does not carry its protected configuration onto the replacement.
 
 What the model is told about acorn is assembled at request time, not written down. The step kinds
 with the fields each one describes, the policies and the agent profiles all come out of the same
-catalog `GET /v2/p/workflows/catalog` answers, so a plugin that contributes a step kind makes it
+catalog `GET /v1/p/workflows/catalog` answers, so a plugin that contributes a step kind makes it
 available to the model with no prompt to edit here. That list is also the list the answer is checked
 against: a kind in the catalog but missing from the prompt would be one the model can never use and
 nothing would ever strip. The workspace's own definitions ride along as worked examples, ranked so
@@ -744,7 +745,7 @@ own keys rather than keys in `with`
 asks `fieldHome(kind, fieldId)`. A kind whose description says `runsAgent` may also take `isolation`,
 `inputs`, and `config_options`, and that is the only way a contributed kind gets them.
 
-`GET /v2/p/workflows/catalog` answers the whole vocabulary: every kind with its description, every
+`GET /v1/p/workflows/catalog` answers the whole vocabulary: every kind with its description, every
 policy, and every agent profile with whether it has a managed driver and a one-shot structured mode.
 It is resolved per request rather than cached, because the plugin that fills the point may start
 after workflows does.
@@ -809,10 +810,10 @@ which every schedule already has.
 
 ## Routes and UI
 
-Node routes are under `/v2/p/workflows/` and core task run-target routes under
-`/v2/core/tasks/:id/run/*`. Both clients draw the Workflows rail source and the editor behind it
+Node routes are under `/v1/p/workflows/` and core task run-target routes under
+`/v1/core/tasks/:id/run/*`. Both clients draw the Workflows rail source and the editor behind it
 (§ Authoring), the run pane below, a Settings page that lists what a task's checkout would load,
-three command-palette rows, gate controls, and attention items. Workflow notices use `/v2/events`.
+three command-palette rows, gate controls, and attention items. Workflow notices use `/v1/events`.
 Durable run history is paged from the plugin database.
 
 ### The run pane
@@ -859,6 +860,9 @@ return route; a missing or archived task leaves the record history readable. Sel
 shows explicit parent and root links. Root-run footers report aggregate tree usage; child-run footers
 report only that run, so the same provider turn is not counted twice. The cancel confirmation says it
 cancels the run tree, and retry explains that it reuses the exact existing attempt.
+The admission ledger supplies run totals in both the task run list and these footers. Step costs remain
+visible on individual steps. A run with no admitted usage has no reported total; an admitted turn with
+no priced usage still appears as a turn without an invented dollar amount.
 
 **The conversation is here.** An agent node draws the transcript, the queue and the composer that the
 Agent pane draws, because reading what a step is saying should not mean leaving the run. It is the
@@ -906,6 +910,11 @@ transition through `running`, `gated`, `cancelling`, `done`, `failed`, `safety-r
 One `setRun` mutation funnel compares old and new state, so retries and terminal completion cannot
 drift into separate event semantics.
 
+At a terminal run status, Workflows also emits `plugin:workflows:completed` with task and run IDs,
+status, and completion time. Findings reads the persisted handoff note through
+`workflows.reviewInput.v1`; the read caps text at 16 KiB and explicitly reports an absent handoff.
+The capability lists up to 256 completed runs per task for startup reconciliation.
+
 Events remain invalidation hints. The run pane and its task-run index re-read after reconnect, so a
 missed child, run, or gate frame cannot leave durable state stale. These resources are mounted inside
 the active Node's client partition; identical task and run IDs on another Node do not share state.
@@ -950,14 +959,15 @@ characters. Rollbar's list carries no prose at all — an item's body is its sta
 send the facts they already have: level, environment, occurrence count, and the permalink. GitHub
 sends the pull's body when the row's detail is already warmed, and the title alone when it is not.
 
-**The box** is the promote-to-task modal with a workflow step over its tabs
-(`packages/client-core/src/features/integrations/PromoteToTaskModal.tsx`): a picker, one field per
-declared input with the prefilled values editable, then the existing **New task** and **Attach to
-task** tabs. The primary button reads **Create & run** or **Attach & run** and is refused while a
-required input is empty. Making or attaching the task is the source's registered `promotion`, which
-is why one component serves all three trackers; starting the run is this plugin's, through the same
-route the editor's **Run** and the palette use, so a refusal reads the same everywhere. On success
-the modal closes and the task opens at `?pane=workflows&item=<runId>`.
+**The box** is the shared promote-to-task modal
+(`packages/client-core/src/features/integrations/PromoteToTaskModal.tsx`). Workflows'
+`StartFromItemHost` supplies the picker, editable typed inputs, readiness rule, and **run** action.
+The modal supplies the **New task** and **Attach to task** tabs through the source's registered
+`promotion`. Its primary button reads **Create & run** or **Attach & run** and is disabled while a
+required input is empty. A failed workflow start keeps the created or attached task for retry, so
+the next press starts on that same task. Starting the run uses the same route as the editor's **Run**
+and the palette. On success the modal closes and the task opens at
+`?pane=workflows&item=<runId>`.
 
 The modal is drawn in the shell's `overlay` slot, because the list the row sits on belongs to
 somebody else. The terminal client mounts no overlay slot and its descriptor source panel draws no row

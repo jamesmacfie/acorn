@@ -43,7 +43,7 @@ describe('memory-owned findings promotion receipts', () => {
     } as unknown as MemoryKnowledge
     const findings: FindingsReviewCapability = { candidate: async () => ({ ...row, status: state }), bundles: async () => [], observations: async () => [] }
     const linked = vi.fn().mockRejectedValueOnce(new Error('findings temporarily unavailable')).mockResolvedValue(undefined)
-    const controller: FindingTargetController = {
+    const controller: FindingTargetController = { submitProposal: async () => { throw new Error('unused') },
       applying: async () => { state = 'applying'; return { ...row, status: state } },
       applied: async () => { await linked(); state = 'applied'; return { ...row, status: state } },
       conflict: async () => ({ ...row, status: 'conflict' }),
@@ -72,6 +72,7 @@ describe('memory-owned findings promotion receipts', () => {
     const linked = vi.fn().mockRejectedValueOnce(new Error('findings temporarily unavailable')).mockResolvedValue(undefined)
     const target = createMemoryFindingsTarget({ db: store.db, memory, capabilities: { get: () => findings }, homeDir: home, announce: () => {} })
     target.contribution.connect({
+      submitProposal: async () => { throw new Error('unused') },
       applying: async () => { state = 'applying'; return { ...row, status: state } },
       applied: async () => { await linked(); state = 'applied'; return { ...row, status: state } },
       conflict: async () => ({ ...row, status: 'conflict' }),
@@ -95,7 +96,7 @@ describe('memory-owned findings promotion receipts', () => {
     let row!: FindingCandidateRevision
     const findings: FindingsReviewCapability = { candidate: async () => row, bundles: async () => [], observations: async () => [] }
     const conflicted = vi.fn(async () => ({ ...row, status: 'conflict' as const }))
-    const controller: FindingTargetController = { applying: async () => ({ ...row, status: 'applying' }), applied: async () => ({ ...row, status: 'applied' }), conflict: conflicted }
+    const controller: FindingTargetController = { submitProposal: async () => { throw new Error('unused') }, applying: async () => ({ ...row, status: 'applying' }), applied: async () => ({ ...row, status: 'applied' }), conflict: conflicted }
     const target = createMemoryFindingsTarget({ db: store.db, memory, capabilities: { get: () => findings }, homeDir: home, announce: () => {} })
     target.contribution.connect(controller)
     const validated = await target.contribution.validate({ scope: { kind: 'project', projectId: 'project-1' }, payload: { operation: 'add', name: 'owner-boundaries', type: 'architecture', description: 'Revised.', body: 'Revised body.', scope: { kind: 'project', projectId: 'project-1' } } })
@@ -115,7 +116,7 @@ describe('memory-owned findings promotion receipts', () => {
     const findings: FindingsReviewCapability = { candidate: async () => row, bundles: async () => [], observations: async () => [] }
     const conflicted = vi.fn(async () => ({ ...row, status: 'conflict' as const }))
     const target = createMemoryFindingsTarget({ db: store.db, memory, capabilities: { get: () => findings }, homeDir: home, announce: () => {} })
-    target.contribution.connect({ applying: async () => ({ ...row, status: 'applying' }), applied: async () => ({ ...row, status: 'applied' }), conflict: conflicted })
+    target.contribution.connect({ submitProposal: async () => { throw new Error('unused') }, applying: async () => ({ ...row, status: 'applying' }), applied: async () => ({ ...row, status: 'applied' }), conflict: conflicted })
     const validated = await target.contribution.validate({ scope: { kind: 'project', projectId: 'project-1' }, payload: { operation: 'add', name: 'owner-boundaries', type: 'architecture', description: 'Revised.', body: 'Revised body.', scope: { kind: 'project', projectId: 'project-1' } } })
     row = { ...candidate(validated.payload, validated.payloadHash), base: validated.base ?? null }
     await writeMemoryFile(dir, { name: 'owner-boundaries', type: 'decision', description: 'Original.', body: 'Original body.', originSessionId: null, commitSha: null, supersededBy: null, createdAt: 1 })

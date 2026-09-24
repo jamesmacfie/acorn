@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
+import { testSecretEnv } from '@acorn/node-core/testkit'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -14,10 +14,10 @@ import { rollbarFetch } from '@acorn/plugin-rollbar/testkit'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/plugin-rollbar/testkit'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
-import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
+import { integrations } from '@acorn/node-core/server/routes'
 import { createRollbarFetch } from '@acorn/plugin-rollbar/testkit'
-import { servePluginFetch } from '@acorn/node-core/server/pluginHost/fetchRoute.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { servePluginFetch } from '@acorn/node-core/server/pluginHost'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import '../../helpers/registerProviders'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
@@ -101,7 +101,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations.md § Rollbar)
       new Request('http://acorn.test/api/integrations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ provider: 'rollbar', token: 'read-token' }),
+        body: JSON.stringify({ provider: 'rollbar', credentials: { token: 'read-token' } }),
       }),
       env(),
     )
@@ -113,7 +113,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations.md § Rollbar)
     const id = await connect()
     const [row] = await t.db.select().from(schema.integrations)
     expect(row.id).toBe(id)
-    expect(row.authRef).not.toContain('read-token')
+    expect(row.encryptedCredentials).not.toContain('read-token')
     expect(JSON.parse(row.config)).toEqual({ projectId: '7' })
 
     const listed = await app.fetch(new Request('http://acorn.test/api/integrations'), env())
@@ -124,12 +124,35 @@ describe('Rollbar source (docs/integrations.md, docs/integrations.md § Rollbar)
     vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('nope', { status: 401 }))
     const res = await app.fetch(
       new Request('http://acorn.test/api/integrations', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'rollbar', token: 'bad' }),
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'rollbar', credentials: { token: 'bad' } }),
       }),
       env(),
     )
     expect(res.status).toBe(401)
     expect(await res.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+  })
+
+  it('requires credentials objects for connect and rotate', async () => {
+    const send = (method: 'POST' | 'PUT', path: string, body: unknown) => app.fetch(new Request(`http://acorn.test/api/integrations${path}`, {
+      method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    }), env())
+    for (const body of [
+      { providerId: 'rollbar', token: 'old' },
+      { providerId: 'rollbar', credentials: { token: 'new' }, token: 'old' },
+      { providerId: 'rollbar' },
+    ]) {
+      const response = await send('POST', '', body)
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ error: { code: 'provider_bad_config', message: expect.stringContaining('credentials object') } })
+    }
+    const id = await connect()
+    for (const body of [{ token: 'old' }, { credentials: { token: 'new' }, token: 'old' }, {}]) {
+      const response = await send('PUT', `/${id}`, body)
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ error: { code: 'provider_bad_config', message: expect.stringContaining('credentials object') } })
+    }
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 8, name: 'rotated' }))
+    expect((await send('PUT', `/${id}`, { credentials: { token: 'rotated-token' } })).status).toBe(200)
   })
 
   it('items list returns summaries with itemId + label, caches, and serves the cache within TTL', async () => {

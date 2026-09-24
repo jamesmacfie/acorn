@@ -112,7 +112,7 @@ describe('the pull request from the keyboard', () => {
       // protocol; without it a terminal sends one byte for Return either way (./main.tsx).
       await screen.press('RETURN', { ctrl: true })
       expect(recordedRequests().filter((request) => request.method === 'POST')).toEqual([
-        { path: '/v2/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' },
+        { path: '/v1/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' },
       ])
     } finally {
       screen.done()

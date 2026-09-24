@@ -1,12 +1,25 @@
 import { z } from 'zod'
-import type { AgentInputPart } from './managedAgents'
 
 export type AgentContextCaptureScope = {
   taskId: string
   workspaceId?: string
 }
 
-export type AgentContextSnapshot = Extract<AgentInputPart, { type: 'context' }>
+export type AgentContextSnapshot = {
+  type: 'context'
+  contextId: string
+  label: string
+  content: string
+  source: string
+  resourceId?: string
+  provenance?: string
+  deepLink?: { pane: string; intent?: Record<string, unknown> }
+  byteSize?: number
+  estimatedTokens?: number
+  freshness?: 'live' | 'cached' | 'stale' | 'unknown'
+  sensitivity?: 'public' | 'workspace' | 'private' | 'secret'
+  capturedAt: number
+}
 
 export type AgentContextOption = {
   id: string

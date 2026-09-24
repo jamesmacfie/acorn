@@ -68,7 +68,7 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.fetch(createPullSourceHandler(), { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
 
-      // /v2/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
+      // /v1/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
       // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono
       // matches them. Reshuffling it changes which handler wins.
       ctx.routes.register(repos(store, emit), { prefix: '/repos' })
@@ -91,7 +91,7 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(prCreate(store, emit), { prefix: '/repos' })
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
       ctx.routes.register(mentions(store), { prefix: '/repos' })
-      // `pinned_repos` moved out of core, so /v2/core/pins became /v2/p/github/pins. The repo
+      // `pinned_repos` moved out of core, so /v1/core/pins became /v1/p/github/pins. The repo
       // selector is the only caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
       // The device-flow connect writes core's own `integrations` row through connectProvider

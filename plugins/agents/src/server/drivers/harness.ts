@@ -5,7 +5,7 @@
 // (@acorn/protocol/plugin/contract.ts), which the delivery seam converts into one of these. They differ
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
-import type { AgentCapability } from '@acorn/protocol/managedAgents.ts'
+import type { AgentCapability } from '../../contract/wire.ts'
 
 /** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
  *  second harness needs it. See docs/plugin-authoring.md § Harnesses. */

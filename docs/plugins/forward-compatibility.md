@@ -24,6 +24,10 @@ roster row to the device, which raises one attention row per entry on the same p
 failed to register takes. The wording says what it is: this version of acorn does not recognise it, so
 it was ignored. Not a failure of the plugin.
 
+The removed `contributions.palette` key is known obsolete input, so the manifest reader rejects it
+with a named diagnostic. A command without `kind` is also rejected. Unknown keys from a future build
+still use the reporting path above.
+
 Those rows, and every other row a loaded plugin raises through `contributions.attention`, land on the
 plugin's own rail source when it has one and on Settings > Plugins when it does not. The manifest
 names no target and the wire carries display strings only, so the host supplies it
@@ -332,7 +336,7 @@ UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
   rail source with its order (`parity.test.ts`).
 - `apps/desktop/test/client/clientPluginDisable.snapshot.json` — every client registry entry, and which
   optional plugin owns each one (`clientPluginDisable.test.ts`).
-- `apps/node/test/integration/routeRegistry.snapshot.json` — every `/v2/p/<plugin>/…` route the compiled
+- `apps/node/test/integration/routeRegistry.snapshot.json` — every `/v1/p/<plugin>/…` route the compiled
   plugins mount (`routeRegistry.test.ts`).
 - `apps/node/test/integration/pluginSystem/pluginDisable.snapshot.json` — the full Node boot's routes, tools, context
   sections, providers and databases, and which optional plugin owns each (`pluginDisable.test.ts`).
@@ -359,7 +363,7 @@ only way an exact match means anything for a key with repeats.
 
 Regeneration can only record what a boot lost, so it cannot record an entry a disable wrongly added;
 that case still has to fail the equality against the recorded file. Route removals are also attributed,
-not just counted: a route's key names its owning plugin (`/v2/p/<plugin>/...`, see § Activation), so an
+not just counted: a route's key names its owning plugin (`/v1/p/<plugin>/...`, see § Activation), so an
 entry credited to the wrong plugin in the golden file fails that check even when the overall equality
 still passes. Regenerating the file cannot launder a wrong attribution, only a human correcting it can.
 

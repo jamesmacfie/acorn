@@ -12,7 +12,7 @@
 // draws it, and this plugin's contribution to it is two routes and a language id.
 //
 // `id: "database"` (the directory name, which the builder uses as the id) is load-bearing and must never
-// change. It binds `/v2/p/database`, the `database` pane's persisted layout key, and — the one that
+// change. It binds `/v1/p/database`, the `database` pane's persisted layout key, and — the one that
 // loses data rather than just breaking a link — `<dataRoot>/plugins/database.sqlite`. Renaming it
 // orphans every saved query on the machine.
 //
@@ -83,12 +83,12 @@ export default {
         document: {
           kind: 'document',
           languageId: 'sql',
-          read: '/v2/p/database/tasks/:taskId/scratch',
-          write: '/v2/p/database/tasks/:taskId/scratch',
+          read: '/v1/p/database/tasks/:taskId/scratch',
+          write: '/v1/p/database/tasks/:taskId/scratch',
           // Table and column completions, answered by this plugin's node half where the schema
           // introspection already lives. `.` is what re-opens the popup after an alias.
           completions: {
-            route: '/v2/p/database/tasks/:taskId/completions',
+            route: '/v1/p/database/tasks/:taskId/completions',
             triggerCharacters: ['.'],
           },
         },
@@ -103,12 +103,13 @@ export default {
       id: 'saved-queries',
       label: 'Saved database queries',
       description: 'Capture saved SQL and the notes beside it. No connection URL or credential is stored to leak.',
-      options: '/v2/p/database/context-options',
-      capture: '/v2/p/database/context-capture',
+      options: '/v1/p/database/context-options',
+      capture: '/v1/p/database/context-capture',
     }],
     commands: [
       {
         id: 'open',
+        kind: 'action',
         title: 'Database: open pane',
         category: 'pane',
         // Not in the group below, and not renamed: it is invisible in the palette, so the only place
@@ -131,6 +132,7 @@ export default {
       },
       {
         id: 'execute',
+        kind: 'action',
         // Was 'Database: run query'. The id and the chord are unchanged, which is what a reader's
         // muscle memory and a stored override are keyed on; the prefix went because the group above now
         // says it.
@@ -162,7 +164,7 @@ export default {
         category: 'navigation',
         kind: 'search',
         scope: 'task',
-        route: '/v2/p/database/palette/queries',
+        route: '/v1/p/database/palette/queries',
         placeholder: 'Find a saved query…',
         onSelect: { verb: 'openPane', pane: 'database' },
       },
@@ -182,7 +184,7 @@ export default {
         category: 'action',
         kind: 'input',
         scope: 'task',
-        route: '/v2/p/database/palette/generate',
+        route: '/v1/p/database/palette/generate',
         placeholder: 'Describe the query — e.g. the 10 most recent orders with the customer’s email',
         onSuccess: { verb: 'openPane', pane: 'database' },
       },

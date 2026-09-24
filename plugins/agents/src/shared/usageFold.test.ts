@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEventRecord, AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventRecord, AgentNormalizedEvent } from '../contract/wire.ts'
 import { foldUsageEvents, mergeAgentUsage, openUsageLine } from './usageFold'
 
 let seq = 0

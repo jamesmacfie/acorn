@@ -14,10 +14,11 @@ describe('the handshake tolerates a newer node', () => {
   // any of them made every older client report "did not answer like an acorn node".
   it('parses a node info response carrying fields it has never heard of', () => {
     const parsed = nodeInfoSchema.safeParse({
+      baseline: 'acorn-1',
       protocolVersion: NODE_PROTOCOL_VERSION,
       fingerprint: FINGERPRINT,
       nodeId: 'node-1',
-      // Whatever protocol 2.next adds.
+      // Whatever a later protocol release adds.
       capabilities: ['dashboards'],
       region: 'home',
     })
@@ -27,6 +28,7 @@ describe('the handshake tolerates a newer node', () => {
 
   it('parses a pairing result carrying unknown fields, including on the nested device', () => {
     const parsed = pairResultSchema.safeParse({
+      baseline: 'acorn-1',
       deviceToken: 'acorn_dt_x',
       nodeId: 'node-1',
       device: { id: 'd1', name: 'Laptop', createdAt: 1, lastSeenAt: null, revokedAt: null, platform: 'darwin' },
@@ -38,8 +40,8 @@ describe('the handshake tolerates a newer node', () => {
   it('still refuses a body that is missing what pairing actually needs', () => {
     // Tolerant of additions is not tolerant of anything: `fingerprint` is the identity a client pins
     // against, and an absent pin is the one thing that must never parse into a usable value.
-    expect(nodeInfoSchema.safeParse({ protocolVersion: 2 }).success).toBe(false)
-    expect(nodeInfoSchema.safeParse({ fingerprint: FINGERPRINT }).success).toBe(false)
+    expect(nodeInfoSchema.safeParse({ protocolVersion: 1, fingerprint: FINGERPRINT }).success).toBe(false)
+    expect(nodeInfoSchema.safeParse({ baseline: 'acorn-1', fingerprint: FINGERPRINT }).success).toBe(false)
   })
 
   it('keeps the pairing REQUEST strict, because a mutation is not a handshake', () => {
@@ -49,18 +51,14 @@ describe('the handshake tolerates a newer node', () => {
   })
 })
 
-describe('node.json survives its own history', () => {
-  it('parses an identity file written before protocolVersion was retired', () => {
-    // A root minted by an older acorn still has the key on disk. Under the strict schema this file used
-    // to have, retiring the field would have made every existing data root unopenable.
+describe('node.json admission', () => {
+  it('rejects an identity file without the baseline marker', () => {
     const parsed = nodeIdentitySchema.safeParse({
       nodeId: '00000000-0000-4000-8000-000000000000',
       createdAt: 1,
-      protocolVersion: 2,
+      protocolVersion: 1,
       port: 4317,
     })
-    expect(parsed.success).toBe(true)
-    expect(parsed.data).not.toHaveProperty('protocolVersion')
-    expect(parsed.data?.port).toBe(4317)
+    expect(parsed.success).toBe(false)
   })
 })

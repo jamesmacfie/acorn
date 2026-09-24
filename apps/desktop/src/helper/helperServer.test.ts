@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FleetNode } from '@acorn/custody/broker/fleetStore.ts'
-import type { Helper } from '@acorn/custody/index.ts'
+import type { FleetNode } from '@acorn/custody/broker'
+import type { Helper } from '@acorn/custody/runtime'
 import type { HelperMessage, HelperMethod, HelperReply } from '../shell/wire'
 
 // The fleet's second door, end to end through the socket the renderer actually speaks.

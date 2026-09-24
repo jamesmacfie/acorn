@@ -9,10 +9,10 @@ import { parsePluginManifest, pluginManifestSchema } from './manifest'
 // in someone else's namespace, a pane it never declared, a non-https URL the shell would hand to the OS.
 
 const manifest = (contributions: Record<string, unknown>) =>
-  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', contributions })
+  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions })
 
 const permissionManifest = (permissions: Record<string, unknown>) =>
-  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', permissions })
+  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', permissions })
 
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
@@ -31,17 +31,23 @@ const PANE = { target: 'pane', id: 'board', label: 'Board', layout: 'single', re
 // cases declare a client one.
 const nodeManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
-    id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', node: './dist/node.js', contributions,
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', node: './dist/node.js', contributions,
   })
 
 const webviewManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
-    id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
   })
+
+it('rejects an API-1 manifest without the current baseline', () => {
+  const result = pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1' })
+  expect(result.success).toBe(false)
+  if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'baseline')).toBe(true)
+})
 
 describe('brand marks', () => {
   const withIcons = (icons: Record<string, unknown>) =>
-    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', ...icons })
+    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', ...icons })
 
   it('accepts a path `d` and passes it through untouched', () => {
     const result = withIcons({ icon: { d: 'M12 .297c-6.63 0-12 5.373-12 12Z' } })
@@ -89,10 +95,10 @@ describe('runtime contribution descriptors', () => {
     const result = nodeManifest({
       agentTools: [{
         id: 'echo', description: 'Echo one message.', inputSchema, risk: 'read',
-        handler: '/v2/p/board/tools/echo',
+        handler: '/v1/p/board/tools/echo',
       }],
       contextSections: [{
-        id: 'references', label: 'References', order: 25, read: '/v2/p/board/context',
+        id: 'references', label: 'References', order: 25, read: '/v1/p/board/context',
         maxBytes: 4096, maxTokens: 1024,
       }],
     })
@@ -105,7 +111,7 @@ describe('runtime contribution descriptors', () => {
   })
 
   it('rejects unsupported schemas, excessive nesting, and unowned/device routes at install', () => {
-    const tool = (schema: unknown, handler = '/v2/p/board/tool') => nodeManifest({
+    const tool = (schema: unknown, handler = '/v1/p/board/tool') => nodeManifest({
       agentTools: [{ id: 'probe', description: 'Probe.', inputSchema: schema, risk: 'read', handler }],
     })
     expect(messages(tool({ ...inputSchema, $ref: 'https://example.test/schema.json' }))).toContain("unsupported JSON Schema keyword '$ref'")
@@ -115,20 +121,20 @@ describe('runtime contribution descriptors', () => {
     let nested: Record<string, unknown> = { type: 'string' }
     for (let i = 0; i < 10; i++) nested = { type: 'array', items: nested }
     expect(messages(tool({ type: 'object', properties: { nested } })).some((message) => message.includes('maximum nesting depth'))).toBe(true)
-    expect(messages(tool(inputSchema, '/v2/p/memory/approve'))).toEqual(['route must be inside /v2/p/board/'])
-    expect(messages(tool(inputSchema, '/v2/core/devices'))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(tool(inputSchema, '/v1/p/memory/approve'))).toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(tool(inputSchema, '/v1/core/devices'))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(nodeManifest({
-      contextSections: [{ id: 'r', label: 'R', order: 1, read: '/v2/p/other/context', maxBytes: 1024, maxTokens: 256 }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      contextSections: [{ id: 'r', label: 'R', order: 1, read: '/v1/p/other/context', maxBytes: 1024, maxTokens: 256 }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('requires a node half and rejects duplicate local ids across carriers', () => {
     expect(messages(manifest({
-      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema, risk: 'read', handler: '/v2/p/board/tool' }],
+      agentTools: [{ id: 'probe', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
     }))).toContain('an agent tool calls a node route; declare `node` in the manifest')
     expect(messages(nodeManifest({
-      agentTools: [{ id: 'same', description: 'Probe.', inputSchema, risk: 'read', handler: '/v2/p/board/tool' }],
-      contextSections: [{ id: 'same', label: 'R', order: 1, read: '/v2/p/board/context', maxBytes: 1024, maxTokens: 256 }],
+      agentTools: [{ id: 'same', description: 'Probe.', inputSchema, risk: 'read', handler: '/v1/p/board/tool' }],
+      contextSections: [{ id: 'same', label: 'R', order: 1, read: '/v1/p/board/context', maxBytes: 1024, maxTokens: 256 }],
     }))).toContain("duplicate contribution id 'same'")
   })
 })
@@ -170,7 +176,7 @@ describe('permission identifier shape', () => {
 
 describe('overlay surfaces', () => {
   const overlay = { target: 'overlay', id: 'files', label: 'Go to file' }
-  const opener = (action: unknown) => ({ id: 'open-files', title: 'Go to file', action })
+  const opener = (action: unknown) => ({ id: 'open-files', kind: 'action', title: 'Go to file', action })
 
   it('accepts an overlay opened by a command', () => {
     const result = manifest({ frames: [overlay], commands: [opener({ verb: 'openOverlay', overlay: 'files' })] })
@@ -210,7 +216,7 @@ describe('overlay surfaces', () => {
   it('refuses a companion overlay on anything but a remote contribution', () => {
     expect(messages(manifest({
       frames: [overlay],
-      extensions: [{ id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v2/p/board/rows', overlay: 'files' }],
+      extensions: [{ id: 'rows', point: 'agents:attachment', label: 'Rows', items: '/v1/p/board/rows', overlay: 'files' }],
     }))).toContain('overlay is only valid on a remote contribution')
   })
 
@@ -218,7 +224,7 @@ describe('overlay surfaces', () => {
     // `openPane` puts a rectangle in a task's layout; an overlay has no layout to be put in.
     expect(messages(manifest({
       frames: [overlay],
-      commands: [opener({ verb: 'openOverlay', overlay: 'files' }), { id: 'x', title: 'X', action: { verb: 'openPane', pane: 'files' } }],
+      commands: [opener({ verb: 'openOverlay', overlay: 'files' }), { id: 'x', kind: 'action', title: 'X', action: { verb: 'openPane', pane: 'files' } }],
     }))).toContain(`openPane names 'files', which this manifest does not declare as a task-scoped pane`)
     expect(messages(manifest({ frames: [{ ...overlay, scope: 'project' }], commands: [opener({ verb: 'openOverlay', overlay: 'files' })] })))
       .toContain('only a pane surface can be project-scoped')
@@ -231,7 +237,7 @@ describe('webview surfaces', () => {
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com/start', hosts: ['docs.example.com'] }],
     }).success).toBe(true)
     expect(webviewManifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v2/p/board/webview-url', hosts: ['*.example.com'] }],
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v1/p/board/webview-url', hosts: ['*.example.com'] }],
     }).success).toBe(true)
   })
 
@@ -240,11 +246,11 @@ describe('webview surfaces', () => {
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', hosts: ['docs.example.com'] }],
     }).success).toBe(false)
     expect(manifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', urlSource: '/v2/p/board/url', hosts: ['docs.example.com'] }],
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', urlSource: '/v1/p/board/url', hosts: ['docs.example.com'] }],
     }).success).toBe(false)
     expect(messages(manifest({
-      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v2/p/other/url', hosts: ['docs.example.com'] }],
-    }))).toContain('route must be inside /v2/p/board/')
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v1/p/other/url', hosts: ['docs.example.com'] }],
+    }))).toContain('route must be inside /v1/p/board/')
   })
 
   it('validates hosts and requires a literal URL to stay inside them', () => {
@@ -314,30 +320,30 @@ describe('pane layouts', () => {
   }
 
   it('accepts a read/write document and defaults the language', () => {
-    const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', write: '/v2/p/board/doc' })] })
+    const result = manifest({ frames: [layout({ read: '/v1/p/board/doc', write: '/v1/p/board/doc' })] })
     expect(result.success).toBe(true)
     expect(region(result, 'body')?.languageId).toBe('plaintext')
   })
 
   it('treats a missing write route as read-only rather than as an error', () => {
-    const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'sql' })] })
+    const result = manifest({ frames: [layout({ read: '/v1/p/board/doc', languageId: 'sql' })] })
     expect(result.success).toBe(true)
     expect(region(result, 'body')?.write).toBeUndefined()
   })
 
   it('confines both routes to the plugin, so the host cannot be made to read core on its behalf', () => {
-    expect(messages(manifest({ frames: [layout({ read: '/v2/core/tasks' })] }))).toContain('route must be inside /v2/p/board/')
-    expect(messages(manifest({ frames: [layout({ read: '/v2/p/board/doc', write: '/v2/p/other/doc' })] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v1/core/tasks' })] }))).toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' })] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 
   it('takes only a published language id', () => {
-    expect(manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'brainfuck' })] }).success).toBe(false)
+    expect(manifest({ frames: [layout({ read: '/v1/p/board/doc', languageId: 'brainfuck' })] }).success).toBe(false)
   })
 
   it('refuses a layout on a surface with no rectangle to arrange', () => {
     expect(messages(manifest({
-      frames: [{ target: 'importer', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v2/p/board/doc' }) } }],
+      frames: [{ target: 'importer', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v1/p/board/doc' }) } }],
     }))).toContain('layout is only valid on a pane, a reference panel or a settings page')
   })
 
@@ -372,7 +378,7 @@ describe('pane layouts', () => {
   })
 
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
-    expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v2/p/board/doc' }) } }] }).success).toBe(false)
+    expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v1/p/board/doc' }) } }] }).success).toBe(false)
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))
       .toContain("layout 'single' has no sidebar region")
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'list-detail', regions: { list: 'frame' } }] })))
@@ -383,7 +389,7 @@ describe('pane layouts', () => {
   })
 
   it('refuses key claims on a pane with no frame region, which draws nothing to claim them', () => {
-    expect(messages(manifest({ frames: [{ ...layout({ read: '/v2/p/board/doc' }), claimsKeys: ['meta+j'] }] })))
+    expect(messages(manifest({ frames: [{ ...layout({ read: '/v1/p/board/doc' }), claimsKeys: ['meta+j'] }] })))
       .toContain('this pane draws no frame, so there is nothing here to claim keys')
   })
 
@@ -394,17 +400,17 @@ describe('pane layouts', () => {
     ({ ...PANE, layout: 'document-over-frame', regions: { document: doc(document), frame: 'frame' } })
 
   it('accepts a composed pane, and allows the key claims a host-drawn one refuses', () => {
-    const result = manifest({ frames: [{ ...composed({ read: '/v2/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }] })
+    const result = manifest({ frames: [{ ...composed({ read: '/v1/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }] })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.frames[0]?.layout).toBe('document-over-frame')
   })
 
   it('confines the completions route like any other, and defaults its trigger characters', () => {
-    const ok = manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete' } })] })
+    const ok = manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete' } })] })
     expect(ok.success).toBe(true)
     expect(region(ok, 'body')?.completions?.triggerCharacters).toEqual([])
-    expect(messages(manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/other/complete' } })] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/other/complete' } })] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 })
 
@@ -419,11 +425,11 @@ describe('surface actions', () => {
     label: 'Query',
     layout: 'document-over-frame',
     regions: {
-      document: { kind: 'document', read: '/v2/p/board/doc', write: '/v2/p/board/doc' },
+      document: { kind: 'document', read: '/v1/p/board/doc', write: '/v1/p/board/doc' },
       frame: 'frame',
     },
   }
-  const execute = (surface: string) => ({ id: 'execute', title: 'Run', action: { verb: 'surfaceAction', surface } })
+  const execute = (surface: string) => ({ id: 'execute', kind: 'action', title: 'Run', action: { verb: 'surfaceAction', surface } })
 
   it('accepts a command aimed at a composed pane this manifest declares', () => {
     expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
@@ -446,7 +452,7 @@ describe('surface actions', () => {
   it('refuses a pane with nothing of the plugin\'s own to receive it', () => {
     // Every region host-drawn: the pane runs none of this plugin's code, so a command aimed at it would
     // parse and then post into nothing.
-    const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v2/p/board/doc' } } }
+    const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v1/p/board/doc' } } }
     expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
       .toContain("surfaceAction names 'board', which this manifest does not declare as a pane drawing a region of its own")
   })
@@ -460,10 +466,10 @@ describe('surface actions', () => {
 describe('migration entrypoint confinement', () => {
   it('accepts a relative migrations directory and rejects escapes', () => {
     expect(pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', migrations: './migrations',
+      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', migrations: './migrations',
     }).success).toBe(true)
     expect(pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', migrations: '../other/migrations',
+      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', migrations: '../other/migrations',
     }).success).toBe(false)
   })
 })
@@ -471,11 +477,11 @@ describe('migration entrypoint confinement', () => {
 describe('chrome descriptors', () => {
   it('accepts a chrome-only manifest with no frames at all', () => {
     const result = manifest({
-      sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v2/p/board/rail-items' }],
-      slots: [{ id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' }],
-      palette: [{ id: 'board.new', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v2/p/board/new' } }],
-      attention: [{ id: 'board-stuck', items: '/v2/p/board/attention' }],
-      nodeStats: [{ id: 'board-count', label: ['card stuck', 'cards stuck'], data: '/v2/p/board/stat' }],
+      sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
+      slots: [{ id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge' }],
+      commands: [{ id: 'board.new', kind: 'action', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v1/p/board/new' } }],
+      attention: [{ id: 'board-stuck', items: '/v1/p/board/attention' }],
+      nodeStats: [{ id: 'board-count', label: ['card stuck', 'cards stuck'], data: '/v1/p/board/stat' }],
     })
     expect(result.success).toBe(true)
     // Defaults land, so the client never has to reason about an absent order.
@@ -499,29 +505,29 @@ describe('chrome descriptors', () => {
   })
 
   it('confines every route to the plugin’s own namespace', () => {
-    expect(messages(manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v2/core/tasks' }] })))
-      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v1/core/tasks' }] })))
+      .toEqual(['route must be inside /v1/p/board/'])
     // Another plugin's namespace is the interesting case: it looks legal and is the whole point of the
     // check.
-    expect(messages(manifest({ attention: [{ id: 'a', items: '/v2/p/github/attention' }] })))
-      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/github/attention' }] })))
+      .toEqual(['route must be inside /v1/p/board/'])
     // A prefix match is not a namespace match.
-    expect(messages(manifest({ nodeStats: [{ id: 'n', label: ['x', 'y'], data: '/v2/p/board-other/stat' }] })))
-      .toEqual(['route must be inside /v2/p/board/'])
-    expect(messages(manifest({ attention: [{ id: 'a', items: '/v2/p/board/../other/items' }] })))
-      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({ nodeStats: [{ id: 'n', label: ['x', 'y'], data: '/v1/p/board-other/stat' }] })))
+      .toEqual(['route must be inside /v1/p/board/'])
+    expect(messages(manifest({ attention: [{ id: 'a', items: '/v1/p/board/../other/items' }] })))
+      .toEqual(['route must be inside /v1/p/board/'])
     // `runNodeAction` carries a route too, and it is checked wherever an action can appear.
-    expect(messages(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'runNodeAction', path: '/v2/p/other/go' } }] })))
-      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } }] })))
+      .toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('rejects an openPane naming a pane the manifest does not declare', () => {
-    const bad = manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/items', onSelect: { verb: 'openPane', pane: 'diff' } }] })
+    const bad = manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'diff' } }] })
     expect(messages(bad)).toEqual([`openPane names 'diff', which this manifest does not declare as a task-scoped pane`])
 
     const good = manifest({
       frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/items', onSelect: { verb: 'openPane', pane: 'board' } }],
+      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/items', onSelect: { verb: 'openPane', pane: 'board' } }],
     })
     expect(good.success).toBe(true)
   })
@@ -529,21 +535,21 @@ describe('chrome descriptors', () => {
   it('rejects a settings surface being used as an openPane target', () => {
     const bad = manifest({
       frames: [{ target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }],
-      palette: [{ id: 'p', title: 'P', action: { verb: 'openPane', pane: 'board-settings' } }],
+      commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openPane', pane: 'board-settings' } }],
     })
     expect(bad.success).toBe(false)
   })
 
   it('rejects a non-https openUrl', () => {
-    expect(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'openUrl', url: 'https://example.com/x' } }] }).success).toBe(true)
-    expect(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'openUrl', url: 'http://example.com/x' } }] }).success).toBe(false)
+    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'https://example.com/x' } }] }).success).toBe(true)
+    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'openUrl', url: 'http://example.com/x' } }] }).success).toBe(false)
   })
 
   it('rejects an unknown slot and an unknown verb', () => {
-    expect(manifest({ slots: [{ id: 'x', slot: 'statusbar', data: '/v2/p/board/badge' }] }).success).toBe(false)
+    expect(manifest({ slots: [{ id: 'x', slot: 'statusbar', data: '/v1/p/board/badge' }] }).success).toBe(false)
     // `invoke` is a v1 non-verb, since it needs a frame lifecycle the shell does not have. Failing here is
     // the point: an author is told, rather than shipping a palette row that silently does nothing.
-    expect(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] }).success).toBe(false)
+    expect(manifest({ commands: [{ id: 'p', kind: 'action', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] }).success).toBe(false)
   })
 
   it('accepts the host-owned createTask verb without embedding executable steps', () => {
@@ -552,7 +558,7 @@ describe('chrome descriptors', () => {
         id: 'board',
         label: 'Board',
         order: 60,
-        items: '/v2/p/board/rail-items',
+        items: '/v1/p/board/rail-items',
         onSelect: { verb: 'createTask' },
       }],
     })
@@ -561,7 +567,7 @@ describe('chrome descriptors', () => {
   })
 
   it('rejects a duplicate contribution id across descriptor kinds', () => {
-    const bad = manifest({ frames: [PANE], slots: [{ id: 'board', slot: 'footer', data: '/v2/p/board/badge' }] })
+    const bad = manifest({ frames: [PANE], slots: [{ id: 'board', slot: 'footer', data: '/v1/p/board/badge' }] })
     expect(messages(bad)).toEqual([`duplicate contribution id 'board'`])
   })
 
@@ -571,33 +577,33 @@ describe('chrome descriptors', () => {
         id: 'saved-requests',
         label: 'Saved HTTP requests',
         description: 'Request shapes with credential-bearing fields redacted.',
-        options: '/v2/p/board/context-options',
-        capture: '/v2/p/board/context-capture',
+        options: '/v1/p/board/context-options',
+        capture: '/v1/p/board/context-capture',
       }],
     })
     expect(good.success).toBe(true)
-    expect(good.success && good.data.contributions.agentContexts[0]?.capture).toBe('/v2/p/board/context-capture')
+    expect(good.success && good.data.contributions.agentContexts[0]?.capture).toBe('/v1/p/board/context-capture')
 
     // A core route is the obvious escape; another plugin's namespace is the one that looks legal.
     expect(messages(manifest({
-      agentContexts: [{ id: 'c', label: 'C', options: '/v2/core/tasks', capture: '/v2/p/board/capture' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      agentContexts: [{ id: 'c', label: 'C', options: '/v1/core/tasks', capture: '/v1/p/board/capture' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(manifest({
-      agentContexts: [{ id: 'c', label: 'C', options: '/v2/p/board/options', capture: '/v2/p/http/context-capture' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      agentContexts: [{ id: 'c', label: 'C', options: '/v1/p/board/options', capture: '/v1/p/http/context-capture' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('rejects an agent-context id already taken by another contribution kind', () => {
     expect(messages(manifest({
       frames: [PANE],
-      agentContexts: [{ id: 'board', label: 'Board context', options: '/v2/p/board/options', capture: '/v2/p/board/capture' }],
+      agentContexts: [{ id: 'board', label: 'Board context', options: '/v1/p/board/options', capture: '/v1/p/board/capture' }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('carries a source’s reserved panel region, and refuses one that also navigates', () => {
     const source = (over: Record<string, unknown>) => manifest({
       frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/rail-items', ...over }],
+      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', ...over }],
     })
 
     const parsed = source({ panels: { fieldRole: 'status', views: ['list', 'board'], max: 6 } })
@@ -619,7 +625,7 @@ describe('chrome descriptors', () => {
   it('carries a source empty state, bounds its message and narrows its action', () => {
     const source = (emptyState: unknown) => manifest({
       frames: [PANE],
-      sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/rail-items', emptyState }],
+      sources: [{ id: 's', label: 'S', order: 1, items: '/v1/p/board/rail-items', emptyState }],
     })
 
     expect(source({ message: 'No linked projects yet.' }).success).toBe(true)
@@ -631,8 +637,8 @@ describe('chrome descriptors', () => {
     expect(source({ message: 'x', action: { verb: 'createTask' } }).success).toBe(false)
     expect(source({ message: 'x', action: { verb: 'navigate', surface: 'board' } }).success).toBe(false)
     // The same route confinement every action gets, and the same url policy.
-    expect(messages(source({ message: 'x', action: { verb: 'runNodeAction', path: '/v2/p/other/go' } })))
-      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(source({ message: 'x', action: { verb: 'runNodeAction', path: '/v1/p/other/go' } })))
+      .toEqual(['route must be inside /v1/p/board/'])
     expect(source({ message: 'x', action: { verb: 'openUrl', url: 'http://example.com' } }).success).toBe(false)
     // An action naming a pane this manifest never declared, which would render a button opening nothing.
     expect(messages(source({ message: 'x', action: { verb: 'openPane', pane: 'ghost' } })))
@@ -645,37 +651,37 @@ describe('chrome descriptors', () => {
 
   it('carries a ref resolver and confines the route it spends provider credentials on', () => {
     const good = manifest({
-      refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v2/p/board/refs' }],
+      refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v1/p/board/refs' }],
     })
     expect(good.success).toBe(true)
-    expect(good.success && good.data.contributions.refResolvers[0]?.resolve).toBe('/v2/p/board/refs')
+    expect(good.success && good.data.contributions.refResolvers[0]?.resolve).toBe('/v1/p/board/refs')
 
     // The escape that matters here is naming another plugin's resolver: the host POSTs identifiers to
     // whatever this says and stamps the answer with the declaring plugin's provider, so an unconfined
     // route is how a plugin would publish someone else's items under its own name.
     expect(messages(manifest({
-      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v2/p/linear/issues' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/p/linear/issues' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(manifest({
-      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v2/core/integrations' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v1/core/integrations' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
   })
 
   it('caps ref resolvers at four and refuses an id another contribution kind already took', () => {
-    const five = Array.from({ length: 5 }, (_, i) => ({ id: `r${i}`, kind: 'board.card', resolve: '/v2/p/board/refs' }))
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `r${i}`, kind: 'board.card', resolve: '/v1/p/board/refs' }))
     expect(manifest({ refResolvers: five }).success).toBe(false)
     expect(manifest({ refResolvers: five.slice(0, 4) }).success).toBe(true)
 
     expect(messages(manifest({
       frames: [PANE],
-      refResolvers: [{ id: 'board', kind: 'board.card', resolve: '/v2/p/board/refs' }],
+      refResolvers: [{ id: 'board', kind: 'board.card', resolve: '/v1/p/board/refs' }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('refuses the removed collection format with a migration path', () => {
     const result = parsePluginManifest({
-      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1',
-      contributions: { collections: [{ id: 'old', items: '/v2/p/board/old' }] },
+      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
+      contributions: { collections: [{ id: 'old', items: '/v1/p/board/old' }] },
     })
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toContain('Register a Node-owned contributions.dataSources entry')
@@ -683,75 +689,75 @@ describe('chrome descriptors', () => {
 
   it('carries a schedule, confines its run route and insists there is a node half to serve it', () => {
     const good = nodeManifest({
-      schedules: [{ id: 'refresh', name: 'Refresh the mirror', run: '/v2/p/board/schedules/refresh', cadence: { every: 600 }, timeout: 120 }],
+      schedules: [{ id: 'refresh', name: 'Refresh the mirror', run: '/v1/p/board/schedules/refresh', cadence: { every: 600 }, timeout: 120 }],
     })
     expect(good.success && good.data.contributions.schedules[0]?.cadence).toEqual({ every: 600 })
 
     // The whole grammar, reused rather than re-declared: a schedule says when in the same three forms
     // core's own do.
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { daily: '03:30' } }] }).success).toBe(true)
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }] }).success).toBe(true)
-    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { cron: '* * * * *' } }] }).success).toBe(false)
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { daily: '03:30' } }] }).success).toBe(true)
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }] }).success).toBe(true)
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { cron: '* * * * *' } }] }).success).toBe(false)
 
     // Confinement is what stops a schedule being a way to make the node POST to core's routes, or to
     // another plugin's, unattended and on a timer.
     expect(messages(nodeManifest({
-      schedules: [{ id: 's', name: 'S', run: '/v2/p/linear/sync', cadence: { every: 600 } }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      schedules: [{ id: 's', name: 'S', run: '/v1/p/linear/sync', cadence: { every: 600 } }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(nodeManifest({
-      schedules: [{ id: 's', name: 'S', run: '/v2/core/tasks', cadence: { every: 600 } }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      schedules: [{ id: 's', name: 'S', run: '/v1/core/tasks', cadence: { every: 600 } }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
 
     // Only a node half serves that namespace, so a client-only package declaring one would fire forever
     // against a 404.
     expect(messages(manifest({
-      schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }],
+      schedules: [{ id: 's', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
     }))).toEqual(['a schedule runs a node route; declare `node` in the manifest'])
   })
 
   it('caps schedules at four and refuses an id another contribution kind already took', () => {
-    const five = Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }))
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }))
     expect(nodeManifest({ schedules: five }).success).toBe(false)
     expect(nodeManifest({ schedules: five.slice(0, 4) }).success).toBe(true)
 
     expect(messages(nodeManifest({
       frames: [PANE],
-      schedules: [{ id: 'board', name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }],
+      schedules: [{ id: 'board', name: 'S', run: '/v1/p/board/s', cadence: { every: 600 } }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('carries a task check, confines both its routes and insists there is a node half to serve them', () => {
     const good = nodeManifest({
-      taskChecks: [{ id: 'containers', check: '/v2/p/board/archive/check', apply: '/v2/p/board/archive/apply', timeout: 3 }],
+      taskChecks: [{ id: 'containers', check: '/v1/p/board/archive/check', apply: '/v1/p/board/archive/apply', timeout: 3 }],
     })
-    expect(good.success && good.data.contributions.taskChecks[0]?.apply).toBe('/v2/p/board/archive/apply')
+    expect(good.success && good.data.contributions.taskChecks[0]?.apply).toBe('/v1/p/board/archive/apply')
 
     // `apply` is optional: a check that only warns is a real mode, not a degenerate one.
-    expect(nodeManifest({ taskChecks: [{ id: 'c', check: '/v2/p/board/c' }] }).success).toBe(true)
+    expect(nodeManifest({ taskChecks: [{ id: 'c', check: '/v1/p/board/c' }] }).success).toBe(true)
 
     // Both halves are confined, and neither may be another plugin's or core's: a check is a route the host
     // calls, so an unconfined one would be a way to make the node read anything on archive.
     expect(messages(nodeManifest({
-      taskChecks: [{ id: 'c', check: '/v2/p/linear/c' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      taskChecks: [{ id: 'c', check: '/v1/p/linear/c' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
     expect(messages(nodeManifest({
-      taskChecks: [{ id: 'c', check: '/v2/p/board/c', apply: '/v2/core/tasks' }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      taskChecks: [{ id: 'c', check: '/v1/p/board/c', apply: '/v1/core/tasks' }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
 
     // Same rule a schedule gets, for the same reason: only a node half serves that namespace.
     expect(messages(manifest({
-      taskChecks: [{ id: 'c', check: '/v2/p/board/c' }],
+      taskChecks: [{ id: 'c', check: '/v1/p/board/c' }],
     }))).toEqual(['a task check calls a node route; declare `node` in the manifest'])
   })
 
   it('caps task checks at four and refuses an id another contribution kind already took', () => {
-    const five = Array.from({ length: 5 }, (_, i) => ({ id: `c${i}`, check: '/v2/p/board/c' }))
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `c${i}`, check: '/v1/p/board/c' }))
     expect(nodeManifest({ taskChecks: five }).success).toBe(false)
     expect(nodeManifest({ taskChecks: five.slice(0, 4) }).success).toBe(true)
 
     expect(messages(nodeManifest({
       frames: [PANE],
-      taskChecks: [{ id: 'board', check: '/v2/p/board/c' }],
+      taskChecks: [{ id: 'board', check: '/v1/p/board/c' }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
@@ -854,16 +860,16 @@ describe('chrome descriptors', () => {
 
   it('confines harness probe routes and insists there is a node half to serve them', () => {
     expect(nodeManifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/board/h/usage', auth: '/v2/p/board/h/auth' } }],
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/board/h/usage', auth: '/v1/p/board/h/auth' } }],
     }).success).toBe(true)
 
     expect(messages(nodeManifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/linear/usage' } }],
-    }))).toEqual(['route must be inside /v2/p/board/'])
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/linear/usage' } }],
+    }))).toEqual(['route must be inside /v1/p/board/'])
 
     // Verbatim the schedule and task-check rule: only a node half serves that namespace.
     expect(messages(manifest({
-      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/board/h/usage' } }],
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v1/p/board/h/usage' } }],
     }))).toEqual(['a harness probe calls a node route; declare `node` in the manifest'])
 
     // And a harness with no probes needs no node half at all, which is the whole point of the tier.
@@ -882,8 +888,8 @@ describe('chrome descriptors', () => {
   })
 
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
-    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 30 }] }).success).toBe(true)
-    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 5 }] }).success).toBe(false)
+    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 30 }] }).success).toBe(true)
+    expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v1/p/board/badge', refresh: 5 }] }).success).toBe(false)
   })
 
   it('validates declarative content links against their declared pane and capture', () => {
@@ -936,7 +942,7 @@ describe('chrome descriptors', () => {
 // because every case below is a mutation of exactly one of the three.
 const PROJECT_PANE = { target: 'pane', id: 'board-card', label: 'Card', scope: 'project', layout: 'single', regions: { body: 'frame' } }
 const PROJECT_ROUTE = { id: 'board.card-route', path: '/p/:projectId/x/board/cards/:key', surface: 'board-card', item: 'key' }
-const PROJECT_SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v2/p/board/rail-items', onSelect: { verb: 'navigate', surface: 'board-card' } }
+const PROJECT_SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v1/p/board/rail-items', onSelect: { verb: 'navigate', surface: 'board-card' } }
 
 describe('project-scoped surfaces and their routes', () => {
   it('carries a project-scoped pane addressed by a host-prefixed route', () => {
@@ -1014,7 +1020,7 @@ describe('project-scoped surfaces and their routes', () => {
       frames: [PROJECT_PANE],
       routes: [PROJECT_ROUTE],
       sources: [PROJECT_SOURCE],
-      commands: [{ id: 'board.open', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
+      commands: [{ id: 'board.open', kind: 'action', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
     }).success).toBe(false)
   })
 
@@ -1024,7 +1030,7 @@ describe('project-scoped surfaces and their routes', () => {
   it('lets a search result navigate, and counts it as a mount site for the surface', () => {
     const find = {
       id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',
-      route: '/v2/p/board/search', onSelect: { verb: 'navigate', surface: 'board-card' },
+      route: '/v1/p/board/search', onSelect: { verb: 'navigate', surface: 'board-card' },
     }
     // `nodeManifest`, because a search calls a node route and only a node half serves one.
     expect(nodeManifest({
@@ -1047,11 +1053,11 @@ describe('project-scoped surfaces and their routes', () => {
       frames: [PROJECT_PANE],
       routes: [PROJECT_ROUTE],
       sources: [PROJECT_SOURCE],
-      slots: [{ id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge', onClick }],
+      slots: [{ id: 'board-footer', slot: 'footer', data: '/v1/p/board/badge', onClick }],
     }).success
     expect(slot({ verb: 'navigate', surface: 'board-card' })).toBe(false)
     expect(slot({ verb: 'createTask' })).toBe(false)
-    expect(slot({ verb: 'runNodeAction', path: '/v2/p/board/refresh' })).toBe(true)
+    expect(slot({ verb: 'runNodeAction', path: '/v1/p/board/refresh' })).toBe(true)
   })
 
   it('allows only a pane to be project-scoped, and folds routes into the duplicate-id sweep', () => {
@@ -1068,8 +1074,9 @@ describe('project-scoped surfaces and their routes', () => {
 describe('plugin commands and keybindings', () => {
   const command = {
     id: 'search',
+    kind: 'action',
     title: 'Editor: find in files',
-    action: { verb: 'runNodeAction', path: '/v2/p/board/search' },
+    action: { verb: 'runNodeAction', path: '/v1/p/board/search' },
   }
 
   it('parses every command verb and supplies stable defaults', () => {
@@ -1077,8 +1084,8 @@ describe('plugin commands and keybindings', () => {
       frames: [PANE],
       commands: [
         command,
-        { id: 'open', title: 'Open board', action: { verb: 'openPane', pane: 'board' } },
-        { id: 'docs', title: 'Open docs', palette: false, action: { verb: 'openUrl', url: 'https://example.com/docs' } },
+        { id: 'open', kind: 'action', title: 'Open board', action: { verb: 'openPane', pane: 'board' } },
+        { id: 'docs', kind: 'action', title: 'Open docs', palette: false, action: { verb: 'openUrl', url: 'https://example.com/docs' } },
       ],
     })
     expect(result.success).toBe(true)
@@ -1086,33 +1093,41 @@ describe('plugin commands and keybindings', () => {
     expect(result.success && result.data.contributions.commands[2]?.palette).toBe(false)
   })
 
-  it('keeps palette descriptors as a compatibility alias and rejects command action escapes', () => {
-    expect(manifest({ palette: [{ id: 'old', title: 'Old', action: { verb: 'runNodeAction', path: '/v2/p/board/old' } }] }).success).toBe(true)
-    expect(manifest({ commands: [{ ...command, action: { verb: 'runNodeAction', path: '/v2/core/tasks' } }] }).success).toBe(false)
+  it('names the removed palette collection and rejects command action escapes', () => {
+    const old = parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions: {
+      palette: [{ id: 'old', title: 'Old', action: { verb: 'runNodeAction', path: '/v1/p/board/old' } }],
+    } })
+    expect(old.ok).toBe(false)
+    expect(!old.ok && old.reason).toContain('removed contributions.palette')
+    expect(manifest({ commands: [{ ...command, action: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] }).success).toBe(false)
     expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
   })
 
   // The five kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
-  // is that the addition is additive — the descriptor above, with no `kind` at all, is still the action
-  // it always was — and that the new kinds are held to the same confinement every other route is.
+  // is that every kind is held to the same confinement as every other route.
   const group = { id: 'cards', title: 'Cards', category: 'navigation', kind: 'group' }
   const find = {
-    id: 'find', title: 'Find a card', kind: 'search', route: '/v2/p/board/search',
-    onSelect: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+    id: 'find', title: 'Find a card', kind: 'search', route: '/v1/p/board/search',
+    onSelect: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   }
   const ask = {
-    id: 'ask', title: 'New card', kind: 'input', route: '/v2/p/board/new-card',
-    onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+    id: 'ask', title: 'New card', kind: 'input', route: '/v1/p/board/new-card',
+    onSuccess: { verb: 'runNodeAction', path: '/v1/p/board/open' },
   }
   const theme = {
     id: 'theme', title: 'Board theme', kind: 'setting',
-    readRoute: '/v2/p/board/theme', writeRoute: '/v2/p/board/theme',
+    readRoute: '/v1/p/board/theme', writeRoute: '/v1/p/board/theme',
     options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   }
 
-  it('reads a command with no kind as the action it has always meant', () => {
-    const result = manifest({ commands: [command] })
-    expect(result.success && result.data.contributions.commands[0]).toMatchObject({ kind: 'action', palette: true })
+  it('requires an explicit command kind', () => {
+    const result = manifest({ commands: [{ id: 'old', title: 'Old', action: { verb: 'openTask' } }] })
+    expect(result.success).toBe(false)
+    expect(paths(result)).toContain('contributions.commands.0.kind')
+    const parsed = parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', contributions: {
+      commands: [{ id: 'old', title: 'Old', action: { verb: 'openTask' } }],
+    } })
+    expect(!parsed.ok && parsed.reason).toContain('contributions.commands[0].kind is required')
   })
 
   it('accepts a group, a search and an input, with the search bounds defaulted', () => {
@@ -1138,12 +1153,12 @@ describe('plugin commands and keybindings', () => {
   })
 
   it('confines both new routes and both new verbs to the plugin’s own namespace', () => {
-    expect(messages(nodeManifest({ commands: [{ ...find, route: '/v2/p/other/search' }] })))
-      .toContain('route must be inside /v2/p/board/')
-    expect(messages(nodeManifest({ commands: [{ ...ask, route: '/v2/tasks' }] })))
-      .toContain('route must be inside /v2/p/board/')
-    expect(messages(nodeManifest({ commands: [{ ...find, onSelect: { verb: 'runNodeAction', path: '/v2/core/tasks' } }] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...find, route: '/v1/p/other/search' }] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...ask, route: '/v1/tasks' }] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...find, onSelect: { verb: 'runNodeAction', path: '/v1/core/tasks' } }] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 
   it('refuses a search, an input or a setting from a package with no node half to answer it', () => {
@@ -1159,17 +1174,17 @@ describe('plugin commands and keybindings', () => {
     const result = nodeManifest({ commands: [group, { ...theme, parentId: 'cards', scope: 'project' }] })
     expect(result.success).toBe(true)
     expect(result.success && result.data.contributions.commands[1]).toMatchObject({
-      kind: 'setting', scope: 'project', readRoute: '/v2/p/board/theme',
+      kind: 'setting', scope: 'project', readRoute: '/v1/p/board/theme',
     })
   })
 
   it('confines both of a setting’s routes to the plugin’s own namespace', () => {
     // The message is the shared one; what the path in the issue names is which of the two routes.
-    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
-      .toContain('route must be inside /v2/p/board/')
-    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
+    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v1/prefs' }] })))
       .toContain('contributions.commands.0.readRoute')
-    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v2/p/other/theme' }] })))
+    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v1/p/other/theme' }] })))
       .toContain('contributions.commands.0.writeRoute')
   })
 
@@ -1276,7 +1291,7 @@ describe('themes', () => {
 
 describe('slots', () => {
   const slot = (over: Record<string, unknown> = {}) =>
-    ({ id: 'board-badge', slot: 'footer', data: '/v2/p/board/badge', ...over })
+    ({ id: 'board-badge', slot: 'footer', data: '/v1/p/board/badge', ...over })
 
   it('accepts the two host slots that have a host to draw them', () => {
     expect(manifest({ slots: [slot()] }).success).toBe(true)
@@ -1293,10 +1308,10 @@ describe('slots', () => {
   })
 
   it('confines a slot’s data route and its click verb to the plugin’s own namespace', () => {
-    expect(messages(manifest({ slots: [slot({ data: '/v2/core/tasks' })] })))
-      .toContain('route must be inside /v2/p/board/')
-    expect(messages(manifest({ slots: [slot({ onClick: { verb: 'runNodeAction', path: '/v2/p/other/go' } })] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ slots: [slot({ data: '/v1/core/tasks' })] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ slots: [slot({ onClick: { verb: 'runNodeAction', path: '/v1/p/other/go' } })] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 })
 
@@ -1308,7 +1323,7 @@ describe('context menus', () => {
     id: 'open-card',
     location: 'task.row',
     label: 'Open the board card',
-    action: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+    action: { verb: 'runNodeAction', path: '/v1/p/board/open' },
     ...over,
   })
 
@@ -1341,8 +1356,8 @@ describe('context menus', () => {
     expect(manifest({ contextMenus: [menu({ action: { verb: 'createTask' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'navigate', surface: 'board' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'teleport' } })] }).success).toBe(false)
-    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'runNodeAction', path: '/v2/core/tasks' } })] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'runNodeAction', path: '/v1/core/tasks' } })] })))
+      .toContain('route must be inside /v1/p/board/')
     expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'openPane', pane: 'ghost' } })] })))
       .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
   })
@@ -1430,7 +1445,7 @@ describe('extension points', () => {
 
 describe('extensions', () => {
   const extension = (over: Record<string, unknown> = {}) =>
-    ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v2/p/board/issues', ...over })
+    ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v1/p/board/issues', ...over })
 
   it('accepts a contribution naming another plugin’s point, and defaults its order', () => {
     const parsed = manifest({ extensions: [extension()] })
@@ -1448,10 +1463,10 @@ describe('extensions', () => {
   it('confines the items route to this plugin’s own namespace', () => {
     // This is "reading another plugin's routes", refused at the earliest possible moment. The point
     // owner's namespace is exactly the one a hostile contribution would name.
-    expect(messages(manifest({ extensions: [extension({ items: '/v2/p/tracker/cards' })] })))
-      .toContain('route must be inside /v2/p/board/')
-    expect(messages(manifest({ extensions: [extension({ items: '/v2/core/tasks' })] })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ extensions: [extension({ items: '/v1/p/tracker/cards' })] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ extensions: [extension({ items: '/v1/core/tasks' })] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 
   it('takes the context-free verb set only, checked against this manifest’s own surfaces', () => {
@@ -1520,29 +1535,29 @@ describe('the five kinds', () => {
   it('makes a contribution name exactly one way in', () => {
     const extension = (over: Record<string, unknown>) =>
       manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
-    expect(extension({ items: '/v2/p/board/rows' }).success).toBe(true)
+    expect(extension({ items: '/v1/p/board/rows' }).success).toBe(true)
     expect(messages(extension({}))).toContain('an extension names exactly one of items, remote, frame or route')
-    expect(messages(extension({ items: '/v2/p/board/rows', route: '/v2/p/board/hook', mode: 'veto' })))
+    expect(messages(extension({ items: '/v1/p/board/rows', route: '/v1/p/board/hook', mode: 'veto' })))
       .toContain('an extension names exactly one of items, remote, frame or route, not items and route')
   })
 
   it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
     const extension = (over: Record<string, unknown>) =>
       manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
-    expect(extension({ route: '/v2/p/board/scan', mode: 'veto' }).success).toBe(true)
-    expect(messages(extension({ route: '/v2/p/board/scan' })))
+    expect(extension({ route: '/v1/p/board/scan', mode: 'veto' }).success).toBe(true)
+    expect(messages(extension({ route: '/v1/p/board/scan' })))
       .toContain('a hook handler says what it asks to do: observe, transform or veto')
-    expect(messages(extension({ items: '/v2/p/board/rows', mode: 'veto' })))
+    expect(messages(extension({ items: '/v1/p/board/rows', mode: 'veto' })))
       .toContain('mode is only valid on a hook handler, which names a route')
     // Confined to this plugin's own namespace, for the reason every other declared route is.
-    expect(messages(extension({ route: '/v2/p/other/scan', mode: 'veto' })))
-      .toContain('route must be inside /v2/p/board/')
+    expect(messages(extension({ route: '/v1/p/other/scan', mode: 'veto' })))
+      .toContain('route must be inside /v1/p/board/')
   })
 
   it('makes an inline frame and the extension that places it name each other', () => {
     const withBundle = (contributions: Record<string, unknown>) =>
       pluginManifestSchema.safeParse({
-        id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+        id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
       })
     expect(withBundle({
       frames: [PANE, { target: 'inline', id: 'preview', label: 'Markdown preview' }],
@@ -1571,7 +1586,7 @@ describe('the exclusive slot', () => {
 
   const withBundle = (contributions: Record<string, unknown>) =>
     pluginManifestSchema.safeParse({
-      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+      id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', client: './dist/client.js', contributions,
     })
 
   it('accepts a replacement for a designated core surface', () => {
@@ -1610,7 +1625,7 @@ describe('forward compatibility: unknown is retained and reported', () => {
   // docs/plugins.md § Forward compatibility. A manifest written for a later acorn still loads on this
   // one; what changed is that it no longer does so in silence.
   const parse = (extra: Record<string, unknown>) =>
-    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '3', ...extra })
+    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3', ...extra })
 
   it('names an unknown top-level key, contribution kind and node facet', () => {
     const result = parse({
@@ -1644,7 +1659,7 @@ describe('forward compatibility: unknown is retained and reported', () => {
 // so neither can live on the field.
 describe('declared dependencies', () => {
   const requires = (plugins: unknown[]) =>
-    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', requires: { plugins } })
+    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', requires: { plugins } })
 
   it('refuses a package that requires itself', () => {
     const result = requires([{ id: 'board' }])

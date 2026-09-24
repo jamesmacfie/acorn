@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Acorn reset export</title>
+<body style="font: 16px system-ui; background: #121212; color: white; padding: 32px">
+  <h1>Exporting Acorn device state</h1>
+  <p id="status">Reading this app's browser storage…</p>
+  <script>
+    const status = document.getElementById('status')
+    const request = value => new Promise((resolve, reject) => {
+      value.onsuccess = () => resolve(value.result)
+      value.onerror = () => reject(value.error)
+    })
+
+    async function cacheEntries() {
+      if (typeof indexedDB.databases !== 'function') throw new Error('This webview cannot inventory IndexedDB')
+      const names = (await indexedDB.databases()).map(db => db.name)
+      if (names.some(name => name !== 'keyval-store')) throw new Error('An unknown IndexedDB database needs an explicit reset adapter')
+      if (!names.includes('keyval-store')) return []
+      const db = await new Promise((resolve, reject) => {
+        const open = indexedDB.open('keyval-store')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      try {
+        if (db.objectStoreNames.length !== 1 || !db.objectStoreNames.contains('keyval')) {
+          throw new Error('The Acorn query cache has an unexpected IndexedDB shape')
+        }
+        const transaction = db.transaction('keyval', 'readonly')
+        const store = transaction.objectStore('keyval')
+        const keys = await request(store.getAllKeys())
+        const values = await request(store.getAll())
+        if (keys.length !== values.length || keys.some(key => typeof key !== 'string') || values.some(value => typeof value !== 'string')) {
+          throw new Error('The Acorn query cache contains an unsupported value')
+        }
+        return keys.map((key, index) => [key, values[index]])
+      } finally {
+        db.close()
+      }
+    }
+
+    async function clearCache() {
+      const names = (await indexedDB.databases()).map(db => db.name)
+      if (!names.includes('keyval-store')) return
+      await new Promise((resolve, reject) => {
+        const deletion = indexedDB.deleteDatabase('keyval-store')
+        deletion.onsuccess = resolve
+        deletion.onerror = () => reject(deletion.error)
+        deletion.onblocked = () => reject(new Error('The query cache is still open in another window'))
+      })
+      if ((await indexedDB.databases()).some(db => db.name === 'keyval-store')) {
+        throw new Error('The query cache was not cleared')
+      }
+    }
+
+    async function seedFixture() {
+      if (new URLSearchParams(location.search).get('fixture') !== '1') return
+      localStorage.setItem('acorn-reset-fixture', 'local value')
+      const db = await new Promise((resolve, reject) => {
+        const open = indexedDB.open('keyval-store', 1)
+        open.onupgradeneeded = () => open.result.createObjectStore('keyval')
+        open.onsuccess = () => resolve(open.result)
+        open.onerror = () => reject(open.error)
+      })
+      try {
+        await request(db.transaction('keyval', 'readwrite').objectStore('keyval').put('cache value', 'acorn-cache:fixture'))
+      } finally {
+        db.close()
+      }
+    }
+
+    async function main() {
+      await seedFixture()
+      const localStorageEntries = Array.from({ length: localStorage.length }, (_, index) => {
+        const key = localStorage.key(index)
+        return [key, localStorage.getItem(key)]
+      })
+      const cache = await cacheEntries()
+      status.textContent = 'Writing the recovery copy…'
+      await window.__TAURI_INTERNALS__.invoke('reset_export', { snapshot: { localStorage: localStorageEntries, cache } })
+      status.textContent = 'Clearing this app’s browser storage…'
+      localStorage.clear()
+      await clearCache()
+      if (localStorage.length !== 0) throw new Error('Local storage was not cleared')
+      status.textContent = 'Completing the verified desktop stage…'
+      await window.__TAURI_INTERNALS__.invoke('reset_complete')
+    }
+
+    main().catch(error => { status.textContent = `Reset stopped: ${error.message}. The recovery copy is retained; do not run the filesystem reset yet.` })
+  </script>
+</body>
+</html>

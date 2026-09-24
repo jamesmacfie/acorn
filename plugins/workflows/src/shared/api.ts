@@ -6,7 +6,7 @@
 // Zod bound are the same number, and a number written twice is a number that drifts. The routes
 // themselves stay in ../client/workflowsClient.ts with the rest of this plugin's namespace.
 
-import type { WorkflowRunRow as WireWorkflowRunRow, WorkflowStepRow as WireWorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowRunRow as WireWorkflowRunRow, WorkflowStepRow as WireWorkflowStepRow } from '../contract/wire.ts'
 import type { WorkflowDef, WorkflowInput } from './workflowContracts'
 
 export type WorkflowUsageSummary = {

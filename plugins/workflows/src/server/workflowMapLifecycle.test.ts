@@ -16,7 +16,8 @@ const result = (structuredOutput: unknown = null) => ({
 })
 
 const childDefinition: WorkflowDef = {
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Review ticket',
   inputs: [
     { name: 'ticket', schema: { type: 'string' }, required: true },
@@ -26,7 +27,8 @@ const childDefinition: WorkflowDef = {
 }
 
 const mapDefinition = (): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Ticket map',
   inputs: [{ name: 'queue', schema: { type: 'string' }, default: 'triage' }],
   steps: [
@@ -179,9 +181,9 @@ describe('workflow map lifecycle', () => {
       dataAccess: async () => ({ scope: { workspaceId: 'w' }, resolve: async () => ({ query, parameters: {} }), invoke: invoke as never }),
       runStep: async () => fail ? { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'Retry this record' } : result(),
     })
-    const child: WorkflowDef = { formatVersion: 2, name: 'Review', inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
       steps: [{ id: 'review', name: 'Review', prompt: 'Review ${inputs.record}' }] }
-    const root: WorkflowDef = { formatVersion: 2, name: 'Source loop', steps: [
+    const root: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Source loop', steps: [
       { id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'inline', content, bindings: {} } },
       { id: 'dispatch', name: 'For each', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' },
         childWorkflow: { ref: { source: 'database', id: 'child-def' }, inputs: { record: { address: { from: 'item', pointer: '/data' } } } } },
@@ -375,8 +377,8 @@ describe('workflow map lifecycle', () => {
     const { runner } = makeRunner([], { dataAccess: async () => ({ scope: { workspaceId: 'w' }, resolve: async () => ({ query, parameters: {} }),
       invoke: (async () => ({ records: [{ ref: { pluginId: 'fixture', sourceId: 'records', recordId: '1' }, data: {} }], mode: 'execution',
         evaluationTime: 1, readTime: 1, revision: '1', completeness: { kind: 'complete' }, incrementalBoundary: 'committed' })) as never }) }, createChild)
-    const child: WorkflowDef = { formatVersion: 2, name: 'Review', steps: [{ id: 'gate', name: 'Gate', kind: 'gate-human' }] }
-    const root: WorkflowDef = { formatVersion: 2, name: 'Incremental', steps: [
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', steps: [{ id: 'gate', name: 'Gate', kind: 'gate-human' }] }
+    const root: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Incremental', steps: [
       { id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'inline', content, bindings: {} }, incremental: true },
       { id: 'dispatch', name: 'Loop', kind: 'workflow-map', items: { step: 'find', pointer: '/records' }, repeat: { mode: 'unseen' }, childWorkflow: { ref: { source: 'database', id: 'child-def' } } },
     ] }

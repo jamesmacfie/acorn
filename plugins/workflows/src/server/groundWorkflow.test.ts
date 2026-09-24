@@ -45,7 +45,7 @@ const parsed = (text: string): GroundedWorkflow => {
 }
 
 const workflow = (steps: unknown[], over: Record<string, unknown> = {}): unknown =>
-  ({ name: 'Investigate', ...over, steps })
+  ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Investigate', ...over, steps })
 
 describe('reading the reply', () => {
   const body = '{"name":"W","steps":[{"name":"a","prompt":"Do it."}]}'
@@ -218,7 +218,7 @@ describe('child workflow grounding', () => {
     workflows: [target],
   }
   const grounded = (steps: unknown[], inputs?: WorkflowDef['inputs']) =>
-    groundWorkflow({ name: 'Parent', inputs, steps } as WorkflowDef, withTarget)
+    groundWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', inputs, steps } as WorkflowDef, withTarget)
 
   it('drops a target that the scoped catalog does not offer', () => {
     const result = grounded([{ name: 'child', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'invented' } } }])
@@ -227,7 +227,7 @@ describe('child workflow grounding', () => {
   })
 
   it('drops every generated target when the scoped catalog is empty', () => {
-    const result = groundWorkflow({
+    const result = groundWorkflow({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Parent',
       steps: [{
         name: 'child',
@@ -316,72 +316,6 @@ describe('keys outside the vocabulary', () => {
     expect(result.def.steps[0]).toEqual({ name: 'a', prompt: 'Go.' })
     expect(result.def.inputs).toBeUndefined()
     expect(codes(result)).toEqual(['unknown-key', 'unknown-key'])
-  })
-})
-
-describe('references that cannot resolve', () => {
-  it('removes a reference to a step that does not exist', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Go.' },
-      { name: 'b', after: ['a'], prompt: 'Read ${steps.ghost.output} and answer.' },
-    ]))
-    expect(result.def.steps[1]?.prompt).toBe('Read  and answer.')
-    expect(codes(result)).toEqual(['unknown-step-reference'])
-    expect(messages(result)).toContain("Step 'b' referenced the step 'ghost'")
-  })
-
-  it('adds the edge to a real step this one does not wait for', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Left.' },
-      { name: 'b', after: [], prompt: 'Right.' },
-      { name: 'c', after: ['a'], prompt: 'Read ${steps.b.output} too.' },
-    ]))
-    expect(result.def.steps[2]?.after).toEqual(['a', 'b'])
-    expect(result.def.steps[2]?.prompt).toBe('Read ${steps.b.output} too.')
-    expect(codes(result)).toEqual(['added-edge'])
-  })
-
-  it('removes a reference when the edge would close a loop', () => {
-    const result = ground(workflow([
-      { name: 'a', after: ['b'], prompt: 'Go.' },
-      { name: 'b', after: [], prompt: 'Read ${steps.a.output} first.' },
-      { name: 'c', after: ['a'], prompt: 'Read ${steps.c.output}.' },
-    ]))
-    expect(result.def.steps[1]?.prompt).toBe('Read  first.')
-    expect(result.def.steps[1]?.after).toEqual([])
-    expect(result.def.steps[2]?.prompt).toBe('Read .')
-    expect(codes(result)).toEqual(['cyclic-reference', 'cyclic-reference'])
-  })
-
-  it('removes a token that is not a reference', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Go.' },
-      { name: 'b', after: ['a'], prompt: 'Read ${steps.a} and ${steps.a.result} and ${inputs.}.' },
-    ]))
-    expect(result.def.steps[1]?.prompt).toBe('Read  and  and .')
-    expect(codes(result)).toEqual(['malformed-reference', 'malformed-reference', 'malformed-reference'])
-  })
-
-  it('declares an input a prompt reaches for', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Work on ${inputs.issue}.' },
-      { name: 'b', after: ['a'], prompt: 'Also ${inputs.issue}, and ${inputs.branch}.' },
-    ]))
-    expect(result.def.inputs).toEqual([{ name: 'issue' }, { name: 'branch' }])
-    expect(result.def.steps[0]?.prompt).toBe('Work on ${inputs.issue}.')
-    expect(codes(result)).toEqual(['declared-input', 'declared-input'])
-    expect(messages(result)).toContain("Step 'a' referenced the input 'issue'")
-  })
-
-  it('reads prompt and contributed-setting references', () => {
-    const result = ground(workflow([
-      { name: 'a', after: [], prompt: 'Go.' },
-      { name: 'b', after: [], prompt: 'Use ${steps.a.output}.' },
-      { name: 'c', after: [], kind: 'http:request', with: { method: 'GET', url: 'https://example.com/${steps.a.output}' } },
-    ]))
-    expect(result.def.steps[1]?.after).toEqual(['a'])
-    expect(result.def.steps[2]?.after).toEqual(['a'])
-    expect(codes(result)).toEqual(['added-edge', 'added-edge'])
   })
 })
 

@@ -10,14 +10,14 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import type {
   CreateAgentSessionInput,
   EnqueueAgentTurnInput,
   ImportAgentTranscriptInput,
 } from '../../shared/schemas'
 
-const ROOT = '/v2/p/agents'
+const ROOT = '/v1/p/agents'
 const sessionRoute = (sessionId: string, suffix = '') =>
   `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
 

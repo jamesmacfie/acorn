@@ -1,6 +1,7 @@
 # Reset and versioning
 
-Date: 2026-09-21. Status: implementation specification; no reset performed.
+Date: 2026-09-21. Status: implemented reset specification; no real-state reset performed.
+See [ticket 13](./13-acceptance.md) for disposable-fixture evidence.
 Read [context](./context.md). Implement through [reset tooling](./01-reset-tooling.md),
 [database baselines](./09-database-baselines.md), and [version cutover](./10-version-one.md).
 

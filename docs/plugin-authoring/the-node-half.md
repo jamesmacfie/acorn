@@ -37,13 +37,13 @@ a mismatch means the package is internally inconsistent, and picking a winner si
 squatting starts.
 
 What a loaded plugin's `ctx` does **not** have, whatever the manifest says: `ctx.routes.register`
-(Hono), `ctx.tools`, `ctx.contextSections`, `ctx.providers.model`, `ctx.events.channel` and
+(Hono), `ctx.tools`, `ctx.contextSections`, `ctx.events.channel` and
 `ctx.events.streams`. You do not have to keep that list: it is the difference between two types,
 `NodePluginContext` and `CompiledNodePluginContext`, so reaching for one of them is an error your
 editor shows you (plugins.md § The two contexts, one per tier). A Hono instance cannot cross a process
 boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.routes.fetch(handler)`
 is the door. The host strips the mount before calling you, so a request to
-`/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
+`/v1/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
 would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.dataSources`,
 `ctx.taskChecks`, `ctx.runs`, `ctx.audit`, `ctx.extensionPoints`, `ctx.hooks`,
 `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
@@ -52,7 +52,7 @@ manifest.
 Agent tools and context sections are still available to a loaded package, but only as manifest
 descriptors: `contributions.agentTools` and `contributions.contextSections`. They do not become live
 registries in `ctx`. The host turns each descriptor into the same normalized registration compiled
-plugins use, binds every route to `/v2/p/<id>/`, and removes it with the package on reload or unload.
+plugins use, binds every route to `/v1/p/<id>/`, and removes it with the package on reload or unload.
 See [Agent tools](../agent-tools.md#loaded-manifest-carriers) for the schema and response contracts.
 
 Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
@@ -169,11 +169,12 @@ ctx.telemetry.error({ name: 'UpstreamError', message: reason, handled: true })
 To time your own work:
 
 ```js
-const result = await ctx.telemetry.measure('fetch-issues', () => fetchIssues(connection))
+const count = ctx.telemetry.measure('count-issues', () => issues.length)
 ```
 
-`measure` hands back the wrapped value untouched and records a histogram sample. It is promise-aware
-and times to settlement. For work whose start and end do not fit one closure:
+In a loaded Node worker, `measure` accepts a synchronous callback and returns its value immediately.
+The compiled context also accepts a Promise-returning callback. Use `startSpan` to time asynchronous
+work in a loaded worker:
 
 ```js
 const span = ctx.telemetry.startSpan('reindex', { attrs: { pages: total } })

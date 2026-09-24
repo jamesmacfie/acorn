@@ -1,3 +1,4 @@
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type {
   WorkflowCatalog,
   WorkflowDef,
@@ -70,7 +71,8 @@ export function renderWorkflowTargets(
   ]))
   const titleName = requiredInputs[0]?.name ?? 'id'
   const singleExample: WorkflowDef = {
-    formatVersion: 2,
+    baseline: ACORN_BASELINE,
+    formatVersion: 1,
     name: `Run ${first.name}`,
     ...(requiredInputs.length ? {
       inputs: requiredInputs.map((input) => ({ name: input.name, required: true, schema: input.schema ?? { type: 'string' } })),
@@ -87,7 +89,8 @@ export function renderWorkflowTargets(
     }],
   }
   const mapExample: WorkflowDef = {
-    formatVersion: 2,
+    baseline: ACORN_BASELINE,
+    formatVersion: 1,
     name: `Map ${first.name}`,
     steps: [
       {

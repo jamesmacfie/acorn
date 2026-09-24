@@ -47,7 +47,7 @@ const request = (over: {
     state: 'active',
     installed: {
       version: over.version ?? '2.0.0',
-      apiVersion: PLUGIN_API_MAJOR,
+      baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
       permissions: over.permissions ?? permissions(),
       contributions: { frames: [], ...over.contributions },
       client: { hash: HASH, bytes: 12 },
@@ -108,7 +108,7 @@ describe('trustTiers', () => {
           { target: 'coreSlot', id: 'board-rail', label: 'Board task list', glyph: 'puzzle', order: 500, formFactor: ['desktop'], coreSlot: 'rail.taskList' },
         ],
         extensionPoints: [{ id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 }],
-        extensions: [{ id: 'tracker-rows', point: 'tracker:issues', label: 'Board cards', order: 500, items: '/v2/p/board/rows' }],
+        extensions: [{ id: 'tracker-rows', point: 'tracker:issues', label: 'Board cards', order: 500, items: '/v1/p/board/rows' }],
       },
     }))
     expect(keysIn(tiers, 'enforced')).toEqual([
@@ -129,7 +129,7 @@ describe('trustTiers', () => {
     // one growth an owner has least ability to reason about.
     const tiers = trustTiers(request({
       contributions: {
-        extensions: [{ id: 'rows', point: 'linear:issues', label: 'Board cards', order: 500, items: '/v2/p/board/rows' }],
+        extensions: [{ id: 'rows', point: 'linear:issues', label: 'Board cards', order: 500, items: '/v1/p/board/rows' }],
       },
       previous: { extensions: [{ kind: 'extends', target: 'tracker:issues', label: 'Board cards' }] },
     }))
@@ -140,12 +140,12 @@ describe('trustTiers', () => {
   it('records and diffs loaded tool and context reach', () => {
     const tool = {
       id: 'record', description: 'Record a finding.', inputSchema: { type: 'object' as const },
-      risk: 'write' as const, scope: 'task' as const, handler: '/v2/p/board/tools/record',
+      risk: 'write' as const, scope: 'task' as const, handler: '/v1/p/board/tools/record',
       requiresSession: true, timeoutMs: 5000, maxOutputBytes: 4096,
     }
     const section = {
       id: 'findings', label: 'Findings', scope: 'task' as const, order: 40,
-      read: '/v2/p/board/context/findings', defaultIncluded: true, timeoutMs: 5000,
+      read: '/v1/p/board/context/findings', defaultIncluded: true, timeoutMs: 5000,
       maxBytes: 8192, maxTokens: 1024,
     }
     const tiers = trustTiers(request({

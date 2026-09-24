@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
-import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
+import { deviceService } from '@acorn/node-core/server/auth'
+import { idempotencyStore } from '@acorn/node-core/server/auth'
+import { pairingCodes } from '@acorn/node-core/server/auth'
 import { setRouteTestCapability } from '@acorn/node-core/server/bridge.ts'
-import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const ENC_KEY = '0'.repeat(64)
@@ -87,7 +87,7 @@ type Entry = { action: string; actor: string; actorId: string | null; subject: s
 async function entries(predicate: (rows: Entry[]) => boolean = (rows) => rows.length > 0): Promise<Entry[]> {
   const deadline = Date.now() + 5_000
   for (;;) {
-    const res = await call('/v2/core/audit', { headers: bearer() })
+    const res = await call('/v1/core/audit', { headers: bearer() })
     expect(res.status).toBe(200)
     const rows = ((await res.json()) as { entries: Entry[] }).entries
     if (predicate(rows) || Date.now() > deadline) return rows
@@ -106,8 +106,8 @@ describe('the audit trail records what security.md says it should', () => {
   })
 
   it('records a pairing window opening and closing', async () => {
-    expect((await call('/v2/core/pair/start', { method: 'POST', headers: asOwner() })).status).toBe(200)
-    expect((await call('/v2/core/pair', { method: 'DELETE', headers: asOwner() })).status).toBe(204)
+    expect((await call('/v1/core/pair/start', { method: 'POST', headers: asOwner() })).status).toBe(200)
+    expect((await call('/v1/core/pair', { method: 'DELETE', headers: asOwner() })).status).toBe(204)
 
     const rows = await entries((all) => all.some((row) => row.action === 'pairing.window.closed'))
     const opened = rows.find((row) => row.action === 'pairing.window.opened')
@@ -122,7 +122,7 @@ describe('the audit trail records what security.md says it should', () => {
 
   it('records a revocation against the device that asked for it', async () => {
     const victim = await devices.issue('other machine')
-    expect((await call(`/v2/core/devices/${victim.device.id}`, { method: 'DELETE', headers: asOwner() })).status).toBe(204)
+    expect((await call(`/v1/core/devices/${victim.device.id}`, { method: 'DELETE', headers: asOwner() })).status).toBe(204)
 
     const rows = await entries((all) => all.some((row) => row.action === 'device.revoked'))
     const revoked = rows.find((row) => row.action === 'device.revoked')
@@ -132,7 +132,7 @@ describe('the audit trail records what security.md says it should', () => {
 
   it('records a plugin toggle once, and not again for a no-op re-save', async () => {
     const put = (names: string[]) =>
-      call('/v2/core/plugins', { method: 'PUT', headers: asOwner(), body: JSON.stringify({ disabled: names }) })
+      call('/v1/core/plugins', { method: 'PUT', headers: asOwner(), body: JSON.stringify({ disabled: names }) })
 
     expect((await put(['docker'])).status).toBe(200)
     await entries((all) => all.some((row) => row.action === 'plugins.disabled.changed'))
@@ -151,17 +151,17 @@ describe('the audit trail records what security.md says it should', () => {
 describe('the trail is owner-readable and paged', () => {
   it('returns the most recent first with a cursor for the next page', async () => {
     for (let index = 0; index < 4; index += 1) {
-      await call('/v2/core/pair/start', { method: 'POST', headers: asOwner() })
+      await call('/v1/core/pair/start', { method: 'POST', headers: asOwner() })
     }
     await entries((all) => all.filter((row) => row.action === 'pairing.window.opened').length >= 4)
 
-    const res = await call('/v2/core/audit?limit=2', { headers: bearer() })
+    const res = await call('/v1/core/audit?limit=2', { headers: bearer() })
     const page = (await res.json()) as { entries: Entry[]; nextBefore: number | null }
     expect(page.entries).toHaveLength(2)
     expect(page.entries[0].at).toBeGreaterThanOrEqual(page.entries[1].at)
     expect(page.nextBefore).toBe(page.entries[1].at)
 
-    const next = (await (await call(`/v2/core/audit?limit=2&before=${page.nextBefore}`, {
+    const next = (await (await call(`/v1/core/audit?limit=2&before=${page.nextBefore}`, {
       headers: bearer(),
     })).json()) as { entries: Entry[] }
     // Strictly older, so the cursor cannot re-serve a row the first page already showed.
@@ -169,6 +169,6 @@ describe('the trail is owner-readable and paged', () => {
   })
 
   it('needs a credential at all', async () => {
-    expect((await call('/v2/core/audit')).status).toBe(401)
+    expect((await call('/v1/core/audit')).status).toBe(401)
   })
 })

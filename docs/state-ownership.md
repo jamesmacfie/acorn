@@ -92,6 +92,13 @@ opens on and nothing else, and the remembered last Node is an id this device dra
 not a place preferences live. Drafts stay device-local by a separate recorded decision, because losable
 is acceptable for a draft and not for a composition.
 
+The preferences query reads Node-owned keys from the active Node and device-owned keys from local
+storage. It never copies either owner's values into the other store. A missing or inaccessible device
+store leaves device preferences at their defaults. Settings saved while storage was available reappear
+on the next launch; a save while it is unavailable stays only in the current query cache. Task layouts
+remain in the owning Node's preferences, so switching Nodes
+does not transfer a layout.
+
 Use the persistence scope that owns the state:
 
 | State | Scope |
@@ -155,7 +162,7 @@ than a decision.
 **The SQL dialog is the one Generate control outside that default, and it is a known limit rather
 than a choice.** It is a remote tree drawn in the database plugin's worker
 (`plugins/database/src/tree/GenerateSqlModal.tsx`), and the default is a device preference: it lives
-in the host's `localStorage`, `/v2/core/prefs` has no bridge scope on purpose, and `bridge.state` is
+in the host's `localStorage`, `/v1/core/prefs` has no bridge scope on purpose, and `bridge.state` is
 that same store namespaced `plugin:<id>:*`, which is what keeps one plugin out of core's keys. So the
 dialog opens on the first backend every time and remembers nothing, and a pick made in it is not
 carried anywhere else. Closing it takes one of two things: a narrow pair of bridge verbs for that one
@@ -199,7 +206,7 @@ The dashboard model (`core.dashboards`, one `app`-scoped slice, version 1) is th
 that rule and worth reading as the worked example
 ([dashboards.md § Persistence](./dashboards.md)). A panel is a saved question about a Node's
 resources, so it follows the Node: build a board once and every client paired with that Node draws
-it, and the agent can read it through `/v2` like anything else. Device storage would have made it a
+it, and the agent can read it through `/v1` like anything else. Device storage would have made it a
 per-laptop artefact of the machine it happened to be composed on. It is one blob rather than a key
 per panel — the whole model is read together by every surface that draws one — holding panel
 definitions by id and placements by scope key, with placements *referencing* definitions rather than

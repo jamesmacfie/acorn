@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
 import { wsOnNodeEvent } from '../../infra/node/wsClient'
-import type { TaskStatus } from '@acorn/protocol/terminal.ts'
+import type { TaskStatus } from '@acorn/protocol/task.ts'
 import type { ClientScheduleContribution } from '../../host/registries/shell/schedules'
 import { latestOnly } from '../../kit/lib/latestOnly'
 
@@ -53,7 +53,7 @@ export const refreshTaskStatuses = latestOnly(
 // Start polling; returns an unsubscribe.
 //
 // No `requires`. This used to be gated on `desktop`, from when the read went through the shell's
-// preload; `/v2/core/task-statuses` is a core HTTP route (server/routes/projects/worktree.ts) and works from
+// preload; `/v1/core/task-statuses` is a core HTTP route (server/routes/projects/worktree.ts) and works from
 // any client. It stays a client clock on purpose: it refreshes what a window is drawing, and nothing
 // needs it when no window is open (docs/schedules.md § Why the node, and only the node).
 export const taskStatusScheduleContribution: ClientScheduleContribution = {

@@ -32,7 +32,8 @@ const resolved = (root: WorkflowDef, child: WorkflowDef): ResolvedWorkflowGraph 
 })
 
 const rootDefinition = (tail = true): WorkflowDef => ({
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Parent run',
   inputs: [{ name: 'fallback', schema: { type: 'string' }, default: 'ABC-0' }],
   steps: [
@@ -126,7 +127,8 @@ describe('single-child workflow lifecycle', () => {
       ? { record: { id: 7, nullable: null }, count: 3, enabled: false }
       : step.id === 'child-id' ? { accepted: false } : null) })
     const child: WorkflowDef = {
-      formatVersion: 2, name: 'Typed child',
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const, name: 'Typed child',
       inputs: [
         { name: 'record', required: true, schema: { type: 'object' } },
         { name: 'count', required: true, schema: { type: 'number' } },
@@ -136,7 +138,8 @@ describe('single-child workflow lifecycle', () => {
       steps: [{ id: 'child-id', name: 'Human child label', after: [], prompt: '${inputs.record}', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } }],
     }
     const root: WorkflowDef = {
-      formatVersion: 2, name: 'Typed parent', steps: [
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const, name: 'Typed parent', steps: [
         { id: 'source-id', name: 'Renamed source', after: [], prompt: 'Source', schema: { type: 'object' } },
         { id: 'dispatch', name: 'Renamed dispatch', kind: 'workflow', after: ['source-id'], childWorkflow: {
           ref: { source: 'database', id: 'child-def' },
@@ -156,7 +159,8 @@ describe('single-child workflow lifecycle', () => {
     const calls: string[] = []
     const { runner } = makeRunner({ runStep: async (_taskId, step) => { calls.push(step.id!); return result({ accepted: 'false' }) } })
     const runId = await runner.start('parent-task', {
-      formatVersion: 2, name: 'Validate result', steps: [
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const, name: 'Validate result', steps: [
         { id: 'first', name: 'A human label', prompt: 'Answer', schema: { type: 'object', properties: { accepted: { type: 'boolean' } }, required: ['accepted'] } },
         { id: 'next', name: 'Successor', after: ['first'], prompt: 'Continue' },
       ],
@@ -176,7 +180,8 @@ describe('single-child workflow lifecycle', () => {
       },
     })
     const child: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Child review',
       tools: { allow: ['notes_list', 'task_current'], maxRisk: 'write' },
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
@@ -218,7 +223,7 @@ describe('single-child workflow lifecycle', () => {
         ? result({ ticket: 'ABC-7' })
         : { ...result(), status: 'error' as const, exitCode: 1, stderrTail: 'review failed' },
     })
-    const child: WorkflowDef = { formatVersion: 2, name: 'Child review', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'review', name: 'review' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child review', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'review', name: 'review' }] }
     const root = rootDefinition(false)
     const runId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
 
@@ -236,7 +241,8 @@ describe('single-child workflow lifecycle', () => {
 
   it('restores a gated child wait after restart and continues when the child gate is approved', async () => {
     const child: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Gated child',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
@@ -262,9 +268,10 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('keeps the parent gated when a child finishes beside a parent gate', async () => {
-    const child: WorkflowDef = { formatVersion: 2, name: 'Child', steps: [{ id: 'finish', name: 'finish', prompt: 'Finish.' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', steps: [{ id: 'finish', name: 'finish', prompt: 'Finish.' }] }
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Parallel gates',
       steps: [
         { id: 'approve-parent', name: 'approve-parent', kind: 'gate-human', after: [] },
@@ -290,7 +297,8 @@ describe('single-child workflow lifecycle', () => {
 
   it('recovers a waiting parent from an already-terminal child without creating another invocation', async () => {
     const child: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Gated child',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
       steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }, { id: 'finish', name: 'finish', prompt: 'Finish.' }],
@@ -319,7 +327,8 @@ describe('single-child workflow lifecycle', () => {
 
   it('treats duplicate terminal wake-ups as hints and settles from the durable child row once', async () => {
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Parent',
       steps: [{
         id: 'dispatch', name: 'dispatch',
@@ -327,7 +336,7 @@ describe('single-child workflow lifecycle', () => {
         childWorkflow: { ref: { source: 'database', id: 'child-def' } },
       }],
     }
-    const child: WorkflowDef = { formatVersion: 2, name: 'Child', steps: [] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', steps: [] }
     const at = Date.now()
     await store.db.insert(schema.workflowRuns).values([
       {
@@ -400,7 +409,7 @@ describe('single-child workflow lifecycle', () => {
       taskIds.add(intended!)
       return intended!
     })
-    const child: WorkflowDef = { formatVersion: 2, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
     const root = rootDefinition(false)
     const { runner } = makeRunner({}, createChild)
     const parentRunId = await runner.start('parent-task', root, { resolvedGraph: resolved(root, child) })
@@ -420,7 +429,7 @@ describe('single-child workflow lifecycle', () => {
 
   it('cancels a child agent session before settling the parent run', async () => {
     const cancelledSessions: { taskId: string; sessionId: string }[] = []
-    const child: WorkflowDef = { formatVersion: 2, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Child', inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }], steps: [{ id: 'work', name: 'work' }] }
     const root = rootDefinition(false)
     const { runner } = makeRunner({
       cancelAgentSession: async (taskId, sessionId) => void cancelledSessions.push({ taskId, sessionId }),
@@ -448,9 +457,10 @@ describe('single-child workflow lifecycle', () => {
   it('cancels an admitted child before a parallel failure settles the parent', async () => {
     let fail = () => {}
     const failure = new Promise<void>((resolve) => { fail = resolve })
-    const child: WorkflowDef = { formatVersion: 2, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Parallel failure',
       steps: [
         {
@@ -488,9 +498,10 @@ describe('single-child workflow lifecycle', () => {
     let siblingStarted = () => {}
     const siblingStart = new Promise<void>((resolve) => { siblingStarted = resolve })
     const siblingAborted = vi.fn()
-    const child: WorkflowDef = { formatVersion: 2, name: 'Failing child', steps: [{ id: 'child-work', name: 'child-work', prompt: 'Fail.' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Failing child', steps: [{ id: 'child-work', name: 'child-work', prompt: 'Fail.' }] }
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Child failure',
       steps: [
         {
@@ -528,9 +539,10 @@ describe('single-child workflow lifecycle', () => {
 
   it('waits for a child while all four agent slots are occupied', async () => {
     const blockers = new Set(['block-1', 'block-2', 'block-3', 'block-4'])
-    const child: WorkflowDef = { formatVersion: 2, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Gated child', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Parallel parent',
       steps: [
         ...[...blockers].map((name) => ({ id: name, name, after: [] as string[], prompt: 'Wait.' })),
@@ -557,7 +569,7 @@ describe('single-child workflow lifecycle', () => {
   })
 
   it('restores an expired absolute deadline as a tree safety rail after restart', async () => {
-    const definition: WorkflowDef = { formatVersion: 2, name: 'Expired root', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
+    const definition: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Expired root', steps: [{ id: 'approve', name: 'approve', kind: 'gate-human' }] }
     const expiredAt = Date.now() - 1
     await store.db.insert(schema.workflowRuns).values({
       id: 'expired-root',
@@ -607,7 +619,8 @@ describe('single-child workflow lifecycle', () => {
       }),
     })
     const runId = await runner.start('parent-task', {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Gated budget',
       budget: { maxCostUsd: 1 },
       steps: [
@@ -625,7 +638,8 @@ describe('single-child workflow lifecycle', () => {
 
   it('cancels an active descendant when the ancestor deadline expires', async () => {
     const root: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Deadline parent',
       budget: { maxWallTimeMs: 100 },
       steps: [{
@@ -634,7 +648,7 @@ describe('single-child workflow lifecycle', () => {
         childWorkflow: { ref: { source: 'database', id: 'child-def' } },
       }],
     }
-    const child: WorkflowDef = { formatVersion: 2, name: 'Slow child', steps: [{ id: 'work', name: 'work' }] }
+    const child: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Slow child', steps: [{ id: 'work', name: 'work' }] }
     const { runner } = makeRunner({
       runStep: async (_taskId, _def, opts) => new Promise((resolve) => {
         opts.signal?.addEventListener('abort', () => resolve({

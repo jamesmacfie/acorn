@@ -14,7 +14,8 @@ const inlineQuery = (pluginId: string, sourceId: string) => ({
 })
 
 const def: WorkflowDef = {
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Triage',
   steps: [
     { id: 'find', name: 'Recent issues', kind: 'find-records', after: [], query: { kind: 'saved', queryId: 'q1', bindings: {} } },
@@ -44,7 +45,8 @@ describe('outline model', () => {
     ['Rollbar occurrence review', 'rollbar', 'occurrences'],
   ])('keeps the %s authoring journey readable without exposing pointers', (_name, pluginId, sourceId) => {
     const journey: WorkflowDef = {
-      formatVersion: 2,
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: _name,
       steps: [
         { id: 'find', name: 'Find records', kind: 'find-records', after: [], query: inlineQuery(pluginId, sourceId) },

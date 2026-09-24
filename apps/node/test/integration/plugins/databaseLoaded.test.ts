@@ -7,10 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DATABASE_QUERY } from '@acorn/plugin-database/contract/query.ts'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
-import { loadExternalPlugins } from '@acorn/node-core/server/plugins/loader.ts'
+import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 

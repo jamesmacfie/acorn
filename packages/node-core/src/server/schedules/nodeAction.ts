@@ -1,4 +1,4 @@
-import { RISK_ORDER, type ToolRisk } from '@acorn/protocol/workflow.ts'
+import { RISK_ORDER, type ToolRisk } from '@acorn/protocol/toolPolicy.ts'
 import type { Env } from '../bindings'
 import { nodeAction, nodeActions, riskOf, runNodeAction } from '../nodeActions'
 import { ScheduleSkipped, type Scheduler } from './scheduler'

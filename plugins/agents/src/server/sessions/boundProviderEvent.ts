@@ -7,7 +7,7 @@ import type {
   AgentSkillDescriptor,
   AgentWebActivity,
   AgentWebResult,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import { safeProviderMessage } from '../drivers/diagnostics'
 
 const sliceText = (value: string | undefined, max = 16_384): string | undefined =>

@@ -2,7 +2,7 @@ import type {
   AgentNormalizedEvent,
   AgentPermissionOption,
   AgentQuestion,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 
 export type FormElicitationRequest = {
   message: string

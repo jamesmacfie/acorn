@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRuntimeState, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentRuntimeState, AgentSession } from '../../contract/wire.ts'
 import { canStopAgent } from './agentActivity'
 
 const RUNTIME_STATES: AgentRuntimeState[] = [

@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import type { LocalStatus } from '@acorn/protocol/terminal.ts'
+import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit, PullOptions, PushOptions } from '../../shared/api'
 import {
   type AppEnv,

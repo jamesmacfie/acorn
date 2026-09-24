@@ -7,7 +7,7 @@
 
 import { createSignal } from 'solid-js'
 import type { NodeConnectionState } from '@acorn/protocol/broker.ts'
-import type { Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { Tone } from '@acorn/client-core/kit/tokens'
 
 type DotTone = Extract<Tone, 'ok' | 'warn' | 'danger' | 'muted' | 'accent'>
 
@@ -34,6 +34,14 @@ const SENTENCES: Partial<Record<NodeConnectionState, string>> = {
 // Client-local rather than a wire state, because only the process that spawned the child knows. Set
 // in `main.tsx` when the handshake is still in flight and cleared when it lands or fails.
 const [nodeStarting, setNodeStarting] = createSignal(false)
+
+// A failed pane can retry after the shell has re-fetched its active queries. The connection dot
+// turns green before those reads finish, so it is not by itself a safe reset point.
+const [recovered, setRecovered] = createSignal<Readonly<Record<string, number>>>({})
+export const nodeRecoveryCount = (nodeId: string): number => recovered()[nodeId] ?? 0
+export const markNodeRecovered = (nodeId: string): void => {
+  setRecovered((current) => ({ ...current, [nodeId]: (current[nodeId] ?? 0) + 1 }))
+}
 
 export { nodeStarting, setNodeStarting }
 

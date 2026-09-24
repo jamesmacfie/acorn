@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BARE_KEYS, intentKeys } from '@acorn/client-core/kit/keys/keymap.ts'
+import { BARE_KEYS, intentKeys } from '@acorn/client-core/kit/keys'
 import { encodeKeyText, encodePaste, LEGACY_MODES, type PtyKey, type PtyModes } from './ptyKeys'
 
 // The key encoder against a recorded table, because there is nothing else to check it with.

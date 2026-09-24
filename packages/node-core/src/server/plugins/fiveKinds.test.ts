@@ -24,6 +24,8 @@ const ID = 'kitchen-sink'
 
 /** All five kinds the owner opens, and all five it fills in somebody else's plugin. */
 const contributions = {
+  commands: [{ id: 'refresh', title: 'Refresh sink', kind: 'action', action: { verb: 'runNodeAction', path: `/v1/p/${ID}/refresh` } }],
+  dataSources: [{ sourceId: 'records', name: 'Sink records', singular: 'Record', plural: 'Records', identityScope: 'Source and ID', handler: `/v1/p/${ID}/records` }],
   frames: [
     // The owner's own pane, which two of its points hang off.
     { target: 'pane', id: 'sink', label: 'Sink', glyph: 'puzzle', order: 800, layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } },
@@ -40,15 +42,15 @@ const contributions = {
   ],
   extensions: [
     // rows: a strip under another plugin's pane.
-    { id: 'links', point: 'board:card-links', label: 'Sink links', items: `/v2/p/${ID}/links` },
+    { id: 'links', point: 'board:card-links', label: 'Sink links', items: `/v1/p/${ID}/links` },
     // annotation: a mark on a diff line somebody else drew.
-    { id: 'diff-note', point: 'changes:diff-line', label: 'Sink notes', items: `/v2/p/${ID}/marks` },
+    { id: 'diff-note', point: 'changes:diff-line', label: 'Sink notes', items: `/v1/p/${ID}/marks` },
     // remote: a card in another plugin's slot, drawn from this bundle in a worker.
     { id: 'tool-card', point: 'agents:tool-card', label: 'Sink tool calls', remote: 'toolCard', matches: ['execute'] },
     // rectangle: this plugin's iframe, beside another plugin's document.
     { id: 'md-preview', point: 'editor:beside', label: 'Sink preview', frame: 'preview', matches: ['*.md'] },
     // hook: a turn before another plugin pushes, with the right to say no.
-    { id: 'scan-push', point: 'changes:before-push', label: 'Sink push scan', route: `/v2/p/${ID}/scan`, mode: 'veto' },
+    { id: 'scan-push', point: 'changes:before-push', label: 'Sink push scan', route: `/v1/p/${ID}/scan`, mode: 'veto' },
   ],
 }
 
@@ -56,7 +58,8 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   id: ID,
   name: 'Kitchen sink',
   version: '1.0.0',
-  apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+  emits: [{ verb: 'records-changed', description: 'The sink records changed.' }],
   node: './dist/node.js',
   client: './dist/client.js',
   contributions,
@@ -91,6 +94,9 @@ describe('a plugin declaring all five extension kinds', () => {
     expect(result.installed).toHaveLength(1)
 
     const info = installedPluginInfo(result.installed[0]!)
+    expect(info.contributions.commands).toMatchObject([{ id: 'refresh', kind: 'action' }])
+    expect(info.contributions.dataSources).toMatchObject([{ sourceId: 'records', handler: `/v1/p/${ID}/records` }])
+    expect(result.installed[0]!.manifest.emits).toEqual([{ verb: 'records-changed', description: 'The sink records changed.' }])
     const points = info.contributions.extensionPoints ?? []
     // Five kinds, one array, and each keeps the fields its own kind needs. A point that lost its
     // `key`, its `mode` or its `payload` on the way through would draw nothing and say nothing.
@@ -132,13 +138,13 @@ describe('a plugin declaring all five extension kinds', () => {
     install(manifest({
       contributions: {
         ...contributions,
-        extensions: [{ id: 'links', point: 'board:card-links', label: 'Sink links', items: '/v2/p/board/links' }],
+        extensions: [{ id: 'links', point: 'board:card-links', label: 'Sink links', items: '/v1/p/board/links' }],
       },
     }))
     const result = await loadExternalPlugins(root, { builtins: [] })
     expect(result.installed).toEqual([])
     expect(result.failures.map((failure) => failure.id)).toEqual([ID])
-    expect(result.failures[0]!.reason).toMatch(/route must be inside \/v2\/p\/kitchen-sink\//)
+    expect(result.failures[0]!.reason).toMatch(/route must be inside \/v1\/p\/kitchen-sink\//)
   })
 
   it('refuses a hook point that says nothing about what it allows', async () => {

@@ -10,7 +10,7 @@
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
 // its corner. The numbers are policy, not data: depend on the relative order, not the literals.
-import type { TaskStatus } from '@acorn/protocol/terminal.ts'
+import type { TaskStatus } from '@acorn/protocol/task.ts'
 import { CHECK_TONE } from '../../kit/lib/displayMeta'
 import type { RailMarker } from '../tabs/railMarkers'
 

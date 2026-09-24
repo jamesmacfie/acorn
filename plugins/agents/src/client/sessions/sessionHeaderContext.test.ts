@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSession, AgentSessionSnapshot, AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sessionHeaderContext } from './sessionHeaderContext'
 

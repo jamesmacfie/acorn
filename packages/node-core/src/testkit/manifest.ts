@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { PLUGIN_API_MAJOR, parsePluginManifest, type PluginManifestResult } from '../server/plugins/manifest'
 
 export const PLUGIN_CONFIG_FILE = 'acorn-plugin.config.mjs'
@@ -60,6 +61,7 @@ export async function validatePluginConfig(configPath: string): Promise<PluginMa
     ...(spec.icon ? { icon: spec.icon } : {}),
     ...(spec.icons ? { icons: spec.icons } : {}),
     version,
+    baseline: ACORN_BASELINE,
     apiVersion: PLUGIN_API_MAJOR,
     node: './dist/node.js',
     ...(client ? { client: './dist/client.js' } : {}),

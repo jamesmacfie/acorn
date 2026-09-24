@@ -94,7 +94,7 @@ if (!configPath || !existsSync(configPath)) {
   console.error(`Usage: build-plugin.mjs <${buildable().join('|')}> [--package-root <directory>]`)
   process.exit(1)
 }
-// The directory name IS the plugin id — it binds the `/v2/p/<id>` namespace, provider ids and task
+// The directory name IS the plugin id — it binds the `/v1/p/<id>` namespace, provider ids and task
 // origins, which is why the config file does not carry a second copy to disagree with.
 const spec = (await import(pathToFileURL(configPath).href)).default
 const packageRootIndex = args.indexOf('--package-root')
@@ -113,8 +113,10 @@ const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins
 // guard is an unresolved-module error that says nothing about Node versions.
 const API_VERSION_SOURCE = '@acorn/protocol/plugin/apiVersion.ts'
 let apiMajor
+let baseline
 try {
   ;({ PLUGIN_API_MAJOR: apiMajor } = await import(API_VERSION_SOURCE))
+  ;({ ACORN_BASELINE: baseline } = await import('@acorn/protocol/baseline.ts'))
 } catch (error) {
   throw new Error(
     `could not read PLUGIN_API_MAJOR from ${API_VERSION_SOURCE}. This script imports a .ts file directly, `
@@ -122,6 +124,7 @@ try {
   )
 }
 if (!apiMajor) throw new Error(`${API_VERSION_SOURCE} exported no PLUGIN_API_MAJOR`)
+if (!baseline) throw new Error('The Acorn baseline is unavailable')
 
 // A temporary entry inside apps/node so Vite resolves a declared node package exactly as the app
 // does. Client-only and descriptor-only plugins need no stand-in: their absence of a node half is a
@@ -236,6 +239,7 @@ writeFileSync(
     ...(spec.icon ? { icon: spec.icon } : {}),
     ...(spec.icons ? { icons: spec.icons } : {}),
     version,
+    baseline,
     apiVersion: apiMajor,
     ...(spec.emits?.length ? { emits: spec.emits } : {}),
     ...(spec.entry ? { node: './dist/node.js' } : {}),

@@ -22,26 +22,26 @@ export {
   rowIdentityKeys,
   splitBandIdentityKeys,
   toBands,
-} from '@acorn/client-core/kit/diff/diffModel.ts'
-export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff/diffModel.ts'
+} from '@acorn/client-core/kit/diff'
+export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff'
 
 // The tokenizer the async builders take. On this entrypoint rather than ./client because it's part of
 // the diff toolkit's contract, since `buildDiffRowsAsync(file, tokenizeDocument)` is the whole intended
 // call, and because a plugin has no other reason to reach the highlighter directly.
-export { tokenizeDocument } from '@acorn/client-core/infra/highlight/worker.ts'
-export type { TokenizeDocument } from '@acorn/client-core/infra/highlight/worker.ts'
+export { tokenizeDocument } from '@acorn/client-core/infra/highlight'
+export type { TokenizeDocument } from '@acorn/client-core/infra/highlight'
 
-export { collectMatches } from '@acorn/client-core/kit/diff/find.ts'
-export type { FindHighlight } from '@acorn/client-core/kit/diff/find.ts'
-export { createDiffHydrator } from '@acorn/client-core/kit/diff/hydration.ts'
-export { synth } from '@acorn/client-core/kit/diff/synth.ts'
-export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/kit/diff/virtualization.ts'
-export { createSplitScrollSync } from '@acorn/client-core/kit/diff/splitScrollSync.ts'
+export { collectMatches } from '@acorn/client-core/kit/diff'
+export type { FindHighlight } from '@acorn/client-core/kit/diff'
+export { createDiffHydrator } from '@acorn/client-core/kit/diff'
+export { synth } from '@acorn/client-core/kit/diff'
+export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/kit/diff'
+export { createSplitScrollSync } from '@acorn/client-core/kit/diff'
 
 // The port DiffPane (on ./ui, since it is a component) is driven through. A plugin that owns a diff
 // fills this in from its own queries and mutations; nothing else about the shell is configurable.
-export type { CommentSide, DiffSource } from '@acorn/client-core/features/diff/source.ts'
+export type { CommentSide, DiffSource } from '@acorn/client-core/features/diff'
 // Session-only scroll and collapse memory, keyed by scope. `diffScopeKey` is here so a caller keying
 // its own session state by the same scope stays in step rather than writing a second spelling.
-export { diffScopeKey } from '@acorn/client-core/features/diff/viewState.ts'
-export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/features/diff/viewState.ts'
+export { diffScopeKey } from '@acorn/client-core/features/diff'
+export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/features/diff'

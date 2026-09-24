@@ -5,7 +5,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
-import { formatCost, formatUsage, kindLabel, runCost, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatUsage, kindLabel, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 // The run pane's list column: this task's runs, then the selected run's nodes in the same reading
@@ -158,7 +158,6 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
   const usage = createMemo(() => formatUsage(model.selectedRun()?.usage))
-  const legacyCost = createMemo(() => formatCost(runCost(model.steps())))
   return (
     <Show when={model.selectedRun()}>
       {(run) => (
@@ -184,7 +183,7 @@ export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
           {[
             run().status,
             run().depth === 0 && run().usage ? 'Tree usage' : run().usage ? 'Run usage' : '',
-            usage() || legacyCost(),
+            usage(),
           ].filter(Boolean).join(' · ')}
         </SectionHeader>
       )}

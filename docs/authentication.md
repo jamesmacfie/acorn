@@ -53,7 +53,7 @@ pairing response. The Node stores a SHA-256 hash in `devices`; the desktop helpe
 token in a blob scoped to the Node, encrypted under the data key the shell holds in the OS keychain. Authentication failures return the same null result for
 missing, malformed, unknown, revoked, or incorrect tokens.
 
-Revoking a device through `DELETE /v2/core/devices/:id` invalidates future HTTP calls and closes its
+Revoking a device through `DELETE /v1/core/devices/:id` invalidates future HTTP calls and closes its
 live sockets. A 60-second activity sweep is the backstop for long-lived streams. A client can revoke
 itself; the desktop separately forgets a Node entry when the user chooses unpair.
 
@@ -61,11 +61,11 @@ itself; the desktop separately forgets a Node entry when the user chooses unpair
 
 Pairing uses one-time in-memory codes:
 
-1. An owner opens a window with `POST /v2/core/pair/start`. The Node returns a code valid for ten
+1. An owner opens a window with `POST /v1/core/pair/start`. The Node returns a code valid for ten
    minutes, with five attempts and a per-node rate ceiling.
-2. The new client probes `GET /v2/node` and compares the presented certificate fingerprint with the
+2. The new client probes `GET /v1/node` and compares the presented certificate fingerprint with the
    fingerprint shown by the owner.
-3. The client submits the code and device name to `POST /v2/pair` over the pinned connection.
+3. The client submits the code and device name to `POST /v1/pair` over the pinned connection.
 4. The Node creates a device row and returns the device token once.
 
 Pairing failures use one `401 pairing_failed` response with no distinguishing details. The bundled
@@ -76,10 +76,10 @@ Device administration is device-only:
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v2/core/pair/start` | Open or replace the pairing window |
-| `DELETE /v2/core/pair` | Close the pairing window |
-| `GET /v2/core/devices` | List paired devices without token material |
-| `DELETE /v2/core/devices/:id` | Revoke a device |
+| `POST /v1/core/pair/start` | Open or replace the pairing window |
+| `DELETE /v1/core/pair` | Close the pairing window |
+| `GET /v1/core/devices` | List paired devices without token material |
+| `DELETE /v1/core/devices/:id` | Revoke a device |
 
 ## Internal tokens
 
@@ -115,15 +115,15 @@ stored as an encrypted `integrations` row.
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v2/p/github/auth/device/start` | Request a GitHub device code |
-| `POST /v2/p/github/auth/device/poll` | Poll once and connect on success |
+| `POST /v1/p/github/auth/device/start` | Request a GitHub device code |
+| `POST /v1/p/github/auth/device/poll` | Poll once and connect on success |
 
 The flow needs `GITHUB_CLIENT_ID`, does not use a client secret, and has no callback URL. The token
 never appears in a response or renderer state.
 
 ## WebSocket authentication
 
-`/v2/events` checks the exact Node `Host` and either the device bearer or internal token before the
+`/v1/events` checks the exact Node `Host` and either the device bearer or internal token before the
 upgrade completes. It has no cookie or browser-origin authentication. The socket carries a sequence
 numbered live event stream plus feature streams; clients reconnect and refetch after a gap. Both
 client and Node use ping/pong watchdogs, and revocation closes device sockets.

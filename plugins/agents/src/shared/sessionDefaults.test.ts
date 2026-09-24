@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption } from '../contract/wire.ts'
 import {
   defaultAgentSessionDefaults,
   effectiveAgentDefaults,

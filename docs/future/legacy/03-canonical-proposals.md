@@ -1,6 +1,6 @@
 # Ticket 03: Canonical review proposals
 
-Date: 2026-09-21. Status: not started. Prerequisites: 01.
+Date: 2026-09-21. Status: implemented. Prerequisites: 01.
 Read [context](./context.md), F01 in [findings](./findings.md), and the Findings decisions in
 [target architecture](./target-architecture.md).
 
@@ -51,3 +51,30 @@ in the isolated desktop window. Schema changes use the existing chain until tick
 Inspect `plugins/memory/src/server/agentTools.ts`, `plugins/findings/src/server/runtime.ts`, and
 `plugins/memory/src/server/findingsReview.ts`. Follow loaded-plugin permissions and controller disposal;
 do not leave a cached writer usable after its plugin unloads.
+
+## Implementation notes
+
+`memory_write` now submits directly to Findings and returns the observation, candidate, and bundle
+IDs. The signed task tool route mints a proof bound to the task, session, and registered tool name.
+Memory passes that proof through its compiled tool handler. Findings verifies it with a declared
+host facet and checks the session against the Agents roster before recording agent origin. Other
+review targets use the bound controller and receive plugin origin. The observation and review rows
+commit in one transaction; repeating a source key returns the same IDs.
+
+Preparation requires a target ID. The preparation job stores it with the frozen backend, model, and
+input set, and retry reads those stored values. Findings settings select an automatic target beside
+the backend and model. Memory selects its own target for manual preparation. The old JSON proposal
+store, importer, mappings, status mirror, and compatibility routes are removed. Canonical export and
+Memory's approval receipts remain.
+
+## Verification
+
+- `pnpm lint`: passed across all 34 package tasks.
+- Findings tests: 43 passed; Memory tests: 36 passed.
+- Loaded Findings and route registry integration: 44 passed. These include immediate `memory_write`
+  review, signed session checks, disabled Findings, manual Memory editing, canonical export, and
+  absence of the JSON proposal directory and migration route.
+- Node-core provenance and permission tests: 24 passed; client notification tests: 24 passed.
+- Isolated desktop sessions `ticket03` and `ticket03b` built and booted the service, but the renderer
+  displayed “Acorn could not start — Importing a module script failed.” The shell reported reset or
+  broken-pipe connections to the Vite dev server for client modules. Both sessions were stopped.

@@ -1,4 +1,4 @@
-import { FleetStore, type FleetNode } from '@acorn/custody/broker/fleetStore.ts'
+import { FleetStore, type FleetNode } from '@acorn/custody/broker'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type DeviceTokens, type TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { configDir, dataRootDir } from './paths'
 import { knownNodeId, runningNode } from './attach'

@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show, type JSX } from 'solid-js'
-import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
 import { borderCell, styled, textStyle } from './roles'
 import { slotColor } from '../appearance'
 import { sliceToWidth, stringWidth } from '../width'

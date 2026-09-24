@@ -164,7 +164,7 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   ...(entry.unknown.length ? { unknown: entry.unknown } : {}),
 })
 
-// The bytes behind GET /v2/core/plugins/:id/client.js. Re-confines the path rather than trusting the
+// The bytes behind GET /v1/core/plugins/:id/client.js. Re-confines the path rather than trusting the
 // one resolved at boot, and re-hashes rather than reporting the boot hash: the two disagree exactly
 // when the file changed underneath us, and the honest answer is the hash of what is being sent.
 export async function readClientBundle(

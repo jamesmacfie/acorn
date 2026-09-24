@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { request as httpsRequest } from 'node:https'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DevicesResponse, PairResult, PairingWindow } from '@acorn/protocol/node.ts'
 import {
   SERVICE_PROTOCOL_VERSION,
@@ -140,6 +141,7 @@ describe('the service as a spawned child process', () => {
     child = service
     // No clientDir: the node serves no web assets, which is why this test needs no renderer build.
     const result = await service.request('service.start', {
+      baseline: ACORN_BASELINE,
       dataDir,
       version: 'spawn-test',
       isPackaged: false,
@@ -148,6 +150,15 @@ describe('the service as a spawned child process', () => {
     })
     return { started: serviceStartResultSchema.parse(result), service }
   }
+
+  it('refuses missing or different baseline before opening the data root', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-incompatible-'))
+    child = new ServiceChild({ SESSION_ENC_KEY: '0'.repeat(64), GITHUB_CLIENT_ID: 'test-client', GITHUB_CLIENT_SECRET: 'test-secret', ACORN_PORT: '' })
+    const config = { dataDir, version: 'spawn-test', isPackaged: false, hostRuntimePath: process.execPath, mcpEntry: join(dataDir, 'unused-mcp.js') }
+    await expect(child.request('service.start', config)).rejects.toThrow()
+    await expect(child.request('service.start', { ...config, baseline: 'other' })).rejects.toThrow()
+    expect(readdirSync(dataDir)).toEqual([])
+  })
 
   it('boots over IPC, reports its endpoint and pin, serves TLS, and drains on request', async () => {
     const { started, service } = await boot()
@@ -160,7 +171,7 @@ describe('the service as a spawned child process', () => {
     // A real request over the wire, validated against the pin the child just handed back, which covers
     // the whole chain at once: the certificate on disk, the listener serving it, the port in the result,
     // and the IP SAN.
-    expect(await get(started, '/v2/node')).toBe(200)
+    expect(await get(started, '/v1/node')).toBe(200)
 
     await service.waitForState('ready')
     // 'starting' is the entry's own acknowledgement before the runtime exists; the rest is the runtime's.
@@ -169,7 +180,7 @@ describe('the service as a spawned child process', () => {
     await service.request('service.stop', {})
     expect(service.states.at(-1)).toBe('stopped')
     // The listener is closed and the data root's lock released, so nothing is left holding the temp dir.
-    await expect(get(started, '/v2/node')).rejects.toThrow()
+    await expect(get(started, '/v1/node')).rejects.toThrow()
   }, 60_000)
 
   it('honours pairing, idempotency and revocation over the wire on a temp data root', async () => {
@@ -177,15 +188,15 @@ describe('the service as a spawned child process', () => {
 
     // The boot token is a real credential on a real node, so the authenticated surface answers to it, and
     // the device list shows exactly the one row the boot handshake created.
-    const listed = await call(started, '/v2/core/devices', { token: started.deviceToken })
+    const listed = await call(started, '/v1/core/devices', { token: started.deviceToken })
     expect(listed.status).toBe(200)
     expect((JSON.parse(listed.body) as DevicesResponse).devices.map((device) => device.name)).toEqual(['This computer'])
 
-    // Idempotency-Key through the middleware createApp() mounts. POST /v2/core/pair/start mints a new
+    // Idempotency-Key through the middleware createApp() mounts. POST /v1/core/pair/start mints a new
     // code on every call, so an identical body back is only explicable as the stored response.
     const key = randomUUID()
-    const opened = await call(started, '/v2/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
-    const replayed = await call(started, '/v2/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
+    const opened = await call(started, '/v1/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
+    const replayed = await call(started, '/v1/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
     expect(opened.status).toBe(200)
     expect(replayed.status).toBe(200)
     expect(replayed.body).toBe(opened.body)
@@ -193,20 +204,20 @@ describe('the service as a spawned child process', () => {
     // Spend the code the owner just opened, unauthenticated: a client that has never paired holds no
     // credential, so this route is the only way in.
     const { code } = JSON.parse(opened.body) as PairingWindow
-    const paired = await call(started, '/v2/pair', { method: 'POST', body: { code, deviceName: 'spawn-test laptop' } })
+    const paired = await call(started, '/v1/pair', { method: 'POST', body: { code, deviceName: 'spawn-test laptop' } })
     expect(paired.status).toBe(200)
     const result = JSON.parse(paired.body) as PairResult
     expect(result.nodeId).toBe(started.nodeId)
     expect(result.deviceToken).toMatch(/^acorn_dt_/)
-    expect((await call(started, '/v2/core/devices', { token: result.deviceToken })).status).toBe(200)
+    expect((await call(started, '/v1/core/devices', { token: result.deviceToken })).status).toBe(200)
 
     // And revocation takes it away on the very next request, envelope and all.
-    const revoke = await call(started, `/v2/core/devices/${result.device.id}`, { method: 'DELETE', token: started.deviceToken })
+    const revoke = await call(started, `/v1/core/devices/${result.device.id}`, { method: 'DELETE', token: started.deviceToken })
     expect(revoke.status).toBe(204)
-    const after = await call(started, '/v2/core/devices', { token: result.deviceToken })
+    const after = await call(started, '/v1/core/devices', { token: result.deviceToken })
     expect(after.status).toBe(401)
     expect((JSON.parse(after.body) as ApiError).error.code).toBe('unauthenticated')
     // The revoking device is untouched: revocation is per-device, not a reset.
-    expect((await call(started, '/v2/core/devices', { token: started.deviceToken })).status).toBe(200)
+    expect((await call(started, '/v1/core/devices', { token: started.deviceToken })).status).toBe(200)
   }, 60_000)
 })

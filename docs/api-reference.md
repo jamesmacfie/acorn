@@ -1,12 +1,12 @@
 # API reference
 
 The [workspace query library](./data-sources.md#workspace-query-library) exposes scoped draft,
-publication, resolution, and consumer operations under `/v2/core/queries/:operation`.
-Typed dashboard panels use the matching device-only `/v2/core/dashboards/:operation` surface for
+publication, resolution, and consumer operations under `/v1/core/queries/:operation`.
+Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operation` surface for
 `list`, `get`, `create`, compare-and-swap `save`, `publish`, immutable `published`, and `delete`.
-`GET /v2/core/dashboards/history` remains the separate measure-series read.
+`GET /v1/core/dashboards/history` remains the separate measure-series read.
 
-The Node exposes one Hono application under `/v2`. It serves JSON routes and one authenticated
+The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
 Route and response types live in `packages/protocol/src/api.ts`; the server composition is
@@ -18,11 +18,11 @@ validation details when changing a contract.
 
 | Surface | Path | Auth |
 | --- | --- | --- |
-| Node probe | `GET /v2/node` | pre-auth; unauthenticated response is limited |
-| Pairing | `POST /v2/pair` | pre-auth; consumes a one-time code |
-| Core | `/v2/core/*` | device or permitted internal principal |
-| Plugin | `/v2/p/<plugin>/*` | device or permitted internal principal |
-| Events/streams | `GET /v2/events` | authenticated WebSocket upgrade |
+| Node probe | `GET /v1/node` | pre-auth; unauthenticated response is limited |
+| Pairing | `POST /v1/pair` | pre-auth; consumes a one-time code |
+| Core | `/v1/core/*` | device or permitted internal principal |
+| Plugin | `/v1/p/<plugin>/*` | device or permitted internal principal |
+| Events/streams | `GET /v1/events` | authenticated WebSocket upgrade |
 
 A request that reaches a node through the desktop broker is killed after 30 seconds. That is less
 than one model call is allowed to take, so a caller that knows its route is slow passes `timeoutMs`
@@ -64,22 +64,26 @@ an exhausted attempt budget, a wrong code, or a malformed body. A caller cannot 
 hit, so there is no oracle for "right code, wrong something". The attempt counter increments before
 the code comparison runs, so racing concurrent guesses cannot dodge the budget.
 
-`POST /v2/pair` returns the device's bearer token once, in that response, and the node stores only
+`POST /v1/pair` returns the device's bearer token once, in that response, and the node stores only
 its hash from then on. The node's unauthenticated probe response carries the TLS certificate
 fingerprint for the new client to compare against the node's own screen. Sending the fingerprint over
 the connection being authenticated proves nothing by itself. The comparison's value comes from the
 owner reading both screens.
 
-`DELETE /v2/core/devices/:id` closes that device's open WebSocket connections immediately, because a
+`DELETE /v1/core/devices/:id` closes that device's open WebSocket connections immediately, because a
 live socket holds no bearer to re-check against a revocation. A device may revoke itself. Every
 paired device already has full owner authority, so there is no separate self-revocation guard.
 
 ## Versioning
 
-**One number, one meaning.** `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
-protocol major and the entire compatibility contract. There is no minor, no capability negotiation,
+`NODE_PROTOCOL_VERSION` is 1 and all owned HTTP and WebSocket paths use `/v1`. Every Node probe and
+pair result also carries `baseline: "acorn-1"`. A client rejects a missing or different baseline
+before pairing or opening a WebSocket, even when the numeric protocol is 1.
+
+The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
+protocol major. There is no minor, no capability negotiation,
 and no feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
-before pairing, and the broker re-probes `GET /v2/node` on every connect, producing the
+before pairing, and the broker re-probes `GET /v1/node` on every connect, producing the
 `incompatible` connection state and the `protocol_mismatch` error code. Checking only at pairing is
 not enough, because a paired node upgrades by restarting, which drops the socket, so the reconnect is
 where a new major shows up.
@@ -162,39 +166,39 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v2/core/pair/start` | Open a ten-minute pairing window |
-| `DELETE` | `/v2/core/pair` | Close the pairing window |
-| `GET` | `/v2/core/devices` | List paired devices |
-| `DELETE` | `/v2/core/devices/:id` | Revoke a device |
-| `GET` | `/v2/core/plugins` | List plugin status and capabilities |
-| `PUT` | `/v2/core/plugins/:name` | Enable/disable an optional plugin |
-| `POST` | `/v2/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
-| `POST` | `/v2/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
-| `GET` | `/v2/core/audit` | Read the retained audit trail |
-| `GET` | `/v2/core/security` | Read Node security posture |
-| `GET` | `/v2/core/attachment` | Which control plane this Node is attached to, if any |
-| `DELETE` | `/v2/core/attachment` | Detach: revoke the control plane's device row and forget it |
-| `GET` | `/v2/core/nodes` | Nodes this Node's plugins know about, plus which verbs each provider declared |
-| `POST` | `/v2/core/nodes/adopt` | Connection material and credential for one provided Node (host-only in practice) |
-| `POST` | `/v2/core/nodes/create` | Ask a provider for a new Node |
-| `POST` | `/v2/core/nodes/{destroy,start,stop}` | The three lifecycle verbs that name an existing Node |
-| `GET` | `/v2/core/backup` | Suggest a destination path for a backup |
-| `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
-| `GET` | `/v2/core/schedules` | List every schedule on this node, plus the global pause flag |
-| `PATCH` | `/v2/core/schedules` | Pause or resume the whole loop |
-| `GET` | `/v2/core/schedules/targets` | List the target options available to the generic creation picker |
-| `POST` | `/v2/core/schedules` | Create a user schedule against a registered target kind |
-| `PATCH` | `/v2/core/schedules/:key` | Pause/resume, retune the cadence, rename (user rows only) |
-| `DELETE` | `/v2/core/schedules/:key` | Delete a user schedule. Declared ones are paused, not deleted |
-| `POST` | `/v2/core/schedules/:key/run` | Run one now; an `Idempotency-Key` identifies a replayed manual occurrence |
-| `GET` | `/v2/core/schedules/:key/runs` | The recent-run ring, newest first |
+| `POST` | `/v1/core/pair/start` | Open a ten-minute pairing window |
+| `DELETE` | `/v1/core/pair` | Close the pairing window |
+| `GET` | `/v1/core/devices` | List paired devices |
+| `DELETE` | `/v1/core/devices/:id` | Revoke a device |
+| `GET` | `/v1/core/plugins` | List plugin status and capabilities |
+| `PUT` | `/v1/core/plugins/:name` | Enable/disable an optional plugin |
+| `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
+| `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
+| `GET` | `/v1/core/audit` | Read the retained audit trail |
+| `GET` | `/v1/core/security` | Read Node security posture |
+| `GET` | `/v1/core/attachment` | Which control plane this Node is attached to, if any |
+| `DELETE` | `/v1/core/attachment` | Detach: revoke the control plane's device row and forget it |
+| `GET` | `/v1/core/nodes` | Nodes this Node's plugins know about, plus which verbs each provider declared |
+| `POST` | `/v1/core/nodes/adopt` | Connection material and credential for one provided Node (host-only in practice) |
+| `POST` | `/v1/core/nodes/create` | Ask a provider for a new Node |
+| `POST` | `/v1/core/nodes/{destroy,start,stop}` | The three lifecycle verbs that name an existing Node |
+| `GET` | `/v1/core/backup` | Suggest a destination path for a backup |
+| `POST` | `/v1/core/backup` | Create a credential-scrubbed database archive |
+| `GET` | `/v1/core/schedules` | List every schedule on this node, plus the global pause flag |
+| `PATCH` | `/v1/core/schedules` | Pause or resume the whole loop |
+| `GET` | `/v1/core/schedules/targets` | List the target options available to the generic creation picker |
+| `POST` | `/v1/core/schedules` | Create a user schedule against a registered target kind |
+| `PATCH` | `/v1/core/schedules/:key` | Pause/resume, retune the cadence, rename (user rows only) |
+| `DELETE` | `/v1/core/schedules/:key` | Delete a user schedule. Declared ones are paused, not deleted |
+| `POST` | `/v1/core/schedules/:key/run` | Run one now; an `Idempotency-Key` identifies a replayed manual occurrence |
+| `GET` | `/v1/core/schedules/:key/runs` | The recent-run ring, newest first |
 
 These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
 reach it. Schedules are the same class for a different reason: a schedule is code the node runs
 unattended, so declaring one is a way to make code run later. For more information, see
 [the schedules doc](./schedules.md).
 
-`GET /v2/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
+`GET /v1/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
 owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
 through the `plugin_request` tool and can reach neither route, which is the point. What it can read
 is the authoring contract, through the `plugin_authoring` tool. That is a read of this node's own
@@ -206,22 +210,26 @@ be denied. For more information, see approval-mediated install and teaching the 
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/v2/core/prefs` | Read Node-scoped preferences |
-| `PUT` | `/v2/core/prefs` | Upsert one preference |
-| `GET` | `/v2/core/integrations` | List provider descriptors and connection state |
-| `POST` | `/v2/core/integrations` | Create/validate an integration |
-| `PUT` | `/v2/core/integrations/:id` | Replace credentials/configuration |
-| `PATCH` | `/v2/core/integrations/:id` | Enable or disable a connection |
-| `POST` | `/v2/core/integrations/:id/test` | Test provider connectivity |
-| `DELETE` | `/v2/core/integrations/:id` | Disconnect and cascade provider data |
-| `GET` | `/v2/core/models/backends` | List the model backends this owner can generate with |
-| `POST` | `/v2/core/telemetry` | Take a batch of records another runtime collected |
-| `GET` | `/v2/core/telemetry/summary` | Counts of what this node has collected since it started |
+| `GET` | `/v1/core/prefs` | Read Node-scoped preferences |
+| `PUT` | `/v1/core/prefs` | Upsert one preference |
+| `GET` | `/v1/core/integrations` | List provider descriptors and connection state |
+| `POST` | `/v1/core/integrations` | Create/validate an integration |
+| `PUT` | `/v1/core/integrations/:id` | Replace credentials/configuration |
+| `PATCH` | `/v1/core/integrations/:id` | Enable or disable a connection |
+| `POST` | `/v1/core/integrations/:id/test` | Test provider connectivity |
+| `DELETE` | `/v1/core/integrations/:id` | Disconnect and cascade provider data |
+| `GET` | `/v1/core/models/backends` | List the model backends this owner can generate with |
+| `POST` | `/v1/core/telemetry` | Take a batch of records another runtime collected |
+| `GET` | `/v1/core/telemetry/summary` | Counts of what this node has collected since it started |
+
+Connection creation and credential replacement require a `credentials` object of provider fields,
+such as `{ "credentials": { "token": "…" } }`. A top-level `token` field or missing `credentials`
+object gets `400 provider_bad_config`.
 
 Integration administration is restricted to device and Node service principals. Secret values are
 write-only.
 
-`POST /v2/core/telemetry` is device-only, and it is the one door into the node's collector for a
+`POST /v1/core/telemetry` is device-only, and it is the one door into the node's collector for a
 runtime outside the node, including the desktop renderer, terminal client, desktop helper, and Rust shell
 ([telemetry.md](./telemetry.md) § Other runtimes). The body is `{ runtime, records }`, capped at one
 mebibyte and refused whole if any record is malformed. `runtime` names the sender and cannot say
@@ -230,13 +238,13 @@ be indistinguishable from one at a sink. The answer is `202` with `{ accepted }`
 the preference is off or no sink is subscribed; that is not an error, and the sender stops on its
 own when it next reads the preference.
 
-`GET /v2/core/telemetry/summary` is the other half of that router and is device-only for the same
+`GET /v1/core/telemetry/summary` is the other half of that router and is device-only for the same
 reason: it names which plugins are subscribed as sinks. It answers counters rather than records,
 per owner and kind since the node started, plus the drop and truncation totals, the last flush, and
 the sink list. Settings → Telemetry is the one caller
 ([telemetry.md](./telemetry.md) § What the page shows).
 
-`GET /v2/core/models/backends` is device-only, and answers `backends` plus `missing`. A backend is a
+`GET /v1/core/models/backends` is device-only, and answers `backends` plus `missing`. A backend is a
 connected model provider or an agent CLI installed on this machine, projected to an id, a label and a
 model catalog; connections come first. `missing` names every agent CLI that declares a one-shot text
 mode whose command is not on this machine, which is what the onboarding wizard draws as "not found".
@@ -246,26 +254,26 @@ For more information, see model providers in [the integrations doc](./integratio
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/v2/core/workspaces` | List workspaces and their project membership |
-| `POST` | `/v2/core/workspaces/bootstrap` | Initialize the default workspace |
-| `POST` | `/v2/core/workspaces` | Create a workspace |
-| `PATCH` | `/v2/core/workspaces/:id` | Rename a workspace |
-| `DELETE` | `/v2/core/workspaces/:id` | Delete a non-default workspace |
-| `GET` | `/v2/core/projects` | List local projects and their facets |
-| `POST` | `/v2/core/projects` | Add or import a project |
-| `GET` | `/v2/core/projects/:id` | Read one project |
-| `PATCH` | `/v2/core/projects/:id` | Update project identity, colour, folder, or visibility |
-| `GET` | `/v2/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
-| `PUT` | `/v2/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
-| `GET` | `/v2/core/tasks` | List active tasks on this Node |
-| `POST` | `/v2/core/tasks` | Create a task |
-| `PATCH` | `/v2/core/tasks/:id` | Update task metadata or archive/activate a task |
-| `POST` | `/v2/core/tasks/:id/links` | Add an external item link |
-| `DELETE` | `/v2/core/tasks/:id/links` | Remove an external item link |
-| `GET` | `/v2/core/tasks/:id/context` | Assemble task context (`?include=` names section ids; `*` for all) |
-| `GET` | `/v2/core/tasks/:id/tools` | List task agent tools |
-| `POST` | `/v2/core/tasks/:id/tools/:name` | Invoke an authorized task tool |
-| `GET` | `/v2/core/agent-tools` | Catalog tools for Settings |
+| `GET` | `/v1/core/workspaces` | List workspaces and their project membership |
+| `POST` | `/v1/core/workspaces/bootstrap` | Initialize the default workspace |
+| `POST` | `/v1/core/workspaces` | Create a workspace |
+| `PATCH` | `/v1/core/workspaces/:id` | Rename a workspace |
+| `DELETE` | `/v1/core/workspaces/:id` | Delete a non-default workspace |
+| `GET` | `/v1/core/projects` | List local projects and their facets |
+| `POST` | `/v1/core/projects` | Add or import a project |
+| `GET` | `/v1/core/projects/:id` | Read one project |
+| `PATCH` | `/v1/core/projects/:id` | Update project identity, colour, folder, or visibility |
+| `GET` | `/v1/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
+| `PUT` | `/v1/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
+| `GET` | `/v1/core/tasks` | List active tasks on this Node |
+| `POST` | `/v1/core/tasks` | Create a task |
+| `PATCH` | `/v1/core/tasks/:id` | Update task metadata or archive/activate a task |
+| `POST` | `/v1/core/tasks/:id/links` | Add an external item link |
+| `DELETE` | `/v1/core/tasks/:id/links` | Remove an external item link |
+| `GET` | `/v1/core/tasks/:id/context` | Assemble task context (`?include=` names section ids; `*` for all) |
+| `GET` | `/v1/core/tasks/:id/tools` | List task agent tools |
+| `POST` | `/v1/core/tasks/:id/tools/:name` | Invoke an authorized task tool |
+| `GET` | `/v1/core/agent-tools` | Catalog tools for Settings |
 
 Task-addressed routes are guarded by the `taskId` in a task-scoped internal token. Task lifecycle,
 worktree, run-target, and repo-config authority remains in core.
@@ -275,13 +283,13 @@ worktree, run-target, and repo-config authority remains in core.
 The core worktree router covers project configuration and task lifecycle surfaces, including:
 
 ```text
-/v2/core/task-statuses
-/v2/core/projects/:id/run-targets
-/v2/core/projects/:id/config
-/v2/core/tasks/:id/{preview-url,on-created,archive}
-/v2/core/tasks/:id/{mcp,mcp/starter}
-/v2/core/tasks/:id/config-trust
-/v2/core/tasks/:id/run/*
+/v1/core/task-statuses
+/v1/core/projects/:id/run-targets
+/v1/core/projects/:id/config
+/v1/core/tasks/:id/{preview-url,on-created,archive}
+/v1/core/tasks/:id/{mcp,mcp/starter}
+/v1/core/tasks/:id/config-trust
+/v1/core/tasks/:id/run/*
 ```
 
 The exact method/body contracts are in `packages/node-core/src/server/routes/projects/worktree.ts`,
@@ -298,15 +306,15 @@ are authoritative.
 
 | Path family | Purpose |
 | --- | --- |
-| `/v2/p/github/auth/device/*` | GitHub OAuth device-flow start and poll |
-| `/v2/p/github/pins` | Pinned repository state |
-| `/v2/p/github/repos` | Repository mirror and refresh |
-| `/v2/p/github/repos/:owner/:repo/pulls` | Open/closed PR lists, batch prefetch, create PR |
-| `/v2/p/github/repos/:owner/:repo/pulls/:number` | PR detail, files, blob bodies, and write actions |
-| `/v2/p/github/tasks/:taskId/pulls` | Durable Acorn-created PR relations for a task |
-| `/v2/p/github/repos/:owner/:repo/actions/*` | Actions jobs/logs and rerun |
-| `/v2/p/github/repos/:owner/:repo/labels` | Label choices |
-| `/v2/p/github/repos/:owner/:repo/mentions` | Mention autocomplete participants |
+| `/v1/p/github/auth/device/*` | GitHub OAuth device-flow start and poll |
+| `/v1/p/github/pins` | Pinned repository state |
+| `/v1/p/github/repos` | Repository mirror and refresh |
+| `/v1/p/github/repos/:owner/:repo/pulls` | Open/closed PR lists, batch prefetch, create PR |
+| `/v1/p/github/repos/:owner/:repo/pulls/:number` | PR detail, files, blob bodies, and write actions |
+| `/v1/p/github/tasks/:taskId/pulls` | Durable Acorn-created PR relations for a task |
+| `/v1/p/github/repos/:owner/:repo/actions/*` | Actions jobs/logs and rerun |
+| `/v1/p/github/repos/:owner/:repo/labels` | Label choices |
+| `/v1/p/github/repos/:owner/:repo/mentions` | Mention autocomplete participants |
 
 GitHub reads use the plugin SQLite mirror with TTL/ETag revalidation where supported. Patch and file
 bodies use the shared immutable blob cache. GitHub writes update or invalidate the affected mirror.
@@ -314,48 +322,48 @@ bodies use the shared immutable blob cache. GitHub writes update or invalidate t
 ### Agents
 
 ```text
-/v2/p/agents/providers
-/v2/p/agents/usage
-/v2/p/agents/pricing
-/v2/p/agents/concurrency
-/v2/p/agents/sessions
-/v2/p/agents/sessions/:id
-/v2/p/agents/sessions/:id/events
-/v2/p/agents/sessions/:id/turns
-/v2/p/agents/sessions/:id/requests/:requestId/resolve
-/v2/p/agents/sessions/:id/{cancel,fork,compact,wait,export}
-/v2/p/agents/attachments[/:id]
-/v2/p/agents/artifacts/:id/content
+/v1/p/agents/providers
+/v1/p/agents/usage
+/v1/p/agents/pricing
+/v1/p/agents/concurrency
+/v1/p/agents/sessions
+/v1/p/agents/sessions/:id
+/v1/p/agents/sessions/:id/events
+/v1/p/agents/sessions/:id/turns
+/v1/p/agents/sessions/:id/requests/:requestId/resolve
+/v1/p/agents/sessions/:id/{cancel,fork,compact,wait,export}
+/v1/p/agents/attachments[/:id]
+/v1/p/agents/artifacts/:id/content
 ```
 
 Sessions persist normalized event history and expose paged HTTP reads plus live WebSocket updates.
-`GET /v2/p/agents/sessions` also returns a bounded `delegations` projection for the sessions in that
+`GET /v1/p/agents/sessions` also returns a bounded `delegations` projection for the sessions in that
 page. Each entry names the child session, depth, isolation, and either its managed parent ID or a
 display-safe terminal owner label and profile. The spawn authority row is not returned.
 
 Managed-agent orchestration uses the ordinary task tool routes rather than plugin-specific control
-routes. `GET /v2/core/tasks/:id/tools` lists `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`,
+routes. `GET /v1/core/tasks/:id/tools` lists `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`,
 and `agent_cancel` only for a task-scoped internal principal with a signed session claim and the
-required execute permission. `POST /v2/core/tasks/:id/tools/:name` invokes them. A direct-child
+required execute permission. `POST /v1/core/tasks/:id/tools/:name` invokes them. A direct-child
 authorization failure is indistinguishable from an unknown session and returns 404.
 
 ### Findings
 
 ```text
-/v2/p/findings/tasks/:id/observations
-/v2/p/findings/tasks/:id/observations/:observationId
-/v2/p/findings/tasks/:id/observations/:observationId/withdraw
-/v2/p/findings/observations
-/v2/p/findings/observations/batch
-/v2/p/findings/tasks/:id/review/prepare
-/v2/p/findings/review/bundles
-/v2/p/findings/review/bundles/:id/cancel
-/v2/p/findings/review/bundles/:id/outcomes/:observationId/restore
-/v2/p/findings/review/candidates/:id
-/v2/p/findings/review/candidates/:id/edit
-/v2/p/findings/review/candidates/:id/decision
-/v2/p/findings/review/candidates/:id/history
-/v2/p/findings/review/candidates/:id/split
+/v1/p/findings/tasks/:id/observations
+/v1/p/findings/tasks/:id/observations/:observationId
+/v1/p/findings/tasks/:id/observations/:observationId/withdraw
+/v1/p/findings/observations
+/v1/p/findings/observations/batch
+/v1/p/findings/tasks/:id/review/prepare
+/v1/p/findings/review/bundles
+/v1/p/findings/review/bundles/:id/cancel
+/v1/p/findings/review/bundles/:id/outcomes/:observationId/restore
+/v1/p/findings/review/candidates/:id
+/v1/p/findings/review/candidates/:id/edit
+/v1/p/findings/review/candidates/:id/decision
+/v1/p/findings/review/candidates/:id/history
+/v1/p/findings/review/candidates/:id/split
 ```
 
 These routes are device-only and support task history, explicit device-authored capture, atomic
@@ -364,19 +372,19 @@ scope from the URL and origin from the authenticated device. Task-scoped interna
 limits, retry semantics, and pagination, see [Findings](./findings.md).
 
 Final findings-backed memory approval is separately device-gated at
-`POST /v2/p/memory/memory/findings/:id/approve`; memory, not findings, owns its durable receipt and
+`POST /v1/p/memory/memory/findings/:id/approve`; memory, not findings, owns its durable receipt and
 file effect.
 
 ### Terminal, workflows, and execution
 
 ```text
-/v2/p/terminal/sessions*
-/v2/p/terminal/tasks/:taskId/run-targets
-/v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
-/v2/p/workflows/catalog
-/v2/p/workflows/defs[/*]
-/v2/p/workflows/tasks/:id/workflows*
-/v2/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry,records}
+/v1/p/terminal/sessions*
+/v1/p/terminal/tasks/:taskId/run-targets
+/v1/core/tasks/:id/{archive,preview-url,on-created,mcp}
+/v1/p/workflows/catalog
+/v1/p/workflows/defs[/*]
+/v1/p/workflows/tasks/:id/workflows*
+/v1/p/workflows/workflows/runs/:runId/{steps,gate,cancel,kill,retry,records}
 ```
 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
@@ -386,10 +394,10 @@ Workflow schedule bindings use these device-only routes:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/v2/p/workflows/workflows/schedules` | Lists workflow-owned schedule bindings and activation state |
-| `POST` | `/v2/p/workflows/workflows/schedules` | Saves a draft project, published workflow, typed input, timezone, and limit binding |
-| `GET` | `/v2/p/workflows/workflows/schedules/:id` | Reads one binding |
-| `POST` | `/v2/p/workflows/workflows/schedules/:id/approve` | Freezes approval and chooses `process-current` or `track-now`; `freshEpoch` resets processing scope |
+| `GET` | `/v1/p/workflows/workflows/schedules` | Lists workflow-owned schedule bindings and activation state |
+| `POST` | `/v1/p/workflows/workflows/schedules` | Saves a draft project, published workflow, typed input, timezone, and limit binding |
+| `GET` | `/v1/p/workflows/workflows/schedules/:id` | Reads one binding |
+| `POST` | `/v1/p/workflows/workflows/schedules/:id/approve` | Freezes approval and chooses `process-current` or `track-now`; `freshEpoch` resets processing scope |
 
 Create the core cadence row separately with target `{ "scheduleId": "..." }` and kind `workflow`.
 The workflows plugin owns approval and occurrences. Core owns cadence, pause, deletion, **Run now**,
@@ -404,9 +412,9 @@ bounded named outputs, and query provenance. Its `/attempts` subroute accepts th
 the retained attempt's digest and title for review. `POST .../reprocess` takes that `digest` and a
 `requestId`; it creates or replays the related attempt and independent root child run without rerunning
 the source query. `GET /workflows/task-navigation` returns aggregate running and attention counts for
-ordinary root tasks. All paths in this paragraph are under `/v2/p/workflows`.
+ordinary root tasks. All paths in this paragraph are under `/v1/p/workflows`.
 
-`POST /v2/p/workflows/tasks/:id/workflows` takes `{ defId, inputs? }`. Inline definitions are refused;
+`POST /v1/p/workflows/tasks/:id/workflows` takes `{ defId, inputs? }`. Inline definitions are refused;
 drafts must be published before execution. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a `workflow_defs` row, and a task-confined caller is refused that with a 403
 because a row skips the repository trust snapshot. `inputs` is a table of named bounded JSON values
@@ -417,10 +425,10 @@ failed node back to pending. Retry answers 403 to a task-confined caller, becaus
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
 foreign or unknown run as a 404.
 
-`GET /v2/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections. Each projection
+`GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections. Each projection
 has explicit root and parent run IDs, the corresponding task IDs and names, depth, and usage. A root
 reports aggregate tree usage; a child reports only its own turns.
-`GET /v2/p/workflows/workflows/runs/:runId/steps` adds a `children` list to each dispatch step. Every child
+`GET /v1/p/workflows/workflows/runs/:runId/steps` adds a `children` list to each dispatch step. Every child
 summary carries its task and run IDs, item key, dispatch and run status, bounded result or error, and
 usage. These are durable reads, not event payload reconstruction.
 
@@ -431,17 +439,17 @@ saved references in the task's scope, freezes the complete graph, and verifies a
 same invocation identity. This is the internal handoff used by scheduled workflows; it does not add
 a scheduling route or button.
 
-`GET /v2/p/workflows/catalog` answers every step kind this node can run, with the form each one
+`GET /v1/p/workflows/catalog` answers every step kind this node can run, with the form each one
 draws, plus the policies and the agent profiles
 ([workflows.md](./workflows.md) § Contributed step kinds). It takes an optional `projectId` and
 ignores it: the answer is node-wide, and the parameter is there so a later per-project answer needs no
 second route. Two routes answer the option lists that a kind's `select` fields point at, both shaped
 `{ options: [{ value, label, description? }] }`:
-`GET /v2/p/terminal/tasks/:taskId/run-targets` and
-`GET /v2/p/database/projects/:projectId/saved-queries`. The second refuses a task-confined caller,
+`GET /v1/p/terminal/tasks/:taskId/run-targets` and
+`GET /v1/p/database/projects/:projectId/saved-queries`. The second refuses a task-confined caller,
 because no task in the path means no scope gate.
 
-Definitions stored as rows live under `/v2/p/workflows/defs`, and the whole family is device-only
+Definitions stored as rows live under `/v1/p/workflows/defs`, and the whole family is device-only
 ([workflows.md](./workflows.md) § Database definitions):
 
 | Route | Body or query | Answer |
@@ -480,14 +488,13 @@ owner's provider key, and the whole `/defs` family is already device-only, which
 ### Notes and memory
 
 ```text
-/v2/p/notes/tasks/:id/notes[/*]
-/v2/p/notes/workspaces/:wsId/notes[/*]
-/v2/p/memory/memory[/*]
+/v1/p/notes/tasks/:id/notes[/*]
+/v1/p/notes/workspaces/:wsId/notes[/*]
+/v1/p/memory/memory[/*]
 ```
 
-The notes plugin owns the notes namespace. The memory plugin's note paths under
-`/v2/p/memory/tasks/.../notes` and `/v2/p/memory/workspaces/.../notes` are deprecated compatibility
-aliases for one release and resolve through the same notes store.
+The notes plugin owns the notes namespace. Workspace and global notes require a device principal;
+task-scoped credentials can reach only their own task notes.
 
 ### Other feature plugins
 
@@ -498,7 +505,7 @@ aliases for one release and resolve through the same notes store.
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
 | `http` | encrypted request/variable storage and send |
-| `memory` | memory entries and proposals; deprecated notes aliases |
+| `memory` | memory entries and Findings approval |
 | `notes` | task, workspace, and global note CRUD |
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
@@ -513,23 +520,23 @@ authentication and owner context; the only thing particular to them is that the 
 display data with no field that can choose a route, a URL or a verb.
 
 ```text
-GET  /v2/p/rollbar/palette/issues        ?q&projectId
-GET  /v2/p/linear/palette/issues         ?q&projectId
-GET  /v2/p/database/palette/queries      ?q&taskId
-POST /v2/p/database/palette/generate     { input, taskId }
-GET  /v2/p/http/palette/requests         ?q&projectId
-POST /v2/p/http/palette/import-curl      { input, taskId }
+GET  /v1/p/rollbar/palette/issues        ?q&projectId
+GET  /v1/p/linear/palette/issues         ?q&projectId
+GET  /v1/p/database/palette/queries      ?q&taskId
+POST /v1/p/database/palette/generate     { input, taskId }
+GET  /v1/p/http/palette/requests         ?q&projectId
+POST /v1/p/http/palette/import-curl      { input, taskId }
 ```
 
 ### Loaded agent tools and context sections
 
 `contributions.agentTools` and `contributions.contextSections` are manifest carriers, not new route
-families. Each names a route under the package's existing `/v2/p/<pluginId>/` namespace. The host
+families. Each names a route under the package's existing `/v1/p/<pluginId>/` namespace. The host
 calls those routes with a verified task-scoped internal principal, adapts the bounded response into
 the existing agent-tool registry or context assembler, and removes the registration on reload or
-unload. Agent tools still project through `GET /v2/core/tasks/:id/tools` and
-`POST /v2/core/tasks/:id/tools/:name`; context still projects through
-`GET /v2/core/tasks/:id/context`. See [Agent tools](./agent-tools.md#loaded-manifest-carriers) for the
+unload. Agent tools still project through `GET /v1/core/tasks/:id/tools` and
+`POST /v1/core/tasks/:id/tools/:name`; context still projects through
+`GET /v1/core/tasks/:id/context`. See [Agent tools](./agent-tools.md#loaded-manifest-carriers) for the
 descriptor and response shapes.
 
 Each search re-checks the project or task owner on the node and answers at most 50 rows. The two
@@ -538,16 +545,16 @@ never navigated to something that is not there yet.
 
 ## WebSocket
 
-`/v2/events` carries sequence-numbered events and feature frames. The event stream is a live
+`/v1/events` carries sequence-numbered events and feature frames. The event stream is a live
 invalidation channel, not a durable replication log. After reconnect or a sequence gap, the client
 marks the Node stale and refetches. Durable agent and workflow history is read from plugin tables.
 
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
-The preview tunnel (`/v2/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
+The preview tunnel (`/v1/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
-internal-token authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port
+internal-token authorization as `/v1/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
 SOCKS proxy to whatever else listens on the node's loopback.
 

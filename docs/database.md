@@ -66,8 +66,8 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 | Row | Kind | What it does |
 | --- | --- | --- |
 | Run query | action, no scope | Delivers `execute` to the `database` pane, the same command ⌘Enter delivers |
-| Find a saved query | search, task-scoped | `/v2/p/database/palette/queries` answers the saved rows of the task's project; picking one opens the pane and loads the SQL into the editor, and does not run it |
-| Generate SQL | input, task-scoped | `/v2/p/database/palette/generate` writes the generated SQL to the task's scratch document, then opens the pane on it |
+| Find a saved query | search, task-scoped | `/v1/p/database/palette/queries` answers the saved rows of the task's project; picking one opens the pane and loads the SQL into the editor, and does not run it |
+| Generate SQL | input, task-scoped | `/v1/p/database/palette/generate` writes the generated SQL to the task's scratch document, then opens the pane on it |
 
 Both routes are task-scoped although a saved query belongs to a project, and that is the boundary
 rather than a convenience: every saved-query route in this plugin is addressed through a task, because
@@ -156,7 +156,7 @@ cannot silently make a workflow statement writable.
 
 `database:generate` spends a model connection, so the plugin declares the `identity` core facet: a
 step has no request to read an owner from, and a connection is spent as somebody.
-`GET /v2/p/database/projects/:projectId/saved-queries` answers the saved-query picker's options and
+`GET /v1/p/database/projects/:projectId/saved-queries` answers the saved-query picker's options and
 refuses a task-confined caller, because a project id is guessable and no task in the path means no
 scope gate.
 

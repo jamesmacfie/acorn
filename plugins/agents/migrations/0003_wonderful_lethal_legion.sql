@@ -1,1 +1,0 @@
-ALTER TABLE `agent_spawns` ADD `provisioning_json` text;

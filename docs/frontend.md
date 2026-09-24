@@ -32,8 +32,15 @@ tabs, agent. A file whose folder you cannot guess belongs in `features/`.
 The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins register panes,
 rail sources, commands and keybindings, settings pages, slots, rail markers, ref panels,
 agent contexts, extension points and their own contributions to somebody else's, schedules,
-persisted-state slices, Node stats, attention sources, brand marks, and content links. The host owns
+persisted-state slices, Node stats, attention sources, session sources, brand marks, and content links. The host owns
 the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
+
+A compiled session source registers node-scoped summaries and optional refresh, send, and focus
+actions through `ctx.sessionSources`. The source retains its full rows and fetch logic. Core reads the
+summaries for task navigation, send pickers, setup markers, and quit concerns. A selected summary
+carries its source registration version, so a send or focus chosen before plugin reload cannot call
+the replacement source. Terminal owns its active tab and PTY session roster; the host never stores
+PTY rows or handles.
 
 There are two render paths and one component API. A compiled plugin's tree runs in this process and
 the host mounts its components directly. A loaded plugin's runs in a Web Worker with no DOM, emitting
@@ -85,13 +92,13 @@ was reviewed on 2026-08-28. **None survives outside a test.**
 | Site | Decision |
 | --- | --- |
 | `plugins/preview` task pane | → `{ seam: 'preview' }` on 2026-08-31. Kept as `'desktop'` until then, and that was the wrong question: a desktop shell may ship without preview views, and on one that does the rail listed the pane and the pane said "needs the desktop app". A seam gate cannot disagree with the surface behind it, because the same probe answers both. |
-| `plugins/agents` pane and three settings pages | → `{ plugin: 'agents' }`. Managed sessions are `/v2` plus the shared WebSocket. |
+| `plugins/agents` pane and three settings pages | → `{ plugin: 'agents' }`. Managed sessions are `/v1` plus the shared WebSocket. |
 | `plugins/editor` pane, quick-open and find-in-files commands | → `{ plugin: 'editor' }`. File reads and ripgrep are routes. |
 | `plugins/terminal` settings page, and the four terminal commands in `TaskView` | → `{ plugin: 'terminal' }`. The drawer is a WebSocket stream, not a shell feature. |
 | `plugins/changes` pane | → `{ plugin: 'changes' }`. |
 | `plugins/notes` task pane | → `{ plugin: 'notes' }`. |
 | `plugins/workflows` settings page | → `{ plugin: 'workflows' }`. |
-| `tasks/taskStatus.ts` schedule | **Gate dropped.** `/v2/core/task-statuses` is a core route. It stays a *client* clock deliberately: it refreshes what a window is drawing, and nothing needs it when no window is open. |
+| `tasks/taskStatus.ts` schedule | **Gate dropped.** `/v1/core/task-statuses` is a core route. It stays a *client* clock deliberately: it refreshes what a window is drawing, and nothing needs it when no window is open. |
 
 Adding a new `'desktop'` gate means writing a row here saying what only a shell can do. Before writing
 one, check whether the honest question is `{ seam: group }` instead: `'desktop'` is right for a
@@ -375,13 +382,18 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,130,000 B, which rounds the
-  measured closure up by about 3%. The closure grew when the client took over its own painting: what
+  in it is evaluated before the first cell is drawn. The ceiling is 1,130,000 B. The 2026-09-23
+  acceptance build measured 1,118,096 B across 123 eager chunks. The closure grew when the client
+  took over its own painting: what
   used to be a 6 MB native library outside the bundle is about 98 KB inside it
   ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —
   every bare import is left to the runtime, so a package that is only ever imported weighs nothing
   here. The walk is a regex over import edges rather than a real module graph, so it is approximate
   on purpose — it exists to catch a 300 KB regression, not to be exact.
+
+The architecture reset briefly pulled DOM primitives, diff virtualization, and annotation rendering
+into this closure through broad `public.ts` barrels. The TUI now imports narrow supported entrypoints
+for its model and host adapters. That restored the original ceiling without exempting those chunks.
 
 **Why a name test as well as a byte total.** Between 2026-08-31 and 2026-09-02 the renderer's total
 drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while staying red, so nobody read

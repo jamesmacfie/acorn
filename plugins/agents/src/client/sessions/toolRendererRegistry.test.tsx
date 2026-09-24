@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, expect, it } from 'vitest'
-import type { AgentToolCall } from '@acorn/protocol/managedAgents.ts'
+import type { AgentToolCall } from '../../contract/wire.ts'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import { AgentToolFoldContext, type AgentToolFoldSetting } from './toolFoldPrefs'
 

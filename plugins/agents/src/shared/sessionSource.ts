@@ -3,7 +3,7 @@ import type { DataSourceDescription, DataSourceRegistration } from '@acorn/proto
 export const sessionSource: DataSourceRegistration = {
   sourceId: 'sessions', name: 'Managed agent sessions', singular: 'Agent session', plural: 'Agent sessions',
   identityScope: 'Managed session UUID; stable across title and runtime-state changes',
-  handler: '/v2/p/agents/data/sessions', titlePointer: '/title', icon: 'bot',
+  handler: '/v1/p/agents/data/sessions', titlePointer: '/title', icon: 'bot',
 }
 
 export const sessionSourceDescription: DataSourceDescription = {

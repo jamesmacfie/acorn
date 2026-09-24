@@ -4,8 +4,8 @@ import '../helpers/registerProviders'
 import type { Task, TaskLink } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { tasks } from '@acorn/node-core/server/routes/projects/tasks.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { tasks } from '@acorn/node-core/server/routes'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -36,8 +36,8 @@ describe('task links grow/shrink', () => {
     app = makeApp()
     const now = Date.now()
     void t.db.insert(schema.integrations).values([
-      { id: 'int-1', userId: 'james', provider: 'linear', label: 'Linear', authRef: 'encrypted', createdAt: now, updatedAt: now },
-      { id: 'int-2', userId: 'james', provider: 'rollbar', label: 'Rollbar', authRef: 'encrypted', createdAt: now, updatedAt: now },
+      { id: 'int-1', userId: 'james', provider: 'linear', label: 'Linear', encryptedCredentials: 'encrypted', createdAt: now, updatedAt: now },
+      { id: 'int-2', userId: 'james', provider: 'rollbar', label: 'Rollbar', encryptedCredentials: 'encrypted', createdAt: now, updatedAt: now },
     ]).run()
     void t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
     void t.db.insert(schema.projects).values({

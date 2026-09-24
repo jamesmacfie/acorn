@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MessageChannel, Worker } from 'node:worker_threads'
 import { PluginRpcEndpoint } from './pluginRpc'
+import { hostFunctionMode } from './hostCallModes'
 import { pluginDbPath, preparePluginDbFiles } from './storage'
 import { brokerEnv } from '../core/proc'
 import type { NodePlugin, NodePluginContext } from '../pluginHost/types'
@@ -19,24 +20,6 @@ type Lifecycle = {
 type Handshake =
   | { __acornPlugin: 'ready'; descriptor: unknown; metadata: Record<string, unknown> }
   | { __acornPlugin: 'failed'; error: unknown }
-
-const hostFunctionMode = (path: string): 'sync' | 'async' => {
-  const sync = [
-    /\.routes\.fetch$/,
-    /\.(schedules|dataSources|taskChecks|runs|audit)\.(register|declare|record)$/,
-    /\.dataSources\.(register|discover)$/,
-    /\.extensionPoints\.(declare|handle|handlers|open|contribute|entries)$/,
-    /\.hooks\.(declare|handle)$/,
-    /\.providers\.(integration|connection|nodes)$/,
-    /\.capabilities\.(provide|get|require|ids)$/,
-    /\.events\.(send|status|worktreeStatus|repoConfigTrustNotice|notice|on)$/,
-    /\.(telemetry|log)\./,
-    /\.core\.identity\.active$/,
-    /\.core\.fs\.(isContainedPath|isValidRepoIdent|resolveInRoot)$/,
-    /\.core\.telemetry\.(enabled|onBatch)$/,
-  ]
-  return sync.some((pattern) => pattern.test(path)) ? 'sync' : 'async'
-}
 
 const workerEntrypoint = (): string => {
   const here = dirname(fileURLToPath(import.meta.url))
@@ -211,8 +194,8 @@ export async function isolateNodePlugin(options: {
   const plugin: NodePlugin & Record<string, unknown> = {
     ...handshake.metadata,
     name: options.plugin,
-    init: (ctx) => lifecycle.init(withoutStorage(ctx)),
-    ...(lifecycle.ready ? { ready: (ctx: NodePluginContext) => lifecycle.ready!(withoutStorage(ctx)) } : {}),
+    init: (ctx) => lifecycle.init(loadedContext(ctx)),
+    ...(lifecycle.ready ? { ready: (ctx: NodePluginContext) => lifecycle.ready!(loadedContext(ctx)) } : {}),
     dispose: async () => {
       try {
         await lifecycle.dispose()
@@ -225,7 +208,35 @@ export async function isolateNodePlugin(options: {
   return plugin
 }
 
-const withoutStorage = (ctx: NodePluginContext): Omit<NodePluginContext, 'storage'> => {
-  const { storage: _storage, ...remote } = ctx
-  return remote
-}
+// The worker opens its own storage. Project only the loaded contract, since compiled contexts can
+// carry additional host methods at runtime even when a caller types them as NodePluginContext.
+const loadedContext = (ctx: NodePluginContext): Omit<NodePluginContext, 'storage'> => ({
+  name: ctx.name,
+  routes: { fetch: ctx.routes.fetch },
+  schedules: { register: ctx.schedules.register },
+  dataSources: ctx.dataSources,
+  taskChecks: ctx.taskChecks,
+  runs: ctx.runs,
+  audit: ctx.audit,
+  extensionPoints: ctx.extensionPoints,
+  hooks: ctx.hooks,
+  providers: {
+    integration: ctx.providers.integration,
+    connection: ctx.providers.connection,
+    model: ctx.providers.model,
+    nodes: ctx.providers.nodes,
+    withConnection: ctx.providers.withConnection,
+  },
+  capabilities: ctx.capabilities,
+  core: ctx.core,
+  events: {
+    send: ctx.events.send,
+    status: ctx.events.status,
+    worktreeStatus: ctx.events.worktreeStatus,
+    repoConfigTrustNotice: ctx.events.repoConfigTrustNotice,
+    notice: ctx.events.notice,
+    on: ctx.events.on,
+  },
+  telemetry: ctx.telemetry,
+  log: ctx.log,
+})

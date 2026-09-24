@@ -1,4 +1,4 @@
-// Typed wrapper over the /v2/p/database routes, over the frame bridge rather than core's fetch
+// Typed wrapper over the /v1/p/database routes, over the frame bridge rather than core's fetch
 // helpers.
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope. Every

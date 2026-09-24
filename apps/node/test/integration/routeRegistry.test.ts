@@ -11,11 +11,11 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
-import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
-import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
+import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routes/registry.ts'
 import { readGolden, writeGolden } from '../helpers/golden'
 
 describe('plugin route registry', () => {
@@ -24,69 +24,69 @@ describe('plugin route registry', () => {
     const router = new Hono<AppEnv>()
     registry.register({ plugin: 'memory', prefix: '', router })
     registry.register({ plugin: 'github', prefix: '/repos', router })
-    expect(registry.list().map(routeMountPath)).toEqual(['/v2/p/memory', '/v2/p/github/repos'])
+    expect(registry.list().map(routeMountPath)).toEqual(['/v1/p/memory', '/v1/p/github/repos'])
   })
 
-  it('rejects anything that would escape /v2/p/<plugin>', () => {
+  it('rejects anything that would escape /v1/p/<plugin>', () => {
     const registry = new RouteRegistry()
     const router = new Hono<AppEnv>()
     // A plugin id is a URL segment, not free text.
     expect(() => registry.register({ plugin: 'My Plugin', prefix: '', router })).toThrow('Plugin route id')
     expect(() => registry.register({ plugin: '', prefix: '', router })).toThrow('Plugin route id')
     // The prefix is relative to the namespace: an absolute-looking or namespace-repeating prefix
-    // would still mount *inside* /v2/p/<plugin>, i.e. at a URL nothing requests.
+    // would still mount *inside* /v1/p/<plugin>, i.e. at a URL nothing requests.
     expect(() => registry.register({ plugin: 'github', prefix: 'repos', router })).toThrow("start with '/'")
-    expect(() => registry.register({ plugin: 'github', prefix: '/v2/core/repos', router })).toThrow("must not repeat '/v2'")
+    expect(() => registry.register({ plugin: 'github', prefix: '/v1/core/repos', router })).toThrow("must not repeat '/v1'")
     expect(registry.list()).toHaveLength(0)
   })
 })
 
 // One representative route per core router mounted by name in createApp(). Together with the plugin
-// table below, this file verifies the current mount shape: core answers under /v2/core and plugins under
-// /v2/p/<plugin>.
+// table below, this file verifies the current mount shape: core answers under /v1/core and plugins under
+// /v1/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-  // The two pre-auth pairing routes, outside /v2/core because that namespace is the gated one. They
+  // The two pre-auth pairing routes, outside /v1/core because that namespace is the gated one. They
   // are how an unpaired client gets a credential at all (docs/api-reference.md § Request processing).
-  ['GET', '/v2/node'],
-  ['POST', '/v2/pair'],
-  ['POST', '/v2/core/pair/start'],
-  ['DELETE', '/v2/core/pair'],
-  ['GET', '/v2/core/devices'],
-  ['DELETE', '/v2/core/devices/:id'],
-  ['PUT', '/v2/core/prefs'],
-  ['GET', '/v2/core/workspaces'],
+  ['GET', '/v1/node'],
+  ['POST', '/v1/pair'],
+  ['POST', '/v1/core/pair/start'],
+  ['DELETE', '/v1/core/pair'],
+  ['GET', '/v1/core/devices'],
+  ['DELETE', '/v1/core/devices/:id'],
+  ['PUT', '/v1/core/prefs'],
+  ['GET', '/v1/core/workspaces'],
   // Linear/Rollbar projects linked to a workspace, not acorn projects, which live under
-  // /v2/core/projects.
-  ['GET', '/v2/core/workspaces/:id/external-projects'],
-  ['GET', '/v2/core/tasks'],
-  ['PATCH', '/v2/core/tasks/:id'],
-  ['POST', '/v2/core/tasks/:id/links'],
-  ['GET', '/v2/core/tasks/:id/config-trust'],
-  ['GET', '/v2/core/task-statuses'],
-  ['GET', '/v2/core/projects'],
-  ['GET', '/v2/core/projects/:id/config'],
-  ['PUT', '/v2/core/projects/:id/config'],
-  ['PUT', '/v2/core/projects/:id/run-targets'],
-  ['POST', '/v2/core/tasks/:id/preview-url'],
-  ['POST', '/v2/core/tasks/:id/on-created'],
-  ['POST', '/v2/core/tasks/:id/archive'],
-  ['GET', '/v2/core/tasks/:id/mcp'],
-  ['POST', '/v2/core/tasks/:id/mcp/starter'],
-  ['GET', '/v2/core/tasks/:id/context'], // taskContext
-  ['GET', '/v2/core/tasks/:id/run'], // harness
-  ['GET', '/v2/core/tasks/:id/tools'], // agentTools — the MCP/harness projection
-  ['POST', '/v2/core/tasks/:id/renderer-tools/:name'],
-  ['GET', '/v2/core/agent-tools'],
-  ['GET', '/v2/core/integrations'],
-  ['POST', '/v2/core/telemetry'], // the batch route every runtime that is not the node posts to
-  ['GET', '/v2/core/telemetry/summary'], // what Settings → Telemetry draws (docs/telemetry.md)
+  // /v1/core/projects.
+  ['GET', '/v1/core/workspaces/:id/external-projects'],
+  ['GET', '/v1/core/tasks'],
+  ['PATCH', '/v1/core/tasks/:id'],
+  ['POST', '/v1/core/tasks/:id/links'],
+  ['GET', '/v1/core/tasks/:id/config-trust'],
+  ['GET', '/v1/core/task-statuses'],
+  ['GET', '/v1/core/projects'],
+  ['GET', '/v1/core/projects/:id/config'],
+  ['PUT', '/v1/core/projects/:id/config'],
+  ['PUT', '/v1/core/projects/:id/run-targets'],
+  ['POST', '/v1/core/tasks/:id/preview-url'],
+  ['POST', '/v1/core/tasks/:id/on-created'],
+  ['POST', '/v1/core/tasks/:id/archive'],
+  ['GET', '/v1/core/tasks/:id/mcp'],
+  ['POST', '/v1/core/tasks/:id/mcp/starter'],
+  ['GET', '/v1/core/tasks/:id/context'], // taskContext
+  ['GET', '/v1/core/tasks/:id/run'], // harness
+  ['GET', '/v1/core/tasks/:id/tools'], // agentTools — the MCP/harness projection
+  ['POST', '/v1/core/tasks/:id/renderer-tools/:name'],
+  ['GET', '/v1/core/agent-tools'],
+  ['GET', '/v1/core/integrations'],
+  ['POST', '/v1/core/telemetry'], // the batch route every runtime that is not the node posts to
+  ['GET', '/v1/core/telemetry/summary'], // what Settings → Telemetry draws (docs/telemetry.md)
 ]
 
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
 // docs/plugins.md § The golden lists covers the mechanism and why it's exact equality now instead of
 // a representative `some()` check per contribution. The segment doubling is visible here too
 // (docs/api-reference.md § Plugin routes): a router that names its own top-level segment repeats it
-// under its plugin namespace, e.g. `/v2/p/memory/memory`.
+// under its plugin namespace, e.g. `/v1/p/memory/memory`.
 //
 // Duplicates are kept rather than deduped. Several github routers register under one path with
 // different handlers, and collapsing them would stop the list noticing nine of them disappearing.
@@ -122,22 +122,15 @@ describe('assembled routes', () => {
         // exercises starts a provider child.
         agents: { internalEnv: () => ({}), reconciled: Promise.resolve() },
         notes: { internalEnv: () => ({}) },
-        // terminal is `required`, so it initializes here whatever this test asks for. Its four
-        // composition-root deps are inert stubs: this suite asserts the mount table, and nothing it
-        // exercises spawns a pseudo-terminal.
+        // terminal is required; nothing in this suite spawns a pseudo-terminal.
         terminal: {
           internalEnv: () => ({}),
-          launchInjector: async () => {},
-          memoryReviewTrigger: async () => {},
           reconciled: Promise.resolve(),
         },
-        // Same treatment: this suite asserts the mount table, so nothing here starts a run.
-        // `failingChecks` answers null, "no PR to check", the honest inert value rather than a fake
-        // green.
+        // This suite asserts the mount table, so nothing here starts a workflow run.
         workflows: {
           internalEnv: () => ({}),
           reconciled: Promise.resolve(),
-          failingChecks: async () => null,
         },
       }),
       {
@@ -163,7 +156,7 @@ describe('assembled routes', () => {
 
   it('mounts exactly the plugin routes in the golden list', () => {
     const actual = routes()
-      .filter((route) => route.path.startsWith('/v2/p/'))
+      .filter((route) => route.path.startsWith('/v1/p/'))
       .map((route) => `${route.method} ${route.path}`)
       .sort()
     writeGolden(PLUGIN_ROUTES, actual)
@@ -174,7 +167,7 @@ describe('assembled routes', () => {
     expect(actual).toEqual(readGolden<string[]>(PLUGIN_ROUTES))
   })
 
-  it('does not mount routes outside the current /v2 namespaces', () => {
+  it('does not mount routes outside the current /v1 namespaces', () => {
     expect(routes().filter((route) => route.path.startsWith('/api'))).toEqual([])
   })
 

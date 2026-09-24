@@ -282,7 +282,7 @@ fn proxy(origin: &str, uri: &Uri) -> Option<(u16, String, Vec<u8>)> {
 /// and answering that with the shell's HTML is a 200 full of markup the caller parses as JSON. A 404
 /// in the wire's own envelope says what happened.
 fn is_node_route(pathname: &str) -> bool {
-    pathname.starts_with("/v2/") || pathname.starts_with("/api/")
+    pathname.starts_with("/v1/") || pathname.starts_with("/api/")
 }
 
 fn refuse_node_route() -> (u16, String, Vec<u8>) {
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn a_node_route_is_not_answered_with_the_shell() {
-        assert!(is_node_route("/v2/p/agents/sessions"));
+        assert!(is_node_route("/v1/p/agents/sessions"));
         assert!(is_node_route("/api/v1/tasks"));
         assert!(!is_node_route("/owner/repo/12"));
         assert!(!is_node_route("/assets/index-abc.js"));

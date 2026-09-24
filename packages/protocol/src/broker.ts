@@ -127,6 +127,7 @@ export type NodeProbeResult = {
   endpoint: string
   fingerprint: string
   protocolVersion: number
+  baseline: string | null
   // False for a protocol major the client cannot speak: the `incompatible` state, decided before
   // pairing rather than after (docs/architecture-overview.md § Client state and fleet behavior).
   compatible: boolean

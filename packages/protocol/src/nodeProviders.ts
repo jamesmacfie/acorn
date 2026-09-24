@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolRisk } from './api'
 
 // The node-provider wire shapes: what a plugin's provider answers with, and what the client reads
-// back off `/v2/core/nodes`. The contribution type itself is node-side
+// back off `/v1/core/nodes`. The contribution type itself is node-side
 // (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
 // stays a pure sink.
 //
@@ -57,7 +57,7 @@ export type NodeProviderDescriptor = {
   verbs: NodeLifecycleVerb[]
 }
 
-// `GET /v2/core/nodes`. One provider being unreachable is a line in `failures`, never a failed
+// `GET /v1/core/nodes`. One provider being unreachable is a line in `failures`, never a failed
 // response: the same partial-result posture the client's fan-out takes across nodes
 // (docs/architecture-overview.md § Client state and fleet behavior).
 export type NodeProvidersResponse = {
@@ -66,7 +66,7 @@ export type NodeProvidersResponse = {
   failures: Array<{ providerId: string; reason: string }>
 }
 
-// `POST /v2/core/nodes/adopt`. The renderer names a provider and a node; the answer carries the
+// `POST /v1/core/nodes/adopt`. The renderer names a provider and a node; the answer carries the
 // credential, so the desktop host is the only caller (docs/shell.md § Fleet membership).
 export const nodeAdoptBodySchema = z.strictObject({
   providerId: z.string().min(1),
@@ -86,7 +86,7 @@ export const nodeAdoptResultSchema = z.object({
 })
 export type NodeAdoptResult = z.infer<typeof nodeAdoptResultSchema>
 
-// `POST /v2/core/nodes/create`. `options` is a provider-specific bag of strings — a region, a size,
+// `POST /v1/core/nodes/create`. `options` is a provider-specific bag of strings — a region, a size,
 // an image — kept opaque here because core has no business knowing a provider's catalogue.
 export const nodeCreateRequestSchema = z.strictObject({
   providerId: z.string().min(1),
@@ -95,7 +95,7 @@ export const nodeCreateRequestSchema = z.strictObject({
 })
 export type NodeCreateRequest = z.input<typeof nodeCreateRequestSchema>
 
-// `POST /v2/core/nodes/{destroy,start,stop}`.
+// `POST /v1/core/nodes/{destroy,start,stop}`.
 export const nodeLifecycleRequestSchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),

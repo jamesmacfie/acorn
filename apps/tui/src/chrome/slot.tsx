@@ -3,11 +3,11 @@ import { createSignal, ErrorBoundary, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
 import type { CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
-import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import {
   exclusiveSlotChoices, noteExclusiveSlotFailure, resolveExclusiveSlot,
-} from '@acorn/client-core/host/registries/extensionPoints/exclusiveSlots.ts'
+} from '@acorn/client-core/host/registries/extensionPoints'
 
 // The terminal host's `ExclusiveSlotHost`: where a plugin draws in place of one of core's own
 // surfaces, and where core gets it back.

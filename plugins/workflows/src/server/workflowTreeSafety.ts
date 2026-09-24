@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import { parseToolCeiling } from '@acorn/protocol/workflow.ts'
+import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { ToolCeiling, WorkflowBudget, WorkflowRunRow, WorkflowStepRow } from '../shared/workflowContracts'
 import * as schema from '../node/schema'
 import { intersectToolCeilings } from './workflowTools'

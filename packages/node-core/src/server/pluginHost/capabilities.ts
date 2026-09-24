@@ -53,7 +53,7 @@ export class CapabilityRegistry {
   }
 }
 
-// Not a module singleton, unlike routeRegistry.ts, whose contributions arrive by side-effect import.
+// Not a module singleton, unlike the HTTP route registry, whose contributions arrive at plugin init.
 // The plugin graph belongs to a service runtime: startServiceRuntime is a construct-and-teardown unit
 // one process can run several times, and a shared registry would throw "already provided" on the
 // second boot. The composition root creates one and threads it through.

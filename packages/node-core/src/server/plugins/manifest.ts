@@ -65,7 +65,7 @@ export type {
 // All three follow the rule the rest of the file already applies, that the host binds every namespace,
 // moved to the one place a manifest can name things outside itself. A descriptor route is the parse-time
 // twin of the bridge's runtime confinement (client-core/host/frames/scopes.ts): a plugin may address
-// its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
+// its own `/v1/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
 // plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
   // A package cannot depend on itself, and a duplicate id is a manifest that disagrees with itself
@@ -80,10 +80,10 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     }
     required.add(dependency.id)
   }
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
-  const own = `/v2/p/${manifest.id}/`
+  const { frames, sources, slots, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
+  const own = `/v1/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
-  // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
+  // `/v1/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
   // client-core/host/registries/commands/corePaths.ts, and node-core does not depend on the client.
   //
   // `x` is a reserved segment, and reserving it is what makes collision a parse error instead of a race.
@@ -321,7 +321,6 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // (@acorn/protocol/contextMenus.ts); what is left is the verb, which needs the frame list only this
   // refinement can see.
   contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
-  palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
   // Five kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
   // an input's route and its one static verb, a setting's two routes and its choices, a group's nothing
   // at all (@acorn/protocol/plugin/contract.ts).
@@ -359,7 +358,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       }
     }
     // Verbatim the schedule and task-check rule above, and for the identical reason: only a node half
-    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke,
+    // serves `/v1/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke,
     // an input on every Enter, and a setting the moment its frame opens.
     if ((entry.kind === 'search' || entry.kind === 'input' || entry.kind === 'setting') && !manifest.node) {
       const article = entry.kind === 'input' ? 'an' : 'a'
@@ -394,7 +393,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       seen.add(above)
     }
   })
-  const commandIds = new Set([...commands, ...palette].map((entry) => entry.id))
+  const commandIds = new Set(commands.map((entry) => entry.id))
   const surfaceIds = new Set(frames.map((frame) => frame.id))
   const boundCommands = new Set<string>()
   keybindings.forEach((entry, i) => {
@@ -429,7 +428,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     const at = ['contributions', 'schedules', i] as (string | number)[]
     route(entry.run, [...at, 'run'])
     // The same "parses and can never do anything" rule the project-scoped pane and webview checks apply:
-    // only a node half serves `/v2/p/<id>/`, so a schedule declared by a client-only package would fire on
+    // only a node half serves `/v1/p/<id>/`, so a schedule declared by a client-only package would fire on
     // its cadence forever against a 404. An error at install beats a run row that fails every hour.
     if (!manifest.node) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a schedule runs a node route; declare `node` in the manifest' })
@@ -440,7 +439,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.check, [...at, 'check'])
     if (entry.apply !== undefined) route(entry.apply, [...at, 'apply'])
     // Verbatim the schedule rule above, and for the identical reason: only a node half serves
-    // `/v2/p/<id>/`, so a check declared by a client-only package would be asked on every archive and 404
+    // `/v1/p/<id>/`, so a check declared by a client-only package would be asked on every archive and 404
     // every time. The owner would see a plugin that installed and does nothing.
     if (!manifest.node) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a task check calls a node route; declare `node` in the manifest' })
@@ -485,7 +484,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     if (entry.probes?.usage !== undefined) route(entry.probes.usage, [...at, 'probes', 'usage'])
     if (entry.probes?.auth !== undefined) route(entry.probes.auth, [...at, 'probes', 'auth'])
     // Verbatim the schedule and task-check rule, and for the identical reason: only a node half serves
-    // `/v2/p/<id>/`, so a probe declared by a data-only package would be asked on every refresh and 404
+    // `/v1/p/<id>/`, so a probe declared by a data-only package would be asked on every refresh and 404
     // every time.
     if (entry.probes && !manifest.node) {
       ctx.addIssue({ code: 'custom', path: [...at, 'probes'], message: 'a harness probe calls a node route; declare `node` in the manifest' })
@@ -698,7 +697,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections]) {
+  for (const entry of [...frames, ...sources, ...slots, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }
@@ -766,6 +765,21 @@ function unknownIn(json: unknown, manifest: PluginManifest): string[] {
  * `source` only names the file in the message; the rules are the same wherever the bytes came from. */
 export function parsePluginManifest(json: unknown, source: string = MANIFEST_FILE): PluginManifestResult {
   const rawContributions = isRecord(json) && isRecord(json.contributions) ? json.contributions : undefined
+  if (rawContributions && 'palette' in rawContributions) {
+    return {
+      ok: false,
+      reason: `${source} uses removed contributions.palette. Put each entry in contributions.commands with an explicit kind.`,
+    }
+  }
+  if (rawContributions && Array.isArray(rawContributions.commands)) {
+    const missing = rawContributions.commands.findIndex((entry) => isRecord(entry) && !('kind' in entry))
+    if (missing !== -1) {
+      return {
+        ok: false,
+        reason: `${source} contributions.commands[${missing}].kind is required. Choose action, group, search, input, or setting.`,
+      }
+    }
+  }
   if (rawContributions && 'collections' in rawContributions) {
     return {
       ok: false,

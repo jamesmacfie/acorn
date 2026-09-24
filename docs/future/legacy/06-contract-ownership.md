@@ -1,6 +1,6 @@
 # Ticket 06: Plugin-owned workflow and agent contracts
 
-Date: 2026-09-21. Status: not started. Prerequisites: 05.
+Date: 2026-09-21. Status: implemented 2026-09-23; UI promotion acceptance remains open. Prerequisites: 05.
 Read [context](./context.md), F04/F06 in [findings](./findings.md), and
 [client/type decisions](./target-architecture.md#shared-client-contracts).
 
@@ -35,3 +35,32 @@ promotion/review UI checks. Both hosts must compile against the moved contracts.
 
 Check all importers before moving protocol files. Preserve core-owned task/worktree/security types;
 two plugins sharing a type is a reason for a plugin contract, not for core ownership.
+
+## Implementation record
+
+- Tool ceiling parsing, encoding, and checks now live in `packages/protocol/src/toolPolicy.ts`.
+  Workflow wire rows and inputs live in Workflows' `contract/wire.ts`; managed session, event,
+  request, and attachment types live in Agents' `contract/wire.ts`. Agents' workflow chip consumes
+  only `{ id, name }` for the run and step, so no Agents-to-Workflows package cycle was added.
+- Agents maps its sessions to the shared attention snapshot and owns the pure tool-tone function.
+  The snapshot identifies its source and carries its notice target and completion policy. Terminal's
+  adapter stays in client-core until ticket 07 moves its session state.
+- `PromoteToTaskModal` accepts a generic rendered action. Workflows supplies its picker, typed inputs,
+  readiness, and start callback. A failed start keeps a created or attached task for retry. Run-list
+  and run-pane totals read admitted turns only; a step's own cost remains on the step.
+- The plugin API surface snapshot records this phase's three moved names. Its regeneration gate
+  allows only those three removals while API 13 remains in use; ticket 10 removes that temporary
+  allowance when it assigns the fresh API-1 baseline.
+- The published draft-attachment shape is checked against Agents' contract from the architecture
+  test package, so neither shared declarations nor the plugin imports the other for that assertion.
+
+## Verification
+
+- `pnpm lint`: 34 of 34 packages passed, including desktop and TUI TypeScript.
+- Client promotion and notification focus: 46 tests passed. Agents: 650 tests passed.
+  Workflows: 480 tests passed. Node tool-policy focus: 28 tests passed. Plugin API: 12 tests passed.
+- Architecture: 62 of 64 tests passed. The two failures were already present before this ticket:
+  `paletteView.ts` invokes a command in a host renderer, and Findings has a test under `src/node/`.
+- An isolated Tauri window opened Home and Workflows, created a draft, and showed its publication
+  validation. No connected external item or published workflow was present, so the promotion form
+  and a successful run could not be checked in that window. The isolated session was stopped.

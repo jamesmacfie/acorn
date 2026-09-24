@@ -1,26 +1,15 @@
-import { buildHeadlessArgv, buildSessionEnv, type CoreServices, gitOrThrow, isDir, listProfileDefs, type PluginDatabase, profileAvailable, type ProfileDef, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { type CoreServices, gitOrThrow, isDir, type PluginDatabase } from '@acorn/plugin-api/node'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { KnowledgeBridge } from '../server/routes/knowledge'
 import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, privateMemoryRoot, projectMemoryDir, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
-import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
-import { MemoryProposalStore } from './memoryProposals'
-import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
-import type { NoteKind } from '@acorn/protocol/notes.ts'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
 import type { MemoryHit, MemoryRow } from './memory'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 export type KnowledgeDeps = {
-  // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
-  sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
-  notes(): NotesStoreCapability
-  /** A bell row saying proposals are waiting. Where it lands is the wiring layer's to say
-   *  (../node/index.ts), which is why nothing here names a target or a notice kind: this file knows
-   *  when a reviewer is needed, not what page answers that. */
-  notice(taskId: string, title: string): void
-  /** This plugin's own channel; the proposal store announces create and resolve on it. */
+  /** This plugin's own channel for memory edits. */
   emit?(frame: { channel: string } & Record<string, unknown>): void
 }
 
@@ -41,35 +30,16 @@ export type MemoryIndex = {
 }
 
 export type MemoryKnowledge = MemoryIndex & {
-  proposals: MemoryProposalStore
-  // Pushes the combined launch block (task context + project memory) into a fresh agent session
-  // (docs/notes-and-memory.md § Context integration). Best-effort: never fails a launch.
-  launchInjector(taskId: string, sessionId: string): Promise<void>
-  // Memory auto-generation trigger: fired when an agent session for a task exits, with that session's
-  // ring tail as the transcript input.
-  memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
+  // Builds the bounded task and memory block. Terminal owns delivery to its new session.
+  launchContext(taskId: string): Promise<string | null>
 }
 
-// The capability id lives in ../contract/knowledge.ts, narrowed to the two methods driven from
-// outside this plugin. This type stays here because it is the full runtime, including the
-// proposal-store handle, which a contract file may not name.
-
-// The headless profile the memory-review pass runs on (docs/notes-and-memory.md § Lifecycle
-// hooks).
-export function memoryReviewProfile(): ProfileDef | null {
-  return (
-    listProfileDefs().find((p) => p.kind === 'agent' && profileAvailable(p) && buildHeadlessArgv(p.id, resolveCommand(p), { prompt: '' }) !== null) ?? null
-  )
-}
-
-export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
-  const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'), deps.emit)
-
+export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try {
       return await fn()
     } catch (e) {
-      return { error: e instanceof Error ? e.message : 'notes failed' }
+      return { error: e instanceof Error ? e.message : 'memory failed' }
     }
   }
 
@@ -90,15 +60,15 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
     ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
   })
 
-  const launchInjector = async (taskId: string, sessionId: string) => {
+  const launchContext = async (taskId: string): Promise<string | null> => {
     // Launch injection (docs/notes-and-memory.md § Context integration): task context is gated by
     // the startup_context_injection pref; the memory block is the MEMORY.md index slice plus
     // feedback/convention bodies. Queued 'after-ready'. Best-effort: never blocks a launch.
     try {
       const t = await core.tasks.load(taskId)
-      if (!t) return
+      if (!t) return null
       const projectId = t.projectId
-      if (!projectId) return
+      if (!projectId) return null
       const blocks: string[] = []
 
       const userId = core.identity.active()
@@ -114,66 +84,14 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
       const memoryBlock = formatMemoryInjection(slice, key)
       if (memoryBlock) blocks.push(memoryBlock)
 
-      if (blocks.length) deps.sendToAgent(sessionId, blocks.join('\n\n'), 'after-ready')
+      return blocks.join('\n\n') || null
     } catch {
-      // launch injection is best-effort: it never blocks a session launch
+      return null
     }
   }
 
-  // Memory auto-generation (docs/notes-and-memory.md § Lifecycle hooks): the task-completion
-  // trigger, fired on agent session end (and best-effort at archive) while the worktree is still
-  // alive. Verification flags ride the proposal's `flags` field, never folded into the
-  // description.
-  const memoryReviewTrigger = async (taskId: string, transcriptTail: string) => {
-    try {
-      const t = await core.tasks.load(taskId)
-      if (!t?.worktreePath || !isDir(t.worktreePath)) return
-      const profile = memoryReviewProfile()
-      if (!profile) return // no headless-capable agent CLI installed → no auto-generation
-      const worktree = t.worktreePath
-      const project = t.projectId ? await core.projects.byId(t.projectId) : null
-      if (!project) return
-      const out = await generateMemoryProposals({
-        runReview: (prompt, schema0) => {
-          const argv = buildHeadlessArgv(profile.id, resolveCommand(profile), { prompt, schema: schema0 })!
-          return runHeadless(argv, { cwd: worktree, env: buildSessionEnv({ taskId, cwd: worktree, task: { projectId: project.id, projectName: project.name, github: project.github, branch: t.branch, title: t.title } }) })
-        },
-        taskDiff: async () => {
-          if (!existsSync(join(worktree, '.git'))) return ''
-          try {
-            const { stdout } = await gitOrThrow(['diff', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 })
-            return stdout
-          } catch {
-            return ''
-          }
-        },
-        transcriptTail: async () => transcriptTail,
-        existingIndex: async () => {
-          await reconciled()
-          return (await listMemories(db, { projectId: project.id })).map((m) => ({ id: m.id, name: m.name, description: m.description, body: m.body }))
-        },
-        fileExists: (p) => existsSync(join(worktree, p)),
-        propose: async (c, flags) =>
-          void (await proposals.propose({
-            taskId,
-            projectId: project.id,
-            name: c.name,
-            type: c.type,
-            description: c.description,
-            body: c.body,
-            flags,
-            originSessionId: null,
-          })),
-      })
-      if (out.proposed > 0) deps.notice(taskId, `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
-    } catch {
-      // auto-generation is best-effort: it never disturbs the task lifecycle
-    }
-  }
-
-  // The client's notes and memory surface, exposed as the KnowledgeBridge behind the HTTP routes
-  // (server/routes/knowledge.ts). This is the human-facing pane, distinct from the harness memory and
-  // notes bridges that serve MCP. guard() keeps the `| { error }` contract the clients union on.
+  // The client's memory surface, exposed as the KnowledgeBridge behind the HTTP routes.
+  // guard() keeps the `| { error }` contract the client unions on.
   const route: KnowledgeBridge = {
     memoryList: (projectId) =>
       guard(async () => {
@@ -220,64 +138,15 @@ export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, c
         announceMemories(p.scope === 'private' ? null : t!.projectId!)
         return res
       }),
-    // The human gate over auto-generated proposals (docs/notes-and-memory.md).
-    memoryProposals: async (taskId) => {
-      const pending = await proposals.list('pending')
-      return taskId ? pending.filter((p) => p.taskId === taskId) : pending
-    },
-    memoryResolveProposal: async (id, approved, edited) => {
-      if (!approved) return rejectProposal(proposals, id)
-      const proposal = await proposals.get(id)
-      if (!proposal) return { ok: false, reason: 'Proposal not found.' }
-      // The proposal carries its own project id. An agent that could not resolve one proposed
-      // unscoped on purpose (server/agentTools.ts), so accepting that lands a memory that applies
-      // everywhere rather than throwing away what the agent learned.
-      const projectId = proposal.projectId ?? (await core.tasks.load(proposal.taskId))?.projectId ?? null
-      const dir = projectId ? projectMemoryDir(homedir(), projectId) : privateMemoryRoot(homedir())
-      return acceptProposal(proposals, proposal.id, dir, async () => {
-        await reconciled()
-        announceMemories(projectId)
-      }, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
-    },
     memoryApproveFinding: async () => ({ ok: false, reason: 'Findings review is unavailable.' }),
-    // --- notes ---
-    //
-    // Delegated to plugins/notes' `notes.store` capability, resolved per call. This is the
-    // compatibility alias for older clients (docs/notes-and-memory.md § Notes). Moving the mount to
-    // /v2/p/notes/* is outstanding: it needs route builder, client, and mount-table changes.
-    notesList: (location) => guard(() => deps.notes().list(location)),
-    notesRead: (location, slug) => guard(() => deps.notes().read(location, slug)),
-    notesCreate: (location, title, kind) => guard(() => deps.notes().create(location, title, { kind: kind as NoteKind | undefined })),
-    notesWrite: (location, slug, body) =>
-      guard(async () => {
-        await deps.notes().write(location, slug, body)
-        return { ok: true }
-      }),
-    notesSetIncluded: (location, slug, included) =>
-      guard(async () => {
-        await deps.notes().setIncluded(location, slug, included)
-        return { ok: true }
-      }),
-    notesSetTitle: (location, slug, title) =>
-      guard(async () => {
-        await deps.notes().setTitle(location, slug, title)
-        return { ok: true }
-      }),
-    notesRemove: (location, slug) =>
-      guard(async () => {
-        await deps.notes().remove(location, slug)
-        return { ok: true }
-      }),
   }
 
-  // Published as `memory.knowledge`. See the MemoryIndex comment above for why these reads bind
-  // to this plugin's own database.
+  // The index reads bind to this plugin's own database; Terminal consumes launchContext as a
+  // contribution and the other reads stay inside Memory.
   return {
     route,
-    proposals,
     reconciled,
-    launchInjector,
-    memoryReviewTrigger,
+    launchContext,
     list: (opts) => listMemories(db, opts),
     get: (opts) => getMemory(db, opts),
     search: (query, opts) => searchMemories(db, query, opts),

@@ -5,6 +5,7 @@ mod helper;
 mod keychain;
 mod menu;
 mod plugin_scheme;
+mod reset_stage;
 mod webviews;
 
 #[cfg(all(feature = "agent-automation", not(debug_assertions)))]
@@ -21,7 +22,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use app_scheme::{Source, APP_ORIGIN, APP_SCHEME};
 use commands::Shell;
-use helper::{Handshake, Helper, Launch, Legacy, Signal};
+use helper::{Handshake, Helper, Launch, Signal};
 use plugin_scheme::{Frames, PLUGIN_SCHEME};
 use webviews::Webviews;
 
@@ -51,6 +52,11 @@ fn dev_server() -> Option<String> {
 }
 
 pub fn run() {
+    let reset_options = reset_stage::options_from_args().unwrap_or_else(|error| {
+        eprintln!("[reset] {error}");
+        std::process::exit(2);
+    });
+    let reset_mode = reset_options.is_some();
     // Read once, at the top, because the window and the scheme handler both need it. A runtime
     // variable rather than a compile-time one, so a stale cargo cache cannot bake the wrong answer
     // into a binary.
@@ -69,19 +75,24 @@ pub fn run() {
     // served from this origin because a worker script must be same-origin with the document that
     // starts it. See src/app_scheme.rs, `plugin_worker_hash`.
     let worker_frames = frames.clone();
+    let scheme_reset_mode = reset_mode;
 
     let mut builder = tauri::Builder::default();
 
     #[cfg(not(feature = "agent-automation"))]
     {
-        // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
-        // launch focus the running window instead of failing on that lock.
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(window) = app.webview_windows().values().next() {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-        }));
+        // A fixture reset uses an incognito webview and a disposable root. It must be able to run
+        // beside an installed Acorn without waking or touching that installation.
+        if !reset_options.as_ref().is_some_and(|options| options.fixture) {
+            // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
+            // launch focus the running window instead of failing on that lock.
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+                if let Some(window) = app.webview_windows().values().next() {
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }));
+        }
     }
 
     #[cfg(feature = "agent-automation")]
@@ -110,7 +121,12 @@ pub fn run() {
             let frames = worker_frames.clone();
             let port = scheme_port.clone();
             std::thread::spawn(move || {
-                responder.respond(app_scheme::serve(&source, frames.read().unwrap().as_ref(), *port.read().unwrap(), &request))
+                let response = if scheme_reset_mode && request.uri().path() == "/reset" {
+                    reset_stage::page()
+                } else {
+                    app_scheme::serve(&source, frames.read().unwrap().as_ref(), *port.read().unwrap(), &request)
+                };
+                responder.respond(response)
             });
         })
         // The origin every loaded plugin's UI runs on. Registered here rather than lazily, because a
@@ -130,6 +146,8 @@ pub fn run() {
             commands::show_notification,
             commands::set_badge,
             commands::set_window_background,
+            reset_stage::reset_export,
+            reset_stage::reset_complete,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
@@ -143,6 +161,14 @@ pub fn run() {
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
         .setup(move |app| {
             let handle = app.handle().clone();
+            if let Some(options) = reset_options.clone() {
+                let fixture = options.fixture;
+                let state = reset_stage::validate(&handle, options, PACKAGED)
+                    .map_err(std::io::Error::other)?;
+                handle.manage(state);
+                open_reset_window(&handle, fixture)?;
+                return Ok(());
+            }
             app.manage(Webviews::<tauri::Wry>::default());
             // Deliberately blocking, and short: the helper reports itself ready as soon as it is
             // listening, which is a cache sweep and a socket bind rather than a node boot. There is
@@ -176,10 +202,10 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("the acorn shell failed to build")
-        .run(|app, event| match event {
+        .run(move |app, event| match event {
             // The quit negotiation's other entry point: the dock's Quit, or a Cmd-Q the menu missed.
             // `prevent_exit` holds the process while the renderer is asked.
-            RunEvent::ExitRequested { api, .. } => {
+            RunEvent::ExitRequested { api, .. } if !reset_mode => {
                 let approved = app.try_state::<Shell>().is_some_and(|s| s.quit_approved.load(Ordering::SeqCst));
                 if !approved {
                     api.prevent_exit();
@@ -205,16 +231,21 @@ pub fn run() {
             RunEvent::Exit => {
                 // Before the helper, so no child webview is left composited over a window whose
                 // process is on its way out.
-                app.state::<Webviews<tauri::Wry>>().dispose();
+                if let Some(webviews) = app.try_state::<Webviews<tauri::Wry>>() {
+                    webviews.dispose();
+                }
                 commands::shutdown(app)
             }
             _ => {}
         });
 }
 
-/// Where the built renderer lives in a packaged build, beside the other bundled resources. The scheme
-/// handler is the only thing that reads it.
+/// The scheme handler reads the staged renderer during development and the bundled renderer in a
+/// release. Agent automation uses the staged copy so its window exercises the shipped file path.
 fn client_root(app: &tauri::AppHandle) -> PathBuf {
+    if !PACKAGED {
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../dist/client");
+    }
     app.path().resource_dir().map(|dir| dir.join("client")).unwrap_or_else(|_| PathBuf::from("client"))
 }
 
@@ -235,8 +266,8 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     let path = app.path();
 
     // The node's data root and the shell's custody root are separate on purpose: fleet.json and the
-    // encrypted device tokens belong to this app, not the node. A dev build points both at the
-    // checkout so a developer's fleet is not the installed app's.
+    // encrypted device tokens belong to this app, not the node. A dev build keeps the custody root
+    // beside the checkout's Node root so a developer's fleet is not the installed app's.
     let (data_dir, user_data_dir) = if packaged {
         let base = path.app_data_dir().map_err(|e| format!("no application data directory: {e}"))?;
         (base.join("node"), base)
@@ -246,7 +277,8 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
             checkout,
             std::env::var_os("ACORN_DATA_DIR").map(PathBuf::from),
         );
-        (checkout.clone(), checkout.join("shell"))
+        let custody = development_custody_root(&checkout)?;
+        (checkout, custody)
     };
     for dir in [&data_dir, &user_data_dir] {
         std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
@@ -286,7 +318,6 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
                 service_entry: staging.join("service.js").to_string_lossy().into_owned(),
                 mcp_entry: staging.join("mcp.js").to_string_lossy().into_owned(),
                 bundled_plugins_dir: bundled_plugins.exists().then(|| bundled_plugins.to_string_lossy().into_owned()),
-                legacy: legacy_custody(&path, packaged),
                 env_files: env_files(app, &data_dir, packaged)?,
                 version: app.package_info().version.to_string(),
                 is_packaged: packaged,
@@ -318,28 +349,11 @@ fn development_data_root(checkout: PathBuf, requested: Option<PathBuf>) -> PathB
         .unwrap_or(checkout)
 }
 
-/// The Electron build's custody root and the key its device tokens are encrypted under, when both are
-/// there. The helper adopts them once, on a first launch that has nothing of its own. See
-/// `packages/custody/src/custody/legacyCustody.ts` for what happens when that fails.
-///
-/// Packaged builds only. A dev build never asks the keychain (see src/keychain.rs), and its custody
-/// root is the checkout, which no Electron build ever wrote to.
-fn legacy_custody(path: &tauri::path::PathResolver<tauri::Wry>, packaged: bool) -> Option<Legacy> {
-    if !packaged {
-        return None;
-    }
-    // Electron's userData is `<app data>/<app name>`, and safeStorage names its keychain item after
-    // the same app name. Tauri keys its app data directory by bundle identifier, which is why the two
-    // builds do not share a root.
-    const ELECTRON_APP_NAME: &str = "acorn";
-    let user_data_dir = path.data_dir().ok()?.join(ELECTRON_APP_NAME);
-    if !user_data_dir.join("fleet.json").exists() {
-        return None;
-    }
-    Some(Legacy {
-        user_data_dir: user_data_dir.to_string_lossy().into_owned(),
-        safe_storage_key: keychain::legacy_safe_storage_key(ELECTRON_APP_NAME)?,
-    })
+fn development_custody_root(node_root: &Path) -> Result<PathBuf, String> {
+    let parent = node_root.parent().ok_or("development Node root has no parent")?;
+    let mut name = node_root.file_name().ok_or("development Node root has no name")?.to_os_string();
+    name.push("-shell");
+    Ok(parent.join(name))
 }
 
 /// Where the helper looks for secrets: the build's own file first, then the owner's file in the data
@@ -408,6 +422,18 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
             eprintln!("[shell] blocked navigation: {url}");
             false
         })
+        .build()?;
+    Ok(())
+}
+
+fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()> {
+    let url = format!("{APP_ORIGIN}/reset{}", if fixture { "?fixture=1" } else { "" }).parse().expect("the reset URL is valid");
+    WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
+        .title("Acorn reset export")
+        .inner_size(640.0, 260.0)
+        // Fixture checks use an ephemeral profile, so they cannot clear an installed app's origin.
+        .incognito(fixture)
+        .on_navigation(|url| url.path() == "/reset" && url.as_str().starts_with(APP_ORIGIN))
         .build()?;
     Ok(())
 }
@@ -492,6 +518,13 @@ mod tests {
             development_data_root(checkout, Some(PathBuf::from("agent-data"))),
             PathBuf::from("agent-data")
         );
+    }
+
+    #[test]
+    fn development_custody_is_a_sibling_of_the_node_root() {
+        let node = PathBuf::from("/tmp/acorn-agent/data");
+        assert_eq!(development_custody_root(&node).unwrap(), PathBuf::from("/tmp/acorn-agent/data-shell"));
+        assert_eq!(development_custody_root(Path::new("apps/node/.acorn")).unwrap(), PathBuf::from("apps/node/.acorn-shell"));
     }
 
     /// The one thing a JSON file can get wrong that nothing else would catch. Naming a window in a

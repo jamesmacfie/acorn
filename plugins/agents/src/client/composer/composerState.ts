@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
 // The part of an unsent turn that belongs to the session rather than to whoever is drawing it.

@@ -84,7 +84,7 @@ export function createSentryTelemetryProvider(options: {
           id: 'release',
           label: 'Release',
           type: 'text',
-          placeholder: 'acorn@0.1.0',
+          placeholder: 'acorn@1.0.0',
           hint: 'Optional. No source maps are uploaded, so this only groups what you send.',
           required: false,
         },

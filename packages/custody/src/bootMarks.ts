@@ -1,5 +1,5 @@
-import { emitSpan } from '@acorn/node-core/server/telemetry/collector.ts'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { emitSpan } from '@acorn/node-core/server/telemetry'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 // The helper's cold-start account, printed behind `ACORN_PERF=1` and reported as spans whenever
 // telemetry is on.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSubagent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSubagent } from '../../contract/wire.ts'
 import {
   decideAgentCommand,
   eventSubagentId,

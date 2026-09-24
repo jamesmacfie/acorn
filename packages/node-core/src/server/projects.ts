@@ -59,7 +59,7 @@ export type ProjectFacets = {
 }
 
 // GitHub treats owner and repository names case-insensitively. Store the canonical form for all
-// new/adopted facets, while lookup remains case-insensitive for older rows and migration data.
+// new facets, while lookup remains case-insensitive for rows written with mixed case.
 export const normalizeGithubPart = (value: string): string => value.trim().toLowerCase()
 
 // Accept the https, ssh, and scp-like forms Git emits, with an optional .git suffix, case-insensitively
@@ -159,8 +159,8 @@ export async function listProjects(db: AppDatabase): Promise<ProjectRow[]> {
   return db.select().from(schema.projects).orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt))
 }
 
-// The bridge from the legacy (owner, name) keying, and the resolution rule when two clones of one
-// repo exist: the oldest project wins, deterministically. Callers that care about all clones read
+// Find a project by GitHub owner and repo, ignoring case. When several local projects point at the
+// same repo, the oldest row wins, with id as a stable tie-breaker. Callers that need every clone read
 // the table themselves.
 export async function projectByGithub(db: AppDatabase, owner: string, name: string): Promise<ProjectRow | null> {
   const normalizedOwner = normalizeGithubPart(owner)

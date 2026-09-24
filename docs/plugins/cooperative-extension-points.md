@@ -116,8 +116,8 @@ otherwise.
   "id": "board-issues",
   "point": "board:card-links",
   "label": "Linear issues",
-  "items": "/v2/p/tracker/board-issues",
-  "onSelect": { "verb": "runNodeAction", "path": "/v2/p/tracker/open" }
+  "items": "/v1/p/tracker/board-issues",
+  "onSelect": { "verb": "runNodeAction", "path": "/v1/p/tracker/open" }
 }] } }
 ```
 
@@ -153,13 +153,13 @@ owner declares what its items are keyed by; the contributor answers with marks f
 
 // B: coverage
 { "id": "coverage-lines", "point": "changes:diff-line", "label": "Coverage",
-  "items": "/v2/p/coverage/lines" }
+  "items": "/v1/p/coverage/lines" }
 ```
 
 The host POSTs the keys on screen in one request and B answers marks:
 
 ```
-POST /v2/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side": "new" }, …] }
+POST /v1/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side": "new" }, …] }
 → { "items": [{ "key": {…}, "severity": "info" | "warn" | "danger", "text": "Not covered by any test", "icon": "shield-off" }] }
 ```
 
@@ -416,7 +416,7 @@ None of it can be stated by a manifest:
 | --- | --- |
 | the point's public name | `<owner>:<point>`, minted from the plugin the manifest was read under. B cannot advertise a point in A's name. |
 | the provenance | every delivered group and every mark is stamped with the **contributing** plugin's id and renders it beside the content. An owner looking at somebody else's items inside a pane can always see whose they are. |
-| the fetch | confined to the contributor's own `/v2/p/<id>/`. A contribution cannot make the host read the point owner's routes on its behalf — the "reading another plugin's routes" refusal below is enforced by construction, not by a rule. |
+| the fetch | confined to the contributor's own `/v1/p/<id>/`. A contribution cannot make the host read the point owner's routes on its behalf — the "reading another plugin's routes" refusal below is enforced by construction, not by a rule. |
 | the gate | nothing is delivered unless **both** plugins are running on the node being looked at, and neither has code this device withheld. A `remote` or `rectangle` contribution additionally needs this device to have accepted the contributor's bundle, exactly as a pane does. |
 
 **Descriptors cross; code does not.** The rows are drawn by the host, with the shell's own `Row`,

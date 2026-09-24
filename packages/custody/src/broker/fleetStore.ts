@@ -1,9 +1,10 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
 import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from '../custody/deviceTokenStore'
-import { createLogger } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('fleet')
 
@@ -13,7 +14,7 @@ const log = createLogger('fleet')
 // File discipline: 0700 dir, 0600 files, chmod after write so a looser umask on an existing file
 // cannot survive.
 
-const FLEET_FILE = 'fleet.json'
+const FLEET_FILE = `${ACORN_BASELINE}-fleet.json`
 
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
 export const fleetNodeSchema = nodeRecordSchema.extend({

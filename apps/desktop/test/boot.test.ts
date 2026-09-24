@@ -13,7 +13,7 @@ import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
 //
 // It runs the real thing — the staged helper bundle under the bundled Node runtime, spawning the real
 // `service.js` over the fd-3 service protocol against a fresh data root — and then asks it the first
-// two questions the renderer asks: which nodes are there, and can a `/v2` request reach one. That is
+// two questions the renderer asks: which nodes are there, and can a `/v1` request reach one. That is
 // the exit criterion minus the window, and it is what catches "the shell cannot load its world"
 // the way `apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel poisoning.
 //
@@ -177,12 +177,12 @@ describe('the Tauri shell boots its world', () => {
     expect(local[0].nodeId).toMatch(/^[0-9a-f-]{36}$/)
   })
 
-  it('carries a /v2 request through the broker to the node', async () => {
+  it('carries a /v1 request through the broker to the node', async () => {
     const fleet = await call<{ nodes: { nodeId: string; local: boolean }[] }>('fleet-list')
     const nodeId = fleet.nodes.find((node) => node.local)!.nodeId
     const response = await call<{ status: number; body: string }>('node-fetch', {
       nodeId,
-      request: { requestId: 'boot-test', path: '/v2/node', method: 'GET', headers: {} },
+      request: { requestId: 'boot-test', path: '/v1/node', method: 'GET', headers: {} },
     })
     // 200 means the pinned TLS connection came up and the device token authenticated, which is the
     // whole custody stack end to end.

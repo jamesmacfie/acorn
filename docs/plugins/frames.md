@@ -90,13 +90,13 @@ archive — that costs a third more on the wire as base64, two copies in memory,
 end, for content the host was already carrying as bytes. So there are two more:
 
 ```ts
-const { bytes, type, filename } = await bridge.api.getBytes('/v2/p/image-markup/files/a1')
-await bridge.api.postBytes('/v2/p/image-markup/files', { bytes, type: 'image/png', filename: 'a.png' })
+const { bytes, type, filename } = await bridge.api.getBytes('/v1/p/image-markup/files/a1')
+await bridge.api.postBytes('/v1/p/image-markup/files', { bytes, type: 'image/png', filename: 'a.png' })
 ```
 
 A separate wire kind, `api.bytes`, rather than a flag on the JSON one, so a JSON call can never
 acquire byte semantics by getting a field wrong. What the two share is the one thing that matters:
-`allowApi` decides the path before either handler looks at a body. Your own `/v2/p/<id>/` namespace is
+`allowApi` decides the path before either handler looks at a body. Your own `/v1/p/<id>/` namespace is
 reachable and another plugin's is refused, byte call or not, and a 12 MiB POST at somebody else's
 namespace is denied without being read. The desktop end-to-end suite pins that by spying at the broker.
 
@@ -193,8 +193,8 @@ region keeps the name its layout gave it.
         "body": {
           "kind": "document",
           "languageId": "sql",
-          "read": "/v2/p/board/tasks/:taskId/scratch",
-          "write": "/v2/p/board/tasks/:taskId/scratch"
+          "read": "/v1/p/board/tasks/:taskId/scratch",
+          "write": "/v1/p/board/tasks/:taskId/scratch"
         }
       }
     }]

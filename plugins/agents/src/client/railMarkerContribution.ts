@@ -7,7 +7,7 @@
 // core drew the loader from terminal sessions only, under the task glyph, and a managed agent working
 // away in the background left the row looking idle.
 import { agentSessionsFor, type RailMarker, type RailMarkerContribution } from '@acorn/plugin-api/client'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentStore } from './sessions/managedStore'
 import { runtimeIcon } from './sessions/stateTone'

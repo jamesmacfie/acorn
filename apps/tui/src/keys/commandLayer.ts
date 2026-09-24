@@ -14,17 +14,17 @@ import { createEffect, onCleanup } from 'solid-js'
 import type { Binding, Command } from '@opentui/keymap'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
-import { toKeymapKey } from '@acorn/client-core/kit/keys/keymap.ts'
+import { toKeymapKey } from '@acorn/client-core/kit/keys'
 import {
   commandAvailable, commandRegistry, commandTitle, executeCommand,
-} from '@acorn/client-core/host/registries/commands/commands.ts'
+} from '@acorn/client-core/host/registries/commands'
 import {
   keybindingRegistry, resolveKeybindings, type KeybindingPrefs, type ResolvedKeybinding,
-} from '@acorn/client-core/host/registries/commands/keybindings.ts'
+} from '@acorn/client-core/host/registries/commands'
 import type { TuiKeymap } from './install'
 import { scopeDepth } from './regions'
 import { COMMAND } from './tiers'
-import { createLogger } from '@acorn/client-core/infra/telemetry/logger.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('commands')
 

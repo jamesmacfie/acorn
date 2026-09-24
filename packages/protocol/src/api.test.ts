@@ -4,10 +4,10 @@ import { parseRailItemId, prefsKey, railItemId } from './api'
 
 describe('shared API contract helpers', () => {
   // A net under the ~90 route literals above, which were namespaced by hand: every one must land in a
-  // current /v2 namespace (docs/api-reference.md § Transport), because a path outside /v2/*
+  // current /v1 namespace (docs/api-reference.md § Transport), because a path outside /v1/*
   // escapes the server's single auth and requireUser glob and would 404 into the SPA shell. Enumerated
   // from the module rather than listed, so a new builder is covered the day it lands.
-  it('namespaces every exported route builder under /v2/core or /v2/p', () => {
+  it('namespaces every exported route builder under /v1/core or /v1/p', () => {
     // One dummy that satisfies every parameter shape the builders take: it interpolates and
     // encodeURIComponent()s as 'x', spreads and joins as a one-element list, and reads as truthy.
     const dummy = ['x']
@@ -20,7 +20,7 @@ describe('shared API contract helpers', () => {
     expect(paths.length).toBeGreaterThan(20) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
-      expect(path as string, name).toMatch(/^\/v2\/(core|p)\//)
+      expect(path as string, name).toMatch(/^\/v1\/(core|p)\//)
     }
   })
 

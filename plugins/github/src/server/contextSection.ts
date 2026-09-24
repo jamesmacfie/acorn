@@ -22,10 +22,8 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
       const pr = await source(userLogin, github.owner, github.name, task.pullNumber)
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
-      const compatibility = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
       return {
         items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
-        compatibility: { pr: compatibility },
       }
     },
     format(items) {

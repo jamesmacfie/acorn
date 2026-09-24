@@ -10,8 +10,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { WS_PATH } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
-import { ensureCert } from '@acorn/node-core/server/transport/tls.ts'
-import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry } from '@acorn/node-core/server/telemetry/collector.ts'
+import { ensureCert } from '@acorn/node-core/server/transport'
+import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry } from '@acorn/node-core/server/telemetry'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { NodeBroker } from './nodeBroker'
 
@@ -96,7 +96,7 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
   }
 }
 
-// Select by path, never by index. upsert() probes `/v2/node` and then opens the WebSocket, so the
+// Select by path, never by index. upsert() probes `/v1/node` and then opens the WebSocket, so the
 // call under test is never the first request the server sees. Indexing into `received` silently
 // asserts against the probe or the upgrade instead, and used to pass, because the upgrade carries the
 // same bearer.
@@ -115,11 +115,11 @@ describe('broker HTTP', () => {
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'acorn_dt_secret' })
 
-    const res = await broker.fetch('n1', { requestId: 'r1', path: '/v2/core/tasks' })
+    const res = await broker.fetch('n1', { requestId: 'r1', path: '/v1/core/tasks' })
     expect(res.status).toBe(200)
     expect(JSON.parse(text(res.body))).toEqual({ ok: true })
     // The renderer never supplies this: the broker exists so the token stays in main.
-    expect(requestTo('/v2/core/tasks').headers.authorization).toBe('Bearer acorn_dt_secret')
+    expect(requestTo('/v1/core/tasks').headers.authorization).toBe('Bearer acorn_dt_secret')
   })
 
   it('sends a JSON body with the caller content-type intact', async () => {
@@ -129,13 +129,13 @@ describe('broker HTTP', () => {
 
     await broker.fetch('n1', {
       requestId: 'r1',
-      path: '/v2/core/tasks',
+      path: '/v1/core/tasks',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: { kind: 'bytes', bytes: bytes('{"title":"x"}') },
     })
-    expect(requestTo('/v2/core/tasks').headers['content-type']).toBe('application/json')
-    expect(requestTo('/v2/core/tasks').body.toString()).toBe('{"title":"x"}')
+    expect(requestTo('/v1/core/tasks').headers['content-type']).toBe('application/json')
+    expect(requestTo('/v1/core/tasks').body.toString()).toBe('{"title":"x"}')
   })
 
   // The reason the renderer had raw-fetch escape hatches at all: readJson always parsed a body.
@@ -272,7 +272,7 @@ describe('broker HTTP', () => {
   // one status code over, so both are asserted.
   it('leaves the node alone for a route-level 401/403 about a third-party credential', async () => {
     const { origin } = await listen(false)
-    // Scoped to the two paths under test. Answering the /v2/events upgrade with a 401 as well would
+    // Scoped to the two paths under test. Answering the /v1/events upgrade with a 401 as well would
     // trip the WS's own (correct) revocation path and prove nothing about the HTTP one.
     respond = (path) => {
       if (path === '/provider-403') {
@@ -305,7 +305,7 @@ describe('broker TLS pinning', () => {
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't', fingerprint, certPem })
 
-    const res = await broker.fetch('n1', { requestId: 'r1', path: '/v2/node' })
+    const res = await broker.fetch('n1', { requestId: 'r1', path: '/v1/node' })
     expect(res.status).toBe(200)
   })
 
@@ -319,7 +319,7 @@ describe('broker TLS pinning', () => {
     const wrong = (fingerprint[0] === '0' ? '1' : '0') + fingerprint.slice(1)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't', fingerprint: wrong, certPem })
 
-    await expect(broker.fetch('n1', { requestId: 'r1', path: '/v2/node' })).rejects.toThrow()
+    await expect(broker.fetch('n1', { requestId: 'r1', path: '/v1/node' })).rejects.toThrow()
     expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'identity_mismatch' } })
   })
 
@@ -343,7 +343,7 @@ describe('broker TLS pinning', () => {
         fingerprint,
         certPem: readFileSync(join(other, 'cert.pem'), 'utf8'),
       })
-      await expect(broker.fetch('n1', { requestId: 'r1', path: '/v2/node' })).rejects.toThrow()
+      await expect(broker.fetch('n1', { requestId: 'r1', path: '/v1/node' })).rejects.toThrow()
     } finally {
       rmSync(other, { recursive: true, force: true })
     }
@@ -565,8 +565,21 @@ describe('broker WebSocket', () => {
 describe('broker protocol version', () => {
   const nodeInfo = (protocolVersion: number) => ({
     status: 200,
-    body: JSON.stringify({ protocolVersion, fingerprint: 'f'.repeat(64) }),
+    body: JSON.stringify({ baseline: 'acorn-1', protocolVersion, fingerprint: 'f'.repeat(64) }),
     headers: { 'content-type': 'application/json' },
+  })
+
+  it('refuses a historical numeric-1 probe without a baseline before opening a socket', async () => {
+    const { origin, server } = await listen(false)
+    let upgrades = 0
+    server.on('upgrade', (_req, socket) => { upgrades += 1; socket.end() })
+    respond = (path) => (path === '/v1/node'
+      ? { ...nodeInfo(NODE_PROTOCOL_VERSION), body: JSON.stringify({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: 'f'.repeat(64) }) }
+      : { status: 200, body: '{}' })
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition')
+    expect(upgrades).toBe(0)
   })
 
   it('refuses a node speaking a different major, and never opens the socket', async () => {
@@ -576,7 +589,7 @@ describe('broker protocol version', () => {
       upgrades += 1
       socket.end()
     })
-    respond = (path) => (path === '/v2/node' ? nodeInfo(NODE_PROTOCOL_VERSION + 1) : { status: 200, body: '{}' })
+    respond = (path) => (path === '/v1/node' ? nodeInfo(NODE_PROTOCOL_VERSION + 1) : { status: 200, body: '{}' })
 
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
@@ -594,7 +607,7 @@ describe('broker protocol version', () => {
   it('connects normally to a node speaking this major', async () => {
     const { origin, server } = await listen(false)
     new WebSocketServer({ server, path: WS_PATH })
-    respond = (path) => (path === '/v2/node' ? nodeInfo(NODE_PROTOCOL_VERSION) : { status: 200, body: '{}' })
+    respond = (path) => (path === '/v1/node' ? nodeInfo(NODE_PROTOCOL_VERSION) : { status: 200, body: '{}' })
 
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
@@ -608,7 +621,7 @@ describe('broker protocol version', () => {
     // a definite, parseable, different major opens the socket and takes the ordinary reconnect path.
     const { origin, server } = await listen(false)
     new WebSocketServer({ server, path: WS_PATH })
-    respond = (path) => (path === '/v2/node' ? { status: 500, body: 'nope' } : { status: 200, body: '{}' })
+    respond = (path) => (path === '/v1/node' ? { status: 500, body: 'nope' } : { status: 200, body: '{}' })
 
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
@@ -623,7 +636,7 @@ describe('broker protocol version', () => {
     const { origin, server } = await listen(false)
     const wss = new WebSocketServer({ server, path: WS_PATH })
     let major = NODE_PROTOCOL_VERSION
-    respond = (path) => (path === '/v2/node' ? nodeInfo(major) : { status: 200, body: '{}' })
+    respond = (path) => (path === '/v1/node' ? nodeInfo(major) : { status: 200, body: '{}' })
 
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalChange } from '@acorn/protocol/terminal.ts'
+import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
   buildCommitPrompt, cleanCommitMessage, commitDiffScope, commitFiles, splitByBudget, splitPatch,
 } from './commitMessage'

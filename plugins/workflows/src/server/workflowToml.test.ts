@@ -17,10 +17,17 @@ const roundTrip = (text: string) => {
   return { parsed: parsed!, written, again: again! }
 }
 
+it('rejects a numeric-1 workflow without the baseline marker', () => {
+  const errors: { source: string; message: string }[] = []
+  expect(parseWorkflowToml('format_version = 1\n[[steps]]\nid = "work"\nname = "Work"\nprompt = "Do it"\n', 'old', 'user', errors)).toBeNull()
+  expect(errors[0]?.message).toMatch(/baseline/)
+})
+
 describe('writing a definition back as TOML', () => {
-  it('round trips the v2 graph, typed inputs, branches, ceilings and budgets', () => {
+  it('round trips the version-1 graph, typed inputs, branches, ceilings and budgets', () => {
     const { parsed, again } = roundTrip(`
-format_version = 2
+format_version = 1
+baseline = "acorn-1"
 name = "everything"
 posture = "autonomous"
 trigger = "checks-red"
@@ -99,7 +106,8 @@ kind = "gate-human"
 
   it('round trips single and mapped runtime workflow references without changing static composition', () => {
     const { parsed, written, again } = roundTrip(`
-format_version = 2
+format_version = 1
+baseline = "acorn-1"
 name = "dispatch"
 [[inputs]]
 name = "ticket"
@@ -145,7 +153,7 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
     expect(written).not.toContain('\nworkflow = "review-row"')
 
     const staticErrors: { source: string; message: string }[] = []
-    const staticStep = parseWorkflowToml('format_version = 2\n[[steps]]\nid = "review"\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
+    const staticStep = parseWorkflowToml('format_version = 1\nbaseline = "acorn-1"\n[[steps]]\nid = "review"\nworkflow = "review-block"\n', 'parent', 'repo', staticErrors)
     expect(staticErrors).toEqual([])
     expect(staticStep?.steps[0]).toMatchObject({ workflowRef: 'review-block' })
     expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
@@ -153,7 +161,8 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
 
   it('writes a multi-line prompt as a literal block, so `${…}` survives unescaped', () => {
     const { written, parsed, again } = roundTrip(`
-format_version = 2
+format_version = 1
+baseline = "acorn-1"
 name = "templated"
 [[inputs]]
 name = "issue"
@@ -177,7 +186,8 @@ Then say what you saw.
   // `$'` is a special sequence in a JavaScript replacement string, and the marker swap is a replace.
   it('survives a prompt holding replacement-pattern characters', () => {
     const { parsed, again } = roundTrip(`
-format_version = 2
+format_version = 1
+baseline = "acorn-1"
 name = "awkward"
 [[steps]]
 id = "quote"
@@ -192,7 +202,7 @@ second line
   })
 
   it('falls back to a quoted string when a literal block cannot hold the text', () => {
-    const def = { formatVersion: 2 as const, name: 'edge', steps: [{ id: 'a', name: 'a', prompt: "one\ntwo '''" }] }
+    const def = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'edge', steps: [{ id: 'a', name: 'a', prompt: "one\ntwo '''" }] }
     const text = writeWorkflowToml(def)
     expect(text).toContain('prompt = "one\\ntwo')
     const errors: { source: string; message: string }[] = []

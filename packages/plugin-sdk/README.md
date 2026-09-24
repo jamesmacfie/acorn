@@ -15,7 +15,7 @@ import { mountFrame, openLinkOnClick } from 'acorn-plugin-sdk'
 import styles from './my-pane.css?inline'
 
 mountFrame({ styles }, async (bridge, root) => {
-  const { text } = await bridge.api.get(`/v2/p/my-plugin/greeting?taskId=${bridge.context.taskId}`)
+  const { text } = await bridge.api.get(`/v1/p/my-plugin/greeting?taskId=${bridge.context.taskId}`)
   root.textContent = text
   root.addEventListener('click', (event) => openLinkOnClick(bridge, event))
 })

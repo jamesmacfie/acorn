@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
-import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
+import { connectionProviderRegistry } from '@acorn/plugin-api/testkit'
+import { connectProvider, rotateConnection, testConnection } from '@acorn/plugin-api/testkit'
+import { SecretService } from '@acorn/plugin-api/testkit'
 import {
   ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,
@@ -112,9 +112,9 @@ describe('model provider connections', () => {
       capabilities: { textGeneration: 'available' },
     })
     const [row] = await testDb.db.select().from(schema.integrations)
-    expect(row.authRef).not.toContain('plaintext-key')
-    expect(await SECRETS.reveal(row.authRef, 'test')).toBe('plaintext-key')
-    expect(JSON.stringify({ ...row, authRef: undefined })).not.toContain('plaintext-key')
+    expect(row.encryptedCredentials).not.toContain('plaintext-key')
+    expect(await SECRETS.reveal(row.encryptedCredentials, 'test')).toBe('plaintext-key')
+    expect(JSON.stringify({ ...row, encryptedCredentials: undefined })).not.toContain('plaintext-key')
   })
 
   it('rotates and tests Anthropic credentials through the same non-generating endpoint', async () => {
@@ -136,7 +136,7 @@ describe('model provider connections', () => {
     expect(anthropic.listModels).toHaveBeenCalledTimes(3)
     expect(summary.status).toBe('connected')
     const [row] = await testDb.db.select().from(schema.integrations)
-    expect(await SECRETS.reveal(row.authRef, 'test')).toBe('rotated-key')
+    expect(await SECRETS.reveal(row.encryptedCredentials, 'test')).toBe('rotated-key')
   })
 
   it.each([

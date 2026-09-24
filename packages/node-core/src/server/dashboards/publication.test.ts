@@ -31,7 +31,7 @@ async function world() {
   await initPlugins([{
     name: 'dashboard-fixture',
     init(ctx) {
-      ctx.dataSources.register({ sourceId: 'items', name: 'Items', singular: 'Item', plural: 'Items', identityScope: 'Source', handler: '/v2/p/dashboard-fixture/source' })
+      ctx.dataSources.register({ sourceId: 'items', name: 'Items', singular: 'Item', plural: 'Items', identityScope: 'Source', handler: '/v1/p/dashboard-fixture/source' })
       ctx.routes.fetch(async request => {
         const input = dataSourceRequestSchema.parse(await request.json())
         if (input.operation !== 'describe') throw new Error('Dashboard publication must not read records')

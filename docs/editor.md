@@ -455,10 +455,10 @@ frames: [{
     document: {
       kind: 'document',
       languageId: 'sql',                     // host-published vocabulary
-      read:  '/v2/p/database/tasks/:taskId/scratch',
-      write: '/v2/p/database/tasks/:taskId/scratch',
+      read:  '/v1/p/database/tasks/:taskId/scratch',
+      write: '/v1/p/database/tasks/:taskId/scratch',
       completions: {                         // optional — § Language smarts
-        route: '/v2/p/database/tasks/:taskId/completions',
+        route: '/v1/p/database/tasks/:taskId/completions',
         triggerCharacters: ['.'],
       },
     },

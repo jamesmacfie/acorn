@@ -19,7 +19,6 @@ export type KeybindingContribution = {
   defaultChord: string
   when?: KeybindingScope
   pane?: string
-  legacyPaneAction?: string
   active?: () => boolean
   // Present only on host-adapted loaded-plugin bindings. Identity and install order come from the
   // manifest/lockfile projection, never from plugin code.
@@ -31,7 +30,7 @@ export type KeybindingContribution = {
   }
 }
 
-export type KeybindingPrefs = { keybindings?: string; pane_shortcuts?: string }
+export type KeybindingPrefs = { keybindings?: string }
 export type ResolvedKeybinding = KeybindingContribution & { chord: string | null; conflict?: string }
 
 export const keybindingRegistry = new Registry<KeybindingContribution>('keybinding')
@@ -56,11 +55,6 @@ export const readKeybindingOverrides = (json: string | undefined): Record<string
   return result
 }
 
-export const readLegacyPaneOverrides = (json: string | undefined): Record<string, string> => {
-  const raw = parseObject(json)
-  return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
-}
-
 const scopesConflict = (a: KeybindingContribution, b: KeybindingContribution): boolean => {
   const aScope = a.when ?? 'global'
   const bScope = b.when ?? 'global'
@@ -74,7 +68,6 @@ export function resolveKeybindings(
   options: { includeInactiveConflicts?: boolean } = {},
 ): ResolvedKeybinding[] {
   const overrides = readKeybindingOverrides(prefs.keybindings)
-  const legacy = parseObject(prefs.pane_shortcuts)
   const sourceOrdered = [...bindings].sort((a, b) => {
     if (!a.plugin && !b.plugin) return 0
     if (!a.plugin) return -1
@@ -85,13 +78,7 @@ export function resolveKeybindings(
 
   const candidates = sourceOrdered.map((binding, sourceIndex) => {
     const overridden = Object.prototype.hasOwnProperty.call(overrides, binding.id)
-    const rawLegacyChord = binding.legacyPaneAction ? legacy[binding.legacyPaneAction] : undefined
-    const legacyChord = typeof rawLegacyChord === 'string' && rawLegacyChord.length === 1 ? `meta+${rawLegacyChord.toLowerCase()}` : rawLegacyChord
-    const chord = overridden
-      ? overrides[binding.id]
-      : typeof legacyChord === 'string' && legacyChord.trim()
-        ? legacyChord
-        : binding.defaultChord
+    const chord = overridden ? overrides[binding.id] : binding.defaultChord
     return { binding, chord, overridden, sourceIndex }
   })
 

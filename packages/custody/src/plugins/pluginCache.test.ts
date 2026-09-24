@@ -28,7 +28,7 @@ const broker = {
 
 const cache = () => new PluginCache(dir, broker)
 const claim = (hash = sha256(BUNDLE)) => ({ hash, version: '1.2.0' })
-const cacheDir = () => join(dir, 'plugin-cache')
+const cacheDir = () => join(dir, 'acorn-1-plugin-cache')
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'acorn-plugin-cache-'))
@@ -47,7 +47,7 @@ describe('fetching a bundle from a node', () => {
   it('stores under the hash of the bytes and reports it', async () => {
     const store = cache()
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
-    expect(requests[0].request.path).toBe('/v2/core/plugins/sparkline/client.js')
+    expect(requests[0].request.path).toBe('/v1/core/plugins/sparkline/client.js')
     expect(store.has(sha256(BUNDLE))).toBe(true)
     expect(readFileSync(join(cacheDir(), `${sha256(BUNDLE)}.js`), 'utf8')).toBe(BUNDLE)
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ pluginId: 'sparkline', version: '1.2.0', bytes: BUNDLE.length, nodeIds: ['node-a'] })

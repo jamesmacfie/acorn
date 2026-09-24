@@ -36,12 +36,12 @@ const form = (body: Record<string, string>): RequestInit => ({
 
 export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // Owner-only, both halves. This plugin registers with `prefix: ''`, so these paths sit at
-  // /v2/p/github/auth/device/* where no core mount gate reaches them, and the router has to carry its
+  // /v1/p/github/auth/device/* where no core mount gate reaches them, and the router has to carry its
   // own. Without it a task-scoped agent token could open a device window, show the owner a code for
   // an account the agent controls, and end up with that account's token stored as the owner's GitHub
   // connection: a confused deputy, with every later GitHub call made on the attacker's behalf.
   // Connecting an account is always a person at a keyboard, so this is requireDevice rather than the
-  // requireProviderAccess that guards /v2/core/integrations, which is looser only because the node's
+  // requireProviderAccess that guards /v1/core/integrations, which is looser only because the node's
   // own service-scope calls have to spend a credential it already holds.
   .use('/auth/device/*', requireDevice)
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how

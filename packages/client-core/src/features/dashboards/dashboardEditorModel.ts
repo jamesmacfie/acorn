@@ -4,7 +4,7 @@ import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import { DATA_SOURCE_PREVIEW_MODE } from '@acorn/protocol/dataSources.ts'
 import { MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
-import { projectDashboardPanel } from '@acorn/dashboards-core/typedProjection.ts'
+import { projectDashboardPanel } from '@acorn/dashboards-core/projection'
 import { viewsForSchema, type PanelViewKind } from './model'
 
 export const emptyDashboardContent = (): DashboardPanelContent => ({

@@ -71,6 +71,7 @@ describe('supervised service runtime', () => {
     const { startServiceRuntime } = await import('./runtime')
     return startServiceRuntime({
       config: {
+        baseline: 'acorn-1',
         dataDir: opts.dataDir,
         version: 'test',
         isPackaged: false,
@@ -117,14 +118,14 @@ describe('supervised service runtime', () => {
       // The pre-auth route, over a connection validated against the reported certificate. The node
       // serves no web assets (docs/architecture-overview.md § Runtime topology), so there is no SPA
       // shell to fetch any more.
-      expect(await get(runtime.started, '/v2/node')).toBe(200)
+      expect(await get(runtime.started, '/v1/node')).toBe(200)
 
       // The pin, end to end: a client that checks the fingerprint the service reported gets through.
-      expect(await get(runtime.started, '/v2/node', runtime.started.fingerprint)).toBe(200)
+      expect(await get(runtime.started, '/v1/node', runtime.started.fingerprint)).toBe(200)
       // A client expecting any other identity is refused before a byte of the request is sent. A
       // changed fingerprint is a hard security stop (docs/security.md), so it must fail closed.
       const wrong = (runtime.started.fingerprint[0] === '0' ? '1' : '0') + runtime.started.fingerprint.slice(1)
-      await expect(get(runtime.started, '/v2/node', wrong)).rejects.toThrow(/fingerprint mismatch/)
+      await expect(get(runtime.started, '/v1/node', wrong)).rejects.toThrow(/fingerprint mismatch/)
 
       await ready
       expect(states).toEqual(['migrating', 'listening', 'reconciling', 'ready'])

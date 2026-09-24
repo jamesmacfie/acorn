@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import type { TerminalProfile } from '@acorn/protocol/terminal.ts'
 import { agentProfileRegistry, type AgentProfileContribution } from './agentProfiles'
 
 // Built-in agent profiles (docs/terminal-and-agents.md), covering shell plus the common coding
@@ -36,7 +35,7 @@ export const interactiveProfile = (p: ProfileDef): boolean => p.interactive !== 
 // `tmuxMissing` means the profile prefers the durable tmux backend but tmux is not on PATH, so
 // sessions degrade to node-pty and do not survive an app restart. The profile menu shows it as a
 // hint.
-export const listProfiles = (): TerminalProfile[] => {
+export const listProfiles = (): { id: string; label: string; kind: 'shell' | 'agent'; available: boolean; tmuxMissing?: boolean }[] => {
   const tmux = tmuxAvailable()
   return listProfileDefs().filter(interactiveProfile).map((p) => ({
     id: p.id,

@@ -79,18 +79,18 @@ export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 // consumer of this file.
 export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
-export const linearIssuesRoute = '/v2/p/linear/issues'
-export const linearProjectsRoute = '/v2/p/linear/projects'
+export const linearIssuesRoute = '/v1/p/linear/issues'
+export const linearProjectsRoute = '/v1/p/linear/projects'
 // `scopeIds` holds what the workspace mapped, which is a Linear project id or a prefixed team id
 // (server/index.ts's `linearTeamScopeId`).
 export const linearProjectIssuesRoute = (integrationId: string, scopeIds: string[]) =>
-  `/v2/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(scopeIds.join(','))}`
+  `/v1/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(scopeIds.join(','))}`
 const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
 export const linearIssueRoute = (identifier: string, connectionId?: string) =>
-  `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
+  `/v1/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
-  `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
+  `/v1/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
 // One private upload, inlined. A data URL rather than the bytes, because the frame can do nothing
 // else with them and the bridge carries JSON.
 export const linearUploadRoute = (url: string, connectionId?: string) =>
-  `/v2/p/linear/uploads?url=${encodeURIComponent(url)}${connectionQuery(connectionId)}`
+  `/v1/p/linear/uploads?url=${encodeURIComponent(url)}${connectionQuery(connectionId)}`

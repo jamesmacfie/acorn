@@ -2,11 +2,12 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 import { pluginExtensionGrantSchema } from './grantSchemas'
 
 const log = createLogger('plugins')
@@ -20,7 +21,7 @@ const log = createLogger('plugins')
 // re-prompts for all of them. Otherwise the file discipline matches fleet.json: 0700 dir, 0600 file,
 // chmod after write.
 
-const TRUST_FILE = 'plugin-trust.json'
+const TRUST_FILE = `${ACORN_BASELINE}-plugin-trust.json`
 
 const webviewGrantSchema = z.strictObject({
   surface: z.string().min(1).max(64),

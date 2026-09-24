@@ -7,7 +7,7 @@ import { catalogValidation } from './generateWorkflow'
 import { BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import { authorWorkflowConversation, type SourceRuntime } from './workflowAuthoringConversation'
 
-const original: WorkflowDef = { formatVersion: 2, name: 'Review', steps: [{ id: 'read', name: 'read', prompt: 'Read the issue.' }] }
+const original: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', steps: [{ id: 'read', name: 'read', prompt: 'Read the issue.' }] }
 const proposed: WorkflowDef = { ...original, steps: [{ id: 'read', name: 'read', prompt: 'Read the issue and summarize the risk.' }] }
 const catalog: WorkflowCatalog = {
   kinds: BUILTIN_STEP_KINDS.map(id => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),

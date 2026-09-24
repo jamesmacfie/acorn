@@ -4,7 +4,7 @@ import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 export const errorSource: DataSourceRegistration = {
   sourceId: 'error-groups', name: 'Rollbar error groups', singular: 'Error group', plural: 'Error groups',
   providerId: 'rollbar', identityScope: 'System item ID and immutable project counter, scoped to one project connection',
-  handler: '/v2/p/rollbar/data/errors', titlePointer: '/title', urlPointer: '/url', icon: 'brand:rollbar',
+  handler: '/v1/p/rollbar/data/errors', titlePointer: '/title', urlPointer: '/url', icon: 'brand:rollbar',
 }
 const recordSchema: DataSchema = { type: 'object', additionalProperties: false, properties: {
   id: { type: 'string' }, counter: { type: 'string' }, title: { type: 'string' }, url: { type: ['string', 'null'] },

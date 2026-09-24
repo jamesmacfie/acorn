@@ -1,15 +1,16 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import { toast } from '@acorn/client-core/features/notifications/toast.ts'
-import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
-import { taskHierarchy } from '@acorn/client-core/features/tasks/taskHierarchy.ts'
-import { toggleWorkflowRoot } from '@acorn/client-core/features/tasks/taskTreeViewState.ts'
+import { toast } from '@acorn/client-core/features/notifications'
+import { pushNotice } from '@acorn/client-core/features/notifications'
+import { _resetNotices } from '@acorn/client-core/testkit/notifications'
+import { taskHierarchy } from '@acorn/client-core/features/tasks'
+import { toggleWorkflowRoot } from '@acorn/client-core/features/tasks'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { createMemo, createRoot, createSignal } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'
 import { renderFixture } from '../harness'
@@ -222,7 +223,7 @@ describe('the shell', () => {
 
   it('draws a search, an input and a setting in the same rectangle as the list', async () => {
     // The interactive kinds, over the same session the desktop's palette runs on; the transitions
-    // themselves are client-core/host/registries/commands/session.test.tsx. What is asked here is only
+    // themselves are client-core/host/registries/commands/sessionStore.test.tsx. What is asked here is only
     // what a terminal can answer: the frame's own placeholder is in the field, the rows are the
     // provider's, the current value is marked, and Enter reaches the outcome.
     const commands = registerFixtureCommands()
@@ -416,7 +417,7 @@ describe('the shell', () => {
     // thirty-second staleTime.
     expect(frame).toContain('from-last-time')
     expect(frame).not.toContain('fix-login')
-    expect(recordedRequests().some((request) => request.path === '/v2/core/tasks')).toBe(false)
+    expect(recordedRequests().some((request) => request.path === '/v1/core/tasks')).toBe(false)
     // …and the chrome around it is whole: topbar, rail, pane strip and the keys on the footer.
     expect(lines[0]).toContain('acorn')
     expect(lines[lines.length - 2]).toContain('j/k move')

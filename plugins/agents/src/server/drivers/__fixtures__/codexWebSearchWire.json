@@ -61,8 +61,8 @@
        "domain": "github.com",
        "ref_id": "turn0search1",
        "snippet": "The Agent Client Protocol allows Agents and Clients to communicate by exposing methods that each side can call and sending notifications to inform each other",
-       "title": "agent-client-protocol/docs/protocol/v2/overview.mdx at main \u00b7 agentclientprotocol/agent-client-protocol \u00b7 GitHub",
-       "url": "https://github.com/agentclientprotocol/agent-client-protocol/blob/main/docs/protocol/v2/overview.mdx"
+       "title": "agent-client-protocol/docs/protocol/v1/overview.mdx at main \u00b7 agentclientprotocol/agent-client-protocol \u00b7 GitHub",
+       "url": "https://github.com/agentclientprotocol/agent-client-protocol/blob/main/docs/protocol/v1/overview.mdx"
       },
       {
        "type": "text_result",

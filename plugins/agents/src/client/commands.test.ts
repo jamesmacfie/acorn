@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor, AgentSession } from '../contract/wire.ts'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 
 const mocks = vi.hoisted(() => ({

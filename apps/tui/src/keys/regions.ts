@@ -1,4 +1,6 @@
-// Focus regions without a DOM.
+// Focus regions without a DOM. This store alone owns the focused renderable, scope stack, region
+// claims, and focus memory. regionTraversal.ts walks explicit tree inputs and counts each visited
+// node through the callback supplied here.
 //
 // `client-core/host/keys/focusRegions.ts` keeps the same contract and is DOM all the way down: it
 // orders regions by `compareDocumentPosition`, finds a region's first stop with `querySelector`,
@@ -34,6 +36,7 @@ import { createSignal, onCleanup } from 'solid-js'
 import { isRemoved, type Renderable } from '../tree/compat'
 import type { Press } from '../tree/hit'
 import type { Renderer } from '../renderer'
+import { adjacentStop, firstInTree, stopsInTree } from './regionTraversal'
 
 export type RegionRef = { paneId: string; regionId: string }
 
@@ -879,15 +882,8 @@ export const focusedExpands = (): boolean => {
 
 // ── Reading the tree ──────────────────────────────────────────────────────────────────────────
 
-const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined => {
-  for (const child of box.getChildren()) {
-    step()
-    if (child.visible && take(child)) return child
-    const nested = child.visible ? walk(child, take) : undefined
-    if (nested) return nested
-  }
-  return undefined
-}
+const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined =>
+  firstInTree(box, take, step)
 
 /**
  * Where entering a box lands: its first parent stop, else its first collection's roving row, else its
@@ -976,45 +972,13 @@ const isPanel = (node: Renderable): boolean => panelSet().has(node)
  *   a focusable node   one stop, not walked into.
  *   anything else      walked through.
  */
-export const stopsIn = (box: Renderable): Renderable[] => {
-  const found: Renderable[] = []
-  const visit = (parent: Renderable): void => {
-    for (const child of parent.getChildren()) {
-      step()
-      if (!child.visible || child.isDestroyed || isPanel(child)) continue
-      if (groupByBox.has(child)) {
-        visit(child)
-        continue
-      }
-      if (parentByNode.has(child)) {
-        found.push(child)
-        continue
-      }
-      const container = containerByBox.get(child)
-      if (container) {
-        // A virtual list whose active row is off its drawn window has no renderable for it, and the
-        // container itself holds the keys until one arrives (../kit/showing.tsx § Rows).
-        const row = container.active()
-        if (row && !row.isDestroyed && row.visible) found.push(row)
-        else if (child.focusable) found.push(child)
-        continue
-      }
-      if (isViewport(child)) {
-        const nestedBefore = found.length
-        visit(child)
-        if (found.length === nestedBefore) found.push(child)
-        continue
-      }
-      if (child.focusable) {
-        found.push(child)
-        continue
-      }
-      visit(child)
-    }
-  }
-  visit(box)
-  return found
-}
+export const stopsIn = (box: Renderable): Renderable[] => stopsInTree(box, {
+  panels: panelSet(),
+  regions: groupByBox,
+  parents: parentByNode,
+  collections: containerByBox,
+  step,
+})
 
 /**
  * The box a stop's neighbours live in: the panel it is inside, else its region's own box.
@@ -1065,10 +1029,7 @@ export function walkStops(
   const box = options.within ?? boxAround(from)
   if (!box) return false
   const stops = options.stops ?? stopsIn(box)
-  const at = stops.indexOf(from)
-  if (at < 0) return false
-  const next = options.wrap ? stops[(at + delta + stops.length) % stops.length] : stops[at + delta]
-  return focusRenderable(next)
+  return focusRenderable(adjacentStop(stops, from, delta, options.wrap))
 }
 
 /**

@@ -2,8 +2,10 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { findWorkspaceRoot } from '@acorn/node-core/server/storage/paths.ts'
+import { findWorkspaceRoot } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 
 // Starting a node and owning its lifetime, for the case where nothing holds the data root yet.
 //
@@ -16,6 +18,8 @@ import { join } from 'node:path'
 
 /** The node's boot line, as the standalone entry prints it. */
 export type Handshake = {
+  baseline: typeof ACORN_BASELINE
+  protocolVersion: typeof NODE_PROTOCOL_VERSION
   nodeId: string
   endpoint: string
   fingerprint?: string
@@ -101,6 +105,12 @@ export function startNode(dataDir: string, deviceToken?: string): SupervisedNode
       try {
         const parsed = JSON.parse(line) as Partial<Handshake>
         if (!parsed.nodeId || !parsed.endpoint || !parsed.deviceToken) return
+        if (parsed.baseline !== ACORN_BASELINE || parsed.protocolVersion !== NODE_PROTOCOL_VERSION) {
+          reject(new Error(`The node has no matching ${ACORN_BASELINE} baseline or protocol. Reset or rebuild it before starting.`))
+          lines.close()
+          child.kill('SIGTERM')
+          return
+        }
         clearTimeout(timer)
         lines.close()
         child.stdout?.resume() // drained, not read: a paused pipe would block the node's own logging

@@ -1,6 +1,7 @@
 # Target architecture
 
-Date: 2026-09-21. Status: accepted review direction; implementation proposal.
+Date: 2026-09-21. Status: historical accepted direction. Tickets 01–12 implemented;
+[ticket 13](./13-acceptance.md) records acceptance. The owning reference docs describe current behaviour.
 Read [context](./context.md), [findings](./findings.md), and [refused alternatives](./refused.md).
 
 Re-checked on 2026-09-22 against `4bdbf29b`. Parts of the Findings and Memory decisions below landed

@@ -1,6 +1,6 @@
 # Ticket 10: Version-1 cutover
 
-Date: 2026-09-21. Status: not started. Prerequisites: 02–09.
+Date: 2026-09-21. Status: implemented 2026-09-23; final release acceptance remains in ticket 13. Prerequisites: 02–09.
 Read [context](./context.md), F11 in [findings](./findings.md), and the complete
 [contract map](./reset-and-versioning.md#contract-identity-and-version-map).
 
@@ -41,3 +41,36 @@ boot integrations, and both host smoke paths. Ticket 13 owns the final whole-sui
 Search constants, route literals, generated artifacts, permission schemas, and package manifests.
 Do not mechanically replace every `2` or `v2`: vendor protocols, tooling metadata, and historical records
 are distinct. This ticket is one atomic contract change and must not be released halfway through.
+
+## Implementation evidence
+
+- `ACORN_BASELINE` owns the `acorn-1` marker. Node identity, probes and pairing, service startup,
+  enrollment requests, installed plugin manifests, workflows, backups, and self-contained JSON
+  exports carry it. Existing data roots and historical API-1 plugins or format-1 workflows without
+  the marker are refused before adoption. Workflow files stay untouched and report a file error.
+- Node HTTP and WebSocket routes use `/v1`; Node and service protocol majors are 1; plugin API is
+  string `1`. Acorn package releases and bundled plugin manifests are `1.0.0`. The nine repository
+  plugin bundles were rebuilt in an isolated directory and checked for baseline, API, and release.
+  The plugin API snapshot, plugin and enrollment schemas, Cargo metadata, and pnpm lockfile were
+  regenerated. Vendor and tool protocol versions were left with their owners.
+- Workflow definitions use format 1 and the baseline in TOML and JSON authoring and import. Dashboard
+  persistence uses format 1. Device preferences, tokens, fleet, plugin trust/cache, and query cache
+  use baseline-specific names. The manual backup verifier reads the archive manifest and target
+  identity before extraction; it rejects missing or different baselines.
+- `pnpm lint` and `pnpm db:check` passed. Protocol: 175 tests; custody: 96; workflow: 475; focused
+  Node workflow: 30; Node plugin load and Findings: 14; pairing and standalone parity: 16; service
+  spawn: 3; Node manifest/installer/data-root: 204; backup: 6; toolkit suites: 30. Desktop package
+  tests passed 102 renderer/boot tests and 38 Rust tests before the final custody-path change; the
+  Rust suite then passed 39 tests. Terminal boot/cache passed 15 tests. Backup verifier passed 2.
+- The real Tauri project session started the baseline-marked Node and rendered the workspace and
+  local-node Home view; its automation session was stopped. The onboarding smoke reached a ready
+  Node and loaded the bundled plugins, then failed in the existing development renderer path:
+  Vite `/@fs/.../packages/client-core/src/kit/components/inputs/CopyButton.tsx` returned
+  `Connection reset by peer (os error 54)` through the shell proxy, and the window reported
+  `Importing a module script failed`. The architecture suite remains at 64/65 because the existing
+  palette view invokes a host command. Both are recorded for ticket 13.
+
+Ticket 13 resolved the palette edge and architecture passed 66/66. Its real Tauri automation uses
+the staged renderer asset path by default; onboarding and project windows then loaded in the native
+app scheme. The Vite dev proxy remains an opt-in debugging path with the cold `/@fs` import failure
+recorded in ticket 13. This does not change the dated phase-10 result above.

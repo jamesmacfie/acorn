@@ -14,6 +14,7 @@ import { idempotencyStore, type IdempotencyStore } from './auth/idempotency'
 import { pairingCodes, type PairingCodes } from './auth/pairingCodes'
 import { SecretService } from './core/secrets'
 import { drizzleOverSqlite, openSqlite } from './storage/sqlite'
+import { assertMigrationHistory } from './storage/migrationHistory'
 import { ensureSessionKey } from './sessionKey'
 import { ensureCert } from './transport/tls'
 
@@ -21,7 +22,7 @@ import { ensureCert } from './transport/tls'
 // at startup and handed to the Hono app at the single app.fetch() seam in server/transport/listener.ts.
 export type RuntimeBindings = {
   DB: AppDatabase
-  // This node's data root. It lives on c.env because `POST /v2/core/backup` has to enumerate
+  // This node's data root. It lives on c.env because `POST /v1/core/backup` has to enumerate
   // `plugins/*.sqlite` beside core.sqlite (server/storage/backup.ts), and a filesystem path carries no
   // secret: every child process this node spawns already receives it as ACORN_DATA_DIR, and
   // server/plugins/storage.ts computes it from the same value. The alternative, a dedicated bridge slot, would
@@ -32,13 +33,13 @@ export type RuntimeBindings = {
   // collide (docs/architecture-overview.md § Fleet semantics).
   NODE_ID: string
   // The sha256 of this node's TLS certificate, the value a client pins (docs/api-reference.md §
-  // Pairing), advertised at GET /v2/node.
+  // Pairing), advertised at GET /v1/node.
   //
   // The fingerprint, not the certificate and not the private key: c.env reaches every core and
   // plugin route, so anything placed here is readable by all of them. The key material stays
   // inside server/transport/tls.ts and server/transport/listener.ts, which are the only modules that need it.
   NODE_FINGERPRINT: string
-  // The app version this node is running, reported at GET /v2/node to an authenticated caller
+  // The app version this node is running, reported at GET /v1/node to an authenticated caller
   // (docs/api-reference.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
   APP_VERSION: string
@@ -154,7 +155,13 @@ export function openDb(dbPath: string): AppDatabase {
   // Drizzle's own better-sqlite3 session, over a node:sqlite handle that presents the same shape
   // (server/storage/sqlite.ts explains why this does not go through drizzle's `drizzle()` front door).
   const db = drizzleOverSqlite(sqlite, schema)
-  migrate(db, { migrationsFolder })
+  try {
+    assertMigrationHistory('Core', migrationsFolder, sqlite)
+    migrate(db, { migrationsFolder })
+  } catch (error) {
+    sqlite.close()
+    throw error
+  }
   for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
     if (existsSync(path)) chmodSync(path, 0o600)
   }

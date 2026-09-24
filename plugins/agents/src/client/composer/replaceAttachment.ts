@@ -1,4 +1,4 @@
-import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
+import type { AgentAttachment } from '../../contract/wire.ts'
 
 // Whether one attachment in an unsent draft may be swapped for another, and what the draft becomes
 // (docs/managed-agents.md § Draft attachments, and docs/plugins.md § Asking the owner for who asks).

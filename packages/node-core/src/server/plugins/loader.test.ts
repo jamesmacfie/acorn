@@ -33,7 +33,7 @@ const manifest = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   name: `${id} plugin`,
   version: '1.0.0',
-  apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
   ...over,
 })
@@ -149,7 +149,8 @@ describe('loaded-plugin migration ownership', () => {
     chain(join(dir, 'migrations'))
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(failures).toEqual([])
-    await loaded[0].plugin.init({} as never)
+    // The worker supplies storage itself; these facets are present on a real host context.
+    await loaded[0].plugin.init({ routes: {}, schedules: {}, providers: {}, events: {} } as never)
     await loaded[0].plugin.dispose?.()
 
     const db = new DatabaseSync(join(pluginInstallDir(root), 'keeper.sqlite'))
@@ -366,7 +367,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
+      .toEqual({ frames: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

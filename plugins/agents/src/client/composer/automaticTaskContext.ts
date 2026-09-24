@@ -1,4 +1,4 @@
-import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentTurn } from '../../contract/wire.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
 export const TASK_CONTEXT_CONTRIBUTION_ID = 'acorn-task-context'

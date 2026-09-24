@@ -11,7 +11,7 @@ import type { QueryDraft, QueryRevision } from '@acorn/protocol/dataQueries.ts'
 
 const catalog = { stepKinds: new Set(['agent']), policies: new Set<string>(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']) }
 const scope = { workspaceId: 'workspace', projectId: 'project', repoDir: null, userDir: null }
-const leaf = (name = 'Child'): WorkflowDef => ({ formatVersion: 2, name, steps: [{ id: 'work', name: 'Work', prompt: 'Do work.' }] })
+const leaf = (name = 'Child'): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'work', name: 'Work', prompt: 'Do work.' }] })
 describe('workflow publication', () => {
   let db: TestPluginDb
   let services: WorkflowPublicationServices
@@ -36,7 +36,7 @@ describe('workflow publication', () => {
   })
   it('publishes unpublished dependencies first, without adopting unrelated dependency edits', async () => {
     const child = await draft(leaf())
-    const parent = await draft({ formatVersion: 2, name: 'Parent', steps: [{ id: 'call', name: 'Call', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: child.id } } }] })
+    const parent = await draft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Parent', steps: [{ id: 'call', name: 'Call', kind: 'workflow', childWorkflow: { ref: { source: 'database', id: child.id } } }] })
     const publication = workflowPublication(db.db, services)
     const operation = await publication.prepare({ id: parent.id, revision: 1 })
     expect(operation.writes.map(write => write.id)).toEqual([child.id, parent.id])
@@ -62,7 +62,7 @@ describe('workflow publication', () => {
   it('detects draft cycles and preserves unrelated published workflows during interruption', async () => {
     const one = await draft(leaf('One'))
     const two = await draft(leaf('Two'))
-    const call = (id: string): WorkflowDef => ({ formatVersion: 2, name: 'Call', steps: [{ id: 'call', name: 'Call', kind: 'workflow', childWorkflow: { ref: { source: 'database', id } } }] })
+    const call = (id: string): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Call', steps: [{ id: 'call', name: 'Call', kind: 'workflow', childWorkflow: { ref: { source: 'database', id } } }] })
     await updateDef(db.db, one.id, call(two.id), 1)
     await updateDef(db.db, two.id, call(one.id), 1)
     await expect(workflowPublication(db.db, services).prepare({ id: one.id, revision: 2 })).rejects.toThrow('cycle')
@@ -74,7 +74,7 @@ describe('workflow publication', () => {
     expect((await resolveScopedWorkflowDefinition(db.db, { source: 'database', id: unrelated.id }, scope, catalog)).definition.name).toBe('Unaffected')
   })
   it('pins saved query revisions once at run admission', async () => {
-    const def: WorkflowDef = { formatVersion: 2, name: 'Query', steps: [{ id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'saved', queryId: 'query', bindings: {} } }] }
+    const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Query', steps: [{ id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'saved', queryId: 'query', bindings: {} } }] }
     const graph = await resolveWorkflowGraph(db.db, def, { scope, catalog: { ...catalog, stepKinds: new Set(['find-records']) }, queryRevision: async () => 3 })
     expect(graph.root.steps[0]?.query).toMatchObject({ revision: 3 })
   })
@@ -116,7 +116,7 @@ describe('workflow publication', () => {
       return { published: written }
     }
     services.queryConsumer = async () => { interrupt('consumer') }
-    const row = await draft({ formatVersion: 2, name: 'Consumer', steps: [{ id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'saved', queryId: query.id, bindings: {} } }] })
+    const row = await draft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Consumer', steps: [{ id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'saved', queryId: query.id, bindings: {} } }] })
     services.catalog = { ...catalog, stepKinds: new Set(['find-records']) }
     const publication = workflowPublication(db.db, services)
     const operation = await publication.prepare({ id: row.id, revision: 1 })

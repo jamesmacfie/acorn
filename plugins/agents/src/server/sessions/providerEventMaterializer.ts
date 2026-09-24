@@ -1,4 +1,4 @@
-import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import type { AgentDriverEvent } from '../drivers/types'
 import type { AgentArtifactStore } from './artifactStore'
 import { boundProviderEvent } from './boundProviderEvent'

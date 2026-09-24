@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { defaultModelIdFor, type ModelBackend } from '@acorn/protocol/modelProviders.ts'
+import { defaultModelIdFor, parseBackendId, type ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { parseJson } from '../../../infra/persistence/persistedState'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { saveJsonPref } from '../savePref'
@@ -37,6 +37,11 @@ export function readGeneratePick(prefs: Record<string, string> | undefined): Mod
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const { backendId, modelId } = value as { backendId?: unknown; modelId?: unknown }
   if (typeof backendId !== 'string' || !backendId) return null
+  try {
+    parseBackendId(backendId)
+  } catch {
+    return null
+  }
   return typeof modelId === 'string' ? { backendId, modelId } : null
 }
 

@@ -62,7 +62,7 @@ describe('findings-backed memory review', () => {
     expect(host.textContent).toContain('Review history')
   })
 
-  it('opens a legacy-mapped candidate when the asynchronous mapping arrives', async () => {
+  it('opens a candidate when the selected destination arrives', async () => {
     mocks.bundles.mockResolvedValue([bundle(4)])
     mocks.finding.mockResolvedValue({ ...candidate('candidate-4'), observations: [] })
     mocks.findingHistory.mockResolvedValue({ items: [] })

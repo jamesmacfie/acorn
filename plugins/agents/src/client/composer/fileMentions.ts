@@ -1,4 +1,4 @@
-import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
+import type { AgentInputPart } from '../../contract/wire.ts'
 import { fuzzyScore } from '@acorn/plugin-api/client'
 
 // Composer file mentions are deliberately conservative: a token must begin with @ at a word

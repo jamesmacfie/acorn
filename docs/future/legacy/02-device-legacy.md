@@ -1,6 +1,6 @@
 # Ticket 02: Remove custody and preference adoption
 
-Date: 2026-09-21. Status: not started. Prerequisites: 01.
+Date: 2026-09-21. Status: implemented. Prerequisites: 01.
 Read [context](./context.md), F07 in [findings](./findings.md), and [reset policy](./reset-and-versioning.md).
 
 ## Outcome
@@ -29,6 +29,22 @@ Switching Nodes never copies task-scoped layout between Nodes. Canonical binding
 and obsolete binding/layout inputs do not activate. The helper boots without reading an Electron key.
 Run `pnpm lint`, affected client/custody tests, and desktop boot/Rust tests. Verify shortcuts and layout
 restoration in the real desktop window using isolated data.
+
+## Verification, 2026-09-23
+
+- `pnpm lint`: passed, 34 package checks.
+- `pnpm --filter @acorn/client-core test`: passed, 210 files and 1,727 tests.
+- `pnpm --filter @acorn/custody test`: passed, 8 files and 95 tests with loopback access.
+- `pnpm --filter @acorn/desktop test`: build, 102 Vitest tests, and 38 Rust tests passed with
+  loopback access. In the restricted sandbox, listener tests failed with `listen EPERM`.
+- In an isolated Tauri window, Shortcuts showed the new-task binding as Unbound after using its
+  control. A new task on the existing checkout switched to Notes, and pinning it showed `Unpin
+  Notes`. The screenshot is under `.acorn/agent-dev/ticket02-device-retry/screenshots/`.
+- Two restarts of that isolated profile reached `Acorn could not start — Importing a module script
+  failed` after Vite module requests were reset by peer. Both sessions were stopped. Shortcut and
+  layout restoration across a real-window restart remain unverified.
+- `pnpm --filter @acorn/tui test` was attempted with loopback access. Three telemetry tests timed
+  out or failed before the run stalled; it was stopped. Terminal TypeScript passed in `pnpm lint`.
 
 ## Verify before building
 

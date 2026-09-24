@@ -242,10 +242,10 @@ describe('flushing', () => {
   it('stamps the runtime on every record and refuses one an emitter set', async () => {
     start()
     setTelemetryEnabled(true)
-    emitEvent('agents', 'cache-miss', { runtime: 'node', owner: 'github', route: '/v2/core/tasks' })
+    emitEvent('agents', 'cache-miss', { runtime: 'node', owner: 'github', route: '/v1/core/tasks' })
     await flushTelemetry()
     const [only] = posted[0]
-    expect(only.attrs).toEqual({ route: '/v2/core/tasks', owner: 'agents', runtime: 'renderer' })
+    expect(only.attrs).toEqual({ route: '/v1/core/tasks', owner: 'agents', runtime: 'renderer' })
   })
 
   it('throws away what it holds when the switch goes off', async () => {

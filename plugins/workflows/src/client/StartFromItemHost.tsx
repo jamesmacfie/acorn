@@ -1,5 +1,5 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import { createEffect, createMemo, createResource, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
@@ -13,8 +13,9 @@ import {
   type Task,
 } from '@acorn/plugin-api/client'
 import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
+import { Field, Input, Select } from '@acorn/plugin-api/ui'
 import { workflowApi } from './workflowsClient'
-import { closeStartFromItem, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
+import { closeStartFromItem, collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows.md § Starting a run).
 //
@@ -51,6 +52,11 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
     async (workspaceId) => workflowApi.defsList(workspaceId),
   )
   const definitions = createMemo(() => (defs()?.workflows ?? []).filter((entry) => !entry.problems?.length))
+  const [defId, setDefId] = createSignal('')
+  const selectedDefId = () => defId() || definitions()[0]?.id || ''
+  const chosen = createMemo(() => definitions().find((entry) => entry.id === selectedDefId()))
+  const workflowInputs = () => chosen()?.inputs ?? []
+  const [values, setValues] = createSignal<Record<string, string>>({})
 
   const attachTasks = createMemo(() => {
     const projectIds = new Set(workspace()?.projects.map((project) => project.id) ?? [])
@@ -63,6 +69,18 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
     ...(props.target.body ? { body: props.target.body } : {}),
     ...(props.target.link ? { link: props.target.link } : {}),
   }), ...(props.target.record ? prefillFromRecord(props.target.record) : {}) }))
+
+  const seeded = createMemo(() => ({
+    ...Object.fromEntries(workflowInputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
+    ...Object.fromEntries(workflowInputs().filter((input) => prefill()[input.name] !== undefined)
+      .map((input) => [input.name, prefill()[input.name]])),
+  }))
+  const valueOf = (name: string): string => {
+    const value = values()[name] ?? seeded()[name]
+    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
+  }
+  const filled = (): Record<string, DataValue> => collectItemWorkflowInputs(workflowInputs(), valueOf)
+  const ready = () => itemWorkflowInputsReady(selectedDefId(), workflowInputs(), valueOf)
 
   // Where the run landed, so `onCreated` can address the pane without threading a second callback
   // through the modal. One entry, written and read in the same gesture.
@@ -103,7 +121,26 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
         itemTitle={props.target.title}
         attachTasks={attachTasks()}
         existingBranches={(tasks.data ?? []).flatMap((task) => (task.branch ? [task.branch] : []))}
-        workflow={{ definitions: definitions(), prefill: prefill(), onStart: start }}
+        action={{
+          label: 'run',
+          ready,
+          onTaskReady: (task) => start(task.id, selectedDefId(), filled()),
+          content: <>
+            <Field label="Workflow" group>
+              <Select size="sm" label="Workflow" value={selectedDefId()}
+                options={definitions().map((entry) => ({ value: entry.id, label: entry.name }))} onChange={setDefId} />
+            </Field>
+            <For each={workflowInputs()}>
+              {(input) => (
+                <Field label={input.required ? `${input.name} *` : input.name} hint={input.description} group>
+                  <Input size="sm" label={input.name} value={valueOf(input.name)}
+                    invalid={!!input.required && !valueOf(input.name).trim()}
+                    onInput={(value) => setValues((current) => ({ ...current, [input.name]: value }))} />
+                </Field>
+              )}
+            </For>
+          </>,
+        }}
         onClose={closeStartFromItem}
         onCreated={land}
         onAttached={land}

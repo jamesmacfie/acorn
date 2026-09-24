@@ -2,7 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, on, onCleanup }
 import {
   activeNodeId, activeTaskId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type Task,
 } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'

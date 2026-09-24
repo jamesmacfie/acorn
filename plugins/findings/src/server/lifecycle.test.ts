@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, schema, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentReviewInputCapability } from '@acorn/plugin-agents/contract/lifecycle.ts'
+import type { TerminalReviewInputCapability } from '@acorn/plugin-terminal/contract/reviewInput.ts'
+import type { WorkflowReviewInputCapability } from '@acorn/plugin-workflows/contract/reviewInput.ts'
 import { findingLifecycleCheckpoints } from '../node/schema'
 import { FindingsLifecycle, truncateLifecycleBody } from './lifecycle'
 import type { FindingsRuntime } from './runtime'
@@ -26,9 +28,38 @@ describe('findings completion lifecycle', () => {
   })
   afterEach(() => ctx.cleanup())
 
-  const lifecycle = (agents?: AgentReviewInputCapability) => new FindingsLifecycle({
-    db: ctx.storage.open(), runtime: { record, startPrepareTask } as unknown as FindingsRuntime,
-    core: ctx.core, agents: () => agents, notice, settingsChanged,
+  const lifecycle = (agents?: AgentReviewInputCapability, hasReviewTarget: (id: string) => boolean = () => true,
+    terminal?: TerminalReviewInputCapability, workflows?: WorkflowReviewInputCapability) => new FindingsLifecycle({
+    db: ctx.storage.open(), runtime: { record, startPrepareTask, hasReviewTarget } as unknown as FindingsRuntime,
+    core: ctx.core, agents: () => agents, terminal: () => terminal, workflows: () => workflows, notice, settingsChanged,
+  })
+
+  it('records a terminal completion only while its bounded snapshot is available', async () => {
+    const terminal: TerminalReviewInputCapability = { read: async (taskId, sessionId) => ({
+      taskId, sessionId, exitCode: 0, completedAt: 10, availability: 'unavailable', output: null,
+      unavailableReason: 'Retained terminal output is unavailable or expired.',
+    }) }
+    await lifecycle(undefined, undefined, terminal).terminalCompleted({ taskId: 'task', sessionId: 'gone', exitCode: 0, completedAt: 10 })
+    expect(record).not.toHaveBeenCalled()
+    expect(ctx.storage.open().select().from(findingLifecycleCheckpoints).all()).toMatchObject([
+      { boundaryKey: 'terminal:gone:exit', availability: 'unavailable', observationId: null },
+    ])
+  })
+
+  it('reads the persisted workflow handoff and records archive session identities', async () => {
+    const workflows: WorkflowReviewInputCapability = {
+      listCompleted: async () => [{ taskId: 'task', runId: 'run', status: 'done', completedAt: 10 }],
+      read: async (taskId, runId) => ({ taskId, runId, status: 'done', completedAt: 10,
+        availability: 'available', handoff: 'Final handoff', unavailableReason: null }),
+    }
+    const owner = lifecycle(undefined, undefined, undefined, workflows)
+    await owner.reconcile()
+    await owner.archiveReview({ taskId: 'task', sessionIds: ['s1', 's2'], terminalOutput: 'PTY output', diff: 'diff' })
+    expect(record).toHaveBeenCalledTimes(2)
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ origin: { kind: 'workflow', runId: 'run' } }))
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ body: expect.stringContaining('Terminal sessions: s1, s2') }),
+    }))
   })
 
   it('reconciles ordinary and workflow turns once without preparing per managed turn', async () => {
@@ -59,7 +90,7 @@ describe('findings completion lifecycle', () => {
 
   it('prepares one archive boundary with the configured model', async () => {
     const owner = lifecycle()
-    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: false, backendId: 'connection:model-1', modelId: 'fixture-model' })
+    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: false, backendId: 'connection:model-1', modelId: 'fixture-model', targetId: 'memory:change' })
     expect(settingsChanged).toHaveBeenCalledOnce()
     const boundary = {
       taskId: 'task', boundaryKey: 'task:task:archive', sourceKind: 'task-archive' as const,
@@ -69,7 +100,7 @@ describe('findings completion lifecycle', () => {
     await owner.boundary(boundary)
     expect(record).toHaveBeenCalledOnce()
     expect(startPrepareTask).toHaveBeenCalledOnce()
-    expect(startPrepareTask).toHaveBeenCalledWith('task', { boundaryKey: boundary.boundaryKey, backendId: 'connection:model-1', modelId: 'fixture-model' })
+    expect(startPrepareTask).toHaveBeenCalledWith('task', { boundaryKey: boundary.boundaryKey, targetId: 'memory:change', backendId: 'connection:model-1', modelId: 'fixture-model' })
   })
 
   it('does not turn an archive into one candidate per observation when no model is configured', async () => {
@@ -80,7 +111,26 @@ describe('findings completion lifecycle', () => {
     })
     expect(record).toHaveBeenCalledOnce()
     expect(startPrepareTask).not.toHaveBeenCalled()
-    await expect(owner.prepareTask('task', 'manual:task:1')).rejects.toMatchObject({ kind: 'unavailable' })
+    await expect(owner.prepareTask('task', 'manual:task:1', 'memory:change')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('requires an available automatic target and keeps evidence when that target unloads', async () => {
+    let available = true
+    const owner = lifecycle(undefined, () => available)
+    await owner.setSettings('owner', { automaticPreparation: true, notifyWhenReady: false, backendId: 'connection:model-1', modelId: 'fixture-model', targetId: null })
+    const boundary = {
+      taskId: 'task', boundaryKey: 'task:task:archive', sourceKind: 'task-archive' as const,
+      sourceVersion: '1', title: 'Task archive requested', body: 'Retained evidence', availability: 'available' as const, completedAt: 10,
+    }
+    await owner.boundary(boundary)
+    expect(record).toHaveBeenCalledOnce()
+    expect(startPrepareTask).not.toHaveBeenCalled()
+    await owner.setSettings('owner', { automaticPreparation: true, notifyWhenReady: false, backendId: 'connection:model-1', modelId: 'fixture-model', targetId: 'other:change' })
+    available = false
+    await owner.boundary(boundary)
+    expect(startPrepareTask).not.toHaveBeenCalled()
+    await expect(owner.setSettings('owner', { automaticPreparation: true, notifyWhenReady: false, backendId: 'connection:model-1', modelId: 'fixture-model', targetId: 'missing:change' }))
+      .rejects.toMatchObject({ kind: 'unavailable' })
   })
 
   it('keeps notifications passive by default and emits at most one per enabled bundle', async () => {
@@ -88,7 +138,7 @@ describe('findings completion lifecycle', () => {
     const bundle = { id: 'bundle-1', boundaryKey: 'manual:task:notice', scope: { kind: 'project' }, candidates: [{}], state: 'ready' }
     await owner.bundlePublished(bundle)
     expect(notice).not.toHaveBeenCalled()
-    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: true, backendId: null, modelId: null })
+    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: true, backendId: null, modelId: null, targetId: null })
     await owner.bundlePublished(bundle)
     await owner.bundlePublished(bundle)
     expect(notice).toHaveBeenCalledOnce()
@@ -112,10 +162,10 @@ describe('findings completion lifecycle', () => {
   it('releases the notification receipt when delivery fails so a retry can succeed', async () => {
     const failingNotice = vi.fn().mockImplementationOnce(() => { throw new Error('transport unavailable') })
     const owner = new FindingsLifecycle({
-      db: ctx.storage.open(), runtime: { record, startPrepareTask } as unknown as FindingsRuntime,
+      db: ctx.storage.open(), runtime: { record, startPrepareTask, hasReviewTarget: () => true } as unknown as FindingsRuntime,
       core: ctx.core, agents: () => undefined, notice: failingNotice, settingsChanged,
     })
-    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: true, backendId: null, modelId: null })
+    await owner.setSettings('owner', { automaticPreparation: false, notifyWhenReady: true, backendId: null, modelId: null, targetId: null })
     const bundle = { id: 'bundle-retry', boundaryKey: 'manual:task:notice-retry', scope: { kind: 'project' }, candidates: [{}], state: 'ready' }
     await expect(owner.bundlePublished(bundle)).rejects.toThrow('transport unavailable')
     await expect(owner.bundlePublished(bundle)).resolves.toBeUndefined()

@@ -4,16 +4,13 @@ import {
   clientCapability,
   dispatchLayout,
   localSearch,
-  refreshSessions,
-  rememberActiveTerminal,
-  requestTerminalFocus,
   runApi,
-  sessions,
   setTerminalOpen,
   type CommandExecutionContext,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
+import { refreshSessions, rememberActiveTerminal, requestTerminalFocus, sessions } from './sessionStore'
 import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
 import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 
@@ -211,8 +208,7 @@ export const terminalCommands: readonly ContributedCommand[] = [
     order: 300,
     requires: { plugin: 'terminal' },
     placeholder: 'Find a terminal…',
-    // No fetch at all: the roster is a signal this window already keeps in step with the node
-    // (client-core/features/tasks/agentSessions.ts), so the load reads it.
+    // No fetch here: Terminal's session store already keeps this roster in step with the node.
     ...localSearch((context) => sessions()
       .filter((session) => session.taskId === context.taskId)
       .map((session): CommandSearchItem => ({

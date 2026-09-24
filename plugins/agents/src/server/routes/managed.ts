@@ -16,7 +16,7 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+} from '../../contract/wire.ts'
 import {
   agentWaitQuerySchema,
   createAgentSessionSchema,
@@ -114,7 +114,7 @@ const idempotencyKey = (headers: Headers): string | null => {
 
 // Reaching another task's session is the hole `requireTaskScope` closes for core: read its transcript,
 // enqueue a turn, fork it, hand it to a terminal. None of these paths carries a taskId, so the mount
-// over /v2/p/:plugin/tasks/:id cannot see them and this router resolves the owner itself. See
+// over /v1/p/:plugin/tasks/:id cannot see them and this router resolves the owner itself. See
 // docs/security.md § Transport and auth. One factory over three id kinds, because only the resolver
 // differs.
 const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Promise<string | null>) =>

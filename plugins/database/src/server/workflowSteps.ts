@@ -32,19 +32,15 @@ type DatabaseStepServices = {
 const MAX_ROWS_FIELD: StepField = { id: 'maxRows', label: 'Row cap', type: 'number', min: 1, max: MAX_QUERY_ROWS, hint: `Defaults to ${MAX_QUERY_ROWS}, which is also the ceiling.` }
 
 const QUERY_FIELDS: StepField[] = [
-  { id: 'savedQueryId', label: 'Saved query', type: 'select', optionsRoute: '/v2/p/database/projects/{projectId}/saved-queries', hint: 'One of a saved query and inline SQL, not both.' },
+  { id: 'savedQueryId', label: 'Saved query', type: 'select', optionsRoute: '/v1/p/database/projects/{projectId}/saved-queries', hint: 'One of a saved query and inline SQL, not both.' },
   { id: 'sql', label: 'SQL', type: 'textarea', templates: true, placeholder: 'select count(*) from orders where created_at > now() - interval \'7 days\'' },
   MAX_ROWS_FIELD,
 ]
 
 const GENERATE_FIELDS: StepField[] = [
   { id: 'prompt', label: 'Ask for', type: 'prompt', required: true, placeholder: 'the ten most recent orders with the customer’s email' },
-  // The id and the label disagree on purpose. The label is what a backend is now called; the id stays
-  // `connectionId` because every `database:generate` step already saved holds its pick under that key,
-  // and a definition whose field id moved would validate as "names no backend" the next time it ran.
-  // The value it holds is a bare connection uuid, which still resolves — a prefix-less backend id is a
-  // connection (@acorn/protocol/modelProviders.ts § parseBackendId).
-  { id: 'connectionId', label: 'Generate with', type: 'select', required: true, optionsRoute: '/v2/p/database/tasks/{taskId}/model-connections' },
+  // The field ID names the pick in workflow definitions. Its value is a canonical backend ID.
+  { id: 'connectionId', label: 'Generate with', type: 'select', required: true, optionsRoute: '/v1/p/database/tasks/{taskId}/model-connections' },
   MAX_ROWS_FIELD,
 ]
 

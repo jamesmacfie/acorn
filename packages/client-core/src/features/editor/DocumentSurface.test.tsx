@@ -32,8 +32,8 @@ const { registerKeybindings } = await import('../../host/registries/commands/key
 
 const region = (extra?: Partial<PluginDocumentRegion>): PluginDocumentRegion => ({
   languageId: 'sql',
-  read: '/v2/p/db/tasks/:taskId/doc',
-  write: '/v2/p/db/tasks/:taskId/doc',
+  read: '/v1/p/db/tasks/:taskId/doc',
+  write: '/v1/p/db/tasks/:taskId/doc',
   ...extra,
 } as PluginDocumentRegion)
 
@@ -69,7 +69,7 @@ const editor = async (host: HTMLElement): Promise<EditorView> =>
 
 describe('the host-owned document surface', () => {
   it('offers the items the plugin\'s completion route returned', async () => {
-    const view = await editor(mount(region({ completions: { route: '/v2/p/db/tasks/:taskId/complete' } })))
+    const view = await editor(mount(region({ completions: { route: '/v1/p/db/tasks/:taskId/complete' } })))
     // Between `select ` and ` from`, which is where a reader asks for a column.
     view.dispatch({ selection: { anchor: 7 } })
     startCompletion(view)

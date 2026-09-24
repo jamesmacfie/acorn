@@ -2,6 +2,10 @@
 
 Date: 2026-09-20. Status: complete.
 
+The workflow-specific transition command and its tests were removed by the later
+[architecture reset programme](../legacy/09-database-baselines.md). The evidence below records the
+earlier slice; the current recoverable reset is documented in [local development](../../local-development.md).
+
 Read [context and decisions](./context.md) first, then the owning
 [data](./data-contract.md), [workflow](./workflow-contract.md), and [verification](./verification.md)
 references.

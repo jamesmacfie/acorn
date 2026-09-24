@@ -18,7 +18,7 @@ vi.mock('./runtime', async (importOriginal) => {
   return {
     ...actual,
     generateTextForConnection: vi.fn((args: { connectionId: string }) =>
-      Promise.resolve({ text: 'from the key', providerId: 'anthropic', backendId: args.connectionId, modelId: 'm' }),
+      Promise.resolve({ text: 'from the key', providerId: 'anthropic', backendId: `connection:${args.connectionId}`, modelId: 'm' }),
     ),
   }
 })
@@ -202,18 +202,19 @@ describe('harnessBackends', () => {
 })
 
 describe('the dispatch on a backend id', () => {
-  it('resolves a bare uuid and its connection: form to the same connection', async () => {
-    // The compatibility rule the id scheme rests on. A saved `database:generate` step and the changes
-    // plugin's device pref both hold a bare uuid from before core minted these ids, and neither is
-    // rewritten, so both forms have to land on the same row forever.
+  it('requires a prefixed connection id', async () => {
     const service = createModelService(null as unknown as AppDatabase, null as unknown as SecretService)
     const uuid = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
-    const bare = await service.generateText({ userId: 'alice', backendId: uuid, input })
+    await expect(service.generateText({ userId: 'alice', backendId: uuid, input }))
+      .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
     const prefixed = await service.generateText({ userId: 'alice', backendId: `connection:${uuid}`, input })
 
-    expect(bare.backendId).toBe(uuid)
-    expect(prefixed).toEqual(bare)
+    expect(prefixed.backendId).toBe(`connection:${uuid}`)
+    for (const id of ['connection:', 'harness:', 'other:item']) {
+      await expect(service.generateText({ userId: 'alice', backendId: id, input }))
+        .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+    }
   })
 
   it('sends a harness id to the CLI runtime instead', async () => {

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
+export type FindingWriteTransaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 import {
   FINDING_LIMITS,
   findingRecordInputSchema,
@@ -205,6 +206,7 @@ export class FindingCapture {
     producerId: string
     inputs: readonly FindingRecordInput[]
     allowedKinds?: ReadonlySet<string>
+    afterRecord?: (results: FindingRecordResult[], tx: FindingWriteTransaction) => void
   }): Promise<FindingRecordResult[]> {
     if (!args.inputs.length || args.inputs.length > FINDING_LIMITS.observationsPerBatch) {
       throw new FindingCaptureError('invalid-input', `a capture batch must contain 1-${FINDING_LIMITS.observationsPerBatch} observations`)
@@ -308,7 +310,9 @@ export class FindingCapture {
           .get()
         revision = bumped!.revision
       }
-      return prepared.map(({ input }) => ({ ...staged.get(input.sourceKey)!.result, revision }))
+      const results = prepared.map(({ input }) => ({ ...staged.get(input.sourceKey)!.result, revision }))
+      args.afterRecord?.(results, tx)
+      return results
     })
   }
 

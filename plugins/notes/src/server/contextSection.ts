@@ -23,7 +23,6 @@ export function notesSection(source: ContextNotesSource): PluginContextSection {
         : allNotes
       return {
         items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
-        compatibility: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
       }
     },
     format(items, omitted) {

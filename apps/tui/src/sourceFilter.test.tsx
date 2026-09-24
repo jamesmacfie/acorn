@@ -23,7 +23,7 @@ describe('a descriptor source list', () => {
     await bootFixture()
     const { sourcePanel } = await import('./plugins/SourcePanel')
     const descriptor = {
-      id: 'items', label: 'Issues', glyph: 'circle', order: 10, items: '/v2/p/probe/items',
+      id: 'items', label: 'Issues', glyph: 'circle', order: 10, items: '/v1/p/probe/items',
     } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
     const list = sourcePanel({ pluginId: 'probe', descriptor }).regions!.list
 

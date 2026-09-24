@@ -8,7 +8,6 @@ import { getDb, schema } from '../db'
 import {
   connectProvider,
   connectionSummary,
-  credentialsFromBody,
   disconnectConnection,
   getConnection,
   listConnections,
@@ -17,7 +16,7 @@ import {
   setConnectionDisabled,
   testConnection,
 } from '../integrations/connections'
-import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { listConnectionProjects } from '../integrations/projectSource'
 import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
@@ -36,7 +35,11 @@ const patchBody = z
     name: z.string().max(MAX_CONNECTION_NAME).nullable().optional(),
   })
   .refine((body) => body.disabled !== undefined || body.name !== undefined)
-const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional() })
+const credentialsSchema = z.record(z.string(), z.string())
+const credentialsBody = z.looseObject({ credentials: credentialsSchema })
+  .refine((body) => !Object.hasOwn(body, 'token'))
+const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional(), credentials: credentialsSchema })
+  .refine((body) => !Object.hasOwn(body, 'token'))
 // The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
 // (routes/workspaces.ts) because both land in the same table.
 const mappingsBody = z.object({
@@ -59,14 +62,13 @@ export const integrations = new Hono<AppEnv>()
     } satisfies IntegrationsResponse)
   })
   .post('/', async (c) => {
-    // `provider` is the legacy field name for `providerId`, still accepted on the wire. Zod's union
-    // keeps the leniency explicit and typed rather than buried in a nested ternary.
+    // `provider` is the legacy field name for `providerId`, still accepted on the wire.
     const parsed = connectBody.safeParse(await c.req.json().catch(() => ({})))
-    if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
+    if (!parsed.success) return respondError(c, 400, 'provider_bad_config', ['Send provider credentials in the credentials object; top-level token is unsupported.'])
     const body = parsed.data
     const providerId = body.providerId ?? body.provider ?? ''
     if (!providerId) return respondError(c, 400, 'provider_bad_config')
-    const request: ConnectIntegrationRequest = { providerId, credentials: credentialsFromBody(body) }
+    const request: ConnectIntegrationRequest = { providerId, credentials: body.credentials }
     try {
       const integration = await connectProvider(getDb(c.env), ownerId(c), request, c.env.SECRETS)
       // Audited here rather than inside connections.ts, for two reasons: the actor only exists on a
@@ -83,8 +85,9 @@ export const integrations = new Hono<AppEnv>()
     }
   })
   .put('/:id', async (c) => {
-    const body = await c.req.json().catch(() => ({}))
-    const request: RotateIntegrationRequest = { credentials: credentialsFromBody(body) }
+    const parsed = credentialsBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'provider_bad_config', ['Send provider credentials in the credentials object; top-level token is unsupported.'])
+    const request: RotateIntegrationRequest = { credentials: parsed.data.credentials }
     try {
       const integration = await rotateConnection(getDb(c.env), ownerId(c), c.req.param('id'), request, c.env.SECRETS)
       auditRequest(c, {
@@ -99,7 +102,7 @@ export const integrations = new Hono<AppEnv>()
   })
   // What this connection offers to be mapped to a workspace. A core route, because the mapping it
   // feeds (`workspace_external_projects`) is core's table and the picker that reads it is core's
-  // surface: asking each provider's own `/v2/p/<id>/...` namespace by convention would put the host
+  // surface: asking each provider's own `/v1/p/<id>/...` namespace by convention would put the host
   // in the position of guessing at a path a plugin defines.
   //
   // Nothing is cached: see integrations/projectSource.ts for why a picker must not serve a stale list.

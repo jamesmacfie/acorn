@@ -1,6 +1,6 @@
 {
   "name": "@acorn/arch-tests",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The architecture boundary suite. Every rule here is stated, with the failure it prevents, in docs/architecture-overview.md.",
   "private": true,
   "type": "module",

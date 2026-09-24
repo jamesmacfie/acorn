@@ -11,7 +11,7 @@ import { linearProjectIssuesRoute } from './api'
 describe('linear wire contract', () => {
   it('sorts the id set in the project-issues route so cache identity is order-independent', () => {
     expect(linearProjectIssuesRoute('conn-1', ['p2', 'p1']))
-      .toBe('/v2/p/linear/project-issues?integration=conn-1&ids=p2%2Cp1')
+      .toBe('/v1/p/linear/project-issues?integration=conn-1&ids=p2%2Cp1')
   })
 
   // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin: enumerated
@@ -27,7 +27,7 @@ describe('linear wire contract', () => {
     expect(paths.length).toBe(6) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
-      expect(path as string, name).toMatch(/^\/v2\/p\/linear\//)
+      expect(path as string, name).toMatch(/^\/v1\/p\/linear\//)
     }
   })
 })

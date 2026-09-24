@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX `memory_promotion_receipts_candidate_revision_unique` ON `memory_promotion_receipts` (`candidate_id`,`candidate_revision`);

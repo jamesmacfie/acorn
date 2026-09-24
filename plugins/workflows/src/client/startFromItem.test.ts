@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { prefillFromItem } from './startFromItem'
+import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from './startFromItem'
 
 // The prefill rule (docs/workflows.md § Starting a run). It is the whole reason "Start workflow…" is
 // one click rather than a form: a Rollbar error, a Linear issue and a GitHub pull request all arrive
@@ -35,5 +35,21 @@ describe('what an item fills in', () => {
   it('says nothing at all about an item with nothing on it', () => {
     expect(prefillFromItem({})).toEqual({})
     expect(prefillFromItem({ title: '   ' })).toEqual({})
+  })
+})
+
+describe('item workflow input controls', () => {
+  const inputs = [
+    { name: 'issue', required: true },
+    { name: 'count', schema: { type: 'number' as const } },
+  ]
+  const answers = (values: Record<string, string>) => (name: string) => values[name] ?? ''
+
+  it('requires declared inputs and parses typed values before starting', () => {
+    expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: '' }))).toBe(false)
+    expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: 'ENG-42', count: 'many' }))).toBe(false)
+    expect(itemWorkflowInputsReady('db:one', inputs, answers({ issue: 'ENG-42', count: '3' }))).toBe(true)
+    expect(collectItemWorkflowInputs(inputs, answers({ issue: 'ENG-42', count: '3' })))
+      .toEqual({ issue: 'ENG-42', count: 3 })
   })
 })

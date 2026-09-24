@@ -64,7 +64,7 @@ describe.skipIf(!process.env.ACORN_BROWSER_SMOKE)('the agent browser, end to end
       )
 
       const shot = await pool.screenshot('task-1')
-      expect(shot).toMatchObject({ captureId: 'capture-0', url: '/v2/p/browser/captures/capture-0' })
+      expect(shot).toMatchObject({ captureId: 'capture-0', url: '/v1/p/browser/captures/capture-0' })
       expect(captures[0].bytes).toBeGreaterThan(0)
     } finally {
       await pool.dispose()

@@ -3,10 +3,10 @@ import { mergeWorkflow } from './workflowMerge'
 
 describe('workflow conflict reconciliation', () => {
   it('merges independent object and stable-ID changes', () => {
-    const base = { name: 'base', steps: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] }
+    const base = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'base', steps: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] }
     const local = { ...base, name: 'local' }
     const external = { ...base, steps: [{ id: 'b', name: 'changed' }, { id: 'a', name: 'A' }] }
-    expect(mergeWorkflow(base, local, external)).toEqual({ value: { name: 'local', steps: external.steps }, conflicts: [] })
+    expect(mergeWorkflow(base, local, external)).toEqual({ value: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'local', steps: external.steps }, conflicts: [] })
   })
   it('retains delete versus edit and conflicting fields until chosen', () => {
     const base = { steps: [{ id: 'a', name: 'A' }] }

@@ -1,25 +1,27 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { findingsPlugin } from '@acorn/plugin-findings/node/index.ts'
+import { AGENTS_SESSIONS, type AgentSessionRosterEntry } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
-import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
+import { mintInternalToken } from '@acorn/node-core/server/auth'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { initPlugins, type LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
-import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
-import { pluginRouteContributions } from '@acorn/node-core/server/routeRegistry.ts'
+import { registerHookPoint, runHook } from '@acorn/node-core/server/pluginHost'
+import { agentToolContributions } from '@acorn/node-core/server/agentTools'
+import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { reconcileBundledPlugins } from '@acorn/node-core/server/plugins/bundled.ts'
-import { loadExternalPlugins, type LoadedPlugin } from '@acorn/node-core/server/plugins/loader.ts'
-import { installPlugin, pluginDir, uninstallPlugin } from '@acorn/node-core/server/plugins/installer.ts'
-import { pluginDbPath } from '@acorn/node-core/server/plugins/storage.ts'
+import { reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
+import { loadExternalPlugins, type LoadedPlugin } from '@acorn/node-core/server/plugins'
+import { installPlugin, pluginDir, uninstallPlugin } from '@acorn/node-core/server/plugins'
+import { pluginDbPath } from '@acorn/node-core/server/plugins'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, testEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, testEnv, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -35,9 +37,19 @@ const binding = (entry: LoadedPlugin): LoadedPluginBinding => ({
   storage: entry.storage,
   agentTools: entry.manifest.contributions.agentTools,
   contextSections: entry.manifest.contributions.contextSections,
+  extensionPoints: entry.manifest.contributions.extensionPoints,
+  extensions: entry.manifest.contributions.extensions,
   destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
   dir: entry.dir,
 })
+
+const capabilities = () => {
+  const registry = new CapabilityRegistry()
+  registry.provide(AGENTS_SESSIONS, {
+    list: async (taskId) => [{ taskId, sessionId: 'session-1' } as AgentSessionRosterEntry],
+  })
+  return registry
+}
 
 describe('findings as a loaded plugin', () => {
   let core: TestDb
@@ -66,8 +78,10 @@ describe('findings as a loaded plugin', () => {
     const loaded = await loadExternalPlugins(dataRoot, { builtins: ['memory'] })
     expect(loaded.failures).toEqual([])
     const entries = loaded.loaded.filter((entry) => ['findings', 'architecture-review'].includes(entry.manifest.id))
-    const host = await initPlugins([memoryPlugin(dataRoot), ...entries.map((entry) => entry.plugin)], {
-      capabilities: new CapabilityRegistry(),
+    const registry = capabilities()
+    env.CAPABILITIES = registry
+    const host = await initPlugins([memoryPlugin(), ...entries.map((entry) => entry.plugin)], {
+      capabilities: registry,
       core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('owner') }),
       dataDir: dataRoot,
       env,
@@ -99,45 +113,37 @@ describe('findings as a loaded plugin', () => {
     // Populate the stable database through the former compiled execution path before the package is
     // installed. The wrapper supplies only that path's historical migration declaration.
     const compiled = { ...findingsPlugin(), migrationsModule: FINDINGS_MODULE }
-    running = await initPlugins([compiled, memoryPlugin(dataRoot)], {
-      capabilities: new CapabilityRegistry(),
+    running = await initPlugins([compiled, memoryPlugin()], {
+      capabilities: capabilities(),
       core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('owner') }),
       dataDir: dataRoot,
       env,
     })
-    const recorded = await call('/v2/p/findings/tasks/task-a/observations', device({
+    const recorded = await call('/v1/p/findings/tasks/task-a/observations', device({
       sourceKey: 'compiled-one', title: 'Compiled finding', body: 'Persist this identity across cutover.', claimStatus: 'observed', evidence: [],
     }))
     expect(recorded.status).toBe(200)
     observationId = (await recorded.json() as { id: string }).id
-    const prepared = await call('/v2/p/findings/tasks/task-a/review/prepare', device({ boundaryKey: 'compiled:cutover' }))
-    expect(prepared.status).toBe(200)
-    for (let attempt = 0; attempt < 40 && !candidateId; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      const bundles = await call('/v2/p/findings/review/bundles?scope=project&projectId=project&history=true', device())
-      const rows = await bundles.json() as Array<{ candidates: Array<{ candidateId: string }> }>
-      candidateId = rows[0]?.candidates[0]?.candidateId ?? ''
-    }
+    const submitted = await call('/v1/core/tasks/task-a/tools/memory_write', task({
+      name: 'compiled-proposal', type: 'reference', description: 'Review this memory.', body: 'Persist this review across cutover.',
+    }, 'session-1'))
+    expect(submitted.status).toBe(200)
+    candidateId = ((await submitted.json()) as { ok: boolean; proposal: { candidateId: string } }).proposal.candidateId
+    expect(existsSync(join(dataRoot, 'memory-proposals'))).toBe(false)
     expect(candidateId).not.toBe('')
-    const currentCandidate = await call(`/v2/p/findings/review/candidates/${candidateId}`, device())
+    const currentCandidate = await call(`/v1/p/findings/review/candidates/${candidateId}`, device())
     const currentRevision = (await currentCandidate.json() as { revision: number }).revision
-    const dismissed = await call(`/v2/p/findings/review/candidates/${candidateId}/decision`, device({
+    const dismissed = await call(`/v1/p/findings/review/candidates/${candidateId}/decision`, device({
       expectedRevision: currentRevision, action: 'dismiss', idempotencyKey: 'compiled-dismiss',
     }))
     expect(dismissed.status).toBe(200)
-    const reasoned = await call(`/v2/p/findings/review/candidates/${candidateId}/decision`, device({
+    const reasoned = await call(`/v1/p/findings/review/candidates/${candidateId}/decision`, device({
       expectedRevision: currentRevision, action: 'dismiss-reason', reason: 'Preserve this dismissal.', idempotencyKey: 'compiled-dismiss-reason',
     }))
     expect(reasoned.status).toBe(200)
     await running.dispose()
     running = null
 
-    mkdirSync(join(dataRoot, 'memory-proposals'), { recursive: true })
-    writeFileSync(join(dataRoot, 'memory-proposals/legacy.json'), JSON.stringify({
-      id: 'legacy', taskId: 'task-a', projectId: 'project', name: 'legacy-proposal', type: 'reference',
-      description: 'Imported through the memory-owned source seam.', body: 'Legacy body', flags: [],
-      status: 'pending', originSessionId: null, createdAt: now,
-    }))
     execFileSync(process.execPath, [join(NODE_APP, 'scripts/build-plugin.mjs'), 'findings'], {
       cwd: NODE_APP,
       env: { ...process.env, ACORN_DATA_DIR: dataRoot },
@@ -160,7 +166,8 @@ describe('findings as a loaded plugin', () => {
     expect(findings.plugin).not.toHaveProperty('migrationsModule')
     expect(findings.manifest.permissions).toMatchObject({
       api: [],
-      node: { capabilities: ['agents.reviewInput.v1'], secrets: false, exec: false, net: [], sockets: false },
+      events: expect.arrayContaining(['plugin:terminal:completed', 'plugin:workflows:completed']),
+      node: { capabilities: ['agents.reviewInput.v1', 'agents.sessions', 'terminal.reviewInput.v1', 'workflows.reviewInput.v1'], secrets: false, exec: false, net: [], sockets: false },
     })
     expect(findings.manifest.permissions.node.capabilities).not.toContain('memory.knowledge')
     expect(findings.manifest.contributions.agentTools.map((entry) => entry.id)).toEqual(['record', 'list', 'get', 'withdraw'])
@@ -172,39 +179,91 @@ describe('findings as a loaded plugin', () => {
     expect(existsSync(pluginDbPath(dataRoot, 'findings'))).toBe(true)
   }, 60_000)
 
-  it('preserves compiled IDs, candidate revisions, dismissal history, and legacy mappings', async () => {
-    const observation = await call(`/v2/p/findings/tasks/task-a/observations/${observationId}`, device())
+  it('runs the bounded archive hook only while loaded Findings is enabled', async () => {
+    const point = registerHookPoint({ id: 'terminal:archive-review', ownerId: 'terminal',
+      payload: { taskId: 'string', sessionIds: 'string[]', terminalOutput: 'string', diff: 'string', captureStatus: 'string' },
+      allows: ['transform'], timeoutMs: 5_000, onTimeout: 'allow', order: 'priority', collect: false })
+    try {
+      const input = { taskId: 'task-a', sessionIds: ['session-1'], terminalOutput: 'Retained output',
+        diff: 'diff --git a/file b/file', captureStatus: 'pending' }
+      const captured = await runHook('terminal:archive-review', input)
+      expect(captured.payload.captureStatus).toBe('captured')
+      const exportResponse = await call('/v1/p/findings/export', device())
+      const exported = await exportResponse.json() as { observations: Array<{ body: string }> }
+      expect(exported.observations).toEqual(expect.arrayContaining([
+        expect.objectContaining({ body: expect.stringContaining('Terminal sessions: session-1') }),
+      ]))
+
+      await running?.dispose()
+      running = null
+      const disabled = await bootLoaded(['findings'])
+      const absent = await runHook('terminal:archive-review', { ...input, taskId: 'task-b' })
+      expect(absent.payload.captureStatus).toBe('pending')
+      await disabled.host.dispose()
+      running = null
+      await bootLoaded()
+      const restored = await runHook('terminal:archive-review', { ...input, taskId: 'task-b' })
+      expect(restored.payload.captureStatus).toBe('captured')
+    } finally {
+      point.dispose()
+    }
+  }, 60_000)
+
+  it('preserves compiled IDs, candidate revisions, and dismissal history', async () => {
+    const observation = await call(`/v1/p/findings/tasks/task-a/observations/${observationId}`, device())
     expect(observation.status).toBe(200)
     expect(await observation.json()).toMatchObject({ id: observationId, title: 'Compiled finding' })
-    const candidate = await call(`/v2/p/findings/review/candidates/${candidateId}`, device())
+    const candidate = await call(`/v1/p/findings/review/candidates/${candidateId}`, device())
     expect(await candidate.json()).toMatchObject({ candidateId, status: 'dismissed' })
-    const history = await call(`/v2/p/findings/review/candidates/${candidateId}/history`, device())
+    const history = await call(`/v1/p/findings/review/candidates/${candidateId}/history`, device())
     const actions = (await history.json() as { items: Array<{ action: string; reason: string | null }> }).items
     expect(actions).toEqual(expect.arrayContaining([
       expect.objectContaining({ action: 'dismiss-reason', reason: 'Preserve this dismissal.' }),
       expect.objectContaining({ action: 'dismiss' }),
     ]))
-    const report = await call('/v2/p/findings/migration/report', device())
-    const migration = await report.json() as { cutoverReady: boolean; imported: { pending: number }; errors: number; changed: number }
-    expect(migration.errors, JSON.stringify(migration)).toBe(0)
-    expect(migration.changed).toBe(0)
-    expect(migration).toMatchObject({ cutoverReady: true, imported: { pending: 1 } })
+    const exported = await call('/v1/p/findings/export', device())
+    expect(exported.status).toBe(200)
+    expect(await exported.json()).toMatchObject({
+      baseline: 'acorn-1',
+      version: 1,
+      observations: expect.arrayContaining([expect.objectContaining({ id: observationId })]),
+      candidates: expect.arrayContaining([expect.objectContaining({ id: candidateId })]),
+    })
+    expect((await call('/v1/p/findings/migration/report', device())).status).toBe(403)
   })
 
   it('dispatches stable task tools/context and rejects interactive access to their private handlers', async () => {
-    const tools = await call('/v2/core/tasks/task-a/tools', task(undefined, 'session-1'))
+    const tools = await call('/v1/core/tasks/task-a/tools', task(undefined, 'session-1'))
     expect((await tools.json() as { tools: Array<{ name: string }> }).tools.map((entry) => entry.name)).toEqual(expect.arrayContaining([
       'findings_record', 'findings_list', 'findings_get', 'findings_withdraw',
     ]))
-    const recorded = await call('/v2/core/tasks/task-a/tools/findings_record', task({
+    const recorded = await call('/v1/core/tasks/task-a/tools/findings_record', task({
       sourceKey: 'loaded-tool', title: 'Loaded tool finding', body: 'Through the host dispatcher.', claimStatus: 'asked', evidence: [],
     }, 'session-1'))
     const recordedBody = await recorded.json()
     expect(recorded.status, JSON.stringify(recordedBody)).toBe(200)
-    const context = await call('/v2/core/tasks/task-a/context?include=findings:task_findings', task())
+    const context = await call('/v1/core/tasks/task-a/context?include=findings:task_findings', task())
     expect(await context.json()).toMatchObject({ sections: [expect.objectContaining({ id: 'findings:task_findings', items: expect.any(Array) })] })
-    expect((await call('/v2/p/findings/runtime/tools/list', device({ arguments: {}, origin: { taskId: 'task-a' } }))).status).toBe(403)
-    expect((await call('/v2/p/findings/tasks/task-b/observations/' + observationId, device())).status).toBe(404)
+    expect((await call('/v1/p/findings/runtime/tools/list', device({ arguments: {}, origin: { taskId: 'task-a' } }))).status).toBe(403)
+    expect((await call('/v1/p/findings/tasks/task-b/observations/' + observationId, device())).status).toBe(404)
+  })
+
+  it('creates a canonical review immediately through the authenticated Memory tool', async () => {
+    const submitted = await call('/v1/core/tasks/task-a/tools/memory_write', task({
+      name: 'loaded-proposal', type: 'reference', description: 'Review a loaded tool write.', body: 'The review is available before restart.',
+    }, 'session-1'))
+    const result = await submitted.json() as { ok: boolean; proposal: { candidateId: string; observationId: string; bundleId: string } }
+    expect(submitted.status, JSON.stringify(result)).toBe(200)
+    expect(result.ok).toBe(true)
+    expect((await call(`/v1/p/findings/review/candidates/${result.proposal.candidateId}`, device())).status).toBe(200)
+    const observation = await call(`/v1/p/findings/tasks/task-a/observations/${result.proposal.observationId}`, device())
+    expect(await observation.json()).toMatchObject({ origin: { kind: 'agent', sessionId: 'session-1' } })
+    expect(existsSync(join(dataRoot, 'memory-proposals'))).toBe(false)
+
+    const mismatched = await call('/v1/core/tasks/task-a/tools/memory_write', task({
+      name: 'spoofed-proposal', type: 'reference', description: 'Do not accept.', body: 'Wrong session.',
+    }, 'session-2'))
+    expect(mismatched.status).not.toBe(200)
   })
 
   it('keeps maximum legal records readable through byte-aware loaded carriers', async () => {
@@ -213,7 +272,7 @@ describe('findings as a loaded plugin', () => {
     const body = '€'.repeat(Math.floor((16 * 1024) / 3))
     const ids: string[] = []
     for (let index = 0; index < 5; index += 1) {
-      const response = await call('/v2/p/findings/tasks/task-a/observations', device({
+      const response = await call('/v1/p/findings/tasks/task-a/observations', device({
         sourceKey: `carrier-max-${index}`,
         title: `Carrier maximum ${index} ${'x'.repeat(170)}`,
         body,
@@ -224,15 +283,15 @@ describe('findings as a loaded plugin', () => {
       ids.push((await response.json() as { id: string }).id)
     }
 
-    const get = await call('/v2/core/tasks/task-a/tools/findings_get', task({ id: ids[0] }))
+    const get = await call('/v1/core/tasks/task-a/tools/findings_get', task({ id: ids[0] }))
     expect(get.status).toBe(200)
-    const list = await call('/v2/core/tasks/task-a/tools/findings_list', task({ limit: 100, state: 'active' }))
+    const list = await call('/v1/core/tasks/task-a/tools/findings_list', task({ limit: 100, state: 'active' }))
     const listText = await list.text()
     expect(list.status, listText).toBe(200)
     expect(Buffer.byteLength(listText, 'utf8')).toBeLessThanOrEqual(256 * 1024)
     expect(JSON.parse(listText)).toMatchObject({ nextCursor: expect.any(String) })
 
-    const context = await call('/v2/core/tasks/task-a/context?include=findings:task_findings', task())
+    const context = await call('/v1/core/tasks/task-a/context?include=findings:task_findings', task())
     const contextBody = await context.json() as { sections: Array<{ id: string; items: unknown[]; absent?: unknown }> }
     expect(context.status).toBe(200)
     expect(contextBody.sections[0]).toMatchObject({ id: 'findings:task_findings', items: expect.any(Array) })
@@ -240,12 +299,12 @@ describe('findings as a loaded plugin', () => {
   })
 
   it('accepts a namespaced observation from an independently installed producer', async () => {
-    const response = await call('/v2/p/architecture-review/record', device({
+    const response = await call('/v1/p/architecture-review/record', device({
       taskId: 'task-a', sourceKey: 'architecture-1', title: 'Boundary leak', body: 'A private implementation escaped its owner.',
     }))
     expect(response.status).toBe(201)
     const id = (await response.json() as { id: string }).id
-    const recorded = await call(`/v2/p/findings/tasks/task-a/observations/${id}`, device())
+    const recorded = await call(`/v1/p/findings/tasks/task-a/observations/${id}`, device())
     expect(await recorded.json()).toMatchObject({
       id, kind: { id: 'architecture-review:architecture', label: 'Architecture concern' },
       origin: { kind: 'plugin', pluginId: 'architecture-review' },
@@ -271,7 +330,7 @@ describe('findings as a loaded plugin', () => {
       writeFileSync(journalPath, JSON.stringify(journal))
       expect(reconcileBundledPlugins(dataRoot, resources)).toMatchObject({ updated: ['findings'] })
       const updated = await bootLoaded()
-      expect((await call(`/v2/p/findings/tasks/task-a/observations/${observationId}`, device())).status).toBe(200)
+      expect((await call(`/v1/p/findings/tasks/task-a/observations/${observationId}`, device())).status).toBe(200)
       await updated.host.dispose()
       running = null
 
@@ -296,7 +355,7 @@ describe('findings as a loaded plugin', () => {
       await failed.host.dispose()
       running = null
       await bootLoaded()
-      expect((await call(`/v2/p/findings/tasks/task-a/observations/${observationId}`, device())).status).toBe(200)
+      expect((await call(`/v1/p/findings/tasks/task-a/observations/${observationId}`, device())).status).toBe(200)
     } finally {
       rmSync(resources, { recursive: true, force: true })
     }
@@ -307,12 +366,23 @@ describe('findings as a loaded plugin', () => {
     running = null
     const disabled = await bootLoaded(['findings'])
     expect(disabled.host.skipped).toContain('findings')
+    expect(disabled.host.enabled, JSON.stringify(disabled.host.failed)).toContain('memory')
     expect(pluginRouteContributions().some((entry) => entry.plugin === 'findings')).toBe(false)
     expect(agentToolContributions().some((entry) => entry.name === 'findings_record')).toBe(false)
-    const disconnected = await call('/v2/p/architecture-review/record', device({
+    const disconnected = await call('/v1/p/architecture-review/record', device({
       taskId: 'task-a', sourceKey: 'after-disable', title: 'Must not record', body: 'The writer was revoked.',
     }))
     expect(disconnected.status).toBe(503)
+    const unavailable = await call('/v1/core/tasks/task-a/tools/memory_write', task({
+      name: 'disabled-proposal', type: 'reference', description: 'No fallback queue.', body: 'Findings is disabled.',
+    }, 'session-1'))
+    expect(unavailable.status).toBe(200)
+    expect(await unavailable.json()).toEqual({ ok: false, reason: 'findings_unavailable' })
+    expect((await call('/v1/p/memory/tasks/task-a/memory', device({
+      scope: 'project', name: 'manual-while-disabled', type: 'reference', description: 'Owner-authored memory.', body: 'Saved directly by the owner.',
+    }))).status).toBe(200)
+    expect(core.db.select().from(schema.tasks).all().some((row) => row.id === 'task-a')).toBe(true)
+    expect(existsSync(join(dataRoot, 'memory-proposals'))).toBe(false)
     await disabled.host.dispose()
     running = null
 
@@ -329,7 +399,7 @@ describe('findings as a loaded plugin', () => {
         id: 'findings', state: 'installed-restart-required',
       })
       await bootLoaded()
-      const restored = await call(`/v2/p/findings/tasks/task-a/observations/${observationId}`, device())
+      const restored = await call(`/v1/p/findings/tasks/task-a/observations/${observationId}`, device())
       expect(await restored.json()).toMatchObject({ id: observationId })
     } finally {
       rmSync(parked, { recursive: true, force: true })

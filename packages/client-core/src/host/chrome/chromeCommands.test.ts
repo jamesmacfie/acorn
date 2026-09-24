@@ -34,21 +34,21 @@ const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () 
 
 const searchDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
   id: 'find', title: 'Find an issue', category: 'action', palette: true, kind: 'search',
-  scope: 'node', route: '/v2/p/linear/search',
-  onSelect: { verb: 'runNodeAction', path: '/v2/p/linear/open' },
+  scope: 'node', route: '/v1/p/linear/search',
+  onSelect: { verb: 'runNodeAction', path: '/v1/p/linear/open' },
   ...over,
 } as PluginCommandDescriptor)
 
 const inputDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
   id: 'ask', title: 'Generate SQL', category: 'action', palette: true, kind: 'input',
-  scope: 'task', route: '/v2/p/database/generate',
-  onSuccess: { verb: 'runNodeAction', path: '/v2/p/database/open' },
+  scope: 'task', route: '/v1/p/database/generate',
+  onSuccess: { verb: 'runNodeAction', path: '/v1/p/database/open' },
   ...over,
 } as PluginCommandDescriptor)
 
 const settingDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
   id: 'theme', title: 'Board theme', category: 'action', palette: true, kind: 'setting',
-  scope: 'project', readRoute: '/v2/p/linear/theme', writeRoute: '/v2/p/linear/theme',
+  scope: 'project', readRoute: '/v1/p/linear/theme', writeRoute: '/v1/p/linear/theme',
   options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   ...over,
 } as PluginCommandDescriptor)
@@ -68,7 +68,7 @@ describe('what the host binds', () => {
   it('qualifies the id, the parent and the owner, and never reads them off the manifest', () => {
     const command = pluginCommand('linear', {
       id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
-      scope: 'node', route: '/v2/p/linear/search', parentId: 'issues',
+      scope: 'node', route: '/v1/p/linear/search', parentId: 'issues',
       onSelect: { verb: 'openTask' },
     } as PluginCommandDescriptor, binding)
     expect(command.id).toBe('plugin.linear.find')
@@ -85,7 +85,7 @@ describe('what the host binds', () => {
 
     const legacy = pluginCommand('linear', {
       id: 'sync', title: 'Sync', category: 'action', palette: true,
-      action: { verb: 'runNodeAction', path: '/v2/p/linear/sync' },
+      action: { verb: 'runNodeAction', path: '/v1/p/linear/sync' },
     } as PluginCommandDescriptor, binding)
     expect(legacy.kind).toBeUndefined()
   })
@@ -95,16 +95,16 @@ describe('a search command', () => {
   it('asks for the reader’s text and the identifiers its scope owns, and nothing else', async () => {
     const command = pluginCommand('linear', searchDescriptor({ scope: 'task' }), binding) as SearchCommand
     await command.query('rol', CONTEXT, signal())
-    expect(readJson).toHaveBeenCalledWith('/v2/p/linear/search?q=rol&taskId=t-1', expect.objectContaining({ nodeId: 'node-b' }))
+    expect(readJson).toHaveBeenCalledWith('/v1/p/linear/search?q=rol&taskId=t-1', expect.objectContaining({ nodeId: 'node-b' }))
 
     const project = pluginCommand('linear', searchDescriptor({ scope: 'project' }), binding) as SearchCommand
     await project.query('rol', CONTEXT, signal())
-    expect(readJson).toHaveBeenLastCalledWith('/v2/p/linear/search?q=rol&projectId=p-1', expect.anything())
+    expect(readJson).toHaveBeenLastCalledWith('/v1/p/linear/search?q=rol&projectId=p-1', expect.anything())
 
     // `node` is the default and is not a parameter: which node answers is an API-client option.
     const node = pluginCommand('linear', searchDescriptor(), binding) as SearchCommand
     await node.query('rol', CONTEXT, signal())
-    expect(readJson).toHaveBeenLastCalledWith('/v2/p/linear/search?q=rol', expect.anything())
+    expect(readJson).toHaveBeenLastCalledWith('/v1/p/linear/search?q=rol', expect.anything())
   })
 
   it('drops a malformed row, caps the rest, and keeps only the fields it names', async () => {
@@ -130,7 +130,7 @@ describe('a search command', () => {
         title: 'One',
         // Everything a hostile answer would want to say, and none of it survives the sanitiser.
         action: { verb: 'openUrl', url: 'https://evil.test' },
-        route: '/v2/tasks',
+        route: '/v1/tasks',
         url: 'https://evil.test',
         taskId: 't-9',
       }],
@@ -142,7 +142,7 @@ describe('a search command', () => {
     await command.select(rows[0], CONTEXT)
     // The route the manifest declared, with the row's id as its subject. The row's own path and verb
     // reached nothing.
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/linear/open', expect.objectContaining({
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/linear/open', expect.objectContaining({
       method: 'POST', body: JSON.stringify({ item: 'i-1' }),
     }))
   })
@@ -189,12 +189,12 @@ describe('an input command', () => {
     writeJson.mockResolvedValue({ ok: true, item: { id: 'q-1', title: 'Saved query' } })
     const command = pluginCommand('database', inputDescriptor(), binding) as InputCommand
     const outcome = await command.submit('rows per project', CONTEXT, signal())
-    expect(writeJson).toHaveBeenCalledWith('/v2/p/database/generate', expect.objectContaining({
+    expect(writeJson).toHaveBeenCalledWith('/v1/p/database/generate', expect.objectContaining({
       method: 'POST',
       nodeId: 'node-b',
       body: JSON.stringify({ input: 'rows per project', taskId: 't-1' }),
     }))
-    expect(sendRaw).toHaveBeenCalledWith('/v2/p/database/open', expect.objectContaining({
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/database/open', expect.objectContaining({
       body: JSON.stringify({ item: 'q-1' }),
     }))
     expect(outcome).toEqual({ effect: 'close' })
@@ -229,10 +229,10 @@ describe('which descriptors this device will honour', () => {
   it('refuses a route outside the plugin’s own namespace', () => {
     expect(usable([
       searchDescriptor({ id: 'own' }),
-      searchDescriptor({ id: 'core', route: '/v2/tasks' }),
-      searchDescriptor({ id: 'neighbour', route: '/v2/p/rollbar/search' }),
-      searchDescriptor({ id: 'escaped', route: '/v2/p/linear/../rollbar/search' }),
-      inputDescriptor({ id: 'posts-core', route: '/v2/tasks' }),
+      searchDescriptor({ id: 'core', route: '/v1/tasks' }),
+      searchDescriptor({ id: 'neighbour', route: '/v1/p/rollbar/search' }),
+      searchDescriptor({ id: 'escaped', route: '/v1/p/linear/../rollbar/search' }),
+      inputDescriptor({ id: 'posts-core', route: '/v1/tasks' }),
     ])).toEqual(['own'])
   })
 
@@ -255,8 +255,8 @@ describe('which descriptors this device will honour', () => {
   it('refuses a setting whose routes are not its own, or that declares too few choices', () => {
     expect(usable([
       settingDescriptor({ id: 'own' }),
-      settingDescriptor({ id: 'reads-core', readRoute: '/v2/prefs' }),
-      settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v2/p/rollbar/theme' }),
+      settingDescriptor({ id: 'reads-core', readRoute: '/v1/prefs' }),
+      settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v1/p/rollbar/theme' }),
       settingDescriptor({ id: 'one-choice', options: [{ value: 'on', label: 'On' }] }),
     ])).toEqual(['own'])
   })
@@ -291,13 +291,13 @@ describe('a loaded setting', () => {
     await expect(command().read(CONTEXT, signal())).resolves.toBe('dark')
     // The project, because the descriptor said `project`. Never the task, which the session also
     // captured and this scope does not own.
-    expect(readJson).toHaveBeenCalledWith('/v2/p/linear/theme?projectId=p-1', expect.objectContaining({ nodeId: 'node-b' }))
+    expect(readJson).toHaveBeenCalledWith('/v1/p/linear/theme?projectId=p-1', expect.objectContaining({ nodeId: 'node-b' }))
   })
 
   it('writes the chosen value and answers with the value the node says is now stored', async () => {
     writeJson.mockResolvedValue({ value: 'light' })
     await expect(command().write('dark', CONTEXT, signal())).resolves.toBe('light')
-    expect(writeJson).toHaveBeenCalledWith('/v2/p/linear/theme', expect.objectContaining({
+    expect(writeJson).toHaveBeenCalledWith('/v1/p/linear/theme', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ value: 'dark', projectId: 'p-1' }),
     }))

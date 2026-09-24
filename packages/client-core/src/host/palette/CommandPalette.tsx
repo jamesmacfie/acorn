@@ -16,7 +16,7 @@ import { PaletteSurface } from './PaletteSurface'
 //
 // This component used to be the palette: it fetched every `paletteRows` source, composed them with
 // the registry's actions and the task and workspace lists, filtered them, kept a row-to-source map
-// and invoked the pick. All of that is `host/registries/commands/session.ts` now, and the terminal
+// and invoked the pick. All of that is `host/registries/commands/sessionStore.ts` now, and the terminal
 // runs on the same object (apps/tui/src/chrome/Palette.tsx). What is left here is what only this host
 // can answer: which identity a session captures, which nodes a fleet search may ask, and the dialog
 // it draws the rows in.

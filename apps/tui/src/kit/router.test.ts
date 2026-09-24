@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
-import { projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
+import { projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 import { _resetRouter, useMatch, useNavigate, useParams, useSearchParams } from './router'
 
 // The router shim, which is the whole of what `@solidjs/router` is on this host.

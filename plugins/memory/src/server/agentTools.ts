@@ -1,17 +1,14 @@
 // The memory plugin's agent tools, the `tools` contribution point (docs/plugins.md § Agent tools
 // and MCP).
 //
-// These four close over the same MemoryIndex and MemoryProposalStore the plugin's own routes do, so
-// there is one index and one proposal queue per node no matter how the caller arrived.
-//
-// memory_write proposes and never writes directly (docs/notes-and-memory.md § Memory).
-// `ctx.sessionId` is transport metadata from the x-acorn-session-id header, stamped on the
-// proposal so a reviewer can see which agent session asked for it.
+// Memory reads use the reconciled file index. Writes enter Findings review and require a signed
+// task-scoped session supplied by the host tool route.
 import { z } from 'zod'
+import { randomUUID } from 'node:crypto'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { MemoryIndex } from './knowledgeChannel'
 import { MEMORY_TYPES, type MemoryType } from './memory'
-import type { MemoryProposalStore } from './memoryProposals'
+import { FINDINGS_AGENT_PROPOSAL, type FindingsAgentProposalCapability } from '@acorn/plugin-findings/contract/review.ts'
 
 // The one core read these tools need: `tasks` is a core table and this plugin owns its own SQLite
 // file, so the project a memory is scoped to comes through core rather than a local query
@@ -30,7 +27,7 @@ async function projectIdFor(core: ToolCore, taskId: string): Promise<string> {
   return task.projectId
 }
 
-export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalStore, core: ToolCore): AgentToolContribution[] {
+export function memoryAgentTools(index: MemoryIndex, capabilities: { get(id: typeof FINDINGS_AGENT_PROPOSAL): FindingsAgentProposalCapability | undefined }, core: ToolCore): AgentToolContribution[] {
   return [
     {
       name: 'memory_search',
@@ -76,26 +73,25 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
       input: z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() }),
       scope: 'task',
       risk: 'write',
+      requiresSession: true,
       handler: async (a, ctx) => {
         const p = a as { name: string; type: string; description: string; body: string }
+        if (!ctx.sessionId || !ctx.provenanceProof) throw new ToolError('failed', 'Authenticated agent session is required.')
+        const findings = capabilities.get(FINDINGS_AGENT_PROPOSAL)
+        if (!findings) return { ok: false, reason: 'findings_unavailable' }
         try {
-          return {
-            ok: true,
-            proposal: await proposals.propose({
-              taskId: ctx.taskId,
-              // An unresolvable task does not block the proposal. It lands unscoped and a reviewer
-              // sees it, rather than losing what the agent learned.
-              projectId: await projectIdFor(core, ctx.taskId).catch(() => null),
-              name: p.name,
-              type: p.type as MemoryType,
-              description: p.description,
-              body: p.body,
-              originSessionId: ctx.sessionId ?? null,
-            }),
-          }
+          const proposal = await findings.submit({
+            taskId: ctx.taskId, sessionId: ctx.sessionId, proof: ctx.provenanceProof,
+            // The authenticated invocation ID makes a lost-response retry idempotent. Callers that
+            // cannot supply one still get a unique proposal, but cannot retry the same operation.
+            sourceKey: `memory-write:${ctx.callId ?? randomUUID()}`, title: p.name, body: p.body,
+            payload: { operation: 'add', ...p, scope: { kind: 'project' } },
+          })
+          return { ok: true, proposal }
         } catch (e) {
-          // Propose validation (bad name/type) is the caller's fault, not a server fault.
-          throw new ToolError('bad_request', e instanceof Error ? e.message : 'invalid proposal')
+          const kind = (e as { kind?: unknown }).kind
+          if (kind === 'unavailable') return { ok: false, reason: 'findings_unavailable' }
+          throw new ToolError(kind === 'conflict' ? 'conflict' : kind === 'invalid-input' ? 'bad_request' : 'failed', e instanceof Error ? e.message : 'proposal submission failed')
         }
       },
     },

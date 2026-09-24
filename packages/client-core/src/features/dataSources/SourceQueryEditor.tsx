@@ -10,7 +10,7 @@ import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataVa
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { ApiError } from '../../infra/node/apiClient'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, Select, Stack, Text } from '@acorn/client-core/features/dataSources/kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -445,7 +445,7 @@ export default function SourceQueryEditor(props: {
     </Alert>}</Show>
     <Show when={query()}>{current => <Stack gap="stack">
       <AuthoringConversation
-        endpoint="/v2/core/authoring/turn"
+        endpoint="/v1/core/authoring/turn"
         target="query"
         targetId={editingShared()?.id ?? selectedSaved()?.id ?? `inline:${sourceKey(current().source)}`}
         scope={scope()}

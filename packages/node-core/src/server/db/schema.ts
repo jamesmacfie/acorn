@@ -34,7 +34,7 @@ export const prefs = sqliteTable(
 // Per-user third-party credentials. First-class, multi-row per provider (docs/workspaces-and-tasks.md):
 // a user can connect several Linears or Rollbars, so the key is an opaque `id`, not (userId, provider).
 // `label` and the owner's optional `name` are what tell them apart in the UI ("Linear – work").
-// `authRef` is encrypted at rest (JWE via SESSION_ENC_KEY, see secretBox.ts encryptSecret) and never
+// `encryptedCredentials` is encrypted at rest (JWE via SESSION_ENC_KEY, see secretBox.ts encryptSecret) and never
 // leaves the server, the same posture as the GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
@@ -46,7 +46,7 @@ export const integrations = sqliteTable('integrations', {
   // stored there, and Rollbar reuses `label` as the name of the project a connection covers, so an
   // owner renaming a connection would rename a project in the mapping picker.
   name: text('name'),
-  authRef: text('access_token').notNull(), // encrypted secret material; physical name retained for migration compatibility
+  encryptedCredentials: text('encrypted_credentials').notNull(),
   authKind: text('auth_kind').notNull().default('api-key'),
   account: text('account'), // JSON ProviderAccountRef; core renders but never interprets provider ids
   scopes: text('scopes').notNull().default('[]'), // JSON string[] resolved during validation

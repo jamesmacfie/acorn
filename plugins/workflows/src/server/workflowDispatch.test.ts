@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-import { fileURLToPath } from 'node:url'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -19,7 +15,8 @@ import { WorkflowRunner, type RunnerDeps } from './workflowRunner'
 
 const at = Date.now()
 const CHILD: WorkflowDef = {
-  formatVersion: 2,
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'Child review',
   steps: [{ id: 'approval', name: 'approval', kind: 'gate-human' }],
 }
@@ -59,7 +56,7 @@ describe('durable workflow dispatch', () => {
     })
     await workflows.db.insert(schema.workflowRuns).values({
       id: 'parent-run', taskId: 'parent-task', name: 'Parent workflow', status: 'gated',
-      posture: 'gated', trigger: 'manual', defJson: JSON.stringify({
+      posture: 'gated', trigger: 'manual', defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
         name: 'Parent workflow',
         steps: [{ name: 'dispatch', kind: 'workflow' }],
       }),
@@ -203,7 +200,7 @@ describe('durable workflow dispatch', () => {
 
   it('atomically reserves only the final descendant task across dispatch steps', async () => {
     await workflows.db.update(schema.workflowRuns).set({
-      defJson: JSON.stringify({
+      defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
         name: 'Parent workflow',
         steps: [
           { name: 'dispatch', kind: 'workflow' },
@@ -276,59 +273,5 @@ describe('durable workflow dispatch', () => {
 
     await expect(dispatcher.dispatch(request())).rejects.toThrow('exceeds 4 child levels')
     expect(await workflows.db.select().from(schema.workflowDispatches)).toEqual([])
-  })
-})
-
-describe('workflow dispatch migration', () => {
-  it('backfills legacy runs as roots without inventing parent lineage', () => {
-    const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../migrations')
-    const db = new DatabaseSync(':memory:')
-    const apply = (tag: string) => {
-      const sql = readFileSync(resolve(migrationsDir, `${tag}.sql`), 'utf8')
-      for (const statement of sql.split('--> statement-breakpoint')) if (statement.trim()) db.exec(statement)
-    }
-    apply('0000_funny_prism')
-    apply('0001_lying_overlord')
-    db.prepare(`
-      INSERT INTO workflow_runs
-        (id, task_id, name, status, posture, trigger, def_json, error, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      'legacy-run',
-      'legacy-task',
-      'Legacy',
-      'done',
-      'gated',
-      'manual',
-      '{"name":"Legacy","tools":{"maxRisk":"read"},"budget":{"maxWallTimeMs":1000,"maxTurns":2},"steps":[]}',
-      null,
-      at,
-      at,
-    )
-
-    apply('0002_needy_wind_dancer')
-    expect(db.prepare(`
-      SELECT root_run_id, parent_run_id, parent_step_id, depth, invocation_key, payload_fingerprint
-      FROM workflow_runs WHERE id = ?
-    `).get('legacy-run')).toEqual({
-      root_run_id: 'legacy-run',
-      parent_run_id: null,
-      parent_step_id: null,
-      depth: 0,
-      invocation_key: null,
-      payload_fingerprint: null,
-    })
-    apply('0003_thick_bill_hollister')
-    apply('0004_productive_justice')
-    expect(db.prepare(`
-      SELECT effective_tools_json, effective_budget_json, requires_repo_trust, deadline_at
-      FROM workflow_runs WHERE id = ?
-    `).get('legacy-run')).toEqual({
-      effective_tools_json: '{"maxRisk":"read"}',
-      effective_budget_json: '{"maxWallTimeMs":1000,"maxTurns":2}',
-      requires_repo_trust: 0,
-      deadline_at: at + 1_000,
-    })
-    db.close()
   })
 })

@@ -1,6 +1,7 @@
 # Ticket 12: Naming and focused simplification
 
-Date: 2026-09-21. Status: not started. Prerequisites: 04, 08, 11.
+Date: 2026-09-21. Status: implemented 2026-09-23; desktop manual check remains for ticket 13.
+Prerequisites: 04, 08, 11.
 Read [context](./context.md), F12 in [findings](./findings.md), and [refusals](./refused.md).
 
 ## Outcome
@@ -38,3 +39,31 @@ Do not write tests that merely assert the new file arrangement.
 
 Confirm the selected functions are pure or can take explicit inputs without duplicating state.
 If extraction would create a second lifecycle owner, retain the function with its state and record why.
+
+## Implementation evidence
+
+- Provider conformance now calls its cached codec fixture `cachedItem`. The Linear and Rollbar
+  fixtures still exercise decoding. Project lookup still ignores GitHub name case and selects the
+  oldest matching project, using the id to break ties.
+- The HTTP route registry lives in `server/routes/registry.ts`; the connection provider registry
+  lives in `server/integrations/connectionProviders/registry.ts`. Each keeps its existing singleton.
+  The integration provider registry remains a separate concern.
+- `sessionRows.ts` and `sessionFrames.ts` construct palette values. `sessionStore.ts` still owns
+  the frame stack, selection, search generation, abort controllers, and setting write. Terminal
+  traversal reads explicit region, parent, collection, and panel inputs through
+  `regionTraversal.ts`; `regions.ts` still owns focus, scopes, memory, and the visit counter.
+- Command session tests passed (50/50). Terminal regions, key tiers, and chrome tests passed
+  (58/58); the chrome renderer cases pressed Tab, arrows, Escape, and the palette chord. Node
+  registry, route, and connection tests passed (18/18). Desktop host and parity
+  tests passed (12/12). Type checks for client-core, node-core, Node, TUI, and desktop passed.
+  Oxlint exited successfully with existing warnings. Architecture and document-path tests exposed
+  the palette host-command invocation and a stale assertion for the renamed `sessionStore.ts` owner.
+  Ticket 13 fixed both; its architecture rerun passed.
+- The Node route and conformance integration tests passed. The plugin-disable suite passed 11/12;
+  its full snapshot omits the current `plugin-authoring` context section. This phase changed only
+  that test's registry import path. Ticket 13 updated the snapshot and passed the exact bounded
+  whole-suite wrapper; see its acceptance record.
+- `pnpm lint` stopped in pnpm 11's dependency check, which proposed removing `node_modules`.
+  The existing local binaries supplied the type checks and tests above without an install. The
+  real Tauri agent session requires the same pnpm staging path, so its keyboard check remains for
+  ticket 13. No Acorn-owned state was reset.

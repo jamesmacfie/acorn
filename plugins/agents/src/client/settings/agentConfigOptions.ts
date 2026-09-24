@@ -1,4 +1,4 @@
-import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 
 const sameValue = (
   left: AgentConfigOption['values'][number],

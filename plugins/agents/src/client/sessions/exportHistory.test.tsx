@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentSession } from '../../contract/wire.ts'
 import type { Task } from '@acorn/plugin-api/client'
 
 // Exporting a transcript, end to end through the platform seam. Like the composer's attach test, the

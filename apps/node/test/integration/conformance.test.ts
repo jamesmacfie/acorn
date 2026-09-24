@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import '../helpers/registerProviders'
-import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
-import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
 
 describe('connection provider conformance', () => {
   for (const provider of connectionProviderRegistry.list()) {
     describe(provider.id, () => {
       it('publishes safe descriptor metadata and executable connection behavior', () => {
         const publicJson = JSON.stringify(provider.toPublic())
-        expect(publicJson).not.toMatch(/authRef|accessToken|refreshToken|plaintext-key/i)
+        expect(publicJson).not.toMatch(/encryptedCredentials|accessToken|refreshToken|plaintext-key/i)
         expect(provider.budgets.maxConcurrentRequests).toBeGreaterThan(0)
         expect(provider.budgets.maxConcurrentRequestsPerConnection).toBeGreaterThan(0)
         expect(provider.connection.validate).toBeTypeOf('function')
@@ -25,7 +25,7 @@ describe('integration provider conformance', () => {
       it('publishes descriptor metadata without secret material', () => {
         expect(connectionProviderRegistry.get(provider.id)).toBe(provider)
         const publicJson = JSON.stringify(provider.toPublic())
-        expect(publicJson).not.toMatch(/authRef|accessToken|refreshToken|secret/i)
+        expect(publicJson).not.toMatch(/encryptedCredentials|accessToken|refreshToken|secret/i)
         expect(provider.budgets.maxConcurrentRequests).toBeGreaterThan(0)
         expect(provider.budgets.maxConcurrentRequestsPerConnection).toBeGreaterThan(0)
         expect(provider.budgets.maxCachedItemBytes).toBeGreaterThan(0)
@@ -59,15 +59,15 @@ describe('integration provider conformance', () => {
       }
 
       if (provider.codec && provider.conformance) {
-        it('migrates old cache, rejects malformed cache, and preserves detail on list refresh', () => {
-          const old = provider.codec!.parse(provider.conformance!.legacyCache, provider.conformance!.ref)
-          expect(old.ok).toBe(true)
-          if (!old.ok) return
-          expect(old.migrated).toBe(true)
+        it('normalizes a cached provider item, rejects malformed cache, and preserves detail on list refresh', () => {
+          const cached = provider.codec!.parse(provider.conformance!.cachedItem, provider.conformance!.ref)
+          expect(cached.ok).toBe(true)
+          if (!cached.ok) return
+          expect(cached.migrated).toBe(true)
           expect(provider.codec!.parse({ obsolete: true }, provider.conformance!.ref).ok).toBe(false)
 
           const detailed = provider.conformance!.detail === undefined
-            ? old.value
+            ? cached.value
             : provider.codec!.withDetail(provider.conformance!.ref, provider.conformance!.summary, provider.conformance!.detail, 10)
           const refreshed = provider.codec!.mergeSummary(detailed, provider.conformance!.ref, provider.conformance!.summary, 20)
           expect(refreshed.detail).toEqual(detailed.detail)

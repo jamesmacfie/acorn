@@ -1,6 +1,6 @@
 import { decodeHTML } from 'entities'
-import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
-import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
+import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
 
 // Markdown in cells, through the shell's own policy.
 //

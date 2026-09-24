@@ -1,6 +1,6 @@
 import { Field, Textarea } from '@acorn/plugin-api/ui'
 import { SourceQueryEditor, TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import { For, Show } from 'solid-js'
 import type { StepField, WorkflowCatalog, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS, readStepField } from '../../shared/stepFields'

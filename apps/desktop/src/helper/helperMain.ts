@@ -1,13 +1,13 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
-import { createHelper, type Helper } from '@acorn/custody/index.ts'
-import { helperMark } from '@acorn/custody/bootMarks.ts'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { createHelper, type Helper } from '@acorn/custody/runtime'
+import { helperMark } from '@acorn/custody/runtime'
 import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
-import { adoptLegacyCustody } from '@acorn/custody/custody/legacyCustody.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
 import { HELPER_PROTOCOL } from '../shell/wire'
-import { createLogger, describeError } from '@acorn/node-core/server/telemetry/logger.ts'
+import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 // The desktop helper process: the whole custody stack, running under the bundled Node runtime with
 // Rust as its supervisor. See docs/shell.md, "The shell process".
@@ -52,10 +52,6 @@ const handshakeSchema = z.strictObject({
   isPackaged: z.boolean(),
   // The renderer's origin, checked on the WebSocket upgrade.
   appOrigin: z.string().min(1),
-  // An Electron build's custody root and the safeStorage password its device tokens are under, when
-  // the shell found both. Adopted once, on a first launch that has no fleet of its own. See
-  // @acorn/custody/custody/legacyCustody.ts.
-  legacy: z.strictObject({ userDataDir: z.string().min(1), safeStorageKey: z.string().min(1) }).optional(),
 })
 type Handshake = z.infer<typeof handshakeSchema>
 
@@ -92,10 +88,6 @@ const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
   const tokenCipher = dataKeyCipher(handshake.dataKey)
-  // Before anything reads the fleet, because everything below assumes the custody root is settled for
-  // this launch.
-  if (handshake.legacy) adoptLegacyCustody(handshake.userDataDir, tokenCipher, handshake.legacy)
-
   for (const file of handshake.envFiles) {
     try {
       process.loadEnvFile(file)
@@ -109,6 +101,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
   const helper = createHelper({
     serviceEntry: handshake.serviceEntry,
     service: {
+      baseline: ACORN_BASELINE,
       dataDir: handshake.dataDir,
       version: handshake.version,
       isPackaged: handshake.isPackaged,

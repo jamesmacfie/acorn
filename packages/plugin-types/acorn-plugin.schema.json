@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 13)",
+  "title": "acorn plugin manifest (plugin API major 1)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -66,6 +66,10 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 64
+    },
+    "baseline": {
+      "type": "string",
+      "const": "acorn-1"
     },
     "emits": {
       "default": [],
@@ -302,6 +306,9 @@
                 "minimum": 0,
                 "maximum": 100000
               },
+              "showInSwitcher": {
+                "type": "boolean"
+              },
               "formFactor": {
                 "default": [
                   "desktop"
@@ -478,6 +485,9 @@
                     }
                   ]
                 }
+              },
+              "collapsible": {
+                "type": "boolean"
               },
               "claimsKeys": {
                 "default": [],
@@ -1043,172 +1053,12 @@
             ]
           }
         },
-        "palette": {
-          "default": [],
-          "maxItems": 32,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "title": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 120
-              },
-              "action": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openPane"
-                      },
-                      "pane": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "pane"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openTask"
-                      }
-                    },
-                    "required": [
-                      "verb"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "navigate"
-                      },
-                      "surface": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "surface"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "runNodeAction"
-                      },
-                      "path": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "path"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "createTask"
-                      }
-                    },
-                    "required": [
-                      "verb"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openUrl"
-                      },
-                      "url": {
-                        "type": "string",
-                        "format": "uri"
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "url"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "openOverlay"
-                      },
-                      "overlay": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "overlay"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "verb": {
-                        "type": "string",
-                        "const": "surfaceAction"
-                      },
-                      "surface": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "required": [
-                      "verb",
-                      "surface"
-                    ]
-                  }
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "title",
-              "action"
-            ]
-          }
-        },
         "commands": {
           "default": [],
           "maxItems": 32,
           "type": "array",
           "items": {
-            "anyOf": [
+            "oneOf": [
               {
                 "type": "object",
                 "properties": {
@@ -1263,7 +1113,6 @@
                     "maxLength": 64
                   },
                   "kind": {
-                    "default": "action",
                     "type": "string",
                     "const": "action"
                   },
@@ -1376,6 +1225,7 @@
                 "required": [
                   "id",
                   "title",
+                  "kind",
                   "action"
                 ]
               },
@@ -3549,6 +3399,7 @@
     "id",
     "name",
     "version",
+    "baseline",
     "apiVersion"
   ]
 }

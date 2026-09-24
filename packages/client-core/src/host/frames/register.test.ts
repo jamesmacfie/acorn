@@ -168,7 +168,7 @@ describe('syncFrameContributions', () => {
       target: 'pane',
       id: 'board-doc',
       layout: 'single',
-      regions: { body: { kind: 'document', read: '/v2/p/board/doc', languageId: 'markdown' } },
+      regions: { body: { kind: 'document', read: '/v1/p/board/doc', languageId: 'markdown' } },
     })
     _seedPluginDistribution([['node-a', [row('board', { frames: [doc, surface({ target: 'pane', id: 'board-pane' })] })]]])
     syncFrameContributions()
@@ -183,7 +183,7 @@ describe('syncFrameContributions', () => {
       target: 'pane',
       id: 'board-doc',
       layout: 'document-over-frame',
-      regions: { document: { kind: 'document', read: '/v2/p/board/doc', languageId: 'markdown' }, frame: 'frame' },
+      regions: { document: { kind: 'document', read: '/v1/p/board/doc', languageId: 'markdown' }, frame: 'frame' },
     })
     _seedPluginDistribution([['node-a', [row('board', { frames: [composed] })]]])
     syncFrameContributions()
@@ -335,9 +335,9 @@ describe('syncFrameContributions', () => {
 
     it('refuses a document route outside the plugin’s own namespace', () => {
       for (const region of [
-        { read: '/v2/core/tasks' },
-        { read: '/v2/p/board/doc', write: '/v2/core/tasks' },
-        { read: '/v2/p/board/doc', completions: { route: '/v2/core/tasks' } },
+        { read: '/v1/core/tasks' },
+        { read: '/v1/p/board/doc', write: '/v1/core/tasks' },
+        { read: '/v1/p/board/doc', completions: { route: '/v1/core/tasks' } },
       ]) {
         _seedPluginDistribution([['node-a', [row('board', { frames: [docPane(region)] })]]])
         syncFrameContributions()

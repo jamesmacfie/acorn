@@ -58,9 +58,10 @@ describe('the loopback TLS listener', () => {
     delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-listener-'))
-    // The listener's own ensureCert call would mint a fresh RSA pair per test otherwise.
-    seedTlsCert(dataDir)
     root = openDataRoot(dataDir)
+    // The listener's own ensureCert call would mint a fresh RSA pair per test otherwise. Admit the
+    // empty root first; a certificate written before node.json is correctly treated as old state.
+    seedTlsCert(dataDir)
   })
 
   afterEach(async () => {
@@ -93,18 +94,18 @@ describe('the loopback TLS listener', () => {
     expect(started.endpoint.origin).toBe(`https://127.0.0.1:${started.endpoint.port}`)
     expect(started.endpoint.port).toBeGreaterThan(0)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
-    // GET /v2/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
+    // GET /v1/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
     // § Pairing), so it is reachable without a bearer, which makes it the right shape probe here. It
     // advertises the same fingerprint the handshake above just presented.
-    const response = await probe(started, '/v2/node')
+    const response = await probe(started, '/v1/node')
     expect(response.status).toBe(200)
     expect(JSON.parse(response.body)).toMatchObject({ fingerprint: started.fingerprint })
   }, 20_000)
 
   it('rejects an unexpected Host but accepts the port it actually bound', async () => {
     const started = await start()
-    expect((await probe(started, '/v2/node', 'localhost:1234')).status).toBe(403)
-    expect((await probe(started, '/v2/node', `127.0.0.1:${started.endpoint.port}`)).status).toBe(200)
+    expect((await probe(started, '/v1/node', 'localhost:1234')).status).toBe(403)
+    expect((await probe(started, '/v1/node', `127.0.0.1:${started.endpoint.port}`)).status).toBe(200)
   }, 20_000)
 
   // "The Node serves no web assets" (docs/architecture-overview.md): the renderer loads from app://acorn,
@@ -142,7 +143,7 @@ describe('the loopback TLS listener', () => {
     try {
       const second = await start()
       expect(second.endpoint.port).not.toBe(port)
-      expect((await probe(second, '/v2/node')).status).toBe(200)
+      expect((await probe(second, '/v1/node')).status).toBe(200)
     } finally {
       await new Promise<void>((resolve) => squatter.close(() => resolve()))
     }

@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
+import type { WorkflowStepRow } from '../../contract/wire.ts'
 import type { WorkflowRunProjection } from '../../shared/api'
 
 // The pane's model under jsdom rather than in bare Node, because everything asserted here is
@@ -70,7 +70,7 @@ const run = (over: Partial<WorkflowRunProjection>): WorkflowRunProjection => ({
   error: null, createdAt: 200, updatedAt: 200,
   rootRunId: 'run-1', parentRunId: null, parentStepId: null, rootTaskId: 'task-1',
   rootRunName: 'Investigate an issue', parentTaskId: null, parentRunName: null, depth: 0, usage: null,
-  defJson: JSON.stringify({ name: 'Investigate an issue', steps: [{ name: 'reproduce', after: [] }, { name: 'synthesise', after: ['reproduce'] }] }),
+  defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Investigate an issue', steps: [{ name: 'reproduce', after: [] }, { name: 'synthesise', after: ['reproduce'] }] }),
   ...over,
 })
 

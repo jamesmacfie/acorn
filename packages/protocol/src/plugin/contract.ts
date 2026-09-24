@@ -5,6 +5,7 @@
 // node-core/server/plugins/manifest.ts adds the cross-field rules and the reader. The wire projections at
 // the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
+import { ACORN_BASELINE } from '../baseline.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
 import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../dataSourceContributions.ts'
 import { dashboardViewKinds } from '../dashboardViews.ts'
@@ -566,12 +567,6 @@ const extensionDescriptor = z.object({
   }
 })
 
-const paletteDescriptor = z.object({
-  id: z.string().min(1).max(64),
-  title: z.string().min(1).max(120),
-  action: chromeAction,
-})
-
 const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
 
 // What every kind of command declares. Ids are local: `chromeRegister.ts` qualifies both this one and
@@ -602,12 +597,9 @@ const commandCommon = {
 // fleet-scoped (@acorn/protocol/commands.ts).
 const loadedCommandScope = z.enum(['none', 'task', 'project', 'workspace', 'node']).default('node')
 
-// The compatibility member, and the reason this is a `z.union` rather than a discriminated one: an
-// existing descriptor carries no `kind` at all, and Zod's discriminated union does not apply a
-// discriminator's default before matching, so it would refuse every manifest already installed.
 const actionCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('action').default('action'),
+  kind: z.literal('action'),
   action: contextFreeAction,
 })
 
@@ -681,7 +673,7 @@ const settingCommandDescriptor = z.object({
   options: z.array(commandSettingOptionSchema).min(MIN_COMMAND_SETTING_OPTIONS).max(MAX_COMMAND_SETTING_OPTIONS),
 })
 
-const commandDescriptor = z.union([
+const commandDescriptor = z.discriminatedUnion('kind', [
   actionCommandDescriptor,
   groupCommandDescriptor,
   searchCommandDescriptor,
@@ -980,7 +972,6 @@ const contributionsShape = z.looseObject({
   frames: z.array(frameSurface).max(32).default([]),
   sources: z.array(sourceDescriptor).max(8).default([]),
   slots: z.array(slotDescriptor).max(8).default([]),
-  palette: z.array(paletteDescriptor).max(32).default([]),
   commands: z.array(commandDescriptor).max(32).default([]),
   keybindings: z.array(keybindingDescriptor).max(32).default([]),
   attention: z.array(attentionDescriptor).max(4).default([]),
@@ -1058,6 +1049,7 @@ const manifestShape = z.object({
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
   version: z.string().min(1).max(64),
+  baseline: z.literal(ACORN_BASELINE),
   emits: z.array(pluginEmitSchema).max(32).default([]),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./pluginApiVersion.ts).
@@ -1201,7 +1193,6 @@ export type PluginSourceDescriptor = Omit<z.infer<typeof sourceDescriptor>, 'pan
   panels?: PluginPanelRegion
 }
 export type PluginSlotDescriptor = z.infer<typeof slotDescriptor>
-export type PluginPaletteDescriptor = z.infer<typeof paletteDescriptor>
 export type PluginCommandCategory = z.infer<typeof commandCategory>
 // `kind` is optional on the action member and required nowhere else, which is the rule this file's
 // header states: the field was added to a shape that had already shipped, so a roster row from a node
@@ -1276,7 +1267,6 @@ export type PluginContributions = {
   frames: PluginFrameSurface[]
   sources?: PluginSourceDescriptor[]
   slots?: PluginSlotDescriptor[]
-  palette?: PluginPaletteDescriptor[]
   commands?: PluginCommandDescriptor[]
   keybindings?: PluginKeybindingDescriptor[]
   attention?: PluginAttentionDescriptor[]

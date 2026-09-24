@@ -22,10 +22,10 @@ import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 
-export type { EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
-export type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
-import type { EmbeddedEditor } from '@acorn/client-core/features/editor/embed.ts'
-import type { EditorViewState } from '@acorn/client-core/features/editor/viewState.ts'
+export type { EditorViewState } from '@acorn/client-core/features/editor'
+export type { EmbeddedEditor } from '@acorn/client-core/features/editor'
+import type { EmbeddedEditor } from '@acorn/client-core/features/editor'
+import type { EditorViewState } from '@acorn/client-core/features/editor'
 
 /** No grammar, because there is no highlighter to give one to. An empty extension is a real answer
  *  here in the way `plaintext` is a real answer on the DOM, not a missing one. */

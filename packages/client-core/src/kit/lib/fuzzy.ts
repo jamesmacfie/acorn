@@ -3,7 +3,7 @@
 // It was `paletteModel.ts` until 2026-09-03, and it held two more things: a flat `PaletteItem` union
 // and the concatenate-then-filter pair both hosts drew the palette with. The session owns the order
 // and the ranking now, because a frame stack cannot be expressed as one concatenation
-// (../../host/registries/commands/session.ts), and the union described a row shape nothing produces
+// (../../host/registries/commands/sessionStore.ts), and the union described a row shape nothing produces
 // any more.
 //
 // What is left is spent everywhere: the command graph ranks a command with it, the session ranks a

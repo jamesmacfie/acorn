@@ -1,6 +1,6 @@
 import { For, Show, type Component } from 'solid-js'
 import { CodeBlock, Inline, Link, Section, Stack, Text } from '@acorn/plugin-api/ui'
-import type { AgentWebActivity, AgentWebResult } from '@acorn/protocol/managedAgents.ts'
+import type { AgentWebActivity, AgentWebResult } from '../../contract/wire.ts'
 
 /**
  * What an agent did on the web, drawn once for every harness that does it.

@@ -2,25 +2,26 @@
 // docs/architecture-overview.md § Runtime topology for how this differs from the supervised node the
 // desktop shell starts.
 import { join } from 'node:path'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/server/transport/listener.ts'
-import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport/advertise.ts'
-import { openDataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport'
+import { openDataRoot } from '@acorn/node-core/server/storage'
 import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
-import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
-import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
+import { resolveDeviceToken } from '@acorn/node-core/server/auth'
+import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
-import { disabledPluginsStore } from '@acorn/node-core/server/plugins/disabled.ts'
-import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
+import { disabledPluginsStore } from '@acorn/node-core/server/plugins'
+import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
-import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools'
 import { buildPluginDeps } from '../composition/pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from '../composition/pluginState'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
-import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
+import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 
 // This file is the one place under `apps/node/src` that still calls `console.log`, and it is in the
 // console rule's baseline on purpose (tools/arch/boundaries.test.ts). Two things it writes are not
@@ -28,9 +29,9 @@ import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree
 // and the pairing banner, which is what a person standing at this terminal is here to read.
 // Everything else in the file goes through the logger like the rest of the node.
 import { installCrashHandlers } from '../composition/crash'
-import { createLogger, installPerfSink } from '@acorn/node-core/server/telemetry/logger.ts'
-import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry/collector.ts'
-import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry/scrub.ts'
+import { createLogger, installPerfSink } from '@acorn/node-core/server/telemetry'
+import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
+import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
 
 // Before anything can throw. A crash during boot is otherwise a silent death with no record
 // (../composition/crash.ts).
@@ -72,7 +73,7 @@ reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
 // The same deps the supervised composition root supplies (service/runtime.ts explains each one). A
 // standalone node runs a real terminal engine, not a stub, because terminal is a required plugin
-// (docs/plugins.md § Activation) and this node answers /v2/core/tasks/:id/archive for a task's live
+// (docs/plugins.md § Activation) and this node answers /v1/core/tasks/:id/archive for a task's live
 // sessions.
 let apiUrl = ''
 const internalEnv: InternalEnvFactory = (claims) => ({
@@ -99,7 +100,7 @@ installPerfSink()
 
 // Same plugin list, through the same builder, as the desktop-supervised root
 // (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.
-const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
+const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, internalEnv, reconciled }))
 // The node's one scheduler (docs/schedules.md § Why the node, and only the node).
 const scheduler = createScheduler(runtime.DB, { env: runtime })
 const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
@@ -205,6 +206,7 @@ process.once('SIGTERM', (signal) => void shutdown(signal))
 
 console.log(
   JSON.stringify({
+    baseline: ACORN_BASELINE,
     nodeId: root.nodeId,
     // The handshake's protocol number (docs/api-reference.md § Versioning): a launcher can refuse a
     // node it cannot drive without pairing to it first.

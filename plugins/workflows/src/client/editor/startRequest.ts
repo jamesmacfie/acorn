@@ -6,7 +6,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // the path makes that module unloadable there (docs/plugin-authoring.md § Testing).
 import { createSignal } from 'solid-js'
 import { toast } from '@acorn/plugin-api/client'
-import type { WorkflowInput } from '@acorn/protocol/workflow.ts'
+import type { WorkflowInput } from '../../contract/wire.ts'
 import { workflowApi } from '../workflowsClient'
 
 export type StartRequest = {
