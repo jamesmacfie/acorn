@@ -233,19 +233,26 @@ its handshake JSON there. Two things are still written to stdout on purpose, bot
 Reading a desktop cold start end to end means putting three of these together: Rust spawns the helper,
 the helper's `[helper:boot] ready line` is the whole of what Rust waited for, and the renderer's clock
 starts at its own document's navigation, after Rust created the window. The node's
-`[service:boot] listener-up` no longer sits inside the wait — the window opens on the helper being
-listening, so the node's whole boot happens after it ([shell.md](./shell.md) § The shell process). The
+`[service:boot] listener-up` is not inside that wait. The window opens as soon as the helper is
+listening and shows the startup loader, and the node boots behind it. The shell mounts only when the
+local node's first status reaches the renderer ([frontend.md](./frontend.md) § Startup readiness). The
 two accounts meet at `[helper:boot] service.start`, which is the node reporting that it is listening,
-so `ready line` to `service.start` is how long the shell was on screen without a node behind it.
+so `ready line` to `service.start` is the node's share of the launch. The loader is on screen for that
+interval less the time the window takes to open and load its scripts. No renderer mark records the
+shell mounting: `nodeReady` is the fleet selection, which lands before the node is up.
 
 Two things about the node's own account are worth knowing before quoting it. Its clock starts inside
 `startServiceRuntime`, so spawning the process and evaluating the service bundle are in front of `+0ms`
-and appear in no step. That gap is a little over 350 ms, nearly all of it evaluating the
-bundle's module graph, and most of that is external libraries rather than acorn's own code,
-`drizzle-orm` and its `sqlite-core` being a third of the whole
-([performance.md](./performance.md) § The service bundle's evaluation). And measuring the node by calling
+and appear in no step. On an M2 Pro that gap is about 100 ms, most of it evaluating the service
+chunk, which bundles the node's pure-JavaScript dependencies. And measuring the node by calling
 `startServiceRuntime` under `tsx` rather than launching the app inflates `graph` roughly sevenfold,
 because the loader then transpiles as it imports.
+
+`graph` also depends on the data root. `apps/desktop/test/boot.test.ts` boots a fresh root, and its
+`graph` step takes a few milliseconds. A root that has run the app before holds the bundled loaded
+plugins, and `graph` then includes starting an isolated worker for each one with a node half, one
+after another. Time a launch against an established root, such as a `pnpm dev:agent -- --reuse`
+session, before quoting a node boot figure.
 
 **`[renderer:boot] first paint` does not print from a background window.** It is a
 `requestAnimationFrame` callback, and macOS pauses those while the window is occluded, so a launch
