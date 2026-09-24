@@ -95,6 +95,7 @@ export default function TabRail() {
   // already checked out, no worktree (docs/workspaces-and-tasks.md § Worktrees and setup). Non-git
   // projects are always like this, so the toggle only shows for git.
   const [noBranch, setNoBranch] = createSignal(false)
+  const [skipSetup, setSkipSetup] = createSignal(false)
   // The selected project's branch prefix. Desktop only, because project config sits behind the
   // main-process bridge and the web build has no checkout. Read through taskBridge rather than the
   // terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
@@ -263,6 +264,7 @@ export default function TabRail() {
     setBranchText('')
     setBranchTouched(false)
     setNoBranch(false)
+    setSkipSetup(false)
     setDraft({ mode: 'new' })
   }
 
@@ -284,7 +286,7 @@ export default function TabRail() {
         const project = selectedProject()
         if (!project) return setDraft(null)
         const branch = project.vcs === 'git' && !noBranch() ? effectiveBranch() : undefined
-        const seed = { origin: 'local' as const, projectId: project.id, branch, title: value, icon: iconDraft() ?? undefined }
+        const seed = { origin: 'local' as const, projectId: project.id, branch, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
         const w = await createTask(seed)
         await invalidate()
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
@@ -545,6 +547,15 @@ export default function TabRail() {
                       title="The task works in the project folder on whatever branch is checked out, with no worktree"
                       checked={noBranch()}
                       onChange={(checked) => setNoBranch(checked)}
+                    />
+                  </Show>
+                  <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch()}>
+                    <Checkbox
+                      size="sm"
+                      label="Skip setup script"
+                      title="Do not run this project's setup script for this task"
+                      checked={skipSetup()}
+                      onChange={setSkipSetup}
                     />
                   </Show>
                   <Button submit disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())}>
