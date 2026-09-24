@@ -354,14 +354,15 @@ feature packages are GitHub, terminal, agents, editor, changes, notes, memory, c
 Docker, preview, onboarding, and the built-in Claude, Codex, and Aider profiles registered by
 `plugins/agents`.
 
-Five packages ship as loaded plugins instead, in neither compiled-plugin list. Rollbar was the first:
+Several packages ship as loaded plugins instead, in neither compiled-plugin list. Rollbar was the first:
 its node provider is installed from disk, its rail rows are host-drawn descriptors, and its detail UI
 is a sandboxed frame. Model providers, the OpenAI and Anthropic connections and text adapters, is the
 minimal shape: a node bundle and a manifest, no client bundle at all, so there is nothing on the
 device to trust. Linear is the widest: a pane frame, a reference-panel frame that github's PR detail
 renders, a descriptor rail source with host-owned task promotion, and declarative `linear.app` URL
 recognisers. HTTP was the first to exercise plugin-owned tables and migrations end to end, and
-database moved onto the host-owned document surface, which proved that contract. See document
+database moved onto the host-owned document surface, which proved that contract. Findings moved its
+review surface into a remote tree, and agent-cost is a client-only loaded example. See document
 surfaces in [the plugins doc](./plugins.md).
 
 The desktop ships every built package as app resources, and the service reconciles them into the

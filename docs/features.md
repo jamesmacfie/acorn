@@ -86,10 +86,10 @@ structured observations. The task pane shows their full history.
 
 ## Workflows
 
-Workflows are loaded from trusted `.acorn/workflows/*.toml` files. The Node persists runs, steps,
-gates, budgets, branches, joins, and trigger state. Agent, terminal, GitHub-check, and human-gate
-steps use typed capabilities and structured step output. Authoring is file-based; the desktop shows
-inspection, problems, palette rows, activity, attention, and gate controls.
+Workflows come from trusted `.acorn/workflows/*.toml` files or owner-authored database definitions.
+The Node persists runs, steps, gates, budgets, branches, joins, and trigger state. Agent, terminal,
+GitHub-check, and human-gate steps use typed capabilities and structured step output. The desktop
+editor creates and revises both definition kinds, while the run pane shows progress and gate controls.
 
 ## Docker, database, and HTTP
 
