@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { Principal } from '../middleware/auth'
 import type { AppEnv } from '../middleware/auth'
 import { authoring } from './authoring'
+
+vi.mock('../db', () => ({ getDb: () => ({}) }))
+vi.mock('../core/models', () => ({
+  createModelService: () => ({ generateText: async () => ({ text: 'Sure, here is a panel!', providerId: 'anthropic', modelId: 'claude' }) }),
+}))
 
 const valid = {
   target: 'query', scope: { workspaceId: 'w1', projectId: 'p1' }, targetId: 'q1', baseRevision: 1,
@@ -39,5 +44,21 @@ describe('authoring route admission', () => {
     })
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ error: { code: 'invalid-request' } })
+  })
+})
+
+describe('authoring route failures', () => {
+  it('logs the reason and the last model reply when the model gives up', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const response = await app({ kind: 'device', userId: 'u1', deviceId: 'd1' }).request('/authoring/turn', {
+      method: 'POST', body: JSON.stringify(valid), headers: { 'content-type': 'application/json' },
+    }, {})
+    expect(await response.json()).toMatchObject({ state: 'stopped' })
+    const line = String(warn.mock.calls.at(-1)?.[0])
+    expect(line).toContain('[authoring] turn ended without a valid candidate')
+    expect(line).toContain('model=claude')
+    expect(line).toContain('after two attempts')
+    expect(line).toContain('reply=Sure, here is a panel!')
+    warn.mockRestore()
   })
 })

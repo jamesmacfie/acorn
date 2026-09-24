@@ -62,14 +62,17 @@ export const linearTeamScopeId = (teamId: string): string => `${TEAM_PREFIX}${te
 // default. `description` is the issue's own prose, capped before it reaches a row: a workflow
 // started from a row menu puts the title and this in its `issue` input, and the alternative was a
 // second call per issue at the moment somebody opened a menu (docs/workflows.md § Starting a run).
+// `labels` has an explicit page size because Linear multiplies a nested list's cost by it (default
+// 50) and rejects a query over 10,000 points. At 50 labels, 250 issues is about 17,000 points; at 10
+// it is about 4,600. The detail pane reads its own labels, so a row never needs more.
 const TRIAGE_FIELDS = `id identifier title url description branchName priority priorityLabel updatedAt
       state { name type color } assignee { name }
-      labels { nodes { id name color } }`
+      labels(first: 10) { nodes { id name color } }`
 
 // Active issues for a set of projects (the Linear rail source). Excludes completed/canceled so the
 // list is signal, not history.
 export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
-  issues(filter: $filter, first: 100) {
+  issues(filter: $filter, first: 250) {
     nodes {
       ${TRIAGE_FIELDS}
     }
@@ -106,8 +109,8 @@ export const projectIssuesFilter = (mappedIds: string[]): Record<string, unknown
  *
  * Provider-side rather than a filter over a fetched page, because the mapping half is a filter Linear
  * supports — `project: { id: { in: … } }` is the one the rail already sends — so the narrowing can ride
- * along with it. Filtering locally would have meant asking for the first hundred active issues and
- * searching those, which cannot find the hundred-and-first and moves more bytes to find fewer rows.
+ * along with it. Filtering locally would have meant asking for the first 250 active issues and
+ * searching those, which cannot find the 251st and moves more bytes to find fewer rows.
  * The request count is the same either way, and it goes through the same per-connection scheduler and
  * budget the rail does, so no rate-limit policy changes hands.
  *

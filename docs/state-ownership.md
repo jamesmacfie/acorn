@@ -164,18 +164,26 @@ compiled client tier, where reading a preference is an import.
 
 **Where you were looking is the node's, not the device's.** Which rail source or task each workspace
 was left on is `core.workspace-views`, one key per workspace
-(`client-core/features/tasks/tasks.ts`, `infra/persistence/stateSlices.ts`). It sits with the pane
-layouts rather than with `last_source` above, and for the same two reasons: it is keyed by that
+(`client-core/features/tasks/tasks.ts`, `infra/persistence/stateSlices.ts`). A source view also
+keeps the page it was on, so a relaunch comes back to the pull request that was open and not only
+to the list. The memory sits with the pane layouts, and for the same two reasons: it is keyed by that
 node's workspace ids, so it means nothing anywhere else, and both clients paired with a node should
-return you to the same place in it. The terminal client also has no `localStorage`, so a device key
-there is written nowhere and read back as nothing — which is why `last_workspace`, the one thing that
-host restores on top of this, is the node's too (`apps/tui/src/chrome/restore.ts`).
+return you to the same place in it. `last_workspace` says which workspace was open, and it is the
+node's too, because the terminal client has no `localStorage` and a device key there is written
+nowhere.
 
-The desktop restores `last_path`, `last_task` and `last_source` on first load and consults the
-per-workspace memory only when you move to a workspace this session has not been in yet, so the two
-never argue. It records on the way out, in the one effect that sees the workspace change; the
-terminal records as you move, because it has no last-task and last-source to fall back on and the
-workspace open when the process ends has to already know its own view.
+Both clients record as you move, so the workspace open when the window closes already knows its own
+view, and both reopen the same way: `last_workspace` picks the workspace, its memory picks the view.
+The desktop differs in three ways, all in `apps/desktop/src/client/App.tsx`. An address that already
+names a place wins, which is what keeps a reload where it was. The restore pass waits for the node's
+own answer to its prefs, unless the node is known to be offline, because the first value is the
+persisted query cache and that is written at most every five seconds: a place changed just before
+quitting used to come back as the one before it. And the place opens only after the whole pass,
+because opening a task with no layout in memory gives it a default one, and the saved layouts land
+in the last phase. The desktop used to reopen from three separate
+values, `last_path`, `last_task` and `last_source`, each with its own fallback. They disagreed, and a
+task view saved an empty path that the next launch replaced with the first project, so every
+relaunch landed in the first workspace. Those keys are retired.
 
 ### Which mechanism holds a given fact
 

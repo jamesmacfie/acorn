@@ -1,25 +1,14 @@
-import { createEffect, onCleanup, type Accessor } from 'solid-js'
+import { createEffect, createSignal, onCleanup, type Accessor } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
-import type { NavigateOptions } from '@solidjs/router'
-import type { Task } from '@acorn/protocol/api.ts'
+import type { Task, Workspace } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
-import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../../features/tasks/tasks'
-import { defaultSourceId } from '../../host/registries/sources/sources'
-import { isProjectPath, projectIdFromPath, projectPath } from '../../host/registries/commands/corePaths'
 // Also the module that seeds the built-in twelve into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
 import { resolveTheme } from '../../features/settings/builtInThemes'
 import { PrefKeys } from './prefKeys'
-import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
+import { persistedStateRegistry, type PersistedStateSlice } from './persistedState'
+import { lastWorkspaceSlice } from './stateSlices'
 import { createStartupRestore } from './startupRestore'
-
-type Navigate = (to: string, options?: Partial<NavigateOptions>) => void
-
-const stringCodec = {
-  parse: (raw: unknown): string => typeof raw === 'string' ? raw : '',
-  serialize: (value: string): unknown => value,
-}
-
 
 // Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
 // default when the stored id names a theme that is not registered right now: a plugin theme whose
@@ -53,18 +42,18 @@ function applyStyle(prefs: Readonly<Record<string, string>>): void {
 export type AppStartupOptions = {
   queryClient: QueryClient
   prefs: Accessor<Readonly<Record<string, string>> | undefined>
+  // Whether `prefs` is the node's own answer from this launch, or the best there will be. The first
+  // value is usually the persisted cache, which is written at most every five seconds, so a place
+  // changed just before quitting came back as the one before it. The theme still paints from the
+  // cache; only the restore waits.
+  prefsSettled: Accessor<boolean>
   cacheRestoring: Accessor<boolean>
   projects: Accessor<Project[] | undefined>
   tasks: Accessor<Task[] | undefined>
-  // The current location's pathname. Read whole rather than rebuilt from route params: this slice
-  // used to assemble `/p/:projectId/pulls/:number` by hand, which meant core was writing one
-  // plugin's URL shape and could remember no other. Any project-scoped path a source contributes
-  // now round-trips unchanged.
-  path: Accessor<string>
-  navigate: Navigate
+  workspaces: Accessor<Workspace[] | undefined>
 }
 
-export function createAppStartupRestore(options: AppStartupOptions): { restored: Accessor<boolean> } {
+export function createAppStartupRestore(options: AppStartupOptions): { restored: Accessor<boolean>; lastWorkspaceId: Accessor<string> } {
   let disposeTheme = () => {}
   createEffect(() => {
     const prefs = options.prefs()
@@ -75,62 +64,18 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
   })
   onCleanup(() => disposeTheme())
 
-  const shellSlices: PersistedStateSlice<unknown>[] = [
-    {
-      id: 'core.last-path', key: PrefKeys.lastPath, scope: 'app', restore: 'workspace', version: 1,
-      codec: stringCodec, empty: () => '', unknownIds: 'drop', maxBytes: 2 * 1024,
-      binding: appStateBinding(
-        // Only project-scoped paths are worth remembering: a task path is restored by
-        // `core.last-task` and a settings path is not a place to come back to.
-        () => (isProjectPath(options.path()) ? options.path() : ''),
-        (saved) => {
-          const projects = options.projects() ?? []
-          if (!projects.length || isProjectPath(options.path())) return
-          const savedProjectId = projectIdFromPath(saved)
-          const valid = !!savedProjectId && projects.some((project) => project.id === savedProjectId)
-          const fallback = projects.find((project) => !project.hidden) ?? projects[0]
-          options.navigate(valid ? saved : projectPath(fallback.id), { replace: true })
-        },
-      ),
-    },
-    {
-      id: 'core.last-task', key: PrefKeys.lastTask, scope: 'app', restore: 'view', version: 1,
-      codec: stringCodec, empty: () => '', unknownIds: 'drop', maxBytes: 512,
-      binding: appStateBinding(
-        () => activeTaskId() ?? '',
-        (saved) => {
-          if (activeTaskId()) return
-          const tasks = options.tasks() ?? []
-          const task = tasks.find((candidate) => candidate.id === saved) ?? tasks[0]
-          if (task) setActiveTaskId(task.id)
-        },
-      ),
-    },
-    {
-      id: 'core.last-source', key: PrefKeys.lastSource, scope: 'app', restore: 'view', version: 1,
-      codec: stringCodec, empty: () => defaultSourceId() ?? '', unknownIds: 'retain-inert', maxBytes: 512,
-      binding: appStateBinding(
-        () => selectedSource() ?? '',
-        (saved) => {
-          // An empty stored value is not "nothing saved" — it is a task view, which has no source.
-          // A fresh install has no key at all and never reaches this function, so the only way to
-          // read an empty string is to have closed the window while looking at a task. Restoring the
-          // default source over it is what used to reopen on Home with the right task selected and
-          // nothing of it on screen. `core.last-task` restores in this phase and ahead of this slice,
-          // so the task is already chosen by the time this asks.
-          if (!saved && activeTaskId()) return setSelectedSource(null)
-          // Home is the core-owned default. A saved optional source is restored here and App.tsx
-          // corrects it after integrations/plugin contributions are known if that source is disabled.
-          setSelectedSource(saved || defaultSourceId() || null)
-        },
-      ),
-    },
-  ]
+  // Held for App.tsx rather than acted on here. Opening a workspace can open a task, and a task opened
+  // before the pane layouts land in the last phase gets a default layout that the saved one then
+  // declines to overwrite.
+  const [lastWorkspaceId, setLastWorkspaceId] = createSignal('')
+  const shellSlices = [lastWorkspaceSlice(setLastWorkspaceId)] as readonly PersistedStateSlice<unknown>[]
 
-  return createStartupRestore({
+  const { restored } = createStartupRestore({
     queryClient: options.queryClient,
     prefs: options.prefs,
-    ready: () => !options.cacheRestoring() && options.projects() !== undefined && options.tasks() !== undefined,
+    ready: () => !options.cacheRestoring() && options.prefsSettled() && options.projects() !== undefined
+      && options.tasks() !== undefined && options.workspaces() !== undefined,
     slices: () => [...persistedStateRegistry.entries(), ...shellSlices],
   })
+  return { restored, lastWorkspaceId }
 }

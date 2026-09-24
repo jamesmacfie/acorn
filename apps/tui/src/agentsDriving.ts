@@ -32,10 +32,10 @@ export async function openFirstSession(screen: Screen): Promise<void> {
  *  The wait is the point. Every region of this pane is a `lazy()`, and entering a region that has no
  *  stops in it yet lands the keys on the region's own frame, where the arrows do nothing — so on a
  *  loaded machine the walk below stood on the header and reported that nothing else existed. The
- *  composer is the last thing in the column, so its placeholder on screen is the column being
- *  finished. */
+ *  composer is the last thing in the column, so its Send button on screen is the column being
+ *  finished. Not its placeholder, which a restored draft replaces. */
 export async function enterDetail(screen: Screen): Promise<void> {
-  await screen.until('Ask the agent')
+  await screen.until('[Send]')
   await screen.press('l')
 }
 
