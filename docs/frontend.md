@@ -43,7 +43,9 @@ The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins r
 rail sources, commands and keybindings, settings pages, slots, rail markers, ref panels,
 agent contexts, extension points and their own contributions to somebody else's, schedules,
 persisted-state slices, Node stats, attention sources, session sources, brand marks, and content links. The host owns
-the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
+the returned disposables so a plugin can be disabled and reactivated without duplicate entries. An
+`activate` that starts something no registry holds, such as a listener or a reactive root, returns a
+function that undoes it, and the host runs that function with the plugin's other disposables.
 
 A compiled session source registers node-scoped summaries and optional refresh, send, and focus
 actions through `ctx.sessionSources`. The source retains its full rows and fetch logic. Core reads the
@@ -318,7 +320,11 @@ keeps pane-owned resources from issuing requests before their routes exist.
 `apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` without
 blocking the renderer. Their effects arrive through the signals they already set: `activate.ts`
 registers every compiled plugin before any node has answered, and `applyNodePlugins` re-runs that
-registration with the node's disabled list when it arrives. `nodeGateHolds()` keeps those registered
+registration with the node's disabled list when it arrives. The host skips a pass whose plugins and
+disabled set match the last one, so a node that disables nothing costs no second registration and no
+second `activate`. A plugin whose startup read depends on the node, such as the agent roster or the
+terminal session list, waits for that node to report itself reachable rather than reading at
+activation. `nodeGateHolds()` keeps those registered
 surfaces unmounted until the selected local Node is reachable.
 
 The cache partition still cannot wait for the fleet, because it decides which cache provider the

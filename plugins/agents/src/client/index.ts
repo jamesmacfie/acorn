@@ -131,14 +131,18 @@ export const agentsClientPlugin: ClientPlugin = {
       },
     })
   },
-  // Not registration: these three attach listeners to the managed-session store and return nothing the
+  // Not registration: these attach listeners to the managed-session store and return nothing the
   // registries can hold. `activateManagedAgentNotifications` also opens the app-lifetime agent
   // WebSocket subscription and primes the store over HTTP, which is why the whole set is in `activate`
-  // rather than `init`.
+  // rather than `init`. Each hands back its own undo, and the host runs them together if it ever takes
+  // this plugin back, so a second activation replaces the first rather than stacking on it.
   activate: () => {
-    activateManagedAgentReferences()
-    activateManagedAgentNotifications()
-    activateManagedAgentNoticeTargets()
-    activateManagedAgentPaneIntents()
+    const stops = [
+      activateManagedAgentReferences(),
+      activateManagedAgentNotifications(),
+      activateManagedAgentNoticeTargets(),
+      activateManagedAgentPaneIntents(),
+    ]
+    return () => { for (const stop of stops.reverse()) stop() }
   },
 }

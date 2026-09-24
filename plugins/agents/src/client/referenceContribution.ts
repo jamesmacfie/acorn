@@ -3,7 +3,7 @@ import { appendManagedDraft } from './sessions/managedDrafts'
 import { managedAgentStore } from './sessions/managedStore'
 import { openManagedSession } from './sessions/managedSelection'
 
-export function activateManagedAgentReferences(): void {
+export function activateManagedAgentReferences(): () => void {
   setManagedAgentReferenceHandler(async (taskId, reference) => {
     const deactivate = managedAgentStore.activate()
     try {
@@ -18,4 +18,5 @@ export function activateManagedAgentReferences(): void {
       deactivate()
     }
   })
+  return () => setManagedAgentReferenceHandler(null)
 }

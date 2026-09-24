@@ -63,7 +63,8 @@ if (activated.skipped.length) log.info(`plugins disabled: ${activated.skipped.jo
 // Re-run the host with whatever the active node reports. This is the client-side disable: the host
 // takes each plugin's previous contributions back before re-registering, so one call replaces a
 // predicate threaded through nine registry accessors (node/nodePlugins.ts explains the trade at
-// length).
+// length). A node that disables nothing, the usual answer, matches the pass above, and the host
+// returns without touching a registry or running any `activate` again.
 //
 // `applied` makes it idempotent per node, so App.tsx can call it from a plain mount effect (which
 // fires for the first node too, right after index.tsx already did) without disposing and

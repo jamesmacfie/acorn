@@ -1,8 +1,8 @@
-import { createSignal } from 'solid-js'
+import { createEffect, createRoot, createSignal } from 'solid-js'
 import type { TerminalSession } from '../contract/wire'
 import { terminalApi } from './terminalClient'
 import { onTerminalSessionCreated } from '../contract/sessionsClient'
-import { activeNodeId, forgetAttentionSource, hasHostCapability, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, forgetAttentionSource, hasHostCapability, nodeState, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { fromTerminalSession } from './attention'
 
 const node = (): string => activeNodeId() ?? ''
@@ -50,7 +50,21 @@ export const requestTerminalFocus = (taskId: string, sessionId: string): void =>
 export function initSessions(): () => void {
   const created = onTerminalSessionCreated(addSession)
   const pull = (): void => { void refreshSessions().catch(() => {}) }
-  pull()
+  // Once per node, when that node can answer, rather than at activation. Activation runs once, before
+  // the window has heard from any node, so a read fired then can meet a node that is still starting,
+  // and nothing would ask again until a session changed. The agent roster primes the same way
+  // (plugins/agents/src/client/sessions/managedStore.ts § activateManagedAgentNotifications). No node id
+  // at all is a renderer served by the node itself, which has no status to wait for, so it reads at once.
+  let primed: string | null | undefined
+  const stopPrime = createRoot((dispose) => {
+    createEffect(() => {
+      const nodeId = activeNodeId()
+      if (nodeId === primed || (nodeId !== null && nodeState(nodeId) === 'offline')) return
+      primed = nodeId
+      pull()
+    })
+    return dispose
+  })
   const channel = registerWsChannel('terminal', (frame) => {
     if (frame.channel === 'terminal:sessions-changed') pull()
   })
@@ -62,5 +76,5 @@ export function initSessions(): () => void {
       pull()
     }
   })
-  return () => { created(); scope(); channel.dispose(); reconnect(); clearSessions() }
+  return () => { stopPrime(); created(); scope(); channel.dispose(); reconnect(); clearSessions() }
 }

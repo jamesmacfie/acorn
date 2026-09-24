@@ -39,9 +39,9 @@ const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0))
 
 describe('priming the managed-session roster', () => {
   // One test rather than three, because there is one effect and it outlives the case that made it.
-  // `activateManagedAgentNotifications` opens a root it never releases, which is right for an
-  // app-lifetime subscription and means a second activation here would leave the first one still
-  // priming in the background and every count off by one.
+  // `activateManagedAgentNotifications` opens an app-lifetime root that only the plugin host's
+  // disposal releases, so a second activation here would leave the first one still priming in the
+  // background and every count off by one.
   it('waits for a node that can answer, primes once, and follows a switch', async () => {
     setTestNodeId('node-a')
     setTestNodeState('offline')

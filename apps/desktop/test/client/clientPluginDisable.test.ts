@@ -187,7 +187,7 @@ describe('disabling a client plugin', () => {
   it('re-activation is idempotent rather than a duplicate-id throw', () => {
     // The registries throw on a duplicate id, so this is the property that makes the whole cycle
     // possible, and the reason the host disposes a plugin's prior contributions before re-registering.
-    // Settings → Plugins re-runs the host on every node switch, so it is a production path now.
+    // The same inputs twice is now a pass the host skips; the disable cases below are the re-runs.
     expect(() => activate()).not.toThrow()
     expect(snapshot()).toEqual(FULL)
   })
