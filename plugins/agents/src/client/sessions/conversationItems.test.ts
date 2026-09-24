@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
-import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
+import {
+  buildConversationItems, findSubagentItem, isChatItem, reuseUnchangedItems, visibleConversationItems,
+} from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
   id: String(seq),
@@ -423,5 +425,53 @@ describe('a transcript the node folded', () => {
     // The folded record reaches seq 5; rows 2, 4 and 5 are already inside it.
     const folded = foldToolEvents(raw.slice(0, 5))
     expect(cards([...folded, raw[1], raw[3], raw[4], raw[5]].sort((a, b) => a.seq - b.seq))).toEqual(cards(raw))
+  })
+})
+
+describe('the next projection of a streaming session', () => {
+  // What a card sees when one more event arrives: the object it already has, unless that event is its.
+  const before = [
+    event(1, { type: 'user_message', text: 'go' }, 'turn-1'),
+    event(2, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } }, 'turn-1'),
+    event(3, { type: 'assistant_message', text: 'reading', messageId: 'm' }, 'turn-1'),
+    event(4, { type: 'usage', usage: { contextUsed: 1_000 } }, 'turn-1'),
+    event(5, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
+  ]
+  const held = buildConversationItems(before)
+  const next = (...more: AgentEventRecord[]) => reuseUnchangedItems(held, buildConversationItems([...before, ...more]))
+
+  it('keeps every item an event did not touch and adds the new one', () => {
+    const items = next(event(6, { type: 'assistant_message', text: 'next turn', messageId: 'n' }, 'turn-2'))
+    expect(items.slice(0, held.length).every((item, at) => item === held[at])).toBe(true)
+    expect(items).toHaveLength(held.length + 1)
+  })
+
+  it('hands over a new object for the item the event changed', () => {
+    const items = next(event(6, { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed' } }, 'turn-1'))
+    const changed = items.findIndex((item) => item.event.type === 'tool')
+    expect(items[changed]).not.toBe(held[changed])
+    expect(items[changed].event.type === 'tool' && items[changed].event.tool.status).toBe('completed')
+    expect(items.filter((item, at) => item !== held[at])).toHaveLength(1)
+  })
+
+  it('redraws a closed turn whose context figure a late usage update moved', () => {
+    const items = next(event(6, { type: 'usage', usage: { contextUsed: 1_500 } }, null))
+    const closing = items.findIndex((item) => item.event.type === 'turn_completed')
+    expect(items[closing]).not.toBe(held[closing])
+    expect(items[closing].context).toEqual({ used: 1_500 })
+  })
+
+  it('never keeps a subagent card, whose run grows without its own seqs moving', () => {
+    const spawn = [
+      event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Read', status: 'running' } }),
+      event(2, { type: 'tool', tool: { id: 'grep-1', title: 'Grep', subagentId: 'sub-1' } }),
+    ]
+    const first = buildConversationItems(spawn)
+    const items = reuseUnchangedItems(first, buildConversationItems([
+      ...spawn,
+      event(3, { type: 'tool', tool: { id: 'grep-2', title: 'Grep', subagentId: 'sub-1' } }),
+    ]))
+    expect(items[0]).not.toBe(first[0])
+    expect(items[0].children).toHaveLength(2)
   })
 })

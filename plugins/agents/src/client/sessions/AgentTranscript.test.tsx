@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createRenderEffect, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentEventRecord, AgentNormalizedEvent, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
@@ -15,11 +15,14 @@ vi.mock('@tanstack/solid-query', () => ({
 }))
 
 const drawn: { turnId: string | null; turn: AgentTurn | undefined }[] = []
+// Every time a card's bindings re-read its item, by key.
+const woken: string[] = []
 vi.mock('./AgentEventCard', () => ({
   // A focusable node tagged with the row's key, so a test can prove a surviving row keeps its own DOM
   // (and the focus and local state that ride on it) when the list around it changes.
   default: (props: { item: { key: string; turnId: string | null }; turn?: AgentTurn }) => {
     drawn.push({ turnId: props.item.turnId, turn: props.turn })
+    createRenderEffect(() => woken.push(props.item.key))
     return <div data-item={props.item.key} tabindex={-1} />
   },
 }))
@@ -67,6 +70,7 @@ const hosts: Array<() => void> = []
 afterEach(() => {
   for (const teardown of hosts.splice(0).reverse()) teardown()
   drawn.length = 0
+  woken.length = 0
 })
 
 const draw = (snapshot: AgentSessionSnapshot) => {
@@ -165,5 +169,31 @@ describe('a surviving transcript row keeping its identity', () => {
     expect(item(host, 'e2')).toBeNull()
     expect(item(host, 'e3')).toBe(before)
     expect(document.activeElement).toBe(before)
+  })
+})
+
+// A streaming session sends about 25 events a second, and each one used to wake every card in the list.
+describe('a streamed event reaching the transcript', () => {
+  it('wakes only the card whose item it changed', () => {
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const events = [message(1, 'a'), message(2, 'a'), message(3, 'a')]
+    const snapshotOf = (list: AgentEventRecord[]) => ({
+      session: { id: 's1', title: 'A session', config: {} },
+      turns: [turn('a', 0)],
+      events: list,
+      requests: [],
+    }) as unknown as AgentSessionSnapshot
+    const [snapshot, setSnapshot] = createSignal(snapshotOf(events))
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => (
+      <AgentTranscript taskId="t1" snapshot={snapshot()} onExitSubagent={() => {}} onRequestResolved={() => {}} />
+    ), host)
+    hosts.push(() => { dispose(); host.remove() })
+    woken.length = 0
+
+    // More text for the last message, the way a harness streams it.
+    setSnapshot(snapshotOf([...events, record(4, 'a', { type: 'assistant_message', text: ' more', messageId: 'm3', append: true })]))
+    expect(woken).toEqual(['e3'])
   })
 })

@@ -288,7 +288,7 @@ Because nothing is virtualised, the DOM holds every card in a session, and what 
 is the only lever there is. `plugins/agents/src/client/sessions/managedStore.ts` holds one snapshot per
 session — the session row, its turns, its events and its requests — and every client sees about 25
 events a second per streaming session, because the Node coalesces text deltas at 40 ms or 16 KB
-(`durableEventBuffer.ts`). Four rules keep that frame cheap, and all four are load-bearing.
+(`durableEventBuffer.ts`). Five rules keep that frame cheap, and all five are load-bearing.
 
 - **The event list is kept in sequence order and appended to in place.** Events arrive in order, so an
   arrival is a `push`; a reconnect replay can still deliver one out of order and that walks back from
@@ -305,6 +305,12 @@ events a second per streaming session, because the Node coalesces text deltas at
   frame names that set.
 - **The turns are a map above the list, not a scan inside it.** A row used to find its turn with
   `turns.find`, once per row per render.
+- **An event wakes only the card it changed.** `buildConversationItems` builds every item again on
+  each event, so `reuseUnchangedItems` hands back the previous object for any item whose seq span did
+  not move, and each row reads its item from a signal of its own that is written only when the object
+  differs. The turn and request maps are memoised on their arrays, which the store replaces only when
+  a turn or a request changes. On a 1,240-card transcript this took a streamed event from about 34 ms
+  to about 5 ms, most of what is left being the projection itself.
 
 A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
