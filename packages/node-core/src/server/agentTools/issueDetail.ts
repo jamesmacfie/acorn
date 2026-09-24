@@ -12,14 +12,12 @@
 // Neither is in a summary, and neither is in the task-context prompt.
 import { z } from 'zod'
 import { listProviderConnections } from '../integrations/connections.ts'
+import { type ItemDetailDeps, providerDetailContext } from '../integrations/itemDetail.ts'
 import { integrationProviderRegistry } from '../integrations/registry.ts'
-import { runProviderResource } from '../integrations/resourceRuntime.ts'
-import type { IntegrationProviderContribution, ProviderDetailContext } from '../integrations/types.ts'
-import type { AppDatabase } from '../db/index.ts'
-import type { SecretService } from '../core/secrets.ts'
+import type { IntegrationProviderContribution } from '../integrations/types.ts'
 import { ToolError, type AgentToolContribution } from './registry.ts'
 
-export type IssueDetailDeps = { db: AppDatabase; secrets: SecretService }
+export type IssueDetailDeps = ItemDetailDeps
 
 const input = z.object({
   identifier: z.string().min(1).describe("the item's own id, such as 'ENG-42' for Linear or '142' for Rollbar"),
@@ -60,19 +58,7 @@ export function issueDetailTool(deps: IssueDetailDeps): AgentToolContribution {
       for (const provider of providers) {
         for (const connection of await listProviderConnections(deps.db, ctx.userLogin, provider.id)) {
           if (connection.status === 'disabled' || connection.status === 'needs-auth') continue
-          const context: ProviderDetailContext = {
-            resource: (resourceId, resourceInput, force) =>
-              runProviderResource({
-                db: deps.db,
-                userId: ctx.userLogin,
-                secrets: deps.secrets,
-                providerId: provider.id,
-                connectionId: connection.id,
-                resourceId,
-                input: resourceInput,
-                force: force ?? args.refresh,
-              }),
-          }
+          const context = providerDetailContext(deps, ctx.userLogin, provider.id, connection.id, args.refresh)
           try {
             const detail = await provider.detail!(context, args.identifier)
             if (detail) return { provider: provider.id, connectionId: connection.id, identifier: args.identifier, detail }

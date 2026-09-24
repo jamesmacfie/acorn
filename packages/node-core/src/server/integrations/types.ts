@@ -99,6 +99,31 @@ export type ProviderDetailContext = {
 // the first that answers, so null is the ordinary case, not a failure.
 export type ProviderItemDetail = (context: ProviderDetailContext, identifier: string) => Promise<unknown | null>
 
+// What core lends a provider for a write on one item. The resource method is there so the provider
+// can turn a display id into whatever its API keys a write off, reading its own cache to do it.
+export type ProviderWriteContext = ProviderDetailContext & {
+  secret: string
+  // A UUID, one per agent tool call. Send it as the write's own id where the tracker accepts one, so
+  // a call the agent's side retries after a lost reply cannot write twice.
+  idempotencyKey?: string
+}
+
+// The write behind core's `issue_comment` agent tool (docs/agent-tools.md § issue_comment). Posts
+// `body` on the item as the connection's owner. Null means this connection has no such item.
+export type ProviderItemComment = (
+  context: ProviderWriteContext,
+  identifier: string,
+  body: string,
+) => Promise<{ url?: string } | null>
+
+// The read behind core's `issue_image` agent tool. `url` is one the item's own detail contains, and
+// the provider decides whether it is a file it fetches with its credential. Null means it is not.
+// `data` is base64. Core checks the type and the size, so the provider does not have to.
+export type ProviderItemImage = (
+  context: { secret: string },
+  url: string,
+) => Promise<{ mimeType: string; data: string } | null>
+
 export type ReferenceCandidate = { displayId: string; url?: string; confidence: 'exact-url' | 'bare-id' }
 export type ReferenceResolver = {
   detectRefs(text: string): ReferenceCandidate[]
@@ -109,16 +134,6 @@ export type ReferenceResolver = {
 export type ExternalIdContract = {
   fromDisplay(connectionId: string, displayId: string): ExternalRef
   parse(raw: unknown, fallback: ExternalRef): ExternalRef | null
-}
-
-export type ProviderMutation = {
-  id: string
-  capability: string
-  risk: 'write' | 'execute'
-  freshness?: 'live-fetch-first'
-  invalidates: string[]
-  idempotent: boolean
-  run?: (args: { secret: string; input: Record<string, unknown> }) => Promise<unknown>
 }
 
 export type ProviderResourceContext = {
@@ -196,8 +211,11 @@ export type IntegrationProviderContribution = ConnectionProviderContribution & {
   // The read behind core's `issue_detail` agent tool. Absent means this provider offers summaries
   // only, and the tool says so rather than guessing at a resource input shape.
   detail?: ProviderItemDetail
+  // The agent's two other issue tools, each switched on by declaring its hook. `comment` must match
+  // `capabilities.comments: 'write'`, and `image` needs `detail`, because core checks the URL against it.
+  comment?: ProviderItemComment
+  image?: ProviderItemImage
   refs?: ReferenceResolver
-  mutations?: ProviderMutation[]
   budgets: ProviderBudgets
   memory: MemoryEvidencePolicy
   conformance?: {

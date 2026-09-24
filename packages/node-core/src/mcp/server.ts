@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
+import { isToolImageResult } from '@acorn/protocol/api.ts'
 import { apiGet, apiSend } from './api'
 
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
@@ -51,6 +52,7 @@ export function buildServer(): Server {
       { callId },
     )
     if (!res.ok) return text({ status: res.kind, detail: res.detail })
+    if (isToolImageResult(res.data)) return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
     return text(res.data)
   })
 

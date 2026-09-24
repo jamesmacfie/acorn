@@ -4,6 +4,7 @@ import { pluginAuthoringTool } from './pluginAuthoring.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
 import { issueDetailTool } from './issueDetail.ts'
+import { issueCommentTool, issueImageTool } from './issueTools.ts'
 import type { AppDatabase } from '../db/index.ts'
 import type { SecretService } from '../core/secrets.ts'
 import type { Env } from '../bindings.ts'
@@ -16,8 +17,8 @@ const OWNER = 'core'
 
 export type AgentToolsDeps = {
   db: AppDatabase
-  // Only `issue_detail` needs it, and only to hand a provider's own read the credential scope core
-  // already uses for the same resource on a route (./issueDetail.ts).
+  // Only the issue tools need it, to hand a provider's own calls the credential scope core already
+  // uses for the same resource on a route (./issueDetail.ts, ./issueTools.ts).
   secrets: SecretService
   /** Host bindings are present in production. Optional only for narrow registry fixtures. */
   env?: Env
@@ -175,8 +176,11 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     // The only tool that can put third-party code on this node, by asking rather than installing
     // (docs/agent-tools.md § plugin_request).
     pluginRequestTool(broadcastPluginApprovalNotice),
-    // The one read that leaves this node: a ticket or an error, from the tracker that owns it.
+    // A ticket or an error, from the tracker that owns it. The comment and image tools act only on an
+    // item this task links (./issueTools.ts).
     issueDetailTool(deps),
+    issueCommentTool(deps),
+    issueImageTool(deps),
     ...sourceTools(deps),
   ]
 }
