@@ -12,6 +12,7 @@ import {
   recordSample,
   onTelemetryActivity,
   currentActivity,
+  setSpansOnTimeline,
   setTelemetryEnabled,
   startClientTelemetry,
   startInteraction,
@@ -71,6 +72,19 @@ it('keeps the stack for a contribution rendering error', async () => {
     stack: error.stack,
     attrs: { 'contribution.id': 'palette.commands', owner: 'agents' },
   })
+})
+
+it('writes each span to the performance timeline while the local switch is on', () => {
+  start()
+  setTelemetryEnabled(true)
+  performance.clearMeasures('acorn:nav.change')
+  startInteraction('core', { name: 'nav.change', attrs: { seam: 'nav.change' } }).end()
+  expect(performance.getEntriesByName('acorn:nav.change')).toEqual([])
+  setSpansOnTimeline(true)
+  startInteraction('core', { name: 'nav.change', attrs: { seam: 'nav.change' } }).end()
+  const [entry] = performance.getEntriesByName('acorn:nav.change') as PerformanceMeasure[]
+  expect(entry?.detail).toMatchObject({ status: 'ok', seam: 'nav.change', owner: 'core' })
+  performance.clearMeasures('acorn:nav.change')
 })
 
 describe('the interaction trace', () => {

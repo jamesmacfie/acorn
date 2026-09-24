@@ -210,7 +210,7 @@ while using the app:
 | --- | --- | --- |
 | Helper | `ACORN_PERF=1` in the environment the shell was started from | `[helper:boot]` on **stderr** for handshake, plugin-cache sweep, bundled plugins trusted, `service.start`, node adopted, WebSocket bound, ready line. stderr and not stdout: stdout is the line protocol Rust parses |
 | Node | same variable | `[perf:request]` per request (method, matched route pattern, status, ms, response bytes, request id), plus `git` and SQLite histograms. The byte count is the response's `content-length`, and `-1` where it declares none, which is what a stream looks like |
-| Renderer | `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console for script start, node selected, plugins applied, tree built, first paint, `nodeReady`. A `localStorage` switch rather than the variable because a webview has no environment — Rust loads the renderer from a custom scheme rather than spawning it. The `performance.mark`s are made either way, so the devtools performance panel has the same labels with the switch off. With telemetry on, the same marks up to `nodeReady` also go to sinks as a `renderer.boot` span ([telemetry.md](./telemetry.md) § Renderer seams) |
+| Renderer | `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console for script start, node selected, plugins applied, tree built, first paint, `nodeReady`. A `localStorage` switch rather than the variable because a webview has no environment — Rust loads the renderer from a custom scheme rather than spawning it. The `performance.mark`s are made either way, so the devtools performance panel has the same labels with the switch off. With telemetry on, the same marks up to `nodeReady` also go to sinks as a `renderer.boot` span ([telemetry.md](./telemetry.md) § Renderer seams), and every renderer span is also written to the page's performance timeline (§ Timing a task switch) |
 | `acorn` | nothing | `[acorn:boot]` on exit for node open, App imported, tasks read, renderer created, first draw. Held rather than printed live, because stderr is the file the renderer draws on while it owns the terminal — a line written mid-session reads as the shell going to garbage. Printed after `renderer.destroy()`, beside the held Node warnings |
 
 The node's histograms count what it does over and over with nothing else counting it: `git status` and
@@ -253,6 +253,30 @@ watched from a terminal never records it. Bring the window to the front before r
 `tree built` instead: that one is printed synchronously when `render` returns, so it fires wherever the
 window is, and it is the end of the renderer's own work. The difference between the two is the
 compositor, which is the part a background window does not do.
+
+## Timing a task switch
+
+Renderer spans such as `nav.change`, `pane.region`, `pane.model`, and `api.request` go to telemetry
+sinks, and the one shipped sink forwards them to Sentry. To read them on your own machine, set
+`localStorage.setItem('acorn.perf', '1')`, reload, and turn telemetry on in Settings →
+Telemetry. Every span is then also a `performance.measure` named `acorn:<span name>`, with the
+span's attributes as its `detail`
+(`packages/client-core/src/infra/telemetry/emitter.ts`, `setSpansOnTimeline`). The devtools
+performance panel draws them, and `performance.getEntriesByType('measure')` returns them, which is
+how a WebDriver script against `pnpm dev:agent` reads a switch without a round trip inside the timed
+window. An `api.request` entry carries `responseBytes`, which the node's `[perf:request]` line
+cannot give for most routes because it prints `-1` for a response with no `content-length`.
+
+The spans stop at their own seams. `pane.region` ends when a region's content mounts, and
+`nav.change` ends on the second animation frame, so neither waits for a pane's data. A pane that
+draws from a store rather than a query, such as the agent transcript, fills in after both have
+ended. To time a switch to a populated pane, watch the pane's content in the page and take the
+moment it stops changing.
+
+Keep the window visible for the whole run. WebKit runs no animation frames for a window that is
+behind another window or on a locked screen, so `nav.change` never ends there, virtualized lists
+such as the diff rows never draw, and timers slow to about one per second. Synchronous work and
+request counts still measure correctly in a hidden window, but a paint does not happen.
 
 ## Build artifacts
 

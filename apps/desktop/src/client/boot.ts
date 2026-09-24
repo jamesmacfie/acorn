@@ -1,4 +1,4 @@
-import { emitSpan, newSpanId, newTraceId, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { emitSpan, newSpanId, newTraceId, setSpansOnTimeline, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 // The renderer's half of a cold-start timeline, and the two readers it has.
@@ -29,6 +29,10 @@ const printing = (() => {
     return false
   }
 })()
+
+// The same switch puts every renderer span on the performance timeline, which is how a task switch is
+// timed locally (docs/local-development.md § Timing a task switch). Spans still need telemetry on.
+setSpansOnTimeline(printing)
 
 /** The mark the account ends on. Everything before it is the window getting from nothing to a
  *  node it can use, which is the launch an owner waits through. */
