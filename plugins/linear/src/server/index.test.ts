@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { linearUploadTarget } from './routes/linear'
-import { issuesFilter, linearData, linearError, linearFetch, linearTeamScopeId, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
+import { issuesFilter, linearData, linearError, linearFetch, linearTeamScopeId, linearUploadTarget, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
 
 describe('linear server helpers', () => {
   afterEach(() => vi.unstubAllGlobals())

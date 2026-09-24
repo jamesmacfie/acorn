@@ -140,3 +140,30 @@ describe('linear item detail', () => {
     await expect(detailFor({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })).rejects.toThrow('provider_needs_auth')
   })
 })
+
+// Core runs these for the agent's issue_comment and issue_image, with the key unsealed and the
+// resource runtime lent back through `context.resource`.
+describe('linear agent hooks', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const cachedIssue = { ok: true as const, value: { id: 'issue-uuid', identifier: 'ENG-42' } }
+  const resource = (async () => cachedIssue) as never
+
+  it('comments on the issue UUID the cached detail carries, with the call id as the comment id', async () => {
+    const sent: unknown[] = []
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)).variables.input)
+      return Promise.resolve(new Response(JSON.stringify({ data: { commentCreate: { success: true, comment: { url: 'https://linear.app/c/1' } } } })))
+    }))
+    await expect(linearProvider.comment!({ resource, secret: 'lin_api_test', idempotencyKey: 'call-uuid' }, 'ENG-42', 'Done.'))
+      .resolves.toEqual({ url: 'https://linear.app/c/1' })
+    expect(sent).toEqual([{ issueId: 'issue-uuid', body: 'Done.', id: 'call-uuid' }])
+  })
+
+  it('fetches only upload-host images, and hands back a non-image without its bytes', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('video', { headers: { 'content-type': 'video/mp4' } }))))
+    await expect(linearProvider.image!({ secret: 'lin_api_test' }, 'https://evil.test/a.png')).resolves.toBeNull()
+    await expect(linearProvider.image!({ secret: 'lin_api_test' }, 'https://uploads.linear.app/w/clip.mp4'))
+      .resolves.toEqual({ mimeType: 'video/mp4', data: '' })
+  })
+})

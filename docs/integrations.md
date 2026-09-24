@@ -72,7 +72,7 @@ Every provider registers a `ConnectionProviderContribution`: connection lifecycl
 request budgets, and optionally a project source and a model catalog. A provider that also mirrors
 external items, such as GitHub or Linear, extends that into an `IntegrationProviderContribution`,
 adding the external-id contract, mirrored resources, a codec, task-context formatting, item detail,
-reference resolution, and mutations. Two registries hold them: the connection registry holds every provider,
+the agent's comment and image hooks, and reference resolution. Two registries hold them: the connection registry holds every provider,
 and the integration registry holds only the ones that extend it. Model providers such as OpenAI and
 Anthropic register in the connection registry only, because they have nothing to mirror.
 
@@ -103,6 +103,32 @@ Why the tool lives in core and the read lives here: `issue_detail` is the stable
 every connected issue and error provider. A loaded plugin can declare its own task-scoped tool, but
 that would be provider-specific rather than automatically covering other providers. For the full
 contract, see [agent tools](./agent-tools.md) § issue_detail.
+
+Core also calls `detail` when a task gains a link, at creation or later, without waiting on it. That
+fills the cache, so the task context an agent starts from names each linked item by title and state
+instead of reporting it missing. A failure leaves the item as uncached as it was.
+
+### Comments and images
+
+Two more hooks sit beside `detail`, and each one switches on a core agent tool. A tracker opts in by
+declaring the hook, and writes no tool code of its own.
+
+`comment(context, identifier, body)` is the write behind `issue_comment`. It posts `body` as the
+person who owns the connection and returns the comment's URL, or `null` when this connection has no
+such item. The context carries the unsealed key, the same `resource` method `detail` gets, and an
+`idempotencyKey`. That key is the agent's tool call ID, a UUID. A tracker that accepts a
+client-chosen ID for a new comment should use it, so a retried call cannot post twice. The registry
+refuses a provider that declares `capabilities.comments: 'write'` without `comment`, or the reverse.
+
+`image(context, url)` is the read behind `issue_image`. It returns `{ mimeType, data }` with the data
+in base64, or `null` when the URL is not one this provider fetches with its key. The provider owns
+that decision. Linear accepts only its private upload host. Core checks the type and the size, so
+the hook does not have to. It requires `detail`, because core first checks that the URL appears in
+the item's own detail.
+
+Both tools act only on an item linked to the agent's task, and they get the connection from that
+link. Hooks run inside core's secret scope with the owner's key, so a loaded plugin can offer them
+even though its own routes refuse a task-scoped caller the credential.
 
 ## Project sources
 
@@ -186,7 +212,8 @@ task with no Linear link rather than a link into the wrong workspace
 Linear ships as a loaded plugin. Its rail source lists issues, promotes one to a task with the
 issue's own suggested branch, links issues, posts comments, recognises `linear.app` issue URLs, and
 renders the reference panel github's PR detail shows, all as manifest descriptors and a sandboxed
-frame rather than compiled contributions. It contributes a project source, so its workspaces appear
+frame rather than compiled contributions. Its provider declares `detail`, `comment`, and `image`, so
+an agent on a task can read a linked ticket, comment on it, and view the screenshots in it. It contributes a project source, so its workspaces appear
 in core's project picker.
 
 A workspace can map a Linear team as well as a Linear project. An issue belongs to exactly one team

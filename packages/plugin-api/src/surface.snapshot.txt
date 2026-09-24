@@ -109,6 +109,7 @@ client: TaskRowTarget
 client: TaskSlotContribution
 client: UiSlotContribution
 client: VersionedDataValue
+client: VisibleElementRect
 client: WorkflowNotice
 client: Workspace
 client: activateTaskSignals
@@ -160,6 +161,7 @@ client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
 client: effectiveModelPick
+client: elementRectKey
 client: fileStatusMeta
 client: focusedPane
 client: formatFileReference
@@ -266,6 +268,7 @@ client: splitRefTokens
 client: summarizeFileStats
 client: taskBridge
 client: taskStatus
+client: taskStatusRevision
 client: tasksKey
 client: tasksOptions
 client: telemetryFor
@@ -275,6 +278,7 @@ client: token
 client: tokenizeAnsiLines
 client: tunnelUrl
 client: validateDataValue
+client: visibleElementRect
 client: watchAppearance
 client: workspaceExternalProjectsKey
 client: workspaceExternalProjectsOptions
@@ -402,11 +406,14 @@ node: ProfileDef
 node: ProjectRef
 node: ProvidedNodeRecord
 node: ProviderDetailContext
+node: ProviderItemComment
 node: ProviderItemDetail
+node: ProviderItemImage
 node: ProviderOperationError
 node: ProviderProjectSource
 node: ProviderResourceContext
 node: ProviderResourceRefreshContext
+node: ProviderWriteContext
 node: QueryBindingContext
 node: QueryBindings
 node: QueryConsumer

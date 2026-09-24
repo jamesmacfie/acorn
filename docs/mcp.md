@@ -27,9 +27,10 @@ registered groups are:
 
 - Task and pull-request context, from core: `task_current`, `task_context`, `pr_current`,
   `pr_changed_files`, `linked_issues`, `repo_info`.
-- One issue or error in full, from core over whichever provider owns it: `issue_detail`. The tool is
-  core's because Linear and Rollbar ship loaded and cannot register a tool; the read is theirs
-  (docs/agent-tools.md § issue_detail).
+- Issues and errors, from core over whichever provider owns them: `issue_detail` reads one in full,
+  `issue_comment` posts on a linked one, and `issue_image` returns an image from a linked one as an
+  image block. The tools are core's, so one name covers every tracker and the provider's key stays in
+  core's secret scope. Each call is the provider's own hook (docs/agent-tools.md § issue_detail).
 - Plugin authoring and the install request, from core: `plugin_authoring`, `plugin_request`.
 - Typed-source metadata, from core: `data_sources_list`, `data_sources_discover`,
   `data_source_describe`, and `data_source_options`.

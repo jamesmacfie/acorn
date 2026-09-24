@@ -17,9 +17,11 @@ class IntegrationProviderRegistry {
 
   register(provider: IntegrationProviderContribution, owner?: string): void {
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate integration provider '${provider.id}'.`)
-    if (provider.capabilities.comments === 'write') {
-      const mutation = provider.mutations?.find((item) => item.capability === 'comments')
-      if (!mutation?.invalidates.length) throw new Error(`Provider '${provider.id}' declares writable comments without an invalidating mutation.`)
+    if ((provider.capabilities.comments === 'write') !== !!provider.comment) {
+      throw new Error(`Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`)
+    }
+    if (provider.image && !provider.detail) {
+      throw new Error(`Provider '${provider.id}' declares \`image\` without \`detail\`, which core reads to check the URL.`)
     }
     if (provider.capabilities.contextFormat && (!provider.codec || !provider.taskContext)) {
       throw new Error(`Provider '${provider.id}' declares context formatting without a codec and formatter.`)

@@ -100,6 +100,30 @@ it rather than the not-found, because a 401 from the workspace that owns the tic
 A provider that declares no `detail` offers summaries only. Naming it explicitly is a `bad_request`
 that says so, and when no provider declares one the tool's `when` withholds it entirely.
 
+## issue_comment and issue_image
+
+`issue_comment` posts a comment on an issue, and is write-tier. `issue_image` returns one image from
+an issue, such as a screenshot in a Linear ticket, and is read-tier. Both live in
+`packages/node-core/src/server/agentTools/issueTools.ts` and follow the `issue_detail` split. Core
+owns the tool, and each provider owns the call through its `comment` or `image` hook
+([integrations](./integrations.md) § Comments and images).
+
+Unlike `issue_detail`, both tools act only on an item linked to the task. The link names the
+connection, so neither tool asks each workspace in turn. An agent also cannot comment on a ticket
+nobody attached to its work, or use the owner's key to read files from one. An unlinked identifier is
+`not_found`, and the message tells the agent to ask the user to link it.
+
+`issue_comment` also checks the capability the connection was granted, which can be narrower than
+what the provider offers. It passes the tool call ID to the hook as `idempotencyKey`. After a
+successful post, it refreshes the item's cached detail in the background, so the next `issue_detail`
+shows the new comment. The comment appears under the name of the person who connected the tracker,
+and the tool description tells the agent so.
+
+`issue_image` accepts a URL only if it appears in the item's detail, so the key fetches nothing the
+ticket does not reference. It accepts PNG, JPEG, GIF, and WebP up to 5 MB. Its result is a
+`ToolImageResult` (`@acorn/protocol/api.ts`), and the MCP server returns it as an image block instead
+of JSON text. That is the only tool result the MCP server treats differently.
+
 ## Loaded manifest carriers
 
 A loaded package does not receive the live `ctx.tools` or `ctx.contextSections` registries. It
