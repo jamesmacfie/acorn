@@ -17,7 +17,7 @@ import type { Size, Tone } from '../tokens/tokens'
 // buys, and docs/ui-design.md § The closed kit for the node set it closes.
 
 /** The delegated tooltip, as props rather than attributes. See docs/ui-design.md § Tooltips: the
- *  contract is still four data attributes on the element, but only the kit writes them now. */
+ *  contract is still data attributes on the element, but only the kit writes them now. */
 type Tipped = {
   tip?: string
   /** The second line: what happens, where the tip's first line is what it is. */
