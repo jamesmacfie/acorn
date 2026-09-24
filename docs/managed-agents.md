@@ -463,6 +463,40 @@ rows still being created. The child inherits the intersection of the parent's si
 and any narrower ceiling requested at spawn. General session configuration updates cannot widen or
 remove that persisted ceiling.
 
+### Reports back to the owner
+
+A turn an owner queues on its child, through `agent_spawn` or `agent_prompt`, carries a `delegation`
+context part and, for a managed owner, `reportTo` in its effective policy
+(`plugins/agents/src/server/delegation/reports.ts`). The context part names the owner and tells the
+child that its final message is its report. It also tells the child to end the turn with a question
+when it needs a decision, instead of asking the user. A turn the user types into the child's own pane
+has neither, and does not report.
+
+When a `reportTo` turn settles as completed, failed, cancelled, or interrupted, the Agents plugin
+queues one `delegation_report` turn on the owner. The report text holds the child's title, the
+outcome, any error, the final assistant message cut to its last 8 KiB, and the validated structured
+result when the turn declared a `resultSchema`. A `delegation_report` context part names the child
+and links to it. The report queues behind whatever the owner is doing and never steers an active
+turn. The owner answers by calling `agent_prompt`, and that turn reports in its turn.
+
+The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
+the post-commit `turn-changed` broadcast, which every settle path already sends. It is not durable,
+so the startup reconcile pass looks for settled `reportTo` turns with no report and queues the
+missing ones. No report is queued in these cases:
+
+- The owner cancelled the turn itself with `agent_cancel`.
+- The owner session is archived or failed.
+- The owner already holds 100 reports. Further results stay readable through `agent_read`.
+
+A report still queued when the owner reads that result through `agent_read`, or cancels the turn,
+is withdrawn. A read that lands between the child settling and its report being queued can leave one
+redundant report. A terminal owner has no session to wake and keeps using `agent_wait` and
+`agent_read`.
+
+The transcript labels a `delegation` turn "From" and the owner's title, and a `delegation_report`
+turn "From" and the child's title, using the matching context part
+(`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
+
 ## Web activity
 
 A reader should be able to answer, from the transcript alone, what an agent searched for, which pages

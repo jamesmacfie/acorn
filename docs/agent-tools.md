@@ -284,6 +284,11 @@ returning malformed structured output. Reads page the durable event sequence, fo
 omit verbose tool and attachment payloads, cap individual text items at 16 KiB, and cap projected
 text at 64 KiB per response. Waits last at most 30 seconds and a timeout does not cancel the child.
 
+A managed owner does not have to stay in its turn to wait. When a turn it gave a child settles, the
+Agents plugin queues one `delegation_report` turn on the owner with the child's final message, and
+withdraws it if the owner reads that result with `agent_read` first. See
+[managed-agents.md](./managed-agents.md#reports-back-to-the-owner).
+
 ## Context sections
 
 Plugins register context sections through the Node context-section registry. Each contribution
