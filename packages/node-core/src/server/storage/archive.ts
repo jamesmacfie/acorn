@@ -9,11 +9,11 @@ import { promisify } from 'node:util'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
+import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult } from '@acorn/protocol/terminal.ts'
 import { getProjectConfig } from '../projectConfig'
-import { projectForTask, waitForTaskWorktreeCreation } from '../worktrees/taskWorktree'
+import { isDir, loadTask, projectForTask, resolveTaskCwd, toTaskRef, waitForTaskWorktreeCreation } from '../worktrees/taskWorktree'
 import { buildSessionEnv } from '../taskEnv'
-import { removeWorktree } from '../worktrees/worktrees'
+import { branchExists, removeWorktree } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
 
@@ -146,4 +146,38 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
     ...(checkFailures.length ? { cleanupFailed: checkFailures } : {}),
     ...(reviewCaptureFailed ? { reviewCaptureFailed: true } : {}),
   }
+}
+
+// Put an archived task back (docs/workspaces-and-tasks.md § Restoring a task). Archive kept the row,
+// the branch, and every plugin's data, so this is a status flip plus rebuilding the worktree.
+//
+// The worktree is rebuilt now rather than by the first pane that asks for it, because the two ways it
+// fails (the branch is checked out somewhere else, or it no longer exists) need the owner, and a pane
+// that silently gets no folder would hide both. A failed rebuild leaves the task archived.
+export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts = {}): Promise<RestoreResult> {
+  const t = await loadTask(db, id)
+  if (!t) return { ok: false, reason: 'Task not found.' }
+  if (t.status === 'active') return { ok: true }
+  if (t.status !== 'archived') return { ok: false, reason: 'Only an archived task can be restored.' }
+  const project = await projectForTask(db, t)
+  const checkout = project?.vcs === 'git' && project.path && isDir(project.path) ? project.path : null
+  const branch = checkout ? t.branch : null
+  // A pull request task fetches its head again, so only a local branch can be lost for good.
+  if (checkout && branch && t.pullNumber == null && !opts.newBranch && !(await branchExists(checkout, branch))) {
+    return { ok: false, reason: `Branch '${branch}' no longer exists.`, branchMissing: true }
+  }
+  await db.update(schema.tasks).set({ status: 'active', archivedAt: null, updatedAt: Date.now() }).where(eq(schema.tasks.id, id))
+  if (checkout && branch) {
+    try {
+      await resolveTaskCwd(db, toTaskRef(t), checkout)
+    } catch (err) {
+      await db
+        .update(schema.tasks)
+        .set({ status: 'archived', archivedAt: t.archivedAt, worktreePath: null, updatedAt: Date.now() })
+        .where(eq(schema.tasks.id, id))
+      return { ok: false, reason: err instanceof Error ? err.message : 'Could not rebuild the worktree.' }
+    }
+  }
+  broadcastTasksChanged({ taskId: id })
+  return { ok: true }
 }

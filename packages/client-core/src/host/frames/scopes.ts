@@ -71,6 +71,17 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/tasks/${SEG}/context`), scopes: { GET: 'core.tasks:read' } },
   { path: shape(`/v2/core/tasks/${SEG}/archive`), scopes: { POST: 'core.tasks:write' } },
   {
+    path: shape(`/v2/core/tasks/${SEG}/restore`),
+    scopes: {},
+    note: 'Restore rebuilds the worktree and runs the project setup script, so it is an owner act from '
+      + 'the archive page, not something a frame can trigger.',
+  },
+  {
+    path: shape('/v2/core/search'),
+    scopes: {},
+    note: 'Reaches every task\'s history across every plugin. Device-only on the node as well.',
+  },
+  {
     path: shape(`/v2/core/tasks/${SEG}/archive-concerns`),
     scopes: {},
     note: 'Every plugin\'s answer about archiving this task, in one list. No scope, because reading '

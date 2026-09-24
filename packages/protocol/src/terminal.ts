@@ -61,6 +61,17 @@ export type ArchiveResult =
   | { ok: true; cleanupFailed?: string[]; reviewCaptureFailed?: boolean }
   | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
 
+// `branchMissing` means the task's local branch is gone, often because a merged pull request deleted
+// it. Restoring anyway puts the task on a new branch cut from the project checkout, so the caller asks
+// first and retries with `newBranch`.
+export type RestoreResult =
+  | { ok: true }
+  | { ok: false; reason: string; branchMissing?: boolean }
+
+export type RestoreOpts = {
+  newBranch?: boolean
+}
+
 export type ArchiveOpts = {
   deleteWorktree?: boolean
   force?: boolean

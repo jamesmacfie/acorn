@@ -32,7 +32,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
-| [unarchive.md](./unarchive.md) | A page to search, preview, and restore archived tasks: what archive deletes today, a search seam plugins opt into, and the agent index fix search needs first. | Proposal, 2026-09-24. Not started. |
+| [unarchive.md](./unarchive.md) | A page to search, preview, and restore archived tasks: what the verification found, where each part is written up, and what was left out. | Shipped, 2026-09-24. Manual smoke owed; more search providers not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [data-capability.md](./data-capability.md) | Historical landing page for the host-owned `ctx.core.data` facet; the owning docs are `database.md`, `data-layer.md`, and the plugin manifest guide. | Shipped, 2026-09-16. |
 

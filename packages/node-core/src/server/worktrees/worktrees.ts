@@ -14,7 +14,7 @@ import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from '.
 // execFile takes an argument array, never a shell. The branch is slugged for the directory name and
 // isContainedPath guards the result.
 
-async function branchExists(checkout: string, branch: string): Promise<boolean> {
+export async function branchExists(checkout: string, branch: string): Promise<boolean> {
   try {
     await gitOrThrow(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: checkout, timeoutMs: 10_000 })
     return true

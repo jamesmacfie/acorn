@@ -23,6 +23,9 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   order: 15,
   defaultChord: 'meta+shift+a',
   requires: { plugin: 'agents' },
+  // Transcripts are stored rows, so an archived task's sessions read as they were. The detail region
+  // turns the composer off for one (./sessions/AgentPane.tsx).
+  readsArchived: true,
   minWidth: 640,
   layout: 'list-detail',
   // The session list, which one is open, its snapshot subscription and the rename/archive dialog,

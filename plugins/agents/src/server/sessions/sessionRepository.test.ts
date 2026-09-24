@@ -178,3 +178,94 @@ describe('finding a run by what it did on the web', () => {
     expect(await store.searchSessions('vogonpoetry')).toEqual([])
   })
 })
+
+// A reply arrives as many small `append` events. The index holds each message once, on its first event,
+// so a search for two words matches however the stream happened to split them.
+describe('searching a streamed reply', () => {
+  let ctx: TestNodeContext
+  let store: AgentStore
+
+  beforeEach(() => {
+    ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    store = new AgentStore(ctx.storage.open(), ctx.core)
+  })
+
+  afterEach(() => {
+    ctx.cleanup()
+  })
+
+  const session = () => store.createSession({
+    taskId: randomUUID(),
+    providerId: 'fake',
+    profileId: 'fake',
+    kind: 'interactive',
+    config: {},
+  }, PROVIDER)
+  const chunk = (text: string) => ({ type: 'assistant_message' as const, text, messageId: 'm1', append: true })
+
+  it('indexes the whole message on its first event, and nothing on the rest', async () => {
+    const created = await session()
+    const first = await store.recordEvent(created.id, 'turn-1', chunk('The flux ca'))
+    const rest = [
+      await store.recordEvent(created.id, 'turn-1', chunk('pacitor is ')),
+      await store.recordEvent(created.id, 'turn-1', chunk('charged')),
+    ]
+    expect(rest.map((event) => event.searchText)).toEqual([null, null])
+    const stored = (await store.snapshot(created.id)).events.find((event) => event.id === first.id)
+    expect(stored?.searchText).toBe('The flux capacitor is charged')
+    expect((await store.searchSessions('flux capacitor charged')).map((row) => row.id)).toEqual([created.id])
+  })
+
+  it('starts a new message after anything that is not the same stream', async () => {
+    const created = await session()
+    await store.recordEvent(created.id, 'turn-1', chunk('before the '))
+    await store.recordEvent(created.id, 'turn-1', { type: 'tool', tool: { id: 't', title: 'Run', status: 'completed' } })
+    const after = await store.recordEvent(created.id, 'turn-1', chunk('tool call'))
+    expect(after.searchText).toBe('tool call')
+    // The two halves were never one message, so no indexed row holds both words.
+    expect(await store.searchSessions('the tool')).toEqual([])
+  })
+
+  it('ranks a word in the conversation above the same word in tool output', async () => {
+    const inTool = await session()
+    await store.recordEvent(inTool.id, null, { type: 'tool', tool: { id: 't', title: 'cat', status: 'completed', output: 'marvin marvin marvin' } })
+    const inReply = await session()
+    await store.recordEvent(inReply.id, null, { type: 'assistant_message', text: 'marvin said hello' })
+    expect((await store.searchSessions('marvin')).map((row) => row.id)).toEqual([inReply.id, inTool.id])
+  })
+})
+
+// The archive page's search provider. The caller picks the tasks, so an archived session counts, and a
+// session in any other task does not.
+describe('searching the sessions of chosen tasks', () => {
+  let ctx: TestNodeContext
+  let store: AgentStore
+
+  beforeEach(() => {
+    ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    store = new AgentStore(ctx.storage.open(), ctx.core)
+  })
+
+  afterEach(() => {
+    ctx.cleanup()
+  })
+
+  const session = (taskId: string) => store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, PROVIDER)
+
+  it('finds an archived session in scope, with an excerpt, and nothing outside it', async () => {
+    const archived = await session('task-a')
+    await store.recordEvent(archived.id, null, { type: 'assistant_message', text: 'The improbability drive is warm.' })
+    await store.patchSession(archived.id, { archived: true })
+    const elsewhere = await session('task-b')
+    await store.recordEvent(elsewhere.id, null, { type: 'assistant_message', text: 'Another improbability entirely.' })
+
+    const hits = await store.searchTaskSessions('improbability drive', ['task-a'], 10)
+    expect(hits).toEqual([{
+      taskId: 'task-a',
+      title: archived.title,
+      preview: expect.stringContaining('improbability drive'),
+      target: { kind: 'managed-agent', resourceId: archived.id },
+    }])
+    expect(await store.searchTaskSessions('improbability', [], 10)).toEqual([])
+  })
+})
