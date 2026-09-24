@@ -932,6 +932,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../editor
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1229,6 +1232,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../editor
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

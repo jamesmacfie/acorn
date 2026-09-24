@@ -90,6 +90,7 @@ describe('editor routes over a real worktree', () => {
     const app = authed()
     expect(await (await app.fetch(req('/api/tasks/task1/editor/read?path=hello.txt'), {} as Env)).json()).toEqual({ text: 'hi there' })
     expect(await (await app.fetch(req('/api/tasks/task1/editor/root'), {} as Env)).json()).toEqual({ root: work })
+    expect(await (await app.fetch(req('/api/tasks/task1/editor/line-markers?path=hello.txt'), {} as Env)).json()).toEqual([])
     const list = (await (await app.fetch(req('/api/tasks/task1/editor/list?path='), {} as Env)).json()) as { name: string; dir: boolean }[]
     expect(list.find((e) => e.name === 'sub')).toEqual({ name: 'sub', dir: true })
     expect(list.find((e) => e.name === 'hello.txt')).toEqual({ name: 'hello.txt', dir: false })
@@ -102,6 +103,23 @@ describe('editor routes over a real worktree', () => {
     const res = await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/a.ts', content: 'export const a = 2\n' }), {} as Env)
     expect(await res.json()).toEqual({ ok: true })
     expect(readFileSync(join(work, 'sub', 'a.ts'), 'utf8')).toBe('export const a = 2\n')
+  })
+
+  it('merges optional marker providers and keeps a failed source isolated', async () => {
+    setEditorBridge(editorBridge(
+      { tasks: createTaskService(t.db), fs: coreFs },
+      () => {},
+      undefined,
+      () => [
+        { kind: 'pull-request', read: async () => [{ from: 2, to: 3 }, { from: 3, to: 4 }] },
+        { kind: 'pull-request', read: async () => [{ from: 8, to: 8 }] },
+        { kind: 'uncommitted', read: async () => { throw new Error('status unavailable') } },
+      ],
+    ))
+    const response = await authed().fetch(req('/api/tasks/task1/editor/line-markers?path=hello.txt'), {} as Env)
+    expect(await response.json()).toEqual([
+      { kind: 'pull-request', ranges: [{ from: 2, to: 4 }, { from: 8, to: 8 }] },
+    ])
   })
 
   it('rejects path traversal on read (403) and write ({ok:false}) — outside file untouched', async () => {
@@ -126,6 +144,7 @@ describe('editor routes over a real worktree', () => {
   it('400s a malformed write body; 401s without a principal', async () => {
     expect((await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: '' }), {} as Env)).status).toBe(400)
     expect((await authed().fetch(req('/api/tasks/task1/editor/read'), {} as Env)).status).toBe(400)
+    expect((await authed().fetch(req('/api/tasks/task1/editor/line-markers'), {} as Env)).status).toBe(400)
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api/tasks', editor)
     expect((await gated.fetch(req('/api/tasks/task1/editor/root'), {} as Env)).status).toBe(401)
   })

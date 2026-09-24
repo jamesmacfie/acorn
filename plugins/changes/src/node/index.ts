@@ -4,6 +4,8 @@ import { changesArchiveConcern } from '../server/archiveCheck'
 import { CHANGES_HOOKS, localGitBridge } from '../server/localGit'
 import { localGit, LOCAL_GIT } from '../server/routes/localGit'
 import { reviewNotesRoutes } from '../server/routes/reviewNotes'
+import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import { uncommittedEditorLineMarkers } from '../server/editorLineMarkers'
 
 export const changesPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
@@ -28,6 +30,10 @@ export const changesPlugin = (): NodePlugin => {
     for (const point of CHANGES_HOOKS) ctx.hooks.declare({ ...point, allows: [...point.allows] })
     const bridge = localGitBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)
     capability = ctx.capabilities.provide(LOCAL_GIT, bridge)
+    ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
+      id: 'uncommitted',
+      value: uncommittedEditorLineMarkers(ctx.core),
+    })
     // Task check: warns about uncommitted work the archive would discard
     // (docs/plugins.md § Task checks; details in main/archiveCheck.ts).
     ctx.taskChecks.register({ id: 'uncommitted', check: (task) => changesArchiveConcern(bridge, task) })

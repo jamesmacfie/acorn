@@ -27,6 +27,10 @@ const write = vi.fn(async (_taskId: string, path: string, content: string) => {
   return { ok: true as const }
 })
 const read = vi.fn(async (_taskId: string, path: string) => disk.get(path) ?? '')
+const lineMarkers = vi.fn(async (_taskId: string, _path: string) => [
+  { kind: 'pull-request' as const, ranges: [{ from: 1, to: 1 }] },
+  { kind: 'uncommitted' as const, ranges: [{ from: 1, to: 1 }] },
+])
 // The checkout path, which the pane now reads through the query cache. A test that wants to see what
 // the pane does *while* that request is outstanding replaces this with a promise it holds open.
 let root: () => Promise<string | null> = async () => '/worktree'
@@ -39,6 +43,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     list: async () => [],
     files: async () => [...disk.keys()],
     read: (taskId: string, path: string) => read(taskId, path),
+    lineMarkers: (taskId: string, path: string) => lineMarkers(taskId, path),
     write: (taskId: string, path: string, content: string) => write(taskId, path, content),
   }),
 }))
@@ -82,6 +87,7 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
   read.mockClear()
+  lineMarkers.mockClear()
   read.mockImplementation(async (_taskId, path) => disk.get(path) ?? '')
   quitEditor = undefined
   localStorage.clear()
@@ -121,6 +127,17 @@ const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
 describe('the editor pane', () => {
+  it('draws independent adjacent markers for PR and uncommitted lines', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+
+    const firstLine = view.contentDOM.querySelector('.cm-line')
+    expect(firstLine?.classList.contains('cm-line-pull-request')).toBe(true)
+    expect(firstLine?.classList.contains('cm-line-uncommitted')).toBe(true)
+  })
+
   it('selects a tab and its file-tree row before the document read finishes', async () => {
     editorOpen(taskId, 'a.ts', false)
     editorOpen(taskId, 'b.ts', false)
