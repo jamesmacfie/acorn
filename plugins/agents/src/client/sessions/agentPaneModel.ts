@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import {
-  activeNodeId, activeTaskId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type Task,
+  activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
@@ -42,7 +42,7 @@ export type AgentPaneModel = ReturnType<typeof createAgentPaneModel>
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
   provider?.capabilities.includes(name as never) ?? false
 
-export function createAgentPaneModel(task: Task) {
+export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [error, setError] = createSignal('')
   const [creating, setCreating] = createSignal(false)
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
@@ -92,9 +92,11 @@ export function createAgentPaneModel(task: Task) {
 
   // Acknowledge on view. The node keeps `attention: completed` until the owner speaks again, so a
   // finished session sits in "Needs you" long after they have read it. Looking at it, in a focused
-  // window, is the acknowledgement (client-core attentionInbox.ts).
+  // window, is the acknowledgement (client-core attentionInbox.ts). Looking means the pane is drawn,
+  // not that the task is the active one: the active task stays set behind a rail source such as Home,
+  // and this model outlives the pane.
   const acknowledgeCompleted = (): void => {
-    if (activeTaskId() !== task.id || !defaultDeliveryContext.focused()) return
+    if (!pane.shown() || !defaultDeliveryContext.focused()) return
     const nodeId = activeNodeId() ?? ''
     for (const session of taskSessions())
       if (session.attention === 'completed') markAttentionSeen(nodeId, agentAttentionItemId(session.id))
@@ -109,10 +111,13 @@ export function createAgentPaneModel(task: Task) {
     onCleanup(() => window.removeEventListener('focus', acknowledgeCompleted))
   }
 
+  // Mark read what the reader can see. Only while the pane is drawn, because the host keeps this model
+  // after they leave, and a read mark also sets the session's attention to none on the node: marking
+  // from the background cleared "Needs you" on sessions nobody had looked at. Coming back re-runs this.
   let readTimer: ReturnType<typeof setTimeout> | null = null
   createEffect(() => {
     const session = selected()
-    if (!session || session.lastEventSeq <= session.lastReadSeq) return
+    if (!pane.shown() || !session || session.lastEventSeq <= session.lastReadSeq) return
     if (readTimer) clearTimeout(readTimer)
     readTimer = setTimeout(() => {
       void managedAgentApi.patch(session.id, { lastReadSeq: session.lastEventSeq })

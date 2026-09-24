@@ -82,7 +82,9 @@ the button offered is the one that can work.
 Nothing here watches the filesystem. The panel re-reads on its own mutations, on the rail's status poll
 every 10 seconds, and on `head:changed` ([api-reference.md](./api-reference.md) § Events). An agent's
 file save shows up within 10 seconds and an agent's commit within one poll, which is the same freshness
-the rail's dirty marker has.
+the rail's dirty marker has. The poll and `head:changed` only count while the pane is drawn. The host keeps
+the pane's model after the reader leaves the task, and a refresh missed then is made once when the
+pane is drawn again ([panes.md](./panes.md) § Layout model).
 
 The list draws three groups: Conflicts, Tracked, and Untracked. An unmerged file has its own status
 rather than reading as a modification, it has no line counts, and it has no checkbox, because git's

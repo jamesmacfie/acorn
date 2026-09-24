@@ -257,7 +257,9 @@ it, so a run that finishes on the task you are watching is quiet for the same re
 
 A finished turn is a state the node keeps until the owner speaks again, so it sits in "Needs you"
 long after they have read it. So does a memory proposal nobody has reviewed. Looking at the session,
-in a focused window, retires it, and so does "Mark all read" in the bell.
+in a focused window, retires it, and so does "Mark all read" in the bell. Looking means the agent pane
+is drawn, not that its task is the active one: the active task stays set behind Home, and the pane's
+model outlives the pane ([panes.md](./panes.md) § Layout model).
 
 `packages/client-core/src/features/notifications/attentionInbox.ts` holds a session-only set keyed by
 node id and the row's own id. A row whose key is in the set is hidden from the inbox and from the pill.

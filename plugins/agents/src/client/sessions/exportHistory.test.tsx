@@ -39,7 +39,7 @@ const runExport = async (id: 'export-markdown' | 'export-json') =>
   await new Promise<void>((resolve) => {
     createRoot((dispose) => {
       managedAgentStore.upsertSession(session)
-      const model = createAgentPaneModel({ id: 't1' } as Task)
+      const model = createAgentPaneModel({ id: 't1' } as Task, { shown: () => true })
       model.sessionActions().find((entry) => entry.id === id)!.run()
       queueMicrotask(() => { dispose(); resolve() })
     })

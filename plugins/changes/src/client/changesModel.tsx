@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
-  sendReferenceToAgent, sendToSession, taskStatusRevision, type Task,
+  sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
@@ -36,7 +36,7 @@ const CHANGES_ROUTE_KEY = 'changes'
 
 export type ChangesModel = ReturnType<typeof createChangesModel>
 
-export function createChangesModel(task: Task) {
+export function createChangesModel(task: Task, pane: PaneModelContext) {
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
@@ -58,19 +58,30 @@ export function createChangesModel(task: Task) {
     },
     { initialValue: emptyLocalStatus() },
   )
+  // Only while the pane is drawn. The host keeps this model after the reader leaves the task, and each
+  // refetch is a `git status` and two numstat reads on the node, every poll, for a list nobody can
+  // see. One refresh skipped that way is owed, and is paid once when the pane is drawn again.
+  let owed = false
+  const refresh = () => {
+    if (isArchiving(task.id)) return
+    if (!pane.shown()) owed = true
+    else void refetch()
+  }
+  createEffect(on(pane.shown, (shown) => {
+    if (!shown || !owed) return
+    owed = false
+    void refetch()
+  }, { defer: true }))
   // The rail's status poll is the refresh signal. Its summary keeps the same object when the dirty
   // count, branch and HEAD are unchanged, but this list has more information than that summary: one
   // file can replace another, or its line counts can move, without changing any rail marker.
-  createEffect(on(taskStatusRevision, () => {
-    if (isArchiving(task.id)) return
-    void refetch()
-  }, { defer: true }))
+  createEffect(on(taskStatusRevision, refresh, { defer: true }))
   // A commit is not a file change, so the dirty poll above does not see one: an agent committing in
   // its terminal leaves a clean tree and a branch one commit further ahead. `head:changed` is the
   // node noticing HEAD moved, and it is what makes the ahead count move within a poll rather than
   // waiting for the next edit (docs/diff-rendering.md § Data flow).
   onCleanup(clientEvents.on('head:changed', (event) => {
-    if (event.taskId === task.id) void refetch()
+    if (event.taskId === task.id) refresh()
   }))
 
   const groups = createMemo(() => groupChanges(status().changes))

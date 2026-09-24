@@ -226,6 +226,15 @@ The seam exists because four compiled panes had each hand-rolled the same per-ta
 the admission rule's own test. A pane whose regions share nothing omits `model` and its regions are
 handed `undefined`.
 
+The model outlives the pane that asked for it. The host keeps one per pane, and a model stays until a
+different task asks for that pane or the task is evicted, so after the reader moves on its effects
+keep running with nobody looking. The host therefore calls `model(task, pane)`, and `pane.shown()` is
+true only while a mounted pane is drawing that task. It is false on another task, behind a rail source
+such as Home, and while the same task shows a different pane. An effect that polls, or marks something
+as seen, reads it first. The agent pane marks sessions read and acknowledges finished turns only while
+it is drawn, and the changes pane skips the status poll while hidden and refetches once when it is
+drawn again.
+
 **The model is also what makes a pane cheap to close and open again.** A pane drawing itself with one
 `component` rather than a layout can reach for the same holder directly — `paneModel(paneId, taskId,
 build)` on `@acorn/plugin-api/client` — and the editor does, for its per-file documents: the text, the

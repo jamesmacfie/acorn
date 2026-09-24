@@ -17,7 +17,7 @@
 // inside that bundle already is the shared thing (`mountTree({ list, detail })`); this seam exists
 // because a compiled plugin's regions are components in the shell's realm with no module of their
 // own to share.
-import { createRoot } from 'solid-js'
+import { createRoot, createSignal } from 'solid-js'
 import { startSpan } from '../../../infra/telemetry/emitter'
 import { onScopeEvicted } from '../shell/scopeEviction'
 
@@ -55,6 +55,39 @@ export function paneModel<M>(paneId: string, taskId: string, build: () => M, own
   }
 }
 
+// How many mounted panes are drawing each (pane, task) right now. The map above keeps a model after
+// the reader leaves its task, and it stays until another task asks for that pane, which may be never.
+// Its effects keep running all that time, so a model that polls, or marks something as seen, asks
+// this before it acts (`shown` in ./panes.ts). A count rather than a flag, because a switch can mount
+// the next view before the last one has let go.
+const [drawn, setDrawn] = createSignal<ReadonlyMap<string, number>>(new Map())
+const drawnKey = (paneId: string, taskId: string): string => `${paneId}\u0000${taskId}`
+
+function countDrawn(key: string, by: number): void {
+  setDrawn((current) => {
+    const next = new Map(current)
+    const count = (next.get(key) ?? 0) + by
+    if (count > 0) next.set(key, count)
+    else next.delete(key)
+    return next
+  })
+}
+
+/** Count this pane as drawing this task until the returned function is called. */
+export function markPaneDrawn(paneId: string, taskId: string): () => void {
+  const key = drawnKey(paneId, taskId)
+  countDrawn(key, 1)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    countDrawn(key, -1)
+  }
+}
+
+/** Whether a mounted pane is drawing this task. Reactive. */
+export const paneDrawn = (paneId: string, taskId: string): boolean => (drawn().get(drawnKey(paneId, taskId)) ?? 0) > 0
+
 onScopeEvicted((event) => {
   if (event.scope !== 'task') return
   for (const [paneId, entry] of held) {
@@ -68,4 +101,5 @@ onScopeEvicted((event) => {
 export const _resetPaneModels = (): void => {
   for (const entry of held.values()) entry.dispose()
   held.clear()
+  setDrawn(new Map())
 }
