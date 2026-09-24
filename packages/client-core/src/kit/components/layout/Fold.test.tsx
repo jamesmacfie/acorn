@@ -2,6 +2,7 @@ import { createSignal, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { expect, it } from 'vitest'
 import { Fold } from './Fold'
+import { Button, Row } from '../primitives'
 
 it('defers closed content until first opened and preserves it across subsequent toggles', () => {
   const host = document.createElement('div')
@@ -40,4 +41,30 @@ it('mounts an initially open section immediately', () => {
   const host = document.createElement('div')
   const dispose = render(() => <Fold label="Running" defaultOpen><span>Progress</span></Fold>, host)
   try { expect(host.textContent).toContain('Progress') } finally { dispose() }
+})
+
+// A slot a Show tests and then inserts is two reads of a prop getter, and each read runs the caller's
+// JSX. Every mark in a transcript's tool cards and file rows was built twice that way.
+it('builds each slot once, in a fold header and a row', () => {
+  const host = document.createElement('div')
+  let built = 0
+  const Mark = () => {
+    built++
+    return <b>mark</b>
+  }
+  const dispose = render(() => (
+    <>
+      <Fold label="Tool" meta={<Mark />} actions={<Mark />}>
+        <span />
+      </Fold>
+      <Row leading={<Mark />} meta={<Mark />} trailing={<Mark />}>Changed files</Row>
+      <Button label="Copy"><Mark /></Button>
+    </>
+  ), host)
+  try {
+    expect(host.querySelectorAll('b')).toHaveLength(6)
+    expect(built).toBe(6)
+  } finally {
+    dispose()
+  }
 })
