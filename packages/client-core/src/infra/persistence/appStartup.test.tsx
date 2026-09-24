@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/solid-query'
-import { createRoot } from 'solid-js'
+import { createRoot, createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Task } from '@acorn/protocol/api.ts'
+import type { Task, Workspace } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
 
 const mocks = vi.hoisted(() => ({
@@ -10,58 +10,69 @@ const mocks = vi.hoisted(() => ({
   savePref: vi.fn(),
 }))
 vi.mock('../../host/registries/commands/clientEvents', () => ({ clientEvents: { emit: mocks.emit } }))
-vi.mock('../../features/notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
+vi.mock('../../features/notifications/notifications', async (importOriginal) => ({
+  ...await importOriginal<object>(),
+  pushBackgroundError: mocks.pushBackgroundError,
+}))
 vi.mock('../../features/settings/savePref', () => ({ savePref: mocks.savePref }))
 
-import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource } from '../../features/tasks/tasks'
 import { createAppStartupRestore } from './appStartup'
 
 const TASK = { id: 'task-1', projectId: 'project-1', title: 'A task' } as Task
 const PROJECT = { id: 'project-1', name: 'A project' } as Project
+const WORKSPACE = { id: 'workspace-2', name: 'Two', isDefault: false, sort: 0, projects: [{ id: 'project-1', name: 'A project', sort: 0 }] } as Workspace
 
-// A whole boot, minus the parts a restore never reads. `path` stays on a project path so the
-// last-path slice has nothing to correct.
-const boot = (prefs: Record<string, string>): (() => void) => createRoot((dispose) => {
-  createAppStartupRestore({
+// A whole boot, minus the parts a restore never reads.
+const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | undefined) => createRoot((dispose) => ({
+  dispose,
+  ...createAppStartupRestore({
     queryClient: new QueryClient(),
     prefs: () => prefs,
+    prefsSettled: () => true,
     cacheRestoring: () => false,
     projects: () => [PROJECT],
     tasks: () => [TASK],
-    path: () => '/p/project-1',
-    navigate: () => {},
-  })
-  return dispose
-})
+    workspaces,
+  }),
+}))
 
-// Reopening where the window was closed. `last_task` and `last_source` are one answer between them,
-// and an empty source is the half that says "a task was on screen" (./appStartup.ts).
-describe('launch view restore', () => {
+// Which workspace to reopen. App.tsx opens it once the pass is done, so this only has to hand the
+// saved id over, and not before the workspaces it names are known.
+describe('launch workspace restore', () => {
   beforeEach(() => {
     // jsdom has no `matchMedia`, and the theme pass reads one to follow the system's light/dark.
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     vi.clearAllMocks()
     mocks.savePref.mockResolvedValue(true)
-    setActiveTaskId(null)
-    setSelectedSource(null)
   })
-  afterEach(() => {
-    setSelectedSource(null)
-    vi.unstubAllGlobals()
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('hands over the saved workspace once the workspaces have loaded', () => {
+    const [workspaces, setWorkspaces] = createSignal<Workspace[] | undefined>(undefined)
+    const startup = boot({ last_workspace: 'workspace-2' }, workspaces)
+    expect(startup.restored()).toBe(false)
+
+    setWorkspaces([WORKSPACE])
+    expect(startup.restored()).toBe(true)
+    expect(startup.lastWorkspaceId()).toBe('workspace-2')
+    startup.dispose()
   })
+})
 
-  it('reopens on the task that was on screen rather than on the default source', () => {
-    const dispose = boot({ last_task: 'task-1', last_source: '' })
-
-    expect(activeTaskId()).toBe('task-1')
-    expect(selectedSource()).toBeNull()
-    dispose()
+describe('launch workspace write', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    vi.clearAllMocks()
+    mocks.savePref.mockResolvedValue(true)
   })
+  afterEach(() => vi.unstubAllGlobals())
 
-  it('reopens on a stored browse source', () => {
-    const dispose = boot({ last_task: 'task-1', last_source: 'github' })
+  // A boot that dies before a workspace opens flushes its pending writes on the way down. What it
+  // flushes must be the saved workspace, not the empty value of "nothing open yet".
+  it('does not save an empty workspace before one has opened', () => {
+    const startup = boot({ last_workspace: 'workspace-2' }, () => [WORKSPACE])
+    startup.dispose()
 
-    expect(selectedSource()).toBe('github')
-    dispose()
+    expect(mocks.savePref).not.toHaveBeenCalledWith(expect.anything(), 'last_workspace', '', expect.anything())
   })
 })

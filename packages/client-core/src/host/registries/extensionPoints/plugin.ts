@@ -1,3 +1,4 @@
+import { batch } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
@@ -253,25 +254,31 @@ export function initClientPlugins(
   // the context each one owns. A second `makeContext` would write disposables into a list nobody holds.
   const activations: { plugin: ClientPlugin; ctx: CompiledClientPluginContext }[] = []
 
-  for (const plugin of plugins) {
-    // Take back whatever this plugin registered on a previous activation, before it registers again.
-    // Registry.register throws on a duplicate id, so a second activate() in one process, from a test
-    // or a dev-server reload, takes the shell down on the first pane without this.
-    for (const disposable of [...(contributed.get(plugin.name) ?? [])].reverse()) disposable.dispose()
-    const disposables: Disposable[] = []
-    contributed.set(plugin.name, disposables)
+  // One update for the whole roster. A second apply takes each plugin's contributions back and
+  // registers them again, and without the batch an effect could run in between and find a source,
+  // pane or command missing. The shell's "is the selected source still on offer" check did exactly
+  // that, and reset every relaunch on a plugin source to Home.
+  batch(() => {
+    for (const plugin of plugins) {
+      // Take back whatever this plugin registered on a previous activation, before it registers again.
+      // Registry.register throws on a duplicate id, so a second activate() in one process, from a test
+      // or a dev-server reload, takes the shell down on the first pane without this.
+      for (const disposable of [...(contributed.get(plugin.name) ?? [])].reverse()) disposable.dispose()
+      const disposables: Disposable[] = []
+      contributed.set(plugin.name, disposables)
 
-    if (disabled.has(plugin.name) && !plugin.required) {
-      skipped.push(plugin.name)
-      continue
+      if (disabled.has(plugin.name) && !plugin.required) {
+        skipped.push(plugin.name)
+        continue
+      }
+      // Not caught, matching the node host. Every plugin here ships in the same bundle, and a
+      // half-registered shell is worse than one that fails loudly at boot.
+      const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
+      plugin.init(ctx)
+      enabled.push(plugin.name)
+      if (plugin.activate) activations.push({ plugin, ctx })
     }
-    // Not caught, matching the node host. Every plugin here ships in the same bundle, and a
-    // half-registered shell is worse than one that fails loudly at boot.
-    const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
-    plugin.init(ctx)
-    enabled.push(plugin.name)
-    if (plugin.activate) activations.push({ plugin, ctx })
-  }
+  })
 
   // Second pass, mirroring the node host's `ready`. Every registry now holds every enabled plugin's
   // contributions, so a plugin priming a store can look up a sibling's descriptor.
