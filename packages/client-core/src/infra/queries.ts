@@ -5,9 +5,10 @@
 // Provider-specific routes and wire types stay with their plugins. The shell owns only core-backed
 // project, task, workspace, preference, and integration queries.
 import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
+import type { RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { readJson } from './node/apiClient'
 import { mergePrefs } from './persistence/devicePrefs'
-import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, archivedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, runTargetsRoute, tasksKey, tasksRoute, archivedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type { ArchivedTask, Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
@@ -29,6 +30,23 @@ export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> => readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
+})
+
+// One task's run targets, for the run buttons in the task's pane switcher. A visit draws the cached
+// list in the same frame as the panes, so the buttons no longer arrive late and push the switcher
+// down, and asks the node again once the shell's 30-second stale time has passed. `run:changed`
+// refreshes one task's entry (node/watchNodeEvents.ts) and `project:changed` every entry
+// (projects/watchProjectChanges.ts). Nothing reports a hand edit to `.acorn/config.toml`, so the stale
+// time and window focus are what pick one up. A configuration the node cannot read answers with no
+// buttons, as the task view always did.
+export const runTargetsKey = ['run-targets'] as const
+export const runTargetsOptions = (taskId: string, enabled: boolean) => ({
+  queryKey: [...runTargetsKey, taskId] as const,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<RunTargetInfo[]> => {
+    const result = await readJson<{ targets: RunTargetInfo[] } | { error: string }>(runTargetsRoute(taskId), { signal })
+    return 'targets' in result ? result.targets : []
+  },
 })
 
 // Workspaces (named groups of Projects) for the top selector. Each carries its project membership.

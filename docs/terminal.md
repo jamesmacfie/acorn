@@ -135,6 +135,13 @@ target instance and publishes `running: false` even when nobody pressed Stop. Ex
 the index first, which suppresses a duplicate frame from the PTY's later exit callback. This remains
 strictly about declared targets; arbitrary processes and ports do not become broadcast events.
 
+The run buttons in a task's pane switcher read the targets through the query cache, keyed
+`['run-targets', taskId]` (`packages/client-core/src/infra/queries.ts`). A visit draws the cached
+list and asks the node again once the entry is older than the shell's 30-second stale time.
+`run:changed` refreshes that task's entry, so a target started from the palette or by an agent, or
+one that exits, flips its button without a revisit. `project:changed` refreshes every entry, because
+the project row carries the dev script and the run-target list.
+
 ## Backpressure
 
 The node's hub holds one WebSocket per client and stamps a per-connection `seq` on every frame. A gap
