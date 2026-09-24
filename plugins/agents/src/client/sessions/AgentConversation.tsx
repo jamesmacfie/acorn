@@ -1,6 +1,7 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { Alert, EmptyState, IconButton, Text, type TimelineControls } from '@acorn/plugin-api/ui'
+import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
@@ -79,11 +80,17 @@ export default function AgentConversation(props: AgentConversationProps & {
     if (!id) return
     const view = claimAgentSelection(id)
     onCleanup(view.dispose)
+    // Every mount reads, a return to a session the store already holds included. That read resumes
+    // where the held events end, so it brings the turns, the requests and whatever the socket missed,
+    // not the transcript again (./managedStore.ts § loadSnapshot).
     void managedAgentStore.loadSnapshot(id).then(() => view.ready()).catch((caught: unknown) => {
       view.fail()
       if (sessionId() !== id) return
       setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
     })
+    // A dropped socket loses frames and nothing replays them, so the session on screen reads on from
+    // its mark when the socket comes back. One that is not on screen does the same when it next mounts.
+    onCleanup(wsOnReconnect(() => void managedAgentStore.loadSnapshot(id).catch(() => undefined)))
   }))
 
   const reload = (): void => void managedAgentStore.loadSnapshot(sessionId())

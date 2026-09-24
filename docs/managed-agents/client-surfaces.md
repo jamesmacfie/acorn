@@ -320,6 +320,20 @@ appeared on a reload — a long transcript reopened hours behind its last messag
 messages rather than a short read. The events were always in SQLite; the Node commits each one as it
 arrives.
 
+**A session the store holds is read on from its mark, not from the start.** The Agent pane loads the
+session every time it mounts, which is every switch back to a task with an agent open, and each of
+those loads used to fetch the whole ledger again. The store keeps a mark per held session,
+`completeThrough`: every event at or below that sequence is held, or folded into a row that is. A
+load sets it to where its walk ended. A streamed event moves it only when it is the next sequence, so
+a frame the socket lost leaves the mark at the gap and the frames after it cannot hide it. The next
+load asks the snapshot route for events after the mark and pages on from there. The ledger only
+appends, so nothing below the mark can have changed. The turns, the requests, and the row still come
+back whole, because some of their changes reach the socket as no frame at all: a turn queued from
+another window, a request that a stop expired. So a resumed read answers what a full read would. When
+it brings no events, the held array passes through unchanged and is not indexed again. A shown
+conversation also reads on when the socket reconnects (`wsOnReconnect`), because nothing replays the
+frames a dropped socket missed. A session that is not on screen catches up when it next mounts.
+
 ### Transcript search
 
 `agent_events_fts` is a SQLite full-text index over `agent_events.search_text`, kept in step by triggers
