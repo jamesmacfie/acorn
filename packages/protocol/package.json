@@ -24,6 +24,7 @@
     "./dashboards.ts": "./src/dashboards.ts",
     "./dashboardViews.ts": "./src/dashboardViews.ts",
     "./queryPublication.ts": "./src/queryPublication.ts",
+    "./search.ts": "./src/search.ts",
     "./dataQueryResolution.ts": "./src/dataQueryResolution.ts",
     "./dataQueryTime.ts": "./src/dataQueryTime.ts",
     "./commands.ts": "./src/commands.ts",

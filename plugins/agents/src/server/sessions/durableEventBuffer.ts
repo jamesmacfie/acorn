@@ -9,14 +9,23 @@ export type PendingAgentEvent = {
 type DeltaEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message' | 'reasoning' }>
 type BufferedDelta = PendingAgentEvent & { event: DeltaEvent }
 
-const isAppendDelta = (event: AgentNormalizedEvent): event is DeltaEvent =>
+export const isAppendDelta = (event: AgentNormalizedEvent): event is DeltaEvent =>
   (event.type === 'assistant_message' || event.type === 'reasoning') && event.append === true
 
-const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta =>
-  isAppendDelta(right.event)
-  && left.turnId === right.turnId
-  && left.event.type === right.event.type
-  && left.event.messageId === right.event.messageId
+// Two events are one streamed message when both are append deltas of the same kind, turn and message id.
+// The buffer coalesces on this, and the repository indexes each such message once for search
+// (sessionRepository.ts § recordEvent).
+export const continuesStream = (
+  previous: Pick<PendingAgentEvent, 'turnId' | 'event'>,
+  next: Pick<PendingAgentEvent, 'turnId' | 'event'>,
+): boolean =>
+  isAppendDelta(previous.event)
+  && isAppendDelta(next.event)
+  && previous.turnId === next.turnId
+  && previous.event.type === next.event.type
+  && previous.event.messageId === next.event.messageId
+
+const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta => continuesStream(left, right)
 
 const takeUtf8Prefix = (text: string, maxBytes: number): [prefix: string, rest: string] => {
   let bytes = 0

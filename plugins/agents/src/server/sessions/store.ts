@@ -633,5 +633,35 @@ export class AgentStore extends AgentSessionRepository {
     return [...known.values()].map(mapAgentSession)
   }
 
+  /** Whether a saved command names this resource, such as the owner's own `agent_cancel` of a turn. */
+  async hasOperationFor(command: string, resourceId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ key: schema.agentOperations.idempotencyKey })
+      .from(schema.agentOperations)
+      .where(and(eq(schema.agentOperations.command, command), eq(schema.agentOperations.resourceId, resourceId)))
+      .limit(1)
+    return row != null
+  }
 
+  async countTurns(sessionId: string, source: AgentTurn['source']): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.agentTurns)
+      .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.source, source)))
+    return Number(row?.count ?? 0)
+  }
+
+  /** Settled turns an owner queued and asked to hear back about. The LIKE is a narrow cut on a JSON
+   *  column; the caller still reads `reportTo` from the parsed policy. Startup-only. */
+  async settledReportingTurns(): Promise<AgentTurn[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.source, 'delegation'),
+        inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
+        like(schema.agentTurns.effectivePolicyJson, '%"reportTo":%'),
+      ))
+    return rows.map(mapAgentTurn)
+  }
 }

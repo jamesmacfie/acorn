@@ -499,6 +499,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the turn the reader is anchored to, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made; `took` is the reader's place changing without the reader, which happens only when the turn they were on has left the list |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
+| The boot account | `apps/desktop/src/client/boot.ts` | span `renderer.boot` from navigation to `nodeReady`, with a `renderer.boot.mark` child per mark. Built after the fact, once the switch is on and the node is ready, because the switch is not known while the marks are taken |
 | Uncaught error, unhandled rejection | `apps/desktop/src/client/index.tsx` | a fatal, unhandled error with its stack |
 | Console lines | everywhere under `packages/client-core/src`, `apps/desktop/src/client` and `apps/desktop/src/shell` | log records through `createLogger(tag)` |
 
@@ -623,7 +624,8 @@ follow the recorded interaction trace. Compare API time with decode, merge, proj
 and highlighting. Check workload counts and `ui.interaction.work` before assuming an individual
 operation is slow. Compare runtime pressure and queue age when several surfaces degrade together.
 A frame gap is a paint-opportunity measurement, not a guarantee that the compositor presented pixels.
-Collection that is still off during startup does not retrospectively measure cache hydration.
+Collection that is still off during startup does not retrospectively measure cache hydration. The
+boot account is the exception: its marks are kept and sent as spans once collection turns on.
 
 Local tests exercise a renderer that never answers, recovery, sleep, consent changes, failed diagnostic
 transport, cancellation, delayed readiness, bounded workload series, slow trace attribution, and

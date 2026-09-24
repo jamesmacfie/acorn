@@ -166,6 +166,8 @@ export type Task = {
   sort: number
   links: TaskLink[]
 }
+// A row of `GET tasksRoute?status=archived`, the archive page's list.
+export type ArchivedTask = Task & { archivedAt: number }
 // The non-derived columns a new task needs, plus initial links. One create path for every source
 // (docs/workspaces-and-tasks.md). `title` is optional; the server seeds one from origin.
 export type TaskSeed = {
@@ -263,6 +265,7 @@ export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 export const taskArchiveRoute = (id: string) => `/v1/core/tasks/${id}/archive`
+export const taskRestoreRoute = (id: string) => `/v1/core/tasks/${id}/restore`
 // What every plugin has to say about archiving this task, asked once when the dialog opens
 // (node-core/server/pluginHost/taskChecks.ts).
 export const taskArchiveConcernsRoute = (id: string) => `/v1/core/tasks/${id}/archive-concerns`
@@ -763,6 +766,7 @@ export const workspaceBootstrapRoute = '/v1/core/workspaces/bootstrap'
 export const workspaceExternalProjectsRoute = (id: string) => `/v1/core/workspaces/${id}/external-projects`
 // Tasks (Project -> Task units of work): rail rows.
 export const tasksRoute = '/v1/core/tasks'
+export const archivedTasksRoute = `${tasksRoute}?status=archived`
 export const taskRoute = (id: string) => `/v1/core/tasks/${id}`
 export const taskLinksRoute = (id: string) => `/v1/core/tasks/${id}/links`
 export const integrationsRoute = '/v1/core/integrations'

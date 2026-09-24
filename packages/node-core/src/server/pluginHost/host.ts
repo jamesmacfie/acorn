@@ -33,6 +33,7 @@ import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
+import { clearSearchProviders } from './search'
 import { declareEmits } from './emits'
 import type { CompiledNodePluginContext, HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -745,6 +746,7 @@ export function clearRegistrations(name: string): void {
   // A task check is a live closure over this plugin's context, asked at archive time, long after a
   // re-init has replaced the instance behind it.
   clearTaskChecks(name)
+  clearSearchProviders(name)
   removeContextSections(name)
   // Model adapters first: an adapter is validated against a registered connection provider, so removing
   // the provider first strands it.

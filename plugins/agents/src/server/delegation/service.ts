@@ -15,11 +15,7 @@ import type {
   AgentWaitInput,
 } from '../../shared/delegationSchemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
-import {
-  assistantResult,
-  parseStructuredResult,
-  promptWithResultContract,
-} from '../sessions/resultContract'
+import { assistantResult, parseStructuredResult } from '../sessions/resultContract'
 import {
   assertBoundedDelegationConfig,
   assertDelegationResultSchema,
@@ -27,6 +23,7 @@ import {
   sessionMayDelegate,
 } from './policy'
 import { foldReadableEvents, type AgentReadResult } from './readProjection'
+import { DelegationReports, delegatedTurn, turnResultSchema } from './reports'
 import {
   AgentDelegationStore,
   DelegationLimitError,
@@ -40,6 +37,7 @@ type Caller = {
   profileId: string
   managedSession: AgentSession | null
   parentTurnId: string | null
+  title: string
 }
 
 export type AgentSpawnResult = {
@@ -89,10 +87,9 @@ const waitConditionMet = (snapshot: AgentSessionSnapshot, until: AgentWaitInput[
     record.event.type === 'turn_completed' || record.event.type === 'error')
 }
 
-const turnResultSchema = (turn: AgentTurn): object | undefined => {
-  const value = turn.effectivePolicy.resultSchema ?? turn.effectivePolicy.schema
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : undefined
-}
+const ownerOf = (caller: Caller) => caller.managedSession
+  ? { sessionId: caller.managedSession.id, title: caller.title }
+  : { sessionId: null, title: caller.title }
 
 const spawnResult = (spawn: AgentSpawn): AgentSpawnResult => ({
     spawnId: spawn.id,
@@ -113,6 +110,7 @@ export class AgentDelegationService {
   private readonly promptInFlight = new Map<string, Promise<AgentPromptResult>>()
   private readonly cancelInFlight = new Map<string, Promise<AgentCancelResult>>()
   private readonly worktrees: WorktreeProvisioning
+  readonly reports: DelegationReports
 
   constructor(
     private readonly runtime: ManagedAgentRuntime,
@@ -122,6 +120,7 @@ export class AgentDelegationService {
     private readonly reconciled: Promise<void> = Promise.resolve(),
   ) {
     this.worktrees = new WorktreeProvisioning(runtime, store, tasks)
+    this.reports = new DelegationReports(runtime)
   }
 
   async canSpawn(context: ToolContext): Promise<boolean> {
@@ -200,7 +199,7 @@ export class AgentDelegationService {
     if (replay) return replay
     const running = this.promptInFlight.get(key)
     if (running) return running
-    const operation = this.promptOnce(input, session, key)
+    const operation = this.caller(context).then((caller) => this.promptOnce(input, session, ownerOf(caller), key))
     this.promptInFlight.set(key, operation)
     void operation.finally(() => this.promptInFlight.delete(key)).catch(() => undefined)
     return operation
@@ -209,6 +208,7 @@ export class AgentDelegationService {
   private async promptOnce(
     input: AgentPromptInput,
     session: AgentSession,
+    owner: ReturnType<typeof ownerOf>,
     key: string,
   ): Promise<AgentPromptResult> {
     if (session.controller !== 'acorn') {
@@ -229,12 +229,11 @@ export class AgentDelegationService {
     }
     const cursor = (await this.runtime.store.requireSession(session.id)).lastEventSeq
     const turn = await this.runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: promptWithResultContract(input.prompt, input.resultSchema) }],
-      source: 'delegation',
-      effectivePolicy: {
+      ...delegatedTurn(owner, input.prompt, input.resultSchema, {
         ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
         ...(input.configOptions ? { configOptions: input.configOptions } : {}),
-      },
+      }),
+      source: 'delegation',
       idempotencyKey: key,
     })
     const result: AgentPromptResult = {
@@ -346,14 +345,13 @@ export class AgentDelegationService {
       }, `delegation:${reserved.spawn.id}:session`)
       childSessionId = session.id
       const turn = await this.runtime.enqueueTurn(session.id, {
-        input: [{ type: 'text', text: promptWithResultContract(input.prompt, input.resultSchema) }],
-        source: 'delegation',
-        effectivePolicy: {
+        ...delegatedTurn(ownerOf(caller), input.prompt, input.resultSchema, {
           delegationSpawnId: reserved.spawn.id,
           toolCeiling,
           ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
           ...(input.configOptions ? { configOptions: input.configOptions } : {}),
-        },
+        }),
+        source: 'delegation',
         idempotencyKey: `delegation:${reserved.spawn.id}:turn`,
       })
       childTurnId = turn.id
@@ -367,9 +365,11 @@ export class AgentDelegationService {
     }
   }
 
-  /** Finish every cross-database worktree spawn that was durably reserved before the last exit. */
+  /** Finish every cross-database worktree spawn that was durably reserved before the last exit, then
+   *  queue any report whose lifecycle broadcast the last process did not live to act on. */
   async reconcile(): Promise<void> {
     await this.worktrees.reconcile()
+    await this.reports.reconcile()
   }
 
   async read(input: AgentReadInput, context: ToolContext): Promise<AgentReadResult> {
@@ -387,6 +387,8 @@ export class AgentDelegationService {
     for (const [turnId, seq] of terminalTurns) {
       const turn = await this.runtime.store.turn(turnId)
       if (!turn || turn.sessionId !== session.id) continue
+      // The owner is reading this result itself, so a report still waiting in its queue says it twice.
+      await this.reports.withdraw(context.sessionId!, turnId)
       const resultSchema = turnResultSchema(turn)
       if (!resultSchema) continue
       const text = assistantResult(await this.runtime.store.eventsForTurn(turnId))
@@ -451,6 +453,10 @@ export class AgentDelegationService {
       state: resultingSession.runtimeState,
     }
     await this.runtime.store.saveOperation(key, 'delegation.cancel', result, target.id)
+    // The owner stopped this turn, so it does not need telling. The saved operation stops a report that
+    // has not been queued yet, and this removes one that already has.
+    const reportTo = target.effectivePolicy.reportTo
+    if (typeof reportTo === 'string') await this.reports.withdraw(reportTo, target.id)
     return result
   }
 
@@ -478,6 +484,7 @@ export class AgentDelegationService {
         profileId: managed.profileId,
         managedSession: managed,
         parentTurnId: (await this.runtime.store.activeTurn(managed.id))?.id ?? null,
+        title: managed.title,
       }
     }
     const terminal = (await this.terminalSessions()).find((candidate) =>
@@ -489,6 +496,7 @@ export class AgentDelegationService {
       profileId: terminal.profileId,
       managedSession: null,
       parentTurnId: null,
+      title: terminal.title,
     }
   }
 }

@@ -54,8 +54,9 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 | `extensionPoints`, `hooks` | Accept contributions and run declared hooks |
 | `audit`, `telemetry`, `log` | Record actions and operational diagnostics |
 
-Loaded plugins do not receive `routes.register`, `tools`, `contextSections`,
-`events.channel`, or `events.streams`. Those members belong to the compiled context.
+Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `search`, `providers.model`,
+`events.channel`, or `events.streams`. Those members belong to the compiled context. `search`
+registers a search provider for the archive page ([plugins.md § Search providers](./plugins.md)).
 Loaded packages declare task-scoped tools and bounded context through `contributions.agentTools` and
 `contributions.contextSections` instead. The host adapts those descriptors into the same registries;
 they are not a second MCP server or context assembler.

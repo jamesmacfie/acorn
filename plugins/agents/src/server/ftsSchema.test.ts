@@ -21,9 +21,10 @@ describe('agent_events_fts schema drift guard', () => {
     const columns = await t.db.all<{ name: string }>(
       sql`SELECT name FROM pragma_table_info('agent_events_fts') ORDER BY cid`,
     )
-    // event_id and session_id are UNINDEXED (the join keys back to agent_events and agent_sessions);
-    // `content` is the search surface, fed from agent_events.search_text by the insert/update triggers.
-    expect(columns.map((column) => column.name)).toEqual(['event_id', 'session_id', 'content'])
+    // event_id and session_id are UNINDEXED (the join keys back to agent_events and agent_sessions).
+    // `content` and `tool` are the search surface, both fed from agent_events.search_text by the
+    // insert/update triggers: tool events go to `tool`, which the stored rank weighs lower.
+    expect(columns.map((column) => column.name)).toEqual(['event_id', 'session_id', 'content', 'tool'])
     const triggers = await t.db.all<{ name: string }>(sql`
       SELECT name
       FROM sqlite_master
@@ -41,7 +42,7 @@ describe('agent_events_fts schema drift guard', () => {
     // renaming `search_text` in schema.ts would generate a table rebuild and leave them pointing at a
     // column that no longer exists.
     const eventColumns = new Set(Object.values(getTableColumns(agentEvents)).map((c) => c.name))
-    for (const column of ['id', 'session_id', 'search_text']) expect(eventColumns).toContain(column)
+    for (const column of ['id', 'session_id', 'search_text', 'event_json']) expect(eventColumns).toContain(column)
   })
 
   // A virtual table with no rows answers every MATCH with an empty set, which looks the same as

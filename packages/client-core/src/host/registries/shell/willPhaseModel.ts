@@ -22,6 +22,7 @@ export const DETAILS_MAX = 5
 
 export type WillEventMap = {
   'task:archive': { taskId: string }
+  'task:restore': { taskId: string }
   'workspace:remove': { workspaceId: string; name: string }
   'app:quit': Record<string, never>
 }
@@ -37,6 +38,7 @@ type RegisteredHandler = { feature: string; run: (payload: never) => Concern | C
 // It lives here so a caller opening a confirmation need not know what the handlers cost.
 const BUDGET_MS: Record<WillEventKind, number> = {
   'task:archive': 2_500,
+  'task:restore': 250,
   'workspace:remove': 250,
   'app:quit': 250,
 }
