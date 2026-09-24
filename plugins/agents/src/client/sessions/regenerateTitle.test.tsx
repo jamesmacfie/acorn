@@ -69,7 +69,7 @@ describe('regenerating a session title', () => {
   it('offers the shared session action and replaces the cached title with the server result', async () => {
     await new Promise<void>((resolve, reject) => {
       createRoot((dispose) => {
-        const model = createAgentPaneModel({ id: original.taskId } as Task)
+        const model = createAgentPaneModel({ id: original.taskId } as Task, { shown: () => true })
         void model.sessionsLoaded
           .then(() => managedAgentStore.loadSnapshot(original.id))
           .then(() => {

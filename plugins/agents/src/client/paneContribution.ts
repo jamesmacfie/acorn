@@ -30,7 +30,7 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   layout: 'list-detail',
   // The session list, which one is open, its snapshot subscription and the rename/archive dialog,
   // held once per task by the host (client-core registries/paneModels.ts).
-  model: (task) => createAgentPaneModel(task),
+  model: (task, pane) => createAgentPaneModel(task, pane),
   // The session list, which is the first thing the model asks for. The store deduplicates it over a
   // five-second window, so opening the task right after the hover costs nothing and the snapshot the
   // pane opens on is the only request left. Not the snapshot itself: which session that would be is

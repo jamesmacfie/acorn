@@ -1,11 +1,11 @@
-import { createComponent, lazy, onMount, Suspense, type Component, type JSX } from 'solid-js'
+import { createComponent, createMemo, createRenderEffect, lazy, onCleanup, onMount, Suspense, type Accessor, type Component, type JSX } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
 import { suppliedLayout } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { paneModel } from './paneModels'
+import { markPaneDrawn, paneDrawn, paneModel } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -77,8 +77,12 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
    * Called inside the model's own reactive root, so resources and effects it creates are disposed
    * together. Omit it and the regions are handed `undefined`, which is every pane whose regions share
    * nothing.
+   *
+   * The model outlives the view. It is kept after the reader moves to another task, until a different
+   * task asks for this pane, so its effects go on running with nobody looking. `pane.shown` is what an
+   * effect that polls, or marks something as seen, reads first.
    */
-  model?: (task: Task) => M
+  model?: (task: Task, pane: PaneModelContext) => M
   regions: Record<string, Component<{ task: Task; model: M }>>
   tabs?: readonly { id: string; label: string }[]
   /** Regions this pane is not showing right now, asked per render. */
@@ -99,6 +103,13 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   collapsible?: boolean
   /** Use an empty rail when the list has no useful one-mark representation. */
   collapseContent?: 'rows' | 'empty'
+}
+
+/** What the host tells a pane's model about the pane it belongs to. */
+export type PaneModelContext = {
+  /** Whether this pane is drawing the model's task right now. False on another task, a rail source,
+   *  or another pane of the same task. */
+  shown: Accessor<boolean>
 }
 
 // `any` for the reason `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by
@@ -159,7 +170,12 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       const regions: Record<string, Region> = {}
       // A getter, so the model is looked up when a region renders rather than when the pane is built,
       // and a pane that switches task hands its regions the new task's model without remounting them.
-      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task), owner ?? 'core') : undefined)
+      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => {
+        const taskId = props.task.id
+        return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId)) })
+      }, owner ?? 'core') : undefined)
+      // For as long as this pane draws this task, which is what the model's `shown` reads.
+      createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
         // renders as an empty string, which draws the region's rectangle empty until the module

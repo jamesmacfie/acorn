@@ -115,6 +115,31 @@ describe('the model a pane’s regions share', () => {
     expect(seen[1]).toBe(seen[0])
   })
 
+  // The model outlives the pane, so it is told whether anyone is looking: the agent pane marks what
+  // it shows as read, and doing that from a held model cleared "Needs you" on unseen sessions.
+  it('tells the model whether its pane is drawing the task', async () => {
+    let shown: (() => boolean) | undefined
+    register(pane({
+      model: (_task: Task, view: { shown: () => boolean }) => {
+        shown = view.shown
+        return {}
+      },
+      // Read, because the model is built when a region first asks for it.
+      regions: { list: (props: { model: object }) => { void props.model; return <span /> }, detail: () => <span /> },
+    }))
+    const Pane = paneRegistry.get('notes')!.component
+    const [open, setOpen] = createSignal(true)
+    dispose = render(() => <>{open() ? <Pane task={task} /> : null}</>, host)
+    for (let tries = 0; tries < 400 && !shown; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(shown?.()).toBe(true)
+    setOpen(false)
+    expect(shown?.()).toBe(false)
+    setOpen(true)
+    expect(shown?.()).toBe(true)
+  })
+
   it('disposes the previous task’s model when another task asks, and on eviction', async () => {
     const { paneModel } = await import('./paneModels')
     const disposed: string[] = []

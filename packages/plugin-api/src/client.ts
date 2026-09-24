@@ -48,7 +48,7 @@ export { onPluginFrame } from '@acorn/client-core/host/plugins'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
-export type { PaneContribution, PaneLayoutContribution, PaneRegistration } from '@acorn/client-core/host/registries/panes/panes.ts'
+export type { PaneContribution, PaneLayoutContribution, PaneModelContext, PaneRegistration } from '@acorn/client-core/host/registries/panes/panes.ts'
 // The host's per-(pane, task) reactive root. A pane that declares `model` on a layout contribution
 // gets this for free; a pane drawing itself with one `component` reaches for it directly, which is
 // what the editor does to keep its per-file document pool across its own mounts
