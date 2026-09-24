@@ -1,9 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { DiffSource } from '@acorn/plugin-api/ui/diff'
+import type { CodeRow, DiffSource } from '@acorn/plugin-api/ui/diff'
 import { filePatchKey, fileSummariesKey, filesKey, type PullFile } from '../shared/api'
 import { DiffForPull } from './DiffForPull'
+
+const { openPane } = vi.hoisted(() => ({ openPane: vi.fn() }))
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  openPane,
+}))
+vi.mock('@solidjs/router', async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  useSearchParams: () => [{}],
+}))
 
 let source: DiffSource | undefined
 vi.mock('@acorn/plugin-api/ui', () => ({
@@ -21,7 +31,39 @@ const file: PullFile = {
 describe('task pull diff', () => {
   afterEach(() => {
     source = undefined
+    openPane.mockClear()
     vi.unstubAllGlobals()
+  })
+
+  it('opens a PR addition in the task editor and omits the action in repository browse', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const host = document.createElement('div')
+    const route = { owner: 'acorn', repo: 'web', number: '42', key: 'acorn/web#42' }
+    const added: CodeRow = { kind: 'insert', path: file.path, oldNo: null, newNo: 48, raw: 'new', toks: [] }
+    const deleted: CodeRow = { ...added, kind: 'delete', oldNo: 47, newNo: null }
+    const dispose = render(() => (
+      <QueryClientProvider client={queryClient}>
+        <DiffForPull route={route} router={false} taskId="task-1" />
+      </QueryClientProvider>
+    ), host)
+
+    expect(source?.openLine).toBeTypeOf('function')
+    source?.openLine?.(added)
+    expect(openPane).toHaveBeenCalledExactlyOnceWith(
+      'task-1', 'editor', { kind: 'editor:reveal', path: 'src/app.ts', line: 48 }, 'add',
+    )
+    source?.openLine?.(deleted)
+    expect(openPane).toHaveBeenCalledTimes(1)
+    dispose()
+
+    const disposeBrowse = render(() => (
+      <QueryClientProvider client={queryClient}>
+        <DiffForPull route={route} router />
+      </QueryClientProvider>
+    ), host)
+    expect(source?.openLine).toBeUndefined()
+    disposeBrowse()
+    queryClient.clear()
   })
 
   it('draws from warmed summaries and fetches only the missing patch', async () => {
