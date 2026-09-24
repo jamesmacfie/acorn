@@ -8,7 +8,8 @@ type AgentFrameCb = (frame: AgentServerFrame) => void
 const agentFrameSubs = new Set<AgentFrameCb>()
 
 // No reattach hook: agent frames are pushed, never subscribed to per id, so there is nothing to restore
-// after a reconnect. The store refetches on the reconnect signal instead.
+// after a reconnect. A shown conversation reads on from its held events on the reconnect signal instead
+// (./AgentConversation.tsx).
 registerWsChannel('agent', (frame) => agentFrameSubs.forEach((cb) => cb(frame as AgentServerFrame)))
 
 // Subscribe to every agent frame; returns an unsubscribe.

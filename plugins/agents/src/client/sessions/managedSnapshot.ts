@@ -49,7 +49,12 @@ export function mergeManagedSnapshot(
     session,
     turns: mergeById<AgentTurn>(current.turns, incoming.turns)
       .sort((left, right) => left.ordinal - right.ordinal),
-    events: mergeEvents(current.events, incoming.events).sort((left, right) => left.seq - right.seq),
+    // A read that resumed where the held events end usually brings none, and then the held array
+    // passes on as it is: rebuilding and sorting a long session's events to add nothing is the cost
+    // resuming exists to avoid, and the store skips re-indexing an array it has already indexed.
+    events: incoming.events.length
+      ? mergeEvents(current.events, incoming.events).sort((left, right) => left.seq - right.seq)
+      : current.events,
     requests: mergeById<AgentRequest>(current.requests, incoming.requests)
       .sort((left, right) => left.createdAt - right.createdAt),
   }

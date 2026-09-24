@@ -25,6 +25,7 @@ vi.mock('./wsChannel', () => ({
 }))
 
 const snapshotCalls: string[] = []
+const snapshotCursors: number[] = []
 const pageCalls: number[] = []
 const sessionCalls: { taskId?: string }[] = []
 let failSessions = false
@@ -34,9 +35,11 @@ let servedPages: Record<number, AgentEventRecord[]> = {}
 let servedList: AgentSessionList = { sessions: [], delegations: [], nextCursor: null }
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
-    snapshot: async (sessionId: string) => {
+    // The route's own rule: every turn and request, and the events after the cursor.
+    snapshot: async (sessionId: string, afterSeq = 0) => {
       snapshotCalls.push(sessionId)
-      return served
+      snapshotCursors.push(afterSeq)
+      return { ...served, events: served.events.filter((item) => item.seq > afterSeq) }
     },
     events: async (_sessionId: string, afterSeq: number) => {
       pageCalls.push(afterSeq)
@@ -90,11 +93,13 @@ const seed = async (snapshot: Partial<AgentSessionSnapshot> = {}) => {
   managedAgentStore.activate()
   await managedAgentStore.loadSnapshot(SESSION)
   snapshotCalls.length = 0
+  snapshotCursors.length = 0
 }
 
 beforeEach(() => {
   managedAgentStore.clear()
   snapshotCalls.length = 0
+  snapshotCursors.length = 0
   pageCalls.length = 0
   servedPages = {}
   servedList = { sessions: [], delegations: [], nextCursor: null }
@@ -349,5 +354,71 @@ describe('a session’s snapshot', () => {
     // Not a time window: every caller after a send asks because it expects the answer to have
     // changed, and holding the old one would show the transcript from before the turn.
     expect(snapshotCalls).toEqual([SESSION, SESSION])
+  })
+})
+
+// Switching back to a task used to read its whole session again: 2.9 MB for a 4,000-event transcript
+// the store already held, 11.7 MB for a 16,000-event one. The ledger only appends, so a held session
+// reads on from where its events are whole.
+describe('reading a session the store holds', () => {
+  const pending = {
+    id: 'r1', sessionId: SESSION, turnId: 'turn1', providerRequestId: 'p1', kind: 'permission',
+    status: 'pending', title: 'May I', detail: null, payload: {}, resolution: null, expiresAt: null,
+    createdAt: 1, resolvedAt: null,
+  } as AgentRequest
+
+  it('resumes after the last event the socket delivered, and keeps the held events as they are', async () => {
+    await seed({ session: { ...session, lastEventSeq: 3 }, events: [prose(1), prose(2), prose(3)] })
+    for (const seq of [4, 5]) push({ channel: 'agent:event', event: prose(seq) })
+    const held = events()
+    pageCalls.length = 0
+    served = { ...served, session: { ...session, lastEventSeq: 5 }, events: [1, 2, 3, 4, 5].map(prose) }
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([5])
+    expect(pageCalls).toEqual([])
+    expect(events()).toBe(held)
+    expect(events().map((item) => item.seq)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('resumes at a gap the socket left, not after the frames that followed it', async () => {
+    await seed({ session: { ...session, lastEventSeq: 2 }, events: [prose(1), prose(2)] })
+    // Seq 4 is lost. A later frame must not move the mark past it, or the read would skip it for good.
+    for (const seq of [3, 5]) push({ channel: 'agent:event', event: prose(seq) })
+    served = { ...served, session: { ...session, lastEventSeq: 5 }, events: [1, 2, 3, 4, 5].map(prose) }
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([3])
+    expect(events().map((item) => item.seq)).toEqual([1, 2, 3, 4, 5])
+
+    // Whole again, so the next read resumes at the end.
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([3, 5])
+  })
+
+  it('pages on from a folded row’s reach', async () => {
+    servedPages = { 9: [prose(10)] }
+    await seed({
+      session: { ...session, lastEventSeq: 10 },
+      events: [{ ...event(1, { type: 'tool', tool: { id: 'x', title: 'Run', status: 'completed' } }), foldedThroughSeq: 9 }],
+    })
+    expect(pageCalls).toEqual([9])
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([10])
+  })
+
+  it('still brings the turns and requests back whole', async () => {
+    await seed({ session: { ...session, lastEventSeq: 1 }, events: [prose(1)], requests: [pending] })
+    // A stop expires pending requests, and no frame says so.
+    served = { ...served, requests: [{ ...pending, status: 'expired' }] }
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([1])
+    expect(managedAgentStore.snapshots()[SESSION].requests.map((item) => item.status)).toEqual(['expired'])
+  })
+
+  it('reads from the start once the store has dropped it', async () => {
+    await seed({ session: { ...session, lastEventSeq: 2 }, events: [prose(1), prose(2)] })
+    managedAgentStore.clear()
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(snapshotCursors).toEqual([0])
+    expect(events().map((item) => item.seq)).toEqual([1, 2])
   })
 })

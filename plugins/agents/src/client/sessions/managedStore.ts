@@ -34,6 +34,12 @@ const deletedSessionIds = new Set<string>()
 // about 25 times a second against thousands of rows (docs/managed-agents.md § The transcript store).
 const seenEventIds = new Map<string, Set<string>>()
 const usageLines = new Map<string, { at: number; turnId: string | null }>()
+// How far each held snapshot's event list is known to be whole: every seq at or below this one is in
+// it, or folded into a row that is. A load sets it to where its walk ended, and the next load reads on
+// from here instead of from the start (see loadSnapshot). A streamed event moves it only when it is
+// the very next seq. So a frame the socket lost leaves the mark at the gap, where the next read finds
+// it, and a later frame can't hide it.
+const completeThrough = new Map<string, number>()
 // A projected event used to mean "refetch the whole snapshot", which is up to 2,000 event rows and a
 // JSON body parsed per row, to learn one fact. The node now sends the turn or the request that
 // changed (server/sessions/runtimeEngine.ts § emitProjection). `error` is the one type left, because
@@ -138,6 +144,7 @@ function removeSession(sessionId: string): void {
   snapshotRefreshTimers.delete(sessionId)
   seenEventIds.delete(sessionId)
   usageLines.delete(sessionId)
+  completeThrough.delete(sessionId)
   setSessions((current) => current.filter((session) => session.id !== sessionId))
   setDelegations((current) => {
     if (!(sessionId in current)) return current
@@ -183,10 +190,11 @@ const pageReach = (events: AgentEventRecord[]): number =>
 //
 // Each page resumes from the furthest row the last one reached, not from its last record's own seq:
 // the node folds a page's tool and usage updates onto the card each one opened, so the rows after that
-// record may already be inside an earlier one (`foldedThroughSeq`).
-async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot): Promise<AgentEventRecord[]> {
+// record may already be inside an earlier one (`foldedThroughSeq`). `from` is where the snapshot read
+// started, which is where the walk starts when that read came back with no events.
+async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot, from: number): Promise<AgentEventRecord[]> {
   const events = [...snapshot.events]
-  let cursor = pageReach(events)
+  let cursor = Math.max(from, pageReach(events))
   while (cursor < snapshot.session.lastEventSeq) {
     const page = await managedAgentApi.events(sessionId, cursor)
     if (!page.events.length) break
@@ -229,10 +237,11 @@ function appendEvent(event: AgentEventRecord): void {
       return current
     }
     seen.add(event.id)
+    if (completeThrough.get(event.sessionId) === event.seq - 1) completeThrough.set(event.sessionId, event.seq)
     // The array is mutated rather than copied. Nothing holds it across a change — buildConversationItems
-    // copies before it sorts and mergeManagedSnapshot builds new arrays — and what makes the transcript's
-    // memo re-run is this signal, not the array's identity. So an append costs a push and a four-field
-    // object instead of a copy of the whole session.
+    // copies before it sorts, and mergeManagedSnapshot either builds a new array or passes this one on —
+    // and what makes the transcript's memo re-run is this signal, not the array's identity. So an append
+    // costs a push and a four-field object instead of a copy of the whole session.
     if (!foldUsage(event.sessionId, snapshot.events, event)) {
       const appended = seatEvent(snapshot.events, event)
       if (!appended) indexEvents(event.sessionId, snapshot.events)
@@ -417,22 +426,52 @@ export const managedAgentStore = {
     replaceDelegations(page.sessions, page.delegations)
     return page.sessions
   },
+  /**
+   * Read a session from the node and merge it into the store.
+   *
+   * A session the store already holds is read on from where its events are whole
+   * (`completeThrough`), not from the start. The ledger only appends, so every row below that mark
+   * is one the store has already, and reading them again was the whole cost of switching back to a
+   * task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of paging for a 16,000-event
+   * one. The turns, the requests and the row still come back whole, because they change in ways no
+   * frame reports: a turn queued from another window, a request expired by a stop. So this answers
+   * what a full read would, for the size of the turns and requests plus whatever the socket missed.
+   */
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
-    const held = snapshotLoads.get(sessionId)
-    agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: held ? 'inflight' : 'miss' })
-    if (held) return held
+    const inflight = snapshotLoads.get(sessionId)
+    const held = snapshots()[sessionId] ? completeThrough.get(sessionId) ?? 0 : 0
+    agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: inflight ? 'inflight' : held ? 'resume' : 'miss' })
+    if (inflight) return inflight
     const run: Promise<AgentSessionSnapshot> = (async () => {
-      const incoming = await managedAgentApi.snapshot(sessionId)
-      if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
-      const full = { ...incoming, events: await pageToEnd(sessionId, incoming) }
+      const read = async (from: number) => {
+        const incoming = await managedAgentApi.snapshot(sessionId, from)
+        if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
+        return { from, snapshot: { ...incoming, events: await pageToEnd(sessionId, incoming, from) } }
+      }
+      let fetched = await read(held)
+      // A read that started part-way along is only half a snapshot. If the store dropped the rows
+      // below it while the read was out (a node switch clears it), read the whole session instead.
+      if (fetched.from && !snapshots()[sessionId]) fetched = await read(0)
+      const full = fetched.snapshot
+      // Complete through wherever the walk ended. The row's own `lastEventSeq` counts too: the walk
+      // stops early on an empty page when rows were pruned below the counter, and those never come.
+      const reached = Math.max(fetched.from, pageReach(full.events), full.session.lastEventSeq)
       let snapshot = full
-      setSnapshots((current) => {
-        snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(current[sessionId], full))
-        return { ...current, [sessionId]: snapshot }
+      let eventsChanged = true
+      // One update rather than two. The merge and the row write each hand the transcript a new
+      // snapshot, and each would have re-projected it.
+      batch(() => {
+        setSnapshots((current) => {
+          const previous = current[sessionId]
+          snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(previous, full))
+          eventsChanged = snapshot.events !== previous?.events
+          return { ...current, [sessionId]: snapshot }
+        })
+        completeThrough.set(sessionId, Math.max(completeThrough.get(sessionId) ?? 0, reached))
+        agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)
+        if (eventsChanged) agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
+        upsertSession(snapshot.session)
       })
-      agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)
-      agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
-      upsertSession(snapshot.session)
       return snapshot
     })().finally(() => {
       // Only if the map still holds this one. A caller that asked again while this was settling owns
@@ -461,6 +500,7 @@ export const managedAgentStore = {
     deletedSessionIds.clear()
     seenEventIds.clear()
     usageLines.clear()
+    completeThrough.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
     delegationLoads.clear()
     // An in-flight read of the old node's session. It resolves after this and merges into an empty
