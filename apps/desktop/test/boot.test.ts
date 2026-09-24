@@ -42,8 +42,10 @@ let dataDir: string
 let ready: Ready
 let socket: WebSocket
 let nextId = 1
-// The helper's `[helper:boot] <label> +<ms>ms` marks, in the order they were printed.
+// The helper's `[helper:boot] <label> +<ms>ms` marks, in the order they were printed, and each
+// one's offset from the helper's start.
 const bootMarks: string[] = []
+const markOffsets = new Map<string, number>()
 const markIndex = (label: string): number => bootMarks.indexOf(label)
 
 // One round trip on the same channel the renderer uses. Not a shared client: the point is that the
@@ -77,8 +79,11 @@ beforeAll(async () => {
   })
   createInterface({ input: helper.stderr! }).on('line', (line) => {
     console.error(line)
-    const mark = /^\[helper:boot] (.+?) \+\d+ms/.exec(line)
-    if (mark) bootMarks.push(mark[1])
+    const mark = /^\[helper:boot] (.+?) \+(\d+)ms/.exec(line)
+    if (mark) {
+      bootMarks.push(mark[1])
+      markOffsets.set(mark[1], Number(mark[2]))
+    }
   })
   const readyLine = new Promise<Ready>((resolve_, reject) => {
     const timer = setTimeout(() => reject(new Error('the helper never printed a ready line')), 120_000)
@@ -167,6 +172,17 @@ describe('the Tauri shell boots its world', () => {
     expect(markIndex('ws bound')).toBeLessThan(markIndex('ready line'))
     expect(markIndex('ready line')).toBeLessThan(markIndex('service.start'))
     expect(markIndex('service.start')).toBeLessThan(markIndex('node adopted'))
+  })
+
+  it('starts the node within a generous bound', () => {
+    // From the ready line to the node answering `service.start`: spawning it, evaluating the service
+    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro. The bound is wide on
+    // purpose, because a timing assertion on a shared CI runner is noisy. It is here to catch a
+    // dependency that adds seconds, and the printed number is the one to read
+    // (apps/node/externals.ts).
+    const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
+    console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
+    expect(elapsed).toBeLessThan(1_500)
   })
 
   it('adopts the local node into the fleet behind the ready line', async () => {

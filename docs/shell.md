@@ -653,7 +653,15 @@ The node receives no window handle, no webview handle, and no shell object of an
 
 ## Build and packaging
 
-`apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and shared chunks.
+`apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and shared chunks. Third-party
+packages are bundled into them, and into the helper, except the native addons and run-time-loaded
+packages that `apps/node/externals.ts` lists. Node resolves those from `apps/desktop`'s
+`node_modules`. Loading packages as separate files was most of the node's and the helper's startup
+before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
+`service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
+Node to resolve. Both builds write the licence text of every package they bundled beside their
+output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`, so it ships in the
+helper resources and the standalone tarball.
 `apps/desktop/scripts/stage.mjs` puts the service, every core and plugin migration chain, the plugin
 frame stylesheet, and the pinned Node runtime where the bundler will find them. The runtime is
 fetched from nodejs.org and verified against that release's `SHASUMS256.txt` rather than copied from

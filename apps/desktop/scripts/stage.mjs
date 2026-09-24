@@ -21,8 +21,9 @@ const need = (path, hint) => {
 }
 
 // The node service, staged beside the helper so both resolve their externals from this package's
-// node_modules. The spike found this out the hard way: service.js externalises its dependencies and
-// cannot resolve them from apps/node (docs/shell.md § Node child).
+// node_modules. The spike found this out the hard way: service.js leaves native and run-time-loaded
+// packages external (apps/node/externals.ts) and cannot resolve them from apps/node
+// (docs/shell.md § Node child).
 const dist = need(resolve(ROOT, 'apps/node/dist'), 'run `pnpm --filter @acorn/node build` first.')
 need(resolve(dist, 'service.js'), 'run `pnpm --filter @acorn/node build` first.')
 need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
