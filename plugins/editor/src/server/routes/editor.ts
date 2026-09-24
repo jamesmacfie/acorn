@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import type { EditorLineMarkerSet } from '../../contract/lineMarkers'
 
 // Editor pane: read, write, and list files on the task's worktree. Task-scoped HTTP behind the
 // EditorBridge (../editor.ts). The bridge confines every relative path to the worktree root
@@ -14,6 +15,7 @@ export type EditorBridge = {
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string> // throws BridgeError(403/404) on escape/missing
+  lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
@@ -33,6 +35,11 @@ export const editor = new Hono<AppEnv>()
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
     return viaBridge(c, EDITOR, async (b) => ({ text: await b.read(c.req.param('id'), path) }))
+  })
+  .get('/:id/editor/line-markers', (c) => {
+    const path = c.req.query('path')
+    if (!path) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, EDITOR, (b) => b.lineMarkers(c.req.param('id'), path))
   })
   .put('/:id/editor/file', async (c) => {
     const parsed = writeBody.safeParse(await c.req.json().catch(() => null))

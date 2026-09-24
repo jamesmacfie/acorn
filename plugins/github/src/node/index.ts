@@ -26,6 +26,8 @@ import { githubEmitter } from '../server/events'
 import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 import { pullSource } from '../shared/pullSource'
 import { createPullSourceHandler } from '../server/data/pullSourceHandler'
+import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 
 export const githubPlugin = (): NodePlugin => {
   return {
@@ -47,6 +49,10 @@ export const githubPlugin = (): NodePlugin => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer.md § Plugin databases).
       const store = ctx.storage.open()
+      ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
+        id: 'pull-request',
+        value: pullRequestEditorLineMarkers(store, ctx.core),
+      })
       // github's own `plugin:github:<verb>` channel (docs/plugins.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
       const emit = githubEmitter(ctx.events.send)
