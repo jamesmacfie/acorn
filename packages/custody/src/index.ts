@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import type { PreviewBrowserRule, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { helperMark } from './bootMarks'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins/bundledPluginTrust'
@@ -98,6 +99,9 @@ export function createHelper(options: HelperOptions): Helper {
   // problem is not reported as the cause of a later one.
   let lastFailure: string | undefined
 
+  // Beside the plugin cache in the custody root, because both are this app's disposable copies. The
+  // node's data root is the owner's data, and the app bundle is signed and read-only.
+  const compileCacheRoot = join(userDataDir, 'compile-cache')
   const service = new ServiceHost(options.serviceEntry, options.service, {
     stateChanged: (state: ServiceState, detail?: string) => {
       log.info(`${state}${detail ? `: ${detail}` : ''}`, { 'service.state': state })
@@ -110,7 +114,7 @@ export function createHelper(options: HelperOptions): Helper {
       lastFailure ??= `the background service exited with code ${code}`
       void recover()
     },
-  })
+  }, compileCacheRoot)
 
   const broker = new NodeBroker({ frame: options.push.frame, bytes: options.push.bytes, status: options.push.status })
   const fleet = new FleetStore(userDataDir, tokens)
