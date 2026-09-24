@@ -64,6 +64,26 @@ async function mirroredTaskPull(
   return { userId, repoId, number: task.pullNumber }
 }
 
+/** The PR comparison facts needed by another plugin, without exposing GitHub's mirror keys. */
+export async function taskPullComparison(
+  db: PluginDatabase,
+  core: Pick<CoreServices, 'tasks' | 'projects'>,
+  userId: string | null,
+  taskId: string,
+): Promise<{ baseRef: string | null; headSha: string | null } | null> {
+  const pull = await mirroredTaskPull(db, core, userId, taskId)
+  if (!pull) return null
+  const [row] = await db
+    .select({ baseRef: pullRequests.baseRef, headSha: pullRequests.headSha })
+    .from(pullRequests)
+    .where(and(
+      eq(pullRequests.userId, pull.userId),
+      eq(pullRequests.repoId, pull.repoId),
+      eq(pullRequests.number, pull.number),
+    ))
+  return row ?? null
+}
+
 // The failure rule, in one place because the ci-loop prompt and the `pr_checks` agent tool must not
 // disagree about what a red PR is. A check with no status yet is not a failure: it has not run.
 export const checkFailed = (status: string | null): boolean =>

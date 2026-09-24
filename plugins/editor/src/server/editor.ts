@@ -6,6 +6,7 @@
 import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
+import { normalizedLineRanges, type EditorLineMarkerProvider, type EditorLineMarkerSet } from '../contract/lineMarkers'
 
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
 
@@ -30,6 +31,8 @@ export const editorBridge = (
   /** The owner's half of `editor:before-save` (docs/plugins.md § Hooks). Absent means nobody objects,
    *  which is also what an empty chain means. */
   hooks?: Pick<PluginHookRegistry, 'run'>,
+  /** Providers are resolved per read because plugin init order and unload are runtime facts. */
+  markerProviders: () => readonly EditorLineMarkerProvider[] = () => [],
 ): EditorBridge => ({
   root: (taskId) => core.tasks.root(taskId),
 
@@ -64,6 +67,24 @@ export const editorBridge = (
     } catch {
       throw new BridgeError(404, 'not_found', 'File not found.')
     }
+  },
+
+  lineMarkers: async (taskId, relPath) => {
+    // Apply the same confinement as a text read before another plugin receives the path.
+    await confine(core, taskId, relPath)
+    const settled = await Promise.allSettled(markerProviders().map(async (provider): Promise<EditorLineMarkerSet> => ({
+      kind: provider.kind,
+      ranges: normalizedLineRanges(await provider.read(taskId, relPath)),
+    })))
+    const byKind = new Map<EditorLineMarkerSet['kind'], EditorLineMarkerSet['ranges']>()
+    for (const result of settled) {
+      if (result.status !== 'fulfilled') continue // line provenance is optional presentation
+      byKind.set(result.value.kind, normalizedLineRanges([
+        ...(byKind.get(result.value.kind) ?? []),
+        ...result.value.ranges,
+      ]))
+    }
+    return [...byKind].map(([kind, ranges]) => ({ kind, ranges }))
   },
 
   // Write keeps the {ok, reason} contract and never throws: EditorPane surfaces reason inline, and
