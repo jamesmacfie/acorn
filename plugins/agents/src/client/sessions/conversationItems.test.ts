@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
+import { foldToolEvents } from '../../shared/toolFold'
 import { buildConversationItems, findSubagentItem, isChatItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
@@ -395,5 +396,32 @@ describe('folding a tool call’s web activity', () => {
       input: '{}',
       subagentId: 'child-1',
     })
+  })
+})
+
+describe('a transcript the node folded', () => {
+  // A Codex command streams its output as appends, the one update that is wrong to apply twice, and
+  // then reports the whole output once more as it completes.
+  const raw = [
+    event(1, { type: 'tool', tool: { id: 'cmd', title: 'ls', kind: 'execute', status: 'running' } }),
+    event(2, { type: 'tool', tool: { id: 'cmd', title: '', output: 'a\n', outputAppend: true } }),
+    event(3, { type: 'assistant_message', text: 'still going', messageId: 'm' }),
+    event(4, { type: 'tool', tool: { id: 'cmd', title: '', output: 'b\n', outputAppend: true } }),
+    event(5, { type: 'tool', tool: { id: 'cmd', title: '', output: 'c\n', outputAppend: true } }),
+    event(6, { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed', output: 'a\nb\nc\n' } }),
+  ]
+  const cards = (events: AgentEventRecord[]) =>
+    buildConversationItems(events).map(({ key, firstSeq, lastSeq, event: value }) => ({ key, firstSeq, lastSeq, value }))
+
+  it('draws what the raw rows draw, whether a call ends inside a page or runs across two', () => {
+    expect(cards(foldToolEvents(raw))).toEqual(cards(raw))
+    expect(cards([...foldToolEvents(raw.slice(0, 4)), ...foldToolEvents(raw.slice(4))])).toEqual(cards(raw))
+    expect(cards([...foldToolEvents(raw.slice(0, 5)), ...foldToolEvents(raw.slice(5))])).toEqual(cards(raw))
+  })
+
+  it('applies a row it already holds once, when a re-read page or a socket frame repeats it', () => {
+    // The folded record reaches seq 5; rows 2, 4 and 5 are already inside it.
+    const folded = foldToolEvents(raw.slice(0, 5))
+    expect(cards([...folded, raw[1], raw[3], raw[4], raw[5]].sort((a, b) => a.seq - b.seq))).toEqual(cards(raw))
   })
 })

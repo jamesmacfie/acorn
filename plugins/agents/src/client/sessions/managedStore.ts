@@ -166,6 +166,9 @@ function indexEvents(sessionId: string, events: AgentEventRecord[]): void {
   else usageLines.set(sessionId, { at, turnId: events[at].turnId })
 }
 
+const pageReach = (events: AgentEventRecord[]): number =>
+  events.reduce((reach, record) => Math.max(reach, record.foldedThroughSeq ?? record.seq), 0)
+
 // Walk the event pages the snapshot route left behind.
 //
 // That route caps its event list, so a session past the cap arrives with its *oldest* events and
@@ -177,15 +180,18 @@ function indexEvents(sessionId: string, events: AgentEventRecord[]): void {
 // `lastEventSeq` on the session row counts the whole ledger, so it is what says whether there is more
 // to fetch. A page that comes back empty ends the walk too, so a ledger whose rows were pruned below
 // the counter costs one request rather than looping.
+//
+// Each page resumes from the furthest row the last one reached, not from its last record's own seq:
+// the node folds a page's tool and usage updates onto the card each one opened, so the rows after that
+// record may already be inside an earlier one (`foldedThroughSeq`).
 async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot): Promise<AgentEventRecord[]> {
   const events = [...snapshot.events]
-  let cursor = events.at(-1)?.seq ?? 0
+  let cursor = pageReach(events)
   while (cursor < snapshot.session.lastEventSeq) {
     const page = await managedAgentApi.events(sessionId, cursor)
-    const last = page.events.at(-1)
-    if (!last) break
+    if (!page.events.length) break
     events.push(...page.events)
-    cursor = last.seq
+    cursor = pageReach(page.events)
   }
   return events
 }

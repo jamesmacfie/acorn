@@ -32,7 +32,7 @@ export const mergeAgentUsage = (previous: AgentUsage, next: AgentUsage): AgentUs
  * with only a context count, and it is why this is not simply "group by turn id".
  *
  * The surviving record keeps the first update's id, seq and timestamp, so a card lands where it
- * landed before and the seq order is untouched.
+ * landed before and the seq order is untouched. `foldedThroughSeq` says how far it reaches.
  */
 export function foldUsageEvents(events: AgentEventRecord[]): AgentEventRecord[] {
   const out: AgentEventRecord[] = []
@@ -44,7 +44,11 @@ export function foldUsageEvents(events: AgentEventRecord[]): AgentEventRecord[] 
     }
     const open = line >= 0 ? out[line] : undefined
     if (open?.event.type === 'usage' && (record.turnId === null || record.turnId === open.turnId)) {
-      out[line] = { ...open, event: { type: 'usage', usage: mergeAgentUsage(open.event.usage, record.event.usage) } }
+      out[line] = {
+        ...open,
+        event: { type: 'usage', usage: mergeAgentUsage(open.event.usage, record.event.usage) },
+        foldedThroughSeq: record.seq,
+      }
       continue
     }
     line = out.length

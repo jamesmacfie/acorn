@@ -87,10 +87,12 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, true),
   importTranscript: (input: ImportAgentTranscriptInput) =>
     jsonWrite<AgentSession>(`${ROOT}/transcript-imports`, 'POST', input),
+  // `fold=1`: this reader takes one record per tool call and pages on from `foldedThroughSeq`
+  // (../../shared/toolFold.ts). A node that predates it ignores the flag and sends every row.
   snapshot: (sessionId: string, afterSeq = 0, limit = 2_000) =>
-    readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}`)),
+    readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
   events: (sessionId: string, afterSeq: number, limit = 2_000) =>
-    readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}`)),
+    readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
   enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>) =>
     jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, true),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>

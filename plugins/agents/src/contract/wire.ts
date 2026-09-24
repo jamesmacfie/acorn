@@ -346,6 +346,10 @@ export type AgentEventRecord = {
   event: AgentNormalizedEvent
   searchText: string | null
   createdAt: number
+  /** Present on a record the node folded later rows into (../shared/usageFold.ts, ../shared/toolFold.ts):
+   *  the seq of the last row it absorbed. A reader pages on from here, and treats a row at or below it
+   *  for the same card as already applied. */
+  foldedThroughSeq?: number
 }
 
 export type AgentRequest = {

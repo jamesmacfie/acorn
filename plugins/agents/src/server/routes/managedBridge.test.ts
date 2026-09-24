@@ -80,6 +80,45 @@ describe('the snapshot a client reads', () => {
     expect(page.events.filter((event) => event.event.type === 'usage')).toHaveLength(58)
   })
 
+  it('folds a tool call only for a reader that asks, and pages on from where the fold reached', async () => {
+    const session = await store.createSession({
+      taskId: randomUUID(),
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    }, PROVIDER)
+    const { turn } = await store.enqueueTurn(session.id, {
+      source: 'interactive',
+      input: [{ type: 'text', text: 'go' }],
+      effectivePolicy: {},
+      idempotencyKey: 'k1',
+    })
+    await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } })
+    for (let at = 1; at <= 5; at++) {
+      await store.recordEvent(session.id, turn.id, {
+        type: 'tool',
+        tool: { id: 'cmd', title: '', output: `${at}\n`, outputAppend: true },
+      })
+    }
+
+    const tools = (events: { event: { type: string } }[]) => events.filter((event) => event.event.type === 'tool')
+    expect(tools((await bridge().snapshot(session.id)).events)).toHaveLength(6)
+    expect(tools((await bridge().events(session.id)).events)).toHaveLength(6)
+
+    const [folded] = tools((await bridge().snapshot(session.id, 0, 2_000, true)).events)
+    expect(folded.event).toEqual({
+      type: 'tool',
+      tool: { id: 'cmd', title: 'ls', status: 'running', output: '1\n2\n3\n4\n5\n', outputAppend: true },
+    })
+    // A page of three rows ends on an update that folded into the first, so the next page starts past it.
+    const page = await bridge().events(session.id, 0, 3, true)
+    expect(page.events).toHaveLength(1)
+    expect(page.events[0].foldedThroughSeq).toBe(3)
+    expect(page.nextCursor).toBe(3)
+    expect((await store.exportSnapshot(session.id)).events).toHaveLength(6)
+  })
+
   it('projects delegation visibility onto the bounded session list', async () => {
     const session = await store.createSession({
       taskId: randomUUID(),
