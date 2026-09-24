@@ -6,6 +6,7 @@
 import { BridgeError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
+import { foldToolEvents } from '../../shared/toolFold'
 import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { AgentDelegationService } from '../delegation/service'
@@ -109,11 +110,17 @@ export function managedAgentsBridge(
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
     // `store.snapshot` still answers workflow execution and the wait route with every row
     // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).
-    snapshot: (sessionId, afterSeq, eventLimit) => guarded(async () => {
+    // Usage folds for every reader, since applying a usage row twice changes nothing; tool calls only
+    // for one that asks (./managed.ts, `fold=1`).
+    snapshot: (sessionId, afterSeq, eventLimit, foldTools) => guarded(async () => {
       const snapshot = await runtime.store.snapshot(sessionId, afterSeq, eventLimit)
-      return { ...snapshot, events: foldUsageEvents(snapshot.events) }
+      const events = foldUsageEvents(snapshot.events)
+      return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
     }),
-    events: (sessionId, afterSeq, limit) => guarded(() => runtime.store.eventPage(sessionId, afterSeq, limit)),
+    events: (sessionId, afterSeq, limit, foldTools) => guarded(async () => {
+      const page = await runtime.store.eventPage(sessionId, afterSeq, limit)
+      return foldTools ? { ...page, events: foldToolEvents(foldUsageEvents(page.events)) } : page
+    }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     patchQueuedTurn: (sessionId, turnId, patch) =>
       guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),

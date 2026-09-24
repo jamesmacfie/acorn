@@ -146,6 +146,21 @@ it fails for any reason a selection can break, not only for the one it was writt
   so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
+- **Tool calls fold on the Node too, for a reader that asks.** A call arrives as a run of updates on
+  one id, and `tool` is about half of all rows, most of a long session. When the client sends
+  `fold=1`, the snapshot route and the event pages behind it fold each call's updates within the page
+  onto the record that opened it, by the rule in `plugins/agents/src/shared/toolFold.ts`, which
+  `conversationItems.ts` imports too. The surviving record keeps the opener's id, sequence and
+  subagent attribution, and it carries `foldedThroughSeq`, the last row it absorbed. A call that spans
+  two pages arrives as two records. The second is marked as a continuation unless a row in its page
+  replaced the output, which Codex does when a command completes. `foldedThroughSeq` is what makes the
+  fold safe to overlap with other reads. Paging resumes from it instead of from the last record's own
+  sequence. The transcript also skips any update at or below the card's reach, which covers a socket
+  frame a refetch has since folded in. Without that skip, Codex output, which streams as appends,
+  would draw twice. A reader that omits the flag, which includes every client older than it, gets
+  every row, because it would do both of those things wrong. The client does not fold a live tool
+  update when it arrives, so the rows a session streamed while open stay raw in that client's memory
+  until it drops the session. The transcript still draws them correctly, it just walks more rows.
 - **A folded usage line has no card of its own.** It used to draw at the head of each turn as tokens,
   context and a provider cost on one row. The cost belongs to whichever plugin fills
   `agents:session-header` and already sits beside the session title, and the token counts said the

@@ -63,8 +63,8 @@ export type ManagedAgentsBridge = {
     cursor?: number
     limit?: number
   }): Promise<AgentSessionList>
-  snapshot(sessionId: string, afterSeq?: number, eventLimit?: number): Promise<AgentSessionSnapshot>
-  events(sessionId: string, afterSeq?: number, limit?: number): Promise<AgentEventPage>
+  snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
+  events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
   patchQueuedTurn(sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
@@ -101,6 +101,10 @@ const listQuerySchema = z.object({
 const pageQuerySchema = z.object({
   afterSeq: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(2_000).default(500),
+  // Asked for, not assumed. A reader that sends `fold=1` gets one record per tool call per page and
+  // honours `foldedThroughSeq`; an older one would page from the wrong seq and apply streamed output
+  // twice, so it keeps every row (../../shared/toolFold.ts).
+  fold: z.literal('1').optional(),
 })
 
 const exportQuerySchema = z.object({ format: z.enum(['json', 'markdown']).default('json') })
@@ -275,13 +279,13 @@ export const managedAgents = new Hono<AppEnv>()
     const parsed = pageQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
-      bridge.snapshot(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit))
+      bridge.snapshot(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit, parsed.data.fold === '1'))
   })
   .get('/sessions/:sessionId/events', (c) => {
     const parsed = pageQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
-      bridge.events(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit))
+      bridge.events(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit, parsed.data.fold === '1'))
   })
   .patch('/sessions/:sessionId', async (c) => {
     const parsed = patchAgentSessionSchema.safeParse(await c.req.json().catch(() => null))

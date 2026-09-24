@@ -3,14 +3,14 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSubagentUpdate,
-  AgentToolCall,
   AgentUsage,
-  AgentWebActivity,
 } from '../../contract/wire.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
 // replayed page, an older node, or a subagent's roster usage folds the way it always did.
 import { mergeAgentUsage as mergeUsage } from '../../shared/usageFold'
+// Tool calls fold by the same rule on the node too, for a reader that asks (../../shared/toolFold.ts).
+import { mergeToolCall, toolCardKey } from '../../shared/toolFold'
 
 export type AgentConversationItem = {
   key: string
@@ -99,35 +99,9 @@ type AppendableEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message'
 const isAppendable = (event: AgentNormalizedEvent): event is AppendableEvent =>
   event.type === 'assistant_message' || event.type === 'reasoning'
 
-// Field by field rather than a spread: the normalizers write absent values as present-but-undefined
-// keys, which a spread would use to wipe what an earlier update reported.
-const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): AgentToolCall => ({
-  id: previous.id,
-  parentId: next.parentId ?? previous.parentId,
-  title: next.title || previous.title,
-  kind: next.kind ?? previous.kind,
-  status: next.status ?? previous.status,
-  input: next.input ?? previous.input,
-  output: next.outputAppend
-    ? (previous.output ?? '') + (next.output ?? '')
-    : next.output ?? previous.output,
-  paths: next.paths ?? previous.paths,
-  subagentId: next.subagentId ?? previous.subagentId,
-  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
-})
-
-// Same convention, one level down. A provider reports the request and the sources on different
-// updates — Claude Code sends the query, then the results, then the status, all on the same call id
-// — so a spread would let each of those wipe the last. An explicit empty result list is the
-// provider saying it found nothing and does replace; an absent one means it had nothing to add.
-const mergeWebActivity = (previous: AgentWebActivity, next: AgentWebActivity): AgentWebActivity => ({
-  action: next.action ?? previous.action,
-  results: next.results ?? previous.results,
-})
-
-
-// Same convention. A harness that only learns the model at completion must not wipe the title it
-// reported at spawn, and one that reports usage twice must not lose the first half of it.
+// Field by field, for the reason on `mergeToolCall` (../../shared/toolFold.ts). A harness that only
+// learns the model at completion must not wipe the title it reported at spawn, and one that reports
+// usage twice must not lose the first half of it.
 const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate): AgentSubagentUpdate => ({
   id: previous.id,
   title: next.title || previous.title,
@@ -191,14 +165,18 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // belongs to the line it is updating. That trailing update is how a cost reaches a line that started
   // with only a context count, which used to render as a second, near-identical line. A subagent folds
   // like a tool call, by id, so a completion summary lands on the card the spawn opened.
-  const toolKey = (record: AgentEventRecord, tool: AgentToolCall) =>
-    `${record.turnId ?? 'session'}:${tool.id}`
+  //
+  // A record the node already folded (`foldedThroughSeq`) stands in for every update of its card up to
+  // that seq, so the card's `lastSeq` jumps there, and a row at or below it is one that record already
+  // holds: a page re-read, a socket frame the refetch overtook. Applying it twice would repeat
+  // appended output.
+  const reach = (record: AgentEventRecord) => record.foldedThroughSeq ?? record.seq
   // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
   const foldTarget = (
     record: AgentEventRecord,
     stream: Stream,
   ): { stream: Stream; at: number } | undefined => {
-    if (record.event.type === 'tool') return toolCards.get(toolKey(record, record.event.tool))
+    if (record.event.type === 'tool') return toolCards.get(toolCardKey(record.turnId, record.event.tool.id))
     if (record.event.type === 'subagent') {
       const at = subagentCardAt.get(record.event.subagent.id)
       return at === undefined ? undefined : { stream: top, at }
@@ -236,12 +214,13 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     const fold = foldTarget(record, stream)
     if (fold) {
       const card = fold.stream.items[fold.at]
+      if (record.seq <= card.lastSeq) continue
       // Spread, so a subagent card keeps the `children` array its stream is still pushing into.
-      fold.stream.items[fold.at] = { ...card, lastSeq: record.seq, event: folded(card.event, record.event) }
+      fold.stream.items[fold.at] = { ...card, lastSeq: reach(record), event: folded(card.event, record.event) }
       continue
     }
     if (record.event.type === 'tool') {
-      toolCards.set(toolKey(record, record.event.tool), { stream, at: stream.items.length })
+      toolCards.set(toolCardKey(record.turnId, record.event.tool.id), { stream, at: stream.items.length })
     }
     if (record.event.type === 'usage') stream.usageCardAt = stream.items.length
     if (record.event.type === 'plan' && record.turnId !== null) {
@@ -269,7 +248,7 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     const item: AgentConversationItem = {
       key: record.id,
       firstSeq: record.seq,
-      lastSeq: record.seq,
+      lastSeq: reach(record),
       turnId: record.turnId,
       event: record.event,
     }
