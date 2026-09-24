@@ -96,12 +96,15 @@ const buttonAttrs = (own: ButtonProps) => ({
 })
 
 export function Button(props: ButtonProps) {
+  // Read once, for the reason on RowParts: testing `props.children` and then inserting it built an
+  // icon button's mark twice.
+  const content = children(() => props.children)
   // The label doubles as the visible text, so a call site that has only words never writes them
   // twice.
   const body = () => (
     <>
       <Show when={props.busy}><Spinner size="sm" /></Show>
-      <Show when={props.children} fallback={props.label}>{props.children}</Show>
+      <Show when={content()} fallback={props.label}>{content()}</Show>
     </>
   )
   return (
@@ -642,6 +645,30 @@ const placement = (own: { offset?: number; height?: number }): JSX.CSSProperties
       ...(own.height === undefined ? {} : { height: `${own.height}px` }),
     }
 
+/** A row's parts beside its body. Each slot is read once, through `children`: a prop is a getter, and
+ *  reading it again runs the caller's JSX again, so a `Show` testing `props.leading` beside an insert
+ *  of `props.leading` built every leading mark twice and kept the unused copy alive. A component of its
+ *  own so a collapsed row, which draws none of them, builds none of them. */
+function RowParts(props: {
+  leading?: JSX.Element
+  meta?: JSX.Element
+  metaFields?: number
+  trailing?: JSX.Element
+  children: JSX.Element
+}) {
+  const leading = children(() => props.leading)
+  const meta = children(() => props.meta)
+  const trailing = children(() => props.trailing)
+  return (
+    <>
+      <Show when={leading()}><span class="ui-row-leading">{leading()}</span></Show>
+      <span class="ui-row-body">{props.children}</span>
+      <Show when={meta()}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{meta()}</span></Show>
+      <Show when={trailing()}><span class="ui-row-trailing">{trailing()}</span></Show>
+    </>
+  )
+}
+
 /* Row: navigational list rows, including the role/tabindex/Enter/Space wiring an activatable row
    needs.
 
@@ -713,12 +740,9 @@ export function Row(props: {
     <Show
       when={collapsed()}
       fallback={(
-        <>
-          <Show when={props.leading}><span class="ui-row-leading">{props.leading}</span></Show>
-          <span class="ui-row-body">{props.children}</span>
-          <Show when={props.meta}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{props.meta}</span></Show>
-          <Show when={props.trailing}><span class="ui-row-trailing">{props.trailing}</span></Show>
-        </>
+        <RowParts leading={props.leading} meta={props.meta} metaFields={props.metaFields} trailing={props.trailing}>
+          {props.children}
+        </RowParts>
       )}
     >
       <span class="ui-row-collapsed">{props.collapsed}</span>

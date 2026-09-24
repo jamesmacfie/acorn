@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show, type JSX } from 'solid-js'
+import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 
 // A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
 // with its own localStorage closure across three different mechanisms, two of them missing
@@ -56,6 +56,10 @@ export function Fold(props: {
   // Closed transcripts can hold thousands of nested cards. Build them on first open, then retain
   // them so closing a section does not discard drafts, selection, or a child's own disclosure state.
   const visited = createMemo((previous) => previous || open(), false)
+  // Read once, for the reason on Row's parts (../primitives.tsx): testing a slot and then inserting it
+  // ran the caller's JSX twice, and a transcript's tool card built its whole status line twice.
+  const meta = children(() => props.meta)
+  const actions = children(() => props.actions)
 
   return (
     <details
@@ -76,10 +80,10 @@ export function Fold(props: {
         <span class="ui-fold-marker" aria-hidden="true" />
         <span class="ui-section-header-label">{props.label}</span>
         <Show when={props.count != null}><span class="ui-section-header-count">{props.count}</span></Show>
-        <Show when={props.meta}><span class="ui-fold-meta">{props.meta}</span></Show>
-        <Show when={props.actions}>
+        <Show when={meta()}><span class="ui-fold-meta">{meta()}</span></Show>
+        <Show when={actions()}>
           <span class="ui-section-header-actions" onClick={(event) => event.stopPropagation()}>
-            {props.actions}
+            {actions()}
           </span>
         </Show>
       </summary>
