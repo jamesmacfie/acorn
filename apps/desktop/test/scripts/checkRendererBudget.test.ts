@@ -53,7 +53,8 @@ describe('check-renderer-budget', () => {
     ...extra,
   })
 
-  // index.html loading a small guard that dynamic-imports the app, as src/client/bootstrap.ts does.
+  // index.html loading a small guard module that dynamic-imports the app, the shape the renderer had
+  // from 2026-09-20 to 2026-09-25.
   const guarded = (imported: string) => build({
     'index.html': { file: 'assets/index-aaaa.js', isEntry: true, dynamicImports: ['src/client/index.tsx'] },
     'src/client/index.tsx': { file: 'assets/client-bbbb.js', imports: ['index.html', '_x'], css: ['assets/client-bbbb.css'] },

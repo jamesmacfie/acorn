@@ -33,10 +33,11 @@ const limits = {
 }
 
 // Source modules that are dynamically imported but still load before the first draw, keyed as the
-// manifest keys them. The startup guard in src/client/bootstrap.ts imports the app unconditionally, so
-// that import is startup whatever syntax loads it. Every other dynamic import is a lazy surface and
-// stays out of the count. A module listed here that has no chunk of its own is skipped: once
-// index.html loads it directly it is part of the entry chunk, and the entry is counted anyway.
+// manifest keys them. Every other dynamic import is a lazy surface and stays out of the count. A module
+// listed here that has no chunk of its own is skipped: index.html loads src/client/index.tsx directly,
+// so today it is part of the entry chunk, and the entry is counted anyway. It stays listed because an
+// entry module that dynamic-imports the app is the shape that blinded this check once (see above), and
+// that import is startup whatever syntax loads it.
 const STARTUP_IMPORTS = ['src/client/index.tsx']
 
 // Chunk-name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy

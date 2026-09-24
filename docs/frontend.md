@@ -14,6 +14,16 @@ needs browser APIs, and declare the host requirement. For more information, see
 runtime installs the client plugin host, scoped persistence, query clients, broker event handling,
 notification sources, and the shell registries before rendering.
 
+`index.html` loads it directly as the module entry, so the page preloads every startup chunk and
+links the stylesheet from the head. Before the entry runs, the page runs
+`apps/desktop/public/startup-guard.js`, a deferred classic script. Deferred scripts and module
+scripts run in document order, so the guard's listener is in place first. When a startup module
+throws, fails to parse, or cannot be fetched, the guard draws an **Acorn could not start** screen
+with the error and a **Reload** button, where the window would otherwise stay blank. The guard is a
+file rather than inline markup because the renderer policy is `script-src 'self'`. It is not a
+module because an entry that imports the app dynamically puts a serial fetch in front of the whole
+graph and loses its preloads.
+
 `App.tsx` composes the top bar, TabRail, main view, task view, notices, overlays, Node gate, and
 appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
 switch disposes the previous task scope.
@@ -379,14 +389,15 @@ over a byte ceiling, and on a **chunk name**.
   `build`, sums every script and stylesheet a cold window loads: 1,250,000 B for scripts, 200,000 B
   for styles. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
   client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
-  chunk plus the modules in the script's `STARTUP_IMPORTS` list. Those are modules the page imports
-  dynamically but always loads before it draws, which is the one `src/client/bootstrap.ts`
-  imports. Every other dynamic import is lazy and is not counted. The count has a floor too. Under
-  100,000 B of scripts the check is reading the wrong graph, and it fails rather than passes. That is
-  how it went blind on 2026-09-24, when the entry became a 9.6 KB guard and the check reported 9.6 KB
-  while the window loaded 870 KB. The script also prints `hops`, the fetches that run one after
-  another before the app can start, and how much more one dynamic import away would fetch. Neither
-  of those is counted.
+  chunk plus the modules in the script's `STARTUP_IMPORTS` list, and every script and stylesheet
+  `index.html` names, the startup guard among them. `STARTUP_IMPORTS` lists modules the page imports
+  dynamically but always loads before it draws. Today that list names only `src/client/index.tsx`,
+  which is the entry itself, so it adds nothing. Every other dynamic import is lazy and is not
+  counted. The count has a floor too. Under 100,000 B of scripts the check is reading the wrong
+  graph, and it fails rather than passes. That is how it went blind on 2026-09-24, when the entry
+  was a 9.6 KB guard module and the check reported 9.6 KB while the window loaded 870 KB. The script
+  also prints `hops`, the fetches that run one after another before the app can start, and how much
+  more one dynamic import away would fetch. Neither of those is counted.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
