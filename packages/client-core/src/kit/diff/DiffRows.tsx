@@ -156,11 +156,15 @@ export function DiffLine(props: {
   composer?: LineComposerController
   mentions?: string[]
   highlight?: FindHighlight
+  openLine?: (row: CodeRow) => void
 }) {
   return (
     <>
       <span class="diff-line-chrome">
-        <span class="diff-gutter">{props.r.oldNo ?? ''}</span>
+        <span class="diff-gutter">
+          {props.r.oldNo ?? ''}
+          <OpenLineButton row={props.r} onOpen={props.openLine} />
+        </span>
         <span class="diff-gutter">{props.r.newNo ?? ''}</span>
         <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
       </span>
@@ -186,6 +190,7 @@ export function SplitCell(props: {
   composer?: LineComposerController
   mentions?: string[]
   highlight?: FindHighlight
+  openLine?: (row: CodeRow) => void
 }) {
   return (
     <div
@@ -199,7 +204,10 @@ export function SplitCell(props: {
       <Show when={props.r} fallback={<span class="diff-gutter" />}>
         {(r) => (
           <>
-            <span class="diff-gutter">{props.gutter ?? ''}</span>
+            <span class="diff-gutter">
+              {props.gutter ?? ''}
+              <OpenLineButton row={r()} onOpen={props.openLine} />
+            </span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <Show when={props.canAdd && props.composer}>
               <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
@@ -214,6 +222,26 @@ export function SplitCell(props: {
         )}
       </Show>
     </div>
+  )
+}
+
+function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }) {
+  const label = () => `Open ${props.row.path}:${props.row.newNo} in editor`
+  return (
+    <Show when={props.row.kind === 'insert' && props.row.newNo != null && props.onOpen}>
+      <button
+        type="button"
+        class="diff-open-btn"
+        title={label()}
+        aria-label={label()}
+        onClick={(event) => {
+          event.stopPropagation()
+          props.onOpen?.(props.row)
+        }}
+      >
+        ↗
+      </button>
+    </Show>
   )
 }
 

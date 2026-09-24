@@ -17,6 +17,16 @@ describe('agent pricing preferences', () => {
     })
   })
 
+  it('prices Opus 5.5 on its own rather than as Opus 5', () => {
+    expect(claudeModelPrice('claude-opus-5-5')).toEqual({
+      input: 4,
+      output: 20,
+      cacheWrite: 5,
+      cacheRead: 0.2,
+    })
+    expect(claudeModelPrice('claude-opus-5-20260724')?.input).toBe(5)
+  })
+
   it('applies a catalog override and gives an exact model price priority', () => {
     const preferences = emptyAgentPricingPreferences()
     preferences.claude.overrides.push({
@@ -41,6 +51,8 @@ describe('agent pricing preferences', () => {
       cacheRead: 1,
     })
     expect(codexModelPrice('gpt-5.6-terra', Date.now(), preferences)?.input).toBe(2)
+    expect(codexModelPrice('gpt-6-sol', Date.now(), preferences)?.input).toBe(2)
+    expect(codexModelPrice('gpt-6-luna', Date.now(), preferences)?.cacheRead).toBe(0.01)
     preferences.codex.overrides.push({
       catalogId: 'gpt-5-6-terra',
       price: { input: 3, output: 13, cacheWrite: 3.75, cacheRead: 0.3 },

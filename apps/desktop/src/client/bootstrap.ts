@@ -14,7 +14,12 @@ const showStartupFailure = (reason: unknown) => {
   const detail = document.createElement('pre')
   detail.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere'
   detail.textContent = error.stack || error.message
-  main.append(heading, detail)
+  // A module that failed to load is often a one-off fetch miss, and a fresh load fetches it again.
+  const reload = document.createElement('button')
+  reload.type = 'button'
+  reload.textContent = 'Reload'
+  reload.addEventListener('click', () => location.reload())
+  main.append(heading, detail, reload)
   root.replaceChildren(main)
 }
 

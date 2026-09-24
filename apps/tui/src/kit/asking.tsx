@@ -31,6 +31,7 @@ import { toVisual, wrapRows, type Row } from '../wrap'
 import { requestFrame } from '../tree/frames'
 import type { Node } from '../tree/node'
 import { Menu } from './grouping'
+import { Text } from './showing'
 import { copyToTerminal } from './copy'
 
 // The kit's asking nodes in cells.
@@ -956,17 +957,27 @@ export function CopyButton(props: { text: () => string; onCopy?: (text: string) 
  *  select and never reset the model when the backend changed. Both are fixed here, because two hosts
  *  that draw the same node and answer differently is a bug a plugin author cannot see coming. */
 export function ModelBackendPicker(props: {
-  backends: readonly { id: string; label?: string; models?: readonly { id: string; label?: string }[]; defaultModelId?: string }[]
+  backends: readonly { id: string; kind?: 'connection' | 'harness'; label?: string; models?: readonly { id: string; label?: string }[]; defaultModelId?: string; catalogUnavailable?: boolean }[]
   backendId: string
   modelId: string
   onChange: (pick: { backendId: string; modelId: string }) => void
 }) {
   const current = () => props.backends.find((entry) => entry.id === props.backendId) ?? props.backends[0]
   const models = () => current()?.models ?? []
+  const modelOptions = () => {
+    const backend = current()
+    const choices = models().map((model) => ({ value: model.id, label: model.label ?? model.id }))
+    if (backend?.kind !== 'harness' || (!choices.length && !backend.catalogUnavailable)) return choices
+    const options = [{ value: '', label: `Use ${backend.label ?? backend.id} default` }, ...choices]
+    if (backend.catalogUnavailable && props.modelId && !choices.some((model) => model.value === props.modelId)) {
+      options.push({ value: props.modelId, label: `${props.modelId} (saved)` })
+    }
+    return options
+  }
   // The same rule as `defaultModelIdFor` (@acorn/protocol/modelProviders.ts), restated rather than
   // imported: that function takes a whole `ModelBackend` and these props are the structural subset.
   const defaultModel = (backend: (typeof props.backends)[number] | undefined) =>
-    backend?.defaultModelId || backend?.models?.[0]?.id || ''
+    backend?.kind === 'harness' ? backend.defaultModelId ?? '' : backend?.defaultModelId || backend?.models?.[0]?.id || ''
   return (
     <box flexDirection="row" gap={1}>
       <Show when={props.backends.length > 1}>
@@ -977,13 +988,16 @@ export function ModelBackendPicker(props: {
           onChange={(backendId) => props.onChange({ backendId, modelId: defaultModel(props.backends.find((entry) => entry.id === backendId)) })}
         />
       </Show>
-      <Show when={models().length}>
+      <Show when={modelOptions().length}>
         <Select
           label="Model"
           value={props.modelId}
-          options={models().map((model) => ({ value: model.id, label: model.label ?? model.id }))}
+          options={modelOptions()}
           onChange={(modelId) => props.onChange({ backendId: current()?.id ?? '', modelId })}
         />
+      </Show>
+      <Show when={current()?.catalogUnavailable}>
+        <Text tone="muted">Could not refresh this CLI's model list. Saved choices are kept.</Text>
       </Show>
     </box>
   )

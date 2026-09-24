@@ -50,18 +50,33 @@ export async function harnessBackends(): Promise<{ backends: ModelBackend[]; mis
   const missing: ModelBackend[] = []
   for (const profile of agentProfileRegistry.list()) {
     if (!profile.aiArgv) continue
-    ;(profileAvailable(profile) ? backends : missing).push(harnessBackend(profile))
+    if (!profileAvailable(profile)) {
+      missing.push(harnessBackend(profile))
+      continue
+    }
+    let models = profile.models ?? []
+    let catalogUnavailable = false
+    if (profile.listModels) {
+      try {
+        const catalog = await profile.listModels(resolveCommand(profile))
+        models = catalog.models
+        catalogUnavailable = catalog.unavailable ?? false
+      }
+      catch { catalogUnavailable = true }
+    }
+    backends.push(harnessBackend(profile, models, catalogUnavailable))
   }
   return { backends, missing }
 }
 
-const harnessBackend = (profile: ProfileDef): ModelBackend => ({
+const harnessBackend = (profile: ProfileDef, models = profile.models ?? [], catalogUnavailable = false): ModelBackend => ({
   id: `${HARNESS_BACKEND_PREFIX}${profile.id}`,
   kind: 'harness',
   label: profile.label,
   ...(profile.glyph ? { glyph: profile.glyph } : {}),
-  models: profile.models ?? [],
+  models,
   defaultModelId: profile.defaultModelId ?? '',
+  ...(catalogUnavailable ? { catalogUnavailable } : {}),
 })
 
 /**

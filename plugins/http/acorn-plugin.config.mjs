@@ -15,11 +15,9 @@
 // On the permissions, and where they differ from what the migration brief sketched:
 //
 //   exec: true — the brief did not list it, and the brief was wrong. `command`-kind variables run a
-//     user-typed shell command at send time (server/send.ts runs `bash -lc` under a shared deadline), so
-//     "Run commands on the node" is exactly what this plugin does. The call site is `node:child_process`
-//     rather than `ctx.core.proc`, which does NOT make the disclosure an over-declaration: the manifest
-//     block is what the owner is told about behaviour, and rung 1 shapes `ctx` for cooperative code —
-//     it was never a sandbox (docs/security.md). database declares the same for the same reason.
+//     user-typed shell command at send time (server/send.ts runs `bash -lc` through `ctx.core.proc`), so
+//     "Run commands on the node" is exactly what this plugin does. The host process broker runs the
+//     command so Node CLIs can read their own files outside the plugin worker's permissions.
 //     Contrast rollbar/linear's `secrets: false`, which is the opposite case: there the plugin does not
 //     touch the host service at all, and claiming it would have overstated.
 //   secrets: true — unlike those two, this one really does call `ctx.core.secrets`, on every read and
@@ -32,12 +30,9 @@
 //     variables are per-owner rows, so it asks core who this node is bound to. Not `projects:config`
 //     (this plugin's commands come from its own tables, not from repo config), not `projects:write`, no
 //     `prefs` (the brief listed it; nothing reads or writes one).
-//   net: [] — and this is the honest awkward one. The plugin's node half calls `fetch` on whatever URL
-//     the owner typed, which is the entire feature; there is no host list that describes "anywhere the
-//     user points it", and the field is a declaration of INTENDED egress rather than an enforced
-//     allowlist. Listing nothing says "this plugin has no destination of its own", which is true and is
-//     the most useful thing it can say. What the owner needs to understand about this pane is on the
-//     `exec` and `secrets` lines above, not here.
+//   net: ['*'] — the owner chooses the request URL, so no fixed host list describes this plugin's
+//     egress. The worker needs an explicit fetch grant or sends fail before making a request. The
+//     permission prompt names this broad access; raw socket modules remain unavailable.
 //   api: ['core.projects:read'] — one scope. The frame reads the project it was opened for (for its name)
 //     and, on the settings surface, the project list to choose from. `core.tasks:read` is NOT declared:
 //     the host hands the frame its `taskId` in `context`, and everything the panel does with a task goes
@@ -55,7 +50,7 @@ export default {
   permissions: {
     api: ['core.projects:read'],
     events: [],
-    node: { core: ['tasks', 'projects:read', 'identity'], capabilities: [], secrets: true, exec: true, net: [] },
+    node: { core: ['tasks', 'projects:read', 'identity'], capabilities: [], secrets: true, exec: true, net: ['*'] },
   },
   contributions: {
     // The one thing this plugin does that a person reviewing the node would want to know about, and

@@ -558,6 +558,7 @@ export function DiffPane(props: {
         findHighlight={findController.findHighlight}
         lineExtra={source().lineExtra}
         lineAction={source().lineAction}
+        openLine={source().openLine}
       />
     </Show>
   )

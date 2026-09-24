@@ -2,7 +2,7 @@ import { For, createEffect, createMemo, createResource, createSignal, on, onClea
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
-  projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
+  openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
   sendReferenceToAgent, sendToSession, taskStatusRevision, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
@@ -206,6 +206,10 @@ export function createChangesModel(task: Task) {
         const line = row.newNo ?? row.oldNo
         if (line != null) void sendRef(formatFileReference(row.path, line))
       },
+    },
+    openLine: (row) => {
+      if (row.newNo == null) return
+      openPane(task.id, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
     },
     find: { commandId: 'changes.diff.find', description: 'Find in changes', category: 'Changes', pane: 'changes' },
   }

@@ -23,7 +23,8 @@ command undiscoverable. Inside a group the query narrows that group's own childr
 **Enter enters, Escape goes back.** Enter runs a leaf and pushes a group. Escape pops one frame and
 restores that frame's query and cursor exactly, because the whole frame object was kept rather than
 rebuilt; at the root it closes and hands focus back. Focus is restored on the final close and never on
-an intermediate pop. Backspace edits the query rather than implicitly popping.
+an intermediate pop. Clicking a result activates that result directly. Backspace edits the query rather
+than implicitly popping.
 
 **A shortcut aimed at a group opens the palette at it.** The keymap remains the only global
 dispatcher: it hands a command id to `executeCommand` whether the command is a leaf or not, and a
@@ -37,6 +38,9 @@ and draws the instruction, loading, empty, error or result state that came back.
 never debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a
 failure keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a
 character; the end of the composition schedules once.
+
+When a search provides a placeholder, that field names the search. Its breadcrumb shows parent groups
+only, so a top-level search starts with the field rather than repeating its title above it.
 
 **A setting shows what is set before it changes it.** Entering a `setting` frame asks its owner what
 the value currently is, draws the two-to-thirty-two declared choices, and marks the one that is set.

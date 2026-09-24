@@ -38,6 +38,11 @@ describe('the two permission groups', () => {
     expect(texts(uiPermissionLines(all))).toEqual(['Read tasks', 'Receive task archive events'])
   })
 
+  it('shows an any-host fetch grant explicitly', () => {
+    const all = permissions({ node: { core: [], capabilities: [], secrets: false, exec: false, net: ['*'], sockets: false } })
+    expect(texts(nodePermissionLines(all))).toEqual(['Send requests to any network host'])
+  })
+
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
     // that is what checkouts() returns (docs/security.md § Rung 1).

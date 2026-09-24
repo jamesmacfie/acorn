@@ -465,6 +465,18 @@ describe('a search frame', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
+  it('uses the placeholder in place of the search title, keeping parent groups visible', async () => {
+    register(group('files', { title: 'Files' }))
+    register(search('find', { title: 'Go to file', placeholder: 'Go to file…' }))
+    register(search('files.find', { title: 'Go to file', parentId: 'files', placeholder: 'Go to file…' }))
+    await withSession((session) => {
+      session.openAt('find')
+      expect(session.breadcrumb()).toEqual([])
+      session.openAt('files.find')
+      expect(session.breadcrumb()).toEqual(['Files'])
+    })
+  })
+
   it('asks once when the typing stops, and only for the last thing typed', async () => {
     const asked: string[] = []
     register(search('find', { query: async (text) => { asked.push(text); return [item('issue-1')] } }))

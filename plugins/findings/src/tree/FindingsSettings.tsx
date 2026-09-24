@@ -1,17 +1,20 @@
 import { createResource, createSignal, Show } from 'solid-js'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
-import { Alert, Checkbox, Field, Heading, ModelBackendPicker, Select, Stack, Text, defaultModelIdFor } from '@acorn/plugin-api/ui/tree'
+import { Alert, Button, Checkbox, Field, Heading, ModelBackendPicker, Select, Stack, Text, defaultModelIdFor } from '@acorn/plugin-api/ui/tree'
 import { DEFAULT_FINDINGS_SETTINGS, type FindingsReviewSettings } from '../contract/lifecycle'
 import { findingsTreeClient } from './findingsClient'
 
 export function FindingsSettings(props: { bridge: AcornBridge }) {
   const api = findingsTreeClient(props.bridge)
-  const [loaded] = createResource(() => Promise.all([api.settings(), api.modelBackends(), api.reviewTargets()]))
+  const [loaded] = createResource(() => api.settings())
+  const [catalog, { refetch: refetchCatalog }] = createResource(() => api.modelBackends())
+  const [reviewTargets] = createResource(() => api.reviewTargets())
   const [edited, setEdited] = createSignal<FindingsReviewSettings | null>(null)
   const [error, setError] = createSignal<string | null>(null)
-  const settings = () => edited() ?? loaded()?.[0] ?? DEFAULT_FINDINGS_SETTINGS
-  const backends = () => loaded()?.[1].backends ?? []
-  const targets = () => loaded()?.[2] ?? []
+  const [refreshing, setRefreshing] = createSignal(false)
+  const settings = () => edited() ?? loaded() ?? DEFAULT_FINDINGS_SETTINGS
+  const backends = () => catalog()?.backends ?? []
+  const targets = () => reviewTargets() ?? []
   const targetIds = () => targets().map((target) => target.id)
   const save = async (patch: Partial<FindingsReviewSettings>) => {
     const previous = settings()
@@ -28,6 +31,13 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
     if (!backend) return
     const targetId = settings().targetId
     void save({ backendId: backend.id, modelId: defaultModelIdFor(backend) || null, targetId: targetId && targetIds().includes(targetId) ? targetId : targets()[0]?.id ?? null })
+  }
+  const refreshModels = async () => {
+    setRefreshing(true)
+    setError(null)
+    try { await refetchCatalog() }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    finally { setRefreshing(false) }
   }
 
   return (
@@ -49,6 +59,9 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
                   modelId={settings().modelId ?? defaultModelIdFor(chosen())}
                   onChange={(pick: { backendId: string; modelId: string }) => void save({ backendId: pick.backendId || null, modelId: pick.modelId || null })}
                 />
+                <Show when={chosen()?.catalogUnavailable}>
+                  <Button label="Retry model list" busy={refreshing()} onPress={() => void refreshModels()} />
+                </Show>
               </Stack>
             </Show>
           </Stack>

@@ -362,9 +362,9 @@ A **backend** is one thing a Generate control can spend: a model-provider connec
 stored a key for, or an agent CLI installed on this machine. `ModelBackend` in
 `packages/protocol/src/modelProviders.ts` is the one read model over both, and it is deliberately
 flat: an id, a kind of `connection` or `harness`, a label, an optional glyph, a model catalog that may
-be empty, and a default model id that may be `''`. A connection's auth kind, scopes, account and
-timestamps do not cross it, because no consumer reads them and a harness has none of them. A caller
-that wants the connection row itself still has `/v1/core/integrations`.
+be empty, a default model id that may be `''`, and a flag for a failed CLI catalog read. A connection's
+auth kind, scopes, account and timestamps do not cross it, because no consumer reads them and a harness
+has none of them. A caller that wants the connection row itself still has `/v1/core/integrations`.
 
 A CLI is not a synthesized connection, and that is the decision the rest of this section follows
 from. `generateTextForConnection` reads a database row, checks its status, reveals its secret and
@@ -404,7 +404,7 @@ changes plugin's fallback when nothing has been picked yet. Both keep spending t
 configured on purpose, and a CLI is chosen for someone only when there is no key at all, which is
 the lock-out this list exists to fix.
 
-**Availability is probed on every read, and nothing is cached.** `which` costs milliseconds, and the
+**Executable availability is probed on every read.** `which` costs milliseconds, and the
 list is read when a dialog opens, a Settings page mounts, or the wizard reaches its step, so a cache
 would be a second source of truth to invalidate when someone installs a CLI while acorn is running.
 The read does wait on one thing first: `spawnsReady()`, the login-shell PATH probe
@@ -413,6 +413,12 @@ the first read lands, and `which claude` before it settles answers "not installe
 `runHeadless` waits on the same gate before spawning, so the read and the call it leads to agree. A
 profile that goes missing between the two fails the call with `provider_not_connected`, exactly as a
 connection deleted between the two does.
+
+Codex's model catalog is a separate, bounded read through its app-server. The agent profile owns
+that read; core only projects the returned catalog into `ModelBackend`. Successful reads are cached
+for one minute. A failed read can be retried from Memory review without leaving the page.
+Claude's catalog is the profile's stable CLI aliases. A harness with an empty selected model id omits
+`-m` or `--model` and uses the CLI default.
 
 **`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
 in `server/modelProviders/runtime.ts`. A `harness:` id goes to `generateTextForHarness` in

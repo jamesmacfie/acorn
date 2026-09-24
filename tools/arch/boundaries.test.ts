@@ -299,7 +299,6 @@ describe('architecture boundaries', () => {
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
       'plugins/editor/src/server/search.ts', // ripgrep, streamed
-      'plugins/http/src/server/send.ts',
     ])
     const importers = [...new Set(
       // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships.
