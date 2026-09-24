@@ -152,28 +152,35 @@ export function createTreeState(input: TreeStateInput) {
     return null
   }
 
-  const childrenOf = (id: string | null): string[] =>
-    id === null ? roots() : nodes[id]?.children ?? []
-
   const setChildren = (id: string | null, next: string[]): void => {
     if (id === null) setRoots(next)
     else setNodes(id, 'children', next)
   }
 
-  const detach = (id: string): void => {
-    const parent = parents.get(id) ?? null
-    setChildren(parent, childrenOf(parent).filter((child) => child !== id))
-  }
-
-  const forget = (id: string): void => {
-    for (const child of nodes[id]?.children ?? []) forget(child)
-    parents.delete(id)
-    setNodes(produce((table) => { delete table[id] }))
-  }
-
   const apply = (ops: readonly TreeMutation[]): void => {
     const problem = acceptable(ops)
     if (problem) return refuse(`dropped a whole batch: ${problem}`)
+    // Every child list the batch touches, as a plain array edited in place and written to the store
+    // once at the end. Copying the store's array for each insert and remove made a batch quadratic in
+    // the siblings, and every element read went through the store's proxy. Clearing a 4,000-row list
+    // took over a second. The edits still run in op order, so the lists come out the same.
+    const lists = new Map<string | null, string[]>()
+    const childrenOf = (id: string | null): string[] => {
+      let list = lists.get(id)
+      if (!list) lists.set(id, (list = [...(id === null ? roots() : nodes[id]?.children ?? [])]))
+      return list
+    }
+    const detach = (id: string): void => {
+      const siblings = childrenOf(parents.get(id) ?? null)
+      const at = siblings.indexOf(id)
+      if (at >= 0) siblings.splice(at, 1)
+    }
+    const forget = (id: string): void => {
+      for (const child of lists.get(id) ?? nodes[id]?.children ?? []) forget(child)
+      lists.delete(id)
+      parents.delete(id)
+      setNodes(produce((table) => { delete table[id] }))
+    }
     batch(() => {
       for (const op of ops) {
         switch (op.op) {
@@ -183,9 +190,8 @@ export function createTreeState(input: TreeStateInput) {
               if (dropped.length) refuse(`${node.type} dropped props: ${dropped.join(', ')}`)
               setNodes(node.id, { type: node.type, props: safe, children: [] })
               parents.set(node.id, parent)
-              const siblings = [...childrenOf(parent)]
+              const siblings = childrenOf(parent)
               siblings.splice(Math.min(index, siblings.length), 0, node.id)
-              setChildren(parent, siblings)
               node.children.forEach((child, at) => add(child, node.id, at))
             }
             add(op.node, op.parent, op.index)
@@ -205,9 +211,8 @@ export function createTreeState(input: TreeStateInput) {
           case 'move': {
             detach(op.id)
             parents.set(op.id, op.parent)
-            const siblings = [...childrenOf(op.parent)]
+            const siblings = childrenOf(op.parent)
             siblings.splice(Math.min(op.index, siblings.length), 0, op.id)
-            setChildren(op.parent, siblings)
             break
           }
           case 'text':
@@ -215,6 +220,7 @@ export function createTreeState(input: TreeStateInput) {
             break
         }
       }
+      for (const [id, list] of lists) setChildren(id, list)
     })
   }
 
