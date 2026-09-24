@@ -72,6 +72,7 @@ const taskSeedBody = z.object({
   origin: z.string().min(1),
   projectId: z.string().min(1),
   branch: z.string().optional(),
+  skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
   links: z.array(z.object({
     connectionId: z.string().min(1),
@@ -191,6 +192,7 @@ export const tasks = new Hono<AppEnv>()
       origin: seed.origin,
       projectId: project.id,
       branch,
+      skipSetup: seed.skipSetup ?? false,
       pullNumber: seed.pullNumber ?? null,
       worktreePath: null,
       status: 'active',
@@ -212,7 +214,7 @@ export const tasks = new Hono<AppEnv>()
     broadcastTasksChanged({ taskId: id })
     return c.json(
       rowToTask(
-        { id, title, icon, origin: seed.origin, projectId: project.id, branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
         project,
       ),

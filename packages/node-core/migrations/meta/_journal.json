@@ -8,6 +8,13 @@
       "when": 1790137402522,
       "tag": "0000_wandering_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790288156891,
+      "tag": "0001_glorious_frightful_four",
+      "breakpoints": true
     }
   ]
 }

@@ -166,6 +166,7 @@ export const tasks = sqliteTable('tasks', {
   projectId: text('project_id').notNull(),
   branch: text('branch'), // null = run in the project root; non-null = isolated Git worktree
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
+  skipSetup: integer('skip_setup', { mode: 'boolean' }).notNull().default(false), // task-specific opt-out of the project setup script
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
   parentId: text('parent_id'), // task tree (docs/workflows.md): set on dispatched children; null = root

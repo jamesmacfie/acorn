@@ -44,7 +44,7 @@ export const rendererBaseCheckout = (cwd: string | undefined): string | undefine
 export type TaskRow = typeof schema.tasks.$inferSelect
 
 // The plugin-facing projection of a task: docs/plugins.md § Activation covers why CoreServices
-// hands back TaskRef rather than the database row, and why it carries only six fields.
+// hands back TaskRef rather than the database row, and why it carries only the fields plugins need.
 export type TaskRef = {
   id: string
   title: string
@@ -52,6 +52,7 @@ export type TaskRef = {
   // null runs in the project root; non-null names an isolated worktree branch
   // (docs/workspaces-and-tasks.md § Task).
   branch: string | null
+  skipSetup: boolean
   // null until the worktree is first created; a plugin that needs the path calls
   // `tasks.root(taskId)` instead of reading this field directly.
   worktreePath: string | null
@@ -64,6 +65,7 @@ export function toTaskRef(row: TaskRow): TaskRef {
     title: row.title,
     projectId: row.projectId,
     branch: row.branch,
+    skipSetup: row.skipSetup,
     worktreePath: row.worktreePath,
     pullNumber: row.pullNumber,
   }
@@ -76,6 +78,7 @@ export const TASK_REF_COLUMNS = {
   title: schema.tasks.title,
   projectId: schema.tasks.projectId,
   branch: schema.tasks.branch,
+  skipSetup: schema.tasks.skipSetup,
   worktreePath: schema.tasks.worktreePath,
   pullNumber: schema.tasks.pullNumber,
 } as const
