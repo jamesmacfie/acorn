@@ -1,9 +1,9 @@
 # What is refused, on the record
 
-> Scope update, 2026-09-13: [workflow v2's refusals](../workflow_v2/refused.md) and
-> [data contract](../workflow_v2/data-contract.md) supersede conflicting flat-field and gated
-> discovery assumptions below. Nested typed values and dynamic discovery are now planned.
-> Provider write-back and SQL execution remain outside that programme.
+> Scope update, 2026-09-13: [What workflows refuses](../../workflows.md#what-workflows-refuses) and
+> the [data sources](../../data-sources.md) contract supersede conflicting flat-field and gated
+> discovery assumptions below. Nested typed values and dynamic discovery have shipped.
+> Provider write-back and SQL execution remain separate.
 
 The guardrails on the backlog (`README.md`): what dashboards deliberately do not do. Each refusal
 carries its reasoning and what would have to change to revisit it — so a future session argues

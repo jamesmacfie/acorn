@@ -26,7 +26,6 @@ unit; array ordering and primitive types remain significant.
 `DATA_LIMITS` owns bounds, including 12 nested levels, 256 fields, 2,048-character descriptions,
 four predicate group levels, and 50 comparisons. Comparisons do not coerce values. Ordered
 comparisons require matching strings or numbers; presence tests handle missing explicitly.
-The [workflow v2 programme](./future/workflow_v2/README.md) owns consumer migration.
 
 ## Data root
 

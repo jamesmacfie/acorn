@@ -1026,8 +1026,8 @@ user files do not gain an implicit trigger from their file contents.
 
 ## What workflows refuses
 
-Thirty decisions from the programmes that built workflow authoring, execution, child dispatch, and
-navigation, each with what would reopen it. They are here rather than in a design folder because
+Fifty decisions from the programmes that built workflow authoring, execution, child dispatch,
+navigation, shared data sources, and scheduling, each with what would reopen it. They are here rather than in a design folder because
 every one of them is a thing workflows will keep being asked for.
 
 **A separate `edges` list.** Refused. proliferate's wire shape is `nodes[]` beside
@@ -1155,6 +1155,75 @@ scope; they do not guarantee exactly-once external effects. A fresh manual root 
 
 **Automatic child cleanup.** Refused. A child task and worktree are user work and remain after the
 workflow completes, fails, or is cancelled. The owner can archive them through the normal task flow.
+The same holds for the root task a schedule creates, and there is no batch archive.
+
+**A universal ticket or work-item schema.** Refused. Normalising records loses provider meaning, such
+as an exact Linear state or a pull request's separate draft and merge-readiness facts. A source keeps
+its own record shape and offers optional display hints. Reopen for a real operation that needs
+normalised records.
+
+**A provider-specific workflow or dashboard editor.** Refused. It defeats the shared source contract.
+A provider that needs more extends the declarative metadata, with a consumer that proves it.
+
+**Cross-source unions and joins in a query.** Refused. Dashboard composition already shows several
+sources side by side. Reopen for a workflow that needs combined query semantics.
+
+**Several connections in one query.** Refused. It complicates scope, options, and partial success.
+Use one explicit query per connection.
+
+**A generic host query fallback.** Refused. Filtering in the host for a source that cannot filter can
+quietly return incomplete or expensive results. A source declares the filters, groups, and sorts it
+supports.
+
+**The full raw provider payload as a required record.** Refused. Large or sensitive fields belong in
+scoped detail reads. A record keeps typed nested fields without promising every upstream field.
+
+**A schema inferred only from samples.** Refused. An empty or varying result proves nothing about
+fields or query support. A source declares its schema, statically or dynamically, and observed
+optional fields are marked as observed.
+
+**A general expression language.** Refused. Typed bindings and bounded predicates cover the known
+workflows. There is no embedded JavaScript, arbitrary transform, or evaluation engine.
+
+**A simulated run or a single-record test run.** Refused. Preview checks data and bindings only. A
+published workflow runs through the ordinary start flow.
+
+**Running an unpublished draft.** Refused. Explicit publication keeps the runnable version clear.
+
+**Previewing a query on every keystroke.** Refused. **Refresh preview** is explicit. Display edits
+redraw from the rows already fetched.
+
+**AI that applies or publishes changes itself.** Refused. A proposal needs review, and applying it is
+one undoable draft edit. Publication and schedule activation stay separate steps.
+
+**Sending record samples to AI automatically.** Refused. Source metadata goes automatically. Sample
+contents need the user's opt-in.
+
+**Automatic retries of failed items.** Refused. A failed attempt stays on record, and a retry is an
+explicit action. Infrastructure reconciliation after a crash is separate from re-running work.
+
+**Queuing every observed record version.** Refused. A scheduled check processes the latest relevant
+change of each record. This is not an event log.
+
+**Timestamp checkpoints for every source.** Refused. An incremental read needs a declared continuation
+contract from the source. Rolling time windows stay available, with their limits.
+
+**Overlapping runs of one schedule.** Refused. The next occurrence is skipped and links to the active
+run. Reopen if throughput needs per-record concurrency beyond that.
+
+**Draining a backlog, or moving a checkpoint past the first N records.** Refused. A checkpoint never
+moves past work that was not durably selected. A persistent backlog would be its own programme.
+
+**A general publication framework, CRDT, data warehouse, or second job engine.** Refused.
+Feature-owned state, optimistic conflict review, and the Node's scheduler and runner cover drafts,
+publication, and scheduled work.
+
+**Saved queries as standalone repository files.** Refused. A workflow file exports its queries
+inline, and the workspace query library covers reuse.
+
+**A generic provider write-back contract.** Refused. Reads are shared through data sources. Writes go
+through contributed workflow actions. Dashboard write-back is a separate proposal in
+[docs/future/dashboards/write-back.md](./future/dashboards/write-back.md).
 
 ## Typed data and conditions
 

@@ -1,8 +1,8 @@
 # Dynamic collections: run-once-and-pin, discovery
 
 > Superseded on 2026-09-13 for generic discovery, schema handling, and query authoring by
-> [workflow v2's data contract](../workflow_v2/data-contract.md) and
-> [authoring UX](../workflow_v2/ux-authoring.md). The text below is historical, not an implementation
+> the shipped [data sources](../../data-sources.md) contract and
+> [dashboards](../../dashboards.md) authoring. The text below is historical, not an implementation
 > plan. Dynamic discovery no longer waits on SQL; taskless SQL execution remains separate.
 
 **Unbuilt, and both parts are gated** on the database plugin's saved-query case actually being
