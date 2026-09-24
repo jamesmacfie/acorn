@@ -1,9 +1,8 @@
 # The taskless database connection — the gate under run-once-and-pin
 
-> Scope update, 2026-09-13: this remains a separate SQL proposal, not a prerequisite for
-> [workflow v2](../workflow_v2/README.md). Any future collection exposure must use its
-> [data contract](../workflow_v2/data-contract.md); older collection API references below are
-> historical and must be rechecked.
+> Scope update, 2026-09-13: this remains a separate SQL proposal, not a prerequisite for shared
+> data sources. Any future collection exposure must use the [data sources](../../data-sources.md)
+> contract. Older collection API references below are historical and must be rechecked.
 
 **Unbuilt, and it is a precondition rather than a feature.** `dynamic-collections.md` assumes a saved
 SQL query can be exposed as an ordinary collection. It cannot be, and the reason is not plumbing: a
