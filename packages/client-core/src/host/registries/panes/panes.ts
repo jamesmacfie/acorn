@@ -38,6 +38,15 @@ type PaneCommon = {
    */
   prefetch?: (task: Task, queryClient: QueryClient) => void
   minWidth?: number
+  /**
+   * This pane can draw an archived task: it reads the task's stored history and needs no worktree
+   * (docs/panes.md § Contributions). The archive page previews an archived task in the ordinary pane
+   * host, and a pane without this shows a restore prompt there instead of itself.
+   *
+   * Opt in, because the safe default is not to run. An editor, a diff, a container or a run target
+   * would find no worktree, and a pane that can start work would start it on a task that is archived.
+   */
+  readsArchived?: boolean
 }
 
 export type PaneContribution = PaneCommon & {

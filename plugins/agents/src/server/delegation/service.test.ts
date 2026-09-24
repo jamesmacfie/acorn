@@ -729,4 +729,79 @@ describe('agent delegation service', () => {
     await expect(service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 10 }, context('33333333-3333-4333-8333-333333333333', root.id)))
       .rejects.toMatchObject({ kind: 'not_found' })
   })
+
+  describe('reports to the owner', () => {
+    const finish = async (sessionId: string, turnId: string, text: string) => {
+      await sessions.startTurn(turnId)
+      await sessions.recordEvent(sessionId, turnId, { type: 'assistant_message', text })
+      await sessions.recordEvent(sessionId, turnId, { type: 'turn_completed', stopReason: 'end_turn' })
+    }
+    const reports = async (sessionId: string) =>
+      (await sessions.snapshot(sessionId)).turns.filter((turn) => turn.source === 'delegation_report')
+
+    it('marks the child turn with its owner and tells the child its role', async () => {
+      const { parent, child } = await spawnChild()
+      const turn = await sessions.turn(child.turnId!)
+      expect(turn?.effectivePolicy.reportTo).toBe(parent.id)
+      expect(turn?.input).toContainEqual(expect.objectContaining({ type: 'context', source: 'delegation', label: 'Parent' }))
+    })
+
+    it('queues one report with the final message when the child turn settles', async () => {
+      const { parent, child } = await spawnChild()
+      await finish(child.sessionId!, child.turnId!, 'All tests pass.')
+
+      await service.reports.deliver(child.turnId!)
+      await service.reports.deliver(child.turnId!)
+
+      const queued = await reports(parent.id)
+      expect(queued).toHaveLength(1)
+      expect(queued[0]!.status).toBe('queued')
+      expect(queued[0]!.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('All tests pass.') })
+      expect(queued[0]!.input).toContainEqual(expect.objectContaining({
+        type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
+      }))
+    })
+
+    it('does not report a turn before it settles, or to a terminal owner', async () => {
+      const { parent, child } = await spawnChild()
+      await service.reports.deliver(child.turnId!)
+      expect(await reports(parent.id)).toHaveLength(0)
+
+      const taskId = '11111111-1111-4111-8111-111111111111'
+      terminals.push(terminal('terminal-owner', taskId))
+      const fromTerminal = await service.spawn(
+        { title: 'Terminal child', prompt: 'Go.', isolation: 'shared' },
+        context(taskId, 'terminal-owner', 'terminal-spawn'),
+      )
+      expect((await sessions.turn(fromTerminal.turnId!))?.effectivePolicy.reportTo).toBeUndefined()
+    })
+
+    it('withdraws a queued report once the owner reads the result itself', async () => {
+      const { parent, child } = await spawnChild()
+      await finish(child.sessionId!, child.turnId!, 'Done.')
+      await service.reports.deliver(child.turnId!)
+
+      await service.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 50 }, context(parent.taskId, parent.id, 'read'))
+
+      expect((await reports(parent.id)).map((turn) => turn.status)).toEqual(['cancelled'])
+    })
+
+    it('does not report a turn the owner cancelled', async () => {
+      const { parent, child } = await spawnChild()
+      await service.cancel({ sessionId: child.sessionId!, turnId: child.turnId! }, context(parent.taskId, parent.id, 'cancel'))
+
+      await service.reports.deliver(child.turnId!)
+
+      expect(await reports(parent.id)).toHaveLength(0)
+    })
+
+    it('queues a report the last process missed when it reconciles', async () => {
+      const { parent, child } = await spawnChild()
+      await finish(child.sessionId!, child.turnId!, 'Finished before the restart.')
+
+      await reconcileAfterRestart()
+
+      expect(await reports(parent.id)).toHaveLength(1)
+    })
+  })
 })

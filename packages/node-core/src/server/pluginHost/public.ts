@@ -7,6 +7,7 @@ export { registerHookPoint, runHook } from './hooks.ts'
 export { portableCarrier } from './portable.ts'
 export { PLUGIN_STATE, pluginState } from './state.ts'
 export type { PluginsBridge } from './state.ts'
+export type { SearchProvider, SearchQuery } from './search.ts'
 export type { TaskConcern } from './taskChecks.ts'
 export type {
   CompiledPluginBroadcast, NodePlugin, NodePluginContext, PluginBroadcast,

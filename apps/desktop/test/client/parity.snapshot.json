@@ -17,6 +17,7 @@
     "40 docker",
     "50 workflows",
     "60 agents",
-    "70 memory"
+    "70 memory",
+    "90 archive"
   ]
 }

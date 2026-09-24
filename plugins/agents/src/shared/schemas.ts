@@ -76,7 +76,7 @@ export const importAgentTranscriptSchema = z.object({
 
 export const enqueueAgentTurnSchema = z.object({
   input: z.array(agentInputPartSchema).min(1).max(32),
-  source: z.enum(['interactive', 'workflow', 'delegation', 'automation', 'import']).default('interactive'),
+  source: z.enum(['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import']).default('interactive'),
   effectivePolicy: z.record(z.string(), z.unknown()).default({}),
   idempotencyKey: z.string().min(8).max(200),
 })

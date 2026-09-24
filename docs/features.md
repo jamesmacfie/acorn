@@ -18,6 +18,10 @@ optional worktree, linked PR or external issue, panes, terminal sessions, and ma
 Tasks can originate from GitHub, Linear, Rollbar, or the local task command. Worktrees are created
 lazily when a task first needs filesystem/process access.
 
+The Archive rail entry lists archived tasks with a search over titles, branches and agent transcripts,
+previews one read-only, and restores it onto its branch
+([workspaces-and-tasks](./workspaces-and-tasks.md) § Restoring a task).
+
 ## Task panes
 
 - `agents` — managed Claude/Codex sessions, requests, context, artifacts, and lifecycle.

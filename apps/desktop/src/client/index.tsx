@@ -22,11 +22,9 @@ import { watchWorkspaceChanges } from '@acorn/client-core/features/workspaces/wa
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
-import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { bootMark, emitBootSpans } from './boot'
 
 const noop = () => null
-
-const log = createLogger('renderer')
 
 // The renderer's telemetry, wired before anything renders so a seam that fires during boot has
 // somewhere to put its record (docs/telemetry.md § The renderer). Wiring is not collecting: the
@@ -68,29 +66,7 @@ window.addEventListener('unhandledrejection', (event) => {
 // not make it out is a batch the queue has already dropped.
 window.addEventListener('pagehide', () => void flushTelemetry())
 
-// The renderer's half of a cold-start timeline. `performance.mark` always, because it costs nothing and
-// puts the same labels in the devtools performance panel; the console line only when asked, because this
-// console is the one a developer has open while using the app.
-//
-// The switch is localStorage rather than `ACORN_PERF`, which is the environment variable the node and
-// the helper read: there is no environment in a webview, and the renderer is loaded by Rust's custom
-// scheme rather than spawned. `localStorage.setItem('acorn.perf', '1')` and reload
-// (docs/local-development.md § Timing a cold start).
-//
-// `performance.now()` counts from this document's navigation, so these offsets are the renderer's own
-// and start where the helper's ready line left off.
-const bootPerf = (() => {
-  try {
-    return localStorage.getItem('acorn.perf') === '1'
-  } catch {
-    // A webview with site data blocked. Not a reason to fail a boot over.
-    return false
-  }
-})()
-const bootMark = (label: string): void => {
-  performance.mark(`acorn:${label}`)
-  if (bootPerf) log.info(`${label} +${performance.now().toFixed(0)}ms`)
-}
+// The first mark of the cold-start account (./boot.ts).
 bootMark('script start')
 
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
@@ -219,6 +195,7 @@ createRoot((dispose) => {
   createEffect(() => {
     if (!nodeReady()) return
     bootMark('nodeReady')
+    emitBootSpans()
     // One mark, not a subscription: the interesting event is the first time it goes ready, and a
     // reconnect later is not a cold start. Deferred so the effect is not disposed from inside itself.
     queueMicrotask(dispose)

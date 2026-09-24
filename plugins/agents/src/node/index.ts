@@ -90,6 +90,7 @@ export type AgentsPluginDeps = {
 // and the usage probe under the data root, so this plugin needs the path for more than its database.
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
   let runtime: ManagedAgentRuntime | null = null
+  let delegation: AgentDelegationService | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
@@ -138,7 +139,15 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
-        publish: (frame) => ctx.events.send(frame),
+        publish: (frame) => {
+          ctx.events.send(frame)
+          // Every path that settles a turn announces it here, after its write commits, so this is the
+          // one place a child's result can start its report home. The broadcast is not durable; the
+          // delegation reconcile pass queues any report a crash cut off.
+          if (frame.channel === 'plugin:agents:turn-changed' && frame.source === 'delegation') {
+            delegation?.reports.deliverSafely(frame.turnId)
+          }
+        },
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
           const profile = getProfile(session.profileId)
@@ -169,7 +178,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
       ctx.dataSources.register(sessionSource)
 
-      const delegation = new AgentDelegationService(
+      delegation = new AgentDelegationService(
         runtime,
         new AgentDelegationStore(store),
         async () => await ctx.capabilities.get(TERMINAL_SESSIONS)?.list() ?? [],
@@ -233,6 +242,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
       // pointer at the route above; nothing here knows workflows is on the same list.
       ctx.runs.register({ runs: '/v1/p/agents/runs' })
+      // Transcripts for the archive page's search (docs/plugins.md § Search providers).
+      ctx.search.register({
+        id: 'sessions',
+        label: 'Agent sessions',
+        search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
+      })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
@@ -263,7 +278,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.capabilities.provide(AGENTS_RUNTIME, {
         reconcile: async () => {
           await runtime!.reconcile()
-          await delegation.reconcile()
+          await delegation!.reconcile()
         },
       })
       // agents.draftAttachments (contract/draftAttachments.ts). What a plugin that edits an unsent image
@@ -277,6 +292,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     dispose: async () => {
       await runtime?.stop()
       runtime = null
+      delegation = null
       managedRoute?.dispose()
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()

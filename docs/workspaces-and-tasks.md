@@ -247,6 +247,40 @@ right, unknown or duplicate pane ids are dropped, and a recipe naming no valid p
 `terminal = "<run-target-id>"` auto-starts that target and opens the terminal drawer; `browser =
 "run:<id>"` points the browser pane at that target's resolved URL once it is up.
 
+## Restoring a task
+
+Archive deletes less than it looks like. It removes the worktree folder, stops what was running, drops
+the terminal plugin's saved sessions, and clears state the client held in memory. The task row, its
+links and pull requests, its branch, its agent sessions, its notes, and every plugin's rows all stay.
+Plugins store `task_id` as a plain id and none of them deletes anything on archive. The one real delete
+is removing a project, which removes its task rows and leaves plugin rows with nothing to point at, so
+those tasks cannot be restored.
+
+The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
+every search provider ([plugins.md § Search providers](./plugins.md)). Selecting a task previews it
+read-only in the ordinary pane host, without adding it to the rail. A pane that reads stored history
+declares `readsArchived` and draws as it would for an active task. Agent, Notes and PR review do.
+Every other pane shows a restore prompt instead, because it would need the worktree or would start
+work on an archived task ([panes.md § Contributions](./panes.md)). The Agent pane keeps the
+transcripts and turns its composer off.
+
+Restore is `POST /v1/core/tasks/:id/restore` (`restoreTask` in `server/storage/archive.ts`). It sets the
+task active and rebuilds the worktree before answering, through the same `resolveTaskCwd` a pane would
+use, so the configured files are copied and the setup hook runs. It rebuilds eagerly rather than
+leaving that to the first pane, because the two ways it fails need the owner:
+
+- The branch is checked out in another worktree. Git refuses, the task stays archived, and the reason
+  comes back.
+- A local task's branch no longer exists, often because a merged pull request deleted it. Creating the
+  worktree anyway would cut a new branch from the project checkout with none of the task's commits, so
+  restore answers `branchMissing` and the client asks before retrying with `newBranch`. A pull request
+  task fetches its head again, so its branch cannot be lost this way.
+
+Containers, terminal sessions and scrollback do not come back. Agent sessions come back on their own:
+a session under an archived task counts as retired when the list is read, so it returns to the live
+list with its task. A session someone archived on its own is restored from Agent Center
+([managed-agents.md § Client surfaces](./managed-agents.md)).
+
 ## Task creation and navigation
 
 The rail creates local tasks from a project and derives a branch from the title when the project is

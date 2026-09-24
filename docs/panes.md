@@ -353,6 +353,15 @@ cannot keep the bargain: its rows are built in a plugin worker with no way to re
 it leaves the flag off and keeps a column that resizes and does not collapse. See
 [docs/ui-design.md § Two-column panes](./ui-design.md#two-column-panes).
 
+`readsArchived` says the pane can draw an archived task. The archive page previews one in the ordinary
+pane host, and the task it hands each pane has `status: 'archived'`. A pane that sets the flag draws
+from stored history and turns off anything that would start work, as the Agent pane does with its
+composer. A pane without it shows a restore prompt in its place. Opt in, because an archived task has
+no worktree and the safe default is not to run: an editor, a diff, a container or a run target would
+find nothing, and a pane that starts work would start it on a task nobody meant to reopen. Agent, Notes
+and PR review set it. A loaded plugin's frame pane has no way to declare it yet, so it always shows the
+prompt ([workspaces-and-tasks.md § Restoring a task](./workspaces-and-tasks.md)).
+
 A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
 a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my
 iframe", and that implicit path is gone. A surface that wants pixels says so with a `frame` region.

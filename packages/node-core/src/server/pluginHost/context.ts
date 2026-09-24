@@ -20,6 +20,7 @@ import { registerNodeProvider } from '../nodeProviders/registry'
 import { registerRunSource } from '../runs/registry'
 import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { registerTaskCheck } from './taskChecks'
+import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
 import { contributeExtension, extensionsFor, openExtensionPoint } from './extensionPoints'
 import { registerHookHandler, registerHookPoint, runHook } from './hooks'
@@ -249,6 +250,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     taskChecks: {
       register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
     },
+    // Owner-bound like task checks, and compiled only (./types.ts § CompiledNodePluginContext).
+    search: permissions
+      ? (undefined as never)
+      : { register: (provider) => registerSearchProvider({ ...provider, pluginId: plugin }) },
     // Owner-bound like the rest: a plugin lists its own runs and cannot register a pointer at someone
     // else's route (../runs/registry.ts). The route is re-confined on every read.
     runs: {
@@ -513,7 +518,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
   // it never fails the thing it describes (docs/telemetry.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
-  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

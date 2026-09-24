@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./features/agent": "./src/features/agent/public.ts",
+    "./features/archive/ArchivePage.tsx": "./src/features/archive/ArchivePage.tsx",
     "./features/dataSources/AuthoringConversation.tsx": "./src/features/dataSources/AuthoringConversation.tsx",
     "./features/dataSources/SourceQueryEditor.tsx": "./src/features/dataSources/SourceQueryEditor.tsx",
     "./features/dataSources/TypedBindingPicker.tsx": "./src/features/dataSources/TypedBindingPicker.tsx",

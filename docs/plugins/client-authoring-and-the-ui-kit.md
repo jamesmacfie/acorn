@@ -403,6 +403,52 @@ workspace being removed. No plugin should use it. It hands the caller an unregis
 was obliged to hold, and the one plugin that used it dropped the function, accumulated a handler on
 every re-activation — twice per boot and once per node switch — and drew its warning twice.
 
+## Search providers
+
+A plugin makes its data searchable by registering a **search provider**. Core asks every provider at
+once and shows the answers grouped by provider, the way Spotlight groups them. The archive page is the
+first caller (`GET /v1/core/search?q=…&archived=1`), and nothing in the contract assumes archive:
+`archived=0` searches active tasks.
+
+```ts
+ctx.search.register({
+  id: 'sessions',
+  label: 'Agent sessions',
+  search: async ({ text, limit, taskIds }, signal) => [{ taskId, title, preview, target }],
+})
+```
+
+Each plugin searches its own data however suits it: full-text for agent transcripts, a substring scan
+for a small table. Core searches task titles and branches itself, as the first group. The agents plugin
+is the only provider today.
+
+**Why grouped.** Relevance scores from different indexes cannot be compared, so merging them into one
+list would be a guess dressed as an order. One central index that plugins push documents into was
+refused for the dual-write reason the projects migration already pays: every plugin would keep two
+copies of its data in step, and deletes and uninstalls would have to clean both.
+
+**Why hits and not tables.** Most rows are machine state, such as event JSON and metadata, and
+matching on them returns noise. So a provider decides what is searchable and what a hit shows: a task
+id (or `null` for a hit that belongs to no task), a title and a preview as plain text, and a `target`
+in the same shape notices use, opened through the same handler table.
+
+**What the host binds and a plugin cannot state.** The owner, the group id `<pluginId>:<id>`, the
+scope and the limits. Core resolves the scope into `taskIds` once, so a provider never has to know
+what archived means, and a hit naming a task outside that list is dropped. Titles and previews are
+trimmed, and each group is capped at 20 hits whatever the caller asked for, so one noisy provider
+cannot flood the page.
+
+**The deadline is a race, as for task checks.** 1.5 seconds per provider. A plugin in a worker keeps
+running after the owner types the next letter, because cancellation does not reach it, so the client
+debounces, core never waits past the deadline, and a provider that timed out or threw shows as a group
+that could not answer rather than as an empty one.
+
+Compiled only for now. The loaded twin would be a manifest route the host calls with the query, the
+way task checks work, and it waits for a loaded plugin that wants to be searchable. The registry is
+`packages/node-core/src/server/pluginHost/search.ts`, and the route is
+`packages/node-core/src/server/routes/search.ts`. The route is device-only, because it reaches every
+task's history.
+
 ## Harnesses
 
 A plugin adds a managed agent — an ACP-speaking CLI acorn drives, with a full transcript, permission

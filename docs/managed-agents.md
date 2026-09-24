@@ -468,6 +468,40 @@ rows still being created. The child inherits the intersection of the parent's si
 and any narrower ceiling requested at spawn. General session configuration updates cannot widen or
 remove that persisted ceiling.
 
+### Reports back to the owner
+
+A turn an owner queues on its child, through `agent_spawn` or `agent_prompt`, carries a `delegation`
+context part and, for a managed owner, `reportTo` in its effective policy
+(`plugins/agents/src/server/delegation/reports.ts`). The context part names the owner and tells the
+child that its final message is its report. It also tells the child to end the turn with a question
+when it needs a decision, instead of asking the user. A turn the user types into the child's own pane
+has neither, and does not report.
+
+When a `reportTo` turn settles as completed, failed, cancelled, or interrupted, the Agents plugin
+queues one `delegation_report` turn on the owner. The report text holds the child's title, the
+outcome, any error, the final assistant message cut to its last 8 KiB, and the validated structured
+result when the turn declared a `resultSchema`. A `delegation_report` context part names the child
+and links to it. The report queues behind whatever the owner is doing and never steers an active
+turn. The owner answers by calling `agent_prompt`, and that turn reports in its turn.
+
+The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
+the post-commit `turn-changed` broadcast, which every settle path already sends. It is not durable,
+so the startup reconcile pass looks for settled `reportTo` turns with no report and queues the
+missing ones. No report is queued in these cases:
+
+- The owner cancelled the turn itself with `agent_cancel`.
+- The owner session is archived or failed.
+- The owner already holds 100 reports. Further results stay readable through `agent_read`.
+
+A report still queued when the owner reads that result through `agent_read`, or cancels the turn,
+is withdrawn. A read that lands between the child settling and its report being queued can leave one
+redundant report. A terminal owner has no session to wake and keeps using `agent_wait` and
+`agent_read`.
+
+The transcript labels a `delegation` turn "From" and the owner's title, and a `delegation_report`
+turn "From" and the child's title, using the matching context part
+(`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
+
 ## Web activity
 
 A reader should be able to answer, from the transcript alone, what an agent searched for, which pages
@@ -616,6 +650,11 @@ selection reads back the same text. Written that way rather than as an element-i
 it fails for any reason a selection can break, not only for the one it was written after.
 
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
+  Its archived filter offers **Restore** on a session someone archived on its own. A session retired
+  because its task was archived has no such button: it comes back when the task is restored, because
+  retirement is worked out when the list is read (docs/workspaces-and-tasks.md § Restoring a task).
+- On an archived task, which only the archive page's preview shows, the Agent pane is read-only: the
+  transcripts draw, the composer is off, and there is no new-session picker.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
   block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the
   descriptor's `glyph`, so a contributed harness gets the same treatment by pointing that field at a
@@ -857,6 +896,39 @@ that walk the store stopped at the cap, and because the socket appends past it l
 appeared on a reload — a long transcript reopened hours behind its last message, which read as lost
 messages rather than a short read. The events were always in SQLite; the Node commits each one as it
 arrives.
+
+### Transcript search
+
+`agent_events_fts` is a SQLite full-text index over `agent_events.search_text`, kept in step by triggers
+written by hand into the migrations (docs/data-layer.md § Migrations). Agent Center's search and the
+archive page's search provider (docs/plugins.md § Search providers) both read it.
+
+**A streamed message is indexed once, on its first event.** A reply arrives as many `append` events,
+and indexing each one on its own meant a search for two words only matched when both landed in the
+same fragment. A measured database held 148,570 assistant rows averaging 21 characters. Now a fragment
+that continues the previous event's stream (same type, turn and message id, the rule
+`durableEventBuffer.ts` coalesces on) adds its text to the stream's first event and keeps none of its
+own. Migration `0005_agent_events_fts_messages.sql` applied the same rule to existing rows: those
+148,570 became 7,410 messages averaging 445 characters, in 11 seconds on a 1.4 GB database. No
+harness writes a final full-text event beside its fragments, so there was nothing simpler to index.
+
+Each fragment rewrites its message's search row, so indexing a message costs its length times its
+fragment count. That is small for replies of a few kilobytes. Indexing when the stream closes is the
+upgrade if very long replies make writes slow.
+
+**Tool text ranks below the conversation.** Tool events are about two thirds of the indexed rows and
+about 1 KB each, and file dumps and command output buried the conversation. They go in their own `tool`
+column, and the table's stored rank weighs a word there at 0.3 of the same word in `content`. Searching
+for a command someone ran still works.
+
+**Search rows are keyed by the event's rowid.** The triggers used to find a row by `event_id`, which
+FTS5 cannot look up, so every update or delete scanned the whole index. Inserts replace on rowid and
+deletes also check `event_id`, so an event table whose rowids a VACUUM renumbered repairs itself on the
+next write instead of failing it.
+
+The index still stores its own copy of the text, about 300 MB on the measured database. Pointing it at
+`agent_events` as external content would save that, but external content is keyed by rowid, and this
+table's rowids are not stable across a VACUUM because its key is text.
 
 ## New-session defaults
 

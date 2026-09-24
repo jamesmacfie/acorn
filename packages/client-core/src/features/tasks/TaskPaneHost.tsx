@@ -22,7 +22,10 @@ import { createSplitDrag } from '../../kit/lib/split'
 export default function TaskPaneHost(props: {
   task: Task
   extraButtons?: JSX.Element
-  onCloseTask: () => void
+  // Absent for an archived task's preview, which has nothing left to close (features/archive).
+  onCloseTask?: () => void
+  // What a pane that cannot read an archived task offers in its place.
+  onRestore?: () => void
   closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
 }) {
@@ -142,9 +145,25 @@ export default function TaskPaneHost(props: {
                     >✕</Button>
                   </Show>
                 </div>
-                <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
-                  <pane.component task={props.task} />
-                </ContributionBoundary>
+                {/* An archived task has no worktree and nothing should start on it, so only a pane that
+                    says it reads stored history draws (registries/panes.ts § readsArchived). */}
+                <Show
+                  when={props.task.status === 'active' || pane.readsArchived}
+                  fallback={
+                    <section class="pane pane-empty workspace-empty">
+                      <EmptyState
+                        title="This task is archived"
+                        action={props.onRestore ? <Button onPress={() => props.onRestore?.()}>Restore task</Button> : undefined}
+                      >
+                        {pane.label} needs the task's worktree. Restore the task to use it.
+                      </EmptyState>
+                    </section>
+                  }
+                >
+                  <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
+                    <pane.component task={props.task} />
+                  </ContributionBoundary>
+                </Show>
               </div>
               <Show when={!maximizedPane(props.task.id) && index() < visiblePanes().length - 1}>
                 {(() => {
@@ -182,15 +201,19 @@ export default function TaskPaneHost(props: {
         {/* Whole-control busy rather than a marker: while the teardown runs there is no close
             action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable
             and focusable, because a disabled button swallows the mouseover the tooltip needs. */}
-        <RailTab
-          class="tabrail-bottom"
-          label="Close task"
-          glyph="x"
-          tone="danger"
-          busy={props.closing}
-          busyLabel="Removing…"
-          onClick={props.onCloseTask}
-        />
+        <Show when={props.onCloseTask}>
+          {(close) => (
+            <RailTab
+              class="tabrail-bottom"
+              label="Close task"
+              glyph="x"
+              tone="danger"
+              busy={props.closing}
+              busyLabel="Removing…"
+              onClick={() => close()()}
+            />
+          )}
+        </Show>
       </nav>
     </>
   )

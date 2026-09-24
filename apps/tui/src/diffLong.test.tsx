@@ -75,7 +75,7 @@ describe('a five-thousand-line diff', () => {
   it('builds a window rather than the whole patch', async () => {
     process.env.ACORN_FIXTURE_PATCH_LINES = '5000'
     try {
-      const screen = await renderFixture({ width: 80, height: 24, pane: 'pr' })
+      const screen = await renderFixture({ width: 160, height: 40, pane: 'pr' })
       await screen.until('somethingRatherLongIndeed', 45)
       const built = renderables(screen.renderer.root)
       screen.done()

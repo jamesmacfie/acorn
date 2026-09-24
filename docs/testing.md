@@ -188,7 +188,8 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
 - managed-agent delegation tests cover signed caller context, execute permissions, ceiling
   inheritance, direct-child authorization, atomic depth and live-count limits, MCP retry
   idempotency, shared and worktree provisioning recovery, bounded read projection, structured-result
-  validation, wait and attention states, cancellation, managed-parent navigation, session roster
+  validation, wait and attention states, cancellation, reports back to a managed owner with their
+  withdrawal and restart recovery, managed-parent navigation, session roster
   nesting, and core task hierarchy. The provider runtime tests remain the contract for both managed
   harness drivers; a real Claude Code or Codex login belongs to the manual checklist;
 - the two web-activity captures under `plugins/agents/src/server/drivers/__fixtures__` are the
@@ -696,6 +697,10 @@ acceptance pass.
     in a child and confirm `agent_wait` reports attention without giving the parent an approval action.
     Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
     workflow-owned session and confirm `agent_spawn` is absent.
+    Then let the managed parent end its turn while a child is still working. Confirm that one
+    "From" report turn arrives in the parent with the child's final message, that the child's
+    transcript labels the parent's prompt "From" and the parent's title instead of "You", and that a
+    parent which reads the result with `agent_read` before its report runs receives no report.
 
 
 The next five items are the workflow-task release checks. They were not run in this worktree because

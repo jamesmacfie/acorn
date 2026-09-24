@@ -11,10 +11,10 @@ import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx'
 import WorkspacePicker from '@acorn/client-core/kit/components/inputs/WorkspacePicker.tsx'
-import { workspaceForProject } from '@acorn/client-core/features/workspaces'
-import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces'
-import { noteWorkspaceVisit } from '@acorn/client-core/features/workspaces'
-import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces'
+import {
+  createFleetWorkspaces, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  viewToRemember, workspaceForProject, workspaceOwnsPath,
+} from '@acorn/client-core/features/workspaces'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
@@ -52,6 +52,7 @@ import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registri
 import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { emitBootSpans } from './boot'
 import { telemetryOn } from '@acorn/client-core/features/settings'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
@@ -250,20 +251,27 @@ export default function App() {
   // Gated on having a node to ask, not on an identity: there is no login. The shell itself mounts only
   // after the selected local node's first status, so these do not race its startup. `nodeReady()` is
   // still the right query gate because a known offline remote node may draw cached data.
-  const prefs = createQuery(() => prefsOptions(nodeReady()))
+  // Always refetched on mount, because the startup restore waits for the node's answer and a cached
+  // value inside its stale time would otherwise never be asked for again.
+  const prefs = createQuery(() => ({ ...prefsOptions(nodeReady()), refetchOnMount: 'always' as const }))
+  const mountedAt = Date.now()
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
 
-  createAppStartupRestore({
+  const startup = createAppStartupRestore({
     queryClient,
     prefs: () => prefs.data,
+    // Timestamps rather than `isFetchedAfterMount`, which also counts the cache arriving from IndexedDB
+    // after this component subscribed. A failed fetch counts, and so does a node known to be offline:
+    // in both the cache is all there is.
+    prefsSettled: () => Math.max(prefs.dataUpdatedAt, prefs.errorUpdatedAt) >= mountedAt
+      || (!nodeGateHolds() && nodeState(activeNodeId() ?? '') === 'offline'),
     cacheRestoring: isRestoring,
     projects: () => projects.data,
     tasks: () => tasks.data,
-    path: () => location.pathname,
-    navigate,
+    workspaces: () => workspaces.data,
   })
 
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
@@ -306,8 +314,13 @@ export default function App() {
   // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
   // switch). An effect rather than a call at boot, because the preference arrives after the first
   // paint and can change while the app is open: the node's collector re-reads its own copy every
-  // five seconds, and this is the renderer's half of the same promise.
-  createEffect(() => setTelemetryEnabled(telemetryOn(prefs.data)))
+  // five seconds, and this is the renderer's half of the same promise. The boot account waits for the
+  // switch as well as for the node, so this is one of the two places that can release it (./boot.ts).
+  createEffect(() => {
+    const on = telemetryOn(prefs.data)
+    setTelemetryEnabled(on)
+    if (on) emitBootSpans()
+  })
 
   // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
   // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
@@ -346,40 +359,64 @@ export default function App() {
     return all.filter((project) => project.workspaceId === ws.id)
   }
 
-  // Remember the last view per workspace (a rail source or a task) so switching workspaces returns
-  // you to exactly what you were looking at, not always Home. On each real workspace change: record
-  // the view we're leaving, then restore the one we're entering (core Home by default). `defer` skips the
-  // startup null→workspace resolution so the persisted-state pipeline's `last_source`/`last_task`
-  // restore still wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
-  createEffect(
-    on(activeWorkspace, (ws, prevWs) => {
-      if (!ws || !prevWs || ws.id === prevWs.id) return
-      const transition = planWorkspaceViewTransition({
-        previousWorkspace: prevWs,
-        nextWorkspace: ws,
-        selectedSource: untrack(selectedSource),
-        activeTaskId: untrack(activeTaskId),
-        tasks: tasks.data ?? [],
-        defaultSource: defaultSourceId() ?? '',
-        rememberedNextView: workspaceView(ws.id),
-      })
-      if (transition.previousView) rememberWorkspaceView(prevWs.id, transition.previousView)
+  // Show what this workspace was last left on. A task opens at its own address. A source keeps the
+  // address when it already names a project here, because a switch or a reload put it there; only
+  // an address from elsewhere, such as `/` at launch, is replaced by the remembered page.
+  const openWorkspaceView = (ws: Workspace) => {
+    const plan = planWorkspaceViewTransition({
+      workspace: ws,
+      selectedSource: selectedSource(),
+      activeTaskId: activeTaskId(),
+      tasks: tasks.data ?? [],
+      defaultSource: defaultSourceId() ?? '',
+      rememberedView: workspaceView(ws.id),
+    })
+    if (plan.kind === 'restore-task') {
+      activateTaskSignals(plan.task)
+      navigate(pathForTask(plan.task), { replace: true })
+    } else if (plan.kind === 'restore-source') {
+      setSelectedSource(plan.source)
+      const landing = plan.path ?? (ws.projects[0] ? projectPath(ws.projects[0].id) : undefined)
+      if (landing && !workspaceOwnsPath(ws, location.pathname)) navigate(landing, { replace: true })
+    }
+  }
 
-      if (transition.next.kind === 'keep-task') {
-        // An explicit task jump already selected the destination task before navigation. Keep it,
-        // and seed the destination memory so a later workspace switch returns to the same task.
-        rememberWorkspaceView(ws.id, { taskId: transition.next.task.id })
-      } else if (transition.next.kind === 'restore-task') {
-        activateTaskSignals(transition.next.task)
-        navigate(pathForTask(transition.next.task), { replace: true })
-      } else {
-        // Also overwrites an invalid remembered task, so old cross-workspace pollution heals in
-        // the current session rather than requiring a restart.
-        rememberWorkspaceView(ws.id, { source: transition.next.source })
-        setSelectedSource(transition.next.source)
-      }
-    }, { defer: true }),
-  )
+  // Reopen where the window was left. An address that names a place wins, which is what a reload
+  // keeps. Otherwise `last_workspace` says which workspace, and its memory says what was open in it.
+  // Waits for the whole restore pass, because opening a task with no layout in memory gives it a
+  // default one, and the saved layouts land in the last phase.
+  const [placeRestored, setPlaceRestored] = createSignal(false)
+  createEffect(() => {
+    if (placeRestored() || !startup.restored()) return
+    untrack(() => {
+      const urlTask = params.taskId ? tasks.data?.find((task) => task.id === params.taskId) : undefined
+      if (urlTask) activateTaskSignals(urlTask)
+      const all = workspaces.data ?? []
+      const ws = activeWorkspace()
+        ?? all.find((candidate) => candidate.id === startup.lastWorkspaceId() && candidate.projects.length)
+        ?? all.find((candidate) => candidate.projects.length)
+      if (ws) openWorkspaceView(ws)
+    })
+    setPlaceRestored(true)
+  })
+
+  // Record what each workspace is showing as you move, so the one open when the window closes
+  // already knows its own view. The same effect handles a switch: the route moves before the
+  // selection does, so a separate recorder could write the old workspace's source into the new
+  // one's memory before the switch read it.
+  let enteredWorkspaceId: string | undefined
+  createEffect(on(
+    [activeWorkspace, selectedSource, activeTask, () => location.pathname, placeRestored],
+    ([ws, , , , ready]) => {
+      if (!ws || !ready) return
+      if (enteredWorkspaceId && enteredWorkspaceId !== ws.id) openWorkspaceView(ws)
+      enteredWorkspaceId = ws.id
+      // Read again rather than taken from the arguments, because opening the workspace may have
+      // just changed them.
+      const view = viewToRemember(ws, selectedSource(), activeTask(), location.pathname)
+      if (view) rememberWorkspaceView(ws.id, view)
+    },
+  ))
 
   const slotContext = (): UiSlotContext => ({
     taskActive: inTaskView(),

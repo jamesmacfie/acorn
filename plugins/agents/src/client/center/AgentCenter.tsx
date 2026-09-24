@@ -84,7 +84,7 @@ export default function AgentCenter() {
   )
   // Asked for only when the archived filter is chosen. This used to load on every visit and every
   // workspace switch, which is a second full session page fetched to fill a list nobody had opened.
-  const [archived] = createResource(
+  const [archived, { refetch: refetchArchived }] = createResource(
     () => (stateFilter() === 'archived' ? workspaceId() || null : null),
     async (activeId) => (await managedAgentApi.sessions({ workspaceId: activeId, archived: true })).sessions,
   )
@@ -186,6 +186,18 @@ export default function AgentCenter() {
     selectManagedSession(row.task.id, row.session.id)
     openPane(row.task.id, 'workflows', { kind: 'workflows:show-run', runId: run.runId, stepId: run.stepId })
     navigate(pathForTask(row.task))
+  }
+
+  // Only a session archived on its own. One retired because its task was archived comes back when the
+  // task is restored, and restoring the session alone would change nothing the owner can see.
+  async function restore(row: AgentRow) {
+    setError('')
+    try {
+      managedAgentStore.upsertSession(await managedAgentApi.patch(row.session.id, { archived: false }))
+      await refetchArchived()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not restore the session.')
+    }
   }
 
   function open(row: AgentRow) {
@@ -351,6 +363,11 @@ export default function AgentCenter() {
                                   Run
                                 </Chip>
                               )}
+                            </Show>
+                            <Show when={current().session.archivedAt}>
+                              <Chip leading={<Icon name="archive-restore" />} onPress={() => void restore(current())}>
+                                Restore
+                              </Chip>
                             </Show>
                           </Inline>
                           <Text emphasis="muted">

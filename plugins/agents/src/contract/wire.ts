@@ -27,7 +27,9 @@ export type AgentAttentionReason =
 export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'automation' | 'import'
+// `delegation` is a turn an owner queued on its delegated child; `delegation_report` is the child's
+// settled result queued back on that owner (docs/managed-agents.md § Managed delegation).
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import'
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'

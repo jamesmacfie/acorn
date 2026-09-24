@@ -1,4 +1,4 @@
-import type { ArchiveOpts, ArchiveResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
+import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
@@ -6,6 +6,7 @@ import {
   taskArchiveRoute,
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
+  taskRestoreRoute,
   taskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
@@ -27,6 +28,7 @@ export type TaskBridge = {
     // Every plugin's answer about archiving this task, asked once when the dialog opens. Never
     // rejects into the caller: a node that cannot answer means no plugin rows, not no dialog.
     archiveConcerns(id: string): Promise<TaskArchiveConcern[]>
+    restore(id: string, opts?: RestoreOpts): Promise<RestoreResult>
     onCreated(id: string): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
@@ -56,6 +58,7 @@ export const taskBridge = (): TaskBridge => {
           log.warn('archive concerns unavailable', error)
           return []
         }),
+      restore: (id, opts) => post<RestoreResult>(taskRestoreRoute(id), opts ?? {}),
       onCreated: (id) => post<{ ok: boolean }>(taskOnCreatedRoute(id)).then(() => undefined),
       statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },

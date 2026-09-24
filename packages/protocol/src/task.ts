@@ -22,6 +22,16 @@ export type ArchiveOpts = {
   applyChecks?: string[]
 }
 
+// `branchMissing` lets the caller offer a new branch when the archived task's local branch
+// disappeared. A failed restore leaves the task archived.
+export type RestoreResult =
+  | { ok: true }
+  | { ok: false; reason: string; branchMissing?: boolean }
+
+export type RestoreOpts = {
+  newBranch?: boolean
+}
+
 // What a plugin said about a task the owner is about to archive, as the dialog receives it. The node
 // mints `id` (`<pluginId>:<checkId>:<concernId>`) and stamps `pluginId`, so a package can neither
 // collide with another's checkbox nor draw a row under its name.
