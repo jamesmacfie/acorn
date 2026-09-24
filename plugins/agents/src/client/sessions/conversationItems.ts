@@ -267,6 +267,42 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
 }
 
 /**
+ * Hand back the previous projection's object for every item the new one built from the same events.
+ *
+ * `buildConversationItems` makes a fresh object for every item on every snapshot, and a streaming
+ * session changes the snapshot about 25 times a second. Every card reads its item, so every card in
+ * the transcript re-ran its bindings for an event that changed one of them. Given the old object for
+ * an unchanged item, the transcript's row signal sees the same value and nothing under it runs.
+ *
+ * An item is its key and the records from `firstSeq` to `lastSeq` folded together. The ledger never
+ * rewrites a seq, and the node's folded record stands in for exactly the updates it covers, so the same
+ * span means the same content. Two things are not in that span: the context figure, stamped from a
+ * usage line that can change after the turn closed, and a subagent's `children`, which is its stream's
+ * own array and grows without the card's seqs moving. The first is compared; the second is never
+ * reused, and there are few of them.
+ */
+export function reuseUnchangedItems(
+  previous: AgentConversationItem[] | undefined,
+  next: AgentConversationItem[],
+): AgentConversationItem[] {
+  if (!previous?.length) return next
+  const held = new Map(previous.map((item) => [item.key, item]))
+  return next.map((item) => {
+    const before = held.get(item.key)
+    return before && sameItem(before, item) ? before : item
+  })
+}
+
+const sameItem = (before: AgentConversationItem, item: AgentConversationItem): boolean =>
+  !before.children && !item.children
+  && before.firstSeq === item.firstSeq
+  && before.lastSeq === item.lastSeq
+  && before.turnId === item.turnId
+  && before.event.type === item.event.type
+  && before.context?.used === item.context?.used
+  && before.context?.size === item.context?.size
+
+/**
  * Put each turn's context figure on the line that closes the turn.
  *
  * Positional rather than by turn id, because a `turn_completed` often has no turn id to match on: the
