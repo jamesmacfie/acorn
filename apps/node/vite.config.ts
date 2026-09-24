@@ -1,11 +1,10 @@
-import { builtinModules } from 'node:module'
-import { isAbsolute, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
-
-const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
-const externalizeBareImports = (id: string) => !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id)
+import { isRuntimeResolved } from './externals'
+import { thirdPartyNotices } from './thirdPartyNotices'
 
 export default defineConfig({
+  plugins: [thirdPartyNotices('THIRD-PARTY-NOTICES.txt')],
   // Node resolution, not browser: prefer the `node` condition and never the `browser` field.
   resolve: {
     conditions: ['node'],
@@ -42,10 +41,9 @@ export default defineConfig({
         standalone: resolve(__dirname, 'src/entries/standalone.ts'),
         'plugin-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/nodePluginWorker.ts'),
       },
-      // node: builtins are listed explicitly as well as caught by the predicate, so a bare
-      // `import 'path'` with no node: prefix can never be bundled either.
-      external: (id: string) =>
-        externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
+      // Builtins and the few packages that have to be installed; everything else is bundled
+      // (./externals.ts).
+      external: isRuntimeResolved,
       output: {
         format: 'es',
         entryFileNames: '[name].js',

@@ -1,8 +1,9 @@
 # Standalone Node distribution
 
 `pnpm pack:node` builds a self-contained tarball for running an acorn Node without the desktop app.
-The artifact contains the Node service and standalone entrypoints, shared chunks, migrations,
-workspace production dependencies, and native modules.
+The artifact contains the Node service and standalone entrypoints, shared chunks with the
+pure-JavaScript dependencies bundled in, migrations, and a `package.json` naming the few packages
+installed beside them: native modules and packages loaded at run time (`apps/node/externals.ts`).
 
 ## Runtime
 

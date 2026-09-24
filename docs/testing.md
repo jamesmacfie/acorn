@@ -266,6 +266,12 @@ questions the renderer asks: which nodes are there, and can a `/v1` request reac
 assertion covers the custody stack end to end. Two more check the gate: a socket without the secret
 is refused, and a plain HTTP request gets 426.
 
+It also prints how long the node took to start, from the helper's ready line to its `service.start`
+mark, and fails over 1,500 ms. That span is spawning the node, evaluating the service bundle, and
+the node's boot to a bound listener, about 270 ms on an M2 Pro. The bound is loose on purpose, since
+timing on a shared CI runner is noisy. It catches a change that adds seconds, and the printed number
+is the one to compare between builds.
+
 The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
 the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
 guard, the highlighter worker's separate policy, the refusal to answer a node route with the shell's

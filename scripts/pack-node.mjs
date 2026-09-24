@@ -38,25 +38,16 @@ const OUT = join(ROOT, 'apps/node/release')
 // from apps/desktop's manifest rather than repeated here, since that package already pins them for
 // the bundled node, so the packaged app and the standalone one cannot diverge.
 // `assertManifestCoversImports` below keeps the names honest.
+//
+// Only what the build leaves outside the bundle (apps/node/externals.ts). Every other third-party
+// package is inside dist/ already.
 const RUNTIME = [
   '@agentclientprotocol/claude-agent-acp',
-  '@agentclientprotocol/sdk',
-  '@anthropic-ai/sdk',
-  '@hono/node-server',
-  '@modelcontextprotocol/sdk',
   '@vscode/ripgrep',
   '@xterm/addon-serialize',
   '@xterm/headless',
-  'drizzle-orm',
-  'hono',
-  'jose',
   'node-pty',
-  'openai',
-  'pg',
   'playwright-core',
-  'smol-toml',
-  'ws',
-  'zod',
 ]
 
 // Loaded through `createRequire(...)` rather than a static import. The scanner below matches both
@@ -73,18 +64,27 @@ const read = (path) => JSON.parse(readFileSync(path, 'utf8'))
 function importedPackages(files) {
   const found = new Set()
   const patterns = [
-    /(?:^|[\s;}])(?:import|export)[^;'"]*?from\s*['"]([^'"]+)['"]/g,
-    /(?:^|[\s;}])import\s*['"]([^'"]+)['"]/g,
+    // Static imports sit at the start of a line in Rolldown's output. Anchoring there matters since
+    // third-party code is bundled: its doc comments are full of example lines such as
+    // ` * import { Hono } from 'hono'`.
+    /^(?:import|export)[^;'"]*?from\s*['"]([^'"]+)['"]/gm,
+    /^import\s*['"]([^'"]+)['"]/gm,
     // The negative lookbehind is load-bearing: `agentProfileRegistry.require("shell")` is a method
     // named require, and without it the scanner reported `shell` as a missing dependency. A checker
     // that cries wolf on the first run is one whose next real finding gets waved through.
+    //
+    // There is no pattern for a bare `require("…")`. The output is ESM and has no `require` binding,
+    // so every one in it is text: ajv's code generator writes them into strings. Bundled CommonJS
+    // calls `__require` instead, and only for builtins and the optional native addons ws and pg can
+    // do without, none of which belong in the manifest.
     /(?<![.\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /(?<![.\w$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     // The dynamic forms, which are not an edge case here: @xterm/headless and @xterm/addon-serialize
     // are both loaded this way, because a lazy load turns a load failure into an actionable error
     // instead of a bare stack at import time. A scanner blind to them declares the manifest complete
-    // and the unpacked tarball dies on `Cannot find module '@xterm/headless'` at boot.
-    /(?<![.\w$])[A-Za-z_$][\w$]*Require\s*\(\s*['"]([^'"]+)['"]/g,
+    // and the unpacked tarball dies on `Cannot find module '@xterm/headless'` at boot. Rolldown
+    // renames a binding that two modules share, so `nodeRequire` can arrive as `nodeRequire$1`, and
+    // `.resolve` is how the Claude adapter's path is found.
+    /(?<![.\w$])[A-Za-z_$][\w$]*Require(?:\$\d+)?(?:\.resolve)?\s*\(\s*['"]([^'"]+)['"]/g,
     /createRequire\([^)]*\)\s*\(\s*['"]([^'"]+)['"]/g,
   ]
   for (const file of files) {

@@ -42,9 +42,11 @@ const packageRoot = (entry: string): string => {
 }
 
 const runtimeReadRoots = (bootstrap: string): string[] => {
-  // The source worker imports adjacent node-core modules. The production worker is a Vite entry whose
-  // trusted chunks sit under dist. Drizzle remains a bare dependency in both layouts.
-  const trusted = import.meta.url.endsWith('.ts') ? resolve(dirname(bootstrap), '..') : dirname(bootstrap)
+  // The production worker is a Vite entry whose chunks, Drizzle included, sit under dist
+  // (apps/node/externals.ts). The source worker imports adjacent node-core modules and Drizzle as a
+  // bare dependency.
+  if (!import.meta.url.endsWith('.ts')) return [realpathSync(dirname(bootstrap))]
+  const trusted = resolve(dirname(bootstrap), '..')
   const drizzle = packageRoot(fileURLToPath(import.meta.resolve('drizzle-orm')))
   const localDrizzle = join(packageRoot(fileURLToPath(import.meta.url)), 'node_modules', 'drizzle-orm')
   return [
