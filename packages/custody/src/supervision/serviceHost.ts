@@ -14,6 +14,7 @@ import {
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
+import { compileCacheDir } from './compileCache'
 
 const log = createLogger('service-host')
 
@@ -41,6 +42,9 @@ export class ServiceHost {
     private readonly entry: string,
     private readonly config: ServiceStartConfig,
     private readonly events: ServiceHostEvents = {},
+    // The parent of the service's compile cache (./compileCache.ts). Without one, every start
+    // compiles the whole bundle from scratch.
+    private readonly compileCacheRoot?: string,
   ) {
     serviceStartConfigSchema.parse(config)
   }
@@ -51,11 +55,17 @@ export class ServiceHost {
   async start(rememberedDeviceToken?: string): Promise<ServiceStartResult> {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
+    // Worked out here rather than in the constructor, so the old build's cache is removed after the
+    // helper's ready line, not before it.
+    const compileCache = this.compileCacheRoot ? compileCacheDir(this.compileCacheRoot, this.entry) : undefined
     const child = spawn(process.execPath, [this.entry], {
       // `process.execPath` is the Node the bundle ships, so the child needs no system Node install
       // and the bundled node-pty finds the ABI it was built against. See docs/shell.md, "Build and
-      // packaging".
-      env: { ...process.env },
+      // packaging". Terminals, agents, and scripts get an allowlisted environment
+      // (server/taskEnv.ts), so the compile cache variable does not reach them. A Node program that
+      // inherits it anyway, through one of the few tools spawned with the full environment, only adds
+      // its own entries, because Node keeps each runtime version apart.
+      env: { ...process.env, ...(compileCache ? { NODE_COMPILE_CACHE: compileCache } : {}) },
       // stdin closed, because the service never reads it. stdout and stderr inherited, so its logs
       // land wherever the app's do. fd 3 is the IPC channel that gives the child `process.send`.
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],

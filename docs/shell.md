@@ -98,9 +98,20 @@ The helper starts the staged `service.js` under the runtime it is itself running
 
 ```ts
 spawn(process.execPath, [entry], {
+  env: { ...process.env, NODE_COMPILE_CACHE: compileCache },
   stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
 })
 ```
+
+`NODE_COMPILE_CACHE` points at `<userDataDir>/compile-cache/<build>`, where Node keeps V8's compiled
+code for the service between launches. `<build>` is a hash of `service.js`, which names every chunk
+the service loads, and `@acorn/custody/supervision/compileCache.ts` removes any other build's
+directory before the spawn. Node keys entries by file path and never removes one, so without that
+every update would leave the previous build's renamed chunks behind. Node checks each entry against
+its source and recompiles on a mismatch, so a stale or damaged cache costs a compile, not a wrong
+program. The first launch of a build writes the cache on quit. The directory sits in the custody
+root rather than the node's data root, because it is this app's disposable copy and not the owner's
+data.
 
 The node sends a versioned service-protocol `start` response carrying its `nodeId`, endpoint,
 certificate fingerprint and PEM, and local device token. The helper adopts that record into the
