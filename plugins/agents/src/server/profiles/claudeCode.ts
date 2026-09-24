@@ -84,7 +84,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
     { id: 'fable', label: 'Fable' },
     { id: 'haiku', label: 'Haiku' },
   ],
-  defaultModelId: 'sonnet',
+  // Leave the CLI's own account or organization default in place until a model is chosen here.
+  defaultModelId: '',
   glyph: 'brand:agents/claude',
 }
-

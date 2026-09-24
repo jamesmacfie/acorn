@@ -219,12 +219,12 @@ profile knows whether its CLI honoured a flag. Claude Code passes `--system-prom
 the CLI's default prompt rather than appending to it, and that is what a generate wants: the
 coding-agent persona is noise in front of "answer with SQL only". Codex has no such flag, so it
 prepends the system text to the prompt with a blank line between. A profile may also declare `models`,
-`defaultModelId` and `glyph`, the same fields a connection provider declares. Claude Code declares
-the CLI's own aliases, `sonnet`, `opus` and `haiku`, rather than dated model ids, because the CLI
-resolves an alias to whatever it ships with and a pinned id goes stale there before it goes stale
-here. Codex declares none: its model list lives in `~/.codex/config.toml` and the owner's account, so
-a copy here would be a second list that drifts from the one that decides. A backend with no catalog
-draws no model select and runs on the CLI's own configured default.
+`defaultModelId`, `listModels` and `glyph`. Claude Code declares the CLI's own aliases, `sonnet`,
+`opus`, `fable` and `haiku`, rather than dated model ids, because the CLI resolves an alias to whatever
+it ships with. Codex reads the account's picker-visible models from the local Codex app-server's
+`model/list` endpoint. Both harnesses offer **Use CLI default**, which omits the model flag so the CLI
+can apply its own config. If Codex's catalog cannot be read, the picker says so and keeps a saved model
+choice until it can be checked again.
 
 **The stream shape is the profile's too, and the two harnesses share nothing but the newline.** Claude
 Code writes a `result` event carrying the answer, the cost and the token counts. Codex writes none:

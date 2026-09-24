@@ -20,9 +20,11 @@ export type ModelBackend = {
   label: string
   /** A Lucide name or a `brand:` mark, for the surfaces that draw one. The picker is two selects and draws none. */
   glyph?: string
-  /** May be empty, which hides the model select: a CLI that keeps its own model list has nothing to offer here. */
+  /** May be empty. A harness with a failed catalog read can still offer the CLI default. */
   models: ModelCatalogEntry[]
-  /** `''` when the backend has no catalog. See `defaultModelIdFor` for why that is a real answer. */
+  /** A live CLI catalog could not be refreshed. Keep an explicit saved model until it can be checked. */
+  catalogUnavailable?: boolean
+  /** `''` lets a harness use its CLI's configured default. */
   defaultModelId: string
 }
 
@@ -82,7 +84,7 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
 }
 
 /**
- * Which model a backend starts on: its declared default, or the first model it lists.
+ * Which model a backend starts on: a harness's CLI default, or a connection's declared or first model.
  *
  * Here rather than beside the picker that used to hold it, because two sides now need the same answer
  * and neither may import the other. The desktop's picker opens on it, and the Database plugin's node
@@ -95,7 +97,7 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
  * configured default for a harness.
  */
 export const defaultModelIdFor = (backend: ModelBackend | undefined): string =>
-  backend?.defaultModelId || backend?.models[0]?.id || ''
+  backend?.kind === 'harness' ? backend.defaultModelId : backend?.defaultModelId || backend?.models[0]?.id || ''
 
 /** What `GET /v1/core/models/backends` answers. */
 export type ModelBackendsResponse = {

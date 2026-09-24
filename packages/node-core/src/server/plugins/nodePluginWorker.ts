@@ -94,9 +94,13 @@ process.getBuiltinModule = ((specifier: string) => {
 const nativeFetch = globalThis.fetch.bind(globalThis)
 if (options.allowNetwork) {
   const hosts = new Set(options.networkHosts)
+  const anyHost = hosts.has('*')
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
     const url = input instanceof Request ? new URL(input.url) : new URL(input)
-    if (!hosts.has(url.hostname)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${url.hostname}'`)
+    if (!anyHost && !hosts.has(url.hostname)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${url.hostname}'`)
+    // An explicit any-host grant also permits redirects to any host. Keep the caller's redirect
+    // policy instead of forcing manual redirects on an API client.
+    if (anyHost) return nativeFetch(input, init)
     // Never let the native fetch implementation follow a redirect before this wrapper has checked
     // its destination. The plugin may inspect Location and make another fetch, which re-enters the
     // same hostname gate.

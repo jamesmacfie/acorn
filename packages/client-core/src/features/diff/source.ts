@@ -88,6 +88,8 @@ export type DiffSource = {
    * only: a split band holds two rows and cannot say which one the click landed on.
    */
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
+  /** Open an added line in the source's editor. Omit to hide the gutter control. */
+  openLine?: (row: CodeRow) => void
   /**
    * The find command this pane registers. Each surface brings its own id so a reader's rebinding
    * survives, and its own pane so the chord resolves to the diff they are looking at. Omit `pane`

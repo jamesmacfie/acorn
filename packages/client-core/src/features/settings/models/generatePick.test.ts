@@ -46,6 +46,14 @@ describe('effectiveModelPick', () => {
       .toEqual({ backendId: 'c1', modelId: 'fast' })
   })
 
+  it('keeps a saved CLI model when its catalog cannot be refreshed', () => {
+    const backend = { ...at('harness:codex', [], '', 'harness'), catalogUnavailable: true }
+    expect(effectiveModelPick([backend], { backendId: backend.id, modelId: 'gpt-5' }))
+      .toEqual({ backendId: backend.id, modelId: 'gpt-5' })
+    expect(effectiveModelPick([{ ...backend, catalogUnavailable: false }], { backendId: backend.id, modelId: 'gpt-5' }))
+      .toEqual({ backendId: backend.id, modelId: '' })
+  })
+
   // Empty is a real answer: the node omits the model and the backend picks. Which is also every
   // harness, since a CLI keeps its own model list.
   it('answers an empty model for a backend that declares none', () => {

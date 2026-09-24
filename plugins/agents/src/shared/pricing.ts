@@ -71,6 +71,14 @@ export const claudePriceCatalog: readonly AgentPriceCatalogEntry[] = [
     matches: matches(/^(?:claude-)?mythos-?5(?:-|$)/i),
     defaultPrice: fixedPrice(PREMIUM_FIVE),
   },
+  // Opus 5.5 sits before Opus 5 because the Opus 5 pattern also matches claude-opus-5-5.
+  {
+    id: 'opus-5-5',
+    label: 'Claude Opus 5.5',
+    models: 'claude-opus-5-5',
+    matches: matches(/^(?:claude-)?opus-?5[-.]5(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 }),
+  },
   {
     id: 'opus-5',
     label: 'Claude Opus 5',
@@ -139,6 +147,20 @@ export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
     models: 'gpt-6-astra',
     matches: matches(/^gpt-6-astra(?:-|$)/i),
     defaultPrice: fixedPrice({ input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }),
+  },
+  {
+    id: 'gpt-6-sol',
+    label: 'GPT-6 Sol',
+    models: 'gpt-6-sol',
+    matches: matches(/^gpt-6-sol(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }),
+  },
+  {
+    id: 'gpt-6-luna',
+    label: 'GPT-6 Luna',
+    models: 'gpt-6-luna',
+    matches: matches(/^gpt-6-luna(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 0.1, output: 0.5, cacheWrite: 0.125, cacheRead: 0.01 }),
   },
   {
     id: 'gpt-5-6-terra',

@@ -1,15 +1,15 @@
 import { createMemo, Show } from 'solid-js'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { Select } from '../../../kit/components/primitives'
+import { Text } from '../../../kit/components/content/Text'
 import { defaultModelIdFor } from './defaultModel'
 
 // Two controlled selects, backend then model, over everything this owner can generate with: a stored
 // API key, or an agent CLI installed on this machine (@acorn/protocol/modelProviders.ts § ModelBackend).
 // Any plugin whose route consumes `models.generateText` can draw it.
 //
-// The backend select is hidden when there is one choice, and the model select when the backend lists
-// no models. A CLI keeps its own model list and offers none here, so on a machine with only `claude`
-// this draws nothing at all — which is right: there is no choice to make.
+// The backend select is hidden when there is one choice. Harness model choices include the CLI's
+// configured default, so selecting a model is always reversible without knowing its config file.
 //
 // Labels are `backend.label` with no group header and no icon. `Select` draws neither, and "Claude
 // Code" beside "Anthropic" already says which is which.
@@ -26,6 +26,16 @@ export default function ModelBackendPicker(props: {
   // upstream tick.
   const current = createMemo(() => props.backends.find((backend) => backend.id === props.backendId) ?? props.backends[0])
   const models = () => current()?.models ?? []
+  const modelOptions = () => {
+    const backend = current()
+    const choices = models().map((model) => ({ value: model.id, label: model.label }))
+    if (backend?.kind !== 'harness' || (!choices.length && !backend.catalogUnavailable)) return choices
+    const options = [{ value: '', label: `Use ${backend.label} default` }, ...choices]
+    if (backend.catalogUnavailable && props.modelId && !choices.some((model) => model.value === props.modelId)) {
+      options.push({ value: props.modelId, label: `${props.modelId} (saved)` })
+    }
+    return options
+  }
 
   return (
     <>
@@ -39,13 +49,16 @@ export default function ModelBackendPicker(props: {
             // heard of.
             const next = props.backends.find((backend) => backend.id === value)
             props.onChange({ backendId: value, modelId: defaultModelIdFor(next) })
-          }} options={[...props.backends.map((backend) => ({ value: backend.id, label: backend.label }))]} />
+          }} options={props.backends.map((backend) => ({ value: backend.id, label: backend.label }))} />
       </Show>
-      <Show when={models().length}>
+      <Show when={modelOptions().length}>
         <Select
           title="Model"
           value={props.modelId}
-          onChange={(value) => props.onChange({ backendId: current()?.id ?? '', modelId: value })} options={[...models().map((model) => ({ value: model.id, label: model.label }))]} />
+          onChange={(value) => props.onChange({ backendId: current()?.id ?? '', modelId: value })} options={modelOptions()} />
+      </Show>
+      <Show when={current()?.catalogUnavailable}>
+        <Text tone="muted">Could not refresh this CLI's model list. Saved choices are kept.</Text>
       </Show>
     </>
   )

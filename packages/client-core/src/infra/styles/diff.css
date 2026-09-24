@@ -50,7 +50,7 @@
   padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
 }
 .diff-line-extra:empty { display: none; }
-.diff-gutter { flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
+.diff-gutter { position: relative; flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
 /* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is
    `flex-wrap: wrap` so an open composer can drop onto its own line, and a flex line breaks on an
@@ -175,7 +175,7 @@
 
 /* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
    (measured by the virtualizer); the add-comment "+" reveals on row hover. */
-.diff-add-btn {
+.diff-add-btn, .diff-open-btn {
   flex: none;
   width: 16px;
   height: 16px;
@@ -191,8 +191,10 @@
   cursor: pointer;
   visibility: hidden;
 }
-.diff-row:hover .diff-add-btn, .diff-add-btn:focus-visible { visibility: visible; }
-.diff-add-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
+.diff-open-btn { position: absolute; top: 2px; left: 2px; margin-right: 0; text-align: center; }
+.diff-row:hover .diff-add-btn, .diff-row:hover .diff-open-btn,
+.diff-add-btn:focus-visible, .diff-open-btn:focus-visible { visibility: visible; }
+.diff-add-btn:hover, .diff-open-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
 
 /* Thread / composer rows opt out of the single-line flex layout used by code rows. */
 .diff-thread-row {
@@ -300,8 +302,8 @@
 .diff-split-full.diff-hunk { display: block; white-space: pre; }
 .diff-split-full.diff-file-row { padding: 0; }
 /* :focus-within as well as :hover: the unified row already had the keyboard half (line ~152). */
-.diff-split-pair:hover .diff-add-btn,
-.diff-split-pair:focus-within .diff-add-btn { visibility: visible; }
+.diff-split-pair:hover .diff-add-btn, .diff-split-pair:hover .diff-open-btn,
+.diff-split-pair:focus-within .diff-add-btn, .diff-split-pair:focus-within .diff-open-btn { visibility: visible; }
 
 /* ── File status ────────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built for why this owns .file-status now. */

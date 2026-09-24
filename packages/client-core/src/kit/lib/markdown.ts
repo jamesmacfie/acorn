@@ -168,11 +168,13 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       // The `:---:` alignment markers are parsed off and dropped. Applying one means an inline style
       // attribute, which the plugin frames' CSP refuses, so it needs a data attribute and a rule per
       // alignment. Nothing has asked yet.
+      // A bare table, the same markup GitHub's HTML carries, so primitives.css styles both from one
+      // `.ui-markdown table` rule.
       emit(
-        '<div class="ui-table-scroll" data-scroll><table class="ui-table">'
+        '<table>'
         + `<thead>${row('th', head)}</thead>`
         + `<tbody>${body.map((r) => row('td', r)).join('')}</tbody>`
-        + '</table></div>',
+        + '</table>',
         start,
       )
       continue

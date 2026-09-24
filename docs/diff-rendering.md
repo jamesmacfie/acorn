@@ -46,6 +46,9 @@ Two members exist for what a caller draws that the viewer has no concept of: `li
 under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
 affordance on a code line. The changes pane uses the first for review notes and the second for
 Alt-click to send a line reference to the agent.
+The Changes source also supplies `openLine`: an added line shows a hover button in its first gutter
+that opens the file at that new-side line in the editor. The viewer hides the button for deleted lines,
+which have no corresponding line in the current file, and for sources without the callback.
 
 Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
 sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not
@@ -58,9 +61,10 @@ the port is the right size.
 
 ## Data flow
 
-The GitHub plugin returns file metadata plus an optional patch. Large or missing patch bodies are
-loaded lazily from the blob route. The Changes plugin obtains a local diff through the core Git
-service. Both paths normalize into file/hunk/line rows before rendering.
+The GitHub task pane uses the file summaries already warmed by the PR list, then loads patch bodies
+in small batches as the diff hydrates. Repository browse can start with full file payloads. Large or
+missing patch bodies are loaded lazily from the blob route. The Changes plugin obtains a local diff
+through the core Git service. Both paths normalize into file/hunk/line rows before rendering.
 
 The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
 scroller and clicking a row scrolls to it, the way the pull-request pane's list works. Staging is a

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import type { PaletteView } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
@@ -126,29 +126,30 @@ export function PaletteSurface<T>(props: {
               and a live region is how somebody not looking at the list hears them change. */}
           <div class="sr-only" role="status" aria-live="polite">{props.announce ?? ''}</div>
           <ul class="palette-list" id={listId} role="listbox" aria-label={props.ariaLabel}>
-            <For each={props.items} fallback={<li class="palette-empty muted">{props.emptyText}</li>}>
+            {/* A cursor change can rebuild the item objects. Keep buttons mounted through hover and click. */}
+            <Index each={props.items} fallback={<li class="palette-empty muted">{props.emptyText}</li>}>
               {(item, index) => (
                 <li role="presentation">
                   <button
                     type="button"
-                    id={rowId(index())}
+                    id={rowId(index)}
                     role="option"
-                    aria-selected={index() === props.palette.sel()}
+                    aria-selected={index === props.palette.sel()}
                     // Not a tab stop: the field keeps focus and names the active row, which is what
                     // `aria-activedescendant` is for.
                     tabIndex={-1}
                     class="palette-row"
-                    classList={{ selected: index() === props.palette.sel(), ...props.rowClassList?.(item) }}
+                    classList={{ selected: index === props.palette.sel(), ...props.rowClassList?.(item()) }}
                     // Hover moves the cursor without touching the query, so mouse and keyboard share one
                     // selection rather than fighting over two.
-                    onMouseEnter={() => props.palette.setSel(index())}
-                    onClick={() => props.onPick(item, index())}
+                    onMouseEnter={() => props.palette.setSel(index)}
+                    onClick={() => props.onPick(item(), index)}
                   >
-                    {props.row(item, index() === props.palette.sel())}
+                    {props.row(item(), index === props.palette.sel())}
                   </button>
                 </li>
               )}
-            </For>
+            </Index>
           </ul>
           <Show when={props.footer}><div class="palette-foot muted">{props.footer}</div></Show>
         </div>

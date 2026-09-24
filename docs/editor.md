@@ -85,6 +85,15 @@ What changed, and why:
   and `basicSetup` gets in first — so every file in every theme was painted by a style built for a
   white page, with a heading and a link label underlined and almost nothing coloured.
   `theme.test.tsx` fails if that ordering comes back.
+- **A selection inside one line is drawn, not hidden.** CodeMirror puts the selection in a layer
+  under `.cm-content`, so the opaque `.cm-activeLine` background sat on top of it, and the line a
+  selection starts on is the line the cursor is on. Selecting a word showed nothing; selecting
+  several lines showed everything but the last one, which is why it read as a one-line bug. The
+  current line now stands down while the selection layer has anything in it. Two colours went with
+  it: the selection takes the accent at 34%, spelled out with the base theme's own selector because
+  a shorter one loses on specificity, and `.cm-selectionMatch` — the other copies of the selected
+  word — takes the same accent at 16% instead of CodeMirror's unthemed lime green. Checked in the
+  app on a light theme and on Nord, with a word selected and with several lines selected.
 - **`languageForPath` is async, and downloads one grammar.** It was seventeen static imports, so a
   pane that opened one file downloaded every language the app knows: the editor's lazy chunk was
   954,915 bytes of which the grammars were nearly all. The map's entries now import their grammar and

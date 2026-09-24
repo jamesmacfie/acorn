@@ -89,6 +89,27 @@ afterEach(() => {
 })
 
 describe('the dialog', () => {
+  it('keeps a result mounted through hover and runs the clicked command', async () => {
+    const ran: string[] = []
+    register(leaf('cmd.one', { title: 'One', run: () => { ran.push('one') } }))
+    register(leaf('cmd.two', { title: 'Two', run: () => { ran.push('two') } }))
+    mount()
+    session.openRoot()
+
+    const row = options()[1]!
+    row.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
+    expect(options()[1]).toBe(row)
+    expect(activeRowText()).toBe('Two')
+
+    row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    row.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    row.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(ran).toEqual(['two'])
+    expect(dialog()).toBeNull()
+  })
+
   it('is a combobox over a listbox, and names the row the arrows are on', () => {
     register(leaf('cmd.one', { title: 'One' }))
     register(leaf('cmd.two', { title: 'Two' }))
@@ -235,6 +256,7 @@ describe('the interactive frames', () => {
     await settle()
 
     expect(field().placeholder).toBe('Search issues…')
+    expect(document.querySelector('.palette-crumbs')).toBeNull()
     expect(options().map((row) => row.textContent)).toEqual(['Searching…'])
     expect(dialog()?.getAttribute('aria-busy')).toBe('true')
     // An explanatory row is not a tab stop and not the cursor: there is nothing to press Enter on.
