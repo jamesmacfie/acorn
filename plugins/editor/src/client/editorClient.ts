@@ -5,10 +5,12 @@
 import {
   editorFilesRoute,
   editorListRoute,
+  editorLineMarkersRoute,
   editorReadRoute,
   editorRootRoute,
   editorWriteRoute,
   type EditorEntry,
+  type EditorLineMarkerSet,
   type EditorWriteResult,
 } from '../contract/api'
 import type { QueryClient } from '@tanstack/solid-query'
@@ -21,6 +23,7 @@ export type EditorApi = {
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
+  lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
@@ -29,6 +32,7 @@ const api: EditorApi = {
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath)),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId)),
   read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath)).then((r) => r.text),
+  lineMarkers: (taskId, relPath) => readJson<EditorLineMarkerSet[]>(editorLineMarkersRoute(taskId, relPath)),
   write: (taskId, relPath, content) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',

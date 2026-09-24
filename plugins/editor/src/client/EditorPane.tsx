@@ -12,7 +12,9 @@ import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, edi
 import { editorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
+import { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
 import SearchPanel from './search/SearchPanel'
+import type { EditorLineMarkerSet } from '../contract/lineMarkers'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -27,6 +29,8 @@ type PooledFile = {
   language: Extension
   /** Which mount built the extensions in `state`. See `adopt` below for why that matters. */
   mount: object
+  /** Marker reads are refreshed on a later tab restore without making every quick swap run Git. */
+  markersReadAt: number
 }
 
 /**
@@ -170,6 +174,7 @@ export default function EditorPane(props: { task: Task }) {
   const perFile = (path: string, language: Extension): Extension[] => [
     basicSetup,
     editorTheme(),
+    lineMarkerExtension(),
     language,
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return
@@ -305,11 +310,12 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   async function readFile(relPath: string): Promise<EditorState | null> {
-    const [content, language] = await Promise.all([
+    const [content, language, markers] = await Promise.all([
       api?.read(taskId, relPath).catch(() => '').then((text) => text ?? '') ?? Promise.resolve(''),
       // No highlighting beats no file, so a grammar that will not download is an empty extension
       // rather than a throw that takes `show()` down with it.
       languageForPath(relPath).catch(() => [] as Extension),
+      api?.lineMarkers(taskId, relPath).catch(() => [] as EditorLineMarkerSet[]) ?? Promise.resolve([]),
     ])
     // Navigation can replace this pane while the bridge response is in flight. Parsing syntax and
     // constructing an EditorState here would block the renderer for a pane nobody can see, and the
@@ -339,9 +345,25 @@ export default function EditorPane(props: { task: Task }) {
       activeLanguage = []
       state = EditorState.create({ doc: content, extensions: perFile(relPath, activeLanguage) })
     }
+    state = state.update({ effects: lineMarkerEffect(markers) }).state
     saved.set(relPath, state.doc)
-    pool.files.set(relPath, { state, language: activeLanguage, mount: mountToken })
+    pool.files.set(relPath, { state, language: activeLanguage, mount: mountToken, markersReadAt: Date.now() })
     return state
+  }
+
+  async function refreshLineMarkers(relPath: string): Promise<void> {
+    if (!api) return
+    const markers = await api.lineMarkers(taskId, relPath).catch(() => null)
+    if (!markers || disposed) return
+    const entry = pool.files.get(relPath)
+    if (!entry) return
+    if (view && currentPath === relPath) {
+      view.dispatch({ effects: lineMarkerEffect(markers) })
+      remember(relPath, view.state)
+    } else {
+      entry.state = entry.state.update({ effects: lineMarkerEffect(markers) }).state
+    }
+    entry.markersReadAt = Date.now()
   }
 
   // Swaps the reused instance to a path. The only place currentPath changes.
@@ -365,6 +387,8 @@ export default function EditorPane(props: { task: Task }) {
     const remembered = editorViewState(taskId, relPath)
     if (remembered) applyViewState(view, remembered)
     maybeReveal(relPath)
+    const entry = pool.files.get(relPath)
+    if (entry && Date.now() - entry.markersReadAt > 2_000) void refreshLineMarkers(relPath)
   }
 
   // Consumes a pending cross-pane reveal for the file just shown: centers the target position and
@@ -424,6 +448,7 @@ export default function EditorPane(props: { task: Task }) {
     saved.set(p, doc)
     // Still-dirty if the user typed more during the async write.
     editorSetDirty(taskId, p, !docFor(p)?.eq(doc))
+    void refreshLineMarkers(p)
   }
 
   async function close(relPath: string) {
@@ -448,7 +473,9 @@ export default function EditorPane(props: { task: Task }) {
     const file = files().find((x) => x.path === p)
     if (file?.dirty) return
     const disk = await api.read(taskId, p).catch(() => null)
-    if (disposed || !view || disk == null || currentPath !== p || disk === view.state.doc.toString()) return
+    if (disposed || !view || disk == null || currentPath !== p) return
+    void refreshLineMarkers(p)
+    if (disk === view.state.doc.toString()) return
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } })
     saved.set(p, view.state.doc)
     editorSetDirty(taskId, p, false)
