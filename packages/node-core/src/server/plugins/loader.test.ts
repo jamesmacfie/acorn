@@ -476,6 +476,29 @@ describe('rejections', () => {
   })
 })
 
+describe('starting the packages', () => {
+  // A top-level await holds the worker's handshake, so the package that sorts first finishes last.
+  const SLOW = (name: string) => `await new Promise((resolve) => setTimeout(resolve, 600))\n${BUNDLE(name)}`
+
+  it('starts every package at once and still reports them in directory order', async () => {
+    install('alpha', manifest('alpha'), SLOW('alpha'))
+    install('bravo', manifest('bravo'), 'nonsense(((\n')
+    install('charlie', manifest('charlie'), SLOW('charlie'))
+    install('delta', manifest('delta', { migrations: './missing' }), BUNDLE('delta'))
+    install('echo', manifest('echo'), SLOW('echo'))
+    install('foxtrot', manifest('foxtrot'), BUNDLE('foxtrot'))
+
+    const started = Date.now()
+    const { loaded, installed, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    // One after another the three slow packages alone would take 1.8 s.
+    expect(Date.now() - started).toBeLessThan(1_500)
+    expect(loaded.map((entry) => entry.manifest.id)).toEqual(['alpha', 'charlie', 'echo', 'foxtrot'])
+    expect(installed.map((entry) => entry.manifest.id)).toEqual(['alpha', 'charlie', 'echo', 'foxtrot'])
+    expect(failures.map((failure) => failure.id)).toEqual(['bravo', 'delta'])
+  })
+})
+
 // Each isolated realm owns a complete module cache. Starting a candidate therefore evaluates the
 // entry and every dependency afresh; `reimport` remains an accepted no-op for older callers.
 describe('evaluating a fresh isolated package realm', () => {
