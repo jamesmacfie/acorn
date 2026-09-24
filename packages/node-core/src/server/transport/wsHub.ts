@@ -32,10 +32,12 @@ type StreamMsg =
 export type StreamSink = (msg: StreamMsg) => void
 
 // The engine handlers the hub routes client frames to (registered by terminal.ts). attach registers
-// the sink synchronously; the terminal engine owns canonical-snapshot-before-live ordering.
+// the sink synchronously; the terminal engine owns canonical-snapshot-before-live ordering. `size` is
+// the viewer's cols and rows when its attach frame carried them, so the engine can size the stream
+// before it takes the snapshot instead of the client posting a resize first and waiting for it.
 export type StreamHandlers = {
   input(id: string, data: string): void
-  attach(id: string, sink: StreamSink): void
+  attach(id: string, sink: StreamSink, size?: { cols: number; rows: number }): void
   detach(id: string, sink: StreamSink): void
   // Which task a stream belongs to, or null/undefined when the id is unknown. Required for the
   // task-scope check in onConnect: a task-scoped internal credential may only drive its own task's
@@ -363,7 +365,7 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number): void {
       // here, because the frame envelope is open now (@acorn/protocol/ws.ts): the runtime guards below
       // are load-bearing on their own, since the union only ever proved the shapes to the compiler,
       // never to a peer sending JSON.
-      const { id, data } = frame as { id?: unknown; data?: unknown }
+      const { id, data, cols, rows } = frame as { id?: unknown; data?: unknown; cols?: unknown; rows?: unknown }
       const streamId = typeof id === 'string' ? id : null
       if (!mayDriveStream(conn, streamId)) return
       if (!streamId) return
@@ -373,7 +375,8 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number): void {
         if (conn.sinks.has(streamId)) return
         const sink: StreamSink = (msg) => sendStreamFrame(conn, streamId, msg)
         conn.sinks.set(streamId, sink)
-        handlers.attach(streamId, sink) // engine restores the canonical screen before queued live frames
+        // Engine restores the canonical screen before queued live frames. The engine clamps the size.
+        handlers.attach(streamId, sink, typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined)
       } else if (frame.channel === 'term:detach') {
         const sink = conn.sinks.get(streamId)
         if (sink) {

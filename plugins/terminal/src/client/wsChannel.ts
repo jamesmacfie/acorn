@@ -30,13 +30,15 @@ export function initPtyChannel(): () => void {
   return () => { scope(); json.dispose(); binary.dispose(); attached.clear() }
 }
 
-export function wsAttach(id: string, on: Subscriber): () => void {
+// `size` rides on the attach frame so the node sizes the session before it takes the snapshot. A
+// node from before that ignores it, which is why the surface still checks the size `ready` reports.
+export function wsAttach(id: string, on: Subscriber, size?: { cols: number; rows: number }): () => void {
   const selected = node()
   let slot = attached.get(id)
   const first = !slot || slot.nodeId !== selected
   if (first) { slot = { nodeId: selected, subscribers: new Set() }; attached.set(id, slot) }
   slot!.subscribers.add(on)
-  if (first) wsSend({ channel: 'term:attach', id })
+  if (first) wsSend({ channel: 'term:attach', id, ...size })
   return () => {
     const current = attached.get(id)
     if (!current || current !== slot) return

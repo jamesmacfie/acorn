@@ -300,6 +300,29 @@ describe('wsHub streaming', () => {
     ws.close()
   })
 
+  // The size rides on the attach so the engine can size the session before its snapshot. A frame
+  // without one, from a client that still posts a resize first, reaches the engine without a size.
+  it('hands the engine the size an attach frame carries, and none when it carries none', async () => {
+    const sizes: unknown[] = []
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, _sink, size) => sizes.push(size),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+    const ws = await open(authHeaders())
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION, cols: 120, rows: 40 }))
+    await waitFor(() => sizes.length === 1, 'the sized attach')
+    ws.send(JSON.stringify({ channel: 'term:detach', id: SESSION }))
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
+    await waitFor(() => sizes.length === 2, 'the unsized attach')
+    ws.send(JSON.stringify({ channel: 'term:detach', id: SESSION }))
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION, cols: '120', rows: 40 }))
+    await waitFor(() => sizes.length === 3, 'the malformed attach')
+    expect(sizes).toEqual([{ cols: 120, rows: 40 }, undefined, undefined])
+    ws.close()
+  })
+
   // Phase 6 of the performance programme: output crosses the wire once per broadcast as bytes rather
   // than once per socket as escaped JSON
   // (docs/performance.md § 2026-09-03 — phase 6).

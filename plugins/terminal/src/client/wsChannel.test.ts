@@ -65,6 +65,11 @@ it('attaches once, validates JSON payloads, and detaches after the last reader',
   expect(transport.sent.at(-1)).toEqual({ nodeId: 'n1', frame: { channel: 'term:detach', id: SESSION } })
 })
 
+it('carries the size on the attach frame', () => {
+  wsAttach(SESSION, () => {}, { cols: 120, rows: 40 })
+  expect(transport.sent).toEqual([{ nodeId: 'n1', frame: { channel: 'term:attach', id: SESSION, cols: 120, rows: 40 } }])
+})
+
 it('decodes binary output and keeps input on the selected node', () => {
   const output: string[] = []
   wsAttach(SESSION, (message) => { if (message.type === 'output') output.push(message.data) })
