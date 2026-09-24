@@ -315,9 +315,9 @@ changed.
 
 Two checks live in a `build` script rather than in a suite, because what they assert is a property of
 built output that no test process has. `@acorn/desktop`'s `build` runs
-`apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html`, and `@acorn/tui`'s
-`build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail the build over
-a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
+`apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html` and Vite's manifest, and
+`@acorn/tui`'s `build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail
+the build over a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
 enforce.
 
 Neither runs in this workflow, which only runs `lint` and `test`: the renderer's runs in

@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { basename, dirname, resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
-// The startup budget for a built renderer, run against the bytes the bundler will pick up: everything
-// the built index.html loads or preloads, which is what a cold window pays for before it draws.
+// The startup budget for a built renderer, run against the bytes the bundler will pick up: every script
+// and stylesheet a cold window loads before it draws.
 //
 // Two checks, because a byte total alone is not enough. Between 2026-08-31 and 2026-09-02 the total
 // drifted from 1,317,605 B to 1,329,679 B on 31 unrelated commits while staying red, so nobody read it;
@@ -11,17 +11,33 @@ import { basename, dirname, resolve } from 'node:path'
 //
 //   node scripts/check-renderer-budget.mjs [--dir <built client dir>]
 //
+// The graph comes from Vite's manifest, which vite.config.ts moves to `renderer-manifest.json` beside
+// the client dir. The built index.html is not enough on its own: on 2026-09-24 its entry became a
+// small guard that loads the app with one dynamic import, the HTML named a single 9.6 KB script, and
+// this check passed on that while the window loaded 870 KB.
+//
 // docs/frontend.md § Startup budget owns the contract. The terminal client's analogue is
 // apps/tui/scripts/check-startup-graph.mjs, which holds the same denylist for its own graph.
 
 const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist/client') : args[dirFlag + 1])
+const manifestPath = resolve(clientDir, '../renderer-manifest.json')
 
+// `floor` is a lower bound, not a target. A startup set that small means the check is reading the
+// wrong graph, which is how it went blind in September, so it fails the build rather than passes it.
 const limits = {
   scripts: 1_250_000,
   styles: 200_000,
+  floor: 100_000,
 }
+
+// Source modules that are dynamically imported but still load before the first draw, keyed as the
+// manifest keys them. The startup guard in src/client/bootstrap.ts imports the app unconditionally, so
+// that import is startup whatever syntax loads it. Every other dynamic import is a lazy surface and
+// stays out of the count. A module listed here that has no chunk of its own is skipped: once
+// index.html loads it directly it is part of the entry chunk, and the entry is counted anyway.
+const STARTUP_IMPORTS = ['src/client/index.tsx']
 
 // Chunk-name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy
 // surface that leaked into the eager graph through a registry holding values instead of loaders
@@ -45,66 +61,69 @@ const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewSta
 const KNOWN = []
 
 const html = await readFile(resolve(clientDir, 'index.html'), 'utf8')
-const assetPaths = (pattern) => [...html.matchAll(pattern)].map((match) => match[1])
-const entryAssets = assetPaths(/<script[^>]+src="([^"]+)"/g)
-const scriptAssets = [
-  ...entryAssets,
-  ...assetPaths(/<link[^>]+rel="modulepreload"[^>]+href="([^"]+)"/g),
-]
-const styleAssets = assetPaths(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)
+const manifest = JSON.parse(
+  await readFile(manifestPath, 'utf8').catch(() => {
+    throw new Error(
+      `No renderer manifest at ${manifestPath}. The acorn:renderer-graph plugin in vite.config.ts writes it; `
+      + 'build the renderer with `vite build` before running this check.',
+    )
+  }),
+)
 
-const onDisk = (assetPath) => resolve(clientDir, assetPath.replace(/^\//, ''))
+// A manifest left over from an earlier build would describe chunks this one does not have, so the
+// entry it names has to be the script this index.html loads.
+const htmlPaths = (pattern) => [...html.matchAll(pattern)].map((match) => match[1].replace(/^\//, ''))
+const entryKey = Object.keys(manifest).find((key) => manifest[key].isEntry)
+if (!entryKey || !htmlPaths(/<script[^>]+src="([^"]+)"/g).includes(manifest[entryKey].file)) {
+  throw new Error(`${manifestPath} does not describe the entry ${clientDir}/index.html loads. Rebuild the renderer.`)
+}
+
+// The static closure of the startup modules: each chunk, the chunks it imports, and their stylesheets.
+// `hops` is how many fetches run one after another before the last of them can start. Vite preloads a
+// chunk's whole static closure alongside it, so a static edge costs no round trip; the entry and each
+// startup import cost one each.
+const startupKeys = [entryKey, ...STARTUP_IMPORTS.filter((key) => key !== entryKey && manifest[key])]
+const closure = (roots) => {
+  const keys = new Set()
+  const visit = (key) => {
+    if (keys.has(key) || !manifest[key]) return
+    keys.add(key)
+    for (const next of manifest[key].imports ?? []) visit(next)
+  }
+  for (const root of roots) visit(root)
+  return keys
+}
+const filesOf = (keys) => new Set([...keys].flatMap((key) => [manifest[key].file, ...manifest[key].css ?? []]))
+
+const startupChunks = closure(startupKeys)
+// Whatever index.html names directly is startup too, whatever the manifest says.
+const startupFiles = new Set([
+  ...filesOf(startupChunks),
+  ...htmlPaths(/<script[^>]+src="([^"]+)"/g),
+  ...htmlPaths(/<link[^>]+rel="(?:modulepreload|stylesheet)"[^>]+href="([^"]+)"/g),
+])
+const scriptAssets = [...startupFiles].filter((path) => !path.endsWith('.css'))
+const styleAssets = [...startupFiles].filter((path) => path.endsWith('.css'))
+const hops = startupKeys.length
+
 async function totalBytes(paths) {
-  const sizes = await Promise.all(paths.map(async (path) => (await stat(onDisk(path))).size))
+  const sizes = await Promise.all(paths.map(async (path) => (await stat(resolve(clientDir, path))).size))
   return sizes.reduce((total, size) => total + size, 0)
 }
-
 const [scriptBytes, styleBytes] = await Promise.all([totalBytes(scriptAssets), totalBytes(styleAssets)])
 
-// How deep the preload chain goes: the longest path of static imports from the entry chunk. The first
-// read argued that 143 requests through the custom scheme handler is a waterfall, and nothing measured
-// it. Depth is the part that costs latency — a flat list of 150 is parallel, a chain of 20 is not.
-const STATIC_EDGE = /(?:^|[\n;}])\s*import\s*(?:[^'";]*?\s*from\s*)?['"](\.[^'"]+)['"]/g
-const DYNAMIC_EDGE = /import\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g
-async function staticEdges(file) {
-  const source = await readFile(file, 'utf8').catch(() => '')
-  const dynamic = new Set([...source.matchAll(DYNAMIC_EDGE)].map((m) => resolve(dirname(file), m[1])))
-  const edges = new Set([...source.matchAll(STATIC_EDGE)].map((m) => resolve(dirname(file), m[1])))
-  for (const lazy of dynamic) edges.delete(lazy)
-  return [...edges]
-}
+// Everything one dynamic import past the startup set. Reported rather than gated: it is the union over
+// every lazy surface the startup code can open, so a legitimately lazy pane is in it and always will
+// be, and denylisting it would fail forever. The number is here because it is the honest answer to
+// "how much more is one interaction away".
+const lazyRoots = [...startupChunks].flatMap((key) => manifest[key].dynamicImports ?? [])
+const lazyFiles = [...filesOf(closure(lazyRoots))].filter((path) => !startupFiles.has(path))
+const lazyBytes = await totalBytes(lazyFiles)
 
-let depth = 0
-{
-  const seen = new Set()
-  let frontier = entryAssets.map(onDisk)
-  while (frontier.length) {
-    depth += 1
-    const next = []
-    for (const file of frontier) {
-      if (seen.has(file)) continue
-      seen.add(file)
-      next.push(...await staticEdges(file))
-    }
-    frontier = next.filter((file) => !seen.has(file))
-  }
-}
+console.log(`[renderer-budget] startup scripts=${scriptBytes}B styles=${styleBytes}B assets=${startupFiles.size} hops=${hops}`)
+console.log(`[renderer-budget] one interaction away: ${lazyFiles.length} more chunks, ${lazyBytes}B (not counted)`)
 
-// The dependency lists Vite emits for the entry chunk's dynamic imports. Reported rather than gated:
-// the array is the union over every import site in the chunk, so a legitimately lazy pane is in it and
-// always will be, and denylisting it would fail forever. The number is here because it is the honest
-// answer to "how much more is one interaction away".
-const entrySource = await Promise.all(entryAssets.map((path) => readFile(onDisk(path), 'utf8').catch(() => '')))
-const mapDeps = new Set(
-  entrySource.flatMap((source) => [...source.matchAll(/["'](assets\/[^"']+\.(?:js|css))["']/g)].map((m) => m[1])),
-)
-for (const path of [...scriptAssets, ...styleAssets]) mapDeps.delete(path.replace(/^\//, ''))
-const mapDepsBytes = await totalBytes([...mapDeps]).catch(() => 0)
-
-console.log(`[renderer-budget] startup scripts=${scriptBytes}B styles=${styleBytes}B assets=${scriptAssets.length + styleAssets.length} depth=${depth}`)
-console.log(`[renderer-budget] one interaction away: ${mapDeps.size} more chunks, ${mapDepsBytes}B (not counted)`)
-
-const startupNames = [...scriptAssets, ...styleAssets].map((path) => basename(path))
+const startupNames = [...startupFiles].map((path) => basename(path))
 const hit = (prefix) => startupNames.filter((name) => name.startsWith(prefix))
 
 // Every emitted asset, so "fixed" can be told from "was never built". A prefix that produces no chunk
@@ -139,6 +158,13 @@ if (scriptBytes > limits.scripts || styleBytes > limits.styles) {
   problems.push(
     `Renderer startup budget exceeded (scripts ${scriptBytes}/${limits.scripts}B, styles ${styleBytes}/${limits.styles}B). `
     + 'Keep optional plugin surfaces behind lazy contribution boundaries.',
+  )
+}
+if (scriptBytes < limits.floor) {
+  problems.push(
+    `Renderer startup scripts total ${scriptBytes}B, under the ${limits.floor}B floor. The app cannot start on that `
+    + 'little, so this check is reading the wrong graph. If the entry now loads the app through a new dynamic '
+    + 'import, add that module to STARTUP_IMPORTS.',
   )
 }
 if (problems.length) throw new Error(problems.join('\n'))
