@@ -21,6 +21,26 @@ vi.mock('./managedClient', () => ({
 
 const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
 
+it('puts a focusable local time with the full timestamp on both sides of a conversation', () => {
+  const at = Date.parse('2026-09-25T03:24:18Z')
+  for (const type of ['user_message', 'assistant_message'] as const) {
+    const item: AgentConversationItem = {
+      key: type, firstSeq: 1, lastSeq: 1, createdAt: at, turnId: null,
+      event: { type, text: 'A message' },
+    }
+    const host = document.createElement('div')
+    const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+    try {
+      const time = host.querySelector<HTMLElement>('[data-tip-at]')
+      expect(time?.getAttribute('data-tip-at')).toBe(String(at))
+      expect(time?.getAttribute('data-tip')).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      expect(time?.tabIndex).toBe(0)
+      expect(time?.textContent).toBeTruthy()
+      expect(time?.getAttribute('data-emphasis')).toBe('eyebrow')
+    } finally { dispose() }
+  }
+})
+
 it('drops the attachment placeholder only when there is an attachment to draw instead', async () => {
   expect(withoutAttachmentPlaceholders('Have a look\n\n[Attachment: 8f2c]\n\nthanks'))
     .toBe('Have a look\n\nthanks')
@@ -28,7 +48,7 @@ it('drops the attachment placeholder only when there is an attachment to draw in
   expect(withoutAttachmentPlaceholders('see [Attachment: 8f2c] above')).toBe('see [Attachment: 8f2c] above')
 
   const item: AgentConversationItem = {
-    key: 'turn', firstSeq: 1, lastSeq: 1, turnId: 'turn-1',
+    key: 'turn', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'turn-1',
     event: { type: 'user_message', text: 'Have a look\n\n[Attachment: 8f2c]' },
   }
   const turn = { id: 'turn-1', input: [{ type: 'attachment', attachmentId: '8f2c' }] } as AgentTurn
@@ -47,10 +67,10 @@ it('drops the attachment placeholder only when there is an attachment to draw in
 it('does not render a completed subagent’s history until its disclosure opens', () => {
   markdownMounts = 0
   const item: AgentConversationItem = {
-    key: 'subagent', firstSeq: 1, lastSeq: 1001, turnId: null,
+    key: 'subagent', firstSeq: 1, lastSeq: 1001, createdAt: 1, turnId: null,
     event: { type: 'subagent', subagent: { id: 'child', title: 'Completed run', status: 'completed' } },
     children: Array.from({ length: 1000 }, (_, index) => ({
-      key: `message-${index}`, firstSeq: index + 2, lastSeq: index + 2, turnId: null,
+      key: `message-${index}`, firstSeq: index + 2, lastSeq: index + 2, createdAt: index + 2, turnId: null,
       event: { type: 'assistant_message', text: `Message ${index}` },
     })),
   }
@@ -76,7 +96,7 @@ it('does not render a completed subagent’s history until its disclosure opens'
 // in the thread and at the moment it interrupted; once it is answered the same seat holds the record,
 // including the part nothing else keeps, which is what the reader did not pick.
 const askedItem: AgentConversationItem = {
-  key: 'ask', firstSeq: 1, lastSeq: 1, turnId: null,
+  key: 'ask', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: null,
   event: {
     type: 'request',
     requestId: 'ask-1',
@@ -131,7 +151,7 @@ it('answers a blocking question in the thread, and keeps the answer in the same 
 
 it('closes a turn with the context window on the right of the line', () => {
   const item: AgentConversationItem = {
-    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
     event: { type: 'turn_completed', stopReason: 'end_turn' },
     context: { used: 94_358, size: 1_000_000 },
   }
@@ -146,7 +166,7 @@ it('closes a turn with the context window on the right of the line', () => {
 
 it('closes a turn that reported no context with the reason alone', () => {
   const item: AgentConversationItem = {
-    key: 'done', firstSeq: 9, lastSeq: 9, turnId: 'turn-1',
+    key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
     event: { type: 'turn_completed', stopReason: 'refusal' },
   }
   const host = document.createElement('div')

@@ -25,7 +25,7 @@ import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regi
 // docs/ui-design.md § Every node at 80 by 24; where a node is `reduced`, `support.ts` says what is
 // lost and the component loses exactly that.
 
-export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; children: JSX.Element }) {
+export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; tip?: string; tipAt?: number; children: JSX.Element }) {
   return <Line role={props.emphasis} tone={props.tone} wrap={props.wrap}>{props.children}</Line>
 }
 

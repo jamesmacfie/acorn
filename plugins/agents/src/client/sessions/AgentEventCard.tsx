@@ -1,4 +1,4 @@
-import { createSignal, For, Index, Show } from 'solid-js'
+import { createMemo, createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '../../contract/wire.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
@@ -17,6 +17,7 @@ import { askedQuestions } from './requestAnswers'
 import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import { senderLabel } from './turnSender'
+import { eventTime } from './eventTime'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -100,6 +101,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
+          const time = createMemo(() => eventTime(props.item.createdAt))
           // The turn's attachments belong to the reader's own turn. A subagent's brief sits inside that
           // same turn, so left ungated it drew the parent's pictures and context manifest under a
           // document the reader never wrote.
@@ -109,7 +111,10 @@ export default function AgentEventCard(props: {
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
-                <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : senderLabel(props.turn)}</Text>
+                <Inline>
+                  <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : senderLabel(props.turn)}</Text>
+                  <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
+                </Inline>
                 <AgentMarkdown
                   text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
                   taskId={props.taskId}
@@ -158,6 +163,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'assistant_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'assistant_message' }>
+          const time = createMemo(() => eventTime(props.item.createdAt))
           return (
             // The same card the reader's own turn gets, in the other stripe colour: the two sides of
             // the conversation are the pair that has to be told apart at a glance, and everything
@@ -169,7 +175,10 @@ export default function AgentEventCard(props: {
             <Card pad="sm" stripe="ok">
               <Stack gap="row">
                 <Inline spread>
-                  <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'Agent'}</Text>
+                  <Inline>
+                    <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'Agent'}</Text>
+                    <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
+                  </Inline>
                   <CopyOutputMenu text={() => message().text} event={message} />
                 </Inline>
                 <AgentMarkdown text={message().text} taskId={props.taskId} />
@@ -191,7 +200,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'tool'}>
         {(_shown) => {
           const tool = () => (event() as Extract<ReturnType<typeof event>, { type: 'tool' }>).tool
-          return <AgentToolCallCard tool={tool()} taskId={props.taskId} />
+          return <AgentToolCallCard tool={tool()} taskId={props.taskId} createdAt={props.item.createdAt} />
         }}
       </Show>
       <Show when={event().type === 'subagent'}>

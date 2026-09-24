@@ -903,7 +903,7 @@ coordination.
 
 ## Tooltips
 
-A tooltip is four data attributes, honoured on any element anywhere, not a `<Tooltip>` wrapper
+A tooltip is five data attributes, honoured on any element anywhere, not a `<Tooltip>` wrapper
 component:
 
 | Attribute | Meaning |
@@ -911,6 +911,7 @@ component:
 | `data-tip` | The tip text. Required; no attribute, no tip. |
 | `data-tip-sub` | A second, muted line. |
 | `data-tip-key` | A keyboard chord, rendered as a key cap. |
+| `data-tip-at` | An event's epoch-millisecond time. The muted line becomes its relative age, calculated when the tip opens. |
 | `data-tip-legend` | A JSON array of status markers (icon name, `StatusDot` tone, colour tone, meaning). `RailTab` serialises this from its own markers; call sites never build it. |
 
 A wrapper component adds an element around every trigger, which changes layout; attributes work on

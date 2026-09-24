@@ -502,6 +502,13 @@ The transcript labels a `delegation` turn "From" and the owner's title, and a `d
 turn "From" and the child's title, using the matching context part
 (`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
 
+Message headers show a small time in the reader's device timezone, styled like the sender label.
+Hovering or focusing that time shows the full local date and time with its timezone and relative age.
+Expanded built-in tool calls show the local date, timezone, and relative age below the command input;
+the collapsed row has no time tooltip. The Node stamps every event when it records it. The conversation
+projection keeps the first event's time when message fragments or tool updates fold into one card, so a
+streaming card's time stays fixed.
+
 ## Web activity
 
 A reader should be able to answer, from the transcript alone, what an agent searched for, which pages

@@ -2,10 +2,11 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from '../content/Icon'
 import { Kbd, StatusDot } from '../primitives'
 import { railDotProps } from '../../lib/displayMeta'
+import { formatRelativeTime } from '../../lib/formatRelativeTime'
 import type { RailLegendItem } from '../../../features/tabs/railMarkers'
 import './tips.css'
 
-// The app's tooltip contract: four data attributes, honoured on any element anywhere. See
+// The app's tooltip contract: data attributes, honoured on any element anywhere. See
 // docs/ui-design.md § Tooltips for the attributes, why they replace a wrapper component, and the
 // positioning rules.
 //
@@ -15,10 +16,11 @@ type LegendItem = RailLegendItem
 type Tip = { title: string; sub?: string; key?: string; legend?: LegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
 
 /** The attribute set, typed, so call sites get completion instead of guessing the spelling. */
-export const tip = (text: string, opts?: { sub?: string; key?: string }) => ({
+export const tip = (text: string, opts?: { sub?: string; key?: string; at?: number }) => ({
   'data-tip': text,
   ...(opts?.sub === undefined ? {} : { 'data-tip-sub': opts.sub }),
   ...(opts?.key === undefined ? {} : { 'data-tip-key': opts.key }),
+  ...(opts?.at === undefined ? {} : { 'data-tip-at': opts.at }),
 })
 
 // Our own attribute, but JSON.parse can still throw on a malformed value. Never let that kill the
@@ -41,9 +43,11 @@ export default function Tips() {
     if (!title) return
     const rect = el.getBoundingClientRect()
     const side = el.closest('.pane-switcher') ? 'left' : 'right'
+    const rawAt = el.getAttribute('data-tip-at')
+    const at = rawAt === null ? NaN : Number(rawAt)
     setTip({
       title,
-      sub: el.getAttribute('data-tip-sub') ?? undefined,
+      sub: Number.isFinite(at) ? formatRelativeTime(at) : el.getAttribute('data-tip-sub') ?? undefined,
       key: el.getAttribute('data-tip-key') ?? undefined,
       legend: parseLegend(el.getAttribute('data-tip-legend')),
       anchor: side === 'right' ? rect.right + 8 : window.innerWidth - rect.left + 8,

@@ -18,6 +18,9 @@ import type { TextRole, Tone } from '../../tokens/tokens'
 export function Text(props: {
   emphasis?: TextRole
   tone?: Tone
+  /** A focused or hovered explanation. `tipAt` refreshes its relative age when opened. */
+  tip?: string
+  tipAt?: number
   /** Wrap onto more lines. Off by default, because the common case is one line in a row that
    *  truncates, and a wrapping line inside a fixed row is what breaks a list's geometry. */
   wrap?: boolean
@@ -29,6 +32,11 @@ export function Text(props: {
       data-emphasis={props.emphasis ?? 'body'}
       data-tone={props.tone ?? undefined}
       data-wrap={props.wrap ? '' : undefined}
+      data-tip={props.tip}
+      data-tip-at={props.tip && props.tipAt !== undefined ? props.tipAt : undefined}
+      role={props.tip ? 'note' : undefined}
+      tabindex={props.tip ? 0 : undefined}
+      aria-label={props.tip}
     >
       {props.children}
     </span>

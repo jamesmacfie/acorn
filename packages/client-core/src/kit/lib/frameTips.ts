@@ -21,7 +21,21 @@ export function mountFrameTips(doc: Document = document): () => void {
   const show = (element: HTMLElement) => {
     const title = element.getAttribute('data-tip')
     if (!title) return
-    const sub = element.getAttribute('data-tip-sub')
+    const rawAt = element.getAttribute('data-tip-at')
+    const at = rawAt === null ? NaN : Number(rawAt)
+    // This frame copy stays importless. Match kit/lib/formatRelativeTime for timestamp tips.
+    const relative = () => {
+      const elapsed = Math.max(0, Date.now() - at)
+      const minute = 60_000
+      const hour = 60 * minute
+      const day = 24 * hour
+      if (elapsed < minute) return 'now'
+      if (elapsed < hour) return `${Math.floor(elapsed / minute)}m ago`
+      if (elapsed < day) return `${Math.floor(elapsed / hour)}h ago`
+      if (elapsed < 30 * day) return `${Math.floor(elapsed / day)}d ago`
+      return `${Math.floor(elapsed / (30 * day))}mo ago`
+    }
+    const sub = Number.isFinite(at) ? relative() : element.getAttribute('data-tip-sub')
     const key = element.getAttribute('data-tip-key')
     // textContent per node rather than innerHTML: these attributes can carry provider data.
     bubble.replaceChildren()
