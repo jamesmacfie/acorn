@@ -133,8 +133,10 @@ export type ClientPlugin = {
   init(ctx: CompiledClientPluginContext): void
   // The side-effect phase, run after every plugin's `init`, so no plugin does I/O while half the
   // registries are empty. A disabled plugin never reaches it. Synchronous as well, so a plugin wanting
-  // a network read fires it and handles its own rejection.
-  activate?(ctx: CompiledClientPluginContext): void
+  // a network read fires it and handles its own rejection. Whatever it starts that no registry holds,
+  // a listener or a reactive root, it hands back as the returned function, and the host runs that with
+  // the plugin's other disposables when it next takes the plugin back.
+  activate?(ctx: CompiledClientPluginContext): void | (() => void)
 }
 
 export type ClientPluginHostOptions = {
@@ -149,6 +151,22 @@ export type ClientPluginHostResult = {
 // Everything a plugin registered, so a second activation can take it back out. Module-level because
 // the registries are, and a per-host map would let two hosts fight over one registry unnoticed.
 const contributed = new Map<string, Disposable[]>()
+
+// The inputs of the last pass and what it returned. The shell calls the host once at boot with nothing
+// disabled and again when the node answers, and that answer is almost always "nothing disabled" as
+// well. Re-running for it took every contribution back, notified every registry twice and ran every
+// `activate` a second time, which primed the agent roster twice per launch.
+let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null = null
+
+// The same plugin objects in the same order, with the same ones switched off. Nothing else is an input
+// to a pass. Which node a contribution talks to and whether it draws are both read when they are
+// asked, not at `init`, and a plugin whose side effects follow the active node keys them on it itself
+// (the agent roster prime, the terminal session list). Loaded plugins arrive through their own pass.
+const samePass = (plugins: readonly ClientPlugin[], skipped: readonly string[]): boolean =>
+  lastPass !== null
+  && lastPass.plugins.length === plugins.length
+  && lastPass.plugins.every((plugin, index) => plugin === plugins[index])
+  && lastPass.skipped.join('\n') === skipped.join('\n')
 
 // A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
 // because `pr`, `changes` and `terminal.drawer` are persisted layout keys and chord targets, so
@@ -253,11 +271,16 @@ export function initClientPlugins(
     seen.add(plugin.name)
   }
   const disabled = new Set(options.disabled ?? [])
+  const isSkipped = (plugin: ClientPlugin): boolean => disabled.has(plugin.name) && !plugin.required
+  if (samePass(plugins, plugins.filter(isSkipped).map((plugin) => plugin.name))) return lastPass!.result
+  // Forgotten until this pass finishes, so one that throws part-way is never mistaken for done.
+  lastPass = null
   const enabled: string[] = []
   const skipped: string[] = []
   // Kept so the activate pass runs in declaration order over the plugins that initialized, paired with
-  // the context each one owns. A second `makeContext` would write disposables into a list nobody holds.
-  const activations: { plugin: ClientPlugin; ctx: CompiledClientPluginContext }[] = []
+  // the context and disposable list each one owns. A second `makeContext` would write disposables into
+  // a list nobody holds.
+  const activations: { plugin: ClientPlugin; ctx: CompiledClientPluginContext; disposables: Disposable[] }[] = []
 
   // One update for the whole roster. A second apply takes each plugin's contributions back and
   // registers them again, and without the batch an effect could run in between and find a source,
@@ -272,7 +295,7 @@ export function initClientPlugins(
       const disposables: Disposable[] = []
       contributed.set(plugin.name, disposables)
 
-      if (disabled.has(plugin.name) && !plugin.required) {
+      if (isSkipped(plugin)) {
         skipped.push(plugin.name)
         continue
       }
@@ -281,13 +304,18 @@ export function initClientPlugins(
       const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
       plugin.init(ctx)
       enabled.push(plugin.name)
-      if (plugin.activate) activations.push({ plugin, ctx })
+      if (plugin.activate) activations.push({ plugin, ctx, disposables })
     }
   })
 
   // Second pass, mirroring the node host's `ready`. Every registry now holds every enabled plugin's
   // contributions, so a plugin priming a store can look up a sibling's descriptor.
-  for (const { plugin, ctx } of activations) plugin.activate?.(ctx)
+  for (const { plugin, ctx, disposables } of activations) {
+    const stop = plugin.activate?.(ctx)
+    if (stop) disposables.push({ dispose: stop })
+  }
 
-  return { enabled, skipped }
+  const result = { enabled, skipped }
+  lastPass = { plugins: [...plugins], skipped, result }
+  return result
 }

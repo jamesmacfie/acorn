@@ -60,10 +60,10 @@ describe('the client plugin host', () => {
         init: () => log.push('init:first'),
         // The whole reason for a second pass: by here every enabled plugin has registered, so this
         // can see a sibling's descriptor. Inside `init` the registry would still be half empty.
-        activate: () => log.push(`activate:first(${paneRegistry.get('host.late') ? 'sees-late' : 'blind'})`),
+        activate: () => { log.push(`activate:first(${paneRegistry.get('host.late') ? 'sees-late' : 'blind'})`) },
       },
       { name: 'second', init: (ctx) => { log.push('init:second'); ctx.panes.register(pane('host.late')) } },
-      { name: 'off', init: () => log.push('init:off'), activate: () => log.push('activate:off') },
+      { name: 'off', init: () => log.push('init:off'), activate: () => { log.push('activate:off') } },
     ]
     initClientPlugins(plugins, { disabled: ['off'] })
     expect(log).toEqual(['init:first', 'init:second', 'activate:first(sees-late)'])
@@ -129,6 +129,34 @@ describe('the client plugin host', () => {
     expect(paneRegistry.entries().filter((entry) => entry.id === 'host.again')).toHaveLength(1)
     expect(uiSlotRegistry.entries().filter((entry) => entry.id === 'host.again.slot')).toHaveLength(1)
     clear('again')
+  })
+
+  // The shell runs the host at boot and again when the node answers, and the answer is usually the
+  // same. A second pass over the same inputs used to take everything back, register it again and run
+  // every `activate` twice, which is two roster reads per launch from the agents plugin alone.
+  it('runs a pass once for the same inputs, and again when one changes', () => {
+    const counts = { init: 0, activate: 0, stopped: 0 }
+    const plugins: ClientPlugin[] = [{
+      name: 'once',
+      init: (ctx) => { counts.init++; ctx.panes.register(pane('host.once')) },
+      activate: () => { counts.activate++; return () => { counts.stopped++ } },
+    }]
+    const first = initClientPlugins(plugins)
+    expect(initClientPlugins(plugins, { disabled: [] })).toEqual(first)
+    // A plugin the node lists as disabled but cannot be, because it is not on this roster, changes
+    // nothing either: the input is which of these plugins are off, not the node's whole list.
+    initClientPlugins(plugins, { disabled: ['elsewhere'] })
+    expect(counts).toEqual({ init: 1, activate: 1, stopped: 0 })
+
+    // A real change still re-runs, and what `activate` returned is undone when the plugin is taken back.
+    initClientPlugins(plugins, { disabled: ['once'] })
+    expect(paneRegistry.get('host.once')).toBeUndefined()
+    expect(counts).toEqual({ init: 1, activate: 1, stopped: 1 })
+    initClientPlugins(plugins)
+    expect(paneRegistry.get('host.once')).toBeDefined()
+    expect(counts).toEqual({ init: 2, activate: 2, stopped: 1 })
+    clear('once')
+    expect(counts.stopped).toBe(2)
   })
 
   it('removes a plugin\'s contributions when it is disabled on a later activation', () => {

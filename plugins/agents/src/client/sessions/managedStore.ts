@@ -474,8 +474,8 @@ export const managedAgentStore = {
 
 // Agent attention is workspace-wide, so the client keeps one application-lifetime subscription
 // even when neither Agent Center nor a task Agent pane is currently mounted.
-export function activateManagedAgentNotifications(): void {
-  managedAgentStore.activate()
+export function activateManagedAgentNotifications(): () => void {
+  const release = managedAgentStore.activate()
   // The prime waits for a node that can answer rather than firing at activation. `acorn` draws the
   // shell in front of a node it started and has not heard from yet (docs/tui.md § Attach or start),
   // so a prime at activation failed with ECONNREFUSED on every launch, for a request that was never
@@ -488,7 +488,7 @@ export function activateManagedAgentNotifications(): void {
   // — and the rejection has nothing between it and an unhandled promise rejection. An empty roster is
   // the correct degraded state; Agent Center refetches.
   let primed: string | null = null
-  createRoot(() => {
+  const stopPrime = createRoot((dispose) => {
     createEffect(() => {
       const nodeId = activeNodeId()
       if (!nodeId || nodeId === primed || nodeState(nodeId) === 'offline') return
@@ -497,7 +497,9 @@ export function activateManagedAgentNotifications(): void {
         log.warn(`could not prime the managed-session roster: ${describeError(error).message}`)
       })
     })
+    return dispose
   })
+  return () => { stopPrime(); release() }
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that

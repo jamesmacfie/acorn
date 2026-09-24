@@ -29,7 +29,9 @@ it('never shows an effect a plugin taken back and not yet registered again', () 
     return dispose
   })
 
-  initClientPlugins(plugins)
+  // A roster that differs, because the host skips a pass whose inputs match the last one, and this has
+  // to be a pass that takes the source back and registers it again.
+  initClientPlugins([...plugins, { name: 'gap-sibling', init: () => {} }])
 
   expect(seen).not.toContain(false)
   dispose()
