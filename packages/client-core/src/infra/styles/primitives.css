@@ -1274,18 +1274,37 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-left: var(--surface-bw) solid var(--border);
   color: var(--text-muted);
 }
-/* A table comes out as `.ui-table` inside `.ui-table-scroll`, so it picks up the same tokens and the
-   same overflow behaviour as a hand-built one. What it adds is the block spacing and the two rules a
-   prose table needs that a data grid does not.
+/* A table, from either source: this renderer's or a provider's HTML (a GitHub PR body arrives as a
+   bare <table>). So the rules hang off the element, not a class, and draw it the way GitHub does: a
+   rule round every cell, room inside it, and a shaded bold header.
 
-   `padding-block` only, so the horizontal padding still comes from the pack's `--pad-cell`: a row of
-   wrapped identifiers reads as a wall without a little air above and below it, and a data grid's rows
-   are one line each, where the same spacing is just wasted height.
+   `display: block` is GitHub's trick for a table wider than the pane. The table becomes its own
+   scroll box, so provider HTML needs no wrapper, which we could not add to it anyway.
+
+   `break-word` rather than the `anywhere` set above. `anywhere` also lets a column shrink below its
+   longest word, and the table then squeezed a commit hash into four characters a line.
 
    Top, not the `middle` a cell defaults to. Prose cells wrap at different lengths, so a one-line cell
-   beside a two-line one floated half a line down and nothing in the row lined up. */
-.ui-markdown .ui-table-scroll { margin: var(--space-3) 0; }
-.ui-markdown .ui-table :is(th, td) { padding-block: var(--space-3); vertical-align: top; }
+   beside a two-line one floated half a line down and nothing in the row lined up.
+
+   `--chrome-divider` because a cell's rules are structure, like the SQL result grid's. `--divider`
+   is zero in some packs and would draw no grid at all. */
+.ui-markdown table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: var(--space-4) 0;
+  border-collapse: collapse;
+  overflow-wrap: break-word;
+}
+.ui-markdown :is(th, td) {
+  padding: var(--space-3) var(--space-6);
+  border: var(--chrome-divider);
+  text-align: start;
+  vertical-align: top;
+}
+.ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
 /* The stand-in for an image the renderer refuses to fetch (ui/markdown.ts, `placeholder`).
    In primitives.css rather than the agents plugin's sheet because the renderer that emits it is core's. */
 .ui-md-omitted { color: var(--text-faint); font-style: italic; }

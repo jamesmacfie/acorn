@@ -49,13 +49,13 @@ describe('renderMarkdown', () => {
     )
   })
 
-  it('renders a GFM table into the shared table classes', () => {
+  it('renders a GFM table as a bare table, the markup GitHub sends', () => {
     const html = renderMarkdown('| a | b |\n| --- | :-: |\n| 1 | 2 |')
     expect(html).toBe(
-      '<div class="ui-table-scroll" data-scroll><table class="ui-table">'
+      '<table>'
       + '<thead><tr><th>a</th><th>b</th></tr></thead>'
       + '<tbody><tr><td>1</td><td>2</td></tr></tbody>'
-      + '</table></div>',
+      + '</table>',
     )
   })
 
@@ -70,8 +70,8 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('run `a | b` first')).toBe('<p>run <code>a | b</code> first</p>')
     // No blank line above it: the paragraph still has to stop at the table.
     expect(renderMarkdown('Results:\n| a |\n| --- |\n| 1 |')).toBe(
-      '<p>Results:</p>\n<div class="ui-table-scroll" data-scroll><table class="ui-table">'
-      + '<thead><tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></div>',
+      '<p>Results:</p>\n<table>'
+      + '<thead><tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>',
     )
   })
 
