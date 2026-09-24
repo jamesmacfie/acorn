@@ -261,9 +261,34 @@ function notifyActivity(): void {
 
 // ── The emit verbs ────────────────────────────────────────────────────────────────────────────────
 
+let spansOnTimeline = false
+
+/**
+ * Also write every span to this page's performance timeline, as a `performance.measure` named
+ * `acorn:<span name>` with the attributes as its `detail`.
+ *
+ * The local reader for span durations. Sinks are the only other one, and the one shipped posts to
+ * Sentry, so without this a developer timing a task switch had no way to see `nav.change` or
+ * `pane.region` on their own machine. The devtools performance panel draws these, and a script reads
+ * them with `performance.getEntriesByType('measure')`. The desktop turns it on with the `acorn.perf`
+ * switch (`apps/desktop/src/client/boot.ts`). Nothing clears the entries, which is fine for a switch a
+ * developer flips for a session and is why it is not on by default.
+ */
+export function setSpansOnTimeline(on: boolean): void {
+  spansOnTimeline = on
+}
+
 export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
   if (!telemetryEnabled()) return
-  safely(() => push({ ...span, kind: 'span', attrs: cleanAttrs(span.attrs, owner) }))
+  safely(() => {
+    const attrs = cleanAttrs(span.attrs, owner)
+    push({ ...span, kind: 'span', attrs })
+    if (spansOnTimeline) {
+      // `start` is wall-clock milliseconds, so the entry's start is to the millisecond; its duration is exact.
+      const start = span.start - performance.timeOrigin
+      performance.measure(`acorn:${span.name}`, { start, duration: span.durationMs, detail: { status: span.status, ...attrs } })
+    }
+  })
 }
 
 export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
@@ -687,6 +712,7 @@ export function _resetClientTelemetry(): void {
   state.trace = null
   state.truncated = 0
   state.runtime = 'renderer'
+  spansOnTimeline = false
 }
 
 // ── The owner-bound projection ────────────────────────────────────────────────────────────────────
