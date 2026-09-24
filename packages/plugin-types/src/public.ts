@@ -676,13 +676,15 @@ export type CoreSecretService = HostOwned<'node-core/server/core/security/secret
   seal(plaintext: string): Promise<string>
 }
 
-/** Six fields off the task row. Never the row, and never a database handle. */
+/** Task facts plugins need. Never the row, and never a database handle. */
 export type TaskRef = {
   id: string
   title: string
   projectId: string
   /** `null` runs in the project root; non-null names an isolated worktree branch. */
   branch: string | null
+  /** Suppresses this task's project setup script when its worktree is created. */
+  skipSetup: boolean
   /** `null` until the worktree is first created. Call `tasks.root(taskId)` rather than reading it. */
   worktreePath: string | null
   pullNumber: number | null

@@ -176,6 +176,7 @@ export type TaskSeed = {
   origin: Task['origin']
   projectId: string
   branch?: string
+  skipSetup?: boolean
   pullNumber?: number
   links?: TaskLinkSeed[]
 }

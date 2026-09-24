@@ -8,7 +8,7 @@ import {
   sanitizeConcern,
 } from './taskChecks'
 
-const task: TaskRef = { id: 't1', title: 'A task', projectId: 'p1', branch: 'feat/x', worktreePath: '/tmp/wt', pullNumber: null }
+const task: TaskRef = { id: 't1', title: 'A task', projectId: 'p1', branch: 'feat/x', skipSetup: false, worktreePath: '/tmp/wt', pullNumber: null }
 
 afterEach(() => {
   for (const owner of ['docker', 'changes', 'slow', 'bad', 'noisy']) clearTaskChecks(owner)
