@@ -60,7 +60,8 @@ export function unpinTask(order: RailOrder, id: string): RailOrder {
 
 // Drag-reorder: place `id` on the chosen edge of `targetId`. Cross-partition drags adopt the target
 // partition, so either edge of a pinned row pins and either edge of an unpinned row unpins. The full
-// visible id list is materialised into the pref so the round-trip is stable.
+// visible id list is materialised into the pref so the round-trip is stable. Saved ids outside the
+// current rail stay in place, since another workspace may have its own manual order.
 export function moveTask(
   order: RailOrder,
   visibleIds: string[],
@@ -70,9 +71,19 @@ export function moveTask(
 ): RailOrder {
   if (id === targetId) return order
   const pinnedSet = new Set(order.pinned)
+  const visibleSet = new Set(visibleIds)
   const rest = visibleIds.filter((x) => !pinnedSet.has(x))
   const targetPinned = pinnedSet.has(targetId)
   const withoutId = (list: string[]) => list.filter((x) => x !== id)
+  const replaceVisible = (saved: string[], reordered: string[]): string[] => {
+    const result: string[] = []
+    let next = 0
+    for (const savedId of saved) {
+      if (!visibleSet.has(savedId)) result.push(savedId)
+      else if (next < reordered.length) result.push(reordered[next++]!)
+    }
+    return [...result, ...reordered.slice(next)]
+  }
   const insert = (list: string[]): string[] => {
     const base = withoutId(list)
     const targetIndex = base.indexOf(targetId)
@@ -80,6 +91,9 @@ export function moveTask(
     const insertAt = targetIndex + (position === 'after' ? 1 : 0)
     return [...base.slice(0, insertAt), id, ...base.slice(insertAt)]
   }
-  if (targetPinned) return { pinned: insert(order.pinned.filter((x) => visibleIds.includes(x) || x === id)), order: withoutId(rest) }
-  return { pinned: withoutId(order.pinned), order: insert(rest) }
+  const pinnedHere = order.pinned.filter((x) => visibleSet.has(x))
+  return {
+    pinned: replaceVisible(order.pinned, targetPinned ? insert(pinnedHere) : withoutId(pinnedHere)),
+    order: replaceVisible(order.order, targetPinned ? withoutId(rest) : insert(rest)),
+  }
 }
