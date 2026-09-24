@@ -16,6 +16,7 @@ import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
 import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
+import { senderLabel } from './turnSender'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -108,7 +109,7 @@ export default function AgentEventCard(props: {
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
-                <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'You'}</Text>
+                <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : senderLabel(props.turn)}</Text>
                 <AgentMarkdown
                   text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
                   taskId={props.taskId}

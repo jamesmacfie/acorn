@@ -53,6 +53,7 @@ import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registri
 import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import { emitBootSpans } from './boot'
 import { telemetryOn } from '@acorn/client-core/features/settings/telemetrySetting.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
@@ -317,8 +318,13 @@ export default function App() {
   // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
   // switch). An effect rather than a call at boot, because the preference arrives after the first
   // paint and can change while the app is open: the node's collector re-reads its own copy every
-  // five seconds, and this is the renderer's half of the same promise.
-  createEffect(() => setTelemetryEnabled(telemetryOn(prefs.data)))
+  // five seconds, and this is the renderer's half of the same promise. The boot account waits for the
+  // switch as well as for the node, so this is one of the two places that can release it (./boot.ts).
+  createEffect(() => {
+    const on = telemetryOn(prefs.data)
+    setTelemetryEnabled(on)
+    if (on) emitBootSpans()
+  })
 
   // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
   // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather

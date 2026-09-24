@@ -401,7 +401,8 @@ export async function renderFixture(size: {
       return found
     },
     /**
-     * The frame, once it holds this text, or the last one taken if it never does.
+     * The frame, once it holds this text. Throws with the last frame if it never does, because a wait
+     * that times out quietly lets the test go on to check a screen it never meant to check.
      *
      * A real wait, not another flush: what is outstanding is a query and, on a cold worker, the
      * compile of a `lazy()` and everything it imports. Turning the render loop makes neither finish.
@@ -417,6 +418,7 @@ export async function renderFixture(size: {
         await new Promise((done) => setTimeout(done, 250))
         drawn = await frame()
       }
+      if (!drawn.includes(text)) throw new Error(`The screen never drew '${text}' within ${seconds} seconds:\n${drawn}`)
       return drawn
     },
     // A single character is itself; a named key is the parser's own spelling for one, which is upper

@@ -45,16 +45,16 @@ type Surface = {
 }
 
 const SURFACES: Surface[] = [
-  { name: 'browse', until: 'Invalidate' },
+  { name: 'browse', until: '#42' },
   { name: 'agents', pane: 'agents', until: 'MANAGED SESSIONS' },
   { name: 'pr', pane: 'pr', until: '#42' },
-  { name: 'changes', pane: 'changes', until: 'STAGED' },
+  { name: 'changes', pane: 'changes', until: 'Tracked' },
   { name: 'notes', pane: 'notes', until: 'Repro steps' },
   { name: 'context', pane: 'context', until: 'Working tree' },
   { name: 'editor', pane: 'editor', until: '$EDITOR' },
   {
     name: 'overlay',
-    until: 'Invalidate',
+    until: '#42',
     // The cheat sheet, because `?` is a key rather than a fixture and it draws a plain `Modal` with
     // nothing focusable in it. The scope's own last-resort stop is therefore its frame, which is the
     // hardest case for "the keys are somewhere a reader can see" (./chrome/CheatSheet.tsx).
@@ -65,7 +65,7 @@ const SURFACES: Surface[] = [
 /**
  * The two sizes, and why only one of them runs by default.
  *
- * Eight surfaces walked at eighty presses each is about three minutes on a warm worker, and doubling
+ * Eight surfaces walked at eighty presses each is about a minute on a warm worker, and doubling
  * it buys one thing: the layouts that split at a hundred cells draw both their columns. That is worth
  * running and it is not worth paying for on every save, so CI sets `ACORN_TUI_WIDE`
  * (docs/testing.md § Test layers).
