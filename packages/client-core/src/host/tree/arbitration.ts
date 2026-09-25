@@ -41,15 +41,18 @@ export type SlotOutcome = {
 /**
  * Who fills this slot right now.
  *
- * `choice` is the user's pick for this point out of Settings → Plugins, and it only ever settles a
+ * `choice` asks for the user's pick for this point out of Settings → Plugins, and it only ever settles a
  * `replace` tie: a single match wins on its own, and a pick naming a plugin that no longer matches
  * falls back to the owner's default rather than to the other candidate. Silently promoting the runner
  * up would mean the box changed hands because somebody uninstalled something.
+ *
+ * A function, asked only at a tie, because reading the pick is what costs a host something (a
+ * preferences query, ./slotChoice.ts) and almost no slot ever has a tie.
  */
 export function resolveSlot(
   point: ExtensionPointContribution,
   key: string | undefined,
-  choice: string | undefined,
+  choice: () => string | undefined,
 ): SlotOutcome {
   const matching = extensionDeliveries(point.id).filter((entry) => matchesKey(entry.matches, key))
   if (matching.length === 0) return { occupants: [], overflow: 0, why: 'default' }
@@ -61,7 +64,8 @@ export function resolveSlot(
     }
   }
   if (matching.length === 1) return { occupants: matching, overflow: 0, why: 'match' }
-  const picked = choice ? matching.find((entry) => entry.pluginId === choice) : undefined
+  const pick = choice()
+  const picked = pick ? matching.find((entry) => entry.pluginId === pick) : undefined
   // A tie nobody has settled draws the owner's default. The count still comes back as overflow, so the
   // settings picker can say how many are waiting on a decision.
   return picked
