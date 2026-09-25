@@ -784,6 +784,16 @@ bindings rather than the prose.
 78. Build and schedule a workflow using only the keyboard in the desktop window: open the editor, pick
     fields, publish, and activate the schedule. Focus stays visible and returns to its trigger when
     each dialog closes.
+79. Archive a task with a committed change and find it on the Archive page by a word from its agent
+    transcript. Open the matching session in the preview, and check that the Changes and editor panes
+    show the restore prompt. Restore it and check that the worktree comes back with the commit. Then
+    delete the branch of another archived local task and check that restore asks before it cuts a new
+    one.
+80. Open a Shell tab on one task and run a command that prints a line a second. Switch to a task
+    without the terminal drawer open, wait ten seconds, and come back. The same terminal is there with
+    every line printed while you were away. Open more than four terminals across tasks and switch
+    between them: each draws, and none goes blank after its GPU context is given to another. Close the
+    tab and check that switching back does not bring it back.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
