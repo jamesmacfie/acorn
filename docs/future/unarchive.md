@@ -34,9 +34,9 @@ records what shipped, where it is written up, and what was left out. The owning 
 - **More providers.** Only core's tasks and the agents plugin answer today. HTTP drafts, findings,
   browser captures, workflow runs, database saved queries and notes are the likely next ones, each a
   `ctx.search.register` in its own plugin.
-- **The loaded tier.** `ctx.search` is compiled only. Its twin is a manifest route the host calls,
-  shaped like task checks, and it waits for a loaded plugin that wants to be searchable. Loaded frame
-  panes also have no way to declare `readsArchived`, so they always show the restore prompt.
+- **Loaded search providers.** `ctx.search` is compiled only. Its twin is a manifest route the host
+  calls, shaped like task checks, and it waits for a loaded plugin that wants to be searchable. Loaded
+  task panes can opt into the archived preview with `readsArchived: true` on their `frames` entry.
 - **Search across active tasks.** The route takes `archived=0` already. No surface asks, because the
   ranking questions a global search raises were not needed for the archive page.
 - **External-content FTS.** It would save about 300 MB on the measured database, but it needs stable
@@ -51,7 +51,7 @@ records what shipped, where it is written up, and what was left out. The owning 
 ## Smoke owed
 
 In the real window (`pnpm dev:agent`): archive a task with a committed change, find it on the Archive
-page by a word from its agent transcript, open the matching session in the preview, check that the
-Changes and editor panes show the restore prompt, restore it, and check that the worktree comes back
-with the commit. Then delete the branch of another archived local task and check that restore asks
-before cutting a new one.
+page by a word from its agent transcript, open the matching session in the preview, check that its
+right rail contains only Agent and Notes, restore it, and check that the worktree comes back with the
+commit. Then delete the branch of another archived local task and check that restore asks before
+cutting a new one.

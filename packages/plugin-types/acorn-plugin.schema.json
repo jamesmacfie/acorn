@@ -309,6 +309,9 @@
               "showInSwitcher": {
                 "type": "boolean"
               },
+              "readsArchived": {
+                "type": "boolean"
+              },
               "formFactor": {
                 "default": [
                   "desktop"

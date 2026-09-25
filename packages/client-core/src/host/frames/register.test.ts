@@ -116,6 +116,15 @@ describe('syncFrameContributions', () => {
     })
   })
 
+  it('carries a loaded task pane\'s archived-preview opt in into the pane registry', () => {
+    seedTrusted(row('board', {
+      frames: [surface({ target: 'pane', id: 'board-history', readsArchived: true })],
+    }))
+    syncFrameContributions()
+
+    expect(paneRegistry.get('board-history')?.readsArchived).toBe(true)
+  })
+
   it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
     // The exclusive slot (registries/exclusiveSlots.ts owns the arbitration and its own test). What this
     // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a
