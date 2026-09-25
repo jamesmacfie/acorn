@@ -53,27 +53,35 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
     if (!line) continue
     const kind = line[0]
     if (kind === '?') {
-      out.push({ path: line.slice(2), status: 'untracked', staged: false, additions: null, deletions: null })
+      out.push({ path: line.slice(2), status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' })
       continue
     }
     if (kind !== '1' && kind !== '2' && kind !== 'u') continue
     const parts = line.split(' ')
     const xy = parts[1] ?? '..'
+    // `contentKey`, from the objects on the line. A staged entry's patch is HEAD against the index, so
+    // those two modes and objects are the whole of it. An unstaged entry's is the index against the
+    // disk, and git names no object for the disk side, so this is half a key that `localStatus`
+    // finishes with a stat. A submodule gets none: its new commit is not on the line.
+    const keyed = parts[2]?.[0] !== 'S'
+    const key = (text: string) => (keyed ? text : undefined)
+    const [mH, mI, mW, hH, hI] = parts.slice(3, 8)
     if (kind === '1') {
       const path = parts.slice(8).join(' ')
-      if (xy[0] !== '.') out.push({ path, status: statusFor(xy, true), staged: true, additions: null, deletions: null })
-      if (xy[1] !== '.') out.push({ path, status: statusFor(xy, false), staged: false, additions: null, deletions: null })
+      if (xy[0] !== '.') out.push({ path, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI}`) })
+      if (xy[1] !== '.') out.push({ path, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
     } else if (kind === '2') {
       // `2 XY sub mH mI mW hH hI Xscore path\torigPath`
       const pathField = parts.slice(9).join(' ')
       const [path, origPath] = pathField.split('\t')
-      if (xy[0] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, true), staged: true, additions: null, deletions: null })
-      if (xy[1] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, false), staged: false, additions: null, deletions: null })
+      if (xy[0] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI} ${origPath}`) })
+      if (xy[1] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
     } else {
       // Unmerged. Its own status, not a modification: git's answer to "stage it" is "mark it
       // resolved", and there is no half of it that can be in the index while the rest is not.
+      // `u XY sub m1 m2 m3 mW h1 h2 h3 path`: three stages and the disk, which the stat finishes.
       const path = parts.slice(10).join(' ')
-      out.push({ path, status: 'conflicted', staged: false, additions: null, deletions: null })
+      out.push({ path, status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: key(parts.slice(3, 10).join(' ')) })
     }
   }
   return {
@@ -143,8 +151,29 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
     worktreeGitText(worktree, ['diff', '--numstat'], { timeoutMs: 15_000 }),
     worktreeGitText(worktree, ['diff', '--staged', '--numstat'], { timeoutMs: 15_000 }),
   ])
-  const changes = mergeNumstat(mergeNumstat(parsed.changes, unstaged ?? '', false), staged ?? '', true)
+  const counted = mergeNumstat(mergeNumstat(parsed.changes, unstaged ?? '', false), staged ?? '', true)
+  const changes = await Promise.all(counted.map(async (change) => {
+    if (change.staged || change.contentKey == null) return change
+    const stamp = await diskStamp(worktree, change)
+    return { ...change, contentKey: stamp == null ? undefined : `${change.contentKey} ${stamp}`.trim() }
+  }))
   return { ...parsed, changes, operation: await operation }
+}
+
+// The disk half of an unstaged entry's `contentKey`. Git names no object for a file it has not
+// hashed, so a stat stands in for one, the way git's own index uses one. Taken fresh on every read
+// rather than inside the two-second window, so an edit is never hidden behind a cached answer, and the
+// ctime is in it because nothing can set a ctime back: an edit that keeps the size and restores the
+// mtime still moves the key.
+async function diskStamp(worktree: string, change: LocalChange): Promise<string | undefined> {
+  try {
+    const stat = await lstat(join(worktree, change.path))
+    return `${stat.mode} ${stat.size} ${stat.mtimeMs} ${stat.ctimeMs}`
+  } catch {
+    // Gone is a steady answer for a deletion. Anything else, such as a path git C-quoted, leaves no
+    // key, and the pane goes back to re-reading that one file every poll.
+    return change.status === 'deleted' ? 'gone' : undefined
+  }
 }
 
 // Everything before the first hunk header is git's file header. The client re-synthesizes its

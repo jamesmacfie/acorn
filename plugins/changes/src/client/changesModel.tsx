@@ -14,7 +14,7 @@ import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
 import {
-  changeKey, groupChanges, groupSections, isFolderKey, pickSelected, remoteReason,
+  changeKey, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, remoteReason,
   stackFor, stageableRows, stagedState, toPullFile, totals, viewNodes, type ChangeView, type RemoteAction,
 } from './model'
 import { CHANGES_PANE, changesBindings, changesCommands } from './commands'
@@ -136,6 +136,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // fresh DiffFile per read would rebuild the row model's file rows for nothing.
   const stack = createMemo(() => stackFor(groups(), selected()))
   const diffFiles = createMemo<DiffFile[]>(() => stack().map((c) => toPullFile(c, null)))
+  const stackByPath = createMemo(() => new Map(stack().map((c) => [c.path, c])))
 
   // The diff column's whole contract with the shared viewer: the stacked files, their patches read on
   // demand, and review notes as the annotation the viewer itself has no concept of.
@@ -143,20 +144,23 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     scope: { taskId: task.id, routeKey: CHANGES_ROUTE_KEY },
     files: diffFiles,
     loading: () => status.loading,
-    // Which files, and separately what they say. An agent saving a file moves the second every poll,
-    // and the viewer keeps the reader's scroll position for that; a file appearing or going moves the
-    // first, which does reset it.
+    // Which files, and separately what they say. An agent saving a file moves the second, and the
+    // viewer keeps the reader's scroll position for that and reads only the file whose key moved; a
+    // file appearing or going moves the first, which does reset it.
     signature: () => stack().map(changeKey).join('\0'),
-    contentSignature: () => `${statusRevision()}:${stack().map((c) => `${changeKey(c)}:${c.additions}:${c.deletions}`).join('\0')}`,
+    contentSignature: () => stack().map((c) => patchKey(c, statusRevision())).join('\0'),
+    contentKey: (path) => {
+      const change = stackByPath().get(path)
+      return change ? patchKey(change, statusRevision()) : ''
+    },
     // Only after a click. pickSelected falls back to the first row so something renders on open, and
     // treating that as a scroll target would mean the remembered offset never won.
     selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
     cachedFile: () => null,
     fetchPatches: async (paths) => {
-      const byPath = new Map(stack().map((c) => [c.path, c]))
       const out: DiffFile[] = []
       for (const path of paths) {
-        const change = byPath.get(path)
+        const change = stackByPath().get(path)
         if (!change) continue
         const res = await localGitApi.diff(task.id, path, change.staged ? 'staged' : 'unstaged')
         // Thrown, not swallowed: the viewer turns a failed patch read into a row that says so and

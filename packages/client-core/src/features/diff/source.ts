@@ -35,6 +35,12 @@ export type DiffSource = {
    * would throw the reader back to the top each time. A pull request does not: a new commit is both.
    */
   contentSignature?: () => string
+  /**
+   * One file's part of `contentSignature`. With it, a content change re-reads only the files whose key
+   * moved, so a poll that finds nothing new reads nothing; without it, every file in the set is read
+   * again. Only consulted when `contentSignature` moves and `signature` did not.
+   */
+  contentKey?: (path: string) => string
   /** The file to scroll to. Empty means "wherever the remembered position was". */
   selectedPath: () => string
   /** Inline conversations, interleaved into the rows by path and line. */

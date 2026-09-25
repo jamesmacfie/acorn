@@ -66,4 +66,27 @@ describe('parsed file publication', () => {
 
     expect(publish).not.toHaveBeenCalled()
   })
+
+  // A file re-read after a content change can come back while its previous parse is still held for an
+  // idle turn. The held one must not land after the new one.
+  it('drops a held parse when a newer one of the same file publishes now', () => {
+    vi.useFakeTimers()
+    const published: ParsedFile[] = []
+    let visible = false
+    const publisher = createParsedFilePublisher({
+      publish: (files) => published.push(...files),
+      isPriority: () => visible,
+    })
+
+    const old = parsed('a.ts')
+    const next = parsed('a.ts')
+    publisher.markScrolling()
+    publisher.enqueue([old])
+    visible = true
+    publisher.enqueue([next])
+    vi.advanceTimersByTime(500)
+    expect(published).toEqual([next])
+    expect(published[0]).toBe(next)
+    publisher.dispose()
+  })
 })

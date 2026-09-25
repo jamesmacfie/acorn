@@ -67,8 +67,12 @@ export function createParsedFilePublisher(options: {
   const enqueue = (files: ParsedFile[]) => {
     const priority: ParsedFile[] = []
     for (const file of files) {
-      if (options.isPriority(file.file.path)) priority.push(file)
-      else pending.set(file.file.path, file)
+      // A file read again while an older parse of it is still held: publishing the new one now and
+      // the held one at the next idle turn would put the old content back on screen.
+      if (options.isPriority(file.file.path)) {
+        pending.delete(file.file.path)
+        priority.push(file)
+      } else pending.set(file.file.path, file)
     }
     if (priority.length) options.publish(priority)
     schedule()

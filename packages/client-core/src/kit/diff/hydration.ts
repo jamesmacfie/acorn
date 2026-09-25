@@ -59,6 +59,9 @@ export function createDiffHydrator(options: HydratorOptions) {
   const statuses = new Map<string, DiffHydrationStatus>()
   const [published, setPublished] = createStore<Record<string, DiffHydrationStatus>>({})
   let fileByPath = new Map<string, DiffFile>()
+  // Bumped per path by `refresh`. A load that started before the bump is carrying the old content, so
+  // it publishes nothing and leaves the path queued for the read that will.
+  const versions = new Map<string, number>()
   let queue: string[] = []
   let firstPath: string | undefined
   let generation = 0
@@ -107,6 +110,8 @@ export function createDiffHydrator(options: HydratorOptions) {
   const hydrateBatch = async (paths: string[], run: number) => {
     if (run !== generation || disposed) return
     for (const path of paths) setStatus(path, 'loading')
+    const started = new Map(paths.map((path) => [path, versions.get(path)]))
+    const current = (path: string) => versions.get(path) === started.get(path)
 
     const signal = controller?.signal
     const cached: DiffFile[] = []
@@ -126,6 +131,7 @@ export function createDiffHydrator(options: HydratorOptions) {
     const parsedBatch: ParsedFile[] = []
     for (const path of paths) {
       if (run !== generation || disposed) return
+      if (!current(path)) continue
       const file = byPath.get(path)
       if (!file) {
         setStatus(path, 'error')
@@ -133,6 +139,7 @@ export function createDiffHydrator(options: HydratorOptions) {
       }
       const parsed = await options.parseFile(file)
       if (run !== generation || disposed) return
+      if (!current(path)) continue
       parsedBatch.push(parsed)
       setStatus(path, 'loaded')
       if (path === firstPath) {
@@ -160,8 +167,10 @@ export function createDiffHydrator(options: HydratorOptions) {
           await hydrateBatch(batch, run)
         } catch (error) {
           if (run !== generation || disposed || controller?.signal.aborted) break
+          // Only what this batch still holds: a path `refresh` re-queued mid-load is owed a new read,
+          // not this batch's failure.
           for (const path of batch) {
-            if (statuses.get(path) !== 'loaded') setStatus(path, 'error')
+            if (statuses.get(path) === 'loading') setStatus(path, 'error')
           }
           console.error('diff hydration failed', error)
         }
@@ -183,6 +192,7 @@ export function createDiffHydrator(options: HydratorOptions) {
     running = false
     fileByPath = new Map(files.map((file) => [file.path, file]))
     statuses.clear()
+    versions.clear()
     firstPath = undefined
     queue = files.map((file) => file.path)
     for (const file of files) statuses.set(file.path, 'queued')
@@ -192,6 +202,23 @@ export function createDiffHydrator(options: HydratorOptions) {
     firstPath = priorityPath && fileByPath.has(priorityPath) ? priorityPath : files[0]?.path
     if (firstPath) {
       enqueueFront([firstPath])
+    }
+    schedule()
+  }
+
+  /**
+   * The same file set, with new content in `paths`. Only those are read again; every other file keeps
+   * its parse and any load in flight. A load of one of `paths` already under way is superseded rather
+   * than aborted, since it shares a fetch batch with files that did not move.
+   */
+  const refresh = (files: DiffFile[], paths: string[]) => {
+    fileByPath = new Map(files.map((file) => [file.path, file]))
+    for (const path of paths) {
+      if (!fileByPath.has(path)) continue
+      versions.set(path, (versions.get(path) ?? 0) + 1)
+      if (statuses.get(path) === 'queued') continue
+      setStatus(path, 'queued')
+      queue.push(path)
     }
     schedule()
   }
@@ -219,5 +246,5 @@ export function createDiffHydrator(options: HydratorOptions) {
     controller?.abort()
   }
 
-  return { dispose, prioritize, reset, retry, status }
+  return { dispose, prioritize, refresh, reset, retry, status }
 }

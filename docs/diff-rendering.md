@@ -33,6 +33,17 @@ working tree needs the two apart, because an agent saving a file mid-review move
 poll and treating that as a new diff would throw the reader back to the top each time. A pull request
 does not: a new commit is both, so the GitHub pane sets only `signature`.
 
+A changed `contentSignature` does not have to mean every patch. A source that also supplies
+`contentKey`, one file's part of the signature, gets only the files whose key moved read again, and
+the rest keep their rows and any load in flight. The changes pane keys a file by what its patch is
+made of, which the node puts on each `LocalChange` as `contentKey`: the modes and objects the status
+line names for the HEAD and index sides, and for the working-tree side, which git has not hashed, a
+fresh stat of the file (mode, size, mtime, ctime). A poll that finds nothing new reads no patch, and an
+agent saving one file reads that file. Before this, every poll read every patch again, two git
+processes per file. A node too old to send the key, a submodule, whose new commit is not on its status
+line, and a path the node could not stat all fall back to the poll count, which reads that file on
+every poll, because an edit can keep both line counts.
+
 Behind the changes pane's two signatures is one resource, `LocalStatus`, which carries the branch, its
 upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
 can describe different trees. It is one `git status --porcelain=v2 --branch --untracked-files=all`
@@ -187,7 +198,10 @@ reads statuses synchronously from whatever reactive scope called `reset()`, and 
 would subscribe that scope to every path in the diff.
 
 Parsed files are keyed the same way, one store key per path, because the map used to be copied whole on
-every parse — one full copy per file in the diff. The priority file publishes as soon as it is
+every parse — one full copy per file in the diff. A publish replaces each key's value from the store's
+root rather than setting it by path, because a Solid store merges an object set by path into the one
+already there: a re-read file then changed no key, and its new rows waited for the next unrelated
+rebuild of the list to appear. The priority file publishes as soon as it is
 ready; later files publish in the hydrator's four-file fetch batches. `parsedPublisher.ts` holds
 off-screen batches while a scroll is active, flushes a file immediately if it enters the viewport,
 and applies the remaining files together in an idle turn after scrolling stops. This keeps progressive

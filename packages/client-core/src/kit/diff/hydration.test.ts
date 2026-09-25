@@ -141,4 +141,61 @@ describe('diff hydrator', () => {
       disposeRoot()
     }
   })
+
+  it('refresh reads only the paths it names, and keeps the rest', async () => {
+    const fetchPatches = vi.fn(async (paths: string[]) => paths.map((path) => pullFile(path, `@@ ${path}`)))
+    const parsed: ParsedFile[] = []
+    const { hydrator, disposeRoot } = makeHydrator(parsed, { fetchPatches })
+
+    try {
+      const files = [pullFile('a.ts', null), pullFile('b.ts', null), pullFile('c.ts', null)]
+      hydrator.reset(files)
+      await waitFor(() => expect(parsed).toHaveLength(3))
+
+      hydrator.refresh(files, ['b.ts'])
+      await waitFor(() => expect(parsed).toHaveLength(4))
+      expect(fetchPatches.mock.calls.at(-1)?.[0]).toEqual(['b.ts'])
+      expect(parsed.at(-1)?.file.path).toBe('b.ts')
+      expect(['a.ts', 'b.ts', 'c.ts'].map((path) => hydrator.status(path))).toEqual(['loaded', 'loaded', 'loaded'])
+
+      hydrator.refresh(files, [])
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      expect(fetchPatches).toHaveBeenCalledTimes(2)
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
+
+  // The load already under way read the file before it changed. Letting it land would put the old
+  // content on screen, and marking it loaded would drop the read that has the new content.
+  it('refresh supersedes a load of the same path that is still in flight', async () => {
+    let body = 'old'
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const fetchPatches = vi.fn(async (paths: string[]) => {
+      const seen = body
+      if (seen === 'old') await gate
+      return paths.map((path) => pullFile(path, `@@ ${seen}`))
+    })
+    const parsed: ParsedFile[] = []
+    const { hydrator, disposeRoot } = makeHydrator(parsed, { fetchPatches })
+
+    try {
+      const files = [pullFile('a.ts', null)]
+      hydrator.reset(files)
+      await waitFor(() => expect(fetchPatches).toHaveBeenCalledTimes(1))
+
+      body = 'new'
+      hydrator.refresh(files, ['a.ts'])
+      release()
+      await waitFor(() => expect(parsed).toHaveLength(1))
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      expect(parsed.map((file) => file.file.patch)).toEqual(['@@ new'])
+      expect(hydrator.status('a.ts')).toBe('loaded')
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
 })

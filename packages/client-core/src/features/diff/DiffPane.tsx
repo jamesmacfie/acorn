@@ -125,9 +125,10 @@ export function DiffPane(props: {
   const [parsedByPath, setParsedByPath] = createStore<Record<string, ParsedFile>>({})
   let visibleHydrationPaths = new Set<string>()
   const parsedPublisher = createParsedFilePublisher({
-    publish: (parsedFiles) => batch(() => {
-      for (const parsedFile of parsedFiles) setParsedByPath(parsedFile.file.path, parsedFile)
-    }),
+    // One write from the root, which replaces each key's value. `setParsedByPath(path, parsed)` would
+    // merge a re-read file into the object already there, so the key never changed, the memo below
+    // never heard, and new content waited for the next unrelated rebuild to reach the screen.
+    publish: (parsedFiles) => setParsedByPath(Object.fromEntries(parsedFiles.map((parsedFile) => [parsedFile.file.path, parsedFile]))),
     isPriority: (path) => path === selectedPath() || visibleHydrationPaths.has(path),
   })
   onCleanup(parsedPublisher.dispose)
@@ -203,14 +204,27 @@ export function DiffPane(props: {
     if (previous && signature !== previous) resetScrollPosition(true)
   }))
 
-  // The same files, saying something new. Re-read every patch, but keep `parsedByPath`: clearing it
+  // The same files, saying something new. Re-read the patches, but keep `parsedByPath`: clearing it
   // would drop every file to a 36px placeholder for a frame, and a virtual canvas that collapses to a
   // tenth of its height has its scrollTop clamped by the browser before the rows come back. The old
   // rows stay on screen until each file's new parse replaces it.
   //
-  // ponytail: re-reads every file in the set, not the ones that moved. The hydrator has retry(path)
-  // if the spawn count ever matters; it would need a per-file content key on the port to know which.
+  // Only the files whose `contentKey` moved, when the source keys them and the set is the one the keys
+  // were taken against. The changes pane's signature moves on every ten-second poll, and re-reading a
+  // whole diff each time was two git spawns per file per poll for a tree nobody had touched.
+  let heldKeys: { files: string; keys: Map<string, string> } | null = null
   createEffect(on(contentSignature, () => {
+    const list = files()
+    const contentKey = source().contentKey
+    const keys = contentKey ? new Map(list.map((file) => [file.path, contentKey(file.path)])) : null
+    const held = heldKeys
+    heldKeys = keys && { files: filesSignature(), keys }
+    if (keys && held?.files === filesSignature()) {
+      const moved = list.filter((file) => keys.get(file.path) !== held.keys.get(file.path)).map((file) => file.path)
+      recordSample('core', 'diff.hydrator.refresh', moved.length)
+      hydrator.refresh(list, moved)
+      return
+    }
     parsedPublisher.reset()
     recordSample('core', 'diff.hydrator.reset', 1)
     recordSample('core', 'diff.files', files().length)
