@@ -344,7 +344,9 @@ export type AgentEventRecord = {
   seq: number
   schemaVersion: number
   event: AgentNormalizedEvent
-  searchText: string | null
+  /** What the transcript search index holds for this row. Node-side only: the HTTP pages and the
+   *  socket leave it out, since no client reads it and on a tool row it repeats the output. */
+  searchText?: string | null
   createdAt: number
   /** Present on a record the node folded later rows into (../shared/usageFold.ts, ../shared/toolFold.ts):
    *  the seq of the last row it absorbed. A reader pages on from here, and treats a row at or below it
