@@ -63,6 +63,50 @@ const delegationLoads = new Map<string, Promise<void>>()
 // two panes open on the same session are.
 const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 
+// Which snapshots the store keeps. It used to keep every session it had read until the session was
+// deleted or the node switched, so a morning of opening agent tasks held every transcript seen: eight
+// real sessions came to 46 MB of JSON. Now a session keeps its snapshot while something draws it
+// (`hold`), and the three most recently drawn beyond those keep theirs too, which is what makes going
+// back to one of them a short read (see loadSnapshot). The rest drop their events and keep their row,
+// so the rail, Agent Center and notices draw them as before, and opening one reads it from the start.
+// Three because a snapshot can be large. Those eight averaged 6 MB of JSON each and one 1,200-event
+// Codex session was 10 MB, so five kept would be 30 MB or more before the heap's own overhead.
+const KEEP_RECENT = 3
+const holds = new Map<string, number>()
+// Every stored snapshot's id, least recently drawn first. A load and a release both move one to the end.
+const recent = new Set<string>()
+
+function touch(sessionId: string): void {
+  recent.delete(sessionId)
+  recent.add(sessionId)
+}
+
+// Forget a snapshot's events and everything kept per event. Not the row, the composer draft, the
+// reading place or the event seq: those are small and belong to the session, not to its transcript.
+function forgetSnapshot(sessionId: string): void {
+  recent.delete(sessionId)
+  const refreshTimer = snapshotRefreshTimers.get(sessionId)
+  if (refreshTimer) clearTimeout(refreshTimer)
+  snapshotRefreshTimers.delete(sessionId)
+  seenEventIds.delete(sessionId)
+  usageLines.delete(sessionId)
+  completeThrough.delete(sessionId)
+}
+
+// Drop what is past the bound. A session being read is left alone: its load is about to put it back
+// as the newest, and dropping it under a resumed read would only make that read start over.
+function trimSnapshots(): void {
+  const idle = [...recent].filter((id) => !holds.has(id) && !snapshotLoads.has(id))
+  const dropped = idle.slice(0, -KEEP_RECENT)
+  if (!dropped.length) return
+  for (const id of dropped) forgetSnapshot(id)
+  setSnapshots((current) => {
+    const next = { ...current }
+    for (const id of dropped) delete next[id]
+    return next
+  })
+}
+
 const byRecent = (a: AgentSession, b: AgentSession): number =>
   b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
 
@@ -177,12 +221,7 @@ function removeSession(sessionId: string): void {
   clearComposerDraft(sessionId)
   // And where the reader was left in it, for the same reason (./readingPlaceStore.ts).
   clearReadingPlaces(sessionId)
-  const refreshTimer = snapshotRefreshTimers.get(sessionId)
-  if (refreshTimer) clearTimeout(refreshTimer)
-  snapshotRefreshTimers.delete(sessionId)
-  seenEventIds.delete(sessionId)
-  usageLines.delete(sessionId)
-  completeThrough.delete(sessionId)
+  forgetSnapshot(sessionId)
   eventSeqs.delete(sessionId)
   setRoster((current) => current.filter((session) => session.id !== sessionId))
   setDelegations((current) => {
@@ -286,9 +325,11 @@ function appendEvent(event: AgentEventRecord): void {
   agentTelemetry.observe('agents.event.append', 1)
   if (deletedSessionIds.has(event.sessionId)) return
   let duplicate = false
+  let stored = false
   setSnapshots((current) => {
     const snapshot = current[event.sessionId]
     if (!snapshot) return current
+    stored = true
     let seen = seenEventIds.get(event.sessionId)
     if (!seen) {
       indexEvents(event.sessionId, snapshot.events)
@@ -314,7 +355,9 @@ function appendEvent(event: AgentEventRecord): void {
     return { ...current, [event.sessionId]: { ...snapshot } }
   })
   if (duplicate) return
-  if (REFETCH_EVENT_TYPES.has(event.event.type)) scheduleSnapshotRefresh(event.sessionId)
+  // Only a snapshot the store holds has requests to expire. One it does not hold is read whole when it
+  // is next drawn, and reading it now would pull a transcript nobody is looking at back into the store.
+  if (stored && REFETCH_EVENT_TYPES.has(event.event.type)) scheduleSnapshotRefresh(event.sessionId)
   // An event for a session we have never seen: fetch the row, which `upsertSession` then puts
   // through the gate.
   if (!sessions().some((candidate) => candidate.id === event.sessionId))
@@ -540,6 +583,7 @@ export const managedAgentStore = {
           return { ...current, [sessionId]: snapshot }
         })
         completeThrough.set(sessionId, Math.max(completeThrough.get(sessionId) ?? 0, reached))
+        touch(sessionId)
         agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)
         if (eventsChanged) agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
         upsertSession(snapshot.session)
@@ -549,9 +593,32 @@ export const managedAgentStore = {
       // Only if the map still holds this one. A caller that asked again while this was settling owns
       // the entry now, and clearing it would leave a third caller refetching what is already in flight.
       if (snapshotLoads.get(sessionId) === run) snapshotLoads.delete(sessionId)
+      // Here rather than at the merge, which is still inside this read and so cannot count it.
+      trimSnapshots()
     })
     snapshotLoads.set(sessionId, run)
     return run
+  },
+  /**
+   * Keep this session's snapshot while a surface draws it. Returns the release.
+   *
+   * The store keeps only the held snapshots and the few most recently released (`KEEP_RECENT`), so a
+   * surface that reads `snapshots()` for a session holds it for as long as it reads, or the bound can
+   * drop the transcript from under it. Holding reads nothing: `loadSnapshot` still does that.
+   */
+  hold(sessionId: string): () => void {
+    holds.set(sessionId, (holds.get(sessionId) ?? 0) + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const count = (holds.get(sessionId) ?? 1) - 1
+      if (count > 0) return void holds.set(sessionId, count)
+      holds.delete(sessionId)
+      if (!untrack(snapshots)[sessionId]) return
+      touch(sessionId)
+      trimSnapshots()
+    }
   },
   upsertSession,
   upsertSessions,
@@ -573,6 +640,7 @@ export const managedAgentStore = {
     seenEventIds.clear()
     usageLines.clear()
     completeThrough.clear()
+    recent.clear() // not `holds`: those belong to mounted surfaces, and each releases its own
     eventSeqs.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
     delegationLoads.clear()

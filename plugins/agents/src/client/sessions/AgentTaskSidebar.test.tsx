@@ -11,6 +11,7 @@ import {
   selectedManagedSubagent,
 } from './managedSelection'
 import AgentTaskSidebar from './AgentTaskSidebar'
+import { managedAgentStore } from './managedStore'
 
 const taskId = 'task-sidebar'
 const session = (id: string, over: Partial<AgentSession> = {}): AgentSession => ({
@@ -187,5 +188,26 @@ describe('the delegated session sidebar', () => {
     expect(selectedManagedSession(taskId)).toBe(root.id)
     expect(selectedManagedSubagent(root.id)).toBeUndefined()
     expect(rowNamed('Parent').getAttribute('aria-selected')).toBe('true')
+  })
+})
+
+// The sidebar lists a waiting session's requests from its snapshot, so it keeps that snapshot while it
+// is drawn. Without the hold, the store's bound could drop the request from the list.
+describe('the sidebar’s waiting sessions', () => {
+  it('holds the snapshot of each session waiting on the reader, until it is gone', () => {
+    const releases: string[] = []
+    const hold = vi.spyOn(managedAgentStore, 'hold').mockImplementation((id) => () => void releases.push(id))
+    const load = vi.spyOn(managedAgentStore, 'loadSnapshot').mockResolvedValue(undefined as never)
+    try {
+      mount([session('asking', { attention: 'permission' }), session('idle')], {})
+      expect(hold.mock.calls.map(([id]) => id)).toEqual(['asking'])
+      expect(releases).toEqual([])
+      dispose?.()
+      dispose = undefined
+      expect(releases).toEqual(['asking'])
+    } finally {
+      hold.mockRestore()
+      load.mockRestore()
+    }
   })
 })

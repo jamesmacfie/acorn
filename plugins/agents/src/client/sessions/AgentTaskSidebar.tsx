@@ -57,13 +57,30 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
       .map((request) => ({ session, request }))))
 
   const attentionLoaded = new Map<string, number>()
+  // The snapshots read above for their requests, held while this list is drawn, or the store's bound
+  // could drop a waiting request from it (./managedStore.ts § hold).
+  const attentionHeld = new Map<string, () => void>()
+  onCleanup(() => {
+    for (const release of attentionHeld.values()) release()
+  })
   createEffect(() => {
+    const waiting = new Set<string>()
     for (const session of model.taskSessions()) {
       if (['none', 'unread', 'completed', 'error'].includes(session.attention)) continue
+      waiting.add(session.id)
+      if (!attentionHeld.has(session.id)) attentionHeld.set(session.id, managedAgentStore.hold(session.id))
       const seq = managedAgentStore.lastEventSeq(session)
       if (attentionLoaded.get(session.id) === seq) continue
       attentionLoaded.set(session.id, seq)
       void managedAgentStore.loadSnapshot(session.id).catch(() => undefined)
+    }
+    // Released once it stops waiting, and read again if it starts waiting again, since by then the
+    // store may have dropped it.
+    for (const [id, release] of attentionHeld) {
+      if (waiting.has(id)) continue
+      release()
+      attentionHeld.delete(id)
+      attentionLoaded.delete(id)
     }
   })
 
