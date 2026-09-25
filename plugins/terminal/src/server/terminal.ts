@@ -176,7 +176,7 @@ function emit(s: Session, msg: ServerMsg) {
 // is coalesced onto the next tick.
 function queueOutput(s: Session, data: string) {
   s.ring.push(data)
-  s.display.write(data) // a no-op while nobody is attached: there is no emulator to feed
+  s.display.write(data) // a no-op unless an attach is restoring: there is no emulator to feed
   s.pendingOut += data
   if (!s.flushTimer) s.flushTimer = setTimeout(() => flushOutput(s), OUTPUT_COALESCE_MS)
 }
@@ -776,7 +776,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       // wait for the answer before attaching, one more round trip before a returning terminal drew.
       if (size) resizeSession(s, size.cols, size.rows)
       flushOutput(s)
-      // The ring is what a cold attach rebuilds the screen from, and it is read only when there is no
+      // The ring is what an attach rebuilds the screen from, and it is read only when there is no
       // emulator yet (./terminalDisplay.ts § TerminalDisplay).
       s.display.attach(sink, s.meta, () => s.ring.tail())
     },

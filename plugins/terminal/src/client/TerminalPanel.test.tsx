@@ -1,3 +1,4 @@
+import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -15,43 +16,67 @@ import type { Task } from '@acorn/plugin-api/client'
 // attaches, and whether its element survives — is the shipped code.
 
 class StubTerminal {
-  static built = 0
+  static built: StubTerminal[] = []
   cols = 80
   rows = 24
   options: Record<string, unknown>
   disposed = false
+  element: HTMLElement | undefined
+  written: string[] = []
 
   constructor(options: Record<string, unknown>) {
-    StubTerminal.built += 1
+    StubTerminal.built.push(this)
     this.options = options
   }
 
   loadAddon(): void {}
-  open(): void {}
-  write(): void {}
+  // Like xterm, one element for life, put into the first parent it is given.
+  open(parent: HTMLElement): void {
+    this.element = document.createElement('div')
+    this.element.className = 'xterm'
+    parent.append(this.element)
+  }
+  write(data: string): void {
+    this.written.push(data)
+  }
   focus(): void {}
+  blur(): void {}
   attachCustomKeyEventHandler(): void {}
   onData(): void {}
   onResize(): void {}
   dispose(): void {
     this.disposed = true
+    this.element?.remove()
   }
+}
+
+class StubWebgl {
+  static made: StubWebgl[] = []
+  disposed = false
+  lose: (() => void) | undefined
+  constructor() { StubWebgl.made.push(this) }
+  onContextLoss(listener: () => void): void { this.lose = listener }
+  dispose(): void { this.disposed = true }
 }
 
 vi.mock('@xterm/xterm', () => ({ Terminal: StubTerminal }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit(): void {} } }))
-vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss(): void {} dispose(): void {} } }))
+vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: StubWebgl }))
 // Shiki sits behind the real one, and an ANSI palette is not what this file is about.
 vi.mock('./theme', () => ({ baseTheme: () => ({}), monoFont: () => 'monospace', xtermTheme: async () => ({}) }))
 
 const attaches: string[] = []
+let offline = false
 const detaches: string[] = []
 const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
 const listeners = new Map<string, (m: ServerMsg) => void>()
 const resizes: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
-    list: async () => roster,
+    list: async () => {
+      if (offline) throw new Error('node unreachable')
+      return roster
+    },
     profiles: async () => [],
     resize: async (id: string, cols: number, rows: number) => {
       resizes.push(`${id} ${cols}x${rows}`)
@@ -80,11 +105,13 @@ globalThis.ResizeObserver ??= class {
 
 const { default: TerminalPanel } = await import('./TerminalPanel')
 const { refreshSessions } = await import('./sessionStore')
+const { heldTerminalCount } = await import('./heldTerminals')
+const { WEBGL_TERMINALS, webglTerminalCount } = await import('./liveXterm')
 
 const A = '11111111-2222-3333-4444-555555555555'
 const B = '99999999-8888-7777-6666-555555555555'
 
-const session = (id: string, title: string): TerminalSession =>
+const session = (id: string, title: string, taskId = 't1'): TerminalSession =>
   ({
     id,
     title,
@@ -95,7 +122,7 @@ const session = (id: string, title: string): TerminalSession =>
     idle: false,
     agentState: 'unknown',
     isWorktree: true,
-    taskId: 't1',
+    taskId,
     cwd: '/w',
     command: 'bash',
     cols: 80,
@@ -122,14 +149,16 @@ beforeEach(() => {
 afterEach(async () => {
   for (const dispose of cleanups.splice(0)) dispose()
   document.body.replaceChildren()
+  // An empty roster is what lets the held xterms go, so it runs before the records are cleared.
+  roster = []
+  await refreshSessions()
   attaches.length = 0
   detaches.length = 0
   attachSizes.length = 0
   listeners.clear()
   resizes.length = 0
-  StubTerminal.built = 0
-  roster = []
-  await refreshSessions()
+  StubTerminal.built = []
+  StubWebgl.made = []
   vi.unstubAllGlobals()
 })
 
@@ -137,11 +166,15 @@ afterEach(async () => {
 // turns.
 const settle = async (): Promise<void> => {
   for (let turn = 0; turn < 8; turn += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => requestAnimationFrame(resolve))
 }
 
 // The `Drawer` host component draws the dock itself, into the document rather than into whatever
 // element rendered the plugin's panel, so both readers below look at the document.
-const mount = (): void => {
+//
+// `open` is the drawer's per-task open state, which the host's slot follows: false unmounts the whole
+// panel, the way a switch to a task without the drawer open does.
+const mount = (drawer: { task?: () => Task; open?: () => boolean } = {}): void => {
   const host = document.createElement('div')
   document.body.append(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -149,7 +182,9 @@ const mount = (): void => {
     render(
       () => (
         <QueryClientProvider client={client}>
-          <TerminalPanel task={task} onClose={() => {}} />
+          <Show when={drawer.open?.() ?? true}>
+            <TerminalPanel task={drawer.task?.() ?? task} onClose={() => {}} />
+          </Show>
         </QueryClientProvider>
       ),
       host,
@@ -170,7 +205,7 @@ describe('the terminal drawer keeps every open session on screen', () => {
     expect(surfaces()).toHaveLength(2)
     expect(surfaces().map((box) => box.hidden)).toEqual([false, true])
     expect(attaches).toEqual([A])
-    expect(StubTerminal.built).toBe(1)
+    expect(StubTerminal.built).toHaveLength(1)
 
     const [firstBox, secondBox] = surfaces()
     tab(B)?.click()
@@ -188,7 +223,7 @@ describe('the terminal drawer keeps every open session on screen', () => {
     tab(A)?.click()
     await settle()
     expect(attaches).toEqual([A, B])
-    expect(StubTerminal.built).toBe(2)
+    expect(StubTerminal.built).toHaveLength(2)
     expect(surfaces()[0]).toBe(firstBox)
     expect(surfaces().map((box) => box.hidden)).toEqual([false, true])
   })
@@ -259,5 +294,134 @@ describe('a surface attaches in one request', () => {
     listeners.get(A)?.({ type: 'ready', session: { ...session(A, 'first'), cols: 120, rows: 40 }, replayed: true })
     await settle()
     expect(resizes).toEqual([`${A} 80x24`])
+  })
+})
+
+// The drawer's open state is per task, so going to a task without it open unmounts the whole panel.
+// The xterms are held outside it (./heldTerminals.ts), until the session leaves the roster.
+describe('a terminal outlives the drawer that drew it', () => {
+  beforeEach(() => { roster = [session(A, 'first')] })
+
+  it('reuses the same attached xterm when the drawer comes back', async () => {
+    const [open, setOpen] = createSignal(true)
+    mount({ open })
+    await settle()
+    expect(StubTerminal.built).toHaveLength(1)
+    const [xterm] = StubTerminal.built
+
+    setOpen(false)
+    await settle()
+    // Nothing drawn, nothing let go: still attached, and its element is out of the document rather
+    // than left inside a box that has gone.
+    expect(surfaces()).toHaveLength(0)
+    expect(detaches).toEqual([])
+    expect(xterm.disposed).toBe(false)
+    expect(xterm.element?.isConnected).toBe(false)
+
+    setOpen(true)
+    await settle()
+    expect(StubTerminal.built).toEqual([xterm])
+    expect(attaches).toEqual([A])
+    expect(surfaces()[0].contains(xterm.element!)).toBe(true)
+  })
+
+  it('keeps writing output that arrives while nobody draws it', async () => {
+    const [open, setOpen] = createSignal(true)
+    mount({ open })
+    await settle()
+    setOpen(false)
+    await settle()
+
+    listeners.get(A)?.({ type: 'output', data: 'built in the background\r\n' })
+    expect(StubTerminal.built[0].written).toEqual(['built in the background\r\n'])
+  })
+
+  it('disposes the xterm and its attachment when the tab closes', async () => {
+    mount()
+    await settle()
+    const [xterm] = StubTerminal.built
+    expect(heldTerminalCount()).toBe(1)
+
+    // The node forgets the session once `remove` answers, and the drawer re-reads the roster.
+    roster = []
+    document.querySelector<HTMLElement>('[aria-label="Close first"]')?.click()
+    await settle()
+
+    expect(xterm.disposed).toBe(true)
+    expect(detaches).toEqual([A])
+    expect(heldTerminalCount()).toBe(0)
+  })
+
+  it('disposes a held xterm whose session goes while its drawer is closed', async () => {
+    const [open, setOpen] = createSignal(true)
+    mount({ open })
+    await settle()
+    setOpen(false)
+    await settle()
+
+    // Killed from the palette, or its task archived: the roster read is what says so.
+    roster = []
+    await refreshSessions()
+    expect(StubTerminal.built[0].disposed).toBe(true)
+    expect(detaches).toEqual([A])
+  })
+
+  it('keeps every held xterm through a roster read that fails', async () => {
+    const [open, setOpen] = createSignal(true)
+    mount({ open })
+    await settle()
+    setOpen(false)
+    await settle()
+
+    // The drawer shows nothing after a failed read, but that is no evidence the session has gone.
+    offline = true
+    await refreshSessions().catch(() => {})
+    offline = false
+    expect(StubTerminal.built[0].disposed).toBe(false)
+    expect(detaches).toEqual([])
+  })
+})
+
+describe('the WebGL contexts stay bounded', () => {
+  const ids = Array.from({ length: WEBGL_TERMINALS + 3 }, (_, index) => `${index}0000000-0000-4000-8000-000000000000`)
+  beforeEach(() => { roster = ids.map((id, index) => session(id, `tab ${index}`, `task-${index}`)) })
+
+  it('keeps a renderer on the terminals shown most recently and none past the bound', async () => {
+    // One task per session, visited in turn with the drawer open on each: every terminal stays alive.
+    const [current, setCurrent] = createSignal(0)
+    mount({ task: () => ({ id: `task-${current()}`, title: 'task' }) as unknown as Task })
+    await settle()
+    for (let index = 1; index < ids.length; index += 1) {
+      setCurrent(index)
+      await settle()
+    }
+
+    expect(heldTerminalCount()).toBe(ids.length)
+    expect(webglTerminalCount()).toBe(WEBGL_TERMINALS)
+    expect(StubWebgl.made.filter((addon) => addon.disposed)).toHaveLength(ids.length - WEBGL_TERMINALS)
+
+    // Back to the first: it takes a context again, and the oldest of the rest gives one up.
+    setCurrent(0)
+    await settle()
+    expect(webglTerminalCount()).toBe(WEBGL_TERMINALS)
+    expect(StubWebgl.made).toHaveLength(ids.length + 1)
+  })
+
+  it('falls back when a context is lost and asks again on the next show', async () => {
+    const [current, setCurrent] = createSignal(0)
+    mount({ task: () => ({ id: `task-${current()}`, title: 'task' }) as unknown as Task })
+    await settle()
+    const [first] = StubWebgl.made
+
+    first.lose?.()
+    expect(first.disposed).toBe(true)
+    expect(webglTerminalCount()).toBe(0)
+
+    setCurrent(1)
+    await settle()
+    setCurrent(0)
+    await settle()
+    expect(StubWebgl.made).toHaveLength(3)
+    expect(webglTerminalCount()).toBe(2)
   })
 })
