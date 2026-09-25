@@ -54,9 +54,15 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       .filter((session) => !session.archivedAt)
       .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)))
   const sessionRoster = createMemo(() => agentSessionRoster(taskSessions(), managedAgentStore.delegations()))
+  // With nothing chosen yet, the session that changed last. That is the order the node lists a task's
+  // sessions in, and so the one the load below selects. The newest-created one opened first and then
+  // switched when the list came back, which started two whole snapshot reads on a first visit.
   const selected = createMemo(() => {
     const id = selectedManagedSession(task.id)
-    return taskSessions().find((session) => session.id === id) ?? taskSessions()[0]
+    const sessions = taskSessions()
+    return sessions.find((session) => session.id === id)
+      ?? sessions.reduce<AgentSession | undefined>((last, session) =>
+        !last || session.updatedAt > last.updatedAt ? session : last, undefined)
   })
   const selectedSessionId = createMemo(() => selected()?.id)
   const selectedDelegation = createMemo(() => {
