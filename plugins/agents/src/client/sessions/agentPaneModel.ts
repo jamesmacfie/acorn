@@ -117,10 +117,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   let readTimer: ReturnType<typeof setTimeout> | null = null
   createEffect(() => {
     const session = selected()
-    if (!pane.shown() || !session || session.lastEventSeq <= session.lastReadSeq) return
+    if (!pane.shown() || !session) return
+    // The live number, not the row's, which stops at the row's last change (./managedStore.ts § eventSeqs).
+    const seq = managedAgentStore.lastEventSeq(session)
+    if (seq <= session.lastReadSeq) return
     if (readTimer) clearTimeout(readTimer)
     readTimer = setTimeout(() => {
-      void managedAgentApi.patch(session.id, { lastReadSeq: session.lastEventSeq })
+      void managedAgentApi.patch(session.id, { lastReadSeq: seq })
         .then(managedAgentStore.upsertSession)
         .catch(() => undefined)
     }, 350)
