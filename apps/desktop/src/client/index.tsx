@@ -189,8 +189,7 @@ bootMark('tree built')
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
 // moment the node could answer. The two are far apart on purpose: nothing between `script start` and
-// this frame waits on the helper or the node (docs/performance.md § Every host draws
-// first).
+// this frame waits on the helper or the node (docs/frontend.md § Startup readiness).
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
 // and not the renderer's: a launch watched from behind another window prints every other mark and not
 // this one, which is why `tree built` above exists (docs/local-development.md § Timing a cold start).

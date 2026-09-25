@@ -80,8 +80,8 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
 }
 
 // Every statement, as a histogram per verb. This loop is synchronous and shared with terminal
-// emulation and git spawns, and the performance programme refused to split it into threads without
-// numbers (docs/performance.md § Splitting the node), so this is where the numbers come from.
+// emulation and git spawns, and splitting it into threads stays refused until a number says one of
+// those is the problem, so this is where the numbers come from.
 //
 // The statement text is not the key: bound parameters are out of it already, but a hundred distinct
 // `SELECT`s would be a hundred histograms nobody reads, and a metric name has to be a pattern

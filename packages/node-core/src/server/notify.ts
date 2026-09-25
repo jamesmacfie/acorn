@@ -9,7 +9,7 @@ import { wsBroadcast } from './transport/wsHub'
 //
 // The plugin id is the whole point of the argument. Without it every ping refetched every plugin's
 // descriptor routes on every connected client, and a terminal flipping between busy and idle fired
-// one per edge (docs/performance.md § 2026-09-03 — phase 5). With it, a plugin
+// one per edge. With it, a plugin
 // saying "my rows moved" costs one plugin's rows. Core's own pings still pass nothing, because a task
 // create or a worktree appearing can move anyone's, and they happen at human speed.
 //
@@ -48,7 +48,7 @@ export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent
 // The chrome bump is scoped to the raiser, which is what `ctx.events.status()` already did at the two
 // call sites this replaces. Unscoped, one plugin raising a row would cost every other plugin a
 // descriptor round trip on every connected client, which is the sweep
-// docs/performance.md § phase 5 narrowed. The rows a notice can have moved are the raiser's.
+// the plugin id on `status()` exists to stop. The rows a notice can have moved are the raiser's.
 export function broadcastNotice(pluginId: string, notice: PluginNotice): void {
   wsBroadcast({ channel: 'workflow:notice', notice: { ...notice, pluginId } satisfies NoticeFrame })
   broadcastStatus(pluginId)

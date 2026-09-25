@@ -4,8 +4,7 @@
 // A string-keyed table from a name to code is a registry, and a registry that holds values pulls
 // every value into whichever chunk holds the table. That is how a diff viewer and a syntax
 // highlighter ended up in the renderer's first paint: nothing drew them, but `RemoteTree` is the
-// fallback branch of ./Slot.tsx, so the table was preloaded whether or not a loaded plugin existed
-// (docs/performance.md § Registries hold loaders).
+// fallback branch of ./Slot.tsx, so the table was preloaded whether or not a loaded plugin existed.
 //
 // So an entry is either the component or a loader for it. Cheap primitives stay components — a
 // `Button` behind a dynamic import would cost a frame for nothing — and the heavy names, the ones

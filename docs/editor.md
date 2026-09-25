@@ -103,7 +103,7 @@ What changed, and why:
   grammar that will not download is an empty extension rather than a throw: no highlighting beats no
   file. The four JavaScript dialects share one package, so opening a `.tsx` file after a `.ts` one
   costs no request. Measured after the split: the chunk is 60,861 bytes and a `.ts` file fetches two
-  more chunks, 110,946 bytes ([performance.md](./performance.md) § 2026-09-03).
+  more chunks, 110,946 bytes (2026-09-03).
 - **Large documents stay editable without a syntax tree.** Above 256 Ki characters both the editor
   pane and host-owned document surfaces omit the grammar extension. This keeps a generated or
   minified file from blocking WebKit's main thread while CodeMirror builds its tree; one
@@ -582,8 +582,7 @@ task's checkout path, mount the CodeMirror rectangle that path gated, then read 
 those are requests, and the second never depended on the first — the file the reader left open is
 remembered in the pane's own state — so the pane now issues both in the same tick and the text lands
 after one round trip. At 50 ms of latency a request, on a remembered file, first text moved from 222 ms
-to 174 ms, and the slope across two latencies says two serial requests became one
-([performance.md](./performance.md) § 2026-09-03 — phase 8).
+to 174 ms, and the slope across two latencies says two serial requests became one.
 
 **The checkout path is a query, not a call.** It is read through the query cache under
 `['editor', 'root', taskId]` with a one-minute freshness window, so reopening the pane on a task the

@@ -40,8 +40,7 @@ export type WsServerWireFrame = WsServerFrame & { seq: number }
 //
 // Everything above is JSON. Terminal output is not, because it is the one channel measured in frames
 // per second: a busy build's bytes used to be JSON-escaped once per attached socket on the node and
-// again on the helper hop, to carry bytes that were already bytes
-// (docs/performance.md).
+// again on the helper hop, to carry bytes that were already bytes.
 //
 // The frame is an id and then the payload verbatim: `WS_BINARY_ID_BYTES` of ASCII id, then the rest.
 // Fixed width rather than length-prefixed because every id this carries is a UUID, and `encodeIdFrame`

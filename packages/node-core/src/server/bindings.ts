@@ -94,7 +94,7 @@ export function diskBlobCache(dir: string): BlobCache {
   // already does. `put` below has written 0600 for a long time, so on a real cache every entry is
   // already right and every chmod was a syscall that changed nothing: 2,975 blobs cost 102 ms of the
   // node's boot, in front of the listener, for zero files fixed. The stat pass is 13 ms
-  // (docs/performance.md § 2026-09-03 — phase 3).
+  // (measured 2026-09-03).
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry)
     try {

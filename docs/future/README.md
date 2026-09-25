@@ -15,7 +15,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [legacy/](./legacy/README.md) | Architecture review, plugin ownership, compatibility removal, and a coordinated version-1 reset. Evidence, target contracts, and 13 implementation tickets. | Tickets 01–12 implemented; ticket 13 acceptance recorded with host limits, 2026-09-23. |
-| [legacy/performance/](./legacy/performance/README.md) | Desktop startup, task switching, streaming work, and memory, measured against the September performance programme. Eight areas, each with verify-before-building lists. | Proposal, 2026-09-24. Not started. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -187,11 +186,12 @@ registry beside the command one — `ctx.paletteRows` and its two published type
 API on the same day, which is what moved `PLUGIN_API_MAJOR` to `10`. All five are in
 `tools/arch/boundaries.test.ts`.
 
-`performance/` was deleted on 2026-09-03 when its eleventh phase closed it, and it ended differently
-from the rest. Its behaviour moved into the owning docs as usual, but three of its files were records
-rather than plans — the decisions about the system's shape, the refusals with their exit conditions, and
-every number the programme took — and those had no owner to move to. They are
-[docs/performance.md](../performance.md) now. The reads and the phase files are in git history.
+`performance/` was deleted on 2026-09-03 when its eleventh phase closed it. Its behaviour moved into
+the owning docs, and its decisions, refusals and numbers became a dated record. That record,
+`docs/performance.md` and `docs/performance/`, was deleted on 2026-09-26 with the second plan,
+`legacy/performance/`, which covered desktop startup, task switching, streaming work and memory. What
+that plan built is in the owning docs, and each change's before-and-after numbers are in its commit
+message. All three are in git history.
 
 `notifications/` was six phases that stopped acorn notifying on every agent step. Shipped and deleted
 2026-09-02. [notifications.md](../notifications.md) owns all of it: the five states and the two
@@ -227,9 +227,9 @@ viewports. § Tests has the harness, which is the real renderer with stdout as a
 Three other docs took a share. [testing.md](../testing.md) § Test layers lost the FFI skip, because
 nothing in that suite skips any more. [bundle.md](./bundle.md) § Shipping `acorn` lost the second
 native module and the flag in `bin/acorn`, and its open question about which packages the tarball has
-to carry is answered. And [performance.md](../performance.md) holds the eager closure's honest number
-— the painter is about 98 KB inside the bundle where a 6 MB library sat outside it, so the ceiling
-went up rather than down — and re-reads its own phase 9 against the store the rewrite left behind.
+to carry is answered. And `apps/tui/scripts/check-startup-graph.mjs` holds the eager closure's honest
+number — the painter is about 98 KB inside the bundle where a 6 MB library sat outside it, so the
+ceiling went up rather than down.
 Two refusals are worth not re-arguing: a Rust or Go painter behind a wire, rejected because
 client-core is TypeScript whatever paints the cells, and a constraint layout instead of flex, parked
 rather than rejected. Both are in the folder's `refused.md`.
@@ -345,6 +345,5 @@ Cooperative extension points and Hooks,
 `telemetry/` shipped all six phases and was reviewed and deleted on 2026-09-11.
 [telemetry.md](../telemetry.md) owns the collector, runtime seams, consent, exporter, deliberate
 limits and verification gap for a live Sentry project. [plugin-authoring.md](../plugin-authoring.md)
-owns the author API, [integrations.md](../integrations.md) the DSN connection, and
-[performance.md](../performance.md) the measured async-context cost. Runtime-specific details live
-in [frontend.md](../frontend.md), [tui.md](../tui.md) and [shell.md](../shell.md).
+owns the author API and [integrations.md](../integrations.md) the DSN connection. Runtime-specific
+details live in [frontend.md](../frontend.md), [tui.md](../tui.md) and [shell.md](../shell.md).

@@ -73,12 +73,11 @@ describe('descriptor source row parsing', () => {
   })
 })
 
-// The whole of phase 5's chrome half, from the frame to the revision a descriptor read watches.
+// The chrome half of the `term:status` split, from the frame to the revision a descriptor read watches.
 //
 // The amplifier this pins closed: `term:status` used to be one content-free ping that a terminal
 // emitted on every idle-to-working edge, and the chrome sweep answered it by refetching every plugin's
-// rail rows, badges and collections on every connected client
-// (docs/performance.md § 2026-09-03 — phase 5).
+// rail rows, badges and collections on every connected client.
 describe('chrome freshness hears only what names it', () => {
   const emit: ((nodeId: string, frame: unknown) => void)[] = []
 

@@ -184,8 +184,7 @@ describe('TerminalDisplay', () => {
   })
 })
 
-// Phase 6 of the performance programme: the emulator is a consequence of attachment
-// (docs/performance.md § 2026-09-03 — phase 6).
+// The emulator is a consequence of attachment (docs/terminal.md § The screen, and who pays for it).
 describe('TerminalDisplay emulates only while somebody is watching', () => {
   it('builds no emulator for a session nobody has attached to', () => {
     let built = 0

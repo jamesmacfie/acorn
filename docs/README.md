@@ -91,7 +91,6 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, and the environment. |
 | [testing.md](./testing.md) | Where tests live, the tiers, the testkit, and the manual smoke checklist. |
-| [performance.md](./performance.md) | The record of the performance programme: what was decided about the shape of the system, what was refused and on what exit condition, and every number it measured. |
 | [telemetry.md](./telemetry.md) | The five record kinds, the switch, the collector, the scrubber, and what a sink can see. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
@@ -169,12 +168,3 @@ The owning reference pages describe current contracts.
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)
 - [The node half](./plugin-authoring/the-node-half.md)
-
-### Performance archive
-
-- [2026-09-03 — phase 10, the re-measurement](./performance/2026-09-03--phase-10-the-re-measurement.md)
-- [2026-09-03 — phase 2](./performance/2026-09-03--phase-2.md)
-- [2026-09-03 — phase 5](./performance/2026-09-03--phase-5.md)
-- [2026-09-03 — phase 8](./performance/2026-09-03--phase-8.md)
-- [Added 2026-09-03](./performance/added-2026-09-03.md)
-- [What was measured this time](./performance/what-was-measured-this-time.md)

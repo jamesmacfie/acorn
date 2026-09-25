@@ -137,7 +137,7 @@ describe('check-renderer-budget', () => {
 
   it('fails on the highlighter, which is the chunk this check was written for', () => {
     // Phase 0 allowed this one and reported it; phase 1 took it out of the startup list and deleted
-    // the allowance, so it fails the build outright now (docs/performance.md).
+    // the allowance, so it fails the build outright now.
     direct('shiki-eeee.js')
     const { code, output } = run(dir)
     expect(code).toBe(1)

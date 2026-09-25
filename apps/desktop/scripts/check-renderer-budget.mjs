@@ -49,8 +49,7 @@ const limits = {
 const STARTUP_IMPORTS = ['src/client/index.tsx']
 
 // Name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy surface
-// that leaked into the eager graph through a registry holding values instead of loaders
-// (docs/performance.md § Registries hold loaders).
+// that leaked into the eager graph through a registry holding values instead of loaders.
 //
 // A prefix is tested against each startup chunk's file name and against every source module inside
 // those chunks: each folder on its path, so a package folder such as `shiki` counts, and its file

@@ -258,7 +258,7 @@ const TRACK = '│'
  * which is the honest answer: the data in it is different.
  *
  * The array is kept as well as the objects, so a render where nothing moved hands `<For>` the list it
- * already has (docs/performance.md § 2026-09-03 — phase 9).
+ * already has.
  */
 export function keyedRows<T, R extends CollectionItem>(
   items: () => readonly T[],

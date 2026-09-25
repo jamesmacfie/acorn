@@ -26,7 +26,7 @@ const log = createLogger('service-host')
 // The shell drives boot order: build the helper, register whatever the renderer talks to, then
 // `bootComplete()`, then start the node. The desktop starts it with `startInBackground()` so the
 // window opens on the helper listening rather than on the node being up
-// (docs/performance.md § Every host draws first). A host that has a reason to wait
+// (docs/shell.md § The shell process). A host that has a reason to wait
 // still awaits `start()`, and until `bootComplete()` an unexpected exit is a failed boot rather than
 // a crash to recover from.
 

@@ -974,8 +974,7 @@ describe('focus regions', () => {
 // ── What a key press costs ────────────────────────────────────────────────────────────────────
 //
 // The model's answers are the same whether the store scans arrays or reads maps, which is what every
-// case above is about. This is the other half: how much of the tree a move has to look at
-// (docs/performance.md § 2026-09-03 — phase 9).
+// case above is about. This is the other half: how much of the tree a move has to look at.
 
 describe('a key press costs the depth of the tree', () => {
   beforeEach(fresh)

@@ -327,8 +327,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           Every open session gets a surface and all but one is hidden. This used to mount the active
           tab alone, keyed on its id, so each switch threw away an xterm and its WebGL context, asked
           the node to serialize a thousand-line framebuffer, shipped it as one frame and parsed it into
-          a fresh emulator — for the most common thing anyone does in this drawer
-          (docs/performance.md). A hidden xterm stays attached and stays
+          a fresh emulator — for the most common thing anyone does in this drawer.
+          A hidden xterm stays attached and stays
           current, so a switch is a repaint. What it costs is one xterm per open tab, which is what a
           terminal application spends.
 

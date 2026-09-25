@@ -177,9 +177,8 @@ would mint a series per call. The owner answers the question the histogram is fo
 carried by the span and the error beside it.
 
 Off, the store is never entered: `runWithTelemetry` reads the switch first and calls straight
-through. On, entering it costs about 0.3 microseconds per request, measured on 2026-09-11 and
-recorded in [performance.md](./performance.md) § 2026-09-11. Reading it costs about 8 nanoseconds,
-which is why a SQL statement can afford to ask per call.
+through. On, entering it costs about 0.3 microseconds per request, measured on 2026-09-11.
+Reading it costs about 8 nanoseconds, which is why a SQL statement can afford to ask per call.
 
 The renderer has no equivalent and gets none. It has no `AsyncLocalStorage`, and its interaction
 trace is a module variable for the reasons § One trace per interaction gives.
